@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "meta": {
+    "libraryCode": "corporate-professional",
+    "stylePreset": "corporate"
+  },
+  "front": [
+    {
+      "id": "headerBand",
+      "type": "field",
+      "fieldKey": "headerBand",
+      "x": 0,
+      "y": 0,
+      "width": 53.98,
+      "height": 12,
+      "zIndex": 0,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "logo",
+      "type": "field",
+      "fieldKey": "logo",
+      "x": 2,
+      "y": 1.5,
+      "width": 8,
+      "height": 7,
+      "zIndex": 2,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "collegeName",
+      "type": "field",
+      "fieldKey": "collegeName",
+      "x": 11,
+      "y": 2,
+      "width": 41,
+      "height": 5,
+      "zIndex": 3,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "collegeAddress",
+      "type": "field",
+      "fieldKey": "collegeAddress",
+      "x": 11,
+      "y": 7,
+      "width": 41,
+      "height": 4,
+      "zIndex": 3,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "photo",
+      "type": "field",
+      "fieldKey": "photo",
+      "x": 3,
+      "y": 14,
+      "width": 16,
+      "height": 28,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "name",
+      "type": "field",
+      "fieldKey": "name",
+      "x": 21,
+      "y": 16,
+      "width": 30,
+      "height": 7,
+      "zIndex": 5,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "roleLabel",
+      "type": "field",
+      "fieldKey": "roleLabel",
+      "x": 21,
+      "y": 23,
+      "width": 30,
+      "height": 3.5,
+      "zIndex": 5,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "employeeId",
+      "type": "field",
+      "fieldKey": "employeeId",
+      "x": 21,
+      "y": 28,
+      "width": 30,
+      "height": 4,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "designation",
+      "type": "field",
+      "fieldKey": "designation",
+      "x": 21,
+      "y": 33,
+      "width": 30,
+      "height": 4,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "department",
+      "type": "field",
+      "fieldKey": "department",
+      "x": 21,
+      "y": 38,
+      "width": 30,
+      "height": 4,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "bloodGroup",
+      "type": "field",
+      "fieldKey": "bloodGroup",
+      "x": 21,
+      "y": 43,
+      "width": 30,
+      "height": 4,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "qr",
+      "type": "field",
+      "fieldKey": "qr",
+      "x": 21,
+      "y": 49,
+      "width": 14,
+      "height": 14,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "validity",
+      "type": "field",
+      "fieldKey": "validity",
+      "x": 36,
+      "y": 49,
+      "width": 15,
+      "height": 5,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "center" }
+    }
+  ],
+  "back": [
+    {
+      "id": "headerBand",
+      "type": "field",
+      "fieldKey": "headerBand",
+      "x": 0,
+      "y": 0,
+      "width": 53.98,
+      "height": 7,
+      "zIndex": 0,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "barcode",
+      "type": "field",
+      "fieldKey": "barcode",
+      "x": 4,
+      "y": 10,
+      "width": 46,
+      "height": 7,
+      "zIndex": 3,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "address",
+      "type": "field",
+      "fieldKey": "address",
+      "x": 3,
+      "y": 19,
+      "width": 48,
+      "height": 10,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "emergencyContact",
+      "type": "field",
+      "fieldKey": "emergencyContact",
+      "x": 3,
+      "y": 30,
+      "width": 48,
+      "height": 5,
+      "zIndex": 5,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "verificationInfo",
+      "type": "field",
+      "fieldKey": "verificationInfo",
+      "x": 3,
+      "y": 36,
+      "width": 48,
+      "height": 6,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "terms",
+      "type": "field",
+      "fieldKey": "terms",
+      "x": 3,
+      "y": 43,
+      "width": 48,
+      "height": 14,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "validityFooter",
+      "type": "field",
+      "fieldKey": "validityFooter",
+      "x": 0,
+      "y": 80,
+      "width": 53.98,
+      "height": 5.6,
+      "zIndex": 8,
+      "style": { "visible": true, "align": "left" }
+    }
+  ]
+}

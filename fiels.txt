@@ -1,0 +1,63 @@
+Application Number
+Photo	
+Full Name	
+Email	
+Mobile Number	
+Date of Birth	
+Gender	
+Shift
+Major Subject	
+Minor Subject	
+MDC Choice	
+AEC	
+SEC	
+VAC		
+Marital Status	
+Blood Group	
+Category	
+Race/Tribe	
+Religion	
+Denomination	
+Class XII Board	
+Class XII Stream	
+Differently Abled	
+Economically Weaker	
+Address in Tura	
+Same as Tura (Check box)
+Home Address		
+Aadhaar Number	
+State	
+Father Name	
+Father Age	
+Father Occupation	
+Father Contact	
+Mother Name	
+Mother Age	
+Mother Occupation	
+Mother Contact	
+Local Guardian Name	
+Local Guardian Age	
+Local Guardian Occupation	
+Local Guardian Contact	
+Household Area Type	
+Board Roll Number	
+Board Year	
+Board Total Marks	
+Board Percentage	
+Board Division	
+Board Name	
+Board Registration Type	
+Class XII Marks (Minimum 5 Subjects)
+CUET Applied	
+CUET Roll Number	
+Last Institution Attended	
+ECO-100	Microeconomics I
+GEO-100	Introduction to Human Geography
+
+
+
+
+Can we implement Admin module so that from there we can create portal users like Admin , Students, Teaching Staff, Non teaching staff, Students and other important modules we can keep there like above sample image ?
+
+
+For this academic year admission is closed now i have the current year 1st semester student data with me in excel format as well as the previous semester students details also i have with me 

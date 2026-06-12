@@ -1,0 +1,73 @@
+/* Certificate dedicated print document — import on /admin/certificates/print only */
+
+body.certificate-print-mode {
+  background: #fff;
+  color: #111;
+}
+
+.certificate-print-shell {
+  min-height: 100vh;
+  background: #e5e7eb;
+  padding: 1rem;
+}
+
+.certificate-print-toolbar {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.certificate-print-document {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 10%);
+}
+
+.certificate-print-loading {
+  max-width: 900px;
+  margin: 2rem auto;
+  text-align: center;
+  color: #475569;
+  font-size: 0.875rem;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 7mm;
+  }
+
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.certificate-print-mode {
+    background: #fff;
+  }
+
+  .certificate-print-shell {
+    padding: 0;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .certificate-print-document {
+    box-shadow: none;
+    max-width: none;
+    margin: 0;
+  }
+
+  .certificate-print-document .dbc-tc {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

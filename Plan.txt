@@ -1,0 +1,1196 @@
+
+
+npm run dev:free-ports
+npm run dev
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Suggested immediate pick (one sprint)
+“Admissions + student enrollment MVP” — it unlocks demos, NAAC-style data, and everything else (attendance, fees, results).
+
+If you tell me which track you want first, I can implement it next:
+
+Organization setup UI (complete admin config)
+Admissions + students
+Attendance + timetable
+Fees + payments
+OBE/ABC dashboards (compliance-focused)
+
+
+
+You are a senior enterprise software architect and full-stack ERP engineer.
+
+Your task is to design and develop a modern, scalable, cloud-native, SaaS-based College ERP platform fully aligned with India’s NEP-2020 (National Education Policy 2020).
+
+==================================================
+PROJECT VISION
+==================================================
+
+Build an enterprise-grade University/College ERP platform capable of serving:
+
+- Universities
+- Autonomous institutions
+- Engineering colleges
+- Medical colleges
+- Multi-campus institutions
+- Private education groups
+- Government institutions
+
+The platform must support:
+- NEP-2020
+- CBCS
+- Outcome-Based Education (OBE)
+- Academic Bank of Credits (ABC)
+- Multiple Entry/Exit
+- Major/Minor programs
+- Skill enhancement courses
+- Interdisciplinary learning
+- AICTE/UGC/NAAC/NBA compliance
+- SaaS multi-tenant architecture
+
+==================================================
+TECH STACK
+==================================================
+
+Frontend:
+- Next.js (latest stable version)
+- React
+- TypeScript
+- Tailwind CSS
+- Shadcn UI
+- TanStack Query
+- Zustand
+- React Hook Form
+- Zod validation
+- Axios
+
+Backend:
+- NestJS
+- TypeScript
+- REST API architecture
+- Modular Monolith Architecture
+- JWT Authentication
+- RBAC
+- Socket.IO
+
+Database:
+- PostgreSQL
+
+ORM:
+- Prisma ORM
+
+Caching & Queue:
+- Redis
+
+Storage:
+- AWS S3 or Cloudflare R2
+
+DevOps:
+- Docker
+- Docker Compose
+- GitHub Actions
+- Nginx
+- CI/CD pipelines
+
+Deployment:
+- AWS / Azure / DigitalOcean
+
+Future Mobile Support:
+- React Native
+
+==================================================
+ARCHITECTURE REQUIREMENTS
+==================================================
+
+Use:
+- Clean Architecture
+- SOLID Principles
+- Domain-Driven Design
+- Feature-based modular structure
+- Enterprise-grade security
+- API versioning
+- Environment-based configuration
+- Scalable SaaS architecture
+
+DO NOT use:
+- MongoDB
+- PHP
+- jQuery
+- Tight coupling
+- Spaghetti architecture
+
+==================================================
+SYSTEM MODULES
+==================================================
+
+--------------------------------------------------
+1. ORGANIZATION SETUP
+--------------------------------------------------
+
+Features:
+- Institution profile
+- Campus setup
+- Department setup
+- Academic year setup
+- Semester setup
+- CBCS configuration
+- NEP policy configuration
+- Credit system configuration
+- Multi-campus support
+
+--------------------------------------------------
+2. AUTHENTICATION & AUTHORIZATION
+--------------------------------------------------
+
+Features:
+- JWT authentication
+- Refresh tokens
+- RBAC
+- Permission management
+- Session management
+- Password reset
+- Email verification
+- Audit logs
+- Multi-role login
+- OAuth-ready architecture
+
+Roles:
+- Super Admin
+- University Admin
+- College Admin
+- Faculty
+- Student
+- Parent
+- Accountant
+- Librarian
+- Hostel Admin
+- Transport Admin
+
+--------------------------------------------------
+3. ADMISSIONS MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Online admissions
+- Application workflows
+- Merit list generation
+- Counseling workflows
+- Seat allocation
+- Document verification
+- Admission approvals
+- Entrance exam support
+- Fee payment integration
+
+--------------------------------------------------
+4. STUDENT MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Student profiles
+- Enrollment management
+- Student lifecycle tracking
+- Document uploads
+- Student history
+- Identity cards
+- Migration certificates
+- Transfer certificates
+- Student analytics
+
+--------------------------------------------------
+5. STUDENT PORTAL & MOBILE APP
+--------------------------------------------------
+
+Features:
+- Attendance
+- Timetable
+- Results
+- Assignments
+- LMS access
+- Notifications
+- Fee payment
+- Leave requests
+- Certificates
+- Academic progression
+
+--------------------------------------------------
+6. PROGRAMS & COURSES MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Programs
+- Degrees
+- Departments
+- Subjects
+- Electives
+- Open electives
+- Major/minor structures
+- CBCS support
+- Skill enhancement courses
+- Curriculum mapping
+- Credits management
+
+--------------------------------------------------
+7. ACADEMIC MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Semesters
+- Academic sessions
+- Subject allocation
+- Faculty allocation
+- Batch management
+- Section management
+- Course registration
+- Credit assignment
+
+--------------------------------------------------
+8. NEP-2020 MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Academic Bank of Credits
+- Credit transfer
+- Multiple entry/exit
+- Flexible curriculum
+- Interdisciplinary course mapping
+- Degree progression tracking
+- Skill-based learning
+- National credit portability
+
+--------------------------------------------------
+9. OUTCOME-BASED EDUCATION (OBE)
+--------------------------------------------------
+
+Features:
+- CO-PO mapping
+- NBA compliance
+- Outcome attainment
+- Bloom taxonomy
+- Program outcome analytics
+- Course outcome tracking
+
+--------------------------------------------------
+10. TIMETABLE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Automatic timetable generation
+- Faculty allocation
+- Classroom allocation
+- Conflict detection
+- Semester scheduling
+- Dynamic updates
+
+--------------------------------------------------
+11. CALENDAR MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Academic calendar
+- Holiday management
+- Event management
+- Examination schedules
+- Semester schedules
+
+--------------------------------------------------
+12. STUDENT ATTENDANCE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Daily attendance
+- QR attendance
+- RFID-ready architecture
+- Biometric integration support
+- Attendance analytics
+- Defaulter reports
+- SMS alerts
+
+--------------------------------------------------
+13. ASSIGNMENT MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Assignment creation
+- Submission workflows
+- Faculty review
+- Evaluation
+- Deadlines
+- Grading
+
+--------------------------------------------------
+14. TASK MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Workflow tasks
+- Approval systems
+- Employee task assignment
+- Internal process tracking
+
+--------------------------------------------------
+15. EXAMINATION & MARKSHEET MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Internal exams
+- External exams
+- Hall tickets
+- Mark entry
+- GPA/CGPA
+- Grade systems
+- Result processing
+- Revaluation
+- Grace marks
+- Backlogs
+- Transcript generation
+- Marksheet generation
+
+--------------------------------------------------
+16. COMPLETION MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Degree completion tracking
+- Credit completion tracking
+- Graduation eligibility
+- Exit management
+- Degree progression
+
+--------------------------------------------------
+17. FEE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Fee structures
+- Installments
+- Online payments
+- Scholarships
+- Refunds
+- Due tracking
+- Financial reports
+- Payment gateway integration
+
+--------------------------------------------------
+18. SCHOLARSHIP & SPONSORSHIP MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Scholarship eligibility
+- Government schemes
+- Sponsor tracking
+- Financial aid workflows
+
+--------------------------------------------------
+19. FACULTY MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Faculty profiles
+- Workload management
+- Attendance
+- Timetable allocation
+- Leave management
+- Research tracking
+- API score tracking
+
+--------------------------------------------------
+20. COMMITTEE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Academic committees
+- NAAC committees
+- Event committees
+- Role assignments
+
+--------------------------------------------------
+21. DISCIPLINE MODULE
+--------------------------------------------------
+
+Features:
+- Disciplinary actions
+- Violations tracking
+- Warnings
+- Parent notifications
+
+--------------------------------------------------
+22. GRIEVANCE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Complaint submission
+- Escalation workflows
+- Tracking
+- Resolution management
+
+--------------------------------------------------
+23. FRONT DESK MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Visitor management
+- Inquiry handling
+- Reception workflows
+- Student support desk
+
+--------------------------------------------------
+24. CAMPAIGNS & ENQUIRIES MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Lead tracking
+- Admission campaigns
+- CRM workflows
+- Counseling tracking
+
+--------------------------------------------------
+25. FILE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Document repository
+- Cloud storage
+- Student documents
+- Faculty documents
+- Versioning support
+
+--------------------------------------------------
+26. CERTIFICATES & DOCUMENT MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Bonafide certificates
+- Transfer certificates
+- Degree certificates
+- Migration certificates
+- QR verification
+- Digital signatures
+
+--------------------------------------------------
+27. LIBRARY MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Book inventory
+- Barcode support
+- Issue/return
+- Fine calculations
+- Digital library support
+
+--------------------------------------------------
+28. HOSTEL MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Room allocation
+- Hostel attendance
+- Visitor tracking
+- Mess management
+- Hostel fee tracking
+
+--------------------------------------------------
+29. TRANSPORT MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Bus routes
+- GPS-ready architecture
+- Driver management
+- Vehicle tracking
+- Transport fee tracking
+
+--------------------------------------------------
+30. RESOURCE BOOKING MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Lab booking
+- Auditorium booking
+- Equipment reservation
+- Sports facility booking
+
+--------------------------------------------------
+31. SECURITY GATE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- RFID integration
+- Visitor entry
+- Vehicle tracking
+- Entry/exit logs
+
+--------------------------------------------------
+32. MEDICAL CARE MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Student medical records
+- Health center workflows
+- Emergency tracking
+- Medical leave management
+
+--------------------------------------------------
+33. PLACEMENT MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Company drives
+- Eligibility management
+- Resume management
+- Interview scheduling
+- Placement analytics
+
+--------------------------------------------------
+34. THESIS MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Research tracking
+- Guide allocation
+- Submission workflows
+- Plagiarism-ready architecture
+
+--------------------------------------------------
+35. ELECTIONS MANAGEMENT
+--------------------------------------------------
+
+Features:
+- Student elections
+- Voting workflows
+- Nomination systems
+
+--------------------------------------------------
+36. MESSAGING & NOTIFICATIONS
+--------------------------------------------------
+
+Features:
+- SMS integration
+- Email integration
+- Push notifications
+- WhatsApp-ready architecture
+- In-app notifications
+- Real-time messaging
+
+--------------------------------------------------
+37. ANALYTICS & REPORTS
+--------------------------------------------------
+
+Features:
+- KPI dashboards
+- Student analytics
+- Financial analytics
+- Attendance analytics
+- NAAC reports
+- NBA reports
+- AICTE reports
+- UGC reports
+- Export to PDF/Excel
+
+--------------------------------------------------
+38. SYSTEM ADMINISTRATION
+--------------------------------------------------
+
+Features:
+- RBAC
+- Permission control
+- Audit logs
+- Tenant management
+- Feature toggles
+- Configurations
+- System monitoring
+
+--------------------------------------------------
+39. AI & AUTOMATION LAYER
+--------------------------------------------------
+
+Future-ready architecture for:
+- AI chatbot
+- Predictive analytics
+- Student risk prediction
+- Smart timetable optimization
+- Attendance risk analysis
+- AI-generated reports
+
+==================================================
+DATABASE REQUIREMENTS
+==================================================
+
+Use PostgreSQL relational database design.
+
+Requirements:
+- UUID primary keys
+- Foreign keys
+- Transactions
+- Soft deletes
+- Audit columns
+- Proper normalization
+- Index optimization
+- Migration support
+
+Create schemas for:
+- Users
+- Roles
+- Permissions
+- Students
+- Faculty
+- Departments
+- Courses
+- Credits
+- Attendance
+- Exams
+- Results
+- Fees
+- Scholarships
+- Notifications
+- Timetables
+- Placements
+- Hostel
+- Transport
+- OBE
+- ABC credits
+
+==================================================
+BACKEND REQUIREMENTS
+==================================================
+
+Use NestJS modules:
+- auth
+- users
+- students
+- faculty
+- admissions
+- academics
+- attendance
+- timetable
+- examinations
+- fees
+- placements
+- hostel
+- transport
+- notifications
+- reports
+- obe
+- abc
+- grievances
+- library
+
+Requirements:
+- DTO validation
+- Swagger documentation
+- Exception filters
+- Guards
+- Interceptors
+- Logging
+- Rate limiting
+- Pagination
+- Filtering
+- Search APIs
+
+==================================================
+FRONTEND REQUIREMENTS
+==================================================
+
+Build responsive dashboards for:
+- Super Admin
+- Institution Admin
+- Faculty
+- Student
+- Parent
+- Accountant
+- Librarian
+
+Requirements:
+- Mobile responsive UI
+- Dark/light mode
+- Reusable components
+- Data tables
+- Charts and analytics
+- Form validation
+- Lazy loading
+- Optimized performance
+
+Pages:
+- Login
+- Dashboard
+- Admissions
+- Attendance
+- Fees
+- Results
+- Timetable
+- LMS
+- Reports
+- Notifications
+- Placements
+- Hostel
+- Library
+
+==================================================
+SECURITY REQUIREMENTS
+==================================================
+
+Implement:
+- JWT auth
+- Refresh token rotation
+- Password hashing
+- CSRF protection
+- SQL injection prevention
+- XSS prevention
+- API throttling
+- Secure headers
+- Audit logging
+
+==================================================
+REAL-TIME FEATURES
+==================================================
+
+Use Socket.IO for:
+- Live notifications
+- Attendance updates
+- Chat system
+- Exam alerts
+- Real-time announcements
+
+==================================================
+DEVOPS REQUIREMENTS
+==================================================
+
+Provide:
+- Docker setup
+- Docker Compose
+- CI/CD pipelines
+- Production deployment
+- Nginx configs
+- Environment configuration
+
+==================================================
+CODING STANDARDS
+==================================================
+
+Use:
+- TypeScript strict mode
+- ESLint
+- Prettier
+- Husky hooks
+- Conventional commits
+
+==================================================
+FOLDER STRUCTURE REQUIREMENTS
+==================================================
+
+Frontend:
+- app/
+- components/
+- modules/
+- hooks/
+- services/
+- store/
+- utils/
+- types/
+
+Backend:
+- src/modules/
+- src/common/
+- src/config/
+- src/database/
+- src/shared/
+
+==================================================
+EXPECTED OUTPUT
+==================================================
+
+Generate:
+1. Full system architecture
+2. Module architecture
+3. Database schema
+4. Prisma schema
+5. REST API structure
+6. Authentication flow
+7. ER diagrams
+8. RBAC structure
+9. SaaS multi-tenant design
+10. Deployment architecture
+11. Docker configuration
+12. CI/CD workflow
+13. Folder structure
+14. UI architecture
+15. API documentation
+16. Scalable production-ready architecture
+
+==================================================
+GOAL
+==================================================
+
+Create a modern, scalable, enterprise-grade, SaaS-ready College ERP platform aligned with NEP-2020 standards capable of serving thousands of institutions with high scalability, security, modularity, and future AI integration support.
+
+
+
+
+==================================================
+NEW REQUIREMENT — SHIFT-BASED CAMPUS OPERATIONS
+==================================================
+
+IMPORTANT:
+The institution operates using MULTIPLE SHIFTS.
+
+The ERP architecture MUST support:
+- Shift-based academic operations
+- Shift-wise administration
+- Shift-specific controls
+- Shift-wise timetable management
+- Shift-wise student management
+- Shift-based access control
+
+==================================================
+COLLEGE SHIFT STRUCTURE
+==================================================
+
+The college has 3 operational shifts:
+
+1. Morning Shift
+   Timing:
+   06:30 AM – 09:30 AM
+
+2. Day Shift
+   Timing:
+   09:45 AM – 03:30 PM
+
+3. Evening Shift
+   Timing:
+   02:45 PM – 05:45 PM
+
+==================================================
+SHIFT-BASED ERP ARCHITECTURE
+==================================================
+
+The ERP must treat shifts as:
+- Independent operational academic units
+- Configurable institutional entities
+- Academic scheduling boundaries
+
+Each shift may have:
+- Separate administration
+- Separate timetable
+- Separate classrooms
+- Separate faculty allocation
+- Separate attendance
+- Separate student batches
+- Separate operations
+
+==================================================
+NEW CORE ENTITY — SHIFTS
+==================================================
+
+Create a centralized Shift Management System.
+
+Database Entity:
+- shifts
+
+Fields:
+- id
+- institution_id
+- campus_id
+- shift_name
+- shift_code
+- start_time
+- end_time
+- shift_type
+- status
+- created_by
+- created_at
+
+Examples:
+- MORNING
+- DAY
+- EVENING
+
+==================================================
+SHIFT-BASED RBAC (VERY IMPORTANT)
+==================================================
+
+The ERP must support:
+- Shift-wise administrators
+- Shift-level permissions
+- Shift-restricted access
+
+Examples:
+- Morning Shift Admin can only manage morning students
+- Evening Shift Faculty can only access evening classes
+- Day Shift timetable manager only controls day shift schedules
+
+==================================================
+NEW ROLES
+==================================================
+
+Add:
+- Shift Admin
+- Shift Academic Coordinator
+- Shift Attendance Manager
+- Shift Examination Coordinator
+
+==================================================
+SHIFT-BASED ACCESS CONTROL
+==================================================
+
+Every major module must support:
+- shift_id filtering
+- shift-level permissions
+- shift-based data isolation
+
+IMPORTANT:
+Users should ONLY see:
+- Their assigned shift data
+- Their assigned timetable
+- Their assigned students
+- Their assigned classes
+
+==================================================
+SHIFT-BASED STUDENT MANAGEMENT
+==================================================
+
+Each student must belong to:
+- Institution
+- Campus
+- Department
+- Programme
+- Shift
+
+Examples:
+- BSc CS Morning Shift
+- BCom Day Shift
+- BA English Evening Shift
+
+ERP MUST support:
+- Shift-wise enrollment
+- Shift migration
+- Shift transfer workflows
+
+==================================================
+SHIFT-BASED ADMISSION SYSTEM
+==================================================
+
+Admission forms must include:
+- Shift selection
+- Shift seat availability
+- Shift-wise intake capacity
+
+Seat allocation must validate:
+- Programme seats
+- Shift seats
+- Category quota
+- Shift-specific intake
+
+==================================================
+SHIFT-BASED COURSE REGISTRATION
+==================================================
+
+Course registration must support:
+- Shift-wise course offerings
+- Shift-wise seat matrix
+- Shift-specific sections
+- Shift timetable mapping
+
+Examples:
+- Python Programming (Morning Shift)
+- Python Programming (Evening Shift)
+
+==================================================
+SHIFT-BASED TIMETABLE ENGINE
+==================================================
+
+VERY IMPORTANT:
+Timetable engine must be shift-aware.
+
+Timetable generation must validate:
+- Shift timings
+- Faculty availability
+- Classroom availability
+- Cross-shift conflicts
+
+Example:
+A faculty teaching in Morning Shift:
+- Should not get conflicting Day Shift schedules
+
+==================================================
+SHIFT-BASED ATTENDANCE
+==================================================
+
+Attendance must support:
+- Shift-wise sessions
+- Shift-wise attendance analytics
+- Shift-specific QR attendance
+- Shift-based biometric logs
+
+==================================================
+SHIFT-BASED EXAMINATION ENGINE
+==================================================
+
+Examinations must support:
+- Shift-wise exam schedules
+- Shift-wise hall allocation
+- Shift-specific invigilators
+- Shift-wise result analysis
+
+==================================================
+SHIFT-BASED REPORTS & ANALYTICS
+==================================================
+
+Generate:
+- Shift-wise student count
+- Shift-wise attendance reports
+- Shift-wise fee reports
+- Shift-wise faculty load
+- Shift-wise academic performance
+- Shift-wise timetable utilization
+
+==================================================
+SHIFT-BASED DASHBOARD
+==================================================
+
+Admin dashboard must support:
+- Shift filters
+- Shift analytics
+- Shift KPIs
+- Shift comparison charts
+
+Example:
+Morning Shift:
+- 1200 students
+- 94% attendance
+
+Day Shift:
+- 1800 students
+- 89% attendance
+
+==================================================
+SHIFT-BASED DATABASE DESIGN
+==================================================
+
+Add shift_id to major entities:
+
+- users
+- student_profiles
+- faculty_profiles
+- admissions
+- semester_registrations
+- course_enrollments
+- timetable_entries
+- attendance_records
+- examination_schedules
+- classrooms
+- fee_structures
+
+==================================================
+SHIFT-BASED NOTIFICATIONS
+==================================================
+
+Notifications must support:
+- Shift-targeted announcements
+- Shift-specific alerts
+- Shift-wise scheduling
+
+==================================================
+SHIFT-BASED CLASSROOM MANAGEMENT
+==================================================
+
+Classrooms may be reused across shifts.
+
+ERP must support:
+- Morning allocation
+- Day allocation
+- Evening allocation
+
+Without conflicts.
+
+==================================================
+SHIFT-BASED FACULTY WORKLOAD
+==================================================
+
+Faculty may teach:
+- Single shift
+OR
+- Multiple shifts
+
+ERP must track:
+- Total teaching hours
+- Cross-shift workloads
+- Faculty availability
+
+==================================================
+SHIFT-BASED FEES
+==================================================
+
+Support:
+- Shift-specific fee structures
+- Shift-wise scholarships
+- Shift-based fee concessions
+
+==================================================
+SHIFT-BASED AI FEATURES (FUTURE)
+==================================================
+
+AI layer should support:
+- Shift optimization
+- Shift load balancing
+- Shift attendance prediction
+- Classroom utilization prediction
+
+==================================================
+IMPORTANT ARCHITECTURAL RULE
+==================================================
+
+Treat SHIFTS as a CORE ERP ENTITY.
+
+NOT:
+- Simple labels
+- Static dropdowns
+
+Instead:
+- Operational academic units
+- Scheduling boundaries
+- Permission boundaries
+- Reporting dimensions
+
+==================================================
+FINAL GOAL
+==================================================
+
+The ERP must fully support:
+- Multi-shift college operations
+- Independent shift administration
+- Shift-wise academics
+- Shift-wise scheduling
+- Shift-wise analytics
+- Shift-wise governance
+
+While maintaining:
+- Shared institutional infrastructure
+- Unified academic engine
+- Centralized ERP architecture

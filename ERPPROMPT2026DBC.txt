@@ -1,0 +1,452 @@
+You are a senior enterprise software architect and full-stack ERP engineer.
+
+Your task is to design and develop a modern, scalable, cloud-native College ERP system that fully supports India’s NEP-2020 (National Education Policy 2020) framework.
+
+==================================================
+PROJECT OVERVIEW
+==================================================
+
+Build a SaaS-based College ERP platform for:
+- Colleges
+- Universities
+- Autonomous Institutions
+- Multi-campus institutions
+
+The system must support:
+- CBCS (Choice Based Credit System)
+- Academic Bank of Credits (ABC)
+- Multidisciplinary programs
+- Major/Minor degree structures
+- Multiple entry/exit
+- Skill-based courses
+- Credit transfer
+- Outcome-based education
+- NAAC/NBA reporting
+- AICTE/UGC compliance
+- Role-based portals
+- Multi-tenant architecture
+
+==================================================
+TECH STACK
+==================================================
+
+Frontend:
+- Next.js (latest stable version)
+- React
+- TypeScript
+- Tailwind CSS
+- Shadcn UI
+- React Query / TanStack Query
+- Zustand for state management
+- React Hook Form + Zod validation
+- Axios
+
+Backend:
+- NestJS
+- TypeScript
+- REST API architecture
+- Modular Monolith Architecture
+- JWT Authentication
+- RBAC (Role-Based Access Control)
+- Socket.IO for real-time features
+
+Database:
+- PostgreSQL
+
+ORM:
+- Prisma ORM
+
+Caching & Queue:
+- Redis
+
+Storage:
+- AWS S3 or Cloudflare R2
+
+DevOps:
+- Docker
+- Docker Compose
+- GitHub Actions CI/CD
+- Nginx Reverse Proxy
+
+Deployment:
+- AWS EC2 / ECS / DigitalOcean
+
+Mobile:
+- React Native (future support)
+
+==================================================
+ARCHITECTURE REQUIREMENTS
+==================================================
+
+Use:
+- Clean Architecture
+- SOLID Principles
+- Feature-based modular structure
+- Domain-driven design concepts
+- Scalable codebase
+- API versioning
+- Environment-based configuration
+- Enterprise-grade security
+
+DO NOT use:
+- Monolithic spaghetti architecture
+- MongoDB
+- jQuery
+- PHP
+- Tight coupling
+- Large unoptimized SQL queries
+
+==================================================
+CORE MODULES
+==================================================
+
+1. Authentication & Authorization
+- JWT auth
+- Refresh tokens
+- Multi-role login
+- RBAC
+- Permission management
+- Session handling
+- Password reset
+- Email verification
+- Audit logs
+
+2. Student Management
+- Student profiles
+- Admission workflows
+- Document uploads
+- Enrollment management
+- Student history
+- Identity cards
+- Migration certificates
+- Transfer certificates
+
+3. Academic Management
+- Programs
+- Departments
+- Courses
+- Subjects
+- Credits
+- Semesters
+- Curriculum management
+- Major/Minor structures
+- CBCS support
+- Electives
+- Open electives
+- Skill enhancement courses
+
+4. NEP-2020 Features
+- Academic Bank of Credits
+- Credit transfer
+- Multiple entry/exit
+- Degree progression tracking
+- Flexible curriculum
+- Interdisciplinary course mapping
+- Outcome-based education tracking
+
+5. Faculty Management
+- Faculty profiles
+- Workload management
+- Attendance
+- Timetable assignment
+- Leave management
+- Research tracking
+- API score tracking
+
+6. Attendance Management
+- Daily attendance
+- Biometric integration ready
+- QR attendance ready
+- SMS alerts
+- Percentage calculations
+- Defaulter reports
+
+7. Timetable Management
+- Automatic timetable generation
+- Conflict detection
+- Classroom allocation
+- Faculty allocation
+
+8. Examination Management
+- Internal exams
+- Semester exams
+- Grading systems
+- GPA/CGPA calculations
+- Result publishing
+- Hall tickets
+- Revaluation workflows
+- Backlog handling
+
+9. Fee Management
+- Fee structures
+- Scholarships
+- Online payment gateway integration
+- Receipts
+- Due tracking
+- Financial reports
+
+10. Learning Management System (LMS)
+- Assignments
+- Notes
+- Course materials
+- Quizzes
+- Discussions
+- Video lecture support
+
+11. Communication Module
+- Notifications
+- SMS integration
+- Email integration
+- In-app messaging
+- Announcements
+
+12. Library Management
+- Book inventory
+- Issue/return
+- Fine calculations
+- Barcode support
+
+13. Hostel Management
+- Room allocation
+- Hostel attendance
+- Mess management
+
+14. Transport Management
+- Bus routes
+- GPS integration ready
+- Transport fee tracking
+
+15. Placement Management
+- Company drives
+- Student eligibility
+- Resume management
+- Interview scheduling
+
+16. Analytics & Reporting
+- Dashboard analytics
+- NAAC reports
+- NBA reports
+- AICTE reports
+- UGC reports
+- Export to PDF/Excel
+
+==================================================
+DATABASE REQUIREMENTS
+==================================================
+
+Use PostgreSQL relational design.
+
+Requirements:
+- Proper normalization
+- Foreign keys
+- Transactions
+- Soft deletes
+- Audit columns
+- Index optimization
+- UUID primary keys
+- Migration support
+
+Design tables for:
+- Students
+- Faculty
+- Departments
+- Courses
+- Subjects
+- Credits
+- Attendance
+- Fees
+- Exams
+- Results
+- Timetables
+- Notifications
+- Academic progression
+- ABC credits
+
+==================================================
+BACKEND REQUIREMENTS
+==================================================
+
+Use NestJS modules:
+- auth
+- users
+- students
+- faculty
+- academics
+- examinations
+- attendance
+- fees
+- timetable
+- notifications
+- reports
+
+Requirements:
+- DTO validation
+- Swagger documentation
+- Exception filters
+- Guards
+- Interceptors
+- Logging
+- Rate limiting
+- RBAC guards
+- Pagination
+- Filtering
+- Search APIs
+
+==================================================
+FRONTEND REQUIREMENTS
+==================================================
+
+Build responsive dashboards for:
+- Super Admin
+- College Admin
+- Faculty
+- Students
+- Parents
+
+Requirements:
+- Mobile responsive UI
+- Dark/light mode
+- Reusable components
+- Data tables
+- Charts and analytics
+- Form validation
+- Lazy loading
+- Optimized performance
+
+Pages:
+- Login
+- Dashboard
+- Admissions
+- Attendance
+- Fees
+- Results
+- Timetable
+- LMS
+- Reports
+- Notifications
+
+==================================================
+SECURITY REQUIREMENTS
+==================================================
+
+Implement:
+- JWT auth
+- Refresh token rotation
+- Password hashing
+- CSRF protection
+- SQL injection prevention
+- XSS prevention
+- Role-based access
+- API throttling
+- Secure headers
+- Audit logs
+
+==================================================
+REAL-TIME FEATURES
+==================================================
+
+Use Socket.IO for:
+- Live notifications
+- Attendance updates
+- Chat system
+- Real-time announcements
+- Exam alerts
+
+==================================================
+DEVOPS REQUIREMENTS
+==================================================
+
+Provide:
+- Docker setup
+- Docker Compose
+- Production-ready deployment
+- CI/CD pipeline
+- Environment configs
+- Nginx configs
+
+==================================================
+CODING STANDARDS
+==================================================
+
+Use:
+- TypeScript strict mode
+- ESLint
+- Prettier
+- Husky hooks
+- Conventional commits
+
+==================================================
+FOLDER STRUCTURE REQUIREMENTS
+==================================================
+
+Frontend:
+- app/
+- components/
+- modules/
+- services/
+- hooks/
+- store/
+- types/
+- utils/
+
+Backend:
+- src/modules/
+- src/common/
+- src/config/
+- src/database/
+- src/shared/
+
+==================================================
+EXPECTED OUTPUT
+==================================================
+
+Generate:
+1. Full system architecture
+2. Database schema design
+3. API structure
+4. Folder structure
+5. Module architecture
+6. Authentication flow
+7. ER diagrams
+8. Prisma schema
+9. REST API endpoints
+10. UI architecture
+11. Deployment architecture
+12. Docker configuration
+13. CI/CD workflow
+14. RBAC structure
+15. Multi-tenant design
+16. Scalable SaaS architecture
+
+==================================================
+IMPORTANT NOTES
+==================================================
+
+- Prioritize scalability and maintainability
+- Use enterprise-grade patterns
+- Write clean and modular code
+- Optimize database queries
+- Use reusable components
+- Ensure future microservices compatibility
+- Keep architecture cloud-ready
+- Focus on production-grade quality
+- Build APIs following REST standards
+- Support future AI integrations
+
+==================================================
+FUTURE AI FEATURES
+==================================================
+
+Architecture should support:
+- AI chatbot assistant
+- Predictive analytics
+- Student performance prediction
+- Attendance risk analysis
+- Smart timetable optimization
+- AI-generated reports
+
+==================================================
+GOAL
+==================================================
+
+Create a modern, scalable, enterprise-grade College ERP platform aligned with NEP-2020 standards that can serve thousands of institutions as a SaaS product.

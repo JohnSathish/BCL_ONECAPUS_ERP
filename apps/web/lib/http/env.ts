@@ -1,0 +1,20 @@
+/**
+ * Resolved API base URL for browser and server-side fetches.
+ * In local dev with Next rewrites, use `/api` (same-origin).
+ */
+export function getApiBaseUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'development') return '/api';
+  return 'http://localhost:3001/api';
+}
+
+export const API_BASE_URL = getApiBaseUrl();
+
+export const API_REQUEST_TIMEOUT_MS = 15_000;
+
+/** Quick in-flight retries inside the HTTP client (per attempt). */
+export const API_GET_RETRY_COUNT = 4;
+
+/** Total time login/bootstrap waits for the API to come up after restarts. */
+export const API_STARTUP_MAX_WAIT_MS = 90_000;

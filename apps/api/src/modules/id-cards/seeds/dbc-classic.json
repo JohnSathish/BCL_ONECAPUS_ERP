@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "meta": { "libraryCode": "dbc-classic", "stylePreset": "classic" },
+  "front": [
+    {
+      "id": "headerBand",
+      "type": "field",
+      "fieldKey": "headerBand",
+      "x": 0,
+      "y": 0,
+      "width": 53.98,
+      "height": 17,
+      "zIndex": 0,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "watermark",
+      "type": "field",
+      "fieldKey": "watermark",
+      "x": 0,
+      "y": 16,
+      "width": 53.98,
+      "height": 69,
+      "zIndex": 0,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "logo",
+      "type": "field",
+      "fieldKey": "logo",
+      "x": 3,
+      "y": 2,
+      "width": 9,
+      "height": 8,
+      "zIndex": 3,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "collegeName",
+      "type": "field",
+      "fieldKey": "collegeName",
+      "x": 0,
+      "y": 2,
+      "width": 53.98,
+      "height": 5.5,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "collegeAddress",
+      "type": "field",
+      "fieldKey": "collegeAddress",
+      "x": 0,
+      "y": 7.5,
+      "width": 53.98,
+      "height": 4,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "affiliationLine",
+      "type": "field",
+      "fieldKey": "affiliationLine",
+      "x": 0,
+      "y": 11.5,
+      "width": 53.98,
+      "height": 2.8,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "accreditationLine",
+      "type": "field",
+      "fieldKey": "accreditationLine",
+      "x": 0,
+      "y": 14.2,
+      "width": 53.98,
+      "height": 2.5,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "photo",
+      "type": "field",
+      "fieldKey": "photo",
+      "x": 18.5,
+      "y": 18.5,
+      "width": 17,
+      "height": 17,
+      "zIndex": 5,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "name",
+      "type": "field",
+      "fieldKey": "name",
+      "x": 2,
+      "y": 36.5,
+      "width": 50,
+      "height": 5.5,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "roleLabel",
+      "type": "field",
+      "fieldKey": "roleLabel",
+      "x": 2,
+      "y": 41.5,
+      "width": 50,
+      "height": 3,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "registrationNumber",
+      "type": "field",
+      "fieldKey": "registrationNumber",
+      "x": 3,
+      "y": 45.5,
+      "width": 48,
+      "height": 3.6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "department",
+      "type": "field",
+      "fieldKey": "department",
+      "x": 3,
+      "y": 49.2,
+      "width": 48,
+      "height": 3.6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "programme",
+      "type": "field",
+      "fieldKey": "programme",
+      "x": 3,
+      "y": 52.9,
+      "width": 48,
+      "height": 3.6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "gender",
+      "type": "field",
+      "fieldKey": "gender",
+      "x": 3,
+      "y": 56.6,
+      "width": 48,
+      "height": 3.6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "bloodGroup",
+      "type": "field",
+      "fieldKey": "bloodGroup",
+      "x": 3,
+      "y": 60.3,
+      "width": 48,
+      "height": 3.6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "validityBlock",
+      "type": "field",
+      "fieldKey": "validityBlock",
+      "x": 3,
+      "y": 64.5,
+      "width": 48,
+      "height": 14,
+      "zIndex": 8,
+      "style": { "visible": true, "align": "center" }
+    }
+  ],
+  "back": [
+    {
+      "id": "headerBand",
+      "type": "field",
+      "fieldKey": "headerBand",
+      "x": 0,
+      "y": 0,
+      "width": 53.98,
+      "height": 8,
+      "zIndex": 0,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "logo",
+      "type": "field",
+      "fieldKey": "logo",
+      "x": 23.5,
+      "y": 1,
+      "width": 7,
+      "height": 6,
+      "zIndex": 2,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "qr",
+      "type": "field",
+      "fieldKey": "qr",
+      "x": 17,
+      "y": 10,
+      "width": 20,
+      "height": 19,
+      "zIndex": 3,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "barcode",
+      "type": "field",
+      "fieldKey": "barcode",
+      "x": 4,
+      "y": 31,
+      "width": 46,
+      "height": 6.5,
+      "zIndex": 4,
+      "style": { "visible": true, "align": "center" }
+    },
+    {
+      "id": "holderAddress",
+      "type": "field",
+      "fieldKey": "holderAddress",
+      "x": 3,
+      "y": 38.5,
+      "width": 48,
+      "height": 7,
+      "zIndex": 5,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "fatherName",
+      "type": "field",
+      "fieldKey": "fatherName",
+      "x": 3,
+      "y": 46,
+      "width": 48,
+      "height": 3.5,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "motherName",
+      "type": "field",
+      "fieldKey": "motherName",
+      "x": 3,
+      "y": 49.5,
+      "width": 48,
+      "height": 3.5,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "emergencyContact",
+      "type": "field",
+      "fieldKey": "emergencyContact",
+      "x": 3,
+      "y": 53,
+      "width": 48,
+      "height": 3.5,
+      "zIndex": 6,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "verificationInfo",
+      "type": "field",
+      "fieldKey": "verificationInfo",
+      "x": 3,
+      "y": 57,
+      "width": 48,
+      "height": 6,
+      "zIndex": 7,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "terms",
+      "type": "field",
+      "fieldKey": "terms",
+      "x": 3,
+      "y": 63.5,
+      "width": 48,
+      "height": 10,
+      "zIndex": 8,
+      "style": { "visible": true, "align": "left" }
+    },
+    {
+      "id": "validityFooter",
+      "type": "field",
+      "fieldKey": "validityFooter",
+      "x": 0,
+      "y": 80,
+      "width": 53.98,
+      "height": 5.6,
+      "zIndex": 9,
+      "style": { "visible": true, "align": "left" }
+    }
+  ]
+}

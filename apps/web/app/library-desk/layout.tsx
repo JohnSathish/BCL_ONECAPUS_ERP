@@ -1,0 +1,28 @@
+'use client';
+
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { canAccessLibraryDesk, canAccessAdminPortal } from '@/lib/permissions/portal-access';
+import { useAuth } from '@/hooks/use-auth';
+
+export default function LibraryDeskLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { session, isReady } = useAuth();
+  const isLogin = pathname?.startsWith('/library-desk/login');
+
+  useEffect(() => {
+    if (!isReady || isLogin) return;
+    if (!session) {
+      router.replace('/library-desk/login');
+      return;
+    }
+    const roles = session.user?.roles ?? [];
+    const perms = session.user?.permissions ?? [];
+    if (!canAccessLibraryDesk(roles, perms) && !canAccessAdminPortal(roles)) {
+      router.replace('/login');
+    }
+  }, [isReady, session, router, isLogin]);
+
+  return <div className="min-h-screen">{children}</div>;
+}
