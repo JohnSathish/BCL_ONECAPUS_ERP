@@ -7,7 +7,13 @@ import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/er
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
-import { fetchStaff } from '@/services/staff';
+import {
+  fetchStaff,
+  fetchStaffDocumentsExpiringReport,
+  fetchStaffDocumentsMissingReport,
+  fetchStaffDocumentsPendingReport,
+} from '@/services/staff';
+import { formatDisplayDate } from '@/utils/format-date';
 
 export default function StaffDocumentsPage() {
   const session = useRequireAuth();
@@ -16,6 +22,24 @@ export default function StaffDocumentsPage() {
   const staffList = useQuery({
     queryKey: ['staff', 'documents-index'],
     queryFn: () => fetchStaff({ limit: 100 }),
+    enabled: Boolean(session) && perms.canRead,
+  });
+
+  const missingQ = useQuery({
+    queryKey: ['staff', 'documents', 'reports', 'missing'],
+    queryFn: fetchStaffDocumentsMissingReport,
+    enabled: Boolean(session) && perms.canRead,
+  });
+
+  const expiringQ = useQuery({
+    queryKey: ['staff', 'documents', 'reports', 'expiring'],
+    queryFn: fetchStaffDocumentsExpiringReport,
+    enabled: Boolean(session) && perms.canRead,
+  });
+
+  const pendingQ = useQuery({
+    queryKey: ['staff', 'documents', 'reports', 'pending'],
+    queryFn: fetchStaffDocumentsPendingReport,
     enabled: Boolean(session) && perms.canRead,
   });
 
@@ -28,6 +52,96 @@ export default function StaffDocumentsPage() {
           Document compliance across staff records. Upload and verify documents from each staff
           profile.
         </p>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <CompactCard>
+            <CompactCardHeader
+              title="Missing Documents"
+              description="Staff with incomplete document sets"
+            />
+            <CompactCardBody>
+              {!missingQ.data?.length ? (
+                <p className="text-sm text-muted-foreground">
+                  All active staff have complete document sets.
+                </p>
+              ) : (
+                <ul className="max-h-64 space-y-2 overflow-auto text-sm">
+                  {missingQ.data.slice(0, 20).map((row) => (
+                    <li key={row.staffProfileId} className="rounded border px-2 py-1.5">
+                      <Link
+                        href={`/admin/staff/${row.staffProfileId}?tab=documents`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {row.fullName} ({row.employeeCode})
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {row.missingCount} missing · {row.complianceScore}% compliance
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CompactCardBody>
+          </CompactCard>
+
+          <CompactCard>
+            <CompactCardHeader
+              title="Expiring Soon"
+              description="Documents expiring within 30 days"
+            />
+            <CompactCardBody>
+              {!expiringQ.data?.length ? (
+                <p className="text-sm text-muted-foreground">No documents expiring soon.</p>
+              ) : (
+                <ul className="max-h-64 space-y-2 overflow-auto text-sm">
+                  {expiringQ.data.map((row, i) => (
+                    <li
+                      key={`${row.staffProfileId}-${row.documentType}-${i}`}
+                      className="rounded border px-2 py-1.5"
+                    >
+                      <Link
+                        href={`/admin/staff/${row.staffProfileId}?tab=documents`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {row.fullName}
+                      </Link>
+                      <p className="text-xs">{row.documentLabel}</p>
+                      <p className="text-xs text-amber-700">
+                        Expires {row.expiryDate ? formatDisplayDate(row.expiryDate) : '—'}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CompactCardBody>
+          </CompactCard>
+
+          <CompactCard>
+            <CompactCardHeader title="Pending Verification" description="Awaiting HR review" />
+            <CompactCardBody>
+              {!pendingQ.data?.length ? (
+                <p className="text-sm text-muted-foreground">No documents pending verification.</p>
+              ) : (
+                <ul className="max-h-64 space-y-2 overflow-auto text-sm">
+                  {pendingQ.data.map((row) => (
+                    <li key={row.documentId} className="rounded border px-2 py-1.5">
+                      <Link
+                        href={`/admin/staff/${row.staffProfileId}?tab=documents`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {row.fullName}
+                      </Link>
+                      <p className="text-xs">{row.documentLabel}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Uploaded {formatDisplayDate(row.uploadedOn)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CompactCardBody>
+          </CompactCard>
+        </div>
 
         <CompactCard>
           <CompactCardHeader

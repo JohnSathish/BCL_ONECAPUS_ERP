@@ -103,6 +103,10 @@ export class GenerateMeritListDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsIn(['GENERAL', 'OBC', 'SC', 'ST', 'EWS'])
+  category?: string;
 }
 
 export class RunSeatAllocationDto {
@@ -122,4 +126,66 @@ export class RunSeatAllocationDto {
 export class UpdateAllocationStatusDto {
   @IsIn(['provisional', 'confirmed', 'withdrawn'])
   status!: string;
+}
+
+export class UpdateCycleDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationOpensAt?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationClosesAt?: string;
+
+  @IsOptional()
+  @IsString()
+  applicationDeadline?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentDeadline?: string;
+
+  @IsOptional()
+  settings?: Record<string, unknown>;
+}
+
+export class VerifyDocumentDto {
+  @IsIn(['VERIFIED', 'REJECTED'])
+  status!: 'VERIFIED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class MarkPaymentDto {
+  @IsIn(['PAID', 'WAIVED', 'PENDING'])
+  status!: string;
+
+  @IsOptional()
+  @IsString()
+  paymentReference?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  amountPaid?: number;
+}
+
+export class MarkAdmissionFeeDto {
+  @IsIn(['PAID', 'WAIVED', 'PENDING', 'NOT_APPLICABLE'])
+  status!: string;
+
+  @IsOptional()
+  @IsString()
+  admissionFeeReference?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  admissionFeeAmount?: number;
 }

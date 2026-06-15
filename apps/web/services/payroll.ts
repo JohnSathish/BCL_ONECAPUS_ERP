@@ -175,6 +175,15 @@ export async function getPayrollRun(id: string) {
   return data;
 }
 
+export async function validatePayrollRunExcel(runId: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post(`/v1/payroll/runs/${runId}/validate-excel`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
 export async function calculatePayrollRun(id: string) {
   const { data } = await api.post(`/v1/payroll/runs/${id}/calculate`);
   return data;

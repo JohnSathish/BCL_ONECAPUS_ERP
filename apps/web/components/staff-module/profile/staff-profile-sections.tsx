@@ -33,7 +33,10 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { formatDisplayDateTime } from '@/utils/format-date';
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
 import { StaffPfSection } from '@/components/staff-module/profile/staff-pf-section';
-import { StaffDocumentsSection as StaffDocumentsComplianceSection } from '@/components/staff-module/profile/staff-documents-section';
+import {
+  TEACHING_SHIFT_CATEGORIES,
+  TEACHING_SHIFT_CATEGORY_LABELS,
+} from '@/components/staff-module/employment/staff-shift-category';
 
 function useDebouncedStaffSave<T extends Record<string, unknown>>(
   staffId: string,
@@ -252,6 +255,7 @@ export function StaffEmploymentSection({
     departmentId: profile.departmentId ?? '',
     designationId: profile.designationId ?? '',
     primaryShiftId: profile.primaryShiftId ?? '',
+    teachingShiftCategory: profile.teachingShiftCategory ?? 'DAY',
     additionalShiftIds: profile.additionalShiftIds ?? [],
     additionalRoleCodes: (profile.additionalRoles ?? [])
       .map((r) => r.code)
@@ -431,27 +435,47 @@ export function StaffEmploymentSection({
             ))}
           </select>
         </Field>
-        <Field label="Primary shift">
-          <select
-            className={inputClass}
-            value={form.primaryShiftId}
-            disabled={!canEdit}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                primaryShiftId: e.target.value,
-                additionalShiftIds: f.additionalShiftIds.filter((id) => id !== e.target.value),
-              }))
-            }
-          >
-            <option value="">Select shift</option>
-            {shiftOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code ? `${s.code} — ` : ''}
-                {s.label}
-              </option>
-            ))}
-          </select>
+        <Field label="Shift">
+          {form.staffType === 'TEACHING' ? (
+            <select
+              className={inputClass}
+              value={form.teachingShiftCategory}
+              disabled={!canEdit}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  teachingShiftCategory: e.target.value,
+                }))
+              }
+            >
+              {TEACHING_SHIFT_CATEGORIES.slice(0, 3).map((value) => (
+                <option key={value} value={value}>
+                  {TEACHING_SHIFT_CATEGORY_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              className={inputClass}
+              value={form.primaryShiftId}
+              disabled={!canEdit}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  primaryShiftId: e.target.value,
+                  additionalShiftIds: f.additionalShiftIds.filter((id) => id !== e.target.value),
+                }))
+              }
+            >
+              <option value="">Select shift</option>
+              {shiftOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code ? `${s.code} — ` : ''}
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Staff short code">
           <ShortCodeField
@@ -619,20 +643,6 @@ export function StaffSalarySection({
         </p>
       </SectionCard>
     </>
-  );
-}
-
-export function StaffDocumentsSection({
-  profile,
-  canEdit,
-  onRefresh,
-}: {
-  profile: StaffProfile;
-  canEdit: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <StaffDocumentsComplianceSection staffId={profile.id} canEdit={canEdit} onRefresh={onRefresh} />
   );
 }
 

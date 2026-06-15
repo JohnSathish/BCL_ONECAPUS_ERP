@@ -22,7 +22,8 @@
     "db:generate": "npm run db:generate -w api",
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
-    "db:studio": "npm run db:studio -w api"
+    "load:test": "node scripts/load-test/run-k6.mjs pre-launch.js",
+    "load:test:smoke": "node scripts/load-test/run-k6.mjs pre-launch-smoke.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",

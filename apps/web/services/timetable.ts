@@ -25,6 +25,18 @@ export type TimetablePlan = {
   generationSummary?: Record<string, unknown>;
 };
 
+export type TimetableReplacementOverlay = {
+  assignmentId: string;
+  reason: string;
+  reasonLabel: string;
+  originalStaffProfileId: string;
+  originalStaffName: string;
+  handledByName: string;
+  handledByCode: string;
+  startDate: string;
+  endDate: string;
+};
+
 export type TimetableEntry = {
   id: string;
   dayOfWeek: number;
@@ -37,6 +49,7 @@ export type TimetableEntry = {
   course?: { code: string; title: string } | null;
   staffProfile?: { shortCode?: string | null; fullName: string } | null;
   classroom?: { code: string; name: string } | null;
+  replacementOverlay?: TimetableReplacementOverlay | null;
   slotType: string;
   fyugpCategory?: string | null;
   sectionCode?: string | null;

@@ -30,21 +30,6 @@ export async function fetchMyDocuments(): Promise<StaffPortalDocument[]> {
   return data;
 }
 
-export async function fetchMyDocumentCompliance() {
-  const { data } = await api.get('/v1/staff/me/documents/compliance');
-  return data;
-}
-
-export async function uploadMyDocument(documentType: string, file: File) {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('documentType', documentType);
-  const { data } = await api.post('/v1/staff/me/documents', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  return data;
-}
-
 export async function fetchMyTodaySchedule(): Promise<StaffTimetableSlot[]> {
   const { data } = await api.get('/v1/staff/me/timetable/today');
   return data;

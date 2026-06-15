@@ -11,6 +11,22 @@ export async function fetchStudentDashboard(): Promise<StudentDashboardResponse>
   return data;
 }
 
+export async function fetchStudentDashboardWidget<T = unknown>(widget: string): Promise<T> {
+  const { data } = await api.get(`/v1/students/me/dashboard/widgets/${widget}`);
+  return data as T;
+}
+
+export async function fetchMyFeeSummary() {
+  const { data } = await api.get('/v1/fees/me/summary');
+  return data as {
+    studentId: string;
+    totalOutstanding: number;
+    totalPaid: number;
+    feeStatus: string;
+    totalOverdue: number;
+  };
+}
+
 export async function fetchStudentPortalMe() {
   const { data } = await api.get('/v1/students/me');
   return data as {

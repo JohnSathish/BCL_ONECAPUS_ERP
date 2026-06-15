@@ -17,6 +17,7 @@ import {
 import { AdmissionsValidationService } from './admissions-validation.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
+import { resolveAdmissionFeeDue } from './admissions-fee.util';
 
 @Injectable()
 export class AdmissionsService {
@@ -101,7 +102,16 @@ export class AdmissionsService {
 
   async listApplications(
     tenantId: string,
-    query: PaginationQueryDto & { intakeId?: string; status?: string },
+    query: PaginationQueryDto & {
+      intakeId?: string;
+      cycleId?: string;
+      status?: string;
+      paymentStatus?: string;
+      documentVerificationStatus?: string;
+      paymentPending?: boolean;
+      documentPending?: boolean;
+      admissionFeePending?: boolean;
+    },
   ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -109,7 +119,30 @@ export class AdmissionsService {
       tenantId,
       deletedAt: null,
       ...(query.intakeId ? { intakeId: query.intakeId } : {}),
+      ...(query.cycleId ? { cycleId: query.cycleId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.paymentStatus ? { paymentStatus: query.paymentStatus } : {}),
+      ...(query.documentVerificationStatus
+        ? { documentVerificationStatus: query.documentVerificationStatus }
+        : {}),
+      ...(query.paymentPending
+        ? {
+            paymentStatus: { notIn: ['PAID', 'WAIVED'] },
+            status: { not: 'draft' },
+          }
+        : {}),
+      ...(query.documentPending
+        ? {
+            status: { not: 'draft' },
+            documentVerificationStatus: { not: 'VERIFIED' },
+          }
+        : {}),
+      ...(query.admissionFeePending
+        ? {
+            status: 'allotted',
+            admissionFeeStatus: 'PENDING',
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -135,7 +168,22 @@ export class AdmissionsService {
         take: limit,
         include: {
           intake: { include: { program: true } },
+          cycle: {
+            select: { id: true, code: true, title: true, status: true },
+          },
+          program: { select: { id: true, code: true, name: true } },
           academicStream: { select: { id: true, code: true, name: true } },
+          preferredShift: { select: { id: true, code: true, name: true } },
+          documents: true,
+          seatAllocations: {
+            where: { deletedAt: null },
+            orderBy: { round: 'desc' },
+            take: 1,
+            include: {
+              shift: { select: { id: true, code: true, name: true } },
+            },
+          },
+          enrolledStudent: { select: { id: true } },
         },
         orderBy: [{ meritScore: 'desc' }, { createdAt: 'asc' }],
       }),
@@ -219,11 +267,16 @@ export class AdmissionsService {
       firstName: string;
       lastName: string;
       email: string;
-      intake: { program: { name: string } };
+      intake: { program: { name: string } } | null;
+      program?: { name: string } | null;
     },
   ) {
     const institutionName =
       await this.communication.getInstitutionName(tenantId);
+    const programName =
+      application.intake?.program.name ??
+      application.program?.name ??
+      'FYUP Programme';
     await this.communication.trigger({
       tenantId,
       templateCode: 'ADMISSION_SUBMITTED',
@@ -238,7 +291,7 @@ export class AdmissionsService {
       variables: {
         student_name: `${application.firstName} ${application.lastName}`.trim(),
         application_number: application.applicationNumber,
-        program_name: application.intake.program.name,
+        program_name: programName,
         institution_name: institutionName,
       },
     });
@@ -256,7 +309,19 @@ export class AdmissionsService {
 
     const updated = await this.prisma.admissionApplication.update({
       where: { id },
-      data: { status: dto.status },
+      data: {
+        status: dto.status,
+        ...(dto.status === 'allotted'
+          ? await this.allotmentAdmissionFeePatch(app)
+          : {}),
+        ...(dto.status === 'rejected'
+          ? {
+              admissionFeeStatus: 'NOT_APPLICABLE',
+              admissionFeeAmount: null,
+              admissionFeeReference: null,
+            }
+          : {}),
+      },
       include: { intake: { include: { program: true } } },
     });
 
@@ -264,6 +329,75 @@ export class AdmissionsService {
       void this.notifyApplicationRejected(tenantId, updated);
     }
     return updated;
+  }
+
+  private async allotmentAdmissionFeePatch(app: {
+    cycleId: string | null;
+    admissionFeeStatus: string;
+    admissionFeeAmount: Prisma.Decimal | null;
+  }) {
+    if (
+      app.admissionFeeStatus === 'PAID' ||
+      app.admissionFeeStatus === 'WAIVED'
+    ) {
+      return {};
+    }
+
+    let due =
+      app.admissionFeeAmount != null ? Number(app.admissionFeeAmount) : null;
+    if (due == null && app.cycleId) {
+      const cycle = await this.prisma.admissionCycle.findFirst({
+        where: { id: app.cycleId },
+        select: { settings: true },
+      });
+      due = resolveAdmissionFeeDue(
+        (cycle?.settings as Record<string, unknown> | null) ?? null,
+      );
+    }
+
+    return {
+      admissionFeeStatus: 'PENDING',
+      ...(due != null ? { admissionFeeAmount: due } : {}),
+    };
+  }
+
+  private async notifyAdmissionOffer(
+    tenantId: string,
+    application: {
+      id: string;
+      applicationNumber: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      status: string;
+      intake: { program: { name: string } } | null;
+      program?: { name: string } | null;
+    },
+  ) {
+    const institutionName =
+      await this.communication.getInstitutionName(tenantId);
+    const programName =
+      application.intake?.program.name ??
+      application.program?.name ??
+      'FYUP Programme';
+    await this.communication.trigger({
+      tenantId,
+      templateCode: 'ADMISSION_CONFIRMATION',
+      triggerKey: 'admission.offer',
+      entityType: 'admission_application',
+      entityId: application.id,
+      recipient: {
+        recipientType: 'USER',
+        displayName: `${application.firstName} ${application.lastName}`.trim(),
+        email: application.email,
+      },
+      variables: {
+        student_name: `${application.firstName} ${application.lastName}`.trim(),
+        application_number: application.applicationNumber,
+        program_name: programName,
+        institution_name: institutionName,
+      },
+    });
   }
 
   private async notifyApplicationRejected(
@@ -274,11 +408,16 @@ export class AdmissionsService {
       firstName: string;
       lastName: string;
       email: string;
-      intake: { program: { name: string } };
+      intake: { program: { name: string } } | null;
+      program?: { name: string } | null;
     },
   ) {
     const institutionName =
       await this.communication.getInstitutionName(tenantId);
+    const programName =
+      application.intake?.program.name ??
+      application.program?.name ??
+      'FYUP Programme';
     await this.communication.trigger({
       tenantId,
       templateCode: 'ADMISSION_REJECTED',
@@ -293,8 +432,128 @@ export class AdmissionsService {
       variables: {
         student_name: `${application.firstName} ${application.lastName}`.trim(),
         application_number: application.applicationNumber,
-        program_name: application.intake.program.name,
+        program_name: programName,
         institution_name: institutionName,
+      },
+    });
+  }
+
+  async markPayment(
+    tenantId: string,
+    id: string,
+    dto: { status: string; paymentReference?: string; amountPaid?: number },
+    actorId?: string,
+  ) {
+    const app = await this.prisma.admissionApplication.findFirst({
+      where: { id, tenantId, deletedAt: null },
+    });
+    if (!app) throw new NotFoundException('Application not found');
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: {
+        paymentStatus: dto.status,
+        paymentReference: dto.paymentReference,
+        amountPaid: dto.amountPaid,
+      },
+    });
+
+    await this.prisma.admissionAuditLog.create({
+      data: {
+        tenantId,
+        cycleId: app.cycleId,
+        entityType: 'application',
+        entityId: id,
+        action: 'payment.updated',
+        actorId,
+        newValue: {
+          status: dto.status,
+          paymentReference: dto.paymentReference,
+        },
+      },
+    });
+
+    return updated;
+  }
+
+  async markAdmissionFee(
+    tenantId: string,
+    id: string,
+    dto: {
+      status: string;
+      admissionFeeReference?: string;
+      admissionFeeAmount?: number;
+    },
+    actorId?: string,
+  ) {
+    const app = await this.prisma.admissionApplication.findFirst({
+      where: { id, tenantId, deletedAt: null },
+    });
+    if (!app) throw new NotFoundException('Application not found');
+    if (
+      dto.status === 'PAID' ||
+      dto.status === 'WAIVED' ||
+      (dto.status === 'PENDING' && dto.admissionFeeAmount !== undefined)
+    ) {
+      if (app.status !== 'allotted') {
+        throw new BadRequestException(
+          'Admission fee applies only after the applicant is selected for admission',
+        );
+      }
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: {
+        admissionFeeStatus: dto.status,
+        admissionFeeReference: dto.admissionFeeReference,
+        ...(dto.admissionFeeAmount !== undefined
+          ? { admissionFeeAmount: dto.admissionFeeAmount }
+          : {}),
+      },
+    });
+
+    await this.prisma.admissionAuditLog.create({
+      data: {
+        tenantId,
+        cycleId: app.cycleId,
+        entityType: 'application',
+        entityId: id,
+        action: 'admission_fee.updated',
+        actorId,
+        newValue: {
+          status: dto.status,
+          admissionFeeReference: dto.admissionFeeReference,
+          admissionFeeAmount: dto.admissionFeeAmount,
+        },
+      },
+    });
+
+    return updated;
+  }
+
+  async sendAdmissionOffer(tenantId: string, id: string) {
+    const app = await this.prisma.admissionApplication.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      include: { intake: { include: { program: true } }, program: true },
+    });
+    if (!app) throw new NotFoundException('Application not found');
+    if (!['shortlisted', 'allotted'].includes(app.status)) {
+      throw new BadRequestException(
+        'Offer email is only for shortlisted or allotted applications',
+      );
+    }
+    await this.notifyAdmissionOffer(tenantId, app);
+    return { sent: true, applicationNumber: app.applicationNumber };
+  }
+
+  getAuditLog(tenantId: string, entityType: string, entityId: string) {
+    return this.prisma.admissionAuditLog.findMany({
+      where: { tenantId, entityType, entityId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        actor: { select: { id: true, displayName: true, email: true } },
       },
     });
   }
@@ -432,6 +691,7 @@ export class AdmissionsService {
     const intake = await this.prisma.admissionIntake.findFirst({
       where: { id: dto.intakeId, tenantId, deletedAt: null },
       include: {
+        cycle: { select: { settings: true } },
         allocations: {
           where: { deletedAt: null, status: { not: 'withdrawn' } },
         },
@@ -513,12 +773,20 @@ export class AdmissionsService {
       ),
     );
 
+    const defaultAdmissionDue = resolveAdmissionFeeDue(
+      (intake.cycle?.settings as Record<string, unknown> | null) ?? null,
+    );
+
     await this.prisma.admissionApplication.updateMany({
       where: {
         id: { in: toAllocate.map((e) => e.applicationId) },
         status: { notIn: ['rejected', 'allotted'] },
       },
-      data: { status: 'allotted' },
+      data: {
+        status: 'allotted',
+        admissionFeeStatus: 'PENDING',
+        admissionFeeAmount: defaultAdmissionDue,
+      },
     });
 
     const totalAllocated = intake.allocations.length + created.length;

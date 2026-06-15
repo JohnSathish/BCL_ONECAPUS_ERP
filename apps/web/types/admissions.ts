@@ -32,12 +32,53 @@ export type AdmissionApplication = {
   meritScore: string | number;
   status: string;
   submittedAt?: string | null;
+  progressPercent?: number;
+  currentStep?: number;
+  paymentStatus?: string;
+  paymentReference?: string | null;
+  amountPaid?: string | number | null;
+  documentVerificationStatus?: string;
+  majorSubjectCode?: string | null;
+  preferredShiftId?: string | null;
+  preferredShift?: { id: string; code: string; name: string } | null;
+  seatAllocations?: {
+    id: string;
+    round: number;
+    status: string;
+    shift?: { id: string; code: string; name: string } | null;
+  }[];
+  admissionFeeStatus?: string;
+  admissionFeeAmount?: string | number | null;
+  admissionFeeReference?: string | null;
+  formData?: Record<string, unknown>;
+  cycle?: { id: string; code: string; title: string; status: string } | null;
+  documents?: AdmissionApplicationDocument[];
   intake: {
     id: string;
     name: string;
     code: string;
     program: { code: string; name: string };
   };
+};
+
+export type AdmissionApplicationDocument = {
+  id: string;
+  slotCode: string;
+  fileUrl: string;
+  mimeType?: string | null;
+  verificationStatus: string;
+  remarks?: string | null;
+  verifiedAt?: string | null;
+};
+
+export type AdmissionAuditEntry = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  actor?: { id: string; displayName: string; email: string } | null;
 };
 
 export type MeritList = {

@@ -177,7 +177,7 @@ export function StaffDirectoryTable({ rows, selectedIds, onToggleRow, onToggleAl
               <td className="max-w-[160px] px-2 py-1.5">
                 <RoleChips row={row} />
               </td>
-              <td className="px-2 py-1.5">{row.shift ?? '—'}</td>
+              <td className="px-2 py-1.5">{row.teachingShiftLabel ?? row.shift ?? '—'}</td>
               <td className="px-2 py-1.5">
                 <StatusPill status={row.status} />
               </td>

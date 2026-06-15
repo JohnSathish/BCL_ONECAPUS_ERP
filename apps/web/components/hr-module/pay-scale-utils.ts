@@ -15,6 +15,7 @@ export const PAY_STRUCTURE_LABELS: Record<string, string> = {
   DBC_UGC_7TH: 'DBC UGC 7th Pay (DA 58%)',
   DBC_TEACHING_LEGACY: 'DBC Legacy Teaching (PF ₹780 cap)',
   DBC_NON_TEACHING: 'DBC Non-Teaching (Basic + Fixed Allowance)',
+  DBC_STATE_NON_TEACHING: 'DBC State Scale Non-Teaching (DA 51%)',
   UGC_SCALE: 'UGC Pay Scale (generic)',
   COLLEGE_TEACHING: 'College Teaching (generic)',
   COLLEGE_NON_TEACHING: 'College Non-Teaching (generic)',

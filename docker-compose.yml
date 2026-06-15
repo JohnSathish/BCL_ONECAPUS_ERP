@@ -37,8 +37,13 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_ACCESS_SECRET: change-me-access-dev-only-32chars-min
       JWT_REFRESH_SECRET: change-me-refresh-dev-only-32chars-min
+      UPLOAD_ROOT: /data/uploads
+      STORAGE_ROOT: /data/storage
     ports:
       - '3001:3001'
+    volumes:
+      - nep_uploads:/data/uploads
+      - nep_storage:/data/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +70,12 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://nep:nep_dev_password@postgres:5432/nep_erp
       REDIS_URL: redis://redis:6379
+      UPLOAD_ROOT: /data/uploads
+      STORAGE_ROOT: /data/storage
+      WEB_ORIGIN: http://localhost
+    volumes:
+      - nep_uploads:/data/uploads
+      - nep_storage:/data/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,3 +94,5 @@ services:
 
 volumes:
   nep_pg_data: {}
+  nep_uploads: {}
+  nep_storage: {}

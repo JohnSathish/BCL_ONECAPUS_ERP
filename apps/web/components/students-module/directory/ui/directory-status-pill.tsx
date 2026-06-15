@@ -3,49 +3,45 @@
 import { cn } from '@/utils/cn';
 
 const STATUS_STYLES: Record<string, string> = {
-  STUDYING:
+  ACTIVE:
     'bg-emerald-500/15 text-emerald-700 shadow-[0_0_12px_-2px] shadow-emerald-500/40 dark:text-emerald-300',
-  PROMOTED:
-    'bg-emerald-500/15 text-emerald-700 shadow-[0_0_12px_-2px] shadow-emerald-500/40 dark:text-emerald-300',
+  PENDING: 'bg-amber-500/15 text-amber-800 dark:text-amber-200',
+  SUSPENDED:
+    'bg-rose-500/15 text-rose-700 shadow-[0_0_12px_-2px] shadow-rose-500/40 dark:text-rose-300',
   ALUMNI:
     'bg-violet-500/15 text-violet-700 shadow-[0_0_12px_-2px] shadow-violet-500/40 dark:text-violet-300',
-  GRADUATED:
+  TRANSFER:
     'bg-blue-500/15 text-blue-700 shadow-[0_0_12px_-2px] shadow-blue-500/40 dark:text-blue-300',
-  DETAINED:
-    'bg-amber-500/15 text-amber-800 shadow-[0_0_12px_-2px] shadow-amber-500/40 dark:text-amber-200',
-  LEAVING:
-    'bg-rose-500/15 text-rose-700 shadow-[0_0_12px_-2px] shadow-rose-500/40 dark:text-rose-300',
-  DROPPED:
-    'bg-rose-500/15 text-rose-700 shadow-[0_0_12px_-2px] shadow-rose-500/40 dark:text-rose-300',
   INACTIVE: 'bg-muted text-muted-foreground',
-  PENDING: 'bg-amber-500/15 text-amber-800 dark:text-amber-200',
 };
-
-const PULSE_STATUSES = new Set(['DETAINED', 'LEAVING', 'DROPPED']);
 
 const DOT_COLORS: Record<string, string> = {
-  STUDYING: 'bg-emerald-500',
-  PROMOTED: 'bg-emerald-500',
-  ALUMNI: 'bg-violet-500',
-  GRADUATED: 'bg-blue-500',
-  DETAINED: 'bg-amber-500',
-  LEAVING: 'bg-rose-500',
-  DROPPED: 'bg-rose-500',
-  INACTIVE: 'bg-muted-foreground/50',
+  ACTIVE: 'bg-emerald-500',
   PENDING: 'bg-amber-500',
+  SUSPENDED: 'bg-rose-500',
+  ALUMNI: 'bg-violet-500',
+  TRANSFER: 'bg-blue-500',
+  INACTIVE: 'bg-muted-foreground/50',
 };
 
-const DISPLAY_LABELS: Record<string, string> = {
-  STUDYING: 'Studying',
-  PROMOTED: 'Promoted',
-  ALUMNI: 'Alumni',
-  GRADUATED: 'Graduated',
-  DETAINED: 'Detained',
-  LEAVING: 'Leaving',
-  DROPPED: 'Dropped',
-  INACTIVE: 'Inactive',
-  PENDING: 'Pending',
+const RAW_TO_DISPLAY: Record<string, { key: string; label: string }> = {
+  STUDYING: { key: 'ACTIVE', label: 'Active' },
+  PROMOTED: { key: 'ACTIVE', label: 'Active' },
+  PENDING: { key: 'PENDING', label: 'Pending' },
+  DETAINED: { key: 'PENDING', label: 'Pending' },
+  DROPPED: { key: 'SUSPENDED', label: 'Suspended' },
+  LEAVING: { key: 'SUSPENDED', label: 'Suspended' },
+  ALUMNI: { key: 'ALUMNI', label: 'Alumni' },
+  GRADUATED: { key: 'ALUMNI', label: 'Alumni' },
+  TRANSFER: { key: 'TRANSFER', label: 'Transfer' },
+  TRANSFERRED: { key: 'TRANSFER', label: 'Transfer' },
+  INACTIVE: { key: 'INACTIVE', label: 'Inactive' },
 };
+
+function normalizeStatus(label: string) {
+  const key = label.toUpperCase().replace(/\s+/g, '_');
+  return RAW_TO_DISPLAY[key] ?? { key, label };
+}
 
 type Props = {
   label: string;
@@ -53,9 +49,8 @@ type Props = {
 };
 
 export function DirectoryStatusPill({ label, className }: Props) {
-  const key = label.toUpperCase().replace(/\s+/g, '_');
-  const pulse = PULSE_STATUSES.has(key);
-  const display = DISPLAY_LABELS[key] ?? label;
+  const { key, label: display } = normalizeStatus(label);
+  const pulse = key === 'SUSPENDED';
 
   return (
     <span

@@ -88,8 +88,10 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
 
   client.interceptors.response.use(
     (res) => {
-      assertJsonApiResponse(res);
-      unwrapApiEnvelope(res);
+      if (res.config.responseType !== 'blob') {
+        assertJsonApiResponse(res);
+        unwrapApiEnvelope(res);
+      }
       options.onSuccess?.();
       return res;
     },

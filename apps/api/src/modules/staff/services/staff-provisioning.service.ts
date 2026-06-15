@@ -190,6 +190,7 @@ export class StaffProvisioningService {
         departmentId: dto.departmentId,
         designationId: dto.designationId,
         primaryShiftId: dto.primaryShiftId,
+        teachingShiftCategory: dto.teachingShiftCategory ?? 'DAY',
         campusId,
         shortCode: dto.shortCode?.trim().toUpperCase() || undefined,
         joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,

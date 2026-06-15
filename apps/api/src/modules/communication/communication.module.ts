@@ -10,6 +10,7 @@ import { CommunicationTemplatesService } from './services/communication-template
 import { CommunicationTriggerService } from './services/communication-trigger.service';
 import { UserNotificationsService } from './services/user-notifications.service';
 import { CommunicationNotificationProcessor } from './processors/communication-notification.processor';
+import { FcmPushService } from './services/fcm-push.service';
 
 @Module({
   controllers: [CommunicationController],
@@ -24,12 +25,14 @@ import { CommunicationNotificationProcessor } from './processors/communication-n
     CommunicationSchedulerService,
     UserNotificationsService,
     CommunicationNotificationProcessor,
+    FcmPushService,
   ],
   exports: [
     CommunicationDeliveryService,
     CommunicationTriggerService,
     UserNotificationsService,
     CommunicationEmailService,
+    FcmPushService,
   ],
 })
 export class CommunicationModule {}

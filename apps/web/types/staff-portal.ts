@@ -160,7 +160,6 @@ export type StaffPortalDocument = {
   documentType: string;
   fileName: string;
   fileUrl: string;
-  verificationStatus?: string;
   createdAt: string;
 };
 

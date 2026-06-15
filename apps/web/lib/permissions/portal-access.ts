@@ -40,6 +40,13 @@ export const STUDENT_PORTAL_ROLES = new Set(['student']);
 
 export const LIBRARY_DESK_ROLES = new Set(['library-operator']);
 
+export const APPLICANT_PORTAL_ROLES = new Set(['applicant']);
+
+export function canAccessApplicantPortal(roles: string[], permissions: string[] = []) {
+  if (roles.some((r) => APPLICANT_PORTAL_ROLES.has(r))) return true;
+  return permissions.includes('admissions:portal:self');
+}
+
 export function canAccessLibraryDesk(roles: string[], permissions: string[] = []) {
   if (roles.some((r) => LIBRARY_DESK_ROLES.has(r))) return true;
   return permissions.includes('library:access-desk');
@@ -85,6 +92,9 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
   if (canAccessLibraryDesk(roles, permissions) && !canAccessAdminPortal(roles, permissions)) {
     return '/library-desk';
   }
+  if (canAccessApplicantPortal(roles, permissions) && !canAccessAdminPortal(roles, permissions)) {
+    return '/admissions-portal/dashboard';
+  }
   if (canAccessAdminPortal(roles, permissions)) {
     return resolveDefaultAdminHome(permissions, roles);
   }
@@ -117,6 +127,9 @@ export function canAccessPath(roles: string[], path: string, permissions: string
     return canAccessAdminPortal(roles, permissions) || roles.includes('librarian');
   if (path.startsWith('/library-desk')) {
     return canAccessLibraryDesk(roles, permissions) || canAccessAdminPortal(roles, permissions);
+  }
+  if (path.startsWith('/admissions-portal')) {
+    return canAccessApplicantPortal(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
   return true;
 }

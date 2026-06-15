@@ -326,11 +326,7 @@ export class StaffPfConfigService {
       string,
       ComponentOverride
     >;
-    const houseRent = existing.HOUSE_RENT;
-    const merged = mergeComponentOverrides(
-      houseRent ? { HOUSE_RENT: houseRent } : {},
-      pfOverrides,
-    );
+    const merged = mergeComponentOverrides(existing, pfOverrides);
 
     await this.prisma.staffPayAssignment.update({
       where: { id: assignment.id },

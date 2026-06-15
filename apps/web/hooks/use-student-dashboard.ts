@@ -20,7 +20,6 @@ export function useStudentDashboard(options?: { enabled?: boolean }) {
     data: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
-    qrPass: query.data?.qrPass ?? null,
     refetch: query.refetch,
   };
 }

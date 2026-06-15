@@ -41,6 +41,8 @@ import { PayrollAuditService } from './services/payroll-audit.service';
 
 import { PayrollReportsService } from './services/payroll-reports.service';
 
+import { PayrollExcelValidationService } from './services/payroll-excel-validation.service';
+
 import { PayrollRunEngineService } from './services/payroll-run-engine.service';
 
 import { PayrollSeedService } from './services/payroll-seed.service';
@@ -60,6 +62,8 @@ import { DbcPayrollSetupService } from './services/dbc-payroll-setup.service';
 import { StaffPayAssignmentService } from './services/staff-pay-assignment.service';
 
 import { StaffPfConfigService } from './services/staff-pf-config.service';
+
+import { SubstitutePayrollBridgeService } from './services/substitute-payroll-bridge.service';
 
 @Module({
   imports: [AccommodationModule, CommunicationModule, LoansModule],
@@ -88,6 +92,8 @@ import { StaffPfConfigService } from './services/staff-pf-config.service';
     LoanService,
 
     PayrollRunEngineService,
+
+    PayrollExcelValidationService,
 
     PayrollApprovalService,
 
@@ -128,6 +134,8 @@ import { StaffPfConfigService } from './services/staff-pf-config.service';
     PayslipsService,
 
     StaffPortalPayrollService,
+
+    SubstitutePayrollBridgeService,
   ],
 
   exports: [

@@ -1,8 +1,8 @@
 'use client';
 
+import { OperationsCommandCenter } from '@/components/dashboard/operations-command-center';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useRequireAuth } from '@/hooks/use-auth';
-import { AdminDashboard } from '@/modules/dashboard/admin-dashboard';
 
 export default function AdminDashboardPage() {
   const session = useRequireAuth();
@@ -11,8 +11,8 @@ export default function AdminDashboardPage() {
   const userName = session.user.email.split('@')[0] ?? 'Admin';
 
   return (
-    <DashboardShell role="admin" title="Analytics">
-      <AdminDashboard userName={userName} />
+    <DashboardShell role="admin">
+      <OperationsCommandCenter userName={userName} />
     </DashboardShell>
   );
 }

@@ -511,6 +511,7 @@ export class StudentPortalProfileService {
         id: true,
         userAgent: true,
         ipAddress: true,
+        metadata: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -523,14 +524,22 @@ export class StudentPortalProfileService {
 
     return {
       lastLoginAt: user?.lastLoginAt?.toISOString() ?? null,
-      devices: sessions.map((s, index) => ({
-        id: s.id,
-        label: index === 0 ? 'Current device' : 'Previous session',
-        userAgent: s.userAgent ?? 'Unknown device',
-        ipAddress: s.ipAddress ?? '—',
-        lastActiveAt: s.updatedAt.toISOString(),
-        isCurrent: index === 0,
-      })),
+      devices: sessions.map((s, index) => {
+        const meta = (s.metadata ?? {}) as Record<string, string | undefined>;
+        return {
+          id: s.id,
+          label:
+            meta.deviceLabel ??
+            (index === 0 ? 'Current device' : 'Previous session'),
+          userAgent: s.userAgent ?? 'Unknown device',
+          ipAddress: s.ipAddress ?? '—',
+          clientType: meta.clientType ?? 'web',
+          appType: meta.appType ?? null,
+          appVersion: meta.appVersion ?? null,
+          lastActiveAt: s.updatedAt.toISOString(),
+          isCurrent: index === 0,
+        };
+      }),
     };
   }
 

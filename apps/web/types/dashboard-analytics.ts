@@ -27,6 +27,95 @@ export type DashboardOverview = {
   updatedAt: string;
 };
 
+export type OperationsActionItem = {
+  id: string;
+  icon: string;
+  message: string;
+  href: string;
+  priority: 'critical' | 'high' | 'medium';
+  count?: number;
+};
+
+export type OperationsCenter = {
+  greeting: {
+    userName: string;
+    dateLabel: string;
+    dayLabel: string;
+  };
+  institution: {
+    academicYear: string;
+    semester: string;
+    cycle: string | null;
+    studentCount: number;
+    staffCount: number;
+  };
+  actions: OperationsActionItem[];
+  upcomingEvents: Array<{ date: string; label: string; href?: string }>;
+  academic: {
+    classesScheduled: number;
+    classesCompleted: number;
+    classesPending: number;
+    facultyPresent: number;
+    facultyAbsent: number;
+    facultyAttendancePct: number;
+    studentAttendancePct: number;
+    studentsPresent: number;
+    studentsAbsent: number;
+    dataSource: 'live' | 'estimated';
+  };
+  finance: {
+    todayCollection: number;
+    monthCollection: number;
+    pendingDues: number;
+    defaulters: number;
+    collectionRate: number;
+    monthlyTuitionPending: number;
+    collectionSparkline: number[];
+  };
+  pulse: {
+    urgentActions: number;
+    attendanceTodayPct: number;
+    collectionRate: number;
+    pendingDues: number;
+  };
+  admissions: {
+    seasonOpen: boolean;
+    received: number;
+    submitted: number;
+    approved: number;
+    pendingReview: number;
+    rejected: number;
+    seatsRemaining: number;
+    totalSeats: number;
+    seatsFilled: number;
+    completionPct: number;
+  } | null;
+  examinations: {
+    marksPending: number;
+    resultsPending: number;
+    hallTicketsPct: number;
+    notEligible: number;
+    daysToExams: number | null;
+  };
+  communication: {
+    smsToday: number;
+    whatsappToday: number;
+    unreadNotifications: number;
+    pendingCirculars: number;
+  };
+  announcements: Array<{ title: string; date: string; href?: string }>;
+  departments: Array<{ name: string; students: number; attendancePct: number | null }>;
+  aiInsights: string[];
+  updatedAt: string;
+};
+
+export type DashboardAiResponse = {
+  answer: string;
+  links?: Array<{ label: string; href: string }>;
+  source: 'live' | 'estimated' | 'rules';
+  suggestedFollowUps?: string[];
+};
+
 export type ChartSeriesPoint = {
   label: string;
   value: number;

@@ -97,12 +97,22 @@ export type FeeDashboard = {
     outstanding: number;
     totalDemanded: number;
     totalCollected: number;
+    admissionCollection?: number;
+    monthlyCollection?: number;
+    admissionOutstanding?: number;
+    monthlyOutstanding?: number;
+    fines?: number;
+    defaulterCount?: number;
+    externalPendingVerification?: number;
     renewalPending: number;
     concessions: number;
     receiptCount: number;
   };
   trends: { month: string; collected: number }[];
-  defaulters: FeeDemand[];
+  split?: { admission: number; monthly: number };
+  defaulters: Array<
+    FeeDemand & { studentName?: string; enrollmentNumber?: string; rollNumber?: string }
+  >;
 };
 
 export type FeeDemandPreview = {

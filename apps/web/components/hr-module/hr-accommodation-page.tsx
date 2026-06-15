@@ -369,6 +369,22 @@ export function HrAccommodationPage() {
         <AccommodationAlertBanner message={error} variant="error" onDismiss={() => setError('')} />
       ) : null}
 
+      {tab === 'dashboard' && dashboardQ.isLoading ? (
+        <GlassCard className="p-8 text-center text-sm text-muted-foreground">
+          Loading accommodation dashboard…
+        </GlassCard>
+      ) : null}
+
+      {tab === 'dashboard' && dashboardQ.isError ? (
+        <AccommodationAlertBanner
+          variant="error"
+          message={apiErrorMessage(
+            dashboardQ.error,
+            'Unable to load accommodation data. Log out and sign in again if you were recently granted access.',
+          )}
+        />
+      ) : null}
+
       {tab === 'dashboard' && dashboardQ.data ? (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

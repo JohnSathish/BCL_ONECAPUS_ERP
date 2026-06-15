@@ -57,6 +57,37 @@ export function StudentExamPortal() {
     );
   }
 
+  if (admit.data?.feeBlocked) {
+    return (
+      <div className="space-y-5">
+        <section className="rounded-3xl border border-rose-200 bg-rose-50 p-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+            Hall ticket blocked
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-rose-950">Fees outstanding</h1>
+          <p className="mt-2 text-sm text-rose-900">
+            Your hall ticket cannot be issued until pending fees are cleared. Outstanding amount:{' '}
+            <strong>₹{Number(admit.data.outstandingAmount ?? 0).toLocaleString('en-IN')}</strong>
+          </p>
+          {(admit.data.feeBlockReasons ?? []).length ? (
+            <ul className="mt-3 list-disc pl-5 text-sm text-rose-800">
+              {admit.data.feeBlockReasons.map((r: string) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          ) : null}
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => window.location.assign('/student/fees')}
+          >
+            View fee account
+          </Button>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">

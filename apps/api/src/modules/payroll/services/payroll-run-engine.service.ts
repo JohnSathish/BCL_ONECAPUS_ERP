@@ -27,7 +27,20 @@ import { PayrollAdjustmentsService } from './payroll-adjustments.service';
 import { PayrollAuditService } from './payroll-audit.service';
 import { ArrearsService } from './arrears.service';
 import { ProfessionalTaxService } from './professional-tax.service';
+import {
+  isCpfEnabledInAssignment,
+  shouldApplyProfessionalTax,
+} from './pay-statutory-overrides';
 import { TdsService } from './tds.service';
+import {
+  finalizeStatePayslipTotals,
+  isStateExcludedDeduction,
+} from './state-payroll-formulas';
+import {
+  finalizeUgcPayslipTotals,
+  isUgcExcludedDeduction,
+} from './ugc-payroll-formulas';
+import { SubstitutePayrollBridgeService } from './substitute-payroll-bridge.service';
 
 @Injectable()
 export class PayrollRunEngineService {
@@ -44,6 +57,7 @@ export class PayrollRunEngineService {
     private readonly arrears: ArrearsService,
     private readonly professionalTax: ProfessionalTaxService,
     private readonly tds: TdsService,
+    private readonly substituteBridge: SubstitutePayrollBridgeService,
   ) {}
 
   list(
@@ -158,6 +172,20 @@ export class PayrollRunEngineService {
       user.tid,
       runId,
     );
+    const collegePaidAssignments =
+      await this.substituteBridge.collegePaidAssignmentsForMonth(
+        user.tid,
+        run.month,
+        run.year,
+      );
+    const collegePaidOriginals = new Set(
+      collegePaidAssignments.map((row) => row.originalStaffProfileId),
+    );
+    const substituteLinkedStaffIds = new Set(
+      collegePaidAssignments
+        .map((row) => row.substitute.linkedStaffProfileId)
+        .filter((id): id is string => Boolean(id)),
+    );
     const arrearMap = await this.arrears.getArrearsForRun(user.tid, runId);
     const payrollSettings = await this.prisma.payrollSettings.findUnique({
       where: { tenantId: user.tid },
@@ -174,6 +202,8 @@ export class PayrollRunEngineService {
     for (const assignment of assignments) {
       if (assignment.staffProfile.status !== 'ACTIVE') continue;
       if (excluded.has(assignment.staffProfileId)) continue;
+      if (collegePaidOriginals.has(assignment.staffProfileId)) continue;
+      if (substituteLinkedStaffIds.has(assignment.staffProfileId)) continue;
 
       const att = await this.attendance.getProrationFactor(
         user.tid,
@@ -201,15 +231,18 @@ export class PayrollRunEngineService {
       );
 
       const pfSnapshot = pfConfigMap.get(assignment.staffProfileId);
-      const pfApplicable = isPfApplicable(pfSnapshot, periodEnd);
       const pfOverrides = buildPfOverridesFromConfig(pfSnapshot, periodEnd);
-      const assignmentOverrides = mergeComponentOverrides(
-        (assignment.componentOverrides ?? null) as Record<
-          string,
-          ComponentOverride
-        > | null,
-        pfOverrides,
-      );
+      const rawAssignmentOverrides = (assignment.componentOverrides ??
+        null) as Record<string, ComponentOverride> | null;
+      const isUgc = assignment.payScaleType === 'UGC';
+      const isState = assignment.payScaleType === 'STATE';
+      const cpfFromAssignment = isUgc || isState;
+      const assignmentOverrides = cpfFromAssignment
+        ? (rawAssignmentOverrides ?? {})
+        : mergeComponentOverrides(rawAssignmentOverrides, pfOverrides);
+      const pfApplicable = cpfFromAssignment
+        ? isCpfEnabledInAssignment(rawAssignmentOverrides)
+        : isPfApplicable(pfSnapshot, periodEnd);
 
       const computed = this.formula.computeAll(
         components,
@@ -221,21 +254,33 @@ export class PayrollRunEngineService {
         assignmentOverrides,
       );
 
-      const accommodationLines = await this.accommodation.getDeductionsForStaff(
-        user.tid,
-        assignment.staffProfileId,
-        run.month,
-        run.year,
-      );
+      const accommodationLines =
+        isUgc || isState
+          ? []
+          : await this.accommodation.getDeductionsForStaff(
+              user.tid,
+              assignment.staffProfileId,
+              run.month,
+              run.year,
+            );
 
       const earningGross = computed
         .filter((l) => l.componentType === 'EARNING')
         .reduce((s, l) => s + l.amount, 0);
-      const ptAmount = this.professionalTax.compute(
-        earningGross,
-        run.month,
-        payrollSettings?.professionalTaxSlabs,
-      );
+      const applyPt =
+        !isUgc &&
+        !isState &&
+        shouldApplyProfessionalTax(
+          assignment.payScaleType,
+          assignment.payStructureTemplate?.code,
+        );
+      const ptAmount = applyPt
+        ? this.professionalTax.compute(
+            earningGross,
+            run.month,
+            payrollSettings?.professionalTaxSlabs,
+          )
+        : 0;
       if (ptAmount > 0) {
         const ptIdx = computed.findIndex((l) => l.code === 'PROFESSIONAL_TAX');
         const ptLine = {
@@ -253,8 +298,10 @@ export class PayrollRunEngineService {
       }
 
       const tdsApplicable =
-        components.some((c) => c.code === 'TDS') ||
-        ['CONTRACT', 'GUEST', 'VISITING'].includes(assignment.payScaleType);
+        !isUgc &&
+        !isState &&
+        (components.some((c) => c.code === 'TDS') ||
+          ['CONTRACT', 'GUEST', 'VISITING'].includes(assignment.payScaleType));
       if (tdsApplicable) {
         const tdsAmount = this.tds.computeMonthlyTds(
           earningGross,
@@ -277,15 +324,26 @@ export class PayrollRunEngineService {
 
       let gross = 0;
       let deductions = 0;
-      for (const line of computed) {
-        if (line.componentType === 'EARNING') gross += line.amount;
-        else deductions += line.amount;
-      }
-      for (const line of accommodationLines) {
-        deductions += line.amount;
+      if (isUgc) {
+        const ugcTotals = finalizeUgcPayslipTotals(computed);
+        gross = ugcTotals.gross;
+        deductions = ugcTotals.deductions;
+      } else if (isState) {
+        const stateTotals = finalizeStatePayslipTotals(computed);
+        gross = stateTotals.gross;
+        deductions = stateTotals.deductions;
+      } else {
+        for (const line of computed) {
+          if (line.componentType === 'EARNING') gross += line.amount;
+          else deductions += line.amount;
+        }
+        for (const line of accommodationLines) {
+          deductions += line.amount;
+        }
       }
 
-      const arrearAmount = arrearMap.get(assignment.staffProfileId) ?? 0;
+      const arrearAmount =
+        isUgc || isState ? 0 : (arrearMap.get(assignment.staffProfileId) ?? 0);
       if (arrearAmount > 0) {
         gross += arrearAmount;
       }
@@ -313,6 +371,8 @@ export class PayrollRunEngineService {
 
       for (const line of computed) {
         if (shouldOmitPfPayslipLine(line.code, pfApplicable)) continue;
+        if (isUgc && isUgcExcludedDeduction(line.code)) continue;
+        if (isState && isStateExcludedDeduction(line.code)) continue;
         const comp = components.find((c) => c.code === line.code);
         await this.prisma.payslipLine.create({
           data: {
@@ -387,6 +447,19 @@ export class PayrollRunEngineService {
       );
 
       count++;
+    }
+
+    const includeSubstitutePayslips =
+      !run.payScaleType ||
+      run.payScaleType === 'GUEST' ||
+      run.payScaleType === 'COLLEGE_TEACHING';
+    if (includeSubstitutePayslips) {
+      count += await this.substituteBridge.appendCollegePaidSubstitutePayslips(
+        user,
+        runId,
+        run.month,
+        run.year,
+      );
     }
 
     await this.adjustments.recalcRunTotals(runId);

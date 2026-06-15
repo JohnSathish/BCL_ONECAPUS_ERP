@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { DirectoryHealthIndicators } from '@/components/students-module/directory/directory-health-indicators';
+import { DirectoryAttendanceBadge } from '@/components/students-module/directory/ui/directory-attendance-badge';
+import { DirectoryFeeBadge } from '@/components/students-module/directory/ui/directory-fee-badge';
 import { DirectoryRowPreview } from '@/components/students-module/directory/directory-row-preview';
-import { DirectoryRegistrationBadge } from '@/components/students-module/directory/ui/directory-registration-badge';
 import { DirectorySemesterChip } from '@/components/students-module/directory/ui/directory-semester-chip';
 import { DirectoryStatusPill } from '@/components/students-module/directory/ui/directory-status-pill';
 import { DirectoryStudentAvatar } from '@/components/students-module/directory/ui/directory-student-avatar';
@@ -96,10 +96,8 @@ export function DirectoryMobileList({ rows, selectedIds, onToggleRow, onOpenProf
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <DirectoryStatusPill label={statusLabel} />
                   <DirectorySemesterChip semester={row.semester} />
-                  <DirectoryRegistrationBadge status={row.registrationStatus} />
-                </div>
-                <div className="mt-1.5">
-                  <DirectoryHealthIndicators row={row} compact />
+                  <DirectoryFeeBadge row={row} />
+                  <DirectoryAttendanceBadge row={row} />
                 </div>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
                   {row.programme ?? '—'}

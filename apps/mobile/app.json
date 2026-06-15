@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "OneCampus Mobile",
+    "slug": "onecampus-mobile",
+    "version": "1.0.0",
+    "scheme": "onecampus",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "edu.onecampus.mobile"
+    },
+    "android": {
+      "package": "edu.onecampus.mobile"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-asset", "expo-font", "expo-dev-client"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

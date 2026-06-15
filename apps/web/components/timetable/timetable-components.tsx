@@ -547,11 +547,13 @@ export function TimetableMatrixGrid({
 
 export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
   const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
+  const overlay = entry.replacementOverlay;
   return (
     <div
       className={cn(
         'rounded-xl border px-3 py-2 text-xs shadow-sm',
         categoryClasses[category] ?? 'border-border bg-card',
+        overlay ? 'border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/20' : '',
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -564,10 +566,25 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
       <p className="mt-2 text-[11px]">
         Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'}
       </p>
-      <p className="text-[11px] opacity-80">
-        {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'} ·{' '}
-        {entry.classroom?.code ?? 'Room TBA'}
-      </p>
+      {overlay ? (
+        <div className="mt-2 space-y-0.5 text-[11px]">
+          <p className="opacity-90">
+            <span className="font-medium">Original Faculty:</span> {overlay.originalStaffName}
+          </p>
+          <p className="font-medium text-amber-800 dark:text-amber-200">
+            Handled By: {overlay.handledByName}
+          </p>
+          <p className="text-[10px] opacity-75">{overlay.reasonLabel}</p>
+        </div>
+      ) : (
+        <p className="text-[11px] opacity-80">
+          {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'} ·{' '}
+          {entry.classroom?.code ?? 'Room TBA'}
+        </p>
+      )}
+      {!overlay ? null : (
+        <p className="mt-1 text-[11px] opacity-80">{entry.classroom?.code ?? 'Room TBA'}</p>
+      )}
       {entry.isCombined ? <p className="mt-1 text-[10px] font-semibold">Combined class</p> : null}
     </div>
   );

@@ -71,6 +71,18 @@ export class TenantResolutionService {
     return normalized;
   }
 
+  async resolveSlug(slug: string) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: {
+        slug: slug.trim().toLowerCase(),
+        deletedAt: null,
+        status: 'active',
+      },
+    });
+    if (!tenant) throw new NotFoundException('Institution not found');
+    return tenant;
+  }
+
   async resolveHost(host: string) {
     const normalized = this.mapDevLoginHost(host);
     if (!normalized) {

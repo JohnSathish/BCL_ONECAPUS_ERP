@@ -1,11 +1,13 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { Loader2, Lock, Mail, Shield } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import type { FieldErrors, UseFormHandleSubmit, UseFormRegister } from 'react-hook-form';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
+import { useLoginHeroMotion } from '@/components/auth/login-hero/use-login-hero-motion';
 import { LoginDemoWorkspace } from './login-demo-workspace';
 import { LoginField } from './login-field';
 import { LoginHumanVerification } from './login-human-verification';
@@ -37,6 +39,18 @@ const SECURITY_LINES = [
   'Role-based multi-tenant secure access',
 ] as const;
 
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+function fadeUp(delay: number, enabled: boolean) {
+  return enabled
+    ? {
+        initial: { opacity: 0, y: 10 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.42, delay, ease: EASE_OUT },
+      }
+    : { initial: false as const };
+}
+
 export function LoginAuthCard({
   context,
   contextLoading,
@@ -56,6 +70,8 @@ export function LoginAuthCard({
   challengeAnswer,
   onFillDemoCredentials,
 }: Props) {
+  const animate = useLoginHeroMotion();
+  const showSignInIntro = Boolean(context) && !contextLoading;
   const themeStyle = context?.theme
     ? ({
         '--login-institution-primary': context.theme.primaryColor,
@@ -67,61 +83,82 @@ export function LoginAuthCard({
     Boolean(context) && Boolean(challenge) && challengeAnswer.trim().length > 0 && !isSubmitting;
 
   return (
-    <article
+    <motion.article
       className="login-glass-card login-institution-themed login-auth-card-shell flex w-full min-h-0 max-h-[min(calc(100dvh-4rem),880px)] min-w-0 max-w-[440px] flex-col overflow-hidden rounded-2xl"
       style={themeStyle}
+      initial={animate ? { opacity: 0, y: 18, scale: 0.98 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.55, ease: EASE_OUT }}
     >
-      <LoginInstitutionHeader
-        context={context}
-        loading={contextLoading}
-        waitingForApi={waitingForApi}
-        errorMessage={contextError}
-      />
+      <motion.div {...fadeUp(0.06, animate)}>
+        <LoginInstitutionHeader
+          context={context}
+          loading={contextLoading}
+          waitingForApi={waitingForApi}
+          errorMessage={contextError}
+        />
+      </motion.div>
+
+      {showSignInIntro ? (
+        <motion.div
+          className="shrink-0 border-b border-border/30 bg-card/40 px-5 py-3 sm:px-6"
+          {...fadeUp(0.14, animate)}
+        >
+          <p className="text-sm font-semibold tracking-tight text-foreground">
+            Sign in to your portal
+          </p>
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+            Enter your credentials to access your campus workspace
+          </p>
+        </motion.div>
+      ) : null}
 
       <div className="login-auth-card-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
         <div className="space-y-3 px-5 py-4 sm:px-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
-            <LoginField
-              id="email"
-              label="Work email"
-              icon={Mail}
-              type="email"
-              autoComplete="email"
-              disabled={isSubmitting || !context}
-              error={errors.email?.message}
-              register={register}
-            />
-            <LoginField
-              id="password"
-              label="Password"
-              icon={Lock}
-              type="password"
-              autoComplete="current-password"
-              disabled={isSubmitting || !context}
-              error={errors.password?.message}
-              register={register}
-              passwordValue={passwordValue}
-            />
-
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                className="rounded border-border"
+            <motion.div className="space-y-3" {...fadeUp(0.22, animate)}>
+              <LoginField
+                id="email"
+                label="Work email"
+                icon={Mail}
+                type="email"
+                autoComplete="email"
                 disabled={isSubmitting || !context}
-                {...register('rememberMe')}
+                error={errors.email?.message}
+                register={register}
               />
-              Remember me for 30 days
-            </label>
+              <LoginField
+                id="password"
+                label="Password"
+                icon={Lock}
+                type="password"
+                autoComplete="current-password"
+                disabled={isSubmitting || !context}
+                error={errors.password?.message}
+                register={register}
+                passwordValue={passwordValue}
+              />
 
-            <LoginHumanVerification
-              challenge={challenge}
-              loading={challengeLoading}
-              waitingForApi={waitingForApi}
-              error={verificationError ?? errors.challengeAnswer?.message}
-              disabled={isSubmitting || !context}
-              register={register}
-              onRefresh={onRefreshChallenge}
-            />
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  disabled={isSubmitting || !context}
+                  {...register('rememberMe')}
+                />
+                Remember me for 30 days
+              </label>
+
+              <LoginHumanVerification
+                challenge={challenge}
+                loading={challengeLoading}
+                waitingForApi={waitingForApi}
+                error={verificationError ?? errors.challengeAnswer?.message}
+                disabled={isSubmitting || !context}
+                register={register}
+                onRefresh={onRefreshChallenge}
+              />
+            </motion.div>
 
             {formError ? (
               <p
@@ -132,29 +169,38 @@ export function LoginAuthCard({
               </p>
             ) : null}
 
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="login-cta group relative flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-sm font-semibold text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="login-cta-gradient absolute inset-0" />
-              <span className="login-cta-shine absolute inset-0" />
-              <span className="relative flex items-center gap-2">
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                    Signing in…
-                  </>
-                ) : (
-                  'Sign In Securely'
-                )}
-              </span>
-            </button>
+            <motion.div {...fadeUp(0.34, animate)}>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="login-cta group relative flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-sm font-semibold text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="login-cta-gradient absolute inset-0" />
+                <span className="login-cta-shine absolute inset-0" />
+                <span className="relative flex items-center gap-2">
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      Signing in…
+                    </>
+                  ) : (
+                    'Sign In Securely'
+                  )}
+                </span>
+              </button>
+            </motion.div>
           </form>
 
-          {context ? <LoginDemoWorkspace onFillCredentials={onFillDemoCredentials} /> : null}
+          {context ? (
+            <motion.div {...fadeUp(0.42, animate)}>
+              <LoginDemoWorkspace onFillCredentials={onFillDemoCredentials} />
+            </motion.div>
+          ) : null}
 
-          <div className="space-y-1 border-t border-border/40 pt-2.5">
+          <motion.div
+            className="space-y-1 border-t border-border/40 pt-2.5"
+            {...fadeUp(0.48, animate)}
+          >
             {SECURITY_LINES.map((line) => (
               <p
                 key={line}
@@ -164,11 +210,14 @@ export function LoginAuthCard({
                 {line}
               </p>
             ))}
-          </div>
+          </motion.div>
         </div>
       </div>
 
-      <footer className="shrink-0 border-t border-border/50 bg-muted/15 px-5 py-3 sm:px-6">
+      <motion.footer
+        className="shrink-0 border-t border-border/50 bg-muted/15 px-5 py-3 sm:px-6"
+        {...fadeUp(0.54, animate)}
+      >
         <div className="flex flex-col items-center gap-1.5 text-center">
           <Link
             href="https://basecodelabs.com"
@@ -189,7 +238,7 @@ export function LoginAuthCard({
             </p>
           </Link>
         </div>
-      </footer>
-    </article>
+      </motion.footer>
+    </motion.article>
   );
 }

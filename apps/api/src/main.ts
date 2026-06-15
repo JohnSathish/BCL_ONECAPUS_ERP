@@ -16,6 +16,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule,
     new ExpressAdapter(),
+    { rawBody: true },
   );
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), {

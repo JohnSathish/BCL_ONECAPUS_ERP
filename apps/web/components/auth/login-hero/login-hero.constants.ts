@@ -19,7 +19,7 @@ import {
 
 /** Set false to keep the login hero fully static (no motion, counters, or carousels). */
 
-export const LOGIN_HERO_ANIMATIONS_ENABLED = false;
+export const LOGIN_HERO_ANIMATIONS_ENABLED = true;
 
 /** Primary highlights — mobile 2×2 grid. */
 

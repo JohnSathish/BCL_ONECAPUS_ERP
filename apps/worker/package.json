@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "node ../../scripts/wait-for-tcp.mjs 127.0.0.1 6379 120000 redis",
+    "prebuild": "node -e \"try{require('fs').accessSync('../api/node_modules/.prisma/client/index.js')}catch{console.warn('[worker] Run npm run db:generate -w api before build')}\"",
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
@@ -12,7 +13,8 @@
   },
   "dependencies": {
     "bullmq": "^5.52.2",
-    "ioredis": "^5.6.1"
+    "ioredis": "^5.6.1",
+    "puppeteer": "^25.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

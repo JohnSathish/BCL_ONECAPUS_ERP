@@ -54,12 +54,25 @@ export class AdmissionsController {
     @CurrentUser() user: JwtUser,
     @Query() query: PaginationQueryDto,
     @Query('intakeId') intakeId?: string,
+    @Query('cycleId') cycleId?: string,
     @Query('status') status?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('documentVerificationStatus') documentVerificationStatus?: string,
+    @Query('paymentPending') paymentPending?: string,
+    @Query('documentPending') documentPending?: string,
+    @Query('admissionFeePending') admissionFeePending?: string,
   ) {
     return this.admissions.listApplications(user.tid, {
       ...query,
       intakeId,
+      cycleId,
       status,
+      paymentStatus,
+      documentVerificationStatus,
+      paymentPending: paymentPending === '1' || paymentPending === 'true',
+      documentPending: documentPending === '1' || documentPending === 'true',
+      admissionFeePending:
+        admissionFeePending === '1' || admissionFeePending === 'true',
     });
   }
 

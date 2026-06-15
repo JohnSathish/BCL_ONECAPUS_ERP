@@ -8,6 +8,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import type { StaffProfileSection } from '../dto/staff.dto';
 import { STAFF_PROFILE_SECTIONS } from '../dto/staff.dto';
 import { StaffEmploymentService } from './staff-employment.service';
+import { teachingShiftCategoryLabel } from './staff-shift-category';
 import { StaffProvisioningService } from './staff-provisioning.service';
 import {
   assertBiometricIdUnique,
@@ -52,13 +53,7 @@ const profileInclude = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
-  documents: {
-    orderBy: { createdAt: 'desc' as const },
-    include: {
-      verifiedBy: { select: { displayName: true, email: true } },
-      uploadedBy: { select: { displayName: true, email: true } },
-    },
-  },
+  documents: { orderBy: { createdAt: 'desc' as const } },
   publications: { orderBy: { publishedAt: 'desc' as const } },
   awards: { orderBy: { awardDate: 'desc' as const } },
   qualifications: { orderBy: { createdAt: 'desc' as const } },
@@ -166,6 +161,9 @@ export class StaffProfileService {
         designationId: payload.designationId as string | null | undefined,
         primaryShiftId: payload.primaryShiftId as string | null | undefined,
         additionalShiftIds: payload.additionalShiftIds as string[] | undefined,
+        teachingShiftCategory: payload.teachingShiftCategory as
+          | string
+          | undefined,
         additionalRoleCodes: payload.additionalRoleCodes as
           | string[]
           | undefined,
@@ -214,6 +212,7 @@ export class StaffProfileService {
     department: { id: string; code: string; name: string } | null;
     designation: { id: string; code: string; label: string } | null;
     primaryShift: { id: string; code: string; name: string } | null;
+    teachingShiftCategory?: string;
     additionalRoles?: { roleCode: string; roleName: string; active: boolean }[];
     portalUser: {
       id: string;
@@ -253,6 +252,10 @@ export class StaffProfileService {
       })),
       shift: staff.primaryShift?.name ?? null,
       primaryShiftId: staff.primaryShift?.id ?? null,
+      teachingShiftCategory: staff.teachingShiftCategory ?? 'DAY',
+      teachingShiftLabel: teachingShiftCategoryLabel(
+        staff.teachingShiftCategory,
+      ),
       portalActive: staff.portalUser?.isActive ?? false,
       portalPending:
         !!staff.portalUser &&

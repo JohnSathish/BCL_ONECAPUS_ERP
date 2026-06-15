@@ -14,8 +14,10 @@ import { Throttle } from '@nestjs/throttler';
 import { ClsService } from 'nestjs-cls';
 import type { Request, Response } from 'express';
 import { CLS_TENANT_ID } from '../../common/cls/cls.constants';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtUser,
+} from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import {
   extractClientIp,
@@ -67,6 +69,41 @@ export class AuthController {
     );
   }
 
+  private isMobileClient(req: Request): boolean {
+    const header = String(req.headers['x-client-type'] ?? '').toLowerCase();
+    const bodyType = (
+      req.body as { clientType?: string } | undefined
+    )?.clientType?.toLowerCase();
+    return header === 'mobile' || bodyType === 'mobile';
+  }
+
+  private respondSession(
+    req: Request,
+    res: Response,
+    session: Awaited<ReturnType<AuthService['login']>>,
+  ) {
+    this.applyRefreshCookie(res, session);
+    return this.auth.toPublicSession(session, {
+      includeRefreshToken: this.isMobileClient(req),
+    });
+  }
+
+  private mobileMeta(req: Request) {
+    if (!this.isMobileClient(req)) return undefined;
+    const appType = String(req.headers['x-app-type'] ?? '').toLowerCase();
+    return {
+      userAgent: req.headers['user-agent'],
+      ipAddress: extractClientIp(req),
+      clientType: 'mobile',
+      appType: appType === 'staff' ? 'staff' : 'student',
+      appVersion:
+        String(req.headers['x-app-version'] ?? '').trim() || undefined,
+      deviceId: String(req.headers['x-device-id'] ?? '').trim() || undefined,
+      deviceLabel:
+        String(req.headers['x-device-model'] ?? '').trim() || undefined,
+    };
+  }
+
   @Public()
   @Get('context')
   getContext(@Req() req: Request) {
@@ -106,14 +143,13 @@ export class AuthController {
       dto.password,
       dto.challengeToken,
       dto.challengeAnswer,
-      {
+      this.mobileMeta(req) ?? {
         userAgent: req.headers['user-agent'],
         ipAddress: extractClientIp(req),
       },
       dto.rememberMe,
     );
-    this.applyRefreshCookie(res, session);
-    return this.auth.toPublicSession(session);
+    return this.respondSession(req, res, session);
   }
 
   @Public()
@@ -134,9 +170,16 @@ export class AuthController {
     const session = await this.auth.refresh(refreshToken, {
       userAgent: req.headers['user-agent'],
       ipAddress: extractClientIp(req),
+      ...(this.isMobileClient(req)
+        ? {
+            clientType: 'mobile',
+            appType: String(req.headers['x-app-type'] ?? 'student'),
+            appVersion:
+              String(req.headers['x-app-version'] ?? '').trim() || undefined,
+          }
+        : {}),
     });
-    this.applyRefreshCookie(res, session);
-    return this.auth.toPublicSession(session);
+    return this.respondSession(req, res, session);
   }
 
   @Public()
@@ -155,12 +198,16 @@ export class AuthController {
   }
 
   @Post('permissions/refresh')
-  async refreshPermissions(@CurrentUser() user: JwtUser, @Req() req: Request) {
+  async refreshPermissions(
+    @CurrentUser() user: JwtUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const session = await this.auth.refreshPermissions(user.sub, {
       userAgent: req.headers['user-agent'],
       ipAddress: extractClientIp(req),
     });
-    return this.auth.toPublicSession(session);
+    return this.respondSession(req, res, session);
   }
 
   @Post('change-password')

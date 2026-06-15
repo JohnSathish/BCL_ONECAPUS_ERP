@@ -11,6 +11,7 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { OfferingSectionStreamsService } from '../../common/services/offering-section-streams.service';
 import { ShiftScopeService } from '../../common/services/shift-scope.service';
 import { PrismaService } from '../../database/prisma.service';
+import { CacheService } from '../../shared/cache/cache.service';
 import { paginate, PaginationQueryDto } from '../../common/dto/pagination.dto';
 import type { CourseListQueryDto } from './dto/course-list-query.dto';
 import { isAcademicDepartment } from '../organization/department-rules';
@@ -141,6 +142,7 @@ export class AcademicCatalogService {
     private readonly prisma: PrismaService,
     private readonly shiftScope: ShiftScopeService,
     private readonly sectionStreams: OfferingSectionStreamsService,
+    private readonly cache: CacheService,
   ) {}
 
   private normalizeCode(code: string) {
@@ -404,6 +406,19 @@ export class AcademicCatalogService {
   async listPrograms(tenantId: string, query: PaginationQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    if (!query.search) {
+      return this.cache.wrap(
+        `programmes:${tenantId}:${page}:${limit}`,
+        86400,
+        () => this.fetchPrograms(tenantId, query),
+      );
+    }
+    return this.fetchPrograms(tenantId, query);
+  }
+
+  private async fetchPrograms(tenantId: string, query: PaginationQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
     const where: Prisma.ProgramWhereInput = {
       tenantId,
       deletedAt: null,
@@ -429,6 +444,10 @@ export class AcademicCatalogService {
     ]);
 
     return paginate(data, total, page, limit);
+  }
+
+  private async bustProgrammeCache(tenantId: string) {
+    await this.cache.delByPrefix(`programmes:${tenantId}:`);
   }
 
   getProgram(tenantId: string, id: string) {
@@ -467,7 +486,7 @@ export class AcademicCatalogService {
       if (existing.deletedAt === null) {
         throw new ConflictException(`Program code "${code}" already exists`);
       }
-      return this.prisma.program.update({
+      const row = await this.prisma.program.update({
         where: { id: existing.id },
         data: {
           deletedAt: null,
@@ -479,9 +498,11 @@ export class AcademicCatalogService {
         },
         include: programInclude,
       });
+      await this.bustProgrammeCache(tenantId);
+      return row;
     }
 
-    return this.prisma.program.create({
+    const row = await this.prisma.program.create({
       data: {
         tenantId,
         code,
@@ -491,6 +512,8 @@ export class AcademicCatalogService {
       },
       include: programInclude,
     });
+    await this.bustProgrammeCache(tenantId);
+    return row;
   }
 
   async updateProgram(tenantId: string, id: string, dto: UpdateProgramDto) {
@@ -510,7 +533,7 @@ export class AcademicCatalogService {
       await this.assertDepartment(tenantId, dto.departmentId);
     }
 
-    return this.prisma.program.update({
+    const row = await this.prisma.program.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name } : {}),
@@ -522,6 +545,8 @@ export class AcademicCatalogService {
       },
       include: programInclude,
     });
+    await this.bustProgrammeCache(tenantId);
+    return row;
   }
 
   /** @deprecated Use ProgramVersionLifecycleService.createDraft */

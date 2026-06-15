@@ -1,0 +1,612 @@
+{
+  "tenantSlug": "don-bosco-tura",
+  "academicYear": "2025-26",
+  "committees": [
+    {
+      "name": "Internal Quality Assurance Cell",
+      "shortCode": "IQAC",
+      "committeeType": "STATUTORY",
+      "category": "QUALITY",
+      "description": "NAAC-aligned internal quality assurance and institutional enhancement.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "IQAC Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Associate Professor"
+        }
+      ]
+    },
+    {
+      "name": "Academic Council",
+      "shortCode": "AC",
+      "committeeType": "STATUTORY",
+      "category": "ACADEMIC",
+      "description": "Academic policy, curriculum approval, and academic governance.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Vice Principal (Academics)",
+          "role": "MEMBER_SECRETARY",
+          "designation": "Vice Principal"
+        }
+      ]
+    },
+    {
+      "name": "Governing Body",
+      "shortCode": "GB",
+      "committeeType": "STATUTORY",
+      "category": "ADMINISTRATIVE",
+      "description": "Top-level institutional governance and policy oversight.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Manager",
+          "role": "CHAIRPERSON",
+          "designation": "Manager, Don Bosco Society"
+        },
+        {
+          "displayName": "Principal",
+          "role": "MEMBER",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "Finance Committee",
+      "shortCode": "FC",
+      "committeeType": "STANDING",
+      "category": "FINANCE",
+      "description": "Budget review, financial planning, and audit coordination.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Bursar",
+          "role": "CONVENER",
+          "designation": "Administrative Officer"
+        }
+      ]
+    },
+    {
+      "name": "RUSA Implementation Cell",
+      "shortCode": "RUSA",
+      "committeeType": "STANDING",
+      "category": "RESEARCH",
+      "description": "RUSA scheme implementation, reporting, and monitoring.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "RUSA Nodal Officer",
+          "role": "COORDINATOR",
+          "designation": "Assistant Professor"
+        }
+      ]
+    },
+    {
+      "name": "Internal Complaints Committee",
+      "shortCode": "ICC",
+      "committeeType": "STATUTORY",
+      "category": "STUDENT_WELFARE",
+      "description": "Prevention, prohibition and redressal of sexual harassment (POSH).",
+      "exOfficioMembers": [
+        {
+          "displayName": "Presiding Officer",
+          "role": "CHAIRPERSON",
+          "designation": "Senior Faculty"
+        },
+        {
+          "displayName": "External Member",
+          "role": "EXTERNAL_EXPERT",
+          "designation": "NGO Representative",
+          "isExternal": true
+        }
+      ]
+    },
+    {
+      "name": "Examination Committee",
+      "shortCode": "EXAM",
+      "committeeType": "STANDING",
+      "category": "EXAMINATION",
+      "description": "Examination scheduling, conduct, and result processing oversight.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Controller of Examinations",
+          "role": "CONVENER",
+          "designation": "Controller of Examinations"
+        },
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "Admission Committee",
+      "shortCode": "ADM",
+      "committeeType": "STANDING",
+      "category": "ADMISSION",
+      "description": "Admission policy, merit lists, and enrollment coordination.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Admission Coordinator",
+          "role": "CONVENER",
+          "designation": "Faculty Coordinator"
+        }
+      ]
+    },
+    {
+      "name": "RTI Cell",
+      "shortCode": "RTI",
+      "committeeType": "STATUTORY",
+      "category": "ADMINISTRATIVE",
+      "description": "Right to Information compliance and public disclosure.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Public Information Officer",
+          "role": "CONVENER",
+          "designation": "Administrative Officer"
+        },
+        {
+          "displayName": "Appellate Authority",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "National Service Scheme Unit",
+      "shortCode": "NSS",
+      "committeeType": "STANDING",
+      "category": "CO_CURRICULAR",
+      "description": "Community service, social outreach, and NSS programme activities.",
+      "exOfficioMembers": [
+        {
+          "displayName": "NSS Programme Officer",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        },
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "National Cadet Corps Unit",
+      "shortCode": "NCC",
+      "committeeType": "STANDING",
+      "category": "CO_CURRICULAR",
+      "description": "NCC training, drills, and cadet welfare.",
+      "exOfficioMembers": [
+        {
+          "displayName": "NCC Officer",
+          "role": "COORDINATOR",
+          "designation": "ANO"
+        },
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "Green Club",
+      "shortCode": "GREEN",
+      "committeeType": "STANDING",
+      "category": "CO_CURRICULAR",
+      "description": "Environmental awareness, sustainability, and eco-initiatives.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Green Club Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        },
+        {
+          "displayName": "Student Representative",
+          "role": "STUDENT_REPRESENTATIVE",
+          "designation": "General Secretary"
+        }
+      ]
+    },
+    {
+      "name": "NAAC Steering Committee",
+      "shortCode": "NAAC",
+      "committeeType": "AD_HOC",
+      "category": "QUALITY",
+      "description": "NAAC accreditation preparation and criterion-wise evidence mapping.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "IQAC Coordinator",
+          "role": "CONVENER",
+          "designation": "IQAC Coordinator"
+        }
+      ]
+    },
+    {
+      "name": "Research Committee",
+      "shortCode": "RC",
+      "committeeType": "STANDING",
+      "category": "RESEARCH",
+      "description": "Research policy, ethics clearance, and faculty research support.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Research Coordinator",
+          "role": "CONVENER",
+          "designation": "Associate Professor"
+        }
+      ]
+    },
+    {
+      "name": "Research and Development Cell",
+      "shortCode": "RDC",
+      "committeeType": "STANDING",
+      "category": "RESEARCH",
+      "description": "Faculty research projects, publications, and consultancy.",
+      "exOfficioMembers": [
+        {
+          "displayName": "RDC Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Assistant Professor"
+        }
+      ]
+    },
+    {
+      "name": "Anti-Ragging Committee",
+      "shortCode": "ARC",
+      "committeeType": "STATUTORY",
+      "category": "STUDENT_WELFARE",
+      "description": "Anti-ragging measures, awareness, and complaint redressal.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Anti-Ragging Nodal Officer",
+          "role": "CONVENER",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Grievance Redressal Cell",
+      "shortCode": "GRC",
+      "committeeType": "STATUTORY",
+      "category": "STUDENT_WELFARE",
+      "description": "Student and staff grievance handling and resolution.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Grievance Officer",
+          "role": "CONVENER",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "SC/ST Cell",
+      "shortCode": "SCST",
+      "committeeType": "STATUTORY",
+      "category": "STUDENT_WELFARE",
+      "description": "Welfare and support for SC/ST students and staff.",
+      "exOfficioMembers": [
+        {
+          "displayName": "SC/ST Liaison Officer",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Equal Opportunity Cell",
+      "shortCode": "EOC",
+      "committeeType": "STATUTORY",
+      "category": "STUDENT_WELFARE",
+      "description": "Inclusive education and equal opportunity initiatives.",
+      "exOfficioMembers": [
+        {
+          "displayName": "EOC Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Women Cell",
+      "shortCode": "WOMEN",
+      "committeeType": "STANDING",
+      "category": "STUDENT_WELFARE",
+      "description": "Gender equity, women empowerment, and welfare programmes.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Women Cell Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Library Committee",
+      "shortCode": "LIB",
+      "committeeType": "STANDING",
+      "category": "INFRASTRUCTURE",
+      "description": "Library resources, procurement, and reader services.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Librarian",
+          "role": "CONVENER",
+          "designation": "Chief Librarian"
+        }
+      ]
+    },
+    {
+      "name": "Sports Committee",
+      "shortCode": "SPORTS",
+      "committeeType": "STANDING",
+      "category": "CO_CURRICULAR",
+      "description": "Sports events, infrastructure, and athlete development.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Director of Physical Education",
+          "role": "COORDINATOR",
+          "designation": "DPE"
+        }
+      ]
+    },
+    {
+      "name": "Cultural Committee",
+      "shortCode": "CULT",
+      "committeeType": "STANDING",
+      "category": "CO_CURRICULAR",
+      "description": "Cultural programmes, fests, and co-curricular activities.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Cultural Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Career Guidance and Placement Cell",
+      "shortCode": "CGC",
+      "committeeType": "STANDING",
+      "category": "STUDENT_WELFARE",
+      "description": "Career counselling, placements, and industry linkages.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Placement Officer",
+          "role": "COORDINATOR",
+          "designation": "Placement Officer"
+        }
+      ]
+    },
+    {
+      "name": "Alumni Association Executive",
+      "shortCode": "ALUM",
+      "committeeType": "STANDING",
+      "category": "OTHER",
+      "description": "Alumni engagement, mentorship, and institutional support.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Alumni Coordinator",
+          "role": "CONVENER",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Staff Council",
+      "shortCode": "STAFF",
+      "committeeType": "STANDING",
+      "category": "ADMINISTRATIVE",
+      "description": "Staff welfare, representation, and internal communication.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Staff Council President",
+          "role": "CHAIRPERSON",
+          "designation": "Senior Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Students Council",
+      "shortCode": "STUD",
+      "committeeType": "STANDING",
+      "category": "STUDENT_WELFARE",
+      "description": "Student representation and co-curricular leadership.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Students Union President",
+          "role": "CHAIRPERSON",
+          "designation": "General Secretary"
+        }
+      ]
+    },
+    {
+      "name": "Disciplinary Committee",
+      "shortCode": "DISC",
+      "committeeType": "STANDING",
+      "category": "ADMINISTRATIVE",
+      "description": "Disciplinary matters for students and staff.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Discipline Coordinator",
+          "role": "CONVENER",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Examination Malpractice Committee",
+      "shortCode": "EMC",
+      "committeeType": "STANDING",
+      "category": "EXAMINATION",
+      "description": "Investigation and action on examination malpractice cases.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Controller of Examinations",
+          "role": "CONVENER",
+          "designation": "CoE"
+        }
+      ]
+    },
+    {
+      "name": "Hostel Committee",
+      "shortCode": "HOSTEL",
+      "committeeType": "STANDING",
+      "category": "INFRASTRUCTURE",
+      "description": "Hostel administration, welfare, and discipline.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Hostel Warden",
+          "role": "CONVENER",
+          "designation": "Chief Warden"
+        }
+      ]
+    },
+    {
+      "name": "Transport Committee",
+      "shortCode": "TRANS",
+      "committeeType": "STANDING",
+      "category": "INFRASTRUCTURE",
+      "description": "Transport routes, safety, and student commute services.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Transport In-charge",
+          "role": "COORDINATOR",
+          "designation": "Administrative Staff"
+        }
+      ]
+    },
+    {
+      "name": "IT Committee",
+      "shortCode": "IT",
+      "committeeType": "STANDING",
+      "category": "INFRASTRUCTURE",
+      "description": "Campus IT infrastructure, ERP, and digital services.",
+      "exOfficioMembers": [
+        {
+          "displayName": "System Administrator",
+          "role": "CONVENER",
+          "designation": "IT Officer"
+        }
+      ]
+    },
+    {
+      "name": "Institutional Ethics Committee",
+      "shortCode": "IEC",
+      "committeeType": "STATUTORY",
+      "category": "RESEARCH",
+      "description": "Research ethics review and compliance.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Ethics Committee Chair",
+          "role": "CHAIRPERSON",
+          "designation": "Senior Faculty"
+        },
+        {
+          "displayName": "External Expert",
+          "role": "EXTERNAL_EXPERT",
+          "designation": "Subject Expert",
+          "isExternal": true
+        }
+      ]
+    },
+    {
+      "name": "Department Quality Assurance Cell",
+      "shortCode": "DQA",
+      "committeeType": "SUB_COMMITTEE",
+      "category": "QUALITY",
+      "description": "Department-level quality monitoring aligned with IQAC.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Head of Department",
+          "role": "CHAIRPERSON",
+          "designation": "HOD"
+        },
+        {
+          "displayName": "DQA Coordinator",
+          "role": "COORDINATOR",
+          "designation": "Faculty"
+        }
+      ]
+    },
+    {
+      "name": "Purchase Committee",
+      "shortCode": "PUR",
+      "committeeType": "STANDING",
+      "category": "FINANCE",
+      "description": "Procurement approvals and vendor evaluation.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Bursar",
+          "role": "CONVENER",
+          "designation": "Bursar"
+        },
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        }
+      ]
+    },
+    {
+      "name": "Infrastructure Development Committee",
+      "shortCode": "IDC",
+      "committeeType": "STANDING",
+      "category": "INFRASTRUCTURE",
+      "description": "Campus infrastructure planning and maintenance oversight.",
+      "exOfficioMembers": [
+        {
+          "displayName": "Principal",
+          "role": "CHAIRPERSON",
+          "designation": "Principal"
+        },
+        {
+          "displayName": "Works Superintendent",
+          "role": "CONVENER",
+          "designation": "Administrative Officer"
+        }
+      ]
+    }
+  ]
+}

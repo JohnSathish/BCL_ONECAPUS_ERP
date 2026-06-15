@@ -38,6 +38,7 @@ import { UserProvisioningService } from '../administration/services/user-provisi
 import { RollNumberService } from './services/roll-number.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
+import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service';
 import { createWorkbookWithSheets } from '../../common/import/excel.util';
 
 const directoryInclude = {
@@ -129,6 +130,7 @@ export class StudentsService {
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
     private readonly displaySettings: StudentDisplaySettingsService,
+    private readonly feeCycleEngine: FeeCycleEngineService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -1648,6 +1650,8 @@ export class StudentsService {
       where: { id: applicationId, tenantId, deletedAt: null },
       include: {
         intake: { include: { program: true, academicYear: true } },
+        cycle: { include: { academicYear: true } },
+        program: true,
       },
     });
     if (!application) throw new NotFoundException('Application not found');
@@ -1656,6 +1660,13 @@ export class StudentsService {
       throw new BadRequestException(
         'Only allotted applications can be enrolled as students',
       );
+    }
+
+    const existingStudent = await this.prisma.student.findFirst({
+      where: { admissionApplicationId: applicationId, deletedAt: null },
+    });
+    if (existingStudent) {
+      return this.getOne(user, existingStudent.id);
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -1668,12 +1679,20 @@ export class StudentsService {
       );
     }
 
+    const programId =
+      application.programId ?? application.intake?.programId ?? null;
+    if (!programId) {
+      throw new BadRequestException(
+        'Program could not be resolved from application',
+      );
+    }
+
     let programVersionId = dto.programVersionId;
     if (!programVersionId) {
       const version = await this.prisma.programVersion.findFirst({
         where: {
           tenantId,
-          programId: application.intake.programId,
+          programId,
           status: 'PUBLISHED',
           deletedAt: null,
         },
@@ -1688,9 +1707,11 @@ export class StudentsService {
       await this.assertProgramVersion(tenantId, programVersionId);
     }
 
+    const intakeCode =
+      application.intake?.code ?? application.cycle?.code ?? 'ADM';
     const enrollmentNumber =
       dto.enrollmentNumber ??
-      (await this.generateEnrollmentNumber(tenantId, application.intake.code));
+      (await this.generateEnrollmentNumber(tenantId, intakeCode));
 
     const student = await this.create(tenantId, {
       email: application.email,
@@ -1704,10 +1725,17 @@ export class StudentsService {
       data: {
         admissionApplicationId: applicationId,
         applicationNumber: application.applicationNumber,
-        admissionSource: 'ADMISSION',
+        admissionSource: 'ONLINE_ADMISSION',
         createdById: user.sub,
       },
     });
+
+    const formData = (application.formData as Record<string, unknown>) ?? {};
+    const personal = (formData.personal as Record<string, string>) ?? {};
+    const addresses = (formData.addresses as Record<string, string>) ?? {};
+    const family = (formData.family as Record<string, unknown>) ?? {};
+    const academic = (formData.academic as Record<string, unknown>) ?? {};
+    const prefs = (formData.coursePreferences as Record<string, string>) ?? {};
 
     const categoryLookup = await this.prisma.masterLookup.findFirst({
       where: {
@@ -1718,21 +1746,33 @@ export class StudentsService {
       },
     });
 
+    const fullName =
+      personal.fullName ??
+      `${application.firstName} ${application.lastName}`.trim();
+
     await this.profileService.createMasterProfile(tenantId, student.id, {
-      fullName: `${application.firstName} ${application.lastName}`.trim(),
-      mobileNumber: application.phone ?? undefined,
+      fullName,
+      mobileNumber: application.phone ?? personal.phone,
       categoryLookupId: categoryLookup?.id,
       admissionStatus: 'ACTIVE',
+      dateOfBirth: personal.dateOfBirth,
+      gender: personal.gender,
     });
 
     await this.prisma.studentProfile.update({
       where: { studentId: student.id },
-      data: { email: application.email },
+      data: {
+        email: application.email,
+      },
     });
 
     await this.prisma.studentCuetDetail
       .create({
-        data: { tenantId, studentId: student.id, cuetApplied: false },
+        data: {
+          tenantId,
+          studentId: student.id,
+          cuetApplied: !!academic.cuetScore,
+        },
       })
       .catch(() => undefined);
 
@@ -1741,14 +1781,26 @@ export class StudentsService {
       orderBy: { createdAt: 'asc' },
     });
 
+    const majorSlug = (application.majorSubjectCode ?? prefs.majorCode ?? '')
+      .toLowerCase()
+      .replace(/_/g, '-');
+    const minorSlug = (application.minorSubjectCode ?? prefs.minorCode ?? '')
+      .toLowerCase()
+      .replace(/_/g, '-');
+
+    const academicYearId =
+      application.cycle?.academicYearId ?? application.intake?.academicYearId;
+
     await this.academicEngine.bootstrapStudentAcademic(tenantId, student.id, {
       streamId: application.academicStreamId ?? undefined,
-      admissionYearId: application.intake.academicYearId ?? undefined,
+      admissionYearId: academicYearId ?? undefined,
       admissionBatchId: dto.admissionBatchId,
-      institutionId: application.intake.academicYear?.institutionId,
+      institutionId:
+        application.cycle?.academicYear?.institutionId ??
+        application.intake?.academicYear?.institutionId,
       departmentId: department?.id ?? undefined,
-      majorSubjectSlug: 'computer-science',
-      minorSubjectSlug: 'mathematics',
+      majorSubjectSlug: majorSlug || 'computer-science',
+      minorSubjectSlug: minorSlug || 'mathematics',
     });
 
     const academicProfile = await this.prisma.studentAcademicProfile.findUnique(
@@ -1796,6 +1848,16 @@ export class StudentsService {
     }
 
     void this.notifyEnrolledFromApplication(tenantId, student, application);
+    const standing = await this.prisma.studentAcademicStanding.findUnique({
+      where: { studentId: student.id },
+      select: { currentSemesterSequence: true },
+    });
+    void this.feeCycleEngine.onStudentSemesterEntry(
+      tenantId,
+      student.id,
+      standing?.currentSemesterSequence ?? 1,
+      user.sub,
+    );
     return this.getOne(user, student.id);
   }
 
@@ -1808,11 +1870,16 @@ export class StudentsService {
       firstName: string;
       lastName: string;
       email: string;
-      intake: { program: { name: string } };
+      intake: { program: { name: string } } | null;
+      program?: { name: string } | null;
     },
   ) {
     const institutionName =
       await this.communication.getInstitutionName(tenantId);
+    const programName =
+      application.intake?.program.name ??
+      application.program?.name ??
+      'FYUP Programme';
     await this.communication.trigger({
       tenantId,
       templateCode: 'ADMISSION_CONFIRMATION',
@@ -1829,7 +1896,7 @@ export class StudentsService {
       variables: {
         student_name: `${application.firstName} ${application.lastName}`.trim(),
         application_number: application.applicationNumber,
-        program_name: application.intake.program.name,
+        program_name: programName,
         institution_name: institutionName,
       },
     });

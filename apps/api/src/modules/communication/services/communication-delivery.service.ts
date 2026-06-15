@@ -3,6 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { CommunicationEmailService } from './communication-email.service';
 import { CommunicationTemplateRendererService } from './communication-template-renderer.service';
 import { UserNotificationsService } from './user-notifications.service';
+import { FcmPushService } from './fcm-push.service';
 import { resolveNotificationLink } from '../utils/notification-link.util';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class CommunicationDeliveryService {
     private readonly email: CommunicationEmailService,
     private readonly notifications: UserNotificationsService,
     private readonly renderer: CommunicationTemplateRendererService,
+    private readonly fcm: FcmPushService,
   ) {}
 
   async deliverCampaign(tenantId: string, campaignId: string) {
@@ -60,16 +62,69 @@ export class CommunicationDeliveryService {
 
     for (const recipient of recipients) {
       for (const channel of channels) {
-        if (channel === 'SMS' || channel === 'WHATSAPP' || channel === 'PUSH') {
+        if (channel === 'SMS' || channel === 'WHATSAPP') {
           await this.logDelivery({
             tenantId,
             campaignId,
             recipientId: recipient.id,
             channel,
             status: 'FAILED',
-            errorMessage: `${channel} integration not configured yet (Phase ${channel === 'PUSH' ? 3 : channel === 'SMS' ? 4 : 5})`,
+            errorMessage: `${channel} integration not configured yet`,
           });
           failedCount++;
+          continue;
+        }
+
+        if (channel === 'PUSH') {
+          if (!recipient.userId) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'FAILED',
+              errorMessage: 'No portal user linked',
+            });
+            failedCount++;
+            continue;
+          }
+          const devices = await this.prisma.mobileDevice.findMany({
+            where: {
+              tenantId,
+              userId: recipient.userId,
+              status: 'ACTIVE',
+              pushToken: { not: null },
+            },
+            select: { pushToken: true },
+          });
+          const tokens = devices
+            .map((d) => d.pushToken)
+            .filter((t): t is string => Boolean(t));
+          const result = await this.fcm.sendToTokens(tokens, {
+            title: subject,
+            body: bodyText ?? subject,
+            data: {
+              campaignId,
+              link:
+                resolveNotificationLink({
+                  recipientType: recipient.recipientType,
+                  triggerKey: String(metadata.trigger ?? ''),
+                  entityType: String(metadata.entityType ?? ''),
+                }) ?? '',
+            },
+          });
+          await this.logDelivery({
+            tenantId,
+            campaignId,
+            recipientId: recipient.id,
+            channel,
+            status: result.ok ? 'SENT' : 'FAILED',
+            provider: result.provider,
+            providerRef: result.providerRef,
+            errorMessage: result.error,
+          });
+          if (result.ok) sentCount++;
+          else failedCount++;
           continue;
         }
 

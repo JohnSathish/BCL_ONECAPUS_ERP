@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "core", "academic", "finance", "compliance", "library"]
+  schemas  = ["platform", "core", "academic", "finance", "compliance", "library", "naac"]
 }
 
 // --- platform ---
@@ -38,6 +38,11 @@ model Tenant {
   impersonationSessions         ImpersonationSession[]
   permissionAuditLogs           PermissionAuditLog[]
   tenantLicense                 TenantLicense?
+  mobileAppSettings             MobileAppSettings?
+  mobileAppReleases             MobileAppRelease[]
+  mobileDevices                 MobileDevice[]
+  mobileAppEvents               MobileAppEvent[]
+  mobileAppDailyStats           MobileAppDailyStats[]
 
   @@map("tenants")
   @@schema("platform")
@@ -284,7 +289,9 @@ model User {
   shiftAssignments               UserShiftAssignment[]
   identities                     UserIdentity[]
   refreshSessions                RefreshSession[]
+  mobileDevices                  MobileDevice[]
   passwordHistory                PasswordHistory[]
+  passwordResetTokens            PasswordResetToken[]
   impersonationsAsAdmin          ImpersonationSession[]      @relation("ImpersonationAdmin")
   impersonationsAsTarget         ImpersonationSession[]      @relation("ImpersonationTarget")
   auditLogs                      AuditLog[]                  @relation("AuditActor")
@@ -301,6 +308,7 @@ model User {
   studentDocumentsVerified       StudentDocument[]           @relation("StudentDocumentVerifiedBy")
   staffDocumentsUploaded         StaffDocument[]             @relation("StaffDocumentUploadedBy")
   staffDocumentsVerified         StaffDocument[]             @relation("StaffDocumentVerifiedBy")
+  substituteStaffCreated         SubstituteStaff[]           @relation("SubstituteStaffCreatedBy")
   studentsCreated                Student[]                   @relation("StudentCreatedBy")
   studentsModified               Student[]                   @relation("StudentModifiedBy")
   studentProfileAuditLogs        StudentProfileAuditLog[]    @relation("ProfileAuditActor")
@@ -336,6 +344,9 @@ model User {
   notificationPreferences        NotificationPreference[]
   userPermissions                UserPermission[]
   permissionAuditLogs            PermissionAuditLog[]        @relation("PermissionAuditActor")
+  applicantApplication           AdmissionApplication?       @relation("ApplicantUser")
+  admissionDocumentsVerified     AdmissionApplicationDocument[] @relation("AdmissionDocVerifiedBy")
+  admissionAuditLogs             AdmissionAuditLog[]         @relation("AdmissionAuditActor")
 
   @@unique([tenantId, email])
   @@unique([tenantId, username])
@@ -507,6 +518,7 @@ model RefreshSession {
   replacedById String?   @map("replaced_by_id") @db.Uuid
   userAgent    String?   @map("user_agent")
   ipAddress    String?   @map("ip_address")
+  metadata     Json      @default("{}")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
@@ -516,6 +528,116 @@ model RefreshSession {
   @@index([userId, familyId])
   @@index([tenantId])
   @@map("refresh_sessions")
+  @@schema("platform")
+}
+
+model MobileAppSettings {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @unique @map("tenant_id") @db.Uuid
+  studentAppName         String   @default("Student App") @map("student_app_name")
+  staffAppName           String   @default("Staff App") @map("staff_app_name")
+  studentMinVersion      String   @default("1.0.0") @map("student_min_version")
+  studentLatestVersion   String   @default("1.0.0") @map("student_latest_version")
+  staffMinVersion        String   @default("1.0.0") @map("staff_min_version")
+  staffLatestVersion     String   @default("1.0.0") @map("staff_latest_version")
+  studentMaintenanceMode Boolean @default(false) @map("student_maintenance_mode")
+  staffMaintenanceMode   Boolean @default(false) @map("staff_maintenance_mode")
+  maintenanceMessage     String?  @map("maintenance_message")
+  studentForceUpdate     Boolean  @default(false) @map("student_force_update")
+  staffForceUpdate       Boolean  @default(false) @map("staff_force_update")
+  forceUpdateMessage     String?  @map("force_update_message")
+  studentDashboardConfig Json     @default("{}") @map("student_dashboard_config")
+  staffDashboardConfig   Json     @default("{}") @map("staff_dashboard_config")
+  brandingOverrides      Json     @default("{}") @map("branding_overrides")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("mobile_app_settings")
+  @@schema("platform")
+}
+
+model MobileAppRelease {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  appType      String   @map("app_type")
+  version      String
+  releaseNotes String?  @map("release_notes")
+  publishedAt  DateTime @default(now()) @map("published_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, appType])
+  @@map("mobile_app_releases")
+  @@schema("platform")
+}
+
+model MobileDevice {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  appType     String   @map("app_type")
+  deviceId    String   @map("device_id")
+  platform    String
+  pushToken   String?  @map("push_token")
+  appVersion  String?  @map("app_version")
+  osVersion   String?  @map("os_version")
+  deviceModel String?  @map("device_model")
+  status      String   @default("ACTIVE")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@map("mobile_devices")
+  @@schema("platform")
+}
+
+model MobileAppEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  appType    String   @map("app_type")
+  eventType  String   @map("event_type")
+  appVersion String?  @map("app_version")
+  deviceId   String?  @map("device_id")
+  metadata   Json     @default("{}")
+  occurredAt DateTime @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, appType, eventType])
+  @@map("mobile_app_events")
+  @@schema("platform")
+}
+
+model MobileAppDailyStats {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  date             DateTime @db.Date
+  appType          String   @map("app_type")
+  activeUsers      Int      @default(0) @map("active_users")
+  loginCount       Int      @default(0) @map("login_count")
+  versionBreakdown Json     @default("{}") @map("version_breakdown")
+  pushSent         Int      @default(0) @map("push_sent")
+  pushDelivered    Int      @default(0) @map("push_delivered")
+  pushFailed       Int      @default(0) @map("push_failed")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date, appType])
+  @@map("mobile_app_daily_stats")
   @@schema("platform")
 }
 
@@ -645,6 +767,24 @@ model PasswordHistory {
 
   @@index([userId, createdAt])
   @@map("password_history")
+  @@schema("platform")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  purpose   String    @default("applicant_portal") @map("purpose")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, purpose])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
   @@schema("platform")
 }
 
@@ -866,6 +1006,7 @@ model Institution {
   departments                Department[]
   shifts                     Shift[]
   academicYears              AcademicYear[]
+  admissionCycles            AdmissionCycle[]
   semesters                  Semester[]
   academicConfig             InstitutionAcademicConfig?
   campusShiftActiveSemesters CampusShiftActiveSemester[]
@@ -983,6 +1124,8 @@ model Department {
   campus           Campus?           @relation(fields: [campusId], references: [id], onDelete: SetNull)
   hod              StaffProfile?     @relation("DepartmentHoD", fields: [hodId], references: [id], onDelete: SetNull)
   staffMembers     StaffProfile[]    @relation("StaffDepartment")
+  substituteStaff  SubstituteStaff[]
+  replacementAssignments ReplacementAssignment[]
   programs         Program[]
   courses          Course[]
   students         Student[]
@@ -1040,6 +1183,7 @@ model AcademicYear {
   institution                Institution                 @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   semesters                  Semester[]
   admissionIntakes           AdmissionIntake[]
+  admissionCycles            AdmissionCycle[]
   entryAdmissionBatches      AdmissionBatch[]            @relation("EntrySession")
   majorMinorRules            MajorMinorRule[]
   staffSubjectAssignments    StaffSubjectAssignment[]
@@ -1218,9 +1362,11 @@ model Program {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  versions         ProgramVersion[]
-  admissionIntakes AdmissionIntake[]
+  department            Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  versions              ProgramVersion[]
+  admissionIntakes      AdmissionIntake[]
+  cyclePrograms         AdmissionCycleProgram[]
+  admissionApplications AdmissionApplication[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1997,9 +2143,63 @@ model StudentProfileFieldConfig {
   @@schema("academic")
 }
 
+model AdmissionCycle {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  institutionId         String    @map("institution_id") @db.Uuid
+  academicYearId        String    @map("academic_year_id") @db.Uuid
+  code                  String
+  title                 String
+  fyupSemester          Int       @default(1) @map("fyup_semester")
+  registrationOpensAt   DateTime? @map("registration_opens_at")
+  registrationClosesAt  DateTime? @map("registration_closes_at")
+  applicationDeadline DateTime? @map("application_deadline")
+  paymentDeadline       DateTime? @map("payment_deadline")
+  status                String    @default("DRAFT")
+  settings              Json      @default("{}")
+  formVersion           Int       @default(1) @map("form_version")
+  applicationSeq        Int       @default(0) @map("application_seq")
+  archivedAt            DateTime? @map("archived_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  institution   Institution            @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  programs      AdmissionCycleProgram[]
+  intakes       AdmissionIntake[]
+  applications  AdmissionApplication[]
+  auditLogs     AdmissionAuditLog[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([academicYearId])
+  @@map("admission_cycles")
+  @@schema("academic")
+}
+
+model AdmissionCycleProgram {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  cycleId   String   @map("cycle_id") @db.Uuid
+  programId String   @map("program_id") @db.Uuid
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cycle   AdmissionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  program Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, programId])
+  @@index([tenantId])
+  @@map("admission_cycle_programs")
+  @@schema("academic")
+}
+
 model AdmissionIntake {
   id             String    @id @default(uuid()) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid
+  cycleId        String?   @map("cycle_id") @db.Uuid
   programId      String    @map("program_id") @db.Uuid
   academicYearId String?   @map("academic_year_id") @db.Uuid
   name           String
@@ -2012,6 +2212,7 @@ model AdmissionIntake {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
+  cycle        AdmissionCycle?        @relation(fields: [cycleId], references: [id], onDelete: SetNull)
   program      Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
   academicYear AcademicYear?          @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   applications AdmissionApplication[]
@@ -2022,6 +2223,7 @@ model AdmissionIntake {
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([programId])
+  @@index([cycleId])
   @@map("admission_intakes")
   @@schema("academic")
 }
@@ -2046,37 +2248,108 @@ model AdmissionIntakeShift {
 }
 
 model AdmissionApplication {
-  id                String    @id @default(uuid()) @db.Uuid
-  tenantId          String    @map("tenant_id") @db.Uuid
-  intakeId          String    @map("intake_id") @db.Uuid
-  applicationNumber String    @map("application_number")
-  firstName         String    @map("first_name")
-  lastName          String    @map("last_name")
-  email             String
-  phone             String?
-  category          String    @default("GENERAL")
-  preferredShiftId  String?   @map("preferred_shift_id") @db.Uuid
-  academicStreamId  String?   @map("academic_stream_id") @db.Uuid
-  meritScore        Decimal   @map("merit_score") @db.Decimal(8, 2)
-  status            String    @default("submitted")
-  submittedAt       DateTime? @map("submitted_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+  id                         String    @id @default(uuid()) @db.Uuid
+  tenantId                   String    @map("tenant_id") @db.Uuid
+  cycleId                    String?   @map("cycle_id") @db.Uuid
+  intakeId                   String?   @map("intake_id") @db.Uuid
+  applicantUserId            String?   @unique @map("applicant_user_id") @db.Uuid
+  programId                    String?   @map("program_id") @db.Uuid
+  applicationNumber          String    @map("application_number")
+  firstName                  String    @map("first_name")
+  lastName                   String    @map("last_name")
+  email                      String
+  phone                      String?
+  category                   String    @default("GENERAL")
+  preferredShiftId           String?   @map("preferred_shift_id") @db.Uuid
+  academicStreamId           String?   @map("academic_stream_id") @db.Uuid
+  meritScore                 Decimal   @default(0) @map("merit_score") @db.Decimal(8, 2)
+  status                     String    @default("draft")
+  formData                   Json      @default("{}") @map("form_data")
+  currentStep                Int       @default(1) @map("current_step")
+  progressPercent            Int       @default(0) @map("progress_percent")
+  lastSavedAt                DateTime? @map("last_saved_at")
+  paymentStatus              String    @default("PENDING") @map("payment_status")
+  paymentReference           String?   @map("payment_reference")
+  amountPaid                 Decimal?  @map("amount_paid") @db.Decimal(12, 2)
+  documentVerificationStatus String    @default("PENDING") @map("document_verification_status")
+  admissionFeeStatus         String    @default("NOT_APPLICABLE") @map("admission_fee_status")
+  admissionFeeAmount         Decimal?  @map("admission_fee_amount") @db.Decimal(12, 2)
+  admissionFeeReference      String?   @map("admission_fee_reference")
+  majorSubjectCode           String?   @map("major_subject_code")
+  minorSubjectCode           String?   @map("minor_subject_code")
+  mdcSubjectCode             String?   @map("mdc_subject_code")
+  aecSubjectCode             String?   @map("aec_subject_code")
+  secSubjectCode             String?   @map("sec_subject_code")
+  vacSubjectCode             String?   @map("vac_subject_code")
+  submittedAt                DateTime? @map("submitted_at")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+  deletedAt                  DateTime? @map("deleted_at")
 
-  intake          AdmissionIntake  @relation(fields: [intakeId], references: [id], onDelete: Cascade)
-  preferredShift  Shift?           @relation(fields: [preferredShiftId], references: [id], onDelete: SetNull)
-  academicStream  AcademicStream?  @relation(fields: [academicStreamId], references: [id], onDelete: Restrict)
+  cycle           AdmissionCycle?              @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  intake          AdmissionIntake?             @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  applicantUser   User?                        @relation("ApplicantUser", fields: [applicantUserId], references: [id], onDelete: SetNull)
+  program         Program?                     @relation(fields: [programId], references: [id], onDelete: SetNull)
+  preferredShift  Shift?                       @relation(fields: [preferredShiftId], references: [id], onDelete: SetNull)
+  academicStream  AcademicStream?              @relation(fields: [academicStreamId], references: [id], onDelete: Restrict)
+  documents       AdmissionApplicationDocument[]
   meritEntries    MeritListEntry[]
   seatAllocations SeatAllocation[]
   enrolledStudent Student?
 
+  @@unique([cycleId, applicationNumber])
   @@unique([intakeId, applicationNumber])
   @@index([tenantId])
+  @@index([cycleId, status])
   @@index([intakeId, status])
   @@index([preferredShiftId])
   @@index([academicStreamId])
   @@map("admission_applications")
+  @@schema("academic")
+}
+
+model AdmissionApplicationDocument {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  applicationId      String    @map("application_id") @db.Uuid
+  slotCode           String    @map("slot_code")
+  fileUrl            String    @map("file_url")
+  mimeType           String?   @map("mime_type")
+  sizeBytes          Int?      @map("size_bytes")
+  verificationStatus String    @default("PENDING") @map("verification_status")
+  verifiedById       String?   @map("verified_by_id") @db.Uuid
+  verifiedAt         DateTime? @map("verified_at")
+  remarks            String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  application AdmissionApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  verifiedBy  User?                @relation("AdmissionDocVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@unique([applicationId, slotCode])
+  @@index([tenantId, applicationId])
+  @@map("admission_application_documents")
+  @@schema("academic")
+}
+
+model AdmissionAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  cycleId    String?  @map("cycle_id") @db.Uuid
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  action     String
+  actorId    String?  @map("actor_id") @db.Uuid
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cycle AdmissionCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  actor User?           @relation("AdmissionAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entityType, entityId])
+  @@index([cycleId])
+  @@map("admission_audit_logs")
   @@schema("academic")
 }
 
@@ -2229,6 +2502,7 @@ model StaffProfile {
   designationId             String?   @map("designation_id") @db.Uuid
   departmentId              String?   @map("department_id") @db.Uuid
   primaryShiftId            String?   @map("primary_shift_id") @db.Uuid
+  teachingShiftCategory     String    @default("DAY") @map("teaching_shift_category")
   campusId                  String?   @map("campus_id") @db.Uuid
   shortCode                 String?   @map("short_code")
   joiningDate               DateTime? @map("joining_date") @db.Date
@@ -2289,6 +2563,8 @@ model StaffProfile {
   payslips                   Payslip[]
   leaveBalances              StaffLeaveBalance[]
   leaveApplications          StaffLeaveApplication[]
+  replacementAssignmentsOriginal ReplacementAssignment[] @relation("ReplacementOriginalStaff")
+  linkedSubstituteProfile    SubstituteStaff?          @relation("SubstituteLinkedStaff")
   pensionEnrollments         StaffPensionEnrollment[]
   pensionLedgerEntries       PensionLedgerEntry[]
   staffAppraisals            StaffAppraisal[]
@@ -2908,6 +3184,139 @@ model StaffLeaveApplication {
   @@index([tenantId, staffProfileId])
   @@index([tenantId, status])
   @@map("staff_leave_applications")
+  @@schema("academic")
+}
+
+model SubstituteStaff {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  substituteCode       String    @map("substitute_code")
+  fullName             String    @map("full_name")
+  gender               String?
+  dateOfBirth          DateTime? @map("date_of_birth") @db.Date
+  mobile               String?
+  email                String?
+  address              String?
+  qualification        String?
+  specialization       String?
+  departmentId         String?   @map("department_id") @db.Uuid
+  category             String    @default("REPLACEMENT_FACULTY")
+  photoUrl             String?   @map("photo_url")
+  joiningDate          DateTime? @map("joining_date") @db.Date
+  relievingDate        DateTime? @map("relieving_date") @db.Date
+  status               String    @default("ACTIVE")
+  linkedStaffProfileId String?   @unique @map("linked_staff_profile_id") @db.Uuid
+  createdById          String?   @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  department         Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  linkedStaffProfile StaffProfile?          @relation("SubstituteLinkedStaff", fields: [linkedStaffProfileId], references: [id], onDelete: SetNull)
+  createdBy          User?                  @relation("SubstituteStaffCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  documents          SubstituteStaffDocument[]
+  assignments        ReplacementAssignment[]
+
+  @@unique([tenantId, substituteCode])
+  @@index([tenantId, status])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, fullName])
+  @@map("substitute_staff")
+  @@schema("academic")
+}
+
+model SubstituteStaffDocument {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  substituteStaffId String    @map("substitute_staff_id") @db.Uuid
+  documentType      String    @map("document_type")
+  fileName          String?   @map("file_name")
+  fileUrl           String?   @map("file_url")
+  status            String    @default("PENDING")
+  remarks           String?
+  uploadedById      String?   @map("uploaded_by_id") @db.Uuid
+  verifiedById      String?   @map("verified_by_id") @db.Uuid
+  verifiedAt        DateTime? @map("verified_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  substituteStaff SubstituteStaff @relation(fields: [substituteStaffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, substituteStaffId])
+  @@index([tenantId, documentType, status])
+  @@map("substitute_staff_documents")
+  @@schema("academic")
+}
+
+model ReplacementAssignment {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tenantId               String    @map("tenant_id") @db.Uuid
+  assignmentCode         String?   @map("assignment_code")
+  originalStaffProfileId String    @map("original_staff_profile_id") @db.Uuid
+  substituteStaffId      String    @map("substitute_staff_id") @db.Uuid
+  reason                 String
+  startDate              DateTime  @map("start_date") @db.Date
+  endDate                DateTime  @map("end_date") @db.Date
+  departmentId           String?   @map("department_id") @db.Uuid
+  salaryArrangement      String    @map("salary_arrangement")
+  monthlyAgreedAmount    Decimal?  @map("monthly_agreed_amount") @db.Decimal(12, 2)
+  fullWorkloadTransfer   Boolean   @default(false) @map("full_workload_transfer")
+  remarks                String?
+  status                 String    @default("ACTIVE")
+  leaveApplicationId     String?   @map("leave_application_id") @db.Uuid
+  approvedById           String?   @map("approved_by_id") @db.Uuid
+  approvedAt             DateTime? @map("approved_at")
+  endedAt                DateTime? @map("ended_at")
+  endedById              String?   @map("ended_by_id") @db.Uuid
+  createdById            String?   @map("created_by_id") @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  originalStaff StaffProfile                  @relation("ReplacementOriginalStaff", fields: [originalStaffProfileId], references: [id], onDelete: Restrict)
+  substitute    SubstituteStaff               @relation(fields: [substituteStaffId], references: [id], onDelete: Restrict)
+  department    Department?                   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  subjects      ReplacementAssignmentSubject[]
+  auditLogs     ReplacementAssignmentAuditLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, originalStaffProfileId, status])
+  @@index([tenantId, substituteStaffId, status])
+  @@index([tenantId, endDate, status])
+  @@index([tenantId, reason])
+  @@map("replacement_assignments")
+  @@schema("academic")
+}
+
+model ReplacementAssignmentSubject {
+  id                String  @id @default(uuid()) @db.Uuid
+  tenantId          String  @map("tenant_id") @db.Uuid
+  assignmentId      String  @map("assignment_id") @db.Uuid
+  courseId          String? @map("course_id") @db.Uuid
+  offeringSectionId String? @map("offering_section_id") @db.Uuid
+  subjectLabel      String? @map("subject_label")
+  notes             String?
+
+  assignment ReplacementAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, assignmentId])
+  @@map("replacement_assignment_subjects")
+  @@schema("academic")
+}
+
+model ReplacementAssignmentAuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  assignmentId String   @map("assignment_id") @db.Uuid
+  action       String
+  actorId      String?  @map("actor_id") @db.Uuid
+  beforeState  Json?    @map("before_state")
+  afterState   Json?    @map("after_state")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  assignment ReplacementAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, assignmentId, createdAt])
+  @@map("replacement_assignment_audit_logs")
   @@schema("academic")
 }
 
@@ -4906,6 +5315,268 @@ model Announcement {
 
 // --- finance ---
 
+model FeeHeadMaster {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  amount    Decimal   @db.Decimal(12, 2)
+  currency  String    @default("INR")
+  category  String    @default("SESSION")
+  sortOrder Int       @default(0) @map("sort_order")
+  isActive  Boolean   @default(true) @map("is_active")
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  cycleLines AcademicFeeCycleLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive, sortOrder])
+  @@map("fee_head_masters")
+  @@schema("finance")
+}
+
+model AcademicFeeCycle {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  code           String
+  name           String
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  programId      String?   @map("program_id") @db.Uuid
+  departmentId   String?   @map("department_id") @db.Uuid
+  shiftId        String?   @map("shift_id") @db.Uuid
+  fyugpYear      Int?      @map("fyugp_year")
+  startSemester  Int       @map("start_semester")
+  endSemester    Int       @map("end_semester")
+  totalAmount    Decimal   @map("total_amount") @db.Decimal(12, 2)
+  currency       String    @default("INR")
+  status         String    @default("DRAFT")
+  description    String?
+  metadata       Json?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  lines    AcademicFeeCycleLine[]
+  demands  StudentFeeDemand[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, startSemester])
+  @@index([tenantId, programId])
+  @@index([tenantId, shiftId])
+  @@map("academic_fee_cycles")
+  @@schema("finance")
+}
+
+model AcademicFeeCycleLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  feeCycleId String   @map("fee_cycle_id") @db.Uuid
+  feeHeadId  String   @map("fee_head_id") @db.Uuid
+  amount     Decimal  @db.Decimal(12, 2)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  feeCycle AcademicFeeCycle @relation(fields: [feeCycleId], references: [id], onDelete: Cascade)
+  feeHead  FeeHeadMaster    @relation(fields: [feeHeadId], references: [id], onDelete: Restrict)
+
+  @@unique([feeCycleId, feeHeadId])
+  @@index([tenantId, feeCycleId])
+  @@map("academic_fee_cycle_lines")
+  @@schema("finance")
+}
+
+model MonthlyFeePlan {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  code           String
+  name           String
+  programId      String?   @map("program_id") @db.Uuid
+  shiftId        String?   @map("shift_id") @db.Uuid
+  majorSlug      String?   @map("major_slug")
+  streamCode     String?   @map("stream_code")
+  status         String    @default("ACTIVE")
+  description    String?
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  lines     MonthlyFeePlanLine[]
+  modifiers MonthlyFeeModifier[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, programId, shiftId])
+  @@map("monthly_fee_plans")
+  @@schema("finance")
+}
+
+model MonthlyFeePlanLine {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  code      String
+  name      String
+  amount    Decimal  @db.Decimal(12, 2)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  plan MonthlyFeePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, code])
+  @@index([tenantId, planId])
+  @@map("monthly_fee_plan_lines")
+  @@schema("finance")
+}
+
+model MonthlyFeeModifier {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  planId    String?  @map("plan_id") @db.Uuid
+  code      String
+  name      String
+  ruleType  String   @map("rule_type")
+  amount    Decimal  @db.Decimal(12, 2)
+  isActive  Boolean  @default(true) @map("is_active")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  plan MonthlyFeePlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, ruleType, isActive])
+  @@map("monthly_fee_modifiers")
+  @@schema("finance")
+}
+
+model FeeFinanceSettings {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  monthlyDueDay         Int      @default(10) @map("monthly_due_day")
+  lateFeeEnabled        Boolean  @default(true) @map("late_fee_enabled")
+  lateFeeMode           String   @default("PER_DAY") @map("late_fee_mode")
+  lateFeeAmount         Decimal  @default(10) @map("late_fee_amount") @db.Decimal(12, 2)
+  lateFeeGraceDays      Int      @default(0) @map("late_fee_grace_days")
+  receiptPrefix         String   @default("DBC/RCPT") @map("receipt_prefix")
+  onlinePaymentEnabled  Boolean  @default(false) @map("online_payment_enabled")
+  cashCollectionEnabled Boolean  @default(false) @map("cash_collection_enabled")
+  collectionModes       Json     @default("{}") @map("collection_modes")
+  cashReceiptPrefix     String   @default("DBC/CASH") @map("cash_receipt_prefix")
+  paymentRequestExpiryMinutes Int @default(15) @map("payment_request_expiry_minutes")
+  officeQrEnabled       Boolean  @default(true) @map("office_qr_enabled")
+  blockHallTicketOnDue  Boolean  @default(true) @map("block_hall_ticket_on_due")
+  blockRegistrationOnDue Boolean @default(true) @map("block_registration_on_due")
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("fee_finance_settings")
+  @@schema("finance")
+}
+
+model FeePaymentRequest {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  requestNo          String    @map("request_no")
+  studentId          String    @map("student_id") @db.Uuid
+  amount             Decimal   @db.Decimal(12, 2)
+  currency           String    @default("INR")
+  status             String    @default("PENDING")
+  channel            String    @default("OFFICE_QR")
+  demandIds          Json      @default("[]") @map("demand_ids")
+  feeItems           Json?     @map("fee_items")
+  paymentId          String?   @map("payment_id") @db.Uuid
+  provider           String?
+  providerOrderId    String?   @map("provider_order_id")
+  providerPaymentId  String?   @map("provider_payment_id")
+  paymentLinkUrl     String?   @map("payment_link_url")
+  qrImageUrl         String?   @map("qr_image_url")
+  upiReference       String?   @map("upi_reference")
+  generatedById      String?   @map("generated_by_id") @db.Uuid
+  expiresAt          DateTime  @map("expires_at")
+  paidAt             DateTime? @map("paid_at")
+  receiptId          String?   @map("receipt_id") @db.Uuid
+  metadata           Json?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, requestNo])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, expiresAt])
+  @@map("fee_payment_requests")
+  @@schema("finance")
+}
+
+model StudentFeeSummary {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  studentId            String    @map("student_id") @db.Uuid
+  totalOutstanding     Decimal   @default(0) @map("total_outstanding") @db.Decimal(12, 2)
+  totalOverdue         Decimal   @default(0) @map("total_overdue") @db.Decimal(12, 2)
+  admissionOutstanding Decimal   @default(0) @map("admission_outstanding") @db.Decimal(12, 2)
+  monthlyOutstanding   Decimal   @default(0) @map("monthly_outstanding") @db.Decimal(12, 2)
+  totalPaid            Decimal   @default(0) @map("total_paid") @db.Decimal(12, 2)
+  feeStatus            String    @default("CLEAR") @map("fee_status")
+  lastPaymentAt        DateTime? @map("last_payment_at")
+  activeDemandCount    Int       @default(0) @map("active_demand_count")
+  calculatedAt         DateTime  @default(now()) @map("calculated_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentId])
+  @@index([tenantId, totalOutstanding])
+  @@index([tenantId, feeStatus])
+  @@map("student_fee_summaries")
+  @@schema("finance")
+}
+
+model ScholarshipScheme {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String
+  name            String
+  schemeType      String    @map("scheme_type")
+  calculationType String    @map("calculation_type")
+  value           Decimal   @db.Decimal(12, 2)
+  isActive        Boolean   @default(true) @map("is_active")
+  description     String?
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  concessions FeeConcession[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("scholarship_schemes")
+  @@schema("finance")
+}
+
+model FeeProductRegistry {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  engineType  String   @map("engine_type")
+  demandType  String   @map("demand_type")
+  isActive    Boolean  @default(true) @map("is_active")
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("fee_product_registry")
+  @@schema("finance")
+}
+
 model FeeStructure {
   id               String    @id @default(uuid()) @db.Uuid
   tenantId         String    @map("tenant_id") @db.Uuid
@@ -5038,6 +5709,9 @@ model StudentFeeDemand {
   tenantId           String    @map("tenant_id") @db.Uuid
   studentId          String    @map("student_id") @db.Uuid
   feeStructureId     String?   @map("fee_structure_id") @db.Uuid
+  feeCycleId         String?   @map("fee_cycle_id") @db.Uuid
+  feeProductCode     String?   @map("fee_product_code")
+  monthlyFeePlanId   String?   @map("monthly_fee_plan_id") @db.Uuid
   academicYearId     String?   @map("academic_year_id") @db.Uuid
   semesterId         String?   @map("semester_id") @db.Uuid
   semesterNumber     Int?      @map("semester_number")
@@ -5064,6 +5738,7 @@ model StudentFeeDemand {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   feeStructure FeeStructure?           @relation(fields: [feeStructureId], references: [id], onDelete: SetNull)
+  feeCycle     AcademicFeeCycle?       @relation(fields: [feeCycleId], references: [id], onDelete: SetNull)
   lines        StudentFeeDemandLine[]
   ledger       StudentFeeLedgerEntry[]
   allocations  PaymentAllocation[]
@@ -5076,6 +5751,7 @@ model StudentFeeDemand {
   @@index([tenantId, academicYearId])
   @@index([tenantId, semesterId])
   @@index([tenantId, demandType])
+  @@index([tenantId, feeCycleId])
   @@map("student_fee_demands")
   @@schema("finance")
 }
@@ -5143,6 +5819,9 @@ model PaymentTransaction {
   studentId           String    @map("student_id") @db.Uuid
   transactionNo       String    @map("transaction_no")
   paymentMode         String    @map("payment_mode")
+  paymentSource       String?   @map("payment_source")
+  externalReference   String?   @map("external_reference")
+  remarks             String?
   provider            String?
   providerOrderId     String?   @map("provider_order_id")
   providerPaymentId   String?   @map("provider_payment_id")
@@ -5214,11 +5893,44 @@ model FeeReceipt {
   @@schema("finance")
 }
 
+model ExternalFeePayment {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  entryNo           String    @map("entry_no")
+  studentId         String    @map("student_id") @db.Uuid
+  paymentSource     String    @map("payment_source")
+  externalReference String?   @map("external_reference")
+  transactionDate   DateTime  @map("transaction_date") @db.Date
+  amount            Decimal   @db.Decimal(12, 2)
+  currency          String    @default("INR")
+  remarks           String?
+  attachmentUrls    Json      @default("[]") @map("attachment_urls")
+  demandIds         Json      @default("[]") @map("demand_ids")
+  status            String    @default("PENDING")
+  paymentId         String?   @map("payment_id") @db.Uuid
+  receiptId         String?   @map("receipt_id") @db.Uuid
+  submittedById     String?   @map("submitted_by_id") @db.Uuid
+  verifiedById      String?   @map("verified_by_id") @db.Uuid
+  verifiedAt        DateTime? @map("verified_at")
+  rejectionReason   String?   @map("rejection_reason")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, entryNo])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, paymentSource, status])
+  @@index([tenantId, transactionDate])
+  @@map("external_fee_payments")
+  @@schema("finance")
+}
+
 model FeeConcession {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid
   studentId       String    @map("student_id") @db.Uuid
   demandId        String?   @map("demand_id") @db.Uuid
+  schemeId        String?   @map("scheme_id") @db.Uuid
   concessionType  String    @map("concession_type")
   calculationType String    @map("calculation_type")
   value           Decimal   @db.Decimal(12, 2)
@@ -5233,10 +5945,12 @@ model FeeConcession {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   demand StudentFeeDemand?       @relation(fields: [demandId], references: [id], onDelete: SetNull)
+  scheme ScholarshipScheme?      @relation(fields: [schemeId], references: [id], onDelete: SetNull)
   ledger StudentFeeLedgerEntry[]
 
   @@index([tenantId, studentId, status])
   @@index([tenantId, concessionType])
+  @@index([tenantId, schemeId])
   @@map("fee_concessions")
   @@schema("finance")
 }
@@ -6748,6 +7462,661 @@ model FrontOfficeComplaint {
   @@index([tenantId, createdAt])
   @@map("front_office_complaints")
   @@schema("core")
+}
+
+// --- governance (core) ---
+
+model GovernanceCommittee {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  shortCode       String    @map("short_code")
+  committeeType   String    @default("STANDING") @map("committee_type")
+  category        String
+  description     String?
+  academicYear    String?   @map("academic_year")
+  status          String    @default("ACTIVE")
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  metadata        Json?
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  members         GovernanceCommitteeMember[]
+  meetings        GovernanceMeeting[]
+  tasks           GovernanceTask[]
+  notices         GovernanceNotice[]
+  documents       GovernanceDocument[]
+  events          GovernanceEvent[]
+  actionItems     GovernanceActionItem[]
+  performanceSnapshots GovernancePerformanceSnapshot[]
+
+  @@unique([tenantId, shortCode])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@map("governance_committees")
+  @@schema("core")
+}
+
+model GovernanceCommitteeMember {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String    @map("committee_id") @db.Uuid
+  staffProfileId  String?   @map("staff_profile_id") @db.Uuid
+  studentId       String?   @map("student_id") @db.Uuid
+  userId          String?   @map("user_id") @db.Uuid
+  displayName     String    @map("display_name")
+  designation     String?
+  role            String
+  mobile          String?
+  email           String?
+  joiningDate     DateTime? @map("joining_date")
+  status          String    @default("ACTIVE")
+  isExternal      Boolean   @default(false) @map("is_external")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  attendances     GovernanceMeetingAttendance[]
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, userId])
+  @@map("governance_committee_members")
+  @@schema("core")
+}
+
+model GovernanceMeeting {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String    @map("committee_id") @db.Uuid
+  title           String
+  meetingDate     DateTime  @map("meeting_date")
+  meetingTime     String?   @map("meeting_time")
+  venue           String?
+  meetingMode     String    @default("PHYSICAL") @map("meeting_mode")
+  agenda          String?
+  priority        String    @default("NORMAL")
+  status          String    @default("SCHEDULED")
+  qrToken         String?   @map("qr_token")
+  otpCodeHash     String?   @map("otp_code_hash")
+  attachments     Json?
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  agendaItems     GovernanceMeetingAgendaItem[]
+  attendances     GovernanceMeetingAttendance[]
+  minutes         GovernanceMeetingMinute[]
+  actionItems     GovernanceActionItem[]
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, meetingDate])
+  @@index([tenantId, status])
+  @@map("governance_meetings")
+  @@schema("core")
+}
+
+model GovernanceMeetingAgendaItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  meetingId   String   @map("meeting_id") @db.Uuid
+  sortOrder   Int      @default(0) @map("sort_order")
+  title       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  meeting     GovernanceMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, meetingId])
+  @@map("governance_meeting_agenda_items")
+  @@schema("core")
+}
+
+model GovernanceMeetingAttendance {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  meetingId       String   @map("meeting_id") @db.Uuid
+  memberId        String?  @map("member_id") @db.Uuid
+  userId          String?  @map("user_id") @db.Uuid
+  displayName     String?  @map("display_name")
+  method          String   @default("MANUAL")
+  status          String   @default("ABSENT")
+  markedAt        DateTime? @map("marked_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  meeting         GovernanceMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  member          GovernanceCommitteeMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, meetingId])
+  @@map("governance_meeting_attendance")
+  @@schema("core")
+}
+
+model GovernanceMeetingMinute {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  meetingId       String    @map("meeting_id") @db.Uuid
+  discussion      String?
+  decisions       String?
+  resolutions     String?
+  futureActions   String?   @map("future_actions")
+  attachments     Json?
+  pdfPath         String?   @map("pdf_path")
+  status          String    @default("DRAFT")
+  publishedAt     DateTime? @map("published_at")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  meeting         GovernanceMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, meetingId])
+  @@map("governance_meeting_minutes")
+  @@schema("core")
+}
+
+model GovernanceActionItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String    @map("committee_id") @db.Uuid
+  meetingId       String?   @map("meeting_id") @db.Uuid
+  actionItem      String    @map("action_item")
+  assignedToId    String?   @map("assigned_to_id") @db.Uuid
+  assignedName    String?   @map("assigned_name")
+  priority        String    @default("NORMAL")
+  targetDate      DateTime? @map("target_date")
+  status          String    @default("PENDING")
+  remarks         String?
+  evidenceFiles   Json?     @map("evidence_files")
+  completedAt     DateTime? @map("completed_at")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  meeting         GovernanceMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  naacTags        GovernanceNaacTag[]
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToId])
+  @@map("governance_action_items")
+  @@schema("core")
+}
+
+model GovernanceTask {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String    @map("committee_id") @db.Uuid
+  title           String
+  description     String?
+  assignedToId    String?   @map("assigned_to_id") @db.Uuid
+  assignedName    String?   @map("assigned_name")
+  dueDate         DateTime? @map("due_date")
+  status          String    @default("PENDING")
+  completedAt     DateTime? @map("completed_at")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, status])
+  @@map("governance_tasks")
+  @@schema("core")
+}
+
+model GovernanceNotice {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String?   @map("committee_id") @db.Uuid
+  noticeNo        String?   @map("notice_no")
+  title           String
+  body            String
+  audience        String    @default("COMMITTEE")
+  status          String    @default("DRAFT")
+  publishedAt     DateTime? @map("published_at")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee? @relation(fields: [committeeId], references: [id], onDelete: SetNull)
+  naacTags        GovernanceNaacTag[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, committeeId])
+  @@map("governance_notices")
+  @@schema("core")
+}
+
+model GovernanceDocument {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  committeeId     String?  @map("committee_id") @db.Uuid
+  folderPath      String   @map("folder_path")
+  title           String
+  category        String
+  storageKey      String   @map("storage_key")
+  fileName        String   @map("file_name")
+  mimeType        String?  @map("mime_type")
+  fileSize        Int?     @map("file_size")
+  academicYear    String?  @map("academic_year")
+  uploadedById    String?  @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee? @relation(fields: [committeeId], references: [id], onDelete: SetNull)
+  naacTags        GovernanceNaacTag[]
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, category])
+  @@index([tenantId, folderPath])
+  @@map("governance_documents")
+  @@schema("core")
+}
+
+model GovernanceEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  committeeId     String    @map("committee_id") @db.Uuid
+  title           String
+  eventType       String    @map("event_type")
+  description     String?
+  startDate       DateTime  @map("start_date")
+  endDate         DateTime? @map("end_date")
+  venue           String?
+  status          String    @default("PLANNED")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  naacTags        GovernanceNaacTag[]
+
+  @@index([tenantId, committeeId])
+  @@index([tenantId, startDate])
+  @@map("governance_events")
+  @@schema("core")
+}
+
+model GovernanceNaacTag {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  entityType      String   @map("entity_type")
+  entityId        String   @map("entity_id") @db.Uuid
+  criterion       Int
+  evidenceNotes   String?  @map("evidence_notes")
+  documentId      String?  @map("document_id") @db.Uuid
+  eventId         String?  @map("event_id") @db.Uuid
+  actionItemId    String?  @map("action_item_id") @db.Uuid
+  noticeId        String?  @map("notice_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  document        GovernanceDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  event           GovernanceEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actionItem      GovernanceActionItem? @relation(fields: [actionItemId], references: [id], onDelete: Cascade)
+  notice          GovernanceNotice? @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, criterion])
+  @@map("governance_naac_tags")
+  @@schema("core")
+}
+
+model GovernanceImportBatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  fileName        String   @map("file_name")
+  storageKey      String   @map("storage_key")
+  status          String   @default("PENDING")
+  rawText         String?  @map("raw_text")
+  createdById     String?  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  drafts          GovernanceImportDraft[]
+
+  @@index([tenantId, status])
+  @@map("governance_import_batches")
+  @@schema("core")
+}
+
+model GovernanceImportDraft {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  batchId         String   @map("batch_id") @db.Uuid
+  parsedJson      Json     @map("parsed_json")
+  confidence      Float    @default(0)
+  reviewStatus    String   @default("PENDING") @map("review_status")
+  committedAt     DateTime? @map("committed_at")
+  committeeId     String?  @map("committee_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  batch           GovernanceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, batchId])
+  @@map("governance_import_drafts")
+  @@schema("core")
+}
+
+model GovernancePerformanceSnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  committeeId     String   @map("committee_id") @db.Uuid
+  academicYear    String   @map("academic_year")
+  scoreTotal      Float    @map("score_total")
+  scoreBreakdown  Json     @map("score_breakdown")
+  computedAt      DateTime @default(now()) @map("computed_at")
+
+  committee       GovernanceCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, committeeId, academicYear])
+  @@index([tenantId, scoreTotal])
+  @@map("governance_performance_snapshots")
+  @@schema("core")
+}
+
+model GovernanceSettings {
+  id                      String   @id @default(uuid()) @db.Uuid
+  tenantId                String   @unique @map("tenant_id") @db.Uuid
+  defaultAcademicYear     String?  @map("default_academic_year")
+  noticePrefix            String   @default("DBC/CIRC") @map("notice_prefix")
+  notifyEmail             Boolean  @default(true) @map("notify_email")
+  notifyInApp             Boolean  @default(true) @map("notify_in_app")
+  notifyPush              Boolean  @default(true) @map("notify_push")
+  notifySms               Boolean  @default(false) @map("notify_sms")
+  qrAttendanceEnabled     Boolean  @default(true) @map("qr_attendance_enabled")
+  performanceWeights      Json?    @map("performance_weights")
+  metadata                Json?
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("governance_settings")
+  @@schema("core")
+}
+
+// --- naac & iqac (naac) ---
+
+model NaacCriterion {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  criterion   Int
+  title       String
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  metrics NaacMetric[]
+
+  @@unique([tenantId, criterion])
+  @@index([tenantId])
+  @@map("naac_criteria")
+  @@schema("naac")
+}
+
+model NaacMetric {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  criterionId String   @map("criterion_id") @db.Uuid
+  code        String
+  title       String
+  description String?
+  dataType    String   @default("document") @map("data_type")
+  isMandatory Boolean  @default(false) @map("is_mandatory")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  criterion NaacCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, criterionId])
+  @@map("naac_metrics")
+  @@schema("naac")
+}
+
+model NaacVaultDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  storageKey   String   @map("storage_key")
+  fileName     String   @map("file_name")
+  mimeType     String?  @map("mime_type")
+  fileSize     Int?     @map("file_size")
+  uploadedById String?  @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  evidenceTags NaacEvidenceTag[]
+
+  @@index([tenantId, createdAt])
+  @@map("naac_vault_documents")
+  @@schema("naac")
+}
+
+model NaacEvidenceTag {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  sourceType     String   @map("source_type")
+  sourceId       String   @map("source_id") @db.Uuid
+  criterion      Int
+  metricCode     String?  @map("metric_code")
+  academicYear   String   @map("academic_year")
+  departmentId   String?  @map("department_id") @db.Uuid
+  committeeId    String?  @map("committee_id") @db.Uuid
+  programmeId    String?  @map("programme_id") @db.Uuid
+  activityTitle  String?  @map("activity_title")
+  eventTitle     String?  @map("event_title")
+  evidenceNotes  String?  @map("evidence_notes")
+  fileName       String?  @map("file_name")
+  storageKey     String?  @map("storage_key")
+  fileUrl        String?  @map("file_url")
+  vaultDocumentId String? @map("vault_document_id") @db.Uuid
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  vaultDocument NaacVaultDocument? @relation(fields: [vaultDocumentId], references: [id], onDelete: SetNull)
+
+  facultyAchievements NaacFacultyAchievement[]
+
+  @@index([tenantId, criterion])
+  @@index([tenantId, academicYear])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, metricCode])
+  @@index([tenantId, departmentId])
+  @@map("naac_evidence_tags")
+  @@schema("naac")
+}
+
+model NaacAqar {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  academicYear        String   @map("academic_year")
+  title               String
+  status              String   @default("DRAFT")
+  institutionProfile  Json?    @map("institution_profile")
+  completionPct       Float    @default(0) @map("completion_pct")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  sections NaacAqarSection[]
+
+  @@unique([tenantId, academicYear])
+  @@index([tenantId, status])
+  @@map("naac_aqars")
+  @@schema("naac")
+}
+
+model NaacAqarSection {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  aqarId        String    @map("aqar_id") @db.Uuid
+  sectionKey    String    @map("section_key")
+  content       Json?
+  completionPct Float     @default(0) @map("completion_pct")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  aqar NaacAqar @relation(fields: [aqarId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, aqarId, sectionKey])
+  @@index([tenantId, aqarId])
+  @@map("naac_aqar_sections")
+  @@schema("naac")
+}
+
+model NaacFacultyAchievement {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  staffProfileId     String   @map("staff_profile_id") @db.Uuid
+  achievementType    String   @map("achievement_type")
+  title              String
+  description        String?
+  achievementDate    DateTime? @map("achievement_date") @db.Date
+  staffPublicationId String?  @map("staff_publication_id") @db.Uuid
+  staffAwardId       String?  @map("staff_award_id") @db.Uuid
+  evidenceTagId      String?  @map("evidence_tag_id") @db.Uuid
+  status             String   @default("PENDING")
+  submittedById      String?  @map("submitted_by_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  evidenceTag NaacEvidenceTag? @relation(fields: [evidenceTagId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, achievementType])
+  @@map("naac_faculty_achievements")
+  @@schema("naac")
+}
+
+model NaacStudentAchievement {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  studentId       String?   @map("student_id") @db.Uuid
+  achievementType String    @map("achievement_type")
+  title           String
+  description     String?
+  achievementDate DateTime? @map("achievement_date") @db.Date
+  departmentId    String?   @map("department_id") @db.Uuid
+  evidenceTagId   String?   @map("evidence_tag_id") @db.Uuid
+  status          String    @default("PENDING")
+  submittedById   String?   @map("submitted_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, achievementType])
+  @@index([tenantId, studentId])
+  @@map("naac_student_achievements")
+  @@schema("naac")
+}
+
+model NaacMou {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  partnerType String    @map("partner_type")
+  partnerName String    @map("partner_name")
+  signedAt    DateTime? @map("signed_at") @db.Date
+  expiresAt   DateTime? @map("expires_at") @db.Date
+  storageKey  String?   @map("storage_key")
+  fileName    String?   @map("file_name")
+  status      String    @default("ACTIVE")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  activities NaacMouActivity[]
+
+  @@index([tenantId, partnerType])
+  @@map("naac_mous")
+  @@schema("naac")
+}
+
+model NaacMouActivity {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  mouId       String    @map("mou_id") @db.Uuid
+  title       String
+  activityDate DateTime? @map("activity_date") @db.Date
+  outcomes    String?
+  reportNotes String?   @map("report_notes")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  mou NaacMou @relation(fields: [mouId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, mouId])
+  @@map("naac_mou_activities")
+  @@schema("naac")
+}
+
+model NaacDepartmentSubmission {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  academicYear   String   @map("academic_year")
+  submissionType String   @map("submission_type")
+  payload        Json?
+  status         String   @default("PENDING")
+  submittedById  String?  @map("submitted_by_id") @db.Uuid
+  reviewedById   String?  @map("reviewed_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, departmentId])
+  @@index([tenantId, academicYear])
+  @@map("naac_department_submissions")
+  @@schema("naac")
+}
+
+model NaacCalendarEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  title            String
+  eventType        String    @map("event_type")
+  dueDate          DateTime  @map("due_date") @db.Date
+  description      String?
+  linkedSourceType String?   @map("linked_source_type")
+  linkedSourceId   String?   @map("linked_source_id") @db.Uuid
+  status           String    @default("UPCOMING")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, dueDate])
+  @@index([tenantId, eventType])
+  @@map("naac_calendar_events")
+  @@schema("naac")
+}
+
+model NaacSettings {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @unique @map("tenant_id") @db.Uuid
+  activeAqarYear    String?  @map("active_aqar_year")
+  institutionProfile Json?   @map("institution_profile")
+  metadata          Json?
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("naac_settings")
+  @@schema("naac")
+}
+
+model NaacReadinessSnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  academicYear    String   @map("academic_year")
+  overallScore    Float    @map("overall_score")
+  criterionScores Json     @map("criterion_scores")
+  pendingCounts   Json     @map("pending_counts")
+  computedAt      DateTime @default(now()) @map("computed_at")
+
+  @@unique([tenantId, academicYear])
+  @@index([tenantId, computedAt])
+  @@map("naac_readiness_snapshots")
+  @@schema("naac")
 }
 
 // --- transport (core) ---

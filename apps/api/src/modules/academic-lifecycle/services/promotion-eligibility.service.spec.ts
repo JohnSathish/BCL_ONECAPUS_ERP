@@ -5,13 +5,14 @@ describe('PromotionEligibilityService', () => {
     studentAcademicStanding: { findUnique: jest.fn() },
     semesterRegistration: { findFirst: jest.fn() },
     studentSemesterProgress: { findUnique: jest.fn() },
-    student: { findMany: jest.fn() },
+    student: { findMany: jest.fn(), findFirst: jest.fn() },
   };
 
   const service = new PromotionEligibilityService(prisma as never);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.student.findFirst.mockResolvedValue({ programVersionId: null });
   });
 
   it('promotes even when prior semester registration is incomplete', async () => {

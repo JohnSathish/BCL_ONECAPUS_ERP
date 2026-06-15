@@ -82,11 +82,6 @@ export class StaffPortalService {
     return staff;
   }
 
-  async resolveStaffProfileId(user: JwtUser) {
-    const staff = await this.resolveStaffProfile(user.tid, user.sub);
-    return staff.id;
-  }
-
   async getMe(user: JwtUser) {
     const staff = await this.resolveStaffProfile(user.tid, user.sub);
     const isTeaching = TEACHING_TYPES.has(staff.staffType);
@@ -294,6 +289,10 @@ export class StaffPortalService {
       pendingLessonPlans,
       examDutyAssigned,
       calendarHolidays,
+      governanceMemberships,
+      governancePendingAtr,
+      governancePendingTasks,
+      governanceUpcomingMeetings,
     ] = await Promise.all([
       this.notifications.list(user, 8),
       this.notifications.unreadCount(user),
@@ -346,6 +345,44 @@ export class StaffPortalService {
         },
         select: { id: true, name: true, holidayDate: true, holidayType: true },
       }),
+      (this.prisma as any).governanceCommitteeMember
+        .count({
+          where: { tenantId: user.tid, userId: user.sub, status: 'ACTIVE' },
+        })
+        .catch(() => 0),
+      (this.prisma as any).governanceActionItem
+        .count({
+          where: {
+            tenantId: user.tid,
+            assignedToId: staff.id,
+            status: { in: ['PENDING', 'IN_PROGRESS'] },
+          },
+        })
+        .catch(() => 0),
+      (this.prisma as any).governanceTask
+        .count({
+          where: {
+            tenantId: user.tid,
+            assignedToId: staff.id,
+            status: { in: ['PENDING', 'IN_PROGRESS'] },
+          },
+        })
+        .catch(() => 0),
+      (this.prisma as any).governanceMeeting
+        .count({
+          where: {
+            tenantId: user.tid,
+            meetingDate: {
+              gte: today,
+              lte: new Date(today.getTime() + 7 * 86400000),
+            },
+            status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
+            committee: {
+              members: { some: { userId: user.sub, status: 'ACTIVE' } },
+            },
+          },
+        })
+        .catch(() => 0),
     ]);
 
     let presentDays = 0;
@@ -405,6 +442,10 @@ export class StaffPortalService {
       examDutyAssigned,
       approvalRequests: 0,
       lmsPendingEvaluations,
+      governanceCommittees: governanceMemberships,
+      governancePendingAtr,
+      governancePendingTasks,
+      governanceUpcomingMeetings,
     };
 
     const calendarEvents = calendarHolidays.map((h) => ({
@@ -492,6 +533,13 @@ export class StaffPortalService {
       unreadNotificationCount:
         unreadCount.count ?? notifications.filter((n) => !n.read).length,
       calendarEvents,
+      governance: {
+        committeeCount: governanceMemberships,
+        pendingAtr: governancePendingAtr,
+        pendingTasks: governancePendingTasks,
+        upcomingMeetings: governanceUpcomingMeetings,
+        href: '/staff/governance',
+      },
     };
   }
 
@@ -678,9 +726,6 @@ export class StaffPortalService {
     return this.prisma.staffDocument.findMany({
       where: { tenantId: user.tid, staffProfileId: staff.id },
       orderBy: { createdAt: 'desc' },
-      include: {
-        verifiedBy: { select: { displayName: true, email: true } },
-      },
     });
   }
 

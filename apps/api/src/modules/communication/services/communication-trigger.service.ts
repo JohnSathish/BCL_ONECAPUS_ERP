@@ -13,7 +13,7 @@ export type TriggerInput = {
   entityId: string;
   recipient: ResolvedRecipient;
   variables: Record<string, string>;
-  channels?: ('EMAIL' | 'IN_APP')[];
+  channels?: ('EMAIL' | 'IN_APP' | 'SMS' | 'WHATSAPP' | 'PUSH')[];
   skipDedupe?: boolean;
 };
 
@@ -70,10 +70,13 @@ export class CommunicationTriggerService {
       );
 
       const channels = input.channels ??
-        (template.channels as string[] as ('EMAIL' | 'IN_APP')[]) ?? [
-          'EMAIL',
-          'IN_APP',
-        ];
+        (template.channels as string[] as (
+          | 'EMAIL'
+          | 'IN_APP'
+          | 'SMS'
+          | 'WHATSAPP'
+          | 'PUSH'
+        )[]) ?? ['EMAIL', 'IN_APP'];
       const campaignName = `${input.triggerKey}: ${rendered.subject || template.name}`;
 
       const campaign = await this.prisma.communicationCampaign.create({

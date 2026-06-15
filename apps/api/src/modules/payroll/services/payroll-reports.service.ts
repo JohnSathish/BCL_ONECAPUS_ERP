@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { PrismaService } from '../../../database/prisma.service';
 import { PayrollExcelStylesService } from './payroll-excel-styles.service';
+import { buildStateBreakdownFromLines } from './state-payroll-formulas';
+import { buildUgcBreakdownFromLines } from './ugc-payroll-formulas';
 
 const DEFAULT_LAYOUTS: Record<string, string[]> = {
   COLLEGE_TEACHING: [
@@ -25,6 +27,7 @@ const DEFAULT_LAYOUTS: Record<string, string[]> = {
     'Allowance',
     'Gross',
     'PF',
+    'House Rent',
     'Loan',
     'Net',
   ],
@@ -37,6 +40,7 @@ const DEFAULT_LAYOUTS: Record<string, string[]> = {
     'CPF Employer',
     'Gross',
     'CPF Deduction',
+    'TDS',
     'House Rent',
     'Loan',
     'Net',
@@ -50,6 +54,7 @@ const DEFAULT_LAYOUTS: Record<string, string[]> = {
     'CPF Employer',
     'Gross',
     'CPF Deduction',
+    'TDS',
     'House Rent',
     'Loan',
     'Net',
@@ -99,6 +104,7 @@ const HEADER_VALUE: Record<
   string,
   (
     ps: {
+      payScaleType?: string;
       grossSalary: unknown;
       netSalary: unknown;
       staffProfile: {
@@ -106,7 +112,12 @@ const HEADER_VALUE: Record<
         fullName: string;
         department?: { name: string } | null;
       };
-      lines: Array<{ componentCode: string; amount: unknown }>;
+      lines: Array<{
+        componentCode: string;
+        componentName?: string;
+        componentType?: string;
+        amount: unknown;
+      }>;
     },
     sl: number,
   ) => string | number
@@ -134,11 +145,57 @@ const HEADER_VALUE: Record<
   HRA: (ps) => lineAmt(ps.lines, 'HRA'),
   MA: (ps) => lineAmt(ps.lines, 'MA'),
   'CPF Employer': (ps) => lineAmt(ps.lines, 'CPF_EMPLOYER'),
+  HCA: (ps) => lineAmt(ps.lines, 'HCA'),
   'CPF Deduction': (ps) => lineAmt(ps.lines, 'CPF'),
   CPF: (ps) => lineAmt(ps.lines, 'CPF'),
+  TDS: (ps) => lineAmt(ps.lines, 'TDS'),
   NPS: (ps) => lineAmt(ps.lines, 'NPS'),
-  Gross: (ps) => Number(ps.grossSalary),
-  Net: (ps) => Number(ps.netSalary),
+  Gross: (ps) => {
+    if (ps.payScaleType === 'UGC') {
+      return buildUgcBreakdownFromLines(
+        ps.lines.map((line) => ({
+          componentCode: line.componentCode,
+          componentName: line.componentName,
+          componentType: line.componentType ?? 'EARNING',
+          amount: Number(line.amount),
+        })),
+      ).gross;
+    }
+    if (ps.payScaleType === 'STATE') {
+      return buildStateBreakdownFromLines(
+        ps.lines.map((line) => ({
+          componentCode: line.componentCode,
+          componentName: line.componentName,
+          componentType: line.componentType ?? 'EARNING',
+          amount: Number(line.amount),
+        })),
+      ).gross;
+    }
+    return Number(ps.grossSalary);
+  },
+  Net: (ps) => {
+    if (ps.payScaleType === 'UGC') {
+      return buildUgcBreakdownFromLines(
+        ps.lines.map((line) => ({
+          componentCode: line.componentCode,
+          componentName: line.componentName,
+          componentType: line.componentType ?? 'EARNING',
+          amount: Number(line.amount),
+        })),
+      ).net;
+    }
+    if (ps.payScaleType === 'STATE') {
+      return buildStateBreakdownFromLines(
+        ps.lines.map((line) => ({
+          componentCode: line.componentCode,
+          componentName: line.componentName,
+          componentType: line.componentType ?? 'EARNING',
+          amount: Number(line.amount),
+        })),
+      ).net;
+    }
+    return Number(ps.netSalary);
+  },
   'Professional Tax': (ps) => lineAmt(ps.lines, 'PROFESSIONAL_TAX'),
 };
 

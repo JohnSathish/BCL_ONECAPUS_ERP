@@ -13,6 +13,7 @@ import {
   FileText,
   Layers3,
   LineChart,
+  Loader2,
   ReceiptText,
   RefreshCw,
   Search,
@@ -37,7 +38,14 @@ import {
   publishFeeStructure,
   type FeeDemandScope,
 } from '@/services/fees';
+import { fetchStudents } from '@/services/students';
 import type { FeeDashboard, FeeDemandPreview, FeeStructure, StudentFeeLedger } from '@/types/fees';
+import type { StudentDirectoryRow } from '@/types/students';
+import { StudentFeeCyclePanel } from '@/components/fees-module/student-fee-cycle-panel';
+import { FeeDemandWorkflowPanel } from '@/components/fees-module/fee-demand-workflow-panel';
+import { FeeReconciliationPanel } from '@/components/fees-module/fee-reconciliation-panel';
+import { DemandScopeForm, PreviewSummary } from '@/components/fees-module/demand-scope-form';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -171,9 +179,13 @@ export function FeesWorkspace({
         }}
       />
 
+      {visiblePage === 'dashboard' && portal === 'admin' && <FeeDemandWorkflowPanel />}
+
       {(visiblePage === 'dashboard' || portal === 'accountant') && (
         <DashboardPanel dashboard={dashboardQ.data} structures={structuresQ.data ?? []} />
       )}
+
+      {visiblePage === 'dashboard' && portal === 'admin' ? <FeeReconciliationPanel /> : null}
 
       {visiblePage === 'structures' && (
         <StructureStudio
@@ -193,15 +205,20 @@ export function FeesWorkspace({
       )}
 
       {(visiblePage === 'demands' || visiblePage === 'renewals') && (
-        <DemandGenerator
-          mode={visiblePage}
-          scope={demandScope}
-          setScope={setDemandScope}
-          preview={previewMut.data}
-          loading={previewMut.isPending || generateMut.isPending}
-          onPreview={() => previewMut.mutate(demandScope)}
-          onGenerate={() => generateMut.mutate(demandScope)}
-        />
+        <>
+          <FeeDemandWorkflowPanel compact />
+          <DemandGenerator
+            mode={visiblePage}
+            scope={demandScope}
+            setScope={setDemandScope}
+            preview={previewMut.data}
+            loading={previewMut.isPending || generateMut.isPending}
+            onPreview={() => previewMut.mutate(demandScope)}
+            onGenerate={() =>
+              generateMut.mutate({ ...demandScope, publish: demandScope.publish ?? false })
+            }
+          />
+        </>
       )}
 
       {visiblePage === 'collections' && (
@@ -213,6 +230,10 @@ export function FeesWorkspace({
           onOnline={() => onlineMut.mutate()}
         />
       )}
+
+      {(visiblePage === 'ledger' || visiblePage === 'student') && portal === 'student' ? (
+        <StudentFeeCyclePanel />
+      ) : null}
 
       {(visiblePage === 'ledger' || visiblePage === 'student') && (
         <LedgerExplorer
@@ -248,18 +269,23 @@ function FeesHero({
       tone: 'text-emerald-600',
     },
     {
+      label: 'Admission Collected',
+      value: money(kpis?.admissionCollection),
+      icon: ReceiptText,
+      tone: 'text-blue-600',
+    },
+    {
+      label: 'Monthly Collected',
+      value: money(kpis?.monthlyCollection),
+      icon: BarChart3,
+      tone: 'text-indigo-600',
+    },
+    {
       label: 'Outstanding',
       value: money(kpis?.outstanding),
       icon: AlertTriangle,
       tone: 'text-rose-600',
     },
-    {
-      label: 'Renewal Pending',
-      value: kpis?.renewalPending ?? 0,
-      icon: RefreshCw,
-      tone: 'text-orange-600',
-    },
-    { label: 'Receipts', value: kpis?.receiptCount ?? 0, icon: ReceiptText, tone: 'text-blue-600' },
   ];
   return (
     <section className="overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-5 shadow-sm">
@@ -310,6 +336,12 @@ function DashboardPanel({
   dashboard?: FeeDashboard;
   structures: FeeStructure[];
 }) {
+  const admission = Number(dashboard?.split?.admission ?? dashboard?.kpis.admissionCollection ?? 0);
+  const monthly = Number(dashboard?.split?.monthly ?? dashboard?.kpis.monthlyCollection ?? 0);
+  const total = admission + monthly || 1;
+  const admissionPct = Math.round((admission / total) * 100);
+  const monthlyPct = 100 - admissionPct;
+
   return (
     <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
       <Panel title="Finance Dashboard" icon={BarChart3}>
@@ -320,21 +352,24 @@ function DashboardPanel({
             detail="published and draft demands"
           />
           <InsightCard
-            label="Total Collected"
-            value={money(dashboard?.kpis.totalCollected)}
-            detail="cash, online, bank and mixed modes"
+            label="Admission Outstanding"
+            value={money(dashboard?.kpis.admissionOutstanding)}
+            detail="biennial cycle dues"
           />
           <InsightCard
-            label="Concessions"
-            value={money(dashboard?.kpis.concessions)}
-            detail="scholarship, waiver and discount approvals"
+            label="Monthly Outstanding"
+            value={money(dashboard?.kpis.monthlyOutstanding)}
+            detail="tuition arrears"
           />
         </div>
-        <div className="mt-4 rounded-2xl border border-border/70 bg-muted/30 p-4">
-          <p className="text-sm font-semibold">Collection Trend</p>
-          <div className="mt-3 flex h-28 items-end gap-2">
-            {(dashboard?.trends?.length ? dashboard.trends : [{ month: 'Now', collected: 0 }]).map(
-              (point) => (
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+            <p className="text-sm font-semibold">Collection Trend</p>
+            <div className="mt-3 flex h-28 items-end gap-2">
+              {(dashboard?.trends?.length
+                ? dashboard.trends
+                : [{ month: 'Now', collected: 0 }]
+              ).map((point) => (
                 <div key={point.month} className="flex flex-1 flex-col items-center gap-2">
                   <div
                     className="w-full rounded-t-xl bg-primary/70"
@@ -344,8 +379,27 @@ function DashboardPanel({
                   />
                   <span className="text-[10px] text-muted-foreground">{point.month}</span>
                 </div>
-              ),
-            )}
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+            <p className="text-sm font-semibold">Admission vs Monthly</p>
+            <div className="mt-4 flex h-8 overflow-hidden rounded-full">
+              <div
+                className="bg-blue-500"
+                style={{ width: `${admissionPct}%` }}
+                title={`Admission ${admissionPct}%`}
+              />
+              <div
+                className="bg-indigo-400"
+                style={{ width: `${monthlyPct}%` }}
+                title={`Monthly ${monthlyPct}%`}
+              />
+            </div>
+            <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+              <span>Admission {money(admission)}</span>
+              <span>Monthly {money(monthly)}</span>
+            </div>
           </div>
         </div>
       </Panel>
@@ -456,60 +510,30 @@ function DemandGenerator({ mode, scope, setScope, preview, loading, onPreview, o
       title={mode === 'renewals' ? 'Renewal Center' : 'Demand Generator'}
       icon={mode === 'renewals' ? RefreshCw : FileText}
     >
-      <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Matches <strong>published</strong> fee structures to each student in scope, adds
+        subject/practical charges where configured, then creates ledger entries. For standard
+        admission or monthly billing, use the workflow cards above instead.
+      </p>
+      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
           <p className="font-semibold">Generation scope</p>
-          <div className="mt-3 grid gap-3">
-            <Input
-              label="Student ID (optional)"
-              value={scope.studentId ?? ''}
-              onChange={(value) =>
-                setScope((prev: FeeDemandScope) => ({ ...prev, studentId: value || undefined }))
-              }
-            />
-            <Input
-              label="Programme Version ID"
-              value={scope.programVersionId ?? ''}
-              onChange={(value) =>
-                setScope((prev: FeeDemandScope) => ({
-                  ...prev,
-                  programVersionId: value || undefined,
-                }))
-              }
-            />
-            <Input
-              label="Shift ID"
-              value={scope.shiftId ?? ''}
-              onChange={(value) =>
-                setScope((prev: FeeDemandScope) => ({ ...prev, shiftId: value || undefined }))
-              }
-            />
-            <Input
-              label="Semester Number"
-              type="number"
-              value={scope.semesterNumber ?? 1}
-              onChange={(value) =>
-                setScope((prev: FeeDemandScope) => ({ ...prev, semesterNumber: Number(value) }))
-              }
-            />
-            <Input
-              label="Billing Layer"
-              value={mode === 'renewals' ? 'YEARLY' : (scope.billingLayer ?? 'YEARLY')}
-              onChange={(value) =>
-                setScope((prev: FeeDemandScope) => ({ ...prev, billingLayer: value }))
-              }
-            />
-            <div className="flex gap-2">
+          <div className="mt-3">
+            <DemandScopeForm scope={scope} setScope={setScope} mode={mode} />
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="outline" onClick={onPreview} disabled={loading}>
                 Preview
               </Button>
               <Button onClick={onGenerate} disabled={loading}>
-                Generate
+                {scope.publish ? 'Generate & Publish' : 'Generate (draft)'}
               </Button>
             </div>
           </div>
         </div>
-        <PreviewTable preview={preview} />
+        <div>
+          <PreviewSummary preview={preview} />
+          <PreviewTable preview={preview} />
+        </div>
       </div>
     </Panel>
   );
@@ -608,19 +632,150 @@ function LedgerExplorer({
   ledger?: StudentFeeLedger;
   studentPortal: boolean;
 }) {
+  const [query, setQuery] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<StudentDirectoryRow | null>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchHint, setSearchHint] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 300);
+
+  const typeaheadQ = useQuery({
+    queryKey: ['ledger-student-typeahead', debouncedQuery],
+    queryFn: async () => {
+      const res = await fetchStudents({ search: debouncedQuery.trim(), limit: 8 });
+      return res.data;
+    },
+    enabled: !studentPortal && debouncedQuery.trim().length >= 2,
+    staleTime: 30_000,
+  });
+
+  const suggestions = typeaheadQ.data ?? [];
+  const showSuggestions =
+    searchFocused &&
+    debouncedQuery.trim().length >= 2 &&
+    (typeaheadQ.isFetching || typeaheadQ.isFetched);
+
+  function selectStudent(row: StudentDirectoryRow) {
+    setStudentId(row.id);
+    setSelectedStudent(row);
+    setQuery(row.fullName || row.enrollmentNumber || '');
+    setSearchFocused(false);
+    setSearchHint('');
+  }
+
+  async function runExplicitSearch() {
+    const q = query.trim();
+    if (!q) return;
+    let rows = debouncedQuery.trim() === q ? suggestions : [];
+    if (!rows.length) {
+      const res = await fetchStudents({ search: q, limit: 8 });
+      rows = res.data;
+    }
+    if (rows.length === 1) {
+      selectStudent(rows[0]);
+    } else if (!rows.length) {
+      setStudentId('');
+      setSelectedStudent(null);
+      setSearchHint(
+        'No student found. Try enrollment no, roll no, name, mobile, Aadhaar, or RFID.',
+      );
+    } else {
+      setSearchFocused(true);
+      setSearchHint('');
+    }
+  }
+
   return (
     <Panel title={studentPortal ? 'My Ledger' : 'Student Ledger Explorer'} icon={ReceiptText}>
       {!studentPortal && (
-        <div className="mb-4 flex max-w-xl gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="Enter student UUID"
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-            />
+        <div className="relative z-30 mb-4 max-w-2xl">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Enrollment no · Roll no · Application no · Name · Mobile · Aadhaar · RFID
+          </p>
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Search by name, enrollment no, roll no, mobile…"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSearchFocused(true);
+                  if (searchHint) setSearchHint('');
+                  if (!e.target.value.trim()) {
+                    setStudentId('');
+                    setSelectedStudent(null);
+                  }
+                }}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => window.setTimeout(() => setSearchFocused(false), 180)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && query.trim()) void runExplicitSearch();
+                  if (e.key === 'Escape') setSearchFocused(false);
+                }}
+                autoComplete="off"
+              />
+              {typeaheadQ.isFetching && debouncedQuery.trim().length >= 2 ? (
+                <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+              ) : null}
+
+              {showSuggestions ? (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-card shadow-lg">
+                  {typeaheadQ.isFetching && !suggestions.length ? (
+                    <p className="px-3 py-3 text-sm text-muted-foreground">Searching…</p>
+                  ) : suggestions.length ? (
+                    <>
+                      <p className="sticky top-0 border-b bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                        {suggestions.length} student{suggestions.length === 1 ? '' : 's'} found
+                      </p>
+                      {suggestions.map((row) => (
+                        <button
+                          key={row.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectStudent(row)}
+                          className="flex w-full items-center justify-between gap-3 border-b border-border/50 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted/70"
+                        >
+                          <span>
+                            <strong>{row.fullName}</strong>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              {row.enrollmentNumber}
+                              {row.rollNumber ? ` · Roll ${row.rollNumber}` : ''}
+                              {row.mobileNumber ? ` · ${row.mobileNumber}` : ''}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-right text-xs text-muted-foreground">
+                            {row.programme ?? '—'}
+                            {row.shift ? ` · ${row.shift}` : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="px-3 py-3 text-sm text-muted-foreground">
+                      No students match &ldquo;{debouncedQuery.trim()}&rdquo;
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              className="h-10 shrink-0"
+              disabled={!query.trim() || typeaheadQ.isFetching}
+              onClick={() => void runExplicitSearch()}
+            >
+              <Search className="mr-1.5 h-4 w-4" />
+              Search
+            </Button>
           </div>
+          {searchHint ? <p className="mt-2 text-xs text-amber-700">{searchHint}</p> : null}
+          {selectedStudent && studentId ? (
+            <p className="mt-2 text-sm">
+              Viewing ledger for <strong>{selectedStudent.fullName}</strong>
+              {selectedStudent.enrollmentNumber ? ` · ${selectedStudent.enrollmentNumber}` : ''}
+            </p>
+          ) : null}
         </div>
       )}
       {!ledger ? (
@@ -691,11 +846,54 @@ function ReportsPanel({
   report: any;
 }) {
   const rows = report?.rows ?? dashboard?.defaulters ?? [];
+  const reportType = type === 'defaulters' ? 'defaulters' : 'outstanding';
+
+  const downloadExport = async (format: 'csv' | 'xlsx' | 'pdf') => {
+    try {
+      const { exportFeeReport } = await import('@/services/fee-cycle');
+      if (format === 'csv') {
+        const res = (await exportFeeReport(reportType, 'csv')) as {
+          content?: string;
+          filename?: string;
+        };
+        const blob = new Blob([res.content ?? ''], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = res.filename ?? `${reportType}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      const blob = (await exportFeeReport(reportType, format)) as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportType}-report.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Export failed';
+      window.alert(message);
+    }
+  };
+
   return (
     <Panel
       title={type === 'defaulters' ? 'Defaulter Intelligence Dashboard' : 'Reports & Cash Book'}
       icon={type === 'defaulters' ? AlertTriangle : LineChart}
     >
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => void downloadExport('csv')}>
+          Export CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void downloadExport('xlsx')}>
+          Export Excel
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void downloadExport('pdf')}>
+          Export PDF
+        </Button>
+      </div>
       <div className="grid gap-3 md:grid-cols-3">
         <InsightCard
           label="Report Total"
@@ -704,9 +902,9 @@ function ReportsPanel({
         />
         <InsightCard label="Rows" value={rows.length} detail="records in this view" />
         <InsightCard
-          label="Risk Signal"
-          value={type === 'defaulters' ? 'High' : 'Normal'}
-          detail="based on outstanding demand aging"
+          label="Fines accrued"
+          value={money(dashboard?.kpis.fines)}
+          detail="late fee charges"
         />
       </div>
       <div className="mt-4 rounded-2xl border border-border/70">
@@ -715,7 +913,13 @@ function ReportsPanel({
             key={row.id ?? row.demandNo ?? row.transactionNo}
             className="flex items-center justify-between border-b border-border/60 p-3 text-sm last:border-0"
           >
-            <span>{row.demandNo ?? row.transactionNo ?? row.studentId}</span>
+            <div>
+              <p className="font-medium">{row.studentName ?? row.demandNo ?? row.transactionNo}</p>
+              <p className="text-xs text-muted-foreground">
+                {row.enrollmentNumber ?? row.studentId}
+                {row.demandType ? ` · ${row.demandType}` : ''}
+              </p>
+            </div>
             <strong>{money(row.balanceAmount ?? row.amount ?? 0)}</strong>
           </div>
         ))}

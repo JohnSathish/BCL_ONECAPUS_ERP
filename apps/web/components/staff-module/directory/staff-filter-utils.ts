@@ -13,6 +13,8 @@ export type StaffDirectoryFilters = {
 
   shiftId: string;
 
+  teachingShiftCategory: string;
+
   status: string;
 
   uiPortalPending: string;
@@ -40,6 +42,8 @@ export const emptyStaffFilters = (): StaffDirectoryFilters => ({
   additionalRoleCode: '',
 
   shiftId: '',
+
+  teachingShiftCategory: '',
 
   status: '',
 
@@ -82,6 +86,8 @@ export function staffFiltersToParams(
 
     shiftId: opt(filters.shiftId),
 
+    teachingShiftCategory: opt(filters.teachingShiftCategory),
+
     status: opt(filters.status),
 
     hodOnly: filters.uiHodOnly === 'true' ? true : undefined,
@@ -104,6 +110,8 @@ export function countActiveStaffFilters(filters: StaffDirectoryFilters): number 
   if (filters.additionalRoleCode) n++;
 
   if (filters.shiftId) n++;
+
+  if (filters.teachingShiftCategory) n++;
 
   if (filters.status) n++;
 

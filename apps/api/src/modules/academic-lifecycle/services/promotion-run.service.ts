@@ -8,6 +8,8 @@ import { PrismaService } from '../../../database/prisma.service';
 import { InstitutionAcademicConfigService } from './institution-academic-config.service';
 import { PromotionEligibilityService } from './promotion-eligibility.service';
 import { ProgrammeCompletionService } from './programme-completion.service';
+import { FeeCycleEngineService } from '../../fees/services/fee-cycle-engine.service';
+import { isFeeCycleTriggerSemester } from '../../fees/constants/fee-cycle.constants';
 import { lockMajorMinorTrackOnPromotion } from '../../academic-engine/domain/student-major-minor-track.lock';
 import type {
   CreatePromotionRunDto,
@@ -22,6 +24,7 @@ export class PromotionRunService {
     private readonly configService: InstitutionAcademicConfigService,
     private readonly eligibility: PromotionEligibilityService,
     private readonly completion: ProgrammeCompletionService,
+    private readonly feeCycleEngine: FeeCycleEngineService,
   ) {}
 
   async preview(tenantId: string, query: PromotionPreviewQueryDto) {
@@ -277,6 +280,17 @@ export class PromotionRunService {
     });
 
     await this.audit(tenantId, runId, actorId, 'RUN_APPLIED', {});
+
+    for (const entry of run.entries) {
+      if (entry.status !== 'PROMOTED' && entry.status !== 'COMPLETED') continue;
+      if (!isFeeCycleTriggerSemester(entry.toSequence)) continue;
+      void this.feeCycleEngine.onStudentSemesterEntry(
+        tenantId,
+        entry.studentId,
+        entry.toSequence,
+        actorId,
+      );
+    }
 
     return this.getRun(tenantId, runId);
   }

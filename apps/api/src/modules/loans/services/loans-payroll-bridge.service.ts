@@ -25,23 +25,19 @@ export class LoansPayrollBridgeService {
 
     year: number,
   ): Promise<number> {
-    const periodStart = new Date(year, month - 1, 1);
+    /** UTC month bounds — avoids excluding loans whose repaymentStartDate is stored as UTC midnight. */
+    const periodEndExclusive = new Date(Date.UTC(year, month, 1));
 
     const loans = await this.prisma.staffLoan.findMany({
       where: {
         tenantId,
-
         staffProfileId,
-
         status: 'ACTIVE',
-
         paused: false,
-
         balanceAmount: { gt: 0 },
-
         OR: [
           { repaymentStartDate: null },
-          { repaymentStartDate: { lte: periodStart } },
+          { repaymentStartDate: { lt: periodEndExclusive } },
         ],
       },
     });
@@ -76,25 +72,19 @@ export class LoansPayrollBridgeService {
 
     payslipId: string,
   ) {
-    const periodStart = new Date(year, month - 1, 1);
-
-    const paymentDate = new Date(year, month - 1, 1);
+    const periodEndExclusive = new Date(Date.UTC(year, month, 1));
+    const paymentDate = new Date(Date.UTC(year, month - 1, 1));
 
     const loans = await this.prisma.staffLoan.findMany({
       where: {
         tenantId,
-
         staffProfileId,
-
         status: 'ACTIVE',
-
         paused: false,
-
         balanceAmount: { gt: 0 },
-
         OR: [
           { repaymentStartDate: null },
-          { repaymentStartDate: { lte: periodStart } },
+          { repaymentStartDate: { lt: periodEndExclusive } },
         ],
       },
     });

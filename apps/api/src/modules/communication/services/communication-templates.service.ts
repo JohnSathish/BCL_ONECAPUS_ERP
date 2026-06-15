@@ -63,6 +63,75 @@ const DEFAULT_TEMPLATES: CommunicationTemplateDto[] = [
     channels: ['EMAIL', 'IN_APP'],
   },
   {
+    code: 'APPLICANT_REGISTERED',
+    name: 'Applicant Registration',
+    category: 'ADMISSIONS',
+    subject: 'Your application number — {{institution_name}}',
+    bodyHtml:
+      '<p>Dear {{student_name}},</p><p>Your application number is <strong>{{application_number}}</strong>. Temporary password: {{temp_password}}</p>',
+    bodyText:
+      'Dear {{student_name}}, application number {{application_number}}. Password: {{temp_password}}',
+    variables: [
+      'student_name',
+      'application_number',
+      'temp_password',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'SMS', 'IN_APP'],
+  },
+  {
+    code: 'APPLICATION_SUBMITTED',
+    name: 'Application Submitted (Portal)',
+    category: 'ADMISSIONS',
+    subject: 'Application submitted — {{institution_name}}',
+    bodyHtml:
+      '<p>Dear {{student_name}},</p><p>Your application {{application_number}} for {{program_name}} has been submitted successfully.</p>',
+    bodyText:
+      'Dear {{student_name}}, application {{application_number}} submitted.',
+    variables: [
+      'student_name',
+      'application_number',
+      'program_name',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'IN_APP'],
+  },
+  {
+    code: 'APPLICANT_PASSWORD_RESET',
+    name: 'Applicant Password Reset',
+    category: 'ADMISSIONS',
+    subject: 'Reset your admission portal password — {{institution_name}}',
+    bodyHtml:
+      '<p>Dear {{student_name}},</p><p>We received a request to reset the password for application <strong>{{application_number}}</strong>.</p><p><a href="{{reset_link}}">Click here to set a new password</a>. This link expires in {{expiry_minutes}} minutes.</p><p>If you did not request this, you can ignore this email.</p>',
+    bodyText:
+      'Dear {{student_name}}, reset your admission portal password for {{application_number}}: {{reset_link}} (expires in {{expiry_minutes}} minutes).',
+    variables: [
+      'student_name',
+      'application_number',
+      'reset_link',
+      'expiry_minutes',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'APPLICATION_STATUS_CHANGED',
+    name: 'Application Status Changed',
+    category: 'ADMISSIONS',
+    subject: 'Application status update — {{institution_name}}',
+    bodyHtml:
+      '<p>Dear {{student_name}},</p><p>Your application {{application_number}} status is now: {{status}}.</p>',
+    bodyText:
+      'Dear {{student_name}}, application {{application_number}} status: {{status}}.',
+    variables: [
+      'student_name',
+      'application_number',
+      'status',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'IN_APP'],
+  },
+  {
     code: 'FEE_REMINDER',
     name: 'Fee Reminder',
     category: 'FEES',
@@ -73,6 +142,28 @@ const DEFAULT_TEMPLATES: CommunicationTemplateDto[] = [
       'Dear {{student_name}}, fee of {{amount}} is due on {{due_date}}.',
     variables: ['student_name', 'amount', 'due_date', 'demand_no'],
     channels: ['EMAIL', 'IN_APP'],
+  },
+  {
+    code: 'FEE_RECEIPT',
+    name: 'Fee Payment Receipt',
+    category: 'FEES',
+    subject: 'Fee receipt {{receipt_no}} — {{institution_name}}',
+    bodyHtml:
+      '<p>Dear {{student_name}},</p><p>Thank you for your payment of <strong>₹{{amount}}</strong>.</p><p>Receipt No: <strong>{{receipt_no}}</strong><br/>Date: {{paid_date}}<br/>Mode: {{payment_mode}}</p><p><a href="{{verify_url}}">Verify receipt online</a></p>',
+    bodyText:
+      'Dear {{student_name}}, fee receipt {{receipt_no}} for Rs {{amount}} ({{payment_mode}}) dated {{paid_date}}. {{institution_name}}',
+    variables: [
+      'student_name',
+      'receipt_no',
+      'amount',
+      'payment_mode',
+      'paid_date',
+      'enrollment_number',
+      'programme',
+      'institution_name',
+      'verify_url',
+    ],
+    channels: ['EMAIL', 'SMS', 'WHATSAPP', 'IN_APP'],
   },
   {
     code: 'TIMETABLE_PUBLISHED',

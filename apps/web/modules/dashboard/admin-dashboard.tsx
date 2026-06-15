@@ -1,8 +1,8 @@
 'use client';
 
-import { EnterpriseAnalyticsDashboard } from '@/modules/dashboard/enterprise-analytics-dashboard';
+import { OperationsCommandCenter } from '@/components/dashboard/operations-command-center';
 
-/** Admin home — enterprise analytics command center. */
-export function AdminDashboard(_props: { userName?: string }) {
-  return <EnterpriseAnalyticsDashboard />;
+/** Admin home — operations command center (action-first). */
+export function AdminDashboard({ userName }: { userName?: string }) {
+  return <OperationsCommandCenter userName={userName} />;
 }

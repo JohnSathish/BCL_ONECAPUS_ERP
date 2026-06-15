@@ -187,6 +187,16 @@ type TemplateReference = {
   name: string;
   headers: string[];
   rows: (string | number | null)[][];
+  hidden?: boolean;
+};
+
+const FYUGP_CATEGORY_LABELS: Record<FyugpCategory, string> = {
+  MAJOR: 'Major',
+  MINOR: 'Minor',
+  MDC: 'MDC',
+  AEC: 'AEC',
+  SEC: 'SEC',
+  VAC: 'VAC',
 };
 
 type FyugpResolutionContext = {
@@ -988,7 +998,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         ctx.warnings.push(...(resolved.warnings ?? []));
         if (mode === 'LEGACY') {
           ctx.warnings.push(
-            `${category} uses a legacy name-based column. Use ${category}_CODE for safer imports.`,
+            `${category} mapped from subject name "${input}". CODE columns with dropdown (CODE - Name) are preferred when available.`,
           );
         }
       }
@@ -1226,7 +1236,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
   private resolveSubjectCodeInput(
     input: string,
-    normalized: string,
+    _normalized: string,
     category: FyugpCategory,
     ctx: {
       programVersionId?: string;
@@ -1239,19 +1249,48 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       defaultSectionCode?: string;
     },
   ): FyugpResolvedSelection | undefined {
-    const codeMatches = ctx.fyugp.offerings.filter(
+    const parsed = this.parseSubjectImportInput(input);
+    const normalized = this.normalizeSubjectKey(
+      this.templateCourseCode(parsed.codeCandidate),
+    );
+
+    let codeMatches = ctx.fyugp.offerings.filter(
       (offering) =>
-        this.normalizeSubjectKey(offering.course.code) === normalized,
+        this.normalizeSubjectKey(
+          this.templateCourseCode(offering.course.code),
+        ) === normalized,
     );
     if (!codeMatches.length) {
+      const displayKey = input.trim().toLowerCase();
+      codeMatches = ctx.fyugp.offerings.filter(
+        (offering) =>
+          this.formatSubjectDisplayLabel(
+            offering.course.code,
+            offering.course.title,
+          ).toLowerCase() === displayKey,
+      );
+    }
+    if (!codeMatches.length) {
       ctx.errors.push(
-        `Invalid ${category} mapping. Provided ${category}_CODE = ${input}. No active paper found with this code.`,
+        `Invalid ${category} mapping. Provided ${category}_CODE = "${input}". No paper found with this code or display label. Choose from the template dropdown.`,
+      );
+      return undefined;
+    }
+
+    const activeMatches = codeMatches.filter(
+      (offering) =>
+        String(offering.course.status ?? 'ACTIVE').toUpperCase() === 'ACTIVE',
+    );
+    if (!activeMatches.length) {
+      const found = codeMatches[0];
+      ctx.errors.push(
+        `Discontinued or inactive ${category} code: ${parsed.codeCandidate} (${found.course.title}). Choose an active paper from SUBJECT_MASTER.`,
       );
       return undefined;
     }
 
     const categoryMatches = this.codeOfferingCandidatesForCategory(
-      codeMatches,
+      activeMatches,
       category,
       ctx,
     );
@@ -1705,6 +1744,34 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
   private compactSubjectKey(value: string) {
     return this.normalizeSubjectKey(value).replace(/\s+/g, '');
+  }
+
+  private formatSubjectDisplayLabel(code: string, name: string) {
+    return `${this.templateCourseCode(code)} - ${name.trim()}`;
+  }
+
+  private parseSubjectImportInput(input: string) {
+    const trimmed = input.trim();
+    const separator = ' - ';
+    const idx = trimmed.indexOf(separator);
+    if (idx > 0) {
+      return {
+        codeCandidate: trimmed.slice(0, idx).trim(),
+        nameCandidate: trimmed.slice(idx + separator.length).trim(),
+      };
+    }
+    return { codeCandidate: trimmed, nameCandidate: undefined };
+  }
+
+  private enrichCategoryReferenceRows(
+    rows: (string | number | null)[][],
+  ): (string | number | null)[][] {
+    return rows.map((row) => {
+      const code = String(row[0] ?? '');
+      const name = String(row[1] ?? '');
+      const displayLabel = this.formatSubjectDisplayLabel(code, name);
+      return [code, name, displayLabel, ...row.slice(2)];
+    });
   }
 
   private async createStudentRecord(
@@ -2219,6 +2286,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         this.helperTextForHeader(col.header),
       ]);
     }
+    instructions.addRow(['', '']);
+    for (const note of this.templateInstructionNotes()) {
+      instructions.addRow(note);
+    }
     instructions.getRow(1).font = { bold: true };
     instructions.columns.forEach((col) => {
       col.width = 34;
@@ -2308,6 +2379,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         orderBy: { name: 'asc' },
       }),
     ]);
+    const categoryHeaders = [
+      'Code',
+      'Name',
+      'Display Label',
+      'Semester',
+      'Department',
+      'Programme Applicability',
+    ];
     const byCategory = (category: FyugpCategory) =>
       courseOfferings
         .filter(
@@ -2337,77 +2416,41 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         s.department?.name ?? '',
         `${category} subject master`,
       ]);
+
+    const categorySheets: { category: FyugpCategory; name: string }[] = [
+      { category: 'MAJOR', name: 'MAJOR Papers' },
+      { category: 'MINOR', name: 'MINOR Papers' },
+      { category: 'MDC', name: 'MDC Papers' },
+      { category: 'AEC', name: 'AEC Papers' },
+      { category: 'SEC', name: 'SEC Papers' },
+      { category: 'VAC', name: 'VAC Papers' },
+    ];
+    const subjectMasterRows: (string | number | null)[][] = [];
+    const categoryReferences: TemplateReference[] = categorySheets.map(
+      ({ category, name }) => {
+        const rawRows = byCategory(category).length
+          ? byCategory(category)
+          : subjectFallback(category);
+        const rows = this.enrichCategoryReferenceRows(rawRows);
+        for (const row of rows) {
+          subjectMasterRows.push([
+            FYUGP_CATEGORY_LABELS[category],
+            row[0],
+            row[1],
+            row[2],
+          ]);
+        }
+        return { name, headers: categoryHeaders, rows };
+      },
+    );
+
     return [
       {
-        name: 'MAJOR Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('MAJOR').length
-          ? byCategory('MAJOR')
-          : subjectFallback('MAJOR'),
+        name: 'SUBJECT_MASTER',
+        headers: ['Subject Type', 'Code', 'Subject Name', 'Display Label'],
+        rows: subjectMasterRows,
       },
-      {
-        name: 'MINOR Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('MINOR').length
-          ? byCategory('MINOR')
-          : subjectFallback('MINOR'),
-      },
-      {
-        name: 'MDC Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('MDC'),
-      },
-      {
-        name: 'AEC Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('AEC'),
-      },
-      {
-        name: 'SEC Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('SEC'),
-      },
-      {
-        name: 'VAC Papers',
-        headers: [
-          'Code',
-          'Name',
-          'Semester',
-          'Department',
-          'Programme Applicability',
-        ],
-        rows: byCategory('VAC'),
-      },
+      ...categoryReferences,
       {
         name: 'Departments',
         headers: ['Department Name', 'Code', 'Type'],
@@ -2422,37 +2465,77 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     references: { name: string; rows: (string | number | null)[][] }[],
   ) {
     const refByName = new Map(references.map((ref) => [ref.name, ref]));
-    const dropdownMap: Record<string, string> = {
-      MAJOR_CODE: 'MAJOR Papers',
-      MINOR_CODE: 'MINOR Papers',
-      MDC_CODE: 'MDC Papers',
-      AEC_CODE: 'AEC Papers',
-      SEC_CODE: 'SEC Papers',
-      VAC_CODE: 'VAC Papers',
-      Department: 'Departments',
-    };
-    for (const [header, refName] of Object.entries(dropdownMap)) {
+    const codeDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        MAJOR_CODE: { refName: 'MAJOR Papers', column: 'C' },
+        MINOR_CODE: { refName: 'MINOR Papers', column: 'C' },
+        MDC_CODE: { refName: 'MDC Papers', column: 'C' },
+        AEC_CODE: { refName: 'AEC Papers', column: 'C' },
+        SEC_CODE: { refName: 'SEC Papers', column: 'C' },
+        VAC_CODE: { refName: 'VAC Papers', column: 'C' },
+        Department: { refName: 'Departments', column: 'A' },
+      };
+    const nameDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        'Major Subject': { refName: 'MAJOR Papers', column: 'B' },
+        'Minor Subject': { refName: 'MINOR Papers', column: 'B' },
+        'MDC Choice': { refName: 'MDC Papers', column: 'B' },
+        AEC: { refName: 'AEC Papers', column: 'B' },
+        SEC: { refName: 'SEC Papers', column: 'B' },
+        VAC: { refName: 'VAC Papers', column: 'B' },
+      };
+
+    const applyListValidation = (
+      header: string,
+      refName: string,
+      column: string,
+      errorLabel: string,
+    ) => {
       const columnIndex = headers.indexOf(header) + 1;
       const ref = refByName.get(refName);
-      if (!columnIndex || !ref?.rows.length) continue;
-      if (!ref.rows.length) continue;
-      const formula = this.excelReferenceFormula(refName, ref.rows.length);
+      if (!columnIndex || !ref?.rows.length) return;
+      const formula = this.excelReferenceFormula(
+        refName,
+        ref.rows.length,
+        column,
+      );
       for (let row = 3; row <= 1000; row += 1) {
         sheet.getCell(row, columnIndex).dataValidation = {
           type: 'list',
           allowBlank: true,
           formulae: [formula],
           showErrorMessage: true,
-          errorTitle: 'Invalid code',
-          error: `Choose a code from ${refName}.`,
+          errorTitle: 'Invalid subject',
+          error: `Choose a valid option from ${errorLabel}.`,
         };
       }
+    };
+
+    for (const [header, config] of Object.entries(codeDropdownMap)) {
+      applyListValidation(
+        header,
+        config.refName,
+        config.column,
+        config.refName,
+      );
+    }
+    for (const [header, config] of Object.entries(nameDropdownMap)) {
+      applyListValidation(
+        header,
+        config.refName,
+        config.column,
+        config.refName,
+      );
     }
   }
 
-  private excelReferenceFormula(sheetName: string, rowCount: number) {
+  private excelReferenceFormula(
+    sheetName: string,
+    rowCount: number,
+    column = 'A',
+  ) {
     const safeName = sheetName.replace(/'/g, "''");
-    return `'${safeName}'!$A$2:$A$${rowCount + 1}`;
+    return `'${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
   }
 
   private templateCourseCode(code: string) {
@@ -2495,12 +2578,24 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       'John Doe',
       'Jane Doe Sr',
       'RFID001',
-      'GAR100',
-      'EDU101',
-      'MDC101',
-      'AEC101',
-      'SEC101',
-      'VAC101',
+      'GAR100 - Garo Major',
+      'EDU101 - Education Minor',
+      'MDC101 - Digital Literacy',
+      'AEC101 - Communicative English',
+      'SEC101 - Computer Applications',
+      'VAC101 - Environmental Studies',
+      'Garo Major',
+      'Education Minor',
+      'Digital Literacy',
+      'Communicative English',
+      'Computer Applications',
+      'Environmental Studies',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
       '',
       '',
       '',
@@ -2568,7 +2663,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const lineByCategory = new Map(
       latestRegistration?.lines.map((line) => [
         String(line.category).toUpperCase(),
-        line.offering.course.code,
+        {
+          code: this.templateCourseCode(line.offering.course.code),
+          title: line.offering.course.title,
+        },
       ]) ?? [],
     );
     const choiceByType = new Map(
@@ -2577,6 +2675,17 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         choice.subjectSlug,
       ]),
     );
+    const codeCell = (category: string, slugFallback?: string) => {
+      const entry = lineByCategory.get(category);
+      if (entry?.code && entry?.title) {
+        return this.formatSubjectDisplayLabel(entry.code, entry.title);
+      }
+      return entry?.code ?? slugFallback ?? '';
+    };
+    const nameCell = (category: string, slugFallback?: string) => {
+      const entry = lineByCategory.get(category);
+      return entry?.title ?? slugFallback ?? '';
+    };
     return [
       '',
       '',
@@ -2605,18 +2714,18 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       '',
       '',
       '',
-      lineByCategory.get('MAJOR') ?? choiceByType.get('MAJOR') ?? '',
-      lineByCategory.get('MINOR') ?? choiceByType.get('MINOR') ?? '',
-      lineByCategory.get('MDC') ?? '',
-      lineByCategory.get('AEC') ?? '',
-      lineByCategory.get('SEC') ?? '',
-      lineByCategory.get('VAC') ?? '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
+      codeCell('MAJOR', choiceByType.get('MAJOR')),
+      codeCell('MINOR', choiceByType.get('MINOR')),
+      codeCell('MDC'),
+      codeCell('AEC'),
+      codeCell('SEC'),
+      codeCell('VAC'),
+      nameCell('MAJOR', choiceByType.get('MAJOR')),
+      nameCell('MINOR', choiceByType.get('MINOR')),
+      nameCell('MDC'),
+      nameCell('AEC'),
+      nameCell('SEC'),
+      nameCell('VAC'),
       '',
       '',
       '',
@@ -2630,14 +2739,54 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     ];
   }
 
+  private templateInstructionNotes(): [string, string][] {
+    return [
+      [
+        'Subject dropdowns (MAJOR_CODE, MINOR_CODE, etc.)',
+        'Use the dropdown to pick CODE - Subject Name (e.g. GAR100 - Garo Major). On import, only the code (GAR100) is saved — the name is for your reference.',
+      ],
+      [
+        'Subject name columns (Major Subject, MDC Choice, etc.)',
+        'Optional alternative: select or type the subject name only (e.g. Garo Major). The system maps names to codes automatically.',
+      ],
+      [
+        'SUBJECT_MASTER sheet',
+        'Full curriculum reference: Subject Type, Code, Subject Name, and Display Label. Use this to verify codes before import.',
+      ],
+      [
+        'Category reference sheets',
+        'MAJOR Papers, MINOR Papers, MDC Papers, etc. list active offerings for each NEP category with semester and programme applicability.',
+      ],
+      [
+        'Invalid or discontinued subjects',
+        'Import will fail with a clear error if a code or name is not in the configured curriculum, is inactive, or belongs to the wrong category.',
+      ],
+    ];
+  }
+
   private helperTextForHeader(header: string) {
     const helpers: Record<string, string> = {
-      'Major Subject': 'Enter configured department/major name, e.g. GARO',
-      'Minor Subject': 'Enter configured minor/department name, e.g. EDUCATION',
-      'MDC Subject': 'Enter FYUGP MDC paper name',
-      'AEC Subject': 'Enter AEC paper name',
-      'SEC Subject': 'Enter SEC paper name',
-      'VAC Subject': 'Enter VAC paper name',
+      MAJOR_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      MINOR_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      MDC_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      AEC_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      SEC_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      VAC_CODE:
+        'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      'Major Subject':
+        'Optional: enter subject name only — select from dropdown or type exact name.',
+      'Minor Subject':
+        'Optional: enter subject name only — select from dropdown or type exact name.',
+      'MDC Choice':
+        'Optional: enter MDC subject name — select from dropdown or type exact name.',
+      AEC: 'Optional: enter AEC subject name — select from dropdown or type exact name.',
+      SEC: 'Optional: enter SEC subject name — select from dropdown or type exact name.',
+      VAC: 'Optional: enter VAC subject name — select from dropdown or type exact name.',
       'Major Subject 2': 'Optional second major paper or track',
       'Minor Subject 2': 'Optional second minor paper or track',
       'Elective Subject': 'Optional elective paper name',

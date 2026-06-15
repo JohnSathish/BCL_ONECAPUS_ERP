@@ -1,0 +1,251 @@
+{
+  "criteria": [
+    {
+      "criterion": 1,
+      "title": "Curricular Aspects",
+      "description": "Programmes, curriculum, syllabus, academic flexibility, feedback"
+    },
+    {
+      "criterion": 2,
+      "title": "Teaching-Learning and Evaluation",
+      "description": "Student intake, diversity, faculty qualification, attendance, examination, results"
+    },
+    {
+      "criterion": 3,
+      "title": "Research, Innovations and Extension",
+      "description": "Publications, research projects, extension activities, MoUs, NSS"
+    },
+    {
+      "criterion": 4,
+      "title": "Infrastructure and Learning Resources",
+      "description": "Buildings, labs, library, ICT infrastructure, equipment"
+    },
+    {
+      "criterion": 5,
+      "title": "Student Support and Progression",
+      "description": "Scholarships, placement, career guidance, sports, cultural activities"
+    },
+    {
+      "criterion": 6,
+      "title": "Governance, Leadership and Management",
+      "description": "IQAC, committees, strategic plans, finance, staff welfare, policies"
+    },
+    {
+      "criterion": 7,
+      "title": "Institutional Values and Best Practices",
+      "description": "Green campus, audits, inclusiveness, best practices, distinctiveness"
+    }
+  ],
+  "metrics": [
+    {
+      "criterion": 1,
+      "code": "1.1.1",
+      "title": "Curricula developed and implemented",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 1,
+      "code": "1.1.2",
+      "title": "Academic flexibility / certificate courses",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 1,
+      "code": "1.2.1",
+      "title": "Add-on / value added courses",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 1,
+      "code": "1.3.2",
+      "title": "Students enrolled in certificate/add-on courses",
+      "dataType": "numeric",
+      "isMandatory": false
+    },
+    {
+      "criterion": 1,
+      "code": "1.4.1",
+      "title": "Structured feedback on curriculum",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "code": "2.1.1",
+      "title": "Student enrolment and profile",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "code": "2.1.2",
+      "title": "Seats filled against reserved categories",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "code": "2.4.2",
+      "title": "Faculty with Ph.D. / NET / SLET",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "code": "2.6.3",
+      "title": "Pass percentage of final year students",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "code": "2.7.1",
+      "title": "Student satisfaction survey",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 3,
+      "code": "3.1.1",
+      "title": "Grants for research projects",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 3,
+      "code": "3.2.2",
+      "title": "Workshops/seminars on research methodology",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 3,
+      "code": "3.3.1",
+      "title": "Research papers per teacher in refereed journals",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 3,
+      "code": "3.4.1",
+      "title": "Extension and outreach programs",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 3,
+      "code": "3.4.3",
+      "title": "Students participating in extension activities",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 3,
+      "code": "3.5.1",
+      "title": "MoUs with institutions/industry",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "code": "4.1.2",
+      "title": "Expenditure on infrastructure augmentation",
+      "dataType": "numeric",
+      "isMandatory": false
+    },
+    {
+      "criterion": 4,
+      "code": "4.3.2",
+      "title": "Library expenditure per student",
+      "dataType": "numeric",
+      "isMandatory": false
+    },
+    {
+      "criterion": 4,
+      "code": "4.4.1",
+      "title": "ICT facilities and maintenance",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "code": "5.1.1",
+      "title": "Scholarships and freeships",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "code": "5.2.1",
+      "title": "Placement and higher studies",
+      "dataType": "numeric",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "code": "5.3.1",
+      "title": "Sports and cultural activities",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "code": "6.1.1",
+      "title": "Institutional vision and leadership",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "code": "6.2.2",
+      "title": "IQAC composition and meetings",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "code": "6.3.2",
+      "title": "Faculty development programmes",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "code": "6.5.2",
+      "title": "Internal quality assurance mechanisms",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "code": "7.1.2",
+      "title": "Environmental consciousness initiatives",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 7,
+      "code": "7.1.4",
+      "title": "Inclusive environment practices",
+      "dataType": "document",
+      "isMandatory": false
+    },
+    {
+      "criterion": 7,
+      "code": "7.2.1",
+      "title": "Best practices",
+      "dataType": "document",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "code": "7.3.1",
+      "title": "Institutional distinctiveness",
+      "dataType": "document",
+      "isMandatory": true
+    }
+  ]
+}

@@ -148,6 +148,10 @@ export class StaffService {
         : {}),
 
       ...(query.hasPublications ? { publications: { some: {} } } : {}),
+
+      ...(query.teachingShiftCategory
+        ? { teachingShiftCategory: query.teachingShiftCategory }
+        : {}),
     };
 
     if (query.shiftId) {

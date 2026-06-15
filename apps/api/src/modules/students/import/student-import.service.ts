@@ -66,7 +66,11 @@ export class StudentImportService {
 
       buffer,
 
-      options,
+      {
+        ...options,
+        excelSheetName: 'Students',
+        excelDataStartRow: 3,
+      },
     );
   }
 

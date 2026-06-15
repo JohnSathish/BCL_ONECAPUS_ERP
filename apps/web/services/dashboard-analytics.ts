@@ -1,9 +1,11 @@
 import { api } from '@/services/api';
 import type {
+  DashboardAiResponse,
   DashboardChart,
   DashboardChartWidgetId,
   DashboardFilters,
   DashboardOverview,
+  OperationsCenter,
   ShiftIntelligence,
 } from '@/types/dashboard-analytics';
 
@@ -28,6 +30,15 @@ export async function fetchDashboardOverview(
   return data;
 }
 
+export async function fetchOperationsCenter(
+  filters: DashboardFilters = {},
+): Promise<OperationsCenter> {
+  const { data } = await api.get<OperationsCenter>('/v1/dashboard/operations', {
+    params: filterParams(filters),
+  });
+  return data;
+}
+
 export async function fetchDashboardChart(
   widgetId: DashboardChartWidgetId,
   filters: DashboardFilters,
@@ -44,5 +55,10 @@ export async function fetchShiftIntelligence(
   const { data } = await api.get<ShiftIntelligence>('/v1/dashboard/shift-intelligence', {
     params: filterParams(filters),
   });
+  return data;
+}
+
+export async function askDashboardAi(question: string): Promise<DashboardAiResponse> {
+  const { data } = await api.post<DashboardAiResponse>('/v1/dashboard/ai/ask', { question });
   return data;
 }

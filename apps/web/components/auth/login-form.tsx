@@ -16,7 +16,7 @@ import { LoginAuthCard } from './login-auth-card';
 import { LoginAuthPanel } from './login-auth-panel';
 import { LoginHeroPanel } from './login-hero-panel';
 import { LoginPageShell } from './login-page-shell';
-import { apiErrorMessage } from '@/utils/api-error';
+import { ApiError, apiErrorMessage, isApiUnavailableError } from '@/utils/api-error';
 import { loginSchema, type LoginFormValues } from './login-schema';
 
 export function LoginForm() {
@@ -136,21 +136,22 @@ export function LoginForm() {
         tokenRefreshManager.scheduleProactiveRefresh(session);
         router.replace(resolveHomePath(session.user.roles));
       } catch (err) {
-        if (!axios.isAxiosError(err) || !err.response) {
+        if (isApiUnavailableError(err)) {
           setError(
             'Cannot reach the API. Start it with: npm run dev -w api (or npm run dev from the repo root).',
           );
           return;
         }
-        const data = err.response.data as {
-          message?: string | string[];
-          detail?: string;
-        };
-        const raw = data.detail ?? data.message ?? 'Invalid credentials';
-        const text = Array.isArray(raw) ? raw.join(', ') : raw;
+        const status =
+          err instanceof ApiError
+            ? err.status
+            : axios.isAxiosError(err)
+              ? err.response?.status
+              : undefined;
+        const text = apiErrorMessage(err, 'Invalid credentials');
         const lower = text.toLowerCase();
         if (
-          err.response.status === 400 &&
+          status === 400 &&
           (lower.includes('verification') ||
             lower.includes('challenge') ||
             lower.includes('equation'))
@@ -160,11 +161,11 @@ export function LoginForm() {
           void loadChallenge();
           return;
         }
-        if (err.response.status === 429) {
+        if (status === 429) {
           setError(text);
           return;
         }
-        if (err.response.status === 401) {
+        if (status === 401) {
           setError(
             'Invalid credentials. Use demo credentials below or contact your administrator.',
           );

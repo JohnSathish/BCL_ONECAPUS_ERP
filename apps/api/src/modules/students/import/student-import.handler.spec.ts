@@ -323,4 +323,22 @@ describe('StudentImportHandler', () => {
 
     expect(results[0]?.normalized?.currentSemester).toBe(3);
   });
+
+  it('parses CODE - Name dropdown values when resolving subject codes', () => {
+    const parsed = (
+      handler as unknown as {
+        parseSubjectImportInput: (v: string) => { codeCandidate: string };
+      }
+    ).parseSubjectImportInput('GAR100 - Garo Major');
+    expect(parsed.codeCandidate).toBe('GAR100');
+  });
+
+  it('parses plain course codes from subject code columns', () => {
+    const parsed = (
+      handler as unknown as {
+        parseSubjectImportInput: (v: string) => { codeCandidate: string };
+      }
+    ).parseSubjectImportInput('EDU101');
+    expect(parsed.codeCandidate).toBe('EDU101');
+  });
 });

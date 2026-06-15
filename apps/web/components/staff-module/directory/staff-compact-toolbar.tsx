@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
+import { TEACHING_SHIFT_FILTER_OPTIONS } from '@/components/staff-module/employment/staff-shift-category';
 import { cn } from '@/utils/cn';
 
 type Option = { id: string; label: string };
@@ -165,9 +166,12 @@ export function StaffCompactToolbar({
         ) : null}
         <FilterPill
           label="Shift"
-          value={filters.shiftId}
-          options={shiftOptions}
-          onChange={(shiftId) => onFilterChange({ shiftId })}
+          value={filters.teachingShiftCategory}
+          options={TEACHING_SHIFT_FILTER_OPTIONS.filter((o) => o.id).map((o) => ({
+            id: o.id,
+            label: o.label,
+          }))}
+          onChange={(teachingShiftCategory) => onFilterChange({ teachingShiftCategory })}
         />
         <FilterPill
           label="Status"

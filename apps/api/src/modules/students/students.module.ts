@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ImportModule } from '../../common/import/import.module';
 import { QueueModule } from '../../shared/queue/queue.module';
 import { AcademicEngineModule } from '../academic-engine/academic-engine.module';
@@ -44,7 +44,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     ShiftsModule,
     ImportModule,
     AdministrationModule,
-    OrganizationModule,
+    forwardRef(() => OrganizationModule),
     QueueModule,
     CommunicationModule,
     LicensingModule,
@@ -88,6 +88,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     StudentProfileService,
     StudentSemesterResolverService,
     RollNumberService,
+    StudentPortalService,
   ],
 })
 export class StudentsModule {}

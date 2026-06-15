@@ -13,17 +13,25 @@ export function DirectorySkeleton({ className }: { className?: string }) {
 
 export function DirectoryKpiSkeleton() {
   return (
-    <div className="flex gap-2 overflow-hidden">
-      {Array.from({ length: 9 }).map((_, i) => (
-        <DirectorySkeleton key={i} className="h-16 min-w-[108px] flex-1 rounded-[20px]" />
+    <div className="flex gap-0 overflow-hidden rounded-xl border border-border/50">
+      {Array.from({ length: 7 }).map((_, i) => (
+        <DirectorySkeleton key={i} className="h-14 min-w-[120px] flex-1" />
       ))}
     </div>
   );
 }
 
-export function DirectoryTableSkeleton({ rows = 10 }: { rows?: number }) {
+export function DirectoryTableSkeleton({
+  rows = 10,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
   return (
-    <div className="glass-card space-y-1 rounded-xl p-2">
+    <div
+      className={cn('glass-card flex min-h-0 flex-1 flex-col space-y-1 rounded-xl p-2', className)}
+    >
       <DirectorySkeleton className="h-7 w-full" />
       {Array.from({ length: rows }).map((_, i) => (
         <DirectorySkeleton key={i} className="h-9 w-full" />

@@ -49,41 +49,42 @@ export type StudentDashboardView = {
   profile: StudentPortalProfile;
   quickStats: StudentQuickStat[];
   academicChips: StudentAcademicChip[];
-  todayTimetable: StudentTimetableSlot[];
-  attendance: {
-    overall: number | null;
-    subjects: { id: string; label: string; percentage: number }[];
-  };
-  fees: {
+  unreadNotificationCount: number;
+  fees?: {
     paid: number;
     due: number;
     status: 'PAID' | 'PENDING';
     semesterLabel: string;
   };
-  lms: {
+  /** Loaded lazily via widget endpoints */
+  todayTimetable?: StudentTimetableSlot[];
+  attendance?: {
+    overall: number | null;
+    subjects: { id: string; label: string; percentage: number }[];
+  };
+  lms?: {
     pendingAssignments: number;
     notesAvailable: number;
     upcomingTests: number;
   };
-  examinations: {
+  examinations?: {
     hasResults: boolean;
     hasAdmitCard: boolean;
     cgpa: number | null;
   };
-  library: {
+  library?: {
     issuedBooks: number;
     finesDue: number;
   };
-  certificates: {
+  certificates?: {
     available: number;
   };
-  notifications: StudentPortalNotification[];
-  unreadNotificationCount: number;
-  health: {
+  notifications?: StudentPortalNotification[];
+  health?: {
     score: number;
     label: string;
     tone: 'good' | 'warn' | 'bad';
     signals?: { key: string; label: string; tone: string }[];
   };
-  calendarEvents: PortalCalendarEvent[];
+  calendarEvents?: PortalCalendarEvent[];
 };

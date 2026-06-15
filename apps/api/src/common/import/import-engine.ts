@@ -29,7 +29,16 @@ export class ImportEngine {
     buffer: Buffer,
     options?: ImportValidateOptions,
   ): Promise<ImportPreviewResponse & { async: boolean }> {
-    const parsed = await parseExcelDataSheet(buffer);
+    const parsed = await parseExcelDataSheet(buffer, {
+      sheetName:
+        typeof options?.excelSheetName === 'string'
+          ? options.excelSheetName
+          : undefined,
+      dataStartRow:
+        typeof options?.excelDataStartRow === 'number'
+          ? options.excelDataStartRow
+          : undefined,
+    });
     if (parsed.length === 0) {
       throw new BadRequestException('No data rows found in Excel file');
     }

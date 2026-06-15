@@ -16,11 +16,10 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
+import { DirectoryAttendanceBadge } from '@/components/students-module/directory/ui/directory-attendance-badge';
 import { DirectoryFeeBadge } from '@/components/students-module/directory/ui/directory-fee-badge';
-import { DirectoryHealthIndicators } from '@/components/students-module/directory/directory-health-indicators';
 import { DirectoryRowPreview } from '@/components/students-module/directory/directory-row-preview';
 import { DirectoryGlassCard } from '@/components/students-module/directory/ui/directory-glass-card';
-import { DirectoryRegistrationBadge } from '@/components/students-module/directory/ui/directory-registration-badge';
 import { DirectorySemesterChip } from '@/components/students-module/directory/ui/directory-semester-chip';
 import { DirectoryStatusPill } from '@/components/students-module/directory/ui/directory-status-pill';
 import { DirectoryStudentAvatar } from '@/components/students-module/directory/ui/directory-student-avatar';
@@ -43,10 +42,11 @@ type Props = {
   onToggleAll: (checked: boolean) => void;
   virtualize?: boolean;
   onOpenProfile?: (row: StudentDirectoryRow) => void;
+  className?: string;
 };
 
 export const ROW_HEIGHT = 44;
-const COL_COUNT = 17;
+const COL_COUNT = 15;
 
 function studentBase(id: string) {
   return `/admin/students/${id}`;
@@ -228,9 +228,7 @@ function DataRow({
           <p className="truncate text-[11px]">{row.programme ?? '—'}</p>
         </td>
         <td className="max-w-[100px] px-1.5 py-1 align-middle">
-          <p className="truncate text-[11px] font-medium text-primary/90">
-            {row.majorSubject ? `Major: ${row.majorSubject}` : '—'}
-          </p>
+          <p className="truncate text-[11px]">{row.majorSubject ?? '—'}</p>
         </td>
         <td className="px-1.5 py-1 align-middle">
           <DirectorySemesterChip semester={row.semester} />
@@ -242,13 +240,10 @@ function DataRow({
           <span className="text-[11px] tabular-nums">{row.mobileNumber ?? '—'}</span>
         </td>
         <td className="px-1.5 py-1 align-middle">
-          <DirectoryRegistrationBadge status={row.registrationStatus} />
-        </td>
-        <td className="px-1.5 py-1 align-middle">
           <DirectoryFeeBadge row={row} />
         </td>
         <td className="px-1.5 py-1 align-middle">
-          <DirectoryHealthIndicators row={row} compact />
+          <DirectoryAttendanceBadge row={row} />
         </td>
         <td className="px-1.5 py-1 align-middle">
           <DirectoryStatusPill label={statusLabel} />
@@ -285,6 +280,7 @@ export function DirectoryTable({
   onToggleAll,
   virtualize = false,
   onOpenProfile,
+  className,
 }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const parentRef = useRef<HTMLDivElement>(null);
@@ -350,7 +346,7 @@ export function DirectoryTable({
           Roll No
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Name
+          Student Name
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Programme
@@ -368,13 +364,10 @@ export function DirectoryTable({
           Mobile
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Subjects
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Fee
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Health
+          Attendance
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Status
@@ -387,8 +380,11 @@ export function DirectoryTable({
   );
 
   return (
-    <DirectoryGlassCard glow className="hidden overflow-hidden md:block">
-      <div ref={parentRef} className="max-h-[calc(100vh-280px)] min-h-[420px] overflow-auto">
+    <DirectoryGlassCard
+      glow
+      className={cn('hidden min-h-0 flex-col overflow-hidden md:flex', className)}
+    >
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[1180px] border-collapse text-sm">
           {header}
           <tbody>

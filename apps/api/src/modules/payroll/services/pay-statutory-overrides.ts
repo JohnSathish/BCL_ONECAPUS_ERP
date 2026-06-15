@@ -39,7 +39,7 @@ export function buildAssignmentOverrides(
   if (opts.houseRent != null && opts.houseRent >= 0) {
     overrides.HOUSE_RENT = { value: opts.houseRent };
   }
-  if (opts.fixedAllowance != null && opts.fixedAllowance > 0) {
+  if (opts.fixedAllowance != null && opts.fixedAllowance >= 0) {
     overrides.ALLOWANCE = { value: opts.fixedAllowance };
     overrides.FIXED_ALLOWANCE = { value: opts.fixedAllowance };
   }
@@ -81,6 +81,15 @@ export function parseAssignmentOverrides(
   };
 }
 
+/** STATE/UGC CPF comes from pay assignment overrides, not staff PF config. */
+export function isCpfEnabledInAssignment(
+  overrides?: Record<string, unknown> | null,
+): boolean {
+  if (!overrides || typeof overrides !== 'object') return true;
+  const cpf = overrides.CPF_EMPLOYER as ComponentOverride | undefined;
+  return cpf?.disabled !== true;
+}
+
 export function mergeStatutoryOverrides(
   existing: Record<string, unknown> | null | undefined,
   opts: StatutoryOptions,
@@ -92,4 +101,14 @@ export function mergeStatutoryOverrides(
     cpfRate: opts.cpfRate ?? parsed.cpfRate,
     fixedAllowance: opts.fixedAllowance ?? parsed.fixedAllowance,
   });
+}
+
+/** DBC non-teaching salary sheet uses House Rent, not Professional Tax. */
+export function shouldApplyProfessionalTax(
+  payScaleType: string,
+  structureCode?: string | null,
+): boolean {
+  if (structureCode === 'DBC_NON_TEACHING') return false;
+  if (payScaleType === 'COLLEGE_NON_TEACHING') return false;
+  return false;
 }

@@ -95,6 +95,9 @@ export async function collectFee(payload: {
   amount: number;
   paymentMode: string;
   provider?: string;
+  externalReference?: string;
+  remarks?: string;
+  metadata?: Record<string, unknown>;
 }) {
   const { data } = await api.post('/v1/fees/collections', payload);
   return data;

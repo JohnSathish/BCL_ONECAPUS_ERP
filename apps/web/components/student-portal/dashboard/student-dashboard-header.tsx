@@ -100,10 +100,13 @@ export function StudentDashboardHeader({ data, loading }: Props) {
           <p className="font-semibold">Today&apos;s Overview</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Classes:{' '}
-            <span className="font-medium text-foreground">{data.todayTimetable.length}</span>
+            <span className="font-medium text-foreground">
+              {data.todayTimetable?.length ?? '—'}
+            </span>
           </p>
           <p className="text-xs text-muted-foreground">
-            Health: <span className="font-medium text-foreground">{data.health.score}%</span>
+            Health:{' '}
+            <span className="font-medium text-foreground">{data.health?.score ?? '—'}%</span>
           </p>
         </div>
       </div>

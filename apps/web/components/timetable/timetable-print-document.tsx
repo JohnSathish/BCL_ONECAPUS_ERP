@@ -197,6 +197,7 @@ function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], da
     <div>
       {entries.map((entry) => {
         const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
+        const overlay = entry.replacementOverlay;
         return (
           <div key={entry.id} className="timetable-print-slot">
             <div className="timetable-print-slot-head">
@@ -207,8 +208,21 @@ function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], da
             <p className="timetable-print-slot-meta">
               Sem {entry.semesterSequence ?? '-'}
               {entry.sectionCode ? ` · Sec ${entry.sectionCode}` : ''}
-              {' · '}
-              {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'}
+              {overlay ? (
+                <>
+                  {' · '}
+                  Original Faculty: {overlay.originalStaffName}
+                  {' · '}
+                  Handled By: {overlay.handledByName}
+                  {' · '}
+                  {overlay.reasonLabel}
+                </>
+              ) : (
+                <>
+                  {' · '}
+                  {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'}
+                </>
+              )}
               {' · '}
               {entry.classroom?.code ?? 'Room TBA'}
               {entry.isCombined ? ' · Combined' : ''}

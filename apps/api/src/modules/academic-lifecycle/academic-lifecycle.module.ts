@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
+import { AdmissionsModule } from '../admissions/admissions.module';
+import { FeesModule } from '../fees/fees.module';
 import { AcademicLifecycleController } from './academic-lifecycle.controller';
 import { AcademicLifecycleService } from './academic-lifecycle.service';
 import { AcademicSessionService } from './services/academic-session.service';
@@ -14,6 +16,7 @@ import { PromotionRunService } from './services/promotion-run.service';
 import { SemesterLifecycleService } from './services/semester-lifecycle.service';
 
 @Module({
+  imports: [forwardRef(() => AdmissionsModule), FeesModule],
   controllers: [AcademicLifecycleController],
   providers: [
     AcademicLifecycleService,

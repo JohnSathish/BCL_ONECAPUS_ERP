@@ -1,25 +1,23 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Post,
-  Body,
-  Param,
-  Patch,
   UploadedFile,
   UseInterceptors,
-  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
-import { StaffPortalService } from './services/staff-portal.service';
-import { StaffDocumentsService } from './services/staff-documents.service';
 import { UploadStaffDocumentDto } from './dto/staff.dto';
+import { StaffDocumentsService } from './services/staff-documents.service';
+import { StaffPortalService } from './services/staff-portal.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -58,9 +56,9 @@ export class StaffPortalController {
 
   @Get('me/documents/compliance')
   @RequireAnyPermission('staff:portal:self')
-  async getMyDocumentCompliance(@CurrentUser() user: JwtUser) {
-    const staffProfileId = await this.portal.resolveStaffProfileId(user);
-    return this.documents.getCompliance(user.tid, staffProfileId);
+  async getDocumentsCompliance(@CurrentUser() user: JwtUser) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.documents.getCompliance(user.tid, staff.id);
   }
 
   @Post('me/documents')
@@ -80,10 +78,10 @@ export class StaffPortalController {
     if (!file?.buffer?.length) {
       throw new BadRequestException('No file uploaded');
     }
-    const staffProfileId = await this.portal.resolveStaffProfileId(user);
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
     return this.documents.uploadDocument(
       user.tid,
-      staffProfileId,
+      staff.id,
       dto.documentType,
       file,
       user.sub,

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { StudentFeeSummaryService } from '../../fees/services/student-fee-summary.service';
 import {
   student360Score,
   studentHealthSignals,
@@ -47,7 +48,10 @@ const ATTENDANCE_SHORTAGE_THRESHOLD = 75;
 export class StudentDirectoryEnrichmentService {
   private readonly logger = new Logger(StudentDirectoryEnrichmentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly feeSummary: StudentFeeSummaryService,
+  ) {}
 
   private db() {
     return this.prisma as unknown as Record<string, any>;
@@ -402,61 +406,21 @@ export class StudentDirectoryEnrichmentService {
     studentIds: string[],
   ): Promise<Map<string, DirectoryFeeSnapshot>> {
     const map = new Map<string, DirectoryFeeSnapshot>();
-    const demands = await this.db().studentFeeDemand.findMany({
-      where: {
-        tenantId,
-        studentId: { in: studentIds },
-        status: { in: [...ACTIVE_DEMAND_STATUSES] },
-      },
-      select: {
-        studentId: true,
-        balanceAmount: true,
-        status: true,
-        dueDate: true,
-      },
-    });
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const grouped = new Map<
-      string,
-      { totalDue: number; hasPartial: boolean; hasOverdue: boolean }
-    >();
-
-    for (const demand of demands) {
-      const balance = Number(demand.balanceAmount ?? 0);
-      if (balance <= 0) continue;
-      const bucket = grouped.get(demand.studentId) ?? {
-        totalDue: 0,
-        hasPartial: false,
-        hasOverdue: false,
-      };
-      bucket.totalDue += balance;
-      if (demand.status === 'PARTIALLY_PAID') bucket.hasPartial = true;
-      if (demand.dueDate) {
-        const due = new Date(demand.dueDate);
-        due.setHours(0, 0, 0, 0);
-        if (due < today) bucket.hasOverdue = true;
-      }
-      grouped.set(demand.studentId, bucket);
-    }
-
+    const summaries = await this.feeSummary.getMany(tenantId, studentIds);
     for (const studentId of studentIds) {
-      const bucket = grouped.get(studentId);
-      if (!bucket || bucket.totalDue <= 0) {
+      const row = summaries.get(studentId);
+      if (!row || row.totalOutstanding <= 0) {
         map.set(studentId, { feeStatus: 'CLEAR', feeDueAmount: 0 });
         continue;
       }
       let feeStatus: DirectoryFeeSnapshot['feeStatus'] = 'DUE';
-      if (bucket.hasOverdue) feeStatus = 'OVERDUE';
-      else if (bucket.hasPartial) feeStatus = 'PARTIAL';
+      if (row.feeStatus === 'OVERDUE') feeStatus = 'OVERDUE';
+      else if (row.activeDemandCount > 1) feeStatus = 'PARTIAL';
       map.set(studentId, {
         feeStatus,
-        feeDueAmount: Math.round(bucket.totalDue * 100) / 100,
+        feeDueAmount: Math.round(row.totalOutstanding * 100) / 100,
       });
     }
-
     return map;
   }
 
@@ -567,16 +531,7 @@ export class StudentDirectoryEnrichmentService {
   }
 
   private async listFeeDefaulterIds(tenantId: string): Promise<string[]> {
-    const rows = await this.db().studentFeeDemand.findMany({
-      where: {
-        tenantId,
-        status: { in: [...ACTIVE_DEMAND_STATUSES] },
-        balanceAmount: { gt: 0 },
-      },
-      distinct: ['studentId'],
-      select: { studentId: true },
-    });
-    return rows.map((row: { studentId: string }) => row.studentId);
+    return this.feeSummary.listDefaulterStudentIds(tenantId);
   }
 
   private async countFeeDefaulters(tenantId: string): Promise<number> {

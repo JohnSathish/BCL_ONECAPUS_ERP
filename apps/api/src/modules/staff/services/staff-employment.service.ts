@@ -9,6 +9,14 @@ import { StaffAdditionalRoleService } from './staff-additional-role.service';
 import { EmployeeCodeService } from './employee-code.service';
 import { StaffLifecycleService } from './staff-lifecycle.service';
 import {
+  inferTeachingShiftCategory,
+  isTeachingShiftCategory,
+  resolveShiftIdsByCode,
+  shiftAssignmentForCategory,
+  teachingShiftCategoryLabel,
+  type TeachingShiftCategory,
+} from './staff-shift-category';
+import {
   validateEmploymentCombination,
   supportsAdditionalAcademicRoles,
 } from './staff-employment-rules';
@@ -20,6 +28,7 @@ export type EmploymentUpdatePayload = {
   designationId?: string | null;
   primaryShiftId?: string | null;
   additionalShiftIds?: string[];
+  teachingShiftCategory?: TeachingShiftCategory | string;
   additionalRoleCodes?: string[];
   shortCode?: string | null;
   staffType?: string;
@@ -212,10 +221,14 @@ export class StaffEmploymentService {
       payload.departmentId !== undefined
         ? payload.departmentId
         : staff.departmentId;
-    const primaryShiftId =
+    let primaryShiftId =
       payload.primaryShiftId !== undefined
         ? payload.primaryShiftId
         : staff.primaryShiftId;
+    let additionalShiftIds =
+      payload.additionalShiftIds !== undefined
+        ? payload.additionalShiftIds
+        : undefined;
     const staffType =
       payload.staffType !== undefined ? payload.staffType : staff.staffType;
     const designationId =
@@ -275,6 +288,20 @@ export class StaffEmploymentService {
     if (payload.primaryShiftId !== undefined) {
       updateData.primaryShiftId = payload.primaryShiftId;
     }
+    if (payload.teachingShiftCategory !== undefined) {
+      if (!isTeachingShiftCategory(payload.teachingShiftCategory)) {
+        throw new BadRequestException('Invalid teaching shift category');
+      }
+      updateData.teachingShiftCategory = payload.teachingShiftCategory;
+      const shiftIds = await this.loadTeachingShiftIds(tenantId);
+      const assignment = shiftAssignmentForCategory(
+        payload.teachingShiftCategory,
+        shiftIds,
+      );
+      primaryShiftId = assignment.primaryShiftId;
+      additionalShiftIds = assignment.additionalShiftIds;
+      updateData.primaryShiftId = assignment.primaryShiftId;
+    }
     if (payload.shortCode !== undefined) updateData.shortCode = shortCode;
     if (campusId !== staff.campusId) updateData.campusId = campusId;
 
@@ -328,13 +355,19 @@ export class StaffEmploymentService {
 
     if (
       payload.primaryShiftId !== undefined ||
-      payload.additionalShiftIds !== undefined
+      payload.additionalShiftIds !== undefined ||
+      payload.teachingShiftCategory !== undefined
     ) {
+      const existingAssignments =
+        await this.prisma.staffShiftAssignment.findMany({
+          where: { tenantId, staffProfileId, active: true, isPrimary: false },
+          select: { shiftId: true },
+        });
       await this.syncShifts(
         tenantId,
         staffProfileId,
         primaryShiftId,
-        payload.additionalShiftIds ?? [],
+        additionalShiftIds ?? existingAssignments.map((row) => row.shiftId),
       );
     }
 
@@ -371,6 +404,54 @@ export class StaffEmploymentService {
       where: { id: staffProfileId },
     });
   }
+
+  async loadTeachingShiftIds(tenantId: string) {
+    const shifts = await this.prisma.shift.findMany({
+      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, code: true },
+    });
+    return resolveShiftIdsByCode(shifts);
+  }
+
+  async applyTeachingShiftCategory(
+    tenantId: string,
+    staffProfileId: string,
+    category: TeachingShiftCategory,
+    options?: { mergeWithExistingDay?: boolean },
+  ) {
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { id: staffProfileId, tenantId, deletedAt: null },
+      include: {
+        primaryShift: { select: { code: true } },
+        shiftAssignments: {
+          where: { active: true },
+          include: { shift: { select: { code: true } } },
+        },
+      },
+    });
+    if (!staff) throw new NotFoundException('Staff member not found');
+
+    let nextCategory = category;
+    if (options?.mergeWithExistingDay && category === 'MORNING') {
+      const current = inferTeachingShiftCategory(
+        staff.primaryShift?.code ?? null,
+        staff.shiftAssignments
+          .filter((row) => !row.isPrimary)
+          .map((row) => row.shift.code),
+      );
+      if (current === 'BOTH') {
+        nextCategory = 'BOTH';
+      } else if (current === 'DAY') {
+        nextCategory = 'BOTH';
+      }
+    }
+
+    return this.applyEmploymentUpdate(tenantId, staffProfileId, {
+      teachingShiftCategory: nextCategory,
+    });
+  }
+
+  teachingShiftCategoryLabel = teachingShiftCategoryLabel;
 
   async listAcademicRoles(tenantId: string) {
     return this.prisma.academicRoleDefinition.findMany({

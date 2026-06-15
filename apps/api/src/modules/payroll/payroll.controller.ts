@@ -54,6 +54,7 @@ import { PayStructureService } from './services/pay-structure.service';
 import { PayrollAnalyticsService } from './services/payroll-analytics.service';
 import { PayrollApprovalService } from './services/payroll-approval.service';
 import { PayrollReportsService } from './services/payroll-reports.service';
+import { PayrollExcelValidationService } from './services/payroll-excel-validation.service';
 import { PayrollRunEngineService } from './services/payroll-run-engine.service';
 import { PayslipDocumentService } from './services/payslip-document.service';
 import { PfCpfService } from './services/pf-cpf.service';
@@ -80,6 +81,7 @@ export class PayrollController {
     private readonly increments: IncrementService,
     private readonly loans: LoanService,
     private readonly runs: PayrollRunEngineService,
+    private readonly excelValidation: PayrollExcelValidationService,
     private readonly approval: PayrollApprovalService,
     private readonly payslipDocs: PayslipDocumentService,
     private readonly pfCpf: PfCpfService,
@@ -422,6 +424,28 @@ export class PayrollController {
   @RequirePermissions('payroll:process')
   calculateRun(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.runs.calculate(user, id);
+  }
+
+  @Post('runs/:id/validate-excel')
+  @RequireAnyPermission(...PAYROLL_READ_ACCESS, 'payroll:process')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  validateRunExcel(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file?.buffer?.length)
+      throw new BadRequestException('No file uploaded');
+    return this.excelValidation.validateRunAgainstExcel(
+      user.tid,
+      id,
+      file.buffer,
+    );
   }
 
   @Post('runs/:id/verify')

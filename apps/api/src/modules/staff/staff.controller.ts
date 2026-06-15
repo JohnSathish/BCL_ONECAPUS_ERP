@@ -57,7 +57,7 @@ import {
   UpdateStaffSectionDto,
   UpdateStaffShiftsDto,
   UploadStaffDocumentDto,
-  UpdateStaffDocumentDto,
+  UpdateStaffDocumentMetaDto,
   VerifyStaffDocumentDto,
   ValidateStaffImportDto,
 } from './dto/staff.dto';
@@ -109,24 +109,6 @@ export class StaffController {
     res.send(result.csv);
   }
 
-  @Get('documents/reports/missing')
-  @RequirePermissions('staff:read')
-  reportMissingDocuments(@CurrentUser() user: JwtUser) {
-    return this.documentsService.reportMissing(user.tid);
-  }
-
-  @Get('documents/reports/expiring')
-  @RequirePermissions('staff:read')
-  reportExpiringDocuments(@CurrentUser() user: JwtUser) {
-    return this.documentsService.reportExpiring(user.tid);
-  }
-
-  @Get('documents/reports/pending-verification')
-  @RequirePermissions('staff:read')
-  reportPendingDocuments(@CurrentUser() user: JwtUser) {
-    return this.documentsService.reportPendingVerification(user.tid);
-  }
-
   @Get('designations')
   @RequirePermissions('staff:read')
   listDesignations(
@@ -168,6 +150,24 @@ export class StaffController {
   @RequireAnyPermission('staff:read', 'staff:assign-subjects')
   subjectTeachingMatrix(@CurrentUser() user: JwtUser) {
     return this.subjectAssignments.teachingMatrix(user.tid);
+  }
+
+  @Get('documents/reports/missing')
+  @RequirePermissions('staff:read')
+  documentsMissingReport(@CurrentUser() user: JwtUser) {
+    return this.documentsService.reportMissing(user.tid);
+  }
+
+  @Get('documents/reports/expiring')
+  @RequirePermissions('staff:read')
+  documentsExpiringReport(@CurrentUser() user: JwtUser) {
+    return this.documentsService.reportExpiring(user.tid);
+  }
+
+  @Get('documents/reports/pending-verification')
+  @RequirePermissions('staff:read')
+  documentsPendingReport(@CurrentUser() user: JwtUser) {
+    return this.documentsService.reportPendingVerification(user.tid);
   }
 
   @Get()
@@ -520,6 +520,39 @@ export class StaffController {
     return this.assetsService.uploadPhoto(user.tid, id, file, user.sub);
   }
 
+  @Get(':id/documents/compliance')
+  @RequirePermissions('staff:read')
+  documentCompliance(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.documentsService.getCompliance(user.tid, id);
+  }
+
+  @Get(':id/documents/audit')
+  @RequirePermissions('staff:read')
+  documentAudit(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.documentsService.getAuditTrail(user.tid, id);
+  }
+
+  @Get(':id/documents/download-zip')
+  @RequirePermissions('staff:read')
+  async documentZip(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query('verifiedOnly') verifiedOnly: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buf = await this.documentsService.downloadZip(
+      user.tid,
+      id,
+      verifiedOnly === 'true',
+    );
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="staff-${id}-documents.zip"`,
+    );
+    return res.send(buf);
+  }
+
   @Post(':id/documents')
   @RequirePermissions('staff:manage')
   @ApiConsumes('multipart/form-data')
@@ -538,20 +571,13 @@ export class StaffController {
     if (!file?.buffer?.length) {
       throw new BadRequestException('No file uploaded');
     }
-    return this.documentsService
-      .uploadDocument(user.tid, id, dto.documentType, file, user.sub)
-      .then(async (doc) => {
-        if (dto.issueDate || dto.expiryDate) {
-          return this.documentsService.updateDocumentMeta(
-            user.tid,
-            id,
-            doc.id,
-            { issueDate: dto.issueDate, expiryDate: dto.expiryDate },
-            user.sub,
-          );
-        }
-        return doc;
-      });
+    return this.documentsService.uploadDocument(
+      user.tid,
+      id,
+      dto.documentType,
+      file,
+      user.sub,
+    );
   }
 
   @Patch(':id/documents/:docId/verify')
@@ -571,13 +597,13 @@ export class StaffController {
     );
   }
 
-  @Patch(':id/documents/:docId')
+  @Patch(':id/documents/:docId/meta')
   @RequirePermissions('staff:manage')
-  updateDocument(
+  updateDocumentMeta(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
     @Param('docId') docId: string,
-    @Body() dto: UpdateStaffDocumentDto,
+    @Body() dto: UpdateStaffDocumentMetaDto,
   ) {
     return this.documentsService.updateDocumentMeta(
       user.tid,
@@ -586,39 +612,6 @@ export class StaffController {
       dto,
       user.sub,
     );
-  }
-
-  @Get(':id/documents/compliance')
-  @RequirePermissions('staff:read')
-  documentCompliance(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.documentsService.getCompliance(user.tid, id);
-  }
-
-  @Get(':id/documents/audit')
-  @RequirePermissions('staff:read')
-  documentAudit(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.documentsService.getAuditTrail(user.tid, id);
-  }
-
-  @Get(':id/documents/download-zip')
-  @RequirePermissions('staff:read')
-  async downloadDocumentsZip(
-    @CurrentUser() user: JwtUser,
-    @Param('id') id: string,
-    @Query('verifiedOnly') verifiedOnly: string | undefined,
-    @Res() res: Response,
-  ) {
-    const buf = await this.documentsService.downloadZip(
-      user.tid,
-      id,
-      verifiedOnly === 'true',
-    );
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="staff-documents-${id}.zip"`,
-    );
-    return res.send(buf);
   }
 
   @Delete(':id/documents/:docId')

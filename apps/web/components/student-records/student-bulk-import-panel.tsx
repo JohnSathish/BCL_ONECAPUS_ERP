@@ -929,14 +929,12 @@ function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: (
       {open ? (
         <div className="mt-3 space-y-4 text-xs">
           <p className="text-muted-foreground">
-            Upload your admission registration Excel as-is. Headers like{' '}
-            <span className="font-medium text-foreground">Major Subject</span>,{' '}
-            <span className="font-medium text-foreground">MDC Choice</span>,{' '}
-            <span className="font-medium text-foreground">AEC</span>,{' '}
-            <span className="font-medium text-foreground">SEC</span>, and{' '}
-            <span className="font-medium text-foreground">VAC</span> are recognized automatically.
-            Use <span className="font-medium text-foreground">Application Number</span> when roll
-            numbers are not yet assigned.
+            Download the template for Excel dropdowns on subject columns ({' '}
+            <span className="font-medium text-foreground">CODE - Subject Name</span> in{' '}
+            <span className="font-medium text-foreground">MAJOR_CODE</span> etc., or subject names
+            in <span className="font-medium text-foreground">Major Subject</span> columns). See the{' '}
+            <span className="font-medium text-foreground">SUBJECT_MASTER</span> sheet for the full
+            curriculum list.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -953,12 +951,12 @@ function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: (
             <div>
               <p className="mb-1 font-semibold">NEP paper columns (Sem 1)</p>
               {[
-                'Major Subject / MAJOR_CODE',
-                'Minor Subject / MINOR_CODE',
-                'MDC Choice',
-                'AEC',
-                'SEC',
-                'VAC',
+                'MAJOR_CODE / Major Subject (dropdown)',
+                'MINOR_CODE / Minor Subject (dropdown)',
+                'MDC_CODE / MDC Choice (dropdown)',
+                'AEC_CODE / AEC (dropdown)',
+                'SEC_CODE / SEC (dropdown)',
+                'VAC_CODE / VAC (dropdown)',
               ].map((item) => (
                 <p key={item} className="text-muted-foreground">
                   ○ {item}

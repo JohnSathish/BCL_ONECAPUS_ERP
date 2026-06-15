@@ -46,6 +46,15 @@ export const STAFF_STATUSES = [
   'CONTRACT_ENDED',
 ] as const;
 
+export const TEACHING_SHIFT_CATEGORIES = [
+  'MORNING',
+  'DAY',
+  'BOTH',
+  'EVENING',
+  'WEEKEND',
+  'ONLINE',
+] as const;
+
 export const STAFF_PROFILE_SECTIONS = [
   'basic',
   'employment',
@@ -106,6 +115,10 @@ export class CreateStaffDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   additionalShiftIds?: string[];
+
+  @IsOptional()
+  @IsIn(TEACHING_SHIFT_CATEGORIES)
+  teachingShiftCategory?: string;
 
   @IsOptional()
   @IsArray()
@@ -209,6 +222,10 @@ export class UpdateStaffDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   additionalShiftIds?: string[];
+
+  @IsOptional()
+  @IsIn(TEACHING_SHIFT_CATEGORIES)
+  teachingShiftCategory?: string;
 
   @IsOptional()
   @IsArray()
@@ -453,6 +470,10 @@ export class StaffDirectoryQueryDto extends PaginationQueryDto {
   shiftId?: string;
 
   @IsOptional()
+  @IsIn(TEACHING_SHIFT_CATEGORIES)
+  teachingShiftCategory?: string;
+
+  @IsOptional()
   @IsIn(STAFF_STATUSES)
   status?: string;
 
@@ -585,14 +606,6 @@ export class UpdateStaffSectionDto {
 export class UploadStaffDocumentDto {
   @IsString()
   documentType!: string;
-
-  @IsOptional()
-  @IsString()
-  issueDate?: string;
-
-  @IsOptional()
-  @IsString()
-  expiryDate?: string;
 }
 
 export class VerifyStaffDocumentDto {
@@ -604,7 +617,7 @@ export class VerifyStaffDocumentDto {
   verificationRemarks?: string;
 }
 
-export class UpdateStaffDocumentDto {
+export class UpdateStaffDocumentMetaDto {
   @IsOptional()
   @IsString()
   issueDate?: string;

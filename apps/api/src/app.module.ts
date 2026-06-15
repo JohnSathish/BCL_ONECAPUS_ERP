@@ -38,6 +38,8 @@ import { UsersModule } from './modules/users/users.module';
 import { DashboardAnalyticsModule } from './modules/dashboard-analytics/dashboard-analytics.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { QueueModule } from './shared/queue/queue.module';
+import { CacheModule } from './shared/cache/cache.module';
+import { StorageModule } from './shared/storage/storage.module';
 import { AdministrationModule } from './modules/administration/administration.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StaffAttendanceModule } from './modules/staff-attendance/staff-attendance.module';
@@ -52,6 +54,8 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { QuestionBankModule } from './modules/question-bank/question-bank.module';
 import { LibraryModule } from './modules/library/library.module';
 import { FrontOfficeModule } from './modules/front-office/front-office.module';
+import { GovernanceModule } from './modules/governance/governance.module';
+import { NaacIqacModule } from './modules/naac-iqac/naac-iqac.module';
 import { TransportModule } from './modules/transport/transport.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { IdCardsModule } from './modules/id-cards/id-cards.module';
@@ -61,6 +65,7 @@ import { AccommodationModule } from './modules/accommodation/accommodation.modul
 import { LoansModule } from './modules/loans/loans.module';
 import { StudentReportsModule } from './modules/student-reports/student-reports.module';
 import { LicensingModule } from './modules/licensing/licensing.module';
+import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
 
 @Module({
   imports: [
@@ -79,6 +84,8 @@ import { LicensingModule } from './modules/licensing/licensing.module';
     PrismaModule,
     PermissionsModule,
     QueueModule,
+    CacheModule,
+    StorageModule,
     CurriculumCoreModule,
     AuthModule,
     TenantsModule,
@@ -92,6 +99,7 @@ import { LicensingModule } from './modules/licensing/licensing.module';
     ReportsModule,
     StudentReportsModule,
     LicensingModule,
+    MobileAppModule,
     ProgramsCoursesModule,
     AdmissionsModule,
     MasterDataModule,
@@ -109,6 +117,8 @@ import { LicensingModule } from './modules/licensing/licensing.module';
     QuestionBankModule,
     LibraryModule,
     FrontOfficeModule,
+    GovernanceModule,
+    NaacIqacModule,
     TransportModule,
     InventoryModule,
     IdCardsModule,

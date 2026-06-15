@@ -28,19 +28,19 @@ const PRESET_VIEWS: SavedView[] = [
     filters: {},
   },
   {
-    id: 'preset-subjects',
-    name: 'Subject Pending',
-    filters: { uiSubjectPending: 'true' },
-  },
-  {
     id: 'preset-fee',
     name: 'Fee Defaulters',
     filters: { uiFeeDue: 'true' },
   },
   {
-    id: 'preset-no-rfid',
-    name: 'No RFID',
-    filters: { uiRfidAssigned: 'false' },
+    id: 'preset-attendance',
+    name: 'Attendance Below 75%',
+    filters: { uiAttendanceShortage: 'true' },
+  },
+  {
+    id: 'preset-no-mobile',
+    name: 'No Mobile Number',
+    filters: { uiNoMobile: 'true' },
   },
   {
     id: 'preset-no-photo',
@@ -48,34 +48,29 @@ const PRESET_VIEWS: SavedView[] = [
     filters: { uiNoPhoto: 'true' },
   },
   {
-    id: 'preset-no-mobile',
-    name: 'No Mobile',
-    filters: { uiNoMobile: 'true' },
-  },
-  {
     id: 'preset-hostel',
     name: 'Hostellers',
     filters: { uiHostel: 'true' },
   },
   {
-    id: 'preset-alumni',
-    name: 'Alumni',
-    filters: { studentStatus: 'ALUMNI' },
-  },
-  {
     id: 'preset-sem1',
-    name: 'Sem 1 Students',
+    name: 'Semester 1',
     filters: { semester: '1' },
   },
   {
-    id: 'preset-attendance',
-    name: 'Attendance Shortage',
-    filters: { uiAttendanceShortage: 'true' },
+    id: 'preset-sem2',
+    name: 'Semester 2',
+    filters: { semester: '2' },
   },
   {
-    id: 'preset-recent',
-    name: 'Recently Added',
-    filters: { uiRecentlyAdded: 'true' },
+    id: 'preset-subjects',
+    name: 'Subject Pending',
+    filters: { uiSubjectPending: 'true' },
+  },
+  {
+    id: 'preset-alumni',
+    name: 'Alumni',
+    filters: { studentStatus: 'ALUMNI' },
   },
 ];
 

@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { AdmissionsCycleService } from '../../admissions/admissions-cycle.service';
 import type {
   CreateAcademicSessionDto,
   UpdateAcademicSessionDto,
@@ -12,7 +15,11 @@ import type {
 
 @Injectable()
 export class AcademicSessionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => AdmissionsCycleService))
+    private readonly admissionCycles: AdmissionsCycleService,
+  ) {}
 
   list(tenantId: string, institutionId: string) {
     return this.prisma.academicYear.findMany({
@@ -43,7 +50,7 @@ export class AcademicSessionService {
       });
     }
 
-    return this.prisma.academicYear.create({
+    const year = await this.prisma.academicYear.create({
       data: {
         tenantId,
         institutionId,
@@ -55,6 +62,15 @@ export class AcademicSessionService {
         isPrimarySession: dto.isPrimarySession ?? false,
       },
     });
+
+    await this.admissionCycles.onAcademicYearCreated(
+      tenantId,
+      institutionId,
+      year.id,
+      year.name,
+    );
+
+    return year;
   }
 
   async update(

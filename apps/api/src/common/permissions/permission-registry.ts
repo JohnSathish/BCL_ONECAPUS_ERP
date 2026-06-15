@@ -54,7 +54,7 @@ export const MODULE_PERMISSIONS = {
     'certificates:manage',
     'certificates:approve',
   ],
-  finance: ['fees:read', 'fees:manage'],
+  finance: ['fees:read', 'fees:manage', 'fees:cash:collect'],
   library: [
     'library:read',
     'library:manage',
@@ -72,6 +72,22 @@ export const MODULE_PERMISSIONS = {
     'front-office:desk',
     'front-office:manage',
     'front-office:reports',
+  ],
+  governance: [
+    'governance:read',
+    'governance:manage',
+    'governance:publish',
+    'governance:reports',
+    'governance:import',
+    'governance:portal',
+  ],
+  naacIqac: [
+    'naac-iqac:read',
+    'naac-iqac:manage',
+    'naac-iqac:collect',
+    'naac-iqac:publish',
+    'naac-iqac:reports',
+    'naac-iqac:portal',
   ],
   communication: ['communication:read', 'communication:manage'],
   transport: ['transport:read', 'transport:manage', 'transport:assign'],
@@ -213,6 +229,18 @@ export const ERP_MODULES: ErpModule[] = [
     defaultHome: '/admin/front-office',
   },
   {
+    id: 'governance',
+    label: 'Governance & Committees',
+    permissions: MODULE_PERMISSIONS.governance,
+    defaultHome: '/admin/governance',
+  },
+  {
+    id: 'naacIqac',
+    label: 'NAAC & IQAC',
+    permissions: MODULE_PERMISSIONS.naacIqac,
+    defaultHome: '/admin/naac',
+  },
+  {
     id: 'communication',
     label: 'Communication',
     permissions: MODULE_PERMISSIONS.communication,
@@ -301,6 +329,11 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: [...MODULE_PERMISSIONS.platform],
   },
   { prefix: '/platform', permissions: [...MODULE_PERMISSIONS.platform] },
+  {
+    prefix: '/admin/governance',
+    permissions: [...MODULE_PERMISSIONS.governance],
+  },
+  { prefix: '/admin/naac', permissions: [...MODULE_PERMISSIONS.naacIqac] },
   {
     prefix: '/admin/front-office',
     permissions: [...MODULE_PERMISSIONS.frontOffice],

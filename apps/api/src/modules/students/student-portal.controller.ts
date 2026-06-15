@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -44,6 +45,38 @@ export class StudentPortalController {
   @RequireAnyPermission('student:portal:self')
   getDashboard(@CurrentUser() user: JwtUser) {
     return this.portal.getDashboard(user);
+  }
+
+  @Get('me/dashboard/widgets/:widget')
+  @RequireAnyPermission('student:portal:self')
+  getDashboardWidget(
+    @CurrentUser() user: JwtUser,
+    @Param('widget') widget: string,
+  ) {
+    switch (widget) {
+      case 'attendance':
+        return this.portal.getDashboardWidgetAttendance(user);
+      case 'fees':
+        return this.portal.getDashboardWidgetFees(user);
+      case 'timetable':
+        return this.portal.getDashboardWidgetTimetable(user);
+      case 'lms':
+        return this.portal.getDashboardWidgetLms(user);
+      case 'examinations':
+        return this.portal.getDashboardWidgetExaminations(user);
+      case 'notifications':
+        return this.portal.getDashboardWidgetNotifications(user);
+      case 'calendar':
+        return this.portal.getDashboardWidgetCalendar(user);
+      case 'library':
+        return this.portal.getDashboardWidgetLibrary(user);
+      case 'health':
+        return this.portal.getDashboardWidgetHealth(user);
+      case 'qr-pass':
+        return this.portal.getDashboardWidgetQrPass(user);
+      default:
+        throw new BadRequestException(`Unknown dashboard widget: ${widget}`);
+    }
   }
 
   @Get('me/health')

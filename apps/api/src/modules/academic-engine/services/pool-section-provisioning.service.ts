@@ -34,7 +34,7 @@ export type ProvisionPoolSectionsResult = {
 export class PoolSectionProvisioningService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly lmsWorkspaces: LmsWorkspaceService,
+    private readonly lmsWorkspaces?: LmsWorkspaceService,
   ) {}
 
   async resolveDefaultShiftId(
@@ -123,8 +123,8 @@ export class PoolSectionProvisioningService {
       update: {},
     });
 
-    void this.lmsWorkspaces.provisionSectionWorkspace(tenantId, section.id);
-    void this.lmsWorkspaces.provisionPoolWorkspace(tenantId, offeringId);
+    void this.lmsWorkspaces?.provisionSectionWorkspace(tenantId, section.id);
+    void this.lmsWorkspaces?.provisionPoolWorkspace(tenantId, offeringId);
 
     return { created: true, sectionId: section.id };
   }

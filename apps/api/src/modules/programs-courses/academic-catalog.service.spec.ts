@@ -4,6 +4,10 @@ import { AcademicCatalogService } from './academic-catalog.service';
 describe('AcademicCatalogService academic department guard', () => {
   const shiftScope = {} as never;
   const sectionStreams = {} as never;
+  const cache = {
+    wrap: async (_k: string, _ttl: number, fn: () => Promise<unknown>) => fn(),
+    delByPrefix: async () => undefined,
+  } as never;
 
   it('rejects administrative department when creating a programme', async () => {
     const prisma = {
@@ -20,6 +24,7 @@ describe('AcademicCatalogService academic department guard', () => {
       prisma as never,
       shiftScope,
       sectionStreams,
+      cache,
     );
 
     await expect(
@@ -59,6 +64,7 @@ describe('AcademicCatalogService academic department guard', () => {
       prisma as never,
       shiftScope,
       sectionStreams,
+      cache,
     );
 
     await service.createProgram('tenant-1', {

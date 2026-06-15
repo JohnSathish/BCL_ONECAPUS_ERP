@@ -5,7 +5,7 @@ import { AcademicEngineService } from '../../academic-engine/academic-engine.ser
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { ExaminationsService } from '../../examinations/examinations.service';
-import { FeeLedgerService } from '../../fees/services/fee-ledger.service';
+import { StudentFeeSummaryService } from '../../fees/services/student-fee-summary.service';
 import { LibraryQrService } from '../../library/services/library-qr.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
@@ -67,7 +67,7 @@ export class StudentPortalService {
     private readonly students: StudentsService,
     private readonly displaySettings: StudentDisplaySettingsService,
     private readonly attendance: StudentAttendanceService,
-    private readonly fees: FeeLedgerService,
+    private readonly feeSummary: StudentFeeSummaryService,
     private readonly timetable: TimetableEngineService,
     private readonly lms: LmsDashboardService,
     private readonly examinations: ExaminationsService,
@@ -122,81 +122,18 @@ export class StudentPortalService {
     const student = await this.resolveStudent(user);
     const format = await this.displaySettings.getFormat(user.tid);
 
-    const [
-      registration,
-      attendance,
-      ledger,
-      weekTimetable,
-      lmsDashboard,
-      examResults,
-      notifications,
-      unreadCount,
-      health,
-      qrPass,
-      loans,
-      fines,
-      certIssues,
-      calendarEvents,
-    ] = await Promise.all([
-      this.academicEngine
-        .getMyRegistration(user.tid, user.sub)
-        .catch(() => null),
-      this.attendance.studentPortalSummary(user),
-      this.fees.myLedger(user.tid, user.sub),
-      this.timetable.studentWeek(user),
-      this.lms.studentDashboard(user).catch(() => null),
-      this.examinations.studentResults(user).catch(() => ({
-        summaries: [],
-        marks: [],
-        papers: [],
-      })),
-      this.notifications.list(user, 8),
-      this.notifications.unreadCount(user),
-      this.students.getStudentHealth(user, student.id).catch(() => null),
-      this.libraryQr.getStudentQr(user).catch(() => null),
-      this.prisma.libraryLoan.findMany({
-        where: {
-          tenantId: user.tid,
-          studentId: student.id,
-          status: { in: ['ACTIVE', 'OVERDUE'] },
-          returnedAt: null,
-        },
-        select: { id: true },
-      }),
-      this.prisma.libraryFine.findMany({
-        where: {
-          tenantId: user.tid,
-          paidAt: null,
-          waivedAt: null,
-          loan: { studentId: student.id },
-        },
-        select: { amount: true },
-      }),
-      this.prisma.certificateIssue.findMany({
-        where: {
-          tenantId: user.tid,
-          studentId: student.id,
-          status: 'ISSUED',
-          revokedAt: null,
-        },
-        select: { id: true },
-      }),
-      this.calendar.buildForStudent(user.tid, student.id, { monthsSpan: 3 }),
-    ]);
+    const [registration, feeSummaryRow, unreadCount, attendancePct] =
+      await Promise.all([
+        this.academicEngine
+          .getMyRegistration(user.tid, user.sub)
+          .catch(() => null),
+        this.feeSummary.get(user.tid, student.id),
+        this.notifications.unreadCount(user),
+        this.attendance
+          .studentPortalSummary(user)
+          .then((a) => (a.overall != null ? Number(a.overall) : null)),
+      ]);
 
-    const overallAttendance =
-      attendance.overall != null ? Number(attendance.overall) : null;
-    const demands = ledger?.demands ?? [];
-    const feeDue = demands.reduce(
-      (sum: number, d: { balanceAmount?: unknown }) =>
-        sum + Number(d.balanceAmount ?? 0),
-      0,
-    );
-    const feePaid = demands.reduce(
-      (sum: number, d: { paidAmount?: unknown }) =>
-        sum + Number(d.paidAmount ?? 0),
-      0,
-    );
     const semesterSequence =
       registration?.standing?.currentSemesterSequence ??
       registration?.registration?.semesterSequence ??
@@ -212,23 +149,13 @@ export class StudentPortalService {
       student,
     );
 
-    const libraryFinesDue = fines.reduce(
-      (sum, f) => sum + Number(f.amount ?? 0),
-      0,
-    );
-    const certAvailable = certIssues.length;
-    const lmsCards = (lmsDashboard?.cards ?? {}) as Record<
-      string,
-      number | undefined
-    >;
-    const summaries = examResults?.summaries ?? [];
-    const latestSgpa =
-      summaries[0]?.sgpa != null ? Number(summaries[0].sgpa) : null;
-
     const displayName = this.displaySettings.formatName(
       student.masterProfile?.fullName,
       format,
     );
+
+    const feeDue = feeSummaryRow.totalOutstanding;
+    const feePaid = feeSummaryRow.totalPaid;
 
     const profileCompletion = this.profileCompletion({
       hasPhoto: Boolean(student.masterProfile?.photoPath),
@@ -238,6 +165,85 @@ export class StudentPortalService {
       feesClear: feeDue <= 0,
     });
 
+    const academicChips = this.academicSnapshotChips(registration, majorMinor);
+
+    const attendanceTone =
+      attendancePct == null
+        ? 'neutral'
+        : attendancePct >= 75
+          ? 'good'
+          : attendancePct >= 65
+            ? 'warn'
+            : 'bad';
+
+    return {
+      profile: {
+        studentId: student.id,
+        fullName: student.masterProfile?.fullName ?? '',
+        displayFullName: displayName,
+        enrollmentNumber: student.enrollmentNumber,
+        photoUrl: student.masterProfile?.photoPath ?? null,
+        programLabel: headerDepartment,
+        department: headerDepartment,
+        semesterSequence,
+        academicYear: null,
+        rfidStatus: student.rfidNumber
+          ? ('assigned' as const)
+          : ('missing' as const),
+        profileCompletion,
+      },
+      quickStats: [
+        {
+          key: 'attendance',
+          title: 'Attendance',
+          value: attendancePct != null ? `${attendancePct.toFixed(0)}%` : '—',
+          tone: attendanceTone,
+          href: '/student/attendance',
+        },
+        {
+          key: 'semester',
+          title: 'Current Semester',
+          value:
+            semesterSequence != null ? `Semester ${semesterSequence}` : '—',
+          tone: 'neutral',
+        },
+        {
+          key: 'fees',
+          title: 'Fee Status',
+          value: feeDue > 0 ? `Pending ₹${feeDue.toLocaleString()}` : 'PAID',
+          tone: feeDue > 0 ? 'warn' : 'good',
+          href: '/student/fees',
+        },
+      ],
+      academicChips,
+      unreadNotificationCount: unreadCount.count ?? 0,
+      fees: {
+        paid: feePaid,
+        due: feeDue,
+        status: feeDue > 0 ? ('PENDING' as const) : ('PAID' as const),
+        semesterLabel: 'Current semester',
+      },
+    };
+  }
+
+  async getDashboardWidgetAttendance(user: JwtUser) {
+    return this.attendance.studentPortalSummary(user);
+  }
+
+  async getDashboardWidgetFees(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    const summary = await this.feeSummary.get(user.tid, student.id);
+    return {
+      paid: summary.totalPaid,
+      due: summary.totalOutstanding,
+      status: summary.totalOutstanding > 0 ? 'PENDING' : 'PAID',
+      semesterLabel: 'Current semester',
+    };
+  }
+
+  async getDashboardWidgetTimetable(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    const weekTimetable = await this.timetable.studentWeek(user);
     const today = new Date().getDay();
     const entries = weekTimetable?.entries ?? [];
     const offeringIds = [
@@ -256,7 +262,7 @@ export class StudentPortalService {
         : [];
     const offeringMap = new Map(offerings.map((o) => [o.id, o]));
 
-    const todayTimetable = entries
+    return entries
       .filter((e: { dayOfWeek: number }) => e.dayOfWeek === today)
       .sort(
         (a: { startTime: string }, b: { startTime: string }) =>
@@ -278,128 +284,47 @@ export class StudentPortalService {
           isPast: isPastSlot(endTime),
         };
       });
+  }
 
-    const academicChips = this.academicSnapshotChips(registration, majorMinor);
-
-    const attendanceTone =
-      overallAttendance == null
-        ? 'neutral'
-        : overallAttendance >= 75
-          ? 'good'
-          : overallAttendance >= 65
-            ? 'warn'
-            : 'bad';
-
+  async getDashboardWidgetLms(user: JwtUser) {
+    const lmsDashboard = await this.lms
+      .studentDashboard(user)
+      .catch(() => null);
+    const lmsCards = (lmsDashboard?.cards ?? {}) as Record<
+      string,
+      number | undefined
+    >;
     return {
-      profile: {
-        studentId: student.id,
-        fullName: student.masterProfile?.fullName ?? '',
-        displayFullName: displayName,
-        enrollmentNumber: student.enrollmentNumber,
-        photoUrl: student.masterProfile?.photoPath ?? null,
-        programLabel: headerDepartment,
-        department: headerDepartment,
-        semesterSequence,
-        academicYear: weekTimetable?.plan?.name ?? null,
-        rfidStatus: student.rfidNumber
-          ? ('assigned' as const)
-          : ('missing' as const),
-        profileCompletion,
-      },
-      quickStats: [
-        {
-          key: 'attendance',
-          title: 'Attendance',
-          value:
-            overallAttendance != null
-              ? `${overallAttendance.toFixed(0)}%`
-              : '—',
-          tone: attendanceTone,
-          href: '/student/attendance',
-        },
-        {
-          key: 'semester',
-          title: 'Current Semester',
-          value:
-            semesterSequence != null ? `Semester ${semesterSequence}` : '—',
-          tone: 'neutral',
-        },
-        {
-          key: 'fees',
-          title: 'Fee Status',
-          value: feeDue > 0 ? `Pending ₹${feeDue.toLocaleString()}` : 'PAID',
-          tone: feeDue > 0 ? 'warn' : 'good',
-          href: '/student/fees',
-        },
-        {
-          key: 'library',
-          title: 'Library Books',
-          value: `${loans.length} Issued`,
-          tone: 'neutral',
-          href: '/student/library',
-        },
-        {
-          key: 'certificates',
-          title: 'Certificates',
-          value: `${certAvailable} Available`,
-          tone: 'neutral',
-          href: '/student/certificates',
-        },
-        {
-          key: 'cgpa',
-          title: 'CGPA',
-          value: latestSgpa != null ? String(latestSgpa) : '—',
-          tone: latestSgpa != null && latestSgpa >= 7 ? 'good' : 'neutral',
-          href: '/student/results',
-        },
-      ],
-      academicChips,
-      todayTimetable,
-      attendance: {
-        overall: overallAttendance,
-        subjects: (attendance.subjects ?? []).map(
-          (s: Record<string, unknown>) => ({
-            id: String(s.id ?? s.courseId ?? ''),
-            label: String(s.courseName ?? s.courseId ?? 'Subject').slice(0, 40),
-            percentage: Number(s.percentage ?? 0),
-          }),
-        ),
-        alerts: attendance.alerts ?? [],
-      },
-      fees: {
-        paid: feePaid,
-        due: feeDue,
-        status: feeDue > 0 ? ('PENDING' as const) : ('PAID' as const),
-        semesterLabel:
-          demands.find(
-            (d: { balanceAmount?: number }) => Number(d.balanceAmount) > 0,
-          )?.billingPeriod ?? 'Current semester',
-      },
-      lms: {
-        pendingAssignments: Number(lmsCards.assignmentsDue ?? 0),
-        notesAvailable: Number(lmsCards.notesAvailable ?? 0),
-        upcomingTests: Number(lmsCards.quizzesPending ?? 0),
-      },
-      examinations: {
-        hasResults: summaries.length > 0,
-        hasAdmitCard: Boolean(examResults),
-        cgpa: latestSgpa,
-      },
-      library: { issuedBooks: loans.length, finesDue: libraryFinesDue },
-      certificates: { available: certAvailable },
-      health: health
-        ? {
-            score: health.score.score,
-            label: health.score.label,
-            tone: health.score.tone,
-            signals: health.signals,
-          }
-        : {
-            score: profileCompletion,
-            label: 'Profile completion',
-            tone: 'warn' as const,
-            signals: [],
-          },
+      pendingAssignments: Number(lmsCards.assignmentsDue ?? 0),
+      notesAvailable: Number(lmsCards.notesAvailable ?? 0),
+      upcomingTests: Number(lmsCards.quizzesPending ?? 0),
+    };
+  }
+
+  async getDashboardWidgetExaminations(user: JwtUser) {
+    const examResults = await this.examinations
+      .studentResults(user)
+      .catch(() => ({
+        summaries: [],
+        marks: [],
+        papers: [],
+      }));
+    const summaries = examResults?.summaries ?? [];
+    const latestSgpa =
+      summaries[0]?.sgpa != null ? Number(summaries[0].sgpa) : null;
+    return {
+      hasResults: summaries.length > 0,
+      hasAdmitCard: Boolean(examResults),
+      cgpa: latestSgpa,
+    };
+  }
+
+  async getDashboardWidgetNotifications(user: JwtUser) {
+    const [notifications, unreadCount] = await Promise.all([
+      this.notifications.list(user, 8),
+      this.notifications.unreadCount(user),
+    ]);
+    return {
       notifications: notifications.map((n) => ({
         id: n.id,
         type: n.type ?? 'notice',
@@ -410,9 +335,68 @@ export class StudentPortalService {
         link: n.link ?? null,
       })),
       unreadNotificationCount: unreadCount.count ?? 0,
-      calendarEvents,
-      qrPass,
     };
+  }
+
+  async getDashboardWidgetCalendar(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    return this.calendar.buildForStudent(user.tid, student.id, {
+      monthsSpan: 3,
+    });
+  }
+
+  async getDashboardWidgetLibrary(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    const [loans, fines] = await Promise.all([
+      this.prisma.libraryLoan.findMany({
+        where: {
+          tenantId: user.tid,
+          studentId: student.id,
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+          returnedAt: null,
+        },
+        select: { id: true },
+      }),
+      this.prisma.libraryFine.findMany({
+        where: {
+          tenantId: user.tid,
+          paidAt: null,
+          waivedAt: null,
+          loan: { studentId: student.id },
+        },
+        select: { amount: true },
+      }),
+    ]);
+    const libraryFinesDue = fines.reduce(
+      (sum, f) => sum + Number(f.amount ?? 0),
+      0,
+    );
+    return { issuedBooks: loans.length, finesDue: libraryFinesDue };
+  }
+
+  async getDashboardWidgetHealth(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    const health = await this.students
+      .getStudentHealth(user, student.id)
+      .catch(() => null);
+    if (health) {
+      return {
+        score: health.score.score,
+        label: health.score.label,
+        tone: health.score.tone,
+        signals: health.signals,
+      };
+    }
+    return {
+      score: 0,
+      label: 'Profile completion',
+      tone: 'warn' as const,
+      signals: [],
+    };
+  }
+
+  async getDashboardWidgetQrPass(user: JwtUser) {
+    return this.libraryQr.getStudentQr(user).catch(() => null);
   }
 
   private profileCompletion(input: {

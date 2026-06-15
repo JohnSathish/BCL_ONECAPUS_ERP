@@ -2,13 +2,13 @@
 
 import type { LoginContext } from '@/types/login-context';
 import { cn } from '@/utils/cn';
+import { ParticleCanvas } from '@/components/landing/particle-canvas';
 import { LOGIN_HERO_ANIMATIONS_ENABLED } from './login-hero.constants';
 import { LoginHeroBackground } from './login-hero-background';
 import { LoginHeroBrandHeader } from './login-hero-brand-header';
+import { LoginHeroEcosystem } from './login-hero-ecosystem';
 import { LoginHeroKpiShowcase } from './login-hero-kpi-showcase';
 import { LoginHeroMobileBranding } from './login-hero-mobile-branding';
-import { LoginHeroModuleStrip } from './login-hero-module-strip';
-import { LoginHeroTrustBadges } from './login-hero-trust-badges';
 
 type Props = {
   compact?: boolean;
@@ -32,23 +32,31 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
       aria-label="BCL OneCampus ERP overview"
     >
       <LoginHeroBackground />
+      {LOGIN_HERO_ANIMATIONS_ENABLED ? <ParticleCanvas className="opacity-50" /> : null}
 
       <div
         className={cn(
           'login-hero-content relative z-10 flex flex-1 flex-col',
           compact
             ? 'justify-start gap-2.5 px-4 py-4 sm:gap-3 sm:px-5 sm:py-5'
-            : 'mx-auto w-full max-w-xl justify-center gap-5 px-10 py-8 xl:max-w-2xl xl:px-12',
+            : 'mx-auto w-full max-w-xl justify-center gap-3 px-6 py-5 xl:max-w-2xl xl:gap-4 xl:px-10 xl:py-6',
         )}
       >
         <LoginHeroBrandHeader compact={compact} />
 
         {!compact ? (
           <>
-            <div className="login-hero-divider" aria-hidden />
-            <LoginHeroTrustBadges />
-            <LoginHeroModuleStrip />
-            <LoginHeroKpiShowcase />
+            {LOGIN_HERO_ANIMATIONS_ENABLED ? (
+              <>
+                <LoginHeroEcosystem />
+                <LoginHeroKpiShowcase />
+              </>
+            ) : (
+              <>
+                <div className="login-hero-divider" aria-hidden />
+                <LoginHeroKpiShowcase />
+              </>
+            )}
           </>
         ) : (
           <LoginHeroMobileBranding />

@@ -24,7 +24,15 @@ type IssueTokensOptions = {
   familyId?: string;
   rememberMe?: boolean;
   previousSessionId?: string;
-  meta?: { userAgent?: string; ipAddress?: string };
+  meta?: {
+    userAgent?: string;
+    ipAddress?: string;
+    clientType?: string;
+    appType?: string;
+    appVersion?: string;
+    deviceId?: string;
+    deviceLabel?: string;
+  };
   impersonatedBy?: string;
   impersonationSessionId?: string;
   skipRefreshSession?: boolean;
@@ -162,6 +170,13 @@ export class AuthService {
             expiresAt: refreshExpiresAt,
             userAgent: options.meta?.userAgent,
             ipAddress: options.meta?.ipAddress,
+            metadata: {
+              clientType: options.meta?.clientType,
+              appType: options.meta?.appType,
+              appVersion: options.meta?.appVersion,
+              deviceId: options.meta?.deviceId,
+              deviceLabel: options.meta?.deviceLabel,
+            },
           },
         });
 
@@ -244,13 +259,69 @@ export class AuthService {
     });
   }
 
+  async issueSessionForUser(
+    tenantId: string,
+    userId: string,
+    meta?: { userAgent?: string; ipAddress?: string },
+    rememberMe?: boolean,
+    extra?: { applicationId?: string; readOnly?: boolean },
+  ): Promise<AuthSessionResponse> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId, deletedAt: null, isActive: true },
+      include: {
+        roles: { where: { deletedAt: null }, include: { role: true } },
+      },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null, status: 'active' },
+    });
+    if (!tenant) throw new UnauthorizedException('Tenant not found');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const roles = user.roles.map((r) => r.role.slug);
+    const resolved = await this.resolveUserPermissions(user.id, roles);
+    const shiftScope = await this.resolveShiftScope(user.id, roles);
+
+    const session = await this.issueTokens(
+      user,
+      tenant.slug,
+      roles,
+      resolved.permissions,
+      shiftScope,
+      resolved.dataScope,
+      { rememberMe, meta },
+    );
+
+    if (extra?.applicationId) {
+      (session.user as Record<string, unknown>).applicationId =
+        extra.applicationId;
+      (session.user as Record<string, unknown>).readOnly =
+        extra.readOnly ?? false;
+    }
+
+    return session;
+  }
+
   async login(
     tenantId: string,
     email: string,
     password: string,
     challengeToken: string,
     challengeAnswer: number,
-    meta?: { userAgent?: string; ipAddress?: string },
+    meta?: {
+      userAgent?: string;
+      ipAddress?: string;
+      clientType?: string;
+      appType?: string;
+      appVersion?: string;
+      deviceId?: string;
+    },
     rememberMe?: boolean,
   ): Promise<AuthSessionResponse> {
     const ip = meta?.ipAddress ?? 'unknown';
@@ -324,7 +395,13 @@ export class AuthService {
 
   async refresh(
     refreshToken: string,
-    meta?: { userAgent?: string; ipAddress?: string },
+    meta?: {
+      userAgent?: string;
+      ipAddress?: string;
+      clientType?: string;
+      appType?: string;
+      appVersion?: string;
+    },
   ): Promise<AuthSessionResponse> {
     const hashed = this.hashToken(refreshToken);
 
@@ -536,8 +613,12 @@ export class AuthService {
     };
   }
 
-  /** Public JSON body — refresh token travels via HttpOnly cookie only */
-  toPublicSession(session: AuthSessionResponse) {
+  /** Public JSON body — refresh token travels via HttpOnly cookie on web; included in body for mobile */
+  toPublicSession(
+    session: AuthSessionResponse,
+    options?: { includeRefreshToken?: boolean },
+  ) {
+    if (options?.includeRefreshToken) return session;
     const {
       refreshToken: _rt,
       refreshMaxAgeSeconds: _ma,

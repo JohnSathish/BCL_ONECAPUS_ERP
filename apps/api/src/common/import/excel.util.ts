@@ -7,8 +7,12 @@ const INSTRUCTIONS_SHEET_NAME = 'Instructions';
 
 export async function parseExcelDataSheet(
   buffer: Buffer,
-  sheetName = DATA_SHEET_NAME,
+  options?: { sheetName?: string; dataStartRow?: number } | string,
 ): Promise<ParsedImportRow[]> {
+  const resolved =
+    typeof options === 'string' ? { sheetName: options } : (options ?? {});
+  const sheetName = resolved.sheetName ?? DATA_SHEET_NAME;
+  const dataStartRow = resolved.dataStartRow ?? 2;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
   const sheet =
@@ -33,6 +37,8 @@ export async function parseExcelDataSheet(
       headers = values.map((v) => String(v ?? '').trim());
       return;
     }
+
+    if (rowNumber < dataStartRow) return;
 
     const allEmpty = values.every(
       (v) => v === '' || v === null || v === undefined,

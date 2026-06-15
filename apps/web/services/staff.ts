@@ -9,11 +9,14 @@ import type {
   StaffAward,
   StaffDesignation,
   StaffDirectoryRow,
+  StaffDocumentAuditEntry,
+  StaffDocumentCompliance,
+  StaffDocumentExpiringReportRow,
+  StaffDocumentMissingReportRow,
+  StaffDocumentPendingReportRow,
   StaffListItem,
   StaffProfile,
   StaffPublication,
-  StaffDocumentAuditEntry,
-  StaffDocumentCompliance,
   StaffSubjectAssignment,
   TeachingAssignmentContext,
   TeachingAssignmentContextQuery,
@@ -34,6 +37,7 @@ export async function fetchStaff(params?: {
   departmentId?: string;
   designationId?: string;
   shiftId?: string;
+  teachingShiftCategory?: string;
   status?: string;
   additionalRoleCode?: string;
   hodOnly?: boolean;
@@ -204,12 +208,12 @@ export async function verifyStaffDocument(
   return data;
 }
 
-export async function updateStaffDocument(
+export async function updateStaffDocumentMeta(
   staffId: string,
   docId: string,
   payload: { issueDate?: string; expiryDate?: string },
 ) {
-  const { data } = await api.patch(`/v1/staff/${staffId}/documents/${docId}`, payload);
+  const { data } = await api.patch(`/v1/staff/${staffId}/documents/${docId}/meta`, payload);
   return data;
 }
 
@@ -218,18 +222,48 @@ export async function downloadStaffDocumentsZip(staffId: string, verifiedOnly = 
     params: verifiedOnly ? { verifiedOnly: 'true' } : undefined,
     responseType: 'blob',
   });
-  const url = URL.createObjectURL(res.data as Blob);
+  const blob = res.data as Blob;
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `staff-documents-${staffId}${verifiedOnly ? '-verified' : ''}.zip`;
+  a.download = `staff-documents${verifiedOnly ? '-verified' : ''}.zip`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export async function fetchStaffDocumentReports(
-  type: 'missing' | 'expiring' | 'pending-verification',
-) {
-  const { data } = await api.get(`/v1/staff/documents/reports/${type}`);
+export async function fetchStaffDocumentsMissingReport() {
+  const { data } = await api.get<StaffDocumentMissingReportRow[]>(
+    '/v1/staff/documents/reports/missing',
+  );
+  return data;
+}
+
+export async function fetchStaffDocumentsExpiringReport() {
+  const { data } = await api.get<StaffDocumentExpiringReportRow[]>(
+    '/v1/staff/documents/reports/expiring',
+  );
+  return data;
+}
+
+export async function fetchStaffDocumentsPendingReport() {
+  const { data } = await api.get<StaffDocumentPendingReportRow[]>(
+    '/v1/staff/documents/reports/pending-verification',
+  );
+  return data;
+}
+
+export async function uploadMyStaffDocument(documentType: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('documentType', documentType);
+  const { data } = await api.post('/v1/staff/me/documents', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function fetchMyStaffDocumentCompliance() {
+  const { data } = await api.get<StaffDocumentCompliance>('/v1/staff/me/documents/compliance');
   return data;
 }
 

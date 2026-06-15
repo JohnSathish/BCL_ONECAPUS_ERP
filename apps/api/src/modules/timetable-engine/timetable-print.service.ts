@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { formatShiftTime } from '../../common/utils/shift-scope.util';
 import { PrismaService } from '../../database/prisma.service';
+import { ReplacementTimetableOverlayService } from '../hr/services/replacement-timetable-overlay.service';
 
 const dayLabels = [
   'Sunday',
@@ -14,7 +15,10 @@ const dayLabels = [
 
 @Injectable()
 export class TimetablePrintService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly replacementOverlay: ReplacementTimetableOverlayService,
+  ) {}
 
   async noticeBoardPayload(
     tenantId: string,
@@ -104,6 +108,14 @@ export class TimetablePrintService {
     const courseById = new Map(courses.map((row) => [row.id, row]));
     const staffById = new Map(staff.map((row) => [row.id, row]));
     const roomById = new Map(rooms.map((row) => [row.id, row]));
+    const asOf = plan?.effectiveFrom
+      ? new Date(plan.effectiveFrom)
+      : new Date();
+    const overlayMap = await this.replacementOverlay.loadOverlayMap(
+      tenantId,
+      staffIds,
+      asOf,
+    );
 
     const fallbackSlots = this.uniqueSlotsFromEntries(entries);
     const effectiveSlots = slots.length ? slots : fallbackSlots;
@@ -137,6 +149,9 @@ export class TimetablePrintService {
             : null,
           classroom: entry.classroomId
             ? (roomById.get(entry.classroomId) ?? null)
+            : null,
+          replacementOverlay: entry.staffProfileId
+            ? (overlayMap.get(entry.staffProfileId) ?? null)
             : null,
         },
       ]);

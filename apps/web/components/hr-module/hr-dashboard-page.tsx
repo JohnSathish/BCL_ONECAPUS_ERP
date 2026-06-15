@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { ApiError } from '@/lib/http/api-error-types';
 import { fetchHrExecutiveDashboard, fetchPayrollDashboard } from '@/services/payroll';
+import { fetchSubstituteDashboard } from '@/services/hr-substitute';
 
 function KpiCard({
   label,
@@ -90,6 +91,11 @@ export function HrDashboardPage() {
   const payrollDashQ = useQuery({
     queryKey: ['payroll', 'dashboard'],
     queryFn: fetchPayrollDashboard,
+    enabled,
+  });
+  const substituteDashQ = useQuery({
+    queryKey: ['hr', 'substitute', 'dashboard'],
+    queryFn: fetchSubstituteDashboard,
     enabled,
   });
 
@@ -201,6 +207,41 @@ export function HrDashboardPage() {
               </>
             )}
           </div>
+
+          <GlassCard className="p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Replacement Faculty</h3>
+              <Link
+                href="/admin/hr/substitute-staff"
+                className="text-xs text-primary hover:underline"
+              >
+                Manage substitute staff
+              </Link>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard
+                label="Active Assignments"
+                value={substituteDashQ.data?.activeAssignments ?? 0}
+                icon={Users}
+              />
+              <KpiCard
+                label="Study Leave Faculty"
+                value={substituteDashQ.data?.studyLeaveFaculty ?? 0}
+                icon={GraduationCap}
+              />
+              <KpiCard
+                label="Maternity Leave Faculty"
+                value={substituteDashQ.data?.maternityLeaveFaculty ?? 0}
+                icon={CalendarClock}
+              />
+              <KpiCard
+                label="Expiring This Month"
+                value={substituteDashQ.data?.expiringThisMonth ?? 0}
+                icon={AlertCircle}
+                tone="warning"
+              />
+            </div>
+          </GlassCard>
 
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <ChartCard title="Department-wise Staff Strength" empty={!d.departmentStrength.length}>

@@ -168,4 +168,11 @@ export class QueueService {
       attempts: 2,
     });
   }
+
+  enqueueFeeReceiptPdf(payload: { tenantId: string; receiptId: string }) {
+    return this.exports.add('fee-receipt-pdf', payload, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+    });
+  }
 }

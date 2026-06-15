@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -28,6 +28,7 @@ import {
   downloadStaffDocumentsZip,
   uploadStaffDocument,
   verifyStaffDocument,
+  updateStaffDocumentMeta,
 } from '@/services/staff';
 import type { StaffDocumentCompliance, StaffDocumentSlotRow } from '@/types/staff';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -145,12 +146,37 @@ function UploadDropzone({
 
 function PreviewPanel({
   slot,
+  staffId,
+  canEdit,
   onClose,
+  onMetaSaved,
 }: {
   slot: StaffDocumentSlotRow | null;
+  staffId: string;
+  canEdit: boolean;
   onClose: () => void;
+  onMetaSaved: () => void;
 }) {
   const [rotation, setRotation] = useState(0);
+  const [issueDate, setIssueDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+
+  useEffect(() => {
+    if (slot?.document?.issueDate) setIssueDate(slot.document.issueDate.slice(0, 10));
+    else setIssueDate('');
+    if (slot?.document?.expiryDate) setExpiryDate(slot.document.expiryDate.slice(0, 10));
+    else setExpiryDate('');
+  }, [slot]);
+
+  const metaMut = useMutation({
+    mutationFn: () =>
+      updateStaffDocumentMeta(staffId, slot!.document!.id, {
+        issueDate: issueDate || undefined,
+        expiryDate: expiryDate || undefined,
+      }),
+    onSuccess: onMetaSaved,
+  });
+
   if (!slot?.document) return null;
   const url = resolveUploadAssetUrl(slot.document.fileUrl);
   const isPdf =
@@ -205,6 +231,38 @@ function PreviewPanel({
           </a>
         </Button>
       </div>
+      {slot.supportsExpiry && canEdit && (
+        <div className="mt-3 space-y-2 border-t pt-3">
+          <p className="text-xs font-medium">Expiry dates</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              type="date"
+              className="h-8 text-xs"
+              value={issueDate}
+              onChange={(e) => setIssueDate(e.target.value)}
+            />
+            <Input
+              type="date"
+              className="h-8 text-xs"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            className="h-7 w-full text-xs"
+            disabled={metaMut.isPending}
+            onClick={() => metaMut.mutate()}
+          >
+            Save dates
+          </Button>
+        </div>
+      )}
+      {slot.document.verificationRemarks && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Note: {slot.document.verificationRemarks}
+        </p>
+      )}
     </div>
   );
 }
@@ -514,7 +572,13 @@ export function StaffDocumentsSection({
 
         <div className="space-y-4">
           {previewSlot ? (
-            <PreviewPanel slot={previewSlot} onClose={() => setPreviewCode(null)} />
+            <PreviewPanel
+              slot={previewSlot}
+              staffId={staffId}
+              canEdit={canEdit}
+              onClose={() => setPreviewCode(null)}
+              onMetaSaved={invalidate}
+            />
           ) : (
             <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
               <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" />

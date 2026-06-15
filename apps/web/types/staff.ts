@@ -59,6 +59,8 @@ export type StaffDirectoryRow = {
   additionalRoles?: StaffAdditionalRoleChip[];
   shift: string | null;
   primaryShiftId: string | null;
+  teachingShiftCategory?: string;
+  teachingShiftLabel?: string;
   portalActive: boolean;
   portalPending: boolean;
   subjectAssignments: number;
@@ -199,62 +201,10 @@ export type StaffDocument = {
   id: string;
   documentType: string;
   fileName: string;
-  fileUrl: string;
-  filePath?: string;
+  filePath: string;
   mimeType?: string | null;
-  verificationStatus?: string;
-  verificationRemarks?: string | null;
-  issueDate?: string | null;
-  expiryDate?: string | null;
   uploadedAt?: string;
   createdAt?: string;
-  verifiedAt?: string | null;
-  verifiedByName?: string | null;
-  uploadedByName?: string | null;
-  verifiedBy?: { displayName?: string | null; email?: string } | null;
-};
-
-export type StaffDocumentSlotRow = {
-  code: string;
-  label: string;
-  category: string;
-  supportsExpiry?: boolean;
-  staffSelfUpload?: boolean;
-  status: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'MISSING' | 'EXPIRED';
-  document: {
-    id: string;
-    fileName: string | null;
-    fileUrl: string;
-    mimeType: string | null;
-    verificationStatus: string;
-    verificationRemarks: string | null;
-    issueDate: string | null;
-    expiryDate: string | null;
-    createdAt: string;
-    verifiedAt: string | null;
-    verifiedByName: string | null;
-    uploadedByName: string | null;
-  } | null;
-};
-
-export type StaffDocumentCompliance = {
-  totalSlots: number;
-  uploaded: number;
-  pending: number;
-  verified: number;
-  expiredSoon: number;
-  missing: string[];
-  completionPercent: number;
-  complianceScore: number;
-  slots: StaffDocumentSlotRow[];
-};
-
-export type StaffDocumentAuditEntry = {
-  id: string;
-  action: string;
-  createdAt: string;
-  metadata?: Record<string, unknown>;
-  user?: { displayName?: string | null; email?: string } | null;
 };
 
 export type StaffPublication = {
@@ -384,6 +334,7 @@ export type CreateStaffPayload = {
   departmentId?: string;
   designationId?: string;
   primaryShiftId?: string;
+  teachingShiftCategory?: string;
   additionalShiftIds?: string[];
   additionalRoleCodes?: string[];
   shortCode?: string;
@@ -517,8 +468,83 @@ export const STAFF_PROFILE_TABS = [
   { key: 'payroll', label: 'Payroll' },
   { key: 'accommodation', label: 'Accommodation' },
   { key: 'leave', label: 'Leave' },
+  { key: 'special-assignment', label: 'Special Assignment' },
   { key: 'audit', label: 'Audit' },
   { key: 'settings', label: 'Settings' },
 ] as const;
 
 export type StaffProfileTabKey = (typeof STAFF_PROFILE_TABS)[number]['key'];
+
+export type StaffDocumentSlotStatus = 'VERIFIED' | 'PENDING' | 'REJECTED' | 'MISSING' | 'EXPIRED';
+
+export type StaffDocumentSlotRow = {
+  code: string;
+  label: string;
+  category: string;
+  supportsExpiry?: boolean;
+  staffSelfUpload?: boolean;
+  status: StaffDocumentSlotStatus;
+  document: {
+    id: string;
+    fileName: string | null;
+    fileUrl: string;
+    mimeType: string | null;
+    verificationStatus: string;
+    verificationRemarks: string | null;
+    issueDate: string | null;
+    expiryDate: string | null;
+    createdAt: string;
+    verifiedAt: string | null;
+    verifiedByName: string | null;
+    uploadedByName: string | null;
+  } | null;
+};
+
+export type StaffDocumentCompliance = {
+  totalSlots: number;
+  uploaded: number;
+  pending: number;
+  verified: number;
+  expiredSoon: number;
+  missing: string[];
+  completionPercent: number;
+  complianceScore: number;
+  slots: StaffDocumentSlotRow[];
+};
+
+export type StaffDocumentAuditEntry = {
+  id: string;
+  action: string;
+  createdAt: string;
+  metadata?: Record<string, unknown> | null;
+  user?: { displayName: string | null; email: string } | null;
+};
+
+export type StaffDocumentMissingReportRow = {
+  staffProfileId: string;
+  fullName: string;
+  employeeCode: string;
+  missingDocuments: string[];
+  missingCount: number;
+  complianceScore: number;
+};
+
+export type StaffDocumentExpiringReportRow = {
+  staffProfileId: string;
+  fullName: string;
+  employeeCode: string;
+  documentType: string;
+  documentLabel: string;
+  expiryDate: string | null;
+};
+
+export type StaffDocumentPendingReportRow = {
+  staffProfileId: string;
+  fullName: string;
+  employeeCode: string;
+  documentId: string;
+  documentType: string;
+  documentLabel: string;
+  uploadedOn: string;
+  fileName: string | null;
+};

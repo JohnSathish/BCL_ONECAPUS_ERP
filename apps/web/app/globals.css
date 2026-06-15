@@ -401,11 +401,141 @@ html.theme-glass-disabled .glass-panel {
   background: hsl(var(--background));
 }
 
+.login-hero .landing-core-glow {
+  box-shadow:
+    0 0 32px rgba(99, 102, 241, 0.4),
+    0 0 64px rgba(168, 85, 247, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.orbit-stage {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.orbit-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.center-node {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.orbit-ring {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.orbit-node {
+  position: absolute;
+}
+
+.orbit-module-tooltip {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(99, 102, 241, 0.25);
+}
+
+.login-hero-gradient-wave {
+  background: linear-gradient(
+    125deg,
+    rgba(14, 165, 233, 0.08) 0%,
+    rgba(99, 102, 241, 0.12) 35%,
+    rgba(168, 85, 247, 0.1) 70%,
+    rgba(14, 165, 233, 0.06) 100%
+  );
+  background-size: 200% 200%;
+  opacity: 0.9;
+}
+
+.login-hero-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 6px rgba(147, 197, 253, 0.8);
+  animation: login-hero-star-twinkle ease-in-out infinite;
+}
+
+@keyframes login-hero-star-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.orbit-core {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 40px rgba(99, 102, 241, 0.45),
+    0 0 80px rgba(168, 85, 247, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.orbit-halo {
+  border: 1px solid rgba(129, 140, 248, 0.12);
+  animation: orbit-halo-pulse 6s ease-in-out infinite;
+}
+
+.orbit-halo-1 {
+  inset: 29%;
+  animation-delay: 0s;
+}
+
+.orbit-halo-2 {
+  inset: 19%;
+  border-color: rgba(56, 189, 248, 0.08);
+  animation-delay: -3s;
+}
+
+@keyframes orbit-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.orbit-module-icon {
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.25),
+    0 0 20px rgba(129, 140, 248, 0.15);
+}
+
+.orbit-module-shine {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    transparent 45%,
+    transparent 100%
+  );
+  opacity: 0.6;
+}
+
 .login-hero {
   background:
-    linear-gradient(145deg, #081b4b 0%, #142d75 42%, #243e90 100%),
-    radial-gradient(ellipse 90% 80% at 20% 0%, rgba(56, 189, 248, 0.12), transparent 50%),
-    radial-gradient(ellipse 70% 60% at 100% 100%, rgba(99, 102, 241, 0.15), transparent 55%);
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(99, 102, 241, 0.35), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 80% 30%, rgba(168, 85, 247, 0.28), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 90%, rgba(14, 165, 233, 0.15), transparent 45%),
+    linear-gradient(165deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
 }
 
 .login-hero-mesh {
@@ -1003,6 +1133,22 @@ html.theme-glass-disabled .glass-panel {
   flex-direction: column;
 }
 
+.login-auth-card-shell.login-glass-card {
+  box-shadow:
+    var(--shadow-soft),
+    0 0 0 1px hsl(var(--primary) / 0.09),
+    0 16px 48px hsl(var(--primary) / 0.12),
+    0 32px 80px hsl(222 47% 11% / 0.1);
+}
+
+.dark .login-auth-card-shell.login-glass-card {
+  box-shadow:
+    var(--shadow-soft),
+    0 0 0 1px hsl(var(--primary) / 0.16),
+    0 20px 56px hsl(0 0% 0% / 0.48),
+    0 0 56px hsl(var(--primary) / 0.14);
+}
+
 .login-auth-card-scroll {
   scrollbar-gutter: stable;
 }
@@ -1104,5 +1250,80 @@ html.institution-branded .erp-theme-sidebar {
   @page {
     size: 53.98mm 85.6mm;
     margin: 0;
+  }
+}
+
+/* ── Marketing landing page ── */
+
+.landing-page {
+  background: #020617;
+}
+
+.landing-hero-gradient {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(99, 102, 241, 0.35), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 80% 30%, rgba(168, 85, 247, 0.28), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 90%, rgba(14, 165, 233, 0.18), transparent 45%),
+    linear-gradient(165deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+}
+
+.landing-core-glow {
+  box-shadow:
+    0 0 40px rgba(99, 102, 241, 0.35),
+    0 0 80px rgba(168, 85, 247, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.landing-stats-panel {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.landing-module-panel {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(12px);
+  transition: border-color 0.3s ease;
+}
+
+.landing-module-panel:hover {
+  border-color: rgba(129, 140, 248, 0.35);
+}
+
+.landing-ecosystem {
+  background: linear-gradient(180deg, transparent, rgba(49, 46, 129, 0.15), transparent);
+}
+
+.landing-ai-feature {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.3s ease;
+}
+
+.landing-ai-feature:hover {
+  border-color: rgba(129, 140, 248, 0.3);
+}
+
+.landing-ai-chat {
+  background: linear-gradient(160deg, rgba(30, 27, 75, 0.8), rgba(15, 23, 42, 0.9));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.landing-enterprise-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+}
+
+.landing-cta-panel {
+  background: linear-gradient(135deg, #4338ca 0%, #7c3aed 50%, #a855f7 100%);
+}
+
+.landing-cta-glow {
+  background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.15), transparent 60%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -209,10 +209,71 @@ export class CollectionDto {
 
   @IsOptional()
   @IsString()
+  paymentSource?: string;
+
+  @IsOptional()
+  @IsString()
+  externalReference?: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional()
+  @IsString()
   provider?: string;
 
   @IsOptional()
   metadata?: Record<string, unknown>;
+}
+
+export class ExternalFeePaymentDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsIn([
+    'ERP_GATEWAY',
+    'SBI_ICOLLECT',
+    'BANK_TRANSFER',
+    'COLLEGE_QR',
+    'OFFICE_QR',
+    'SCHOLARSHIP',
+    'ADJUSTMENT',
+  ])
+  paymentSource!: string;
+
+  @IsOptional()
+  @IsString()
+  externalReference?: string;
+
+  @IsDateString()
+  transactionDate!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  demandIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional()
+  @IsArray()
+  attachmentUrls?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  approveImmediately?: boolean;
+}
+
+export class RejectExternalFeePaymentDto {
+  @IsString()
+  reason!: string;
 }
 
 export class GatewayPaymentDto {
@@ -238,6 +299,10 @@ export class ConcessionDto {
   @IsOptional()
   @IsUUID()
   demandId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  schemeId?: string;
 
   @IsString()
   concessionType!: string;
@@ -293,4 +358,60 @@ export class ReportsQueryDto {
   @IsOptional()
   @IsUUID()
   shiftId?: string;
+}
+
+export class SendReceiptDto {
+  @IsArray()
+  @IsIn(['EMAIL', 'SMS', 'WHATSAPP'], { each: true })
+  channels!: Array<'EMAIL' | 'SMS' | 'WHATSAPP'>;
+}
+
+export class CancelReceiptDto {
+  @IsString()
+  reason!: string;
+}
+
+export class RefundPaymentDto {
+  @IsOptional()
+  @IsUUID()
+  receiptId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  paymentId?: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsString()
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  refundMode?: string;
+}
+
+export class CreatePaymentRequestDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  demandIds!: string[];
+
+  @IsOptional()
+  @IsIn(['OFFICE_QR', 'PAYMENT_LINK', 'STUDENT_PORTAL'])
+  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
+}
+
+export class VerifyFeePaymentDto {
+  @IsString()
+  razorpay_order_id!: string;
+
+  @IsString()
+  razorpay_payment_id!: string;
+
+  @IsString()
+  razorpay_signature!: string;
 }

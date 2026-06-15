@@ -6,7 +6,6 @@ import { Settings2 } from 'lucide-react';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DirectoryAdvancedFiltersDrawer } from '@/components/students-module/directory/directory-advanced-filters-drawer';
-import { DirectoryAnalyticsPanel } from '@/components/students-module/directory/directory-analytics-panel';
 import { DirectoryCompactToolbar } from '@/components/students-module/directory/directory-compact-toolbar';
 import { DirectoryFloatingBulkBar } from '@/components/students-module/directory/directory-floating-bulk-bar';
 import { DirectoryKpiStrip } from '@/components/students-module/directory/directory-kpi-strip';
@@ -16,11 +15,6 @@ import {
   DirectoryTable,
   shouldVirtualizeDirectory,
 } from '@/components/students-module/directory/directory-table';
-import {
-  DirectoryViewTabs,
-  getViewTabFilters,
-  type DirectoryViewTab,
-} from '@/components/students-module/directory/directory-view-tabs';
 import { QuickAddDrawer } from '@/components/students-module/directory/quick-add-drawer';
 import { StudentQuickProfileDrawer } from '@/components/students-module/directory/student-quick-profile-drawer';
 import { DirectoryShell } from '@/components/students-module/directory/ui/directory-shell';
@@ -144,19 +138,6 @@ function clearAdvancedFilters(filters: DirectoryFilters): DirectoryFilters {
   };
 }
 
-function detectActiveTab(filters: DirectoryFilters, currentSemester = '1'): DirectoryViewTab {
-  if (filters.studentStatus === 'ALUMNI') return 'alumni';
-  if (filters.studentStatus === 'DROPPED') return 'suspended';
-  if (filters.uiSubjectPending === 'true') return 'subject-pending';
-  if (filters.uiFeeDue === 'true') return 'fee-due';
-  if (filters.uiRfidAssigned === 'false') return 'no-rfid';
-  if (filters.uiNoPhoto === 'true') return 'no-photo';
-  if (filters.uiNoMobile === 'true') return 'no-mobile';
-  if (filters.uiHostel === 'true') return 'hostel';
-  if (filters.semester === currentSemester) return 'current-sem';
-  return 'all';
-}
-
 export function StudentDirectoryPage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
@@ -170,7 +151,6 @@ export function StudentDirectoryPage() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [admittedProfile, setAdmittedProfile] = useState<StudentProfile | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DirectoryViewTab>('all');
   const [profileRow, setProfileRow] = useState<StudentDirectoryRow | null>(null);
   const [message, setMessage] = useState('');
 
@@ -333,13 +313,6 @@ export function StudentDirectoryPage() {
     [religions.data],
   );
 
-  const currentSemester = useMemo(() => {
-    const entries = Object.entries(summary.data?.bySemester ?? {}).sort(
-      ([a], [b]) => Number(b) - Number(a),
-    );
-    return entries[0]?.[0] ?? '1';
-  }, [summary.data?.bySemester]);
-
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['students'] });
   };
@@ -378,22 +351,7 @@ export function StudentDirectoryPage() {
     if ('search' in patch && patch.search !== undefined) {
       setSearchInput(patch.search);
     }
-    setFilters((f) => {
-      const next = { ...f, ...patch };
-      setActiveTab(detectActiveTab(next, currentSemester));
-      return next;
-    });
-    setPage(1);
-    setSelectedIds(new Set());
-  };
-
-  const handleViewTabChange = (tab: DirectoryViewTab) => {
-    setActiveTab(tab);
-    setFilters((f) => ({
-      ...emptyFilters,
-      search: f.search,
-      ...getViewTabFilters(tab, currentSemester),
-    }));
+    setFilters((f) => ({ ...f, ...patch }));
     setPage(1);
     setSelectedIds(new Set());
   };
@@ -401,7 +359,6 @@ export function StudentDirectoryPage() {
   const handleResetFilters = () => {
     setSearchInput('');
     setFilters(emptyFilters);
-    setActiveTab('all');
     setPage(1);
     setSelectedIds(new Set());
   };
@@ -409,7 +366,6 @@ export function StudentDirectoryPage() {
   const handleApplySavedView = (viewFilters: DirectoryFilters) => {
     setSearchInput(viewFilters.search ?? '');
     setFilters(viewFilters);
-    setActiveTab(detectActiveTab(viewFilters, currentSemester));
     setPage(1);
     setSelectedIds(new Set());
   };
@@ -442,73 +398,68 @@ export function StudentDirectoryPage() {
   const openProfile = (row: StudentDirectoryRow) => setProfileRow(row);
 
   return (
-    <DashboardShell role="admin" title="Student Directory">
-      <DirectoryShell className="space-y-2 pb-20">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">Student Directory</h1>
-            <p className="text-[11px] text-muted-foreground">
-              Compact admin workspace · {meta.total.toLocaleString()} students
-            </p>
-          </div>
+    <DashboardShell role="admin" title="Student Records Management">
+      <DirectoryShell className="flex h-[calc(100dvh-6.5rem)] flex-col gap-2 pb-2">
+        <div className="shrink-0">
+          <h1 className="text-lg font-bold tracking-tight">Student Records Management</h1>
+          <p className="text-[11px] text-muted-foreground">
+            Manage, search, track and update student records · {meta.total.toLocaleString()}{' '}
+            students
+          </p>
         </div>
 
-        {summary.isLoading ? (
-          <DirectoryKpiSkeleton />
-        ) : (
-          <DirectoryKpiStrip
-            summary={summary.data}
+        <div className="shrink-0">
+          {summary.isLoading ? (
+            <DirectoryKpiSkeleton />
+          ) : (
+            <DirectoryKpiStrip
+              summary={summary.data}
+              filters={filters}
+              onFilterChange={handleFilterChange}
+            />
+          )}
+        </div>
+
+        <div className="shrink-0">
+          <DirectoryCompactToolbar
             filters={filters}
+            totalCount={meta.total}
+            search={searchInput}
+            onSearchChange={setSearchInput}
+            searchLoading={students.isFetching && Boolean(debouncedSearch)}
+            onFilterChange={handleFilterChange}
+            onOpenAdvanced={() => setAdvancedOpen(true)}
+            onResetFilters={handleResetFilters}
+            onApplySavedView={handleApplySavedView}
+            programOptions={programVersions}
+            batchOptions={batchOptions}
             shiftOptions={shiftOptions}
             streamOptions={streamOptions}
-            onFilterChange={handleFilterChange}
+            departmentOptions={departmentOptions}
+            sessionOptions={sessionOptions}
+            categoryOptions={categoryOptions}
+            religionOptions={religionOptions}
+            canManage={perms.canManage}
+            canBulkUpdate={perms.canBulkUpdate}
+            canManagePhotos={perms.canManagePhotos}
+            canExport={perms.canExport}
+            canImport={perms.canImport}
+            selectedIds={selectedIds}
+            onQuickAdd={() => {
+              setAdmittedProfile(null);
+              setQuickAddOpen(true);
+            }}
+            onExport={() => exportMut.mutate(undefined)}
+            onExportSelected={
+              selectedIds.size > 0 ? () => exportMut.mutate([...selectedIds]) : undefined
+            }
+            exportPending={exportMut.isPending}
           />
-        )}
+        </div>
 
-        <DirectoryAnalyticsPanel summary={summary.data} />
-
-        <DirectoryViewTabs
-          active={activeTab}
-          onChange={handleViewTabChange}
-          currentSemester={currentSemester}
-        />
-
-        <DirectoryCompactToolbar
-          filters={filters}
-          totalCount={meta.total}
-          search={searchInput}
-          onSearchChange={setSearchInput}
-          searchLoading={students.isFetching && Boolean(debouncedSearch)}
-          onFilterChange={handleFilterChange}
-          onOpenAdvanced={() => setAdvancedOpen(true)}
-          onResetFilters={handleResetFilters}
-          onApplySavedView={handleApplySavedView}
-          programOptions={programVersions}
-          batchOptions={batchOptions}
-          shiftOptions={shiftOptions}
-          streamOptions={streamOptions}
-          departmentOptions={departmentOptions}
-          sessionOptions={sessionOptions}
-          categoryOptions={categoryOptions}
-          religionOptions={religionOptions}
-          canManage={perms.canManage}
-          canBulkUpdate={perms.canBulkUpdate}
-          canManagePhotos={perms.canManagePhotos}
-          canExport={perms.canExport}
-          canImport={perms.canImport}
-          selectedIds={selectedIds}
-          onQuickAdd={() => {
-            setAdmittedProfile(null);
-            setQuickAddOpen(true);
-          }}
-          onExport={() => exportMut.mutate(undefined)}
-          onExportSelected={
-            selectedIds.size > 0 ? () => exportMut.mutate([...selectedIds]) : undefined
-          }
-          exportPending={exportMut.isPending}
-        />
-
-        {message ? <p className="glass-card rounded-lg px-2.5 py-1.5 text-xs">{message}</p> : null}
+        {message ? (
+          <p className="glass-card shrink-0 rounded-lg px-2.5 py-1.5 text-xs">{message}</p>
+        ) : null}
 
         <DirectoryAdvancedFiltersDrawer
           open={advancedOpen}
@@ -523,42 +474,45 @@ export function StudentDirectoryPage() {
           religionOptions={religionOptions}
         />
 
-        {students.isLoading ? (
-          <DirectoryTableSkeleton rows={10} />
-        ) : students.isError ? (
-          <p className="py-8 text-center text-sm text-danger">
-            {apiErrorMessage(students.error, 'Failed to load students')}
-          </p>
-        ) : (
-          <>
-            <DirectoryTable
-              rows={displayRows}
-              selectedIds={selectedIds}
-              onToggleRow={toggleRow}
-              onToggleAll={toggleAll}
-              virtualize={useVirtual}
-              onOpenProfile={openProfile}
-            />
-            <DirectoryMobileList
-              rows={displayRows}
-              selectedIds={selectedIds}
-              onToggleRow={toggleRow}
-              onOpenProfile={openProfile}
-            />
-            <DirectoryPagination
-              meta={meta}
-              onPageChange={(p) => {
-                setPage(p);
-                setSelectedIds(new Set());
-              }}
-              onLimitChange={(l) => {
-                setLimit(l);
-                setPage(1);
-                setSelectedIds(new Set());
-              }}
-            />
-          </>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {students.isLoading ? (
+            <DirectoryTableSkeleton rows={10} className="min-h-0 flex-1" />
+          ) : students.isError ? (
+            <p className="py-8 text-center text-sm text-danger">
+              {apiErrorMessage(students.error, 'Failed to load students')}
+            </p>
+          ) : (
+            <>
+              <DirectoryTable
+                rows={displayRows}
+                selectedIds={selectedIds}
+                onToggleRow={toggleRow}
+                onToggleAll={toggleAll}
+                virtualize={useVirtual}
+                onOpenProfile={openProfile}
+                className="min-h-0 flex-1"
+              />
+              <DirectoryMobileList
+                rows={displayRows}
+                selectedIds={selectedIds}
+                onToggleRow={toggleRow}
+                onOpenProfile={openProfile}
+              />
+              <DirectoryPagination
+                meta={meta}
+                onPageChange={(p) => {
+                  setPage(p);
+                  setSelectedIds(new Set());
+                }}
+                onLimitChange={(l) => {
+                  setLimit(l);
+                  setPage(1);
+                  setSelectedIds(new Set());
+                }}
+              />
+            </>
+          )}
+        </div>
 
         <Button
           type="button"
@@ -575,8 +529,6 @@ export function StudentDirectoryPage() {
           selectedIds={selectedIds}
           filters={filters}
           canManage={perms.canManage}
-          canBulkUpdate={perms.canBulkUpdate}
-          canManagePhotos={perms.canManagePhotos}
           canExport={perms.canExport}
           onExportSelected={
             selectedIds.size > 0 ? () => exportMut.mutate([...selectedIds]) : undefined

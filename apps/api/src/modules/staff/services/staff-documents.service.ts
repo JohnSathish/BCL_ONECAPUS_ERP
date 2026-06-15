@@ -30,20 +30,17 @@ const DOC_MIMES = new Set([
 
 const EXPIRY_SOON_DAYS = 30;
 
-type ComplianceDoc = {
-  documentType: string;
-  verificationStatus: string;
-  expiryDate: Date | null;
-  createdAt: Date;
-};
-
-type DocRow = ComplianceDoc & {
+type DocRow = {
   id: string;
+  documentType: string;
   fileUrl: string;
   fileName: string | null;
   mimeType: string | null;
+  verificationStatus: string;
   verificationRemarks: string | null;
   issueDate: Date | null;
+  expiryDate: Date | null;
+  createdAt: Date;
   verifiedAt: Date | null;
   verifiedBy: { displayName: string | null; email: string } | null;
   uploadedBy: { displayName: string | null; email: string } | null;
@@ -78,7 +75,7 @@ export class StaffDocumentsService {
   }
 
   private slotStatus(
-    doc: ComplianceDoc | undefined,
+    doc: DocRow | undefined,
   ): 'VERIFIED' | 'PENDING' | 'REJECTED' | 'MISSING' | 'EXPIRED' {
     if (!doc) return 'MISSING';
     if (this.isExpired(doc.expiryDate)) return 'EXPIRED';
@@ -87,8 +84,8 @@ export class StaffDocumentsService {
     return 'PENDING';
   }
 
-  private latestByType<T extends ComplianceDoc>(docs: T[]): Map<string, T> {
-    const map = new Map<string, T>();
+  private latestByType(docs: DocRow[]) {
+    const map = new Map<string, DocRow>();
     for (const doc of docs) {
       const existing = map.get(doc.documentType);
       if (!existing || doc.createdAt > existing.createdAt) {
@@ -98,7 +95,7 @@ export class StaffDocumentsService {
     return map;
   }
 
-  computeCompliance(docs: ComplianceDoc[]) {
+  computeCompliance(docs: DocRow[]) {
     const latest = this.latestByType(docs);
     const totalSlots = STAFF_DOCUMENT_SLOTS.length;
     let uploaded = 0;
@@ -426,11 +423,18 @@ export class StaffDocumentsService {
   async reportMissing(tenantId: string) {
     const staff = await this.prisma.staffProfile.findMany({
       where: { tenantId, deletedAt: null, status: 'ACTIVE' },
-      select: { id: true, fullName: true, employeeCode: true, documents: true },
+      select: {
+        id: true,
+        fullName: true,
+        employeeCode: true,
+        documents: { include: this.docInclude },
+      },
     });
     return staff
       .map((s) => {
-        const compliance = this.computeCompliance(s.documents);
+        const compliance = this.computeCompliance(
+          s.documents as unknown as DocRow[],
+        );
         return {
           staffProfileId: s.id,
           fullName: s.fullName,

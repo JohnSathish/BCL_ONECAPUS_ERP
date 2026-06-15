@@ -22,6 +22,7 @@ const ROLE_HOME: Record<string, string> = {
   student: '/student',
   parent: '/parent',
   'library-operator': '/library-desk',
+  applicant: '/admissions-portal/dashboard',
 };
 
 export { canAccessStaffPortal } from '@/lib/permissions/portal-access';

@@ -3,12 +3,14 @@ import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import type { ConcessionDto, FineRuleDto } from '../dto/fees.dto';
 import { FeeLedgerService } from './fee-ledger.service';
+import { StudentFeeSummaryService } from './student-fee-summary.service';
 
 @Injectable()
 export class FineConcessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: FeeLedgerService,
+    private readonly feeSummary: StudentFeeSummaryService,
   ) {}
 
   private db() {
@@ -49,6 +51,7 @@ export class FineConcessionService {
         tenantId: user.tid,
         studentId: dto.studentId,
         demandId: dto.demandId,
+        schemeId: dto.schemeId,
         concessionType: dto.concessionType,
         calculationType: dto.calculationType,
         value: dto.value,
@@ -99,6 +102,7 @@ export class FineConcessionService {
         description: concession.reason ?? 'Fee concession approved',
         postedById: user.sub,
       });
+      await this.feeSummary.touchAfterPayment(user.tid, concession.studentId);
     }
     return updated;
   }

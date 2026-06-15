@@ -6,6 +6,11 @@ import {
 import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PayrollAuditService } from './payroll-audit.service';
+import {
+  buildUgcBreakdownFromLines,
+  isUgcExcludedDeduction,
+  syncUgcPayslipTotalsFromLines,
+} from './ugc-payroll-formulas';
 
 @Injectable()
 export class PayrollAdjustmentsService {
@@ -185,16 +190,42 @@ export class PayrollAdjustmentsService {
       where: { payslipId, componentCode: { startsWith: 'ADJ_' } },
     });
 
+    if (payslip.payScaleType === 'UGC') {
+      const strayExcluded = payslip.lines.filter((line) =>
+        isUgcExcludedDeduction(line.componentCode),
+      );
+      if (strayExcluded.length) {
+        await this.prisma.payslipLine.deleteMany({
+          where: { id: { in: strayExcluded.map((line) => line.id) } },
+        });
+      }
+    }
+
     const adjustments = await this.prisma.payslipAdjustment.findMany({
       where: { payrollRunId: runId, staffProfileId: payslip.staffProfileId },
     });
 
     let baseGross = 0;
     let baseDed = 0;
-    for (const line of payslip.lines) {
-      if (line.componentCode.startsWith('ADJ_')) continue;
-      if (line.componentType === 'EARNING') baseGross += Number(line.amount);
-      else baseDed += Number(line.amount);
+    if (payslip.payScaleType === 'UGC') {
+      const base = buildUgcBreakdownFromLines(
+        payslip.lines
+          .filter((line) => !line.componentCode.startsWith('ADJ_'))
+          .map((line) => ({
+            componentCode: line.componentCode,
+            componentName: line.componentName,
+            componentType: line.componentType,
+            amount: Number(line.amount),
+          })),
+      );
+      baseGross = base.gross;
+      baseDed = base.totalDeductions;
+    } else {
+      for (const line of payslip.lines) {
+        if (line.componentCode.startsWith('ADJ_')) continue;
+        if (line.componentType === 'EARNING') baseGross += Number(line.amount);
+        else baseDed += Number(line.amount);
+      }
     }
 
     let adjEarnings = 0;
@@ -226,14 +257,43 @@ export class PayrollAdjustmentsService {
 
     const gross = baseGross + adjEarnings;
     const deductions = baseDed + adjDeductions;
-    await this.prisma.payslip.update({
-      where: { id: payslipId },
-      data: {
-        grossSalary: gross,
-        totalDeductions: deductions,
-        netSalary: gross - deductions,
-      },
-    });
+    let net = gross - deductions;
+
+    if (payslip.payScaleType === 'UGC') {
+      const synced = syncUgcPayslipTotalsFromLines(
+        (
+          await this.prisma.payslipLine.findMany({
+            where: { payslipId },
+            orderBy: { sortOrder: 'asc' },
+          })
+        ).map((line) => ({
+          componentCode: line.componentCode,
+          componentName: line.componentName,
+          componentType: line.componentType,
+          amount: Number(line.amount),
+        })),
+      );
+      const ugcGross = synced.gross + adjEarnings;
+      const ugcDeductions = synced.totalDeductions + adjDeductions;
+      net = ugcGross - ugcDeductions;
+      await this.prisma.payslip.update({
+        where: { id: payslipId },
+        data: {
+          grossSalary: ugcGross,
+          totalDeductions: ugcDeductions,
+          netSalary: net,
+        },
+      });
+    } else {
+      await this.prisma.payslip.update({
+        where: { id: payslipId },
+        data: {
+          grossSalary: gross,
+          totalDeductions: deductions,
+          netSalary: net,
+        },
+      });
+    }
 
     await this.recalcRunTotals(runId);
   }

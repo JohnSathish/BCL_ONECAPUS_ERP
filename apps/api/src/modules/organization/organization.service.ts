@@ -1,11 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { CacheService } from '../../shared/cache/cache.service';
+import { AdmissionsCycleService } from '../admissions/admissions-cycle.service';
 import { UpsertAcademicSettingsDto } from './dto/academic-settings.dto';
 import { DEFAULT_SHARED_POOL_SECTION_CAPACITY } from '../../common/constants/academic-capacity';
 import {
@@ -54,7 +58,12 @@ const departmentInclude = {
 
 @Injectable()
 export class OrganizationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+    @Inject(forwardRef(() => AdmissionsCycleService))
+    private readonly admissionCycles: AdmissionsCycleService,
+  ) {}
 
   private normalizeCode(code: string) {
     return code.trim().toUpperCase();
@@ -172,6 +181,29 @@ export class OrganizationService {
       departmentType?: string;
     },
   ) {
+    const hasFilters = Boolean(
+      filters?.campusId ||
+      filters?.institutionId ||
+      filters?.status ||
+      filters?.type ||
+      filters?.departmentType,
+    );
+    if (hasFilters) return this.queryDepartments(tenantId, filters);
+    return this.cache.wrap(`departments:${tenantId}`, 86400, () =>
+      this.queryDepartments(tenantId, filters),
+    );
+  }
+
+  private queryDepartments(
+    tenantId: string,
+    filters?: {
+      campusId?: string;
+      institutionId?: string;
+      status?: string;
+      type?: DepartmentGroup;
+      departmentType?: string;
+    },
+  ) {
     return this.prisma.department.findMany({
       where: {
         tenantId,
@@ -189,6 +221,10 @@ export class OrganizationService {
       include: departmentInclude,
       orderBy: [{ code: 'asc' }],
     });
+  }
+
+  private async bustDepartmentCache(tenantId: string) {
+    await this.cache.del(`departments:${tenantId}`);
   }
 
   async assertAcademicDepartment(tenantId: string, departmentId: string) {
@@ -250,7 +286,7 @@ export class OrganizationService {
     );
     await this.assertHod(tenantId, dto.hodId);
 
-    return this.prisma.department.create({
+    const row = await this.prisma.department.create({
       data: {
         tenantId,
         institutionId: dto.institutionId,
@@ -263,6 +299,8 @@ export class OrganizationService {
       },
       include: departmentInclude,
     });
+    await this.bustDepartmentCache(tenantId);
+    return row;
   }
 
   async updateDepartment(
@@ -306,7 +344,7 @@ export class OrganizationService {
       throw new BadRequestException('Invalid department status');
     }
 
-    return this.prisma.department.update({
+    const row = await this.prisma.department.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name } : {}),
@@ -320,6 +358,8 @@ export class OrganizationService {
       },
       include: departmentInclude,
     });
+    await this.bustDepartmentCache(tenantId);
+    return row;
   }
 
   listFacultyForHod(tenantId: string, departmentId?: string) {
@@ -372,7 +412,7 @@ export class OrganizationService {
       }
       institutionId = inst.id;
     }
-    return this.prisma.academicYear.create({
+    const year = await this.prisma.academicYear.create({
       data: {
         tenantId,
         institutionId,
@@ -381,6 +421,15 @@ export class OrganizationService {
         endDate: new Date(dto.endDate),
       },
     });
+
+    await this.admissionCycles.onAcademicYearCreated(
+      tenantId,
+      institutionId,
+      year.id,
+      year.name,
+    );
+
+    return year;
   }
 
   async createSemester(tenantId: string, dto: CreateSemesterDto) {
@@ -517,9 +566,11 @@ export class OrganizationService {
       where: { id, tenantId, deletedAt: null },
     });
     if (!row) throw new NotFoundException('Department not found');
-    return this.prisma.department.update({
+    const deleted = await this.prisma.department.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+    await this.bustDepartmentCache(tenantId);
+    return deleted;
   }
 }

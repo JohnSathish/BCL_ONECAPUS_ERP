@@ -15,6 +15,7 @@ import {
   SaveExamMarksDto,
 } from './dto/examinations.dto';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
+import { FeeEnforcementService } from '../fees/services/fee-enforcement.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class ExaminationsService {
     private readonly prisma: PrismaService,
     private readonly communication: CommunicationTriggerService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly feeEnforcement: FeeEnforcementService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -837,6 +839,24 @@ export class ExaminationsService {
     });
     if (!student)
       return { student: null, papers: [], seats: [], session: null };
+
+    const feeCheck = await this.feeEnforcement.checkFeesClear(
+      user.tid,
+      student.id,
+      'HALL_TICKET',
+    );
+    if (feeCheck.blocked) {
+      return {
+        student: null,
+        papers: [],
+        seats: [],
+        session: null,
+        feeBlocked: true,
+        outstandingAmount: feeCheck.outstandingAmount,
+        feeBlockReasons: feeCheck.reasons,
+      };
+    }
+
     const seats = await (this.prisma as any).examSeatAllocation.findMany({
       where: {
         tenantId: user.tid,

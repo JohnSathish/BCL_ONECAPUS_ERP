@@ -1,15 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-function isLibraryHost(host: string) {
-  const hostname = host.split(':')[0]?.toLowerCase() ?? '';
-  return hostname.startsWith('library.');
+function hostname(host: string) {
+  return host.split(':')[0]?.toLowerCase() ?? '';
 }
 
-export function middleware(request: NextRequest) {
-  const host = request.headers.get('host') ?? '';
-  if (!isLibraryHost(host)) return NextResponse.next();
+function isLibraryHost(host: string) {
+  return hostname(host).startsWith('library.');
+}
 
+function isAdmissionsHost(host: string) {
+  return hostname(host).startsWith('admissions.');
+}
+
+function handleSubdomainRewrite(
+  request: NextRequest,
+  basePath: string,
+  loginPath: string,
+  blockedPrefixes: string[],
+) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -21,30 +30,52 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith('/library-desk')) {
+  if (pathname.startsWith(basePath)) {
     return NextResponse.next();
   }
 
   if (pathname === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = '/library-desk/login';
+    url.pathname = loginPath;
     return NextResponse.redirect(url);
   }
 
-  if (
-    pathname.startsWith('/admin') ||
-    pathname.startsWith('/student') ||
-    pathname.startsWith('/staff') ||
-    pathname.startsWith('/shift')
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/library-desk';
-    return NextResponse.redirect(url);
+  for (const prefix of blockedPrefixes) {
+    if (pathname.startsWith(prefix)) {
+      const url = request.nextUrl.clone();
+      url.pathname = basePath;
+      return NextResponse.redirect(url);
+    }
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = pathname === '/' ? '/library-desk' : `/library-desk${pathname}`;
+  url.pathname = pathname === '/' ? basePath : `${basePath}${pathname}`;
   return NextResponse.rewrite(url);
+}
+
+export function middleware(request: NextRequest) {
+  const host = request.headers.get('host') ?? '';
+
+  if (isAdmissionsHost(host)) {
+    return handleSubdomainRewrite(request, '/admissions-portal', '/admissions-portal/login', [
+      '/admin',
+      '/student',
+      '/staff',
+      '/shift',
+      '/library-desk',
+    ]);
+  }
+
+  if (isLibraryHost(host)) {
+    return handleSubdomainRewrite(request, '/library-desk', '/library-desk/login', [
+      '/admin',
+      '/student',
+      '/staff',
+      '/shift',
+    ]);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

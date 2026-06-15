@@ -15,41 +15,72 @@ import { LmsWidget } from '@/components/student-portal/widgets/lms-widget';
 import { StudentNotificationsWidget } from '@/components/student-portal/widgets/notifications-widget';
 import { TodayTimetableWidget } from '@/components/student-portal/widgets/today-timetable-widget';
 import { useStudentDashboard } from '@/hooks/use-student-dashboard';
+import { useStudentDashboardWidget } from '@/hooks/use-student-dashboard-widget';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPortalPreferencesStore } from '@/store/student-portal-preferences-store';
 import { cn } from '@/utils/cn';
 
 export function StudentDashboardPage() {
   useRequireAuth();
-  const { data, isLoading, qrPass } = useStudentDashboard();
+  const { data: shell, isLoading: shellLoading } = useStudentDashboard();
   const compact = useStudentPortalPreferencesStore((s) => s.compact);
+
+  const attendanceQ = useStudentDashboardWidget('attendance');
+  const feesQ = useStudentDashboardWidget('fees');
+  const timetableQ = useStudentDashboardWidget('timetable');
+  const lmsQ = useStudentDashboardWidget('lms');
+  const examsQ = useStudentDashboardWidget('examinations');
+  const notificationsQ = useStudentDashboardWidget('notifications');
+  const calendarQ = useStudentDashboardWidget('calendar');
+  const libraryQ = useStudentDashboardWidget('library');
+  const healthQ = useStudentDashboardWidget('health');
+  const qrQ = useStudentDashboardWidget('qr-pass');
+
+  const shellWithTimetable = shell
+    ? {
+        ...shell,
+        todayTimetable: timetableQ.data ?? [],
+        health: healthQ.data ?? {
+          score: shell.profile.profileCompletion,
+          label: 'Profile',
+          tone: 'warn' as const,
+          signals: [],
+        },
+      }
+    : undefined;
 
   return (
     <DashboardShell role="student" title="Student Dashboard">
       <ErpWorkspace className={cn('space-y-4', compact && 'space-y-3')}>
-        <StudentDashboardHeader data={data} loading={isLoading} />
-        <StudentQuickStats data={data} loading={isLoading} />
-        <AcademicSnapshotWidget chips={data?.academicChips} loading={isLoading} />
+        <StudentDashboardHeader data={shellWithTimetable} loading={shellLoading} />
+        <StudentQuickStats data={shell} loading={shellLoading} />
+        <AcademicSnapshotWidget chips={shell?.academicChips} loading={shellLoading} />
 
-        <TodayTimetableWidget schedule={data?.todayTimetable} loading={isLoading} />
+        <TodayTimetableWidget schedule={timetableQ.data} loading={timetableQ.isLoading} />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <AttendanceWidget data={data?.attendance} loading={isLoading} />
-          <FeeWidget fees={data?.fees} loading={isLoading} />
-          <LmsWidget lms={data?.lms} loading={isLoading} />
-          <ExaminationWidget exams={data?.examinations} loading={isLoading} />
+          <AttendanceWidget data={attendanceQ.data} loading={attendanceQ.isLoading} />
+          <FeeWidget fees={feesQ.data ?? shell?.fees} loading={feesQ.isLoading && shellLoading} />
+          <LmsWidget lms={lmsQ.data} loading={lmsQ.isLoading} />
+          <ExaminationWidget exams={examsQ.data} loading={examsQ.isLoading} />
           <StudentNotificationsWidget
-            notifications={data?.notifications}
-            unreadCount={data?.unreadNotificationCount}
-            loading={isLoading}
+            notifications={notificationsQ.data?.notifications}
+            unreadCount={
+              notificationsQ.data?.unreadNotificationCount ?? shell?.unreadNotificationCount
+            }
+            loading={notificationsQ.isLoading}
           />
           <PortalCalendarWidget
-            events={data?.calendarEvents}
-            loading={isLoading}
+            events={calendarQ.data}
+            loading={calendarQ.isLoading}
             title="Student Calendar"
           />
-          <DigitalIdWidget profile={data?.profile} qrPass={qrPass} loading={isLoading} />
-          <HealthScoreWidget health={data?.health} loading={isLoading} />
+          <DigitalIdWidget
+            profile={shell?.profile}
+            qrPass={qrQ.data}
+            loading={shellLoading || qrQ.isLoading}
+          />
+          <HealthScoreWidget health={healthQ.data} loading={healthQ.isLoading} />
         </div>
       </ErpWorkspace>
     </DashboardShell>

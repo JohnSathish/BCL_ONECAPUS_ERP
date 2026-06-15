@@ -10,6 +10,10 @@ import {
 import { seedDbcFyugpRules } from './seed-dbc-fyugp-rules';
 import { seedArtsFyugpCatalog } from './seed-arts-fyugp-catalog';
 import { seedArtsOddTimetable } from './seed-arts-odd-timetable';
+import { seedDonBoscoFeeCycles } from './seeds/fee-cycle.seed';
+import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
+import { seedDbcCommittees } from './seeds/seed-dbc-committees';
+import { seedNaacIqac } from './seeds/seed-naac-iqac';
 
 const prisma = new PrismaClient();
 
@@ -84,6 +88,42 @@ const PERMISSIONS: {
     resource: 'admissions',
     action: 'manage',
     description: 'Manage admissions workflows',
+  },
+  {
+    slug: 'admissions:configure',
+    resource: 'admissions',
+    action: 'configure',
+    description: 'Configure admission cycles and seat matrix',
+  },
+  {
+    slug: 'admissions:verify-documents',
+    resource: 'admissions',
+    action: 'verify-documents',
+    description: 'Verify applicant documents',
+  },
+  {
+    slug: 'admissions:publish-merit',
+    resource: 'admissions',
+    action: 'publish-merit',
+    description: 'Generate and publish merit lists',
+  },
+  {
+    slug: 'admissions:allocate',
+    resource: 'admissions',
+    action: 'allocate',
+    description: 'Run seat allocation',
+  },
+  {
+    slug: 'admissions:enroll',
+    resource: 'admissions',
+    action: 'enroll',
+    description: 'Enroll selected applicants as students',
+  },
+  {
+    slug: 'admissions:portal:self',
+    resource: 'admissions',
+    action: 'portal:self',
+    description: 'Applicant portal self-service',
   },
   {
     slug: 'students:read',
@@ -218,6 +258,12 @@ const PERMISSIONS: {
     description: 'Manage fee structures and payments',
   },
   {
+    slug: 'fees:cash:collect',
+    resource: 'fees',
+    action: 'cash:collect',
+    description: 'Collect cash fee payments at the desk',
+  },
+  {
     slug: 'reports:read',
     resource: 'reports',
     action: 'read',
@@ -234,6 +280,18 @@ const PERMISSIONS: {
     resource: 'communication',
     action: 'manage',
     description: 'Manage templates, campaigns, and send messages',
+  },
+  {
+    slug: 'mobile:settings:read',
+    resource: 'mobile',
+    action: 'settings:read',
+    description: 'View mobile app control settings',
+  },
+  {
+    slug: 'mobile:settings:manage',
+    resource: 'mobile',
+    action: 'settings:manage',
+    description: 'Manage mobile app control settings',
   },
   {
     slug: 'notifications:read',
@@ -748,6 +806,78 @@ const PERMISSIONS: {
     description: 'View front office reports',
   },
   {
+    slug: 'governance:read',
+    resource: 'governance',
+    action: 'read',
+    description: 'View committees, meetings, and governance records',
+  },
+  {
+    slug: 'governance:manage',
+    resource: 'governance',
+    action: 'manage',
+    description: 'Manage committees, meetings, ATR, and tasks',
+  },
+  {
+    slug: 'governance:publish',
+    resource: 'governance',
+    action: 'publish',
+    description: 'Publish notices, minutes, and circulars',
+  },
+  {
+    slug: 'governance:reports',
+    resource: 'governance',
+    action: 'reports',
+    description: 'Export governance and NAAC reports',
+  },
+  {
+    slug: 'governance:import',
+    resource: 'governance',
+    action: 'import',
+    description: 'Import committees from PDF',
+  },
+  {
+    slug: 'governance:portal',
+    resource: 'governance',
+    action: 'portal',
+    description: 'Staff committee member self-service portal',
+  },
+  {
+    slug: 'naac-iqac:read',
+    resource: 'naac-iqac',
+    action: 'read',
+    description: 'View NAAC & IQAC workspace, criteria, and evidence',
+  },
+  {
+    slug: 'naac-iqac:manage',
+    resource: 'naac-iqac',
+    action: 'manage',
+    description: 'Manage AQAR, vault, MoUs, and IQAC workflows',
+  },
+  {
+    slug: 'naac-iqac:collect',
+    resource: 'naac-iqac',
+    action: 'collect',
+    description: 'Submit department-wise NAAC data and achievements',
+  },
+  {
+    slug: 'naac-iqac:publish',
+    resource: 'naac-iqac',
+    action: 'publish',
+    description: 'Publish finalized NAAC reports and circulars',
+  },
+  {
+    slug: 'naac-iqac:reports',
+    resource: 'naac-iqac',
+    action: 'reports',
+    description: 'Export NAAC evidence packs and DVV reports',
+  },
+  {
+    slug: 'naac-iqac:portal',
+    resource: 'naac-iqac',
+    action: 'portal',
+    description: 'Staff IQAC and department coordinator self-service',
+  },
+  {
     slug: 'transport:read',
     resource: 'transport',
     action: 'read',
@@ -832,6 +962,24 @@ const PERMISSIONS: {
     description: 'View own payslips, loans, and PF summary',
   },
   {
+    slug: 'accommodation:read',
+    resource: 'accommodation',
+    action: 'read',
+    description: 'View staff quarters and accommodation',
+  },
+  {
+    slug: 'accommodation:manage',
+    resource: 'accommodation',
+    action: 'manage',
+    description: 'Manage quarters, allotments, and charges',
+  },
+  {
+    slug: 'accommodation:reports',
+    resource: 'accommodation',
+    action: 'reports',
+    description: 'Export accommodation reports',
+  },
+  {
     slug: 'license:read',
     resource: 'license',
     action: 'read',
@@ -896,6 +1044,16 @@ async function main() {
     create: {
       tenantId: tenant.id,
       host: 'library.demo.localhost',
+      verified: true,
+    },
+  });
+
+  await prisma.tenantDomain.upsert({
+    where: { host: 'admissions.demo.localhost' },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      host: 'admissions.demo.localhost',
       verified: true,
     },
   });
@@ -1065,8 +1223,15 @@ async function main() {
     'payroll:approve',
     'payroll:publish',
     'payroll:reports',
+    'accommodation:read',
+    'accommodation:manage',
+    'accommodation:reports',
     'license:read',
     'license:activate',
+    'mobile:settings:read',
+    'mobile:settings:manage',
+    'communication:read',
+    'communication:manage',
   ]);
   await upsertRole('academic-admin', 'Academic Admin', [
     'academic:read',
@@ -1136,6 +1301,11 @@ async function main() {
   await upsertRole('admission-admin', 'Admission Admin', [
     'admissions:read',
     'admissions:manage',
+    'admissions:configure',
+    'admissions:verify-documents',
+    'admissions:publish-merit',
+    'admissions:allocate',
+    'admissions:enroll',
     'students:read',
     'students:manage',
     'students:import',
@@ -1148,6 +1318,10 @@ async function main() {
     'users:read',
     'users:manage',
     'lookups:read',
+  ]);
+  await upsertRole('applicant', 'Applicant', [
+    'admissions:portal:self',
+    'notifications:read',
   ]);
   await upsertRole('hod', 'Head of Department', [
     'academic:read',
@@ -1172,6 +1346,8 @@ async function main() {
     'lms:lesson-plans:manage',
     'lms:assignments:manage',
     'lms:analytics:read',
+    'naac-iqac:read',
+    'naac-iqac:collect',
   ]);
   await upsertRole('parent', 'Parent', ['students:read']);
   await upsertRole('hostel-warden', 'Hostel Warden', [
@@ -1231,6 +1407,10 @@ async function main() {
     'staff:portal:self',
     'payroll:portal:self',
     'notifications:read',
+    'governance:portal',
+    'governance:read',
+    'naac-iqac:portal',
+    'naac-iqac:collect',
     'lms:read',
     'lms:materials:upload',
     'lms:materials:publish',
@@ -1269,6 +1449,7 @@ async function main() {
   await upsertRole('accountant', 'Accounts Staff', [
     'fees:read',
     'fees:manage',
+    'fees:cash:collect',
     'reports:read',
     'notifications:read',
     'payroll:read',
@@ -1331,6 +1512,9 @@ async function main() {
     'certificates:manage',
     'reports:read',
     'notifications:read',
+    'naac-iqac:read',
+    'naac-iqac:manage',
+    'naac-iqac:reports',
   ]);
   await upsertRole('principal', 'Principal', [
     'students:read',
@@ -1345,6 +1529,8 @@ async function main() {
     'payroll:read',
     'payroll:approve',
     'payroll:reports',
+    'naac-iqac:read',
+    'naac-iqac:reports',
   ]);
   await upsertRole('vice-principal', 'Vice Principal', [
     'students:read',
@@ -1359,6 +1545,8 @@ async function main() {
     'payroll:read',
     'payroll:approve',
     'payroll:reports',
+    'naac-iqac:read',
+    'naac-iqac:reports',
   ]);
   await upsertRole('erp-administrator', 'ERP Administrator', [
     'users:read',
@@ -2137,6 +2325,87 @@ async function main() {
         opensAt: new Date(),
       },
     });
+  }
+
+  const cycleInstitution = await prisma.institution.findFirst({
+    where: { tenantId: tenant.id, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let admissionCycle = await prisma.admissionCycle.findFirst({
+    where: { tenantId: tenant.id, code: 'ADM-2026-27' },
+  });
+  if (!admissionCycle && cycleInstitution && academicYear) {
+    admissionCycle = await prisma.admissionCycle.create({
+      data: {
+        tenantId: tenant.id,
+        institutionId: cycleInstitution.id,
+        academicYearId: academicYear.id,
+        code: 'ADM-2026-27',
+        title: 'Admission 2026-27',
+        status: 'OPEN',
+        fyupSemester: 1,
+        registrationOpensAt: new Date('2026-01-01'),
+        registrationClosesAt: new Date('2026-08-31'),
+        applicationDeadline: new Date('2026-07-31'),
+        paymentDeadline: new Date('2026-08-15'),
+        settings: {
+          applicationNumberPrefix: 'DBCT26',
+          applicationFee: 600,
+          admissionFeeMin: 10500,
+          meritRules: {
+            class12Weight: 1,
+            tieBreakers: ['meritScore', 'submittedAt'],
+          },
+          helpDesk: {
+            phone: '+91-9876543210',
+            email: 'admissions@donboscocollege.ac.in',
+          },
+        },
+      },
+    });
+
+    await prisma.admissionCycleProgram.upsert({
+      where: {
+        cycleId_programId: {
+          cycleId: admissionCycle.id,
+          programId: program.id,
+        },
+      },
+      update: { enabled: true },
+      create: {
+        tenantId: tenant.id,
+        cycleId: admissionCycle.id,
+        programId: program.id,
+        enabled: true,
+      },
+    });
+
+    await prisma.admissionIntake.update({
+      where: { id: intake.id },
+      data: { cycleId: admissionCycle.id },
+    });
+
+    const shifts = await prisma.shift.findMany({
+      where: { tenantId: tenant.id, deletedAt: null },
+      take: 2,
+    });
+    for (const shift of shifts) {
+      await prisma.admissionIntakeShift.upsert({
+        where: { intakeId_shiftId: { intakeId: intake.id, shiftId: shift.id } },
+        update: {
+          totalSeats: 60,
+          reservedSeats: { GENERAL: 30, OBC: 12, SC: 9, ST: 5, EWS: 4 },
+        },
+        create: {
+          tenantId: tenant.id,
+          intakeId: intake.id,
+          shiftId: shift.id,
+          totalSeats: 60,
+          reservedSeats: { GENERAL: 30, OBC: 12, SC: 9, ST: 5, EWS: 4 },
+        },
+      });
+    }
   }
 
   const applicants = [
@@ -3833,6 +4102,29 @@ async function main() {
   }
 
   await seedNehuFyugpTemplate(tenant.id, adminUser.id);
+  await seedDonBoscoFeeCycles(prisma, tenant.id, adminUser.id);
+  await seedDonBoscoMonthlyPlans(prisma, tenant.id);
+  const governanceSeed = await seedDbcCommittees(
+    prisma,
+    tenant.id,
+    adminUser.id,
+  );
+  console.log(
+    'Governance committees seeded:',
+    governanceSeed.committeeCount,
+    'committees,',
+    governanceSeed.memberCount,
+    'ex-officio members',
+  );
+  const naacSeed = await seedNaacIqac(prisma, tenant.id);
+  console.log(
+    'NAAC & IQAC seeded:',
+    naacSeed.criterionCount,
+    'criteria,',
+    naacSeed.metricCount,
+    'metrics, AQAR:',
+    naacSeed.aqarId,
+  );
   await seedCategoryPools(tenant.id, institution.id, adminUser.id);
   const fyugpRules = await seedDbcFyugpRules(prisma, tenant.id, institution.id);
   console.log(

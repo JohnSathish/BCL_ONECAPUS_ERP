@@ -29,9 +29,16 @@ import { StudentMajorMinorTrackService } from './services/student-major-minor-tr
 import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
 import { LmsModule } from '../lms/lms.module';
+import { FeesModule } from '../fees/fees.module';
 
 @Module({
-  imports: [AcademicLifecycleModule, ShiftsModule, ImportModule, LmsModule],
+  imports: [
+    AcademicLifecycleModule,
+    ShiftsModule,
+    ImportModule,
+    LmsModule,
+    FeesModule,
+  ],
   controllers: [
     AcademicEngineController,
     RegistrationImportController,

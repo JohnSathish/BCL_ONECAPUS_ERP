@@ -66,6 +66,13 @@ const EXTRA_COMPONENTS = [
     isStatutory: true,
     sortOrder: 107,
   },
+  {
+    code: 'HCA',
+    name: 'House Compensation Allowance',
+    componentType: 'EARNING',
+    category: 'ALLOWANCE',
+    sortOrder: 32,
+  },
 ];
 
 type StructureSeed = {
@@ -116,11 +123,31 @@ const DBC_STRUCTURES: StructureSeed[] = [
     structureType: 'COLLEGE_NON_TEACHING',
     payScaleTypes: ['COLLEGE_NON_TEACHING'],
     description:
-      'Non-teaching staff — individual Basic and Fixed Allowance per person; PF 12% of basic; PT auto-applied',
+      'Non-teaching staff — Basic + per-person Fixed Allowance; PF employer ₹600 in gross; PF employee ₹1200; House Rent per assignment',
     components: [
       { code: 'BASIC', formula: basicRef() },
-      { code: 'ALLOWANCE', formula: pct('BASIC', 20) },
-      { code: 'PF', formula: pct('BASIC', 12) },
+      { code: 'ALLOWANCE', formula: fixed(0) },
+      { code: 'PF_EMPLOYER', formula: fixed(600) },
+      { code: 'PF_EMPLOYEE', formula: fixed(1200) },
+      { code: 'HOUSE_RENT', formula: fixed(0) },
+      { code: 'LOAN', formula: loan() },
+    ],
+  },
+  {
+    code: 'DBC_STATE_NON_TEACHING',
+    name: 'DBC State Scale Non-Teaching (DA 51%)',
+    structureType: 'STATE',
+    payScaleTypes: ['STATE'],
+    description:
+      'Meghalaya State scale non-teaching — DA 51%, HCA ₹500, HR 15%, MA ₹1000, CPF 10%/8% (override per staff)',
+    components: [
+      { code: 'BASIC', formula: basicRef() },
+      { code: 'CPF_EMPLOYER', formula: pct('BASIC', 10) },
+      { code: 'DA', formula: pct('BASIC', 51) },
+      { code: 'HCA', formula: fixed(500) },
+      { code: 'HRA', formula: pct('BASIC', 15) },
+      { code: 'MA', formula: fixed(1000) },
+      { code: 'CPF', formula: doubleRef('CPF_EMPLOYER') },
       { code: 'LOAN', formula: loan() },
     ],
   },
@@ -233,7 +260,22 @@ export class DbcPayrollSetupService implements OnModuleInit {
         'Fixed Allowance',
         'Gross',
         'PF',
-        'Professional Tax',
+        'House Rent',
+        'Loan',
+        'Net',
+      ],
+      DBC_STATE_NON_TEACHING: [
+        'Sl',
+        'Employee Code',
+        'Name',
+        'Basic',
+        'CPF Employer',
+        'DA',
+        'HCA',
+        'HRA',
+        'MA',
+        'Gross',
+        'CPF Deduction',
         'Loan',
         'Net',
       ],
@@ -246,6 +288,7 @@ export class DbcPayrollSetupService implements OnModuleInit {
         'CPF Employer',
         'Gross',
         'CPF Deduction',
+        'TDS',
         'House Rent',
         'Loan',
         'Net',
@@ -267,7 +310,9 @@ export class DbcPayrollSetupService implements OnModuleInit {
     const merged = { ...existing };
     let changed = false;
     for (const [key, columns] of Object.entries(defaults)) {
-      if (!merged[key]?.length) {
+      const prev = JSON.stringify(merged[key] ?? []);
+      const next = JSON.stringify(columns);
+      if (prev !== next) {
         merged[key] = columns;
         changed = true;
       }

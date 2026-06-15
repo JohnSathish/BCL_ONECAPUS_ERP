@@ -49,6 +49,7 @@ import {
 import { StudentMajorMinorTrackService } from './services/student-major-minor-track.service';
 import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
+import { FeeEnforcementService } from '../fees/services/fee-enforcement.service';
 import {
   assignmentSourceForPool,
   MAPPING_SOURCE,
@@ -70,6 +71,7 @@ export class AcademicEngineService {
     private readonly majorMinorTrack: StudentMajorMinorTrackService,
     private readonly vtcTrack: StudentVtcTrackService,
     private readonly courseEligibility: CourseEligibilityService,
+    private readonly feeEnforcement: FeeEnforcementService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -596,6 +598,16 @@ export class AcademicEngineService {
     }
     if (standing.registrationLocked) {
       throw new BadRequestException('Registration is locked for this student');
+    }
+    const feeCheck = await this.feeEnforcement.checkFeesClear(
+      tenantId,
+      studentId,
+      'REGISTRATION',
+    );
+    if (feeCheck.blocked) {
+      throw new BadRequestException(
+        `Fee dues outstanding (₹${feeCheck.outstandingAmount}). ${feeCheck.reasons.join('; ')}`,
+      );
     }
     if (standing.currentSemesterSequence !== dto.semesterSequence) {
       throw new BadRequestException(

@@ -21,6 +21,7 @@ import { TimetableSlotRuleService } from './timetable-slot-rule.service';
 import { TimetableStreamMasterService } from './timetable-stream-master.service';
 import { StudentAttendanceService } from '../student-attendance/student-attendance.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
+import { CacheService } from '../../shared/cache/cache.service';
 
 type PlanFilters = {
   shiftId?: string;
@@ -98,6 +99,7 @@ export class TimetableEngineService {
     private readonly routineExcel: TimetableRoutineExcelService,
     private readonly attendance: StudentAttendanceService,
     private readonly communication: CommunicationTriggerService,
+    private readonly cache: CacheService,
   ) {}
 
   listPlans(user: JwtUser, filters: PlanFilters = {}) {
@@ -944,6 +946,24 @@ export class TimetableEngineService {
   ) {
     const student = await this.prisma.student.findFirst({
       where: { tenantId: user.tid, userId: user.sub, deletedAt: null },
+      select: { id: true, primaryShiftId: true },
+    });
+    if (!student) return { entries: [] };
+
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const cacheKey = `timetable:student:${student.id}:week:${dateKey}`;
+    return this.cache.wrap(cacheKey, 3600, () =>
+      this.computeStudentWeek(user, student, filters),
+    );
+  }
+
+  private async computeStudentWeek(
+    user: JwtUser,
+    student: { id: string; primaryShiftId: string | null },
+    filters?: { shiftId?: string; streamId?: string },
+  ) {
+    const fullStudent = await this.prisma.student.findFirst({
+      where: { id: student.id, tenantId: user.tid },
       include: {
         semesterRegistrations: {
           include: { lines: true },
@@ -954,13 +974,14 @@ export class TimetableEngineService {
     } as any);
     const plan = await this.latestPublishedPlan(user.tid, {
       shiftId:
-        filters?.shiftId ?? (student as any)?.primaryShiftId ?? undefined,
-      streamId: filters?.streamId ?? (student as any)?.streamId ?? undefined,
+        filters?.shiftId ?? (fullStudent as any)?.primaryShiftId ?? undefined,
+      streamId:
+        filters?.streamId ?? (fullStudent as any)?.streamId ?? undefined,
     });
     if (!plan) return { entries: [] };
 
     const lines: { offeringId?: string; offeringSectionId?: string | null }[] =
-      (student as any)?.semesterRegistrations?.[0]?.lines ?? [];
+      (fullStudent as any)?.semesterRegistrations?.[0]?.lines ?? [];
     const offeringIds = [
       ...new Set(lines.map((line) => line.offeringId).filter(Boolean)),
     ] as string[];

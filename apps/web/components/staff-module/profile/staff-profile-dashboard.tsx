@@ -3,22 +3,22 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
 import { ErpWorkspace, ErpWorkspaceGrid } from '@/components/erp/erp-workspace-shell';
 import {
   StaffBasicSection,
-  StaffDocumentsSection,
   StaffEmploymentSection,
   StaffSalarySection,
   StaffSystemSection,
 } from '@/components/staff-module/profile/staff-profile-sections';
+import { StaffDocumentsSection } from '@/components/staff-module/profile/staff-documents-section';
 import { AdminStaffIdCardPanel } from '@/components/id-cards/admin-staff-id-card-panel';
 import { StaffAccommodationSection } from '@/components/staff-module/profile/staff-accommodation-section';
 import { StaffAwardsTab } from '@/components/staff-module/profile/staff-awards-tab';
 import { StaffPublicationsTab } from '@/components/staff-module/profile/staff-publications-tab';
 import { StaffSubjectsTab } from '@/components/staff-module/profile/staff-subjects-tab';
 import { StaffAttendanceProfileCard } from '@/components/staff-module/attendance/staff-attendance-profile-card';
+import { StaffSpecialAssignmentSection } from '@/components/staff-module/profile/staff-special-assignment-section';
 import { roleChipLabel } from '@/components/staff-module/employment/employment-utils';
 import {
   staffTypeLabel,
@@ -27,7 +27,6 @@ import {
 import { SectionCard } from '@/components/student-profile/student-profile-shell';
 import { buttonVariants } from '@/components/ui/button';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
-import { fetchStaffDocumentCompliance } from '@/services/staff';
 import type { StaffProfile, StaffProfileTabKey } from '@/types/staff';
 import { STAFF_PROFILE_TABS } from '@/types/staff';
 import { cn } from '@/utils/cn';
@@ -95,7 +94,9 @@ function ProfileTabPanel({
               </div>
               <div>
                 <dt className="text-muted-foreground">Shift</dt>
-                <dd className="font-medium">{profile.shift ?? '—'}</dd>
+                <dd className="font-medium">
+                  {profile.teachingShiftLabel ?? profile.shift ?? 'Day Shift'}
+                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Joining</dt>
@@ -169,7 +170,7 @@ function ProfileTabPanel({
     case 'attendance':
       return <StaffAttendanceProfileCard profile={profile} />;
     case 'documents':
-      return <StaffDocumentsSection profile={profile} canEdit={canEdit} onRefresh={onRefresh} />;
+      return <StaffDocumentsSection staffId={profile.id} canEdit={canEdit} onRefresh={onRefresh} />;
     case 'id-card':
       return <AdminStaffIdCardPanel profile={profile} />;
     case 'communication':
@@ -192,6 +193,8 @@ function ProfileTabPanel({
           description="Leave balances and applications will appear here once the leave module is connected."
         />
       );
+    case 'special-assignment':
+      return <StaffSpecialAssignmentSection profile={profile} canEdit={canEdit} />;
     case 'audit':
       return <StaffSystemSection profile={profile} />;
     case 'settings':
@@ -210,11 +213,6 @@ function ProfileTabPanel({
 
 function ProfileSummarySidebar({ profile }: { profile: StaffProfile }) {
   const photoSrc = resolveUploadAssetUrl(profile.photoUrl ?? undefined);
-  const complianceQ = useQuery({
-    queryKey: ['staff', profile.id, 'documents', 'compliance'],
-    queryFn: () => fetchStaffDocumentCompliance(profile.id),
-  });
-  const score = complianceQ.data?.complianceScore;
 
   return (
     <aside className="glass-card space-y-2.5 rounded-xl border border-border/50 p-3 shadow-sm">
@@ -280,23 +278,6 @@ function ProfileSummarySidebar({ profile }: { profile: StaffProfile }) {
             {profile.portalActive ? 'Active' : profile.portalPending ? 'Pending' : 'None'}
           </dd>
         </div>
-        {score != null && (
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Document Compliance</dt>
-            <dd
-              className={cn(
-                'mt-0.5 inline-flex rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums',
-                score >= 80
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : score >= 50
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-red-200 bg-red-50 text-red-700',
-              )}
-            >
-              {score}%
-            </dd>
-          </div>
-        )}
       </dl>
     </aside>
   );

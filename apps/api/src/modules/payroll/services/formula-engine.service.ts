@@ -27,6 +27,13 @@ export function applyComponentOverride(
   if (override.disabled) {
     return { op: 'FIXED', value: 0, round: 'NEAREST_RUPEE' };
   }
+  if (override.value != null) {
+    return {
+      op: 'FIXED',
+      value: override.value,
+      round: node.round ?? 'NEAREST_RUPEE',
+    };
+  }
   const op = node.op?.toUpperCase();
   if (op === 'PERCENT_OF' && override.rate != null) {
     return { ...node, rate: override.rate };
