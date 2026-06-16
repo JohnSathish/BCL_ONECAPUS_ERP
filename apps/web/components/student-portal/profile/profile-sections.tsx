@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   submitStudentProfileChangeRequest,
+  updateStudentPortalAbcId,
   uploadStudentPortalDocument,
 } from '@/services/student-portal';
 import type { StudentPortalProfile360 } from '@/types/student-portal-profile';
@@ -221,6 +222,55 @@ function ParentEditForm({
   );
 }
 
+function AbcIdEditForm({
+  profile,
+  onSuccess,
+}: {
+  profile: StudentPortalProfile360;
+  onSuccess: () => void;
+}) {
+  const [abcId, setAbcId] = useState(profile.personal.abcId ?? '');
+  const mutation = useMutation({
+    mutationFn: () => updateStudentPortalAbcId(abcId.trim()),
+    onSuccess,
+  });
+
+  if (!profile.personal.abcIdEditable) return null;
+
+  return (
+    <form
+      className="mt-4 space-y-3 border-t border-border/40 pt-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        mutation.mutate();
+      }}
+    >
+      <p className="text-xs text-muted-foreground">
+        Enter or update your Academic Bank of Credits (ABC) ID.
+      </p>
+      <div>
+        <Label htmlFor="abcId">ABC ID</Label>
+        <Input
+          id="abcId"
+          value={abcId}
+          maxLength={20}
+          placeholder="Enter ABC ID"
+          onChange={(e) => setAbcId(e.target.value.trim().slice(0, 20))}
+        />
+      </div>
+      <Button type="submit" size="sm" disabled={mutation.isPending || !abcId.trim()}>
+        Save ABC ID
+      </Button>
+      {mutation.isSuccess ? (
+        <p className="text-xs text-emerald-600">{mutation.data.message}</p>
+      ) : null}
+      {mutation.isError ? (
+        <p className="text-xs text-destructive">Could not save ABC ID. Try again.</p>
+      ) : null}
+    </form>
+  );
+}
+
 const UPLOAD_TYPES = [
   { key: 'AADHAAR', label: 'Aadhaar' },
   { key: 'TRANSFER_CERTIFICATE', label: 'Transfer Certificate' },
@@ -228,12 +278,22 @@ const UPLOAD_TYPES = [
   { key: 'SIGNATURE', label: 'Signature' },
 ];
 
-export function ProfilePersonalSection({ profile }: { profile: StudentPortalProfile360 }) {
+export function ProfilePersonalSection({
+  profile,
+  onRefresh,
+}: {
+  profile: StudentPortalProfile360;
+  onRefresh?: () => void;
+}) {
   const body = (
     <>
       <dl className="space-y-1">
         <InfoRow label="Registration Number" value={profile.personal.registrationNumber} />
         <InfoRow label="Roll Number" value={profile.personal.rollNumber} />
+        <InfoRow
+          label="ABC ID"
+          value={profile.personal.abcId?.trim() ? profile.personal.abcId : 'ABC ID Not Submitted'}
+        />
         <InfoRow label="Gender" value={profile.personal.gender} />
         <InfoRow
           label="Date of Birth"
@@ -249,6 +309,7 @@ export function ProfilePersonalSection({ profile }: { profile: StudentPortalProf
         <InfoRow label="Religion" value={profile.personal.religion} />
         <InfoRow label="Nationality" value={profile.personal.nationality} />
       </dl>
+      {onRefresh ? <AbcIdEditForm profile={profile} onSuccess={onRefresh} /> : null}
       <p className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground">
         <Lock className="h-3 w-3" /> Name and identity fields are institution-managed.
       </p>

@@ -59,6 +59,7 @@ export async function fetchStudents(params?: {
   noPhoto?: string;
   noMobile?: string;
   recentlyAdded?: string;
+  abcStatus?: string;
 }): Promise<PaginatedStudents> {
   const { data } = await api.get('/v1/students', { params });
   return data;
@@ -598,6 +599,34 @@ export async function updateStudent(
 export async function deleteStudent(id: string) {
   const { data } = await api.delete(`/v1/students/${id}`);
   return data;
+}
+
+export type AbcCoverageStats = {
+  totalStudents: number;
+  withAbcId: number;
+  missingAbcId: number;
+  coveragePct: number;
+};
+
+export async function fetchAbcCoverage(): Promise<AbcCoverageStats> {
+  const { data } = await api.get('/v1/students/abc/coverage');
+  return data;
+}
+
+export async function downloadAbcUploadTemplate() {
+  const { data } = await api.get('/v1/students/abc/upload-template', {
+    responseType: 'blob',
+  });
+  downloadBlob(data as Blob, 'ABC_ID_Upload_Template.xlsx');
+}
+
+export async function bulkUploadAbcIds(rows: Array<{ rollNumber: string; abcId: string }>) {
+  const { data } = await api.post('/v1/students/abc/bulk-upload', { rows });
+  return data as {
+    updated: number;
+    total: number;
+    errors: Array<{ rollNumber: string; message: string }>;
+  };
 }
 
 export type { StudentDirectoryRow };

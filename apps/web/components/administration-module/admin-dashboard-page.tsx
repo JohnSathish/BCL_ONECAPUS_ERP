@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   Database,
   Eraser,
+  HardDrive,
   Hash,
   KeyRound,
   LayoutDashboard,
@@ -81,6 +82,12 @@ const MODULES = [
     label: 'Import / Export',
     icon: ArrowLeftRight,
     desc: 'Bulk data center',
+  },
+  {
+    href: '/admin/administration/backups',
+    label: 'Backup & DR Center',
+    icon: HardDrive,
+    desc: 'Automated backups, cloud sync & disaster recovery',
   },
 ];
 

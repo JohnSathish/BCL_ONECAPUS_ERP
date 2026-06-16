@@ -51,7 +51,7 @@ export class ListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(250)
   limit?: number;
 
   @IsOptional()
@@ -202,6 +202,10 @@ export class CreateMemberDto {
   joiningDate?: string;
 
   @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
   @IsBoolean()
   isExternal?: boolean;
 }
@@ -240,6 +244,10 @@ export class UpdateMemberDto {
   joiningDate?: string;
 
   @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
   @IsBoolean()
   isExternal?: boolean;
 }
@@ -253,6 +261,24 @@ export class BulkAssignMembersDto {
   @ValidateNested({ each: true })
   @Type(() => CreateMemberDto)
   members!: Omit<CreateMemberDto, 'committeeId'>[];
+}
+
+export class ReplaceMemberDto {
+  @IsUUID()
+  staffProfileId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsIn([...GOVERNANCE_MEMBER_ROLES])
+  role!: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDateForPrevious?: string;
 }
 
 export class AgendaItemDto {

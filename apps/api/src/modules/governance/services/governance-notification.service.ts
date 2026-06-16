@@ -125,6 +125,101 @@ export class GovernanceNotificationService {
     return { notified: 1 };
   }
 
+  async notifyMemberAssigned(
+    tenantId: string,
+    input: { userId: string; committeeName: string; role: string },
+  ) {
+    const cfg = await this.settings.get(tenantId);
+    const roleLabel = input.role.replace(/_/g, ' ').toLowerCase();
+    const body = `You have been assigned to ${input.committeeName} as ${roleLabel}.`;
+    if (cfg.notifyInApp) {
+      await this.notifications.createInApp({
+        tenantId,
+        userId: input.userId,
+        type: 'GOVERNANCE_MEMBER',
+        title: 'Committee membership assigned',
+        body,
+        link: '/staff/governance',
+        metadata: { committeeName: input.committeeName, role: input.role },
+      });
+    }
+    const user = await this.prisma.user.findFirst({
+      where: { id: input.userId, tenantId },
+    });
+    if (cfg.notifyEmail && user?.email) {
+      await this.email.send({
+        to: user.email,
+        subject: `[Governance] Committee assignment — ${input.committeeName}`,
+        text: body,
+      });
+    }
+    return { notified: 1 };
+  }
+
+  async notifyMemberEnded(
+    tenantId: string,
+    input: { userId: string; committeeName: string },
+  ) {
+    const cfg = await this.settings.get(tenantId);
+    const body = `Your committee membership for ${input.committeeName} has been ended.`;
+    if (cfg.notifyInApp) {
+      await this.notifications.createInApp({
+        tenantId,
+        userId: input.userId,
+        type: 'GOVERNANCE_MEMBER',
+        title: 'Committee membership ended',
+        body,
+        link: '/staff/governance',
+        metadata: { committeeName: input.committeeName },
+      });
+    }
+    return { notified: 1 };
+  }
+
+  async notifyReplacementRequired(
+    tenantId: string,
+    input: { staffProfileId: string; committeeNames: string[] },
+  ) {
+    const cfg = await this.settings.get(tenantId);
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { id: input.staffProfileId, tenantId },
+      select: { fullName: true },
+    });
+    const list = input.committeeNames.join(', ');
+    const body = `${staff?.fullName ?? 'A staff member'} was relieved but is still listed on: ${list}. Please assign a replacement.`;
+
+    const admins = await this.prisma.userRole.findMany({
+      where: {
+        deletedAt: null,
+        role: {
+          tenantId,
+          slug: { in: ['college-admin', 'super-admin', 'institution-admin'] },
+        },
+      },
+      include: { user: { select: { id: true, email: true } } },
+      take: 20,
+    });
+
+    for (const row of admins) {
+      if (!row.user) continue;
+      if (cfg.notifyInApp) {
+        await this.notifications.createInApp({
+          tenantId,
+          userId: row.user.id,
+          type: 'GOVERNANCE_REPLACEMENT',
+          title: 'Committee replacement required',
+          body,
+          link: '/admin/governance/members',
+          metadata: {
+            staffProfileId: input.staffProfileId,
+            committees: input.committeeNames,
+          },
+        });
+      }
+    }
+    return { notified: admins.length };
+  }
+
   private async resolveNoticeRecipients(
     tenantId: string,
     audience: string,

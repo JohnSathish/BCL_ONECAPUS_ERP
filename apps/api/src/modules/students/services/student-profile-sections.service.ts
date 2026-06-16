@@ -9,6 +9,7 @@ import { MajorMinorEligibilityService } from '../../academic-engine/services/maj
 import { OrganizationService } from '../../organization/organization.service';
 import { StudentSemesterResolverService } from './student-semester-resolver.service';
 import { StudentDirectoryEnrichmentService } from './student-directory-enrichment.service';
+import { StudentAbcService } from './student-abc.service';
 import {
   DEFAULT_PROFILE_SECTIONS,
   flattenDefaultFieldConfigs,
@@ -51,6 +52,9 @@ const extendedProfileInclude = {
     include: { subjectMarks: { orderBy: { sortOrder: 'asc' as const } } },
   },
   cuetDetail: true,
+  abcAccount: {
+    select: { abcId: true, abcVerified: true, verificationStatus: true },
+  },
   createdBy: { select: { id: true, email: true } },
   lastModifiedBy: { select: { id: true, email: true } },
   semesterRegistrations: {
@@ -68,6 +72,7 @@ export class StudentProfileSectionsService {
     private readonly eligibility: MajorMinorEligibilityService,
     private readonly organization: OrganizationService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
+    private readonly abcService: StudentAbcService,
   ) {}
 
   async getSection(tenantId: string, studentId: string, sectionKey: string) {
@@ -326,6 +331,7 @@ export class StudentProfileSectionsService {
           admissionBatchId: student.academicProfile?.admissionBatchId,
           currentSemester: student.academicStanding?.currentSemesterSequence,
           rfidNumber: student.rfidNumber,
+          abcId: student.abcAccount?.abcId ?? null,
         };
       case 'academic':
         return {
@@ -625,6 +631,10 @@ export class StudentProfileSectionsService {
         }
       }
     });
+
+    if (dto.abcId !== undefined) {
+      await this.abcService.upsertForStudent(tenantId, studentId, dto.abcId);
+    }
   }
 
   private normalizeOptionalUuid(value?: string | null) {

@@ -80,6 +80,7 @@ const emptyFilters: DirectoryFilters = {
   uiRecentlyAdded: '',
   uiNoPhoto: '',
   uiNoMobile: '',
+  uiAbcStatus: '',
 };
 
 const DEFAULT_LIMIT = 50;
@@ -112,6 +113,7 @@ function filtersToParams(filters: DirectoryFilters, page: number, limit: number)
     noPhoto: filters.uiNoPhoto === 'true' ? 'true' : undefined,
     noMobile: filters.uiNoMobile === 'true' ? 'true' : undefined,
     recentlyAdded: filters.uiRecentlyAdded === 'true' ? 'true' : undefined,
+    abcStatus: filters.uiAbcStatus || undefined,
   };
 }
 
@@ -135,6 +137,7 @@ function clearAdvancedFilters(filters: DirectoryFilters): DirectoryFilters {
     uiRecentlyAdded: '',
     uiNoPhoto: '',
     uiNoMobile: '',
+    uiAbcStatus: '',
   };
 }
 

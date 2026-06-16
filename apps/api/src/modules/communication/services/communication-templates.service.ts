@@ -144,6 +144,43 @@ const DEFAULT_TEMPLATES: CommunicationTemplateDto[] = [
     channels: ['EMAIL', 'IN_APP'],
   },
   {
+    code: 'BACKUP_SUCCESS',
+    name: 'Backup Completed Successfully',
+    category: 'GENERAL',
+    subject: 'Backup completed — {{institution_name}}',
+    bodyHtml:
+      '<p>Backup <strong>{{backup_type}}</strong> completed at {{completed_at}}.</p><p>Size: {{size_bytes}} · Run: {{run_id}}</p>',
+    bodyText:
+      'Backup {{backup_type}} completed at {{completed_at}}. Size: {{size_bytes}}. Run: {{run_id}}',
+    variables: [
+      'institution_name',
+      'backup_type',
+      'completed_at',
+      'size_bytes',
+      'run_id',
+    ],
+    channels: ['EMAIL', 'IN_APP'],
+  },
+  {
+    code: 'BACKUP_FAILED',
+    name: 'Backup Failed',
+    category: 'GENERAL',
+    subject: 'Backup failed — {{institution_name}}',
+    bodyHtml:
+      '<p>Backup <strong>{{backup_type}}</strong> failed at {{completed_at}}.</p><p>{{error_message}}</p>',
+    bodyText:
+      'Backup {{backup_type}} failed at {{completed_at}}. {{error_message}}',
+    variables: [
+      'institution_name',
+      'backup_type',
+      'completed_at',
+      'size_bytes',
+      'run_id',
+      'error_message',
+    ],
+    channels: ['EMAIL', 'IN_APP'],
+  },
+  {
     code: 'FEE_RECEIPT',
     name: 'Fee Payment Receipt',
     category: 'FEES',

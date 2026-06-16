@@ -548,6 +548,9 @@ export function TimetableMatrixGrid({
 export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
   const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
   const overlay = entry.replacementOverlay;
+  const group = entry.teachingSubjectGroup;
+  const primaryCode = group?.code ?? entry.course?.code ?? entry.slotType;
+  const primaryTitle = group?.title ?? entry.course?.title ?? 'Manual / library / tutorial slot';
   return (
     <div
       className={cn(
@@ -557,11 +560,11 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold">{entry.course?.code ?? entry.slotType}</span>
+        <span className="font-semibold">{primaryTitle}</span>
         <span className="rounded-full bg-background/70 px-2 py-0.5">{category}</span>
       </div>
-      <p className="mt-1 line-clamp-2 text-[11px] opacity-90">
-        {entry.course?.title ?? 'Manual / library / tutorial slot'}
+      <p className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide opacity-80">
+        {primaryCode}
       </p>
       <p className="mt-2 text-[11px]">
         Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'}

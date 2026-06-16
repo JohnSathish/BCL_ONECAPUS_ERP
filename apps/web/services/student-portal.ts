@@ -61,6 +61,11 @@ export async function submitStudentProfileChangeRequest(payload: {
   return data as { id: string; status: string; message: string };
 }
 
+export async function updateStudentPortalAbcId(abcId: string) {
+  const { data } = await api.patch('/v1/students/me/profile/abc-id', { abcId });
+  return data as { abcId: string | null; message: string };
+}
+
 export async function submitStudentIdCardPrintRequest(payload: {
   requestType: 'NEW' | 'REPRINT';
   note?: string;

@@ -5,6 +5,7 @@ import { LicensingModule } from '../licensing/licensing.module';
 import { AcademicEngineModule } from '../academic-engine/academic-engine.module';
 import { AcademicLifecycleModule } from '../academic-lifecycle/academic-lifecycle.module';
 import { CommunicationModule } from '../communication/communication.module';
+import { GovernanceModule } from '../governance/governance.module';
 import { LmsModule } from '../lms/lms.module';
 import { AdministrationModule } from '../administration/administration.module';
 import { ShiftsModule } from '../shifts/shifts.module';
@@ -39,6 +40,7 @@ import { StaffPortalService } from './services/staff-portal.service';
     forwardRef(() => AcademicEngineModule),
     AcademicLifecycleModule,
     CommunicationModule,
+    forwardRef(() => GovernanceModule),
     LmsModule,
     ImportModule,
     QueueModule,

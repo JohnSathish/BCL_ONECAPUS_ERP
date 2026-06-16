@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -46,10 +48,29 @@ export class NaacIqacPortalController {
     return this.dashboard.dashboard(user.tid);
   }
 
+  @Get('staff-context')
+  @RequireAnyPermission(...NIQ_PORTAL)
+  async portalStaffContext(@CurrentUser() user: JwtUser) {
+    const staff = await this.achievements.resolveStaffProfile(user);
+    return { staff };
+  }
+
+  @Get('department')
+  @RequireAnyPermission(...NIQ_PORTAL)
+  portalDepartment(@CurrentUser() user: JwtUser) {
+    return this.department.dashboard(user);
+  }
+
   @Get('achievements')
   @RequireAnyPermission(...NIQ_PORTAL)
-  myAchievements(@CurrentUser() user: JwtUser, @Query() query: ListQueryDto) {
-    return this.achievements.listFaculty(user.tid, query.page, query.limit);
+  async myAchievements(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ListQueryDto,
+  ) {
+    const staff = await this.achievements.resolveStaffProfile(user);
+    return this.achievements.listFaculty(user.tid, query.page, query.limit, {
+      staffProfileId: staff?.id,
+    });
   }
 
   @Post('achievements')
@@ -71,5 +92,11 @@ export class NaacIqacPortalController {
     @Body() dto: CreateDepartmentSubmissionDto,
   ) {
     return this.department.createSubmission(user, dto);
+  }
+
+  @Post('submissions/:id/submit')
+  @RequireAnyPermission(...NIQ_PORTAL)
+  submitDepartmentDraft(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.department.submitDraft(user, id);
   }
 }

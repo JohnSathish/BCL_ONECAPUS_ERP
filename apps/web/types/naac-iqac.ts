@@ -24,7 +24,10 @@ export type NaacEvidenceTag = {
   metricCode?: string;
   academicYear: string;
   departmentId?: string;
+  committeeId?: string;
+  programmeId?: string;
   activityTitle?: string;
+  eventTitle?: string;
   evidenceNotes?: string;
   fileName?: string;
   storageKey?: string;

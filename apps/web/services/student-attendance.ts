@@ -12,6 +12,13 @@ export type StudentAttendanceSession = {
   offeringSectionId?: string | null;
   courseId?: string | null;
   course?: { code?: string; title?: string; courseType?: string } | null;
+  subjectGroup?: {
+    id?: string;
+    code?: string;
+    title?: string;
+    fyugpCategory?: string;
+  } | null;
+  linkedPapers?: Array<{ id: string; code: string; title: string }>;
   section?: { sectionCode?: string | null } | null;
   faculty?: { fullName?: string; shortCode?: string | null; employeeCode?: string | null } | null;
   classroom?: { code?: string; name?: string; capacity?: number; status?: string } | null;

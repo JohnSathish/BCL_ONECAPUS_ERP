@@ -847,7 +847,12 @@ export class TimetableGeneratorService {
 
   private isInstitutionalDayShift(shift: { code?: string; name?: string }) {
     const text = `${shift.code ?? ''} ${shift.name ?? ''}`.toLowerCase();
-    return !text.trim() || text.includes('day');
+    return (
+      !text.trim() ||
+      text.includes('day') ||
+      text.includes('shift ii') ||
+      text.includes('shift_ii')
+    );
   }
 
   private hasInstitutionalDayShiftShape(slots: Slot[]) {

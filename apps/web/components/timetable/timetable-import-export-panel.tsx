@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileDown, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,8 @@ import {
   commitRoutineUpload,
   downloadRoutineTemplate,
   exportTimetableRoutine,
+  fetchDraftRoomEntries,
+  finalizeTimetableRooms,
   validateRoutineUpload,
 } from '@/services/timetable';
 
@@ -34,6 +36,20 @@ export function TimetableImportExportPanel({ planId, onCommitted }: Props) {
     onSuccess: () => {
       setFile(null);
       setPreview(null);
+      onCommitted?.();
+    },
+  });
+
+  const draftRoomsQ = useQuery({
+    queryKey: ['timetable', 'draft-rooms', planId],
+    queryFn: () => fetchDraftRoomEntries(planId),
+    enabled: Boolean(planId),
+  });
+
+  const finalizeRoomsMut = useMutation({
+    mutationFn: () => finalizeTimetableRooms(planId),
+    onSuccess: () => {
+      void draftRoomsQ.refetch();
       onCommitted?.();
     },
   });
@@ -136,6 +152,7 @@ export function TimetableImportExportPanel({ planId, onCommitted }: Props) {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="px-2 py-2 text-left">Row</th>
+                    <th className="px-2 py-2 text-left">Group</th>
                     <th className="px-2 py-2 text-left">Subject</th>
                     <th className="px-2 py-2 text-left">Issues</th>
                   </tr>
@@ -144,6 +161,7 @@ export function TimetableImportExportPanel({ planId, onCommitted }: Props) {
                   {preview.rows.slice(0, 50).map((row, index) => (
                     <tr key={index} className="border-t border-border">
                       <td className="px-2 py-2">{String(row.rowNo ?? index + 2)}</td>
+                      <td className="px-2 py-2">{String(row['Subject Group Code'] ?? '')}</td>
                       <td className="px-2 py-2">{String(row['Subject Code'] ?? '')}</td>
                       <td className="px-2 py-2 text-muted-foreground">
                         {Array.isArray(row.issues)
@@ -159,6 +177,22 @@ export function TimetableImportExportPanel({ planId, onCommitted }: Props) {
             </div>
           </div>
         ) : null}
+        <div className="rounded-xl border border-border/70 p-3">
+          <p className="text-sm font-medium">Draft → Final Rooms</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {(draftRoomsQ.data ?? []).length} slot(s) still missing a finalized room assignment.
+            Import faculty/subject rows first, assign rooms in the grid or Excel, then finalize.
+          </p>
+          <Button
+            size="sm"
+            className="mt-2"
+            variant="outline"
+            disabled={!planId || finalizeRoomsMut.isPending}
+            onClick={() => finalizeRoomsMut.mutate()}
+          >
+            Mark All Assigned Rooms Final
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

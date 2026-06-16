@@ -49,6 +49,7 @@ import { GovernanceTaskService } from './services/governance-task.service';
   ],
   exports: [
     GovernanceCommitteeService,
+    GovernanceMemberService,
     GovernanceMeetingService,
     GovernanceNoticeService,
     GovernanceSettingsService,

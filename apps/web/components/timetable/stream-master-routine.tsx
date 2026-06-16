@@ -89,11 +89,13 @@ export function StreamMasterRoutineView({ routine }: { routine?: StreamMasterRou
                                   )}
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-semibold">{entry.courseCode}</span>
+                                    <span className="font-semibold">
+                                      {entry.courseTitle ?? entry.courseCode}
+                                    </span>
                                     <span>{entry.facultyInitial}</span>
                                   </div>
-                                  <div className="mt-1 line-clamp-2 text-[11px]">
-                                    {entry.courseTitle}
+                                  <div className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                    {entry.courseCode}
                                   </div>
                                   <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
                                     {entry.category ? <span>{entry.category}</span> : null}

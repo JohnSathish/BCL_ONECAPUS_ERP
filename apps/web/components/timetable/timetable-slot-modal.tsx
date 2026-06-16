@@ -8,6 +8,7 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
 import { fetchAllStaff } from '@/services/staff';
+import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
 import type { ManualEntryPayload, TimetableEntry } from '@/services/timetable';
 
 const CATEGORIES = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'LAB'];
@@ -54,6 +55,8 @@ export function TimetableSlotModal({
   const [periodNo, setPeriodNo] = useState<number | ''>('');
   const [semesterSequence, setSemesterSequence] = useState<number | ''>('');
   const [sectionCode, setSectionCode] = useState('');
+  const [useSubjectGroup, setUseSubjectGroup] = useState(true);
+  const [teachingSubjectGroupId, setTeachingSubjectGroupId] = useState('');
   const [courseId, setCourseId] = useState('');
   const [staffProfileId, setStaffProfileId] = useState('');
   const [classroomId, setClassroomId] = useState('');
@@ -77,6 +80,15 @@ export function TimetableSlotModal({
     queryFn: () => fetchInfrastructureRooms({ status: 'ACTIVE' }),
     enabled: authReady && open,
   });
+  const subjectGroupsQ = useQuery({
+    queryKey: ['timetable', 'subject-groups', semesterSequence, fyugpCategory],
+    queryFn: () =>
+      fetchTeachingSubjectGroups({
+        semesterNo: Number(semesterSequence),
+        fyugpCategory,
+      }),
+    enabled: authReady && open && !!semesterSequence,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +98,8 @@ export function TimetableSlotModal({
       entry?.semesterSequence ?? context?.defaultSemester ?? context?.allowedSemesters[0] ?? '',
     );
     setSectionCode(entry?.sectionCode ?? '');
+    setTeachingSubjectGroupId(entry?.teachingSubjectGroupId ?? '');
+    setUseSubjectGroup(Boolean(entry?.teachingSubjectGroupId ?? true));
     setCourseId(entry?.courseId ?? '');
     setStaffProfileId(entry?.staffProfileId ?? '');
     setClassroomId(entry?.classroomId ?? '');
@@ -93,11 +107,20 @@ export function TimetableSlotModal({
     setCoFacultyIds([]);
   }, [open, entry, context]);
 
+  useEffect(() => {
+    if (!teachingSubjectGroupId) return;
+    const group = (subjectGroupsQ.data ?? []).find((g) => g.id === teachingSubjectGroupId);
+    if (group?.primaryStaffProfileId && !staffProfileId) {
+      setStaffProfileId(group.primaryStaffProfileId);
+    }
+  }, [teachingSubjectGroupId, subjectGroupsQ.data, staffProfileId]);
+
   if (!open || !context) return null;
 
   const courses = coursesQ.data?.data ?? [];
   const staff = staffQ.data?.data ?? [];
   const rooms = roomsQ.data ?? [];
+  const subjectGroups = subjectGroupsQ.data ?? [];
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -111,7 +134,9 @@ export function TimetableSlotModal({
       slotTemplateId: context.slotTemplateId,
       semesterSequence: Number(semesterSequence),
       sectionCode: sectionCode || undefined,
-      courseId: courseId || undefined,
+      teachingSubjectGroupId:
+        useSubjectGroup && teachingSubjectGroupId ? teachingSubjectGroupId : undefined,
+      courseId: !useSubjectGroup && courseId ? courseId : undefined,
       staffProfileId: staffProfileId || undefined,
       classroomId: classroomId || undefined,
       fyugpCategory,
@@ -182,31 +207,90 @@ export function TimetableSlotModal({
             />
           </label>
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Subject
+            FYUGP Category
             <select
               className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              disabled={coursesQ.isLoading}
+              value={fyugpCategory}
+              onChange={(e) => {
+                setFyugpCategory(e.target.value);
+                setTeachingSubjectGroupId('');
+              }}
             >
-              <option value="">
-                {coursesQ.isLoading
-                  ? 'Loading courses…'
-                  : coursesQ.isError
-                    ? 'Failed to load courses'
-                    : courses.length
-                      ? 'Select course'
-                      : 'No courses found'}
-              </option>
-              {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.code} · {course.title}
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
                 </option>
               ))}
             </select>
           </label>
+          <div className="flex gap-2 text-xs">
+            <button
+              type="button"
+              className={`rounded-md border px-3 py-1 ${useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
+              onClick={() => setUseSubjectGroup(true)}
+            >
+              Subject group
+            </button>
+            <button
+              type="button"
+              className={`rounded-md border px-3 py-1 ${!useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
+              onClick={() => setUseSubjectGroup(false)}
+            >
+              Single paper
+            </button>
+          </div>
+          {useSubjectGroup ? (
+            <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+              Teaching subject group
+              <select
+                className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+                value={teachingSubjectGroupId}
+                onChange={(e) => setTeachingSubjectGroupId(e.target.value)}
+                disabled={subjectGroupsQ.isLoading}
+              >
+                <option value="">
+                  {subjectGroupsQ.isLoading
+                    ? 'Loading groups…'
+                    : subjectGroups.length
+                      ? 'Select group (e.g. Major Sociology)'
+                      : 'No groups — create in Subject Groups page'}
+                </option>
+                {subjectGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.code} · {group.title}
+                    {(group.papers?.length ?? 0) > 0 ? ` (${group.papers?.length} papers)` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+              University paper
+              <select
+                className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                disabled={coursesQ.isLoading}
+              >
+                <option value="">
+                  {coursesQ.isLoading
+                    ? 'Loading courses…'
+                    : coursesQ.isError
+                      ? 'Failed to load courses'
+                      : courses.length
+                        ? 'Select course'
+                        : 'No courses found'}
+                </option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.code} · {course.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Primary Faculty
+            Primary Faculty (short code on print)
             <select
               className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
               value={staffProfileId}
@@ -279,13 +363,13 @@ export function TimetableSlotModal({
             ) : null}
           </label>
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Room / Lab
+            Room / Lab (optional — TBA for draft)
             <select
               className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
               value={classroomId}
               onChange={(e) => setClassroomId(e.target.value)}
             >
-              <option value="">Select room</option>
+              <option value="">Room TBA</option>
               {(Array.isArray(rooms) ? rooms : []).map(
                 (room: { id: string; code: string; name: string }) => (
                   <option key={room.id} value={room.id}>
@@ -293,20 +377,6 @@ export function TimetableSlotModal({
                   </option>
                 ),
               )}
-            </select>
-          </label>
-          <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Category
-            <select
-              className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
-              value={fyugpCategory}
-              onChange={(e) => setFyugpCategory(e.target.value)}
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
             </select>
           </label>
           <div className="flex flex-wrap justify-end gap-2 pt-2">

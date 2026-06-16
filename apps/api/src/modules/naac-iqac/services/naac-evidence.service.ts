@@ -100,6 +100,13 @@ export class NaacEvidenceService {
       );
   }
 
+  async findBySource(tenantId: string, sourceType: string, sourceId: string) {
+    return this.db().naacEvidenceTag.findMany({
+      where: { tenantId, sourceType, sourceId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async create(user: JwtUser, dto: CreateEvidenceTagDto) {
     const valid = NAAC_CRITERIA.some((c) => c.criterion === dto.criterion);
     if (!valid) throw new BadRequestException('Invalid NAAC criterion');

@@ -14,7 +14,11 @@ import { QueueService } from './queue.service';
         },
       }),
     }),
-    BullModule.registerQueue({ name: 'notifications' }, { name: 'exports' }),
+    BullModule.registerQueue(
+      { name: 'notifications' },
+      { name: 'exports' },
+      { name: 'backups' },
+    ),
   ],
   providers: [QueueService],
   exports: [QueueService, BullModule],

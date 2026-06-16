@@ -11,6 +11,7 @@ import {
   AcademicSection,
   AddressSection,
   BasicSection,
+  AcademicIdentitySection,
   BoardExamSection,
   CategorySection,
   CuetSection,
@@ -84,6 +85,7 @@ function ProfileTabPanel({
       return (
         <div className="grid gap-3 xl:grid-cols-2">
           <BasicSection profile={profile} canEdit={canEdit} />
+          <AcademicIdentitySection profile={profile} canEdit={canEdit} />
           <CategorySection profile={profile} canEdit={canEdit} />
           <AddressSection profile={profile} canEdit={canEdit} />
           <GuardiansSection profile={profile} canEdit={canEdit} />

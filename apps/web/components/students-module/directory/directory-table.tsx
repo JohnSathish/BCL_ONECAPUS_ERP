@@ -46,7 +46,7 @@ type Props = {
 };
 
 export const ROW_HEIGHT = 44;
-const COL_COUNT = 15;
+const COL_COUNT = 16;
 
 function studentBase(id: string) {
   return `/admin/students/${id}`;
@@ -239,6 +239,9 @@ function DataRow({
         <td className="whitespace-nowrap px-1.5 py-1 align-middle">
           <span className="text-[11px] tabular-nums">{row.mobileNumber ?? '—'}</span>
         </td>
+        <td className="whitespace-nowrap px-1.5 py-1 align-middle">
+          <span className="font-mono text-[11px]">{row.abcId?.trim() ? row.abcId : '—'}</span>
+        </td>
         <td className="px-1.5 py-1 align-middle">
           <DirectoryFeeBadge row={row} />
         </td>
@@ -362,6 +365,9 @@ export function DirectoryTable({
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Mobile
+        </th>
+        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          ABC ID
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Fee

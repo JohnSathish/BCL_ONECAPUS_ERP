@@ -104,6 +104,7 @@ export function buildAdmitFullPayload(draft: AddStudentDraft): AdmitStudentFullP
     primaryShiftId: draft.primaryShiftId,
     rollNumber: draft.rollNumber || undefined,
     admissionNumber: draft.nehuRollNumber.trim() || undefined,
+    abcId: draft.abcId.trim() || undefined,
     campusId: draft.campusId || undefined,
     departmentId: draft.departmentId || undefined,
     gender: draft.gender || undefined,

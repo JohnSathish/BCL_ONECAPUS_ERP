@@ -13,6 +13,7 @@ import type {
   StudentPortalChangeSection,
 } from '../dto/student-portal-profile.dto';
 import { StudentAssetsService } from './student-assets.service';
+import { StudentAbcService } from './student-abc.service';
 import { StudentPortalService } from './student-portal.service';
 import { StudentProfileService } from './student-profile.service';
 
@@ -45,19 +46,37 @@ export class StudentPortalProfileService {
     private readonly lms: LmsDashboardService,
     private readonly examinations: ExaminationsService,
     private readonly idCards: IdCardsService,
+    private readonly abcService: StudentAbcService,
   ) {}
 
   async getMyProfile(user: JwtUser) {
     const student = await this.portal.resolveStudent(user);
-    const [profile, format, attendance, ledger, changeRequests, sessions] =
-      await Promise.all([
-        this.profiles.getFullProfile(user.tid, student.id),
-        this.displaySettings.getFormat(user.tid),
-        this.attendance.studentPortalSummary(user).catch(() => null),
-        this.fees.myLedger(user.tid, user.sub).catch(() => null),
-        this.listChangeRequests(user.tid, student.id),
-        this.listDeviceSessions(user.tid, user.sub),
-      ]);
+    const [
+      profile,
+      format,
+      attendance,
+      ledger,
+      changeRequests,
+      sessions,
+      academicSettings,
+    ] = await Promise.all([
+      this.profiles.getFullProfile(user.tid, student.id),
+      this.displaySettings.getFormat(user.tid),
+      this.attendance.studentPortalSummary(user).catch(() => null),
+      this.fees.myLedger(user.tid, user.sub).catch(() => null),
+      this.listChangeRequests(user.tid, student.id),
+      this.listDeviceSessions(user.tid, user.sub),
+      this.prisma.tenantAcademicSettings.findFirst({
+        where: { tenantId: user.tid },
+        select: { nepProfile: true },
+      }),
+    ]);
+
+    const nepProfile =
+      (academicSettings?.nepProfile as Record<string, unknown> | null) ?? {};
+    const abcEnabled = nepProfile.abcEnabled !== false;
+    const studentCanUpdateAbcId =
+      abcEnabled && nepProfile.studentCanUpdateAbcId !== false;
 
     const lookupIds = [
       profile.bloodGroupLookupId,
@@ -272,6 +291,9 @@ export class StudentPortalProfileService {
           ? (lookupMap.get(profile.religionLookupId) ?? null)
           : null,
         nationality: 'Indian',
+        abcId: profile.abcId ?? null,
+        abcIdEditable: studentCanUpdateAbcId,
+        erpStudentId: profile.id,
       },
       academic: {
         programme: profile.programme ?? null,
@@ -344,6 +366,35 @@ export class StudentPortalProfileService {
       })),
       changeRequests,
       sessions,
+    };
+  }
+
+  async updateMyAbcId(user: JwtUser, abcIdInput: string) {
+    const student = await this.portal.resolveStudent(user);
+    const settings = await this.prisma.tenantAcademicSettings.findFirst({
+      where: { tenantId: user.tid },
+      select: { nepProfile: true },
+    });
+    const nepProfile =
+      (settings?.nepProfile as Record<string, unknown> | null) ?? {};
+    const abcEnabled = nepProfile.abcEnabled !== false;
+    const studentCanUpdateAbcId =
+      abcEnabled && nepProfile.studentCanUpdateAbcId !== false;
+    if (!studentCanUpdateAbcId) {
+      throw new BadRequestException(
+        'ABC ID updates are disabled by your institution.',
+      );
+    }
+
+    const account = await this.abcService.upsertForStudent(
+      user.tid,
+      student.id,
+      abcIdInput,
+    );
+
+    return {
+      abcId: account.abcId,
+      message: 'ABC ID saved successfully.',
     };
   }
 

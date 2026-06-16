@@ -455,7 +455,265 @@ declare module 'expo-router' {
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/.next/types/app/admin/naac/page`;
+            pathname: `/../../web/components/naac-iqac-module/evidence-tag-fields`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-evidence-tag-button`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/naac-iqac/services/naac-calendar-notify.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-department-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/achievement-form-fields`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-faculty-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-student-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-aqar-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-mou-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-calendar-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-settings-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/dto/teaching-subject-group.dto`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.module`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/services/teaching-subject-groups`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/academics/teaching-subject-groups/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable-runner`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/scripts/verify-subject-group-attendance`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-timetable-subject-groups`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation-runner`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup.constants`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/dto/backup.dto`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-audit.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-crypto.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/system-maintenance.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-database.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-files.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-settings-export.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/tenant-backup-export.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-verify.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-cloud-sync.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-retention.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-restore.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-run-executor.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-notification.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-orchestrator.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-scheduler.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.controller`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.module`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/processors/backup-run.processor`;
+            params?: Router.UnknownInputParams;
+          }
+        | { pathname: `/../../worker/src/jobs/backup/shared`; params?: Router.UnknownInputParams }
+        | {
+            pathname: `/../../worker/src/jobs/backup/backup-run`;
+            params?: Router.UnknownInputParams;
+          }
+        | { pathname: `/../../web/services/backup`; params?: Router.UnknownInputParams }
+        | {
+            pathname: `/../../web/components/backup-module/backup-dashboard-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-schedule-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-restore-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-cloud-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-logs-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-disaster-recovery-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/schedule/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/manual/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/cloud/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/logs/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/disaster-recovery/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-utils`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-dialog`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-table`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/committee-members-workspace`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/staff-committee-memberships-section`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/students/services/student-abc.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/students-module/abc-bulk/abc-id-bulk-upload-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/students/abc-upload/page`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }
@@ -927,7 +1185,265 @@ declare module 'expo-router' {
             params?: Router.UnknownOutputParams;
           }
         | {
-            pathname: `/../../web/.next/types/app/admin/naac/page`;
+            pathname: `/../../web/components/naac-iqac-module/evidence-tag-fields`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-evidence-tag-button`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/naac-iqac/services/naac-calendar-notify.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-department-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/achievement-form-fields`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-faculty-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-student-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-aqar-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-mou-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-calendar-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-settings-panel`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/dto/teaching-subject-group.dto`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.module`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/services/teaching-subject-groups`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/academics/teaching-subject-groups/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable-runner`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/scripts/verify-subject-group-attendance`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-timetable-subject-groups`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation-runner`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup.constants`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/dto/backup.dto`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-audit.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-crypto.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/system-maintenance.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-database.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-files.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-settings-export.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/tenant-backup-export.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-verify.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-cloud-sync.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-retention.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-restore.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-run-executor.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-notification.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-orchestrator.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-scheduler.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.controller`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.module`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/processors/backup-run.processor`;
+            params?: Router.UnknownOutputParams;
+          }
+        | { pathname: `/../../worker/src/jobs/backup/shared`; params?: Router.UnknownOutputParams }
+        | {
+            pathname: `/../../worker/src/jobs/backup/backup-run`;
+            params?: Router.UnknownOutputParams;
+          }
+        | { pathname: `/../../web/services/backup`; params?: Router.UnknownOutputParams }
+        | {
+            pathname: `/../../web/components/backup-module/backup-dashboard-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-schedule-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-restore-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-cloud-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-logs-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-disaster-recovery-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/schedule/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/manual/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/cloud/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/logs/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/disaster-recovery/page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-utils`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-dialog`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-table`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/committee-members-workspace`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/staff-committee-memberships-section`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/students/services/student-abc.service`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/components/students-module/abc-bulk/abc-id-bulk-upload-page`;
+            params?: Router.UnknownOutputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/students/abc-upload/page`;
             params?: Router.UnknownOutputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownOutputParams }
@@ -1083,7 +1599,73 @@ declare module 'expo-router' {
         | `/../../api/scripts/verify-naac-iqac${`?${string}` | `#${string}` | ''}`
         | `/../../web/types/naac-evidence${`?${string}` | `#${string}` | ''}`
         | `/../../web/components/naac-iqac-module/evidence-tag-upload-form${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/naac/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/evidence-tag-fields${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-evidence-tag-button${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/naac-iqac/services/naac-calendar-notify.service${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-department-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/achievement-form-fields${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-faculty-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-student-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-aqar-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-mou-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-calendar-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/naac-iqac-module/naac-settings-panel${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/timetable-engine/dto/teaching-subject-group.dto${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/timetable-engine/teaching-subject-group.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/timetable-engine/teaching-subject-group.module${`?${string}` | `#${string}` | ''}`
+        | `/../../web/services/teaching-subject-groups${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/academics/teaching-subject-groups/page${`?${string}` | `#${string}` | ''}`
+        | `/../../api/prisma/seed-arts-shift-ii-timetable${`?${string}` | `#${string}` | ''}`
+        | `/../../api/prisma/seed-arts-shift-ii-timetable-runner${`?${string}` | `#${string}` | ''}`
+        | `/../../api/scripts/verify-subject-group-attendance${`?${string}` | `#${string}` | ''}`
+        | `/../../api/prisma/seed-timetable-subject-groups${`?${string}` | `#${string}` | ''}`
+        | `/../../api/prisma/seed-demo-timetable-foundation${`?${string}` | `#${string}` | ''}`
+        | `/../../api/prisma/seed-demo-timetable-foundation-runner${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/backup.constants${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/dto/backup.dto${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-audit.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-crypto.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/system-maintenance.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-database.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-files.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-settings-export.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/tenant-backup-export.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-verify.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-cloud-sync.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-retention.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-restore.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-run-executor.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-notification.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-orchestrator.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/services/backup-scheduler.service${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/backup-engine.controller${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/backup-engine.module${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/backup-engine/processors/backup-run.processor${`?${string}` | `#${string}` | ''}`
+        | `/../../worker/src/jobs/backup/shared${`?${string}` | `#${string}` | ''}`
+        | `/../../worker/src/jobs/backup/backup-run${`?${string}` | `#${string}` | ''}`
+        | `/../../web/services/backup${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-dashboard-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-schedule-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-manual-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-repository-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-restore-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-cloud-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-logs-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-disaster-recovery-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/schedule/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/manual/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/cloud/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/logs/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/administration/backups/disaster-recovery/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-utils${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-manual-dialog${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/backup-module/backup-repository-table${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/governance-module/committee-members-workspace${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/governance-module/staff-committee-memberships-section${`?${string}` | `#${string}` | ''}`
+        | `/../../api/src/modules/students/services/student-abc.service${`?${string}` | `#${string}` | ''}`
+        | `/../../web/components/students-module/abc-bulk/abc-id-bulk-upload-page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/app/admin/students/abc-upload/page${`?${string}` | `#${string}` | ''}`
         | `/_sitemap${`?${string}` | `#${string}` | ''}`
         | `${'/(auth)'}/login${`?${string}` | `#${string}` | ''}`
         | `/login${`?${string}` | `#${string}` | ''}`
@@ -1541,7 +2123,265 @@ declare module 'expo-router' {
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/.next/types/app/admin/naac/page`;
+            pathname: `/../../web/components/naac-iqac-module/evidence-tag-fields`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-evidence-tag-button`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/naac-iqac/services/naac-calendar-notify.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-department-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/achievement-form-fields`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-faculty-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-student-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-aqar-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-mou-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-calendar-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/naac-iqac-module/naac-settings-panel`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/dto/teaching-subject-group.dto`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/timetable-engine/teaching-subject-group.module`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/services/teaching-subject-groups`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/academics/teaching-subject-groups/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-arts-shift-ii-timetable-runner`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/scripts/verify-subject-group-attendance`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-timetable-subject-groups`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/prisma/seed-demo-timetable-foundation-runner`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup.constants`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/dto/backup.dto`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-audit.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-crypto.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/system-maintenance.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-database.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-files.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-settings-export.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/tenant-backup-export.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-verify.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-cloud-sync.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-retention.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-restore.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-run-executor.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-notification.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-orchestrator.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/services/backup-scheduler.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.controller`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/backup-engine.module`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/backup-engine/processors/backup-run.processor`;
+            params?: Router.UnknownInputParams;
+          }
+        | { pathname: `/../../worker/src/jobs/backup/shared`; params?: Router.UnknownInputParams }
+        | {
+            pathname: `/../../worker/src/jobs/backup/backup-run`;
+            params?: Router.UnknownInputParams;
+          }
+        | { pathname: `/../../web/services/backup`; params?: Router.UnknownInputParams }
+        | {
+            pathname: `/../../web/components/backup-module/backup-dashboard-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-schedule-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-restore-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-cloud-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-logs-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-disaster-recovery-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/schedule/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/manual/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/cloud/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/logs/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/administration/backups/disaster-recovery/page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-utils`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-manual-dialog`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/backup-module/backup-repository-table`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/committee-members-workspace`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/governance-module/staff-committee-memberships-section`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../api/src/modules/students/services/student-abc.service`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/components/students-module/abc-bulk/abc-id-bulk-upload-page`;
+            params?: Router.UnknownInputParams;
+          }
+        | {
+            pathname: `/../../web/app/admin/students/abc-upload/page`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }

@@ -19,6 +19,7 @@ import { StaffPublicationsTab } from '@/components/staff-module/profile/staff-pu
 import { StaffSubjectsTab } from '@/components/staff-module/profile/staff-subjects-tab';
 import { StaffAttendanceProfileCard } from '@/components/staff-module/attendance/staff-attendance-profile-card';
 import { StaffSpecialAssignmentSection } from '@/components/staff-module/profile/staff-special-assignment-section';
+import { StaffCommitteeMembershipsSection } from '@/components/governance-module/staff-committee-memberships-section';
 import { roleChipLabel } from '@/components/staff-module/employment/employment-utils';
 import {
   staffTypeLabel,
@@ -104,6 +105,7 @@ function ProfileTabPanel({
               </div>
             </dl>
           </SectionCard>
+          <StaffCommitteeMembershipsSection staffId={profile.id} />
         </div>
       );
     case 'employment':

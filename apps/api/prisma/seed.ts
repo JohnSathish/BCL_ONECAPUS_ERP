@@ -10,6 +10,8 @@ import {
 import { seedDbcFyugpRules } from './seed-dbc-fyugp-rules';
 import { seedArtsFyugpCatalog } from './seed-arts-fyugp-catalog';
 import { seedArtsOddTimetable } from './seed-arts-odd-timetable';
+import { seedArtsShiftIiTimetable } from './seed-arts-shift-ii-timetable';
+import { seedDemoTimetableFoundation } from './seed-demo-timetable-foundation';
 import { seedDonBoscoFeeCycles } from './seeds/fee-cycle.seed';
 import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
 import { seedDbcCommittees } from './seeds/seed-dbc-committees';
@@ -1003,6 +1005,30 @@ const PERMISSIONS: {
     action: 'licenses:manage',
     description: 'Manage tenant licenses',
   },
+  {
+    slug: 'backup:read',
+    resource: 'backup',
+    action: 'read',
+    description: 'View backup dashboard, repository, and logs',
+  },
+  {
+    slug: 'backup:manage',
+    resource: 'backup',
+    action: 'manage',
+    description: 'Configure schedules, run manual backups, cloud settings',
+  },
+  {
+    slug: 'backup:download',
+    resource: 'backup',
+    action: 'download',
+    description: 'Download backup artifacts (super-admin)',
+  },
+  {
+    slug: 'backup:restore',
+    resource: 'backup',
+    action: 'restore',
+    description: 'Restore from backup (super-admin)',
+  },
 ];
 
 async function main() {
@@ -1232,6 +1258,9 @@ async function main() {
     'mobile:settings:manage',
     'communication:read',
     'communication:manage',
+    'backup:read',
+    'backup:manage',
+    'backup:download',
   ]);
   await upsertRole('academic-admin', 'Academic Admin', [
     'academic:read',
@@ -3392,9 +3421,16 @@ async function main() {
       end: shiftTime(15, 30),
     },
     {
+      code: 'SHIFT_II',
+      name: 'Arts Shift II',
+      sortOrder: 2,
+      start: shiftTime(9, 45),
+      end: shiftTime(15, 30),
+    },
+    {
       code: 'EVENING',
       name: 'Evening Shift',
-      sortOrder: 2,
+      sortOrder: 3,
       start: shiftTime(14, 45),
       end: shiftTime(17, 45),
     },
@@ -3710,9 +3746,30 @@ async function main() {
     createdById: adminUser.id,
   });
 
+  await seedArtsShiftIiTimetable({
+    prisma,
+    tenantId: tenant.id,
+    institutionId: institution.id,
+    campusId: campus.id,
+    academicYearId: academicYear.id,
+    createdById: adminUser.id,
+  });
+
+  await seedDemoTimetableFoundation({
+    prisma,
+    tenantId: tenant.id,
+    institutionId: institution.id,
+    campusId: campus.id,
+    academicYearId: academicYear.id,
+    createdById: adminUser.id,
+    shifts,
+    semesterBySeq,
+  });
+
   for (const [code, cap] of [
     ['MORNING', 30],
     ['DAY', 60],
+    ['SHIFT_II', 40],
     ['EVENING', 30],
   ] as const) {
     const shiftId = shifts[code]!.id;
@@ -4257,6 +4314,8 @@ async function seedTenantLicensing(
   );
 
   await seedLicenseNotificationTemplates(demoTenantId, adminUserId);
+  await seedBackupNotificationTemplates(demoTenantId, adminUserId);
+  await seedBackupDefaults();
 
   await prisma.licenseActivationKey.upsert({
     where: { activationKey: 'BCLK-DEMO-2026-0001-KEY1' },
@@ -4325,6 +4384,99 @@ const LICENSE_NOTIFICATION_TEMPLATES = [
     bodyText: 'License expired. Contact {{renewal_contact}}.',
   },
 ];
+
+async function seedBackupDefaults() {
+  await prisma.backupRetentionPolicy.upsert({
+    where: { id: 'singleton' },
+    create: { id: 'singleton', keepDays: 30, autoCleanupEnabled: true },
+    update: {},
+  });
+  await prisma.systemMaintenanceFlag.upsert({
+    where: { id: 'singleton' },
+    create: { id: 'singleton', active: false },
+    update: {},
+  });
+  const existingSchedule = await prisma.backupSchedule.findFirst({
+    where: { tenantId: null },
+  });
+  if (!existingSchedule) {
+    const tomorrow2am = new Date();
+    tomorrow2am.setUTCDate(tomorrow2am.getUTCDate() + 1);
+    tomorrow2am.setUTCHours(2, 0, 0, 0);
+    await prisma.backupSchedule.create({
+      data: {
+        frequency: 'DAILY',
+        backupType: 'DATABASE_DOCUMENTS',
+        enabled: true,
+        nextRunAt: tomorrow2am,
+      },
+    });
+  }
+  for (const provider of ['AWS_S3', 'BACKBLAZE_B2'] as const) {
+    await prisma.backupCloudTarget.upsert({
+      where: { provider },
+      create: { provider, bucket: '', enabled: false },
+      update: {},
+    });
+  }
+}
+
+const BACKUP_NOTIFICATION_TEMPLATES = [
+  {
+    code: 'BACKUP_SUCCESS',
+    name: 'Backup Completed Successfully',
+    subject: 'Backup completed — {{institution_name}}',
+    bodyHtml:
+      '<p>Backup <strong>{{backup_type}}</strong> completed successfully at {{completed_at}}.</p><p>Size: {{size_bytes}} · Run ID: {{run_id}}</p>',
+    bodyText:
+      'Backup {{backup_type}} completed at {{completed_at}}. Size: {{size_bytes}}. Run: {{run_id}}',
+  },
+  {
+    code: 'BACKUP_FAILED',
+    name: 'Backup Failed',
+    subject: 'Backup failed — {{institution_name}}',
+    bodyHtml:
+      '<p>Backup <strong>{{backup_type}}</strong> failed at {{completed_at}}.</p><p>Error: {{error_message}}</p><p>Run ID: {{run_id}}</p>',
+    bodyText:
+      'Backup {{backup_type}} failed at {{completed_at}}. Error: {{error_message}}. Run: {{run_id}}',
+  },
+];
+
+async function seedBackupNotificationTemplates(
+  tenantId: string,
+  createdById: string,
+) {
+  for (const tpl of BACKUP_NOTIFICATION_TEMPLATES) {
+    await prisma.communicationTemplate.upsert({
+      where: { tenantId_code: { tenantId, code: tpl.code } },
+      create: {
+        tenantId,
+        code: tpl.code,
+        name: tpl.name,
+        category: 'GENERAL',
+        subject: tpl.subject,
+        bodyHtml: tpl.bodyHtml,
+        bodyText: tpl.bodyText,
+        variables: [
+          'institution_name',
+          'backup_type',
+          'completed_at',
+          'size_bytes',
+          'run_id',
+          'error_message',
+        ],
+        channels: ['EMAIL', 'IN_APP'],
+        createdById,
+      },
+      update: {
+        name: tpl.name,
+        subject: tpl.subject,
+        bodyHtml: tpl.bodyHtml,
+        bodyText: tpl.bodyText,
+      },
+    });
+  }
+}
 
 async function seedLicenseNotificationTemplates(
   tenantId: string,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { HrModule } from '../hr/hr.module';
+import { TeachingSubjectGroupModule } from './teaching-subject-group.module';
 import { TimetableConflictService } from './timetable-conflict.service';
 import { TimetableAllocationService } from './timetable-allocation.service';
 import { TimetableAllocationExcelService } from './timetable-allocation-excel.service';
@@ -17,7 +18,12 @@ import { TimetableStreamMasterService } from './timetable-stream-master.service'
 import { TimetableWorkloadService } from './timetable-workload.service';
 
 @Module({
-  imports: [StudentAttendanceModule, CommunicationModule, HrModule],
+  imports: [
+    StudentAttendanceModule,
+    CommunicationModule,
+    HrModule,
+    TeachingSubjectGroupModule,
+  ],
   controllers: [TimetableEngineController],
   providers: [
     TimetableEngineService,

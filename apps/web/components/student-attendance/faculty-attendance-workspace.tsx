@@ -164,15 +164,28 @@ export function FacultyAttendanceWorkspace() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold">
-                    {roster.data.session.course?.code} · {roster.data.session.course?.title}
+                    {roster.data.session.subjectGroup?.title ??
+                      roster.data.session.course?.title ??
+                      'Class roster'}
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Section {roster.data.session.section?.sectionCode ?? '—'} · Period{' '}
+                    {roster.data.session.subjectGroup?.code ??
+                      roster.data.session.course?.code ??
+                      '—'}{' '}
+                    · Section {roster.data.session.section?.sectionCode ?? '—'} · Period{' '}
                     {roster.data.session.periodNo ?? '—'} · {roster.data.session.sessionType}
                     {roster.data.session.location
                       ? ` · ${roster.data.session.location.roomCode ?? ''} ${roster.data.session.location.roomName ?? ''}`
                       : ''}
                   </p>
+                  {(roster.data.session.linkedPapers ?? []).length ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Rolls up to papers:{' '}
+                      {(roster.data.session.linkedPapers ?? [])
+                        .map((paper) => paper.code)
+                        .join(', ')}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={markAllPresent}>
@@ -234,6 +247,12 @@ export function FacultyAttendanceWorkspace() {
   );
 }
 
+function sessionDisplay(session: StudentAttendanceSession) {
+  const title = session.subjectGroup?.title ?? session.course?.title ?? 'Attendance session';
+  const code = session.subjectGroup?.code ?? session.course?.code ?? 'Class';
+  return { title, code };
+}
+
 function SessionCard({
   session,
   active,
@@ -243,6 +262,7 @@ function SessionCard({
   active: boolean;
   onClick: () => void;
 }) {
+  const label = sessionDisplay(session);
   return (
     <button
       type="button"
@@ -256,9 +276,8 @@ function SessionCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">
-            {session.course?.code ?? 'Class'} · {session.course?.title ?? 'Attendance'}
-          </p>
+          <p className="truncate text-sm font-semibold">{label.title}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{label.code}</p>
           <p className="text-xs text-muted-foreground">
             Section {session.section?.sectionCode ?? '—'} · {session.sessionType}
             {session.location ? ` · ${session.location.roomCode ?? ''}` : ''}

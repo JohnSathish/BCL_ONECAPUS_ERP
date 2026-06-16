@@ -10,6 +10,8 @@ export class UpsertAcademicSettingsDto {
   nepProfile?: {
     multipleEntryExit?: boolean;
     abcEnabled?: boolean;
+    studentCanUpdateAbcId?: boolean;
+    requireAbcBeforeSemesterRegistration?: boolean;
     interdisciplinaryEnabled?: boolean;
     skillCoursesRequired?: boolean;
   };
@@ -33,6 +35,14 @@ export class NepProfileDto {
   @IsOptional()
   @IsBoolean()
   abcEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  studentCanUpdateAbcId?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireAbcBeforeSemesterRegistration?: boolean;
 
   @IsOptional()
   @IsBoolean()

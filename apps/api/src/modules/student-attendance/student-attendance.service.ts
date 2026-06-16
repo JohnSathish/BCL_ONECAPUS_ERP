@@ -15,6 +15,7 @@ import {
   MarkAttendanceDto,
 } from './dto/student-attendance.dto';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
+import { TeachingSubjectGroupService } from '../timetable-engine/teaching-subject-group.service';
 
 const PRESENT_STATUSES = new Set(['P', 'L', 'OD', 'SPORTS', 'NSS', 'NCC']);
 const ABSENT_STATUSES = new Set(['A']);
@@ -26,6 +27,7 @@ export class StudentAttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly subjectGroups: TeachingSubjectGroupService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -102,6 +104,12 @@ export class StudentAttendanceService {
       const facultyTeam = Array.isArray(metadata.facultyTeam)
         ? metadata.facultyTeam
         : [];
+      const linkedPapers = entry.teachingSubjectGroupId
+        ? await this.subjectGroups.linkedPaperIds(
+            user.tid,
+            entry.teachingSubjectGroupId,
+          )
+        : [];
       await (this.prisma as any).studentAttendanceSession.upsert({
         where: {
           tenantId_timetablePlanEntryId_sessionDate: {
@@ -118,6 +126,7 @@ export class StudentAttendanceService {
           programVersionId: entry.plan?.programVersionId,
           offeringSectionId: entry.offeringSectionId,
           courseId: entry.courseId,
+          teachingSubjectGroupId: entry.teachingSubjectGroupId,
           shiftId: entry.shiftId,
           classroomId: entry.classroomId,
           timetablePlanEntryId: entry.id,
@@ -135,9 +144,20 @@ export class StudentAttendanceService {
             facultyTeam,
             fyugpCategory: entry.fyugpCategory,
             generatedFrom: 'TIMETABLE',
+            teachingSubjectGroupId: entry.teachingSubjectGroupId,
+            linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
           },
         },
-        update: {},
+        update: {
+          teachingSubjectGroupId: entry.teachingSubjectGroupId,
+          metadata: {
+            facultyTeam,
+            fyugpCategory: entry.fyugpCategory,
+            generatedFrom: 'TIMETABLE',
+            teachingSubjectGroupId: entry.teachingSubjectGroupId,
+            linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
+          },
+        },
       });
       created += 1;
     }
@@ -239,19 +259,32 @@ export class StudentAttendanceService {
     const sectionIds = authorizedSections.map(
       (row: any) => row.offeringSectionId,
     );
-    return this.listSessions(user.tid, {
+    const groupIds = await (this.prisma as any).teachingSubjectGroup.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        primaryStaffProfileId: staff.id,
+      },
+      select: { id: true },
+    });
+    const groupIdList = groupIds.map((g: any) => g.id);
+
+    const sessions = await this.listSessions(user.tid, {
       date: today.toISOString(),
-      staffProfileId: staff.id,
-    }).then(async (sessions) => {
-      const teamSessions = sectionIds.length
-        ? await this.listSessions(user.tid, { date: today.toISOString() }).then(
-            (rows) =>
-              rows.filter((row: any) =>
-                sectionIds.includes(row.offeringSectionId),
-              ),
-          )
-        : [];
-      return this.uniqueById([...sessions, ...teamSessions]);
+    });
+
+    return sessions.filter((row: any) => {
+      if (row.primaryFacultyId === staff.id) return true;
+      if (
+        row.teachingSubjectGroupId &&
+        groupIdList.includes(row.teachingSubjectGroupId)
+      ) {
+        return true;
+      }
+      if (row.offeringSectionId && sectionIds.includes(row.offeringSectionId)) {
+        return true;
+      }
+      return false;
     });
   }
 
@@ -263,11 +296,17 @@ export class StudentAttendanceService {
       include: { entries: true },
     });
     if (!session) throw new NotFoundException('Attendance session not found');
-    const students = await this.studentsForSection(
-      tenantId,
-      session.offeringSectionId,
-      session.semesterNo,
-    );
+    const students = session.teachingSubjectGroupId
+      ? await this.subjectGroups.studentsForGroup(
+          tenantId,
+          session.teachingSubjectGroupId,
+          session.semesterNo,
+        )
+      : await this.studentsForSection(
+          tenantId,
+          session.offeringSectionId,
+          session.semesterNo,
+        );
     const entryByStudent = new Map<string, any>(
       session.entries.map((entry: any) => [entry.studentId, entry]),
     );
@@ -536,6 +575,63 @@ export class StudentAttendanceService {
     });
     if (!staff) return;
     if (session.primaryFacultyId === staff.id) return;
+    if (session.teachingSubjectGroupId) {
+      const group = await this.subjectGroups.get(
+        user.tid,
+        session.teachingSubjectGroupId,
+      );
+      if (group.primaryStaffProfileId === staff.id) return;
+
+      const papers = await this.subjectGroups.linkedPaperIds(
+        user.tid,
+        session.teachingSubjectGroupId,
+      );
+      const sectionIds = [
+        ...new Set(
+          papers
+            .map(
+              (paper: { offeringSectionId?: string | null }) =>
+                paper.offeringSectionId,
+            )
+            .filter(Boolean),
+        ),
+      ] as string[];
+      if (sectionIds.length) {
+        const sectionAssignment = await (
+          this.prisma as any
+        ).subjectTeachingAssignment.findFirst({
+          where: {
+            tenantId: user.tid,
+            staffProfileId: staff.id,
+            offeringSectionId: { in: sectionIds },
+            deletedAt: null,
+            canMarkAttendance: true,
+          },
+        });
+        if (sectionAssignment) return;
+      }
+      const courseIds = [
+        ...new Set(
+          papers
+            .map((paper: { courseId?: string | null }) => paper.courseId)
+            .filter(Boolean),
+        ),
+      ] as string[];
+      if (courseIds.length) {
+        const courseAssignment = await (
+          this.prisma as any
+        ).subjectTeachingAssignment.findFirst({
+          where: {
+            tenantId: user.tid,
+            staffProfileId: staff.id,
+            courseId: { in: courseIds },
+            deletedAt: null,
+            canMarkAttendance: true,
+          },
+        });
+        if (courseAssignment) return;
+      }
+    }
     const sessionMetadata = (session.metadata ?? {}) as any;
     const facultyTeam = Array.isArray(sessionMetadata.facultyTeam)
       ? sessionMetadata.facultyTeam
@@ -547,6 +643,11 @@ export class StudentAttendanceService {
       )
     ) {
       return;
+    }
+    if (!session.offeringSectionId) {
+      throw new BadRequestException(
+        'You are not authorized to mark this attendance session',
+      );
     }
     const assignment = await (
       this.prisma as any
@@ -605,103 +706,169 @@ export class StudentAttendanceService {
       include: { entries: true },
     });
     if (!session) return;
-    for (const entry of session.entries) {
-      const allEntries = await (
-        this.prisma as any
-      ).studentAttendanceEntry.findMany({
-        where: {
+    const paperTargets = session.teachingSubjectGroupId
+      ? await this.subjectGroups.linkedPaperIds(
           tenantId,
-          studentId: entry.studentId,
-          session: {
-            courseId: session.courseId,
-            offeringSectionId: session.offeringSectionId,
-            semesterNo: session.semesterNo,
-            deletedAt: null,
-            status: { not: 'CANCELLED' },
-          },
-        },
-      });
-      const counted = allEntries.filter(
-        (row: any) => !NEUTRAL_STATUSES.has(row.status),
-      );
-      const present = counted.filter((row: any) =>
-        PRESENT_STATUSES.has(row.status),
-      ).length;
-      const absent = counted.filter((row: any) =>
-        ABSENT_STATUSES.has(row.status),
-      ).length;
-      const medical = counted.filter((row: any) =>
-        MEDICAL_STATUSES.has(row.status),
-      ).length;
-      const percentage = counted.length
-        ? Math.round((present / counted.length) * 10000) / 100
-        : 0;
-      await (this.prisma as any).studentAttendanceSummary.upsert({
-        where: {
-          studentId_courseId_offeringSectionId_semesterNo_periodKey: {
+          session.teachingSubjectGroupId,
+        )
+      : session.courseId
+        ? [
+            {
+              courseId: session.courseId,
+              offeringSectionId: session.offeringSectionId,
+            },
+          ]
+        : [];
+
+    if (!paperTargets.length) return;
+
+    for (const entry of session.entries) {
+      for (const paper of paperTargets) {
+        const sessionFilter: Record<string, unknown> = {
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+          semesterNo: session.semesterNo,
+        };
+        if (session.teachingSubjectGroupId) {
+          sessionFilter.teachingSubjectGroupId = session.teachingSubjectGroupId;
+        } else {
+          sessionFilter.courseId = paper.courseId;
+          sessionFilter.offeringSectionId =
+            paper.offeringSectionId ?? session.offeringSectionId;
+        }
+
+        const allEntries = await (
+          this.prisma as any
+        ).studentAttendanceEntry.findMany({
+          where: {
+            tenantId,
             studentId: entry.studentId,
-            courseId: session.courseId,
-            offeringSectionId: session.offeringSectionId,
+            session: sessionFilter,
+          },
+        });
+        const counted = allEntries.filter(
+          (row: any) => !NEUTRAL_STATUSES.has(row.status),
+        );
+        const present = counted.filter((row: any) =>
+          PRESENT_STATUSES.has(row.status),
+        ).length;
+        const absent = counted.filter((row: any) =>
+          ABSENT_STATUSES.has(row.status),
+        ).length;
+        const medical = counted.filter((row: any) =>
+          MEDICAL_STATUSES.has(row.status),
+        ).length;
+        const percentage = counted.length
+          ? Math.round((present / counted.length) * 10000) / 100
+          : 0;
+        await (this.prisma as any).studentAttendanceSummary.upsert({
+          where: {
+            studentId_courseId_offeringSectionId_semesterNo_periodKey: {
+              studentId: entry.studentId,
+              courseId: paper.courseId,
+              offeringSectionId:
+                paper.offeringSectionId ?? session.offeringSectionId,
+              semesterNo: session.semesterNo,
+              periodKey: 'SEMESTER',
+            },
+          },
+          create: {
+            tenantId,
+            studentId: entry.studentId,
+            courseId: paper.courseId,
+            offeringSectionId:
+              paper.offeringSectionId ?? session.offeringSectionId,
             semesterNo: session.semesterNo,
             periodKey: 'SEMESTER',
+            totalSessions: counted.length,
+            presentCount: present,
+            absentCount: absent,
+            medicalLeaveCount: medical,
+            percentage,
+            metadata: session.teachingSubjectGroupId
+              ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
+              : {},
           },
-        },
-        create: {
-          tenantId,
-          studentId: entry.studentId,
-          courseId: session.courseId,
-          offeringSectionId: session.offeringSectionId,
-          semesterNo: session.semesterNo,
-          periodKey: 'SEMESTER',
-          totalSessions: counted.length,
-          presentCount: present,
-          absentCount: absent,
-          medicalLeaveCount: medical,
-          percentage,
-        },
-        update: {
-          totalSessions: counted.length,
-          presentCount: present,
-          absentCount: absent,
-          medicalLeaveCount: medical,
-          percentage,
-          calculatedAt: new Date(),
-        },
-      });
+          update: {
+            totalSessions: counted.length,
+            presentCount: present,
+            absentCount: absent,
+            medicalLeaveCount: medical,
+            percentage,
+            calculatedAt: new Date(),
+            metadata: session.teachingSubjectGroupId
+              ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
+              : {},
+          },
+        });
+      }
     }
   }
 
   private async enrichSession(session: any) {
-    const [course, section, faculty, classroom] = await Promise.all([
-      session.courseId
-        ? this.prisma.course.findFirst({
-            where: { id: session.courseId },
-            select: { code: true, title: true, courseType: true },
-          })
-        : null,
-      session.offeringSectionId
-        ? this.prisma.offeringSection.findFirst({
-            where: { id: session.offeringSectionId },
-            select: { sectionCode: true },
-          })
-        : null,
-      session.primaryFacultyId
-        ? this.prisma.staffProfile.findFirst({
-            where: { id: session.primaryFacultyId },
-            select: { fullName: true, shortCode: true, employeeCode: true },
-          })
-        : null,
-      session.classroomId
-        ? this.prisma.classroom.findFirst({
-            where: { id: session.classroomId },
-            include: { campus: true, roomType: true },
-          })
-        : null,
-    ]);
+    const [course, section, faculty, classroom, subjectGroup, linkedPapers] =
+      await Promise.all([
+        session.courseId
+          ? this.prisma.course.findFirst({
+              where: { id: session.courseId },
+              select: { code: true, title: true, courseType: true },
+            })
+          : null,
+        session.offeringSectionId
+          ? this.prisma.offeringSection.findFirst({
+              where: { id: session.offeringSectionId },
+              select: { sectionCode: true },
+            })
+          : null,
+        session.primaryFacultyId
+          ? this.prisma.staffProfile.findFirst({
+              where: { id: session.primaryFacultyId },
+              select: { fullName: true, shortCode: true, employeeCode: true },
+            })
+          : null,
+        session.classroomId
+          ? this.prisma.classroom.findFirst({
+              where: { id: session.classroomId },
+              include: { campus: true, roomType: true },
+            })
+          : null,
+        session.teachingSubjectGroupId
+          ? (this.prisma as any).teachingSubjectGroup.findFirst({
+              where: { id: session.teachingSubjectGroupId },
+              select: {
+                id: true,
+                code: true,
+                title: true,
+                fyugpCategory: true,
+              },
+            })
+          : null,
+        session.teachingSubjectGroupId
+          ? this.subjectGroups.linkedPaperIds(
+              session.tenantId,
+              session.teachingSubjectGroupId,
+            )
+          : Promise.resolve([]),
+      ]);
     const entries = session.entries ?? [];
+    const paperCourses = linkedPapers.length
+      ? await this.prisma.course.findMany({
+          where: { id: { in: linkedPapers.map((p: any) => p.courseId) } },
+          select: { id: true, code: true, title: true },
+        })
+      : [];
+    const displayCourse = subjectGroup
+      ? {
+          code: subjectGroup.code,
+          title: subjectGroup.title,
+          courseType: subjectGroup.fyugpCategory,
+        }
+      : course;
     return {
       ...session,
-      course,
+      course: displayCourse,
+      subjectGroup,
+      linkedPapers: paperCourses,
       section,
       faculty,
       classroom,

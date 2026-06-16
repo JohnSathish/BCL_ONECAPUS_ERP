@@ -31,6 +31,7 @@ import {
   AdmitStudentDto,
   AdmitFullStudentDto,
   AdmitWithRegistrationDto,
+  BulkAbcUploadDto,
   BulkAssignRfidDto,
   BulkGenerateRollNumbersDto,
   CommitStudentImportDto,
@@ -91,6 +92,33 @@ export class StudentsController {
   @Get('summary/enhanced')
   enhancedSummary(@CurrentUser() user: JwtUser) {
     return this.students.getEnhancedSummary(user.tid);
+  }
+
+  @Get('abc/coverage')
+  @RequirePermissions('students:read')
+  abcCoverage(@CurrentUser() user: JwtUser) {
+    return this.students.getAbcCoverage(user.tid);
+  }
+
+  @Get('abc/upload-template')
+  @RequirePermissions('students:manage')
+  async downloadAbcUploadTemplate(@Res() res: Response) {
+    const buffer = await this.students.buildAbcUploadTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="ABC_ID_Upload_Template.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  @Post('abc/bulk-upload')
+  @RequirePermissions('students:manage')
+  bulkUploadAbc(@CurrentUser() user: JwtUser, @Body() dto: BulkAbcUploadDto) {
+    return this.students.bulkUploadAbcIds(user.tid, dto.rows);
   }
 
   @Get('export.csv')

@@ -165,6 +165,25 @@ export function StepBasic({
                   placeholder="University roll no."
                 />
               </GlassField>
+              <GlassField
+                label="ABC ID"
+                error={errors.abcId}
+                optional
+                hint="Academic Bank of Credits ID"
+              >
+                <input
+                  className={glassInputClass}
+                  value={draft.abcId}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      abcId: e.target.value.trim().slice(0, 20),
+                    }))
+                  }
+                  placeholder="Enter ABC ID"
+                  maxLength={20}
+                />
+              </GlassField>
             </div>
           </div>
 

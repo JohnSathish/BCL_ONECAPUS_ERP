@@ -22,12 +22,23 @@ import {
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import { TimetableEngineService } from './timetable-engine.service';
+import { TeachingSubjectGroupService } from './teaching-subject-group.service';
+import {
+  CreateTeachingSubjectGroupDto,
+  LinkTeachingSubjectGroupPaperDto,
+  SyncTeachingSubjectGroupsDto,
+  TeachingSubjectGroupQueryDto,
+  UpdateTeachingSubjectGroupDto,
+} from './dto/teaching-subject-group.dto';
 
 @ApiBearerAuth()
 @ApiTags('timetable')
 @Controller({ path: 'timetable', version: '1' })
 export class TimetableEngineController {
-  constructor(private readonly timetable: TimetableEngineService) {}
+  constructor(
+    private readonly timetable: TimetableEngineService,
+    private readonly subjectGroups: TeachingSubjectGroupService,
+  ) {}
 
   @Get('plans')
   @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
@@ -507,6 +518,23 @@ export class TimetableEngineController {
     });
   }
 
+  @Get('plans/:id/draft-rooms')
+  @RequirePermissions('shift:timetable:manage')
+  draftRoomEntries(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.timetable.draftRoomEntries(user, id);
+  }
+
+  @Post('plans/:id/finalize-rooms')
+  @RequirePermissions('shift:timetable:manage')
+  finalizePlanRooms(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    body: { assignments?: Array<{ entryId: string; classroomId: string }> },
+  ) {
+    return this.timetable.finalizePlanRooms(user, id, body);
+  }
+
   @Get('plans/:id/substitutions')
   @RequirePermissions('shift:timetable:manage')
   substitutions(@CurrentUser() user: JwtUser, @Param('id') id: string) {
@@ -568,5 +596,80 @@ export class TimetableEngineController {
       date ? new Date(date) : new Date(),
       { shiftId, streamId, staffProfileId },
     );
+  }
+
+  @Get('teaching-subject-groups')
+  @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
+  listTeachingSubjectGroups(
+    @CurrentUser() user: JwtUser,
+    @Query() query: TeachingSubjectGroupQueryDto,
+  ) {
+    return this.subjectGroups.list(user.tid, query);
+  }
+
+  @Get('teaching-subject-groups/:id')
+  @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
+  getTeachingSubjectGroup(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.subjectGroups.get(user.tid, id);
+  }
+
+  @Post('teaching-subject-groups')
+  @RequirePermissions('academic:timetable:manage')
+  createTeachingSubjectGroup(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateTeachingSubjectGroupDto,
+  ) {
+    return this.subjectGroups.create(user, dto);
+  }
+
+  @Patch('teaching-subject-groups/:id')
+  @RequirePermissions('academic:timetable:manage')
+  updateTeachingSubjectGroup(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateTeachingSubjectGroupDto,
+  ) {
+    return this.subjectGroups.update(user, id, dto);
+  }
+
+  @Patch('teaching-subject-groups/:id/delete')
+  @RequirePermissions('academic:timetable:manage')
+  deleteTeachingSubjectGroup(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.subjectGroups.remove(user, id);
+  }
+
+  @Post('teaching-subject-groups/:id/papers')
+  @RequirePermissions('academic:timetable:manage')
+  linkTeachingSubjectGroupPaper(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: LinkTeachingSubjectGroupPaperDto,
+  ) {
+    return this.subjectGroups.addPaper(user, id, dto);
+  }
+
+  @Patch('teaching-subject-groups/:id/papers/:courseId/delete')
+  @RequirePermissions('academic:timetable:manage')
+  unlinkTeachingSubjectGroupPaper(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('courseId') courseId: string,
+  ) {
+    return this.subjectGroups.removePaper(user, id, courseId);
+  }
+
+  @Post('teaching-subject-groups/sync-from-semester')
+  @RequirePermissions('academic:timetable:manage')
+  syncTeachingSubjectGroups(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SyncTeachingSubjectGroupsDto,
+  ) {
+    return this.subjectGroups.syncFromSemester(user, dto);
   }
 }

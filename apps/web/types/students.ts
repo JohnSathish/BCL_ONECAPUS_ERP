@@ -37,6 +37,7 @@ export type StudentDirectoryRow = {
   displayFullName?: string;
   email: string;
   mobileNumber?: string | null;
+  abcId?: string | null;
   programVersionId?: string | null;
   programme?: string | null;
   programmeCode?: string | null;
@@ -206,6 +207,7 @@ export type AdmitStudentPayload = {
   primaryShiftId: string;
   rollNumber?: string;
   admissionNumber?: string;
+  abcId?: string;
   campusId?: string;
   departmentId?: string;
   gender?: string;

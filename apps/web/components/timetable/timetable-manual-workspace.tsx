@@ -521,6 +521,13 @@ export function TimetableManualWorkspace() {
                     Use teaching allocation as a reference when assigning faculty to manual slots.
                   </p>
                   <Link
+                    href="/admin/academics/teaching-subject-groups"
+                    className="text-sm text-primary underline"
+                  >
+                    Subject Groups
+                  </Link>
+                  {' · '}
+                  <Link
                     href="/admin/academics/teaching-allocation"
                     className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
                   >

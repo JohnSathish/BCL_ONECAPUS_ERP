@@ -40,6 +40,7 @@ import { CommunicationTriggerService } from '../communication/services/communica
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
 import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service';
 import { createWorkbookWithSheets } from '../../common/import/excel.util';
+import { StudentAbcService } from './services/student-abc.service';
 
 const directoryInclude = {
   user: { select: { id: true, email: true, isActive: true } },
@@ -68,6 +69,15 @@ const directoryInclude = {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
     select: { status: true, semesterSequence: true },
+  },
+  abcAccount: {
+    select: {
+      abcId: true,
+      status: true,
+      abcVerified: true,
+      verificationStatus: true,
+      updatedAt: true,
+    },
   },
 } satisfies Prisma.StudentInclude;
 
@@ -107,6 +117,7 @@ export type StudentListQuery = PaginationQueryDto & {
   noPhoto?: string;
   noMobile?: string;
   recentlyAdded?: string;
+  abcStatus?: string;
 };
 
 @Injectable()
@@ -131,6 +142,7 @@ export class StudentsService {
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
     private readonly displaySettings: StudentDisplaySettingsService,
     private readonly feeCycleEngine: FeeCycleEngineService,
+    private readonly abcService: StudentAbcService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -497,6 +509,11 @@ export class StudentsService {
             rfidNumber: { contains: query.search, mode: 'insensitive' },
           },
           {
+            abcAccount: {
+              abcId: { contains: query.search, mode: 'insensitive' },
+            },
+          },
+          {
             programVersion: {
               program: {
                 name: { contains: query.search, mode: 'insensitive' },
@@ -511,6 +528,18 @@ export class StudentsService {
       where = {
         ...where,
         ...this.academicStatusWhere(query.academicStatus),
+      };
+    }
+
+    if (query.abcStatus === 'available') {
+      where = {
+        ...where,
+        abcAccount: { abcId: { not: null } },
+      };
+    } else if (query.abcStatus === 'missing') {
+      where = {
+        ...where,
+        OR: [{ abcAccount: null }, { abcAccount: { abcId: null } }],
       };
     }
 
@@ -588,6 +617,7 @@ export class StudentsService {
       'Admission',
       'Registration',
       'Roll',
+      'ABC ID',
       'Name',
       'Email',
       'Mobile',
@@ -608,6 +638,7 @@ export class StudentsService {
           row.admissionNumber ?? '',
           row.enrollmentNumber,
           row.rollNumber ?? '',
+          (row as { abcId?: string | null }).abcId ?? '',
           `"${((row as { displayFullName?: string }).displayFullName ?? row.fullName ?? '').replace(/"/g, '""')}"`,
           row.email,
           row.mobileNumber ?? '',
@@ -984,6 +1015,10 @@ export class StudentsService {
       student.id,
       dto.admissionBatchId,
     );
+
+    if (dto.abcId !== undefined) {
+      await this.abcService.upsertForStudent(tenantId, student.id, dto.abcId);
+    }
 
     if (dto.currentSemester != null && dto.currentSemester >= 1) {
       await this.prisma.studentAcademicStanding.update({
@@ -2050,5 +2085,26 @@ export class StudentsService {
       where: { id: programVersionId, tenantId, deletedAt: null },
     });
     if (!version) throw new BadRequestException('Invalid program version');
+  }
+
+  getAbcCoverage(tenantId: string) {
+    return this.abcService.getCoverage(tenantId);
+  }
+
+  bulkUploadAbcIds(
+    tenantId: string,
+    rows: Array<{ rollNumber: string; abcId: string }>,
+  ) {
+    return this.abcService.bulkUploadByRollNumber(tenantId, rows);
+  }
+
+  async buildAbcUploadTemplate() {
+    return createWorkbookWithSheets([
+      {
+        name: 'ABC IDs',
+        headers: ['Roll Number', 'ABC ID'],
+        rows: [['BA26-001', 'ABC123456789']],
+      },
+    ]);
   }
 }

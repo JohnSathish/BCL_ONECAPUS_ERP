@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -19,6 +20,7 @@ import { RequireAnyPermission } from '../../common/decorators/require-permission
 import {
   StudentIdCardPrintRequestDto,
   StudentPortalChangeRequestDto,
+  UpdateAbcIdDto,
   UploadStudentPortalDocumentDto,
 } from './dto/student-portal-profile.dto';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
@@ -98,6 +100,12 @@ export class StudentPortalController {
     @Body() dto: StudentPortalChangeRequestDto,
   ) {
     return this.portalProfile.submitChangeRequest(user, dto);
+  }
+
+  @Patch('me/profile/abc-id')
+  @RequireAnyPermission('student:portal:self')
+  updateAbcId(@CurrentUser() user: JwtUser, @Body() dto: UpdateAbcIdDto) {
+    return this.portalProfile.updateMyAbcId(user, dto.abcId);
   }
 
   @Post('me/id-card/print-requests')

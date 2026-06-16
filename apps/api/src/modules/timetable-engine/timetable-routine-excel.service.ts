@@ -10,6 +10,7 @@ import {
   ARTS_ODD_PAPER_BASKET,
   buildArtsRoutineSampleRows,
 } from '../academic-engine/domain/arts-fyugp-odd-catalog';
+import { TeachingSubjectGroupService } from './teaching-subject-group.service';
 
 const ROUTINE_HEADERS = [
   'Stream',
@@ -17,6 +18,7 @@ const ROUTINE_HEADERS = [
   'Semester',
   'Day',
   'Period',
+  'Subject Group Code',
   'Subject Code',
   'Faculty Code',
   'Room',
@@ -41,7 +43,10 @@ const DAY_MAP: Record<string, number> = {
 
 @Injectable()
 export class TimetableRoutineExcelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subjectGroups: TeachingSubjectGroupService,
+  ) {}
 
   async routineTemplate(tenantId: string, planId: string) {
     const plan = await this.prisma.timetablePlan.findFirst({
@@ -52,25 +57,34 @@ export class TimetableRoutineExcelService {
       where: { tenantId, planId, deletedAt: null },
       orderBy: [{ dayOfWeek: 'asc' }, { periodNo: 'asc' }],
     });
-    const [streams, shifts, courses, staff, rooms] = await Promise.all([
-      this.prisma.academicStream.findMany({
-        where: { tenantId, deletedAt: null, isActive: true },
-      }),
-      this.prisma.shift.findMany({ where: { tenantId, deletedAt: null } }),
-      this.prisma.course.findMany({
-        where: { tenantId, deletedAt: null },
-        orderBy: { code: 'asc' },
-      }),
-      this.prisma.staffProfile.findMany({
-        where: { tenantId, deletedAt: null, status: 'ACTIVE' },
-        take: 500,
-      }),
-      this.prisma.classroom.findMany({
-        where: { tenantId, deletedAt: null, status: 'ACTIVE' },
-        take: 300,
-      }),
-    ]);
+    const [streams, shifts, courses, staff, rooms, subjectGroups] =
+      await Promise.all([
+        this.prisma.academicStream.findMany({
+          where: { tenantId, deletedAt: null, isActive: true },
+        }),
+        this.prisma.shift.findMany({ where: { tenantId, deletedAt: null } }),
+        this.prisma.course.findMany({
+          where: { tenantId, deletedAt: null },
+          orderBy: { code: 'asc' },
+        }),
+        this.prisma.staffProfile.findMany({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+          take: 500,
+        }),
+        this.prisma.classroom.findMany({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+          take: 300,
+        }),
+        (this.prisma as any).teachingSubjectGroup.findMany({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+          orderBy: [{ semesterNo: 'asc' }, { code: 'asc' }],
+          take: 500,
+        }),
+      ]);
     const courseById = new Map(courses.map((c) => [c.id, c]));
+    const groupById = new Map<string, { code?: string }>(
+      subjectGroups.map((g: { id: string; code?: string }) => [g.id, g]),
+    );
     const staffById = new Map(staff.map((s) => [s.id, s]));
     const roomById = new Map(rooms.map((r) => [r.id, r]));
     const metadata = (plan.metadata ?? {}) as any;
@@ -94,6 +108,9 @@ export class TimetableRoutineExcelService {
     if (entries.length) {
       for (const entry of entries) {
         const course = entry.courseId ? courseById.get(entry.courseId) : null;
+        const group = entry.teachingSubjectGroupId
+          ? groupById.get(entry.teachingSubjectGroupId)
+          : null;
         const faculty = entry.staffProfileId
           ? staffById.get(entry.staffProfileId)
           : null;
@@ -104,6 +121,7 @@ export class TimetableRoutineExcelService {
           entry.semesterSequence ?? '',
           this.dayLabel(entry.dayOfWeek),
           entry.periodNo ? `P${entry.periodNo}` : '',
+          group?.code ?? '',
           course?.code ?? '',
           faculty?.shortCode ?? faculty?.employeeCode ?? '',
           room?.code ?? '',
@@ -119,6 +137,7 @@ export class TimetableRoutineExcelService {
           sample.semester,
           sample.day,
           sample.period,
+          '',
           sample.subjectCode,
           '',
           '',
@@ -148,6 +167,17 @@ export class TimetableRoutineExcelService {
     if (isOddArtsPlan) {
       this.addPaperBasketSheet(workbook);
     }
+    this.addLookup(
+      workbook,
+      'SubjectGroups',
+      ['Code', 'Title', 'Semester', 'Category'],
+      subjectGroups.map((g: any) => [
+        g.code,
+        g.title,
+        g.semesterNo,
+        g.fyugpCategory,
+      ]),
+    );
     this.addLookup(
       workbook,
       'Faculty',
@@ -190,17 +220,30 @@ export class TimetableRoutineExcelService {
     const rows = parsedRows as Array<Record<string, unknown>>;
     const metadata = (plan.metadata ?? {}) as any;
     const allowedSemesters: number[] = metadata.allowedSemesters ?? [1, 3, 5];
-    const [courses, staff, rooms, templates] = await Promise.all([
-      this.prisma.course.findMany({ where: { tenantId, deletedAt: null } }),
-      this.prisma.staffProfile.findMany({
-        where: { tenantId, deletedAt: null },
-      }),
-      this.prisma.classroom.findMany({ where: { tenantId, deletedAt: null } }),
-      this.prisma.timetableSlotTemplate.findMany({
-        where: { tenantId, planId },
-      }),
-    ]);
+    const [courses, staff, rooms, templates, subjectGroups] = await Promise.all(
+      [
+        this.prisma.course.findMany({ where: { tenantId, deletedAt: null } }),
+        this.prisma.staffProfile.findMany({
+          where: { tenantId, deletedAt: null },
+        }),
+        this.prisma.classroom.findMany({
+          where: { tenantId, deletedAt: null },
+        }),
+        this.prisma.timetableSlotTemplate.findMany({
+          where: { tenantId, planId },
+        }),
+        (this.prisma as any).teachingSubjectGroup.findMany({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        }),
+      ],
+    );
     const courseByCode = new Map(courses.map((c) => [c.code.toUpperCase(), c]));
+    const groupByCode = new Map<string, { id: string; code?: string }>(
+      subjectGroups.map((g: { id: string; code?: string }) => [
+        String(g.code).toUpperCase(),
+        g,
+      ]),
+    );
     const staffByCode = new Map(
       staff.flatMap((s) => {
         const keys = [s.shortCode, s.employeeCode]
@@ -227,11 +270,33 @@ export class TimetableRoutineExcelService {
         ] ?? null;
       const period =
         Number(String(row['Period'] ?? '').replace(/^P/i, '')) || null;
-      const course = courseByCode.get(
-        String(row['Subject Code'] ?? '')
-          .trim()
-          .toUpperCase(),
-      );
+      const groupCode = String(row['Subject Group Code'] ?? '')
+        .trim()
+        .toUpperCase();
+      const subjectCode = String(row['Subject Code'] ?? '')
+        .trim()
+        .toUpperCase();
+      let subjectGroup: { id: string; code?: string } | null | undefined =
+        groupCode ? groupByCode.get(groupCode) : null;
+      const course = subjectCode ? courseByCode.get(subjectCode) : null;
+      if (groupCode && !subjectGroup) {
+        issues.push({
+          level: 'error',
+          message: 'Subject group code not found.',
+        });
+      }
+      if (!course && !subjectGroup) {
+        issues.push({
+          level: 'error',
+          message: 'Subject Code or Subject Group Code is required.',
+        });
+      } else if (!subjectGroup && course && semester) {
+        subjectGroup = await this.subjectGroups.findForCourse(
+          tenantId,
+          course.id,
+          semester,
+        );
+      }
       const faculty = staffByCode.get(
         String(row['Faculty Code'] ?? '')
           .trim()
@@ -250,8 +315,6 @@ export class TimetableRoutineExcelService {
       }
       if (!day) issues.push({ level: 'error', message: 'Invalid day.' });
       if (!period) issues.push({ level: 'error', message: 'Invalid period.' });
-      if (!course)
-        issues.push({ level: 'error', message: 'Subject code not found.' });
       if (row['Faculty Code'] && !faculty)
         issues.push({ level: 'error', message: 'Faculty code not found.' });
       if (row['Room'] && !room)
@@ -269,7 +332,7 @@ export class TimetableRoutineExcelService {
           message: 'Period not in slot template for this day.',
         });
       }
-      const key = `${day}-${period}-${semester}-${row['Section'] ?? ''}-${course?.id ?? ''}`;
+      const key = `${day}-${period}-${semester}-${row['Section'] ?? ''}-${subjectGroup?.id ?? ''}-${course?.id ?? ''}`;
       if (draftKeys.has(key)) {
         issues.push({
           level: 'warning',
@@ -290,6 +353,7 @@ export class TimetableRoutineExcelService {
         issues,
         resolved: {
           courseId: course?.id,
+          teachingSubjectGroupId: subjectGroup?.id,
           staffProfileId: faculty?.id,
           classroomId: room?.id,
           dayOfWeek: day,
@@ -317,19 +381,47 @@ export class TimetableRoutineExcelService {
     tenantId: string,
     planId: string,
     buffer: Buffer,
-    options?: { overrideConflicts?: boolean },
+    options?: { overrideConflicts?: boolean; replaceExisting?: boolean },
   ) {
     const preview = await this.validateRoutineUpload(tenantId, planId, buffer);
     const plan = await this.prisma.timetablePlan.findFirst({
       where: { id: planId, tenantId, deletedAt: null },
     });
     if (!plan) throw new BadRequestException('Timetable plan not found');
+    const replaceExisting =
+      options?.replaceExisting ?? Boolean(options?.overrideConflicts);
     let committed = 0;
     for (const row of preview.rows) {
       if (row.issues.some((issue: any) => issue.level === 'error')) continue;
       const resolved = row.resolved;
-      if (!resolved?.courseId || !resolved.dayOfWeek || !resolved.periodNo)
-        continue;
+      if (!resolved?.dayOfWeek || !resolved.periodNo) continue;
+      const links = await this.subjectGroups.resolveEntryLinks(
+        tenantId,
+        resolved.teachingSubjectGroupId,
+        resolved.courseId,
+        null,
+        resolved.staffProfileId,
+      );
+      if (!links.courseId && !links.teachingSubjectGroupId) continue;
+
+      if (replaceExisting) {
+        await this.prisma.timetablePlanEntry.updateMany({
+          where: {
+            tenantId,
+            planId,
+            deletedAt: null,
+            source: 'MANUAL',
+            dayOfWeek: resolved.dayOfWeek,
+            periodNo: resolved.periodNo,
+            semesterSequence: resolved.semesterSequence,
+            ...(links.teachingSubjectGroupId
+              ? { teachingSubjectGroupId: links.teachingSubjectGroupId }
+              : { courseId: links.courseId ?? undefined }),
+          },
+          data: { deletedAt: new Date() },
+        });
+      }
+
       await this.prisma.timetablePlanEntry.create({
         data: {
           tenantId,
@@ -344,8 +436,10 @@ export class TimetableRoutineExcelService {
             ? parseTimeToDate(resolved.endTime)
             : parseTimeToDate('10:30:00'),
           slotTemplateId: resolved.slotTemplateId,
-          courseId: resolved.courseId,
-          staffProfileId: resolved.staffProfileId,
+          offeringSectionId: links.offeringSectionId ?? undefined,
+          courseId: links.courseId ?? undefined,
+          teachingSubjectGroupId: links.teachingSubjectGroupId ?? undefined,
+          staffProfileId: links.staffProfileId ?? undefined,
           classroomId: resolved.classroomId,
           semesterSequence: resolved.semesterSequence,
           sectionCode: row['Section'] ? String(row['Section']) : null,
@@ -359,9 +453,13 @@ export class TimetableRoutineExcelService {
             : 'THEORY',
           isLocked: true,
           source: 'MANUAL',
-          metadata: options?.overrideConflicts
-            ? { conflictOverride: true }
-            : {},
+          metadata: {
+            ...(options?.overrideConflicts ? { conflictOverride: true } : {}),
+            ...(links.teachingSubjectGroupId
+              ? { teachingSubjectGroupId: links.teachingSubjectGroupId }
+              : {}),
+            roomStatus: resolved.classroomId ? 'FINAL' : 'DRAFT',
+          },
         },
       });
       committed += 1;
@@ -405,7 +503,9 @@ export class TimetableRoutineExcelService {
     const lines = [
       'Timetable Routine Import',
       'Fill the Routine sheet only. Other sheets are lookups.',
-      'Stream / Shift / Semester / Day / Period / Subject Code are required.',
+      'Stream / Shift / Semester / Day / Period are required.',
+      'Use Subject Group Code for Major/Minor teaching units (preferred).',
+      'Subject Code is required when no group code is provided, or as paper reference.',
       'Faculty Code and Room are optional but validated when provided.',
       'Category must match FYUGP role: MAJOR, MINOR, MDC, AEC, SEC, VAC, VTC, INTERNSHIP, LAB.',
       'Day values: Monday, Tuesday, … or MON, TUE, …',

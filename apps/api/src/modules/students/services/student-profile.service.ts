@@ -36,6 +36,15 @@ const profileInclude = {
     include: { subjectMarks: { orderBy: { sortOrder: 'asc' as const } } },
   },
   cuetDetail: true,
+  abcAccount: {
+    select: {
+      abcId: true,
+      abcVerified: true,
+      verificationStatus: true,
+      lastSyncedAt: true,
+      status: true,
+    },
+  },
   createdBy: { select: { id: true, email: true } },
   lastModifiedBy: { select: { id: true, email: true } },
 };
@@ -171,6 +180,7 @@ export class StudentProfileService {
       applicationNumber: student.applicationNumber,
       admissionNumber: student.admissionNumber,
       rfidNumber: student.rfidNumber,
+      abcId: student.abcAccount?.abcId ?? null,
       importSource: student.importSource,
       admissionSource: student.admissionSource,
       photoPath: student.masterProfile?.photoPath,
@@ -291,6 +301,7 @@ export class StudentProfileService {
       } | null;
       programChoices?: { choiceType?: string; subjectSlug: string }[];
       semesterRegistrations?: { status: string; semesterSequence: number }[];
+      abcAccount?: { abcId: string | null } | null;
     },
     resolved: { semester: number; cycle: string | null },
     academicStatus: string,
@@ -320,6 +331,7 @@ export class StudentProfileService {
       admissionNumber: student.admissionNumber ?? null,
       rollNumber: student.rollNumber,
       rfidNumber: student.rfidNumber ?? null,
+      abcId: student.abcAccount?.abcId ?? null,
       fullName: student.masterProfile?.fullName ?? student.user.email,
       email: student.user.email,
       mobileNumber: student.masterProfile?.mobileNumber,

@@ -33,6 +33,13 @@ export const fetchNaacMetrics = (criterion?: number) =>
 export const fetchNaacEvidence = (params?: QueryParams) =>
   api.get<NaacEvidenceSearchResult>(`${base}/evidence`, { params }).then((r) => r.data);
 
+export const fetchNaacEvidenceBySource = (sourceType: string, sourceId: string) =>
+  api
+    .get<NaacEvidenceTag[]>(`${base}/evidence/by-source`, {
+      params: { sourceType, sourceId },
+    })
+    .then((r) => r.data);
+
 export const createNaacEvidenceTag = (payload: Partial<NaacEvidenceTag>) =>
   api.post<NaacEvidenceTag>(`${base}/evidence/tags`, payload).then((r) => r.data);
 
@@ -96,8 +103,36 @@ export const createNaacMou = (form: FormData) =>
 export const fetchNaacDepartmentDashboard = (departmentId?: string) =>
   api.get(`${base}/department/dashboard`, { params: { departmentId } }).then((r) => r.data);
 
-export const createNaacDepartmentSubmission = (payload: Partial<NaacDepartmentSubmission>) =>
+export const fetchNaacDepartmentSubmissions = (params?: QueryParams) =>
+  api
+    .get<NaacDepartmentSubmission[]>(`${base}/department/submissions`, { params })
+    .then((r) => r.data);
+
+export const createNaacDepartmentSubmission = (
+  payload: Partial<NaacDepartmentSubmission> & { submit?: boolean },
+) =>
   api.post<NaacDepartmentSubmission>(`${base}/department/submissions`, payload).then((r) => r.data);
+
+export const submitNaacDepartmentDraft = (id: string) =>
+  api
+    .post<NaacDepartmentSubmission>(`${base}/department/submissions/${id}/submit`)
+    .then((r) => r.data);
+
+export const reviewNaacDepartmentSubmission = (
+  id: string,
+  payload: { status: string; reviewNotes?: string },
+) =>
+  api
+    .patch<NaacDepartmentSubmission>(`${base}/department/submissions/${id}`, payload)
+    .then((r) => r.data);
+
+export const fetchNaacPortalDepartment = () => api.get(`${base}/me/department`).then((r) => r.data);
+
+export const downloadNaacEvidencePack = (params?: { criterion?: number; academicYear?: string }) =>
+  api.get<Blob>(`${base}/reports/evidence-pack`, {
+    params,
+    responseType: 'blob',
+  });
 
 export const fetchNaacIqacSummary = () =>
   api.get<NaacIqacSummary>(`${base}/iqac/summary`).then((r) => r.data);
@@ -121,5 +156,75 @@ export const fetchNaacSettings = () => api.get(`${base}/settings`).then((r) => r
 
 export const updateNaacSettings = (payload: Record<string, unknown>) =>
   api.patch(`${base}/settings`, payload).then((r) => r.data);
+
+export const reviewNaacFacultyAchievement = (
+  id: string,
+  payload: { status: string; reviewNotes?: string },
+) =>
+  api
+    .patch<NaacFacultyAchievement>(`${base}/faculty-achievements/${id}`, payload)
+    .then((r) => r.data);
+
+export const bulkReviewNaacFacultyAchievements = (payload: {
+  ids: string[];
+  status: string;
+  reviewNotes?: string;
+}) =>
+  api
+    .post<{
+      reviewed: number;
+      skipped: number;
+      ids: string[];
+    }>(`${base}/faculty-achievements/bulk-review`, payload)
+    .then((r) => r.data);
+
+export const reviewNaacStudentAchievement = (
+  id: string,
+  payload: { status: string; reviewNotes?: string },
+) =>
+  api
+    .patch<NaacStudentAchievement>(`${base}/student-achievements/${id}`, payload)
+    .then((r) => r.data);
+
+export const fetchNaacPortalStaffContext = () =>
+  api
+    .get<{
+      staff: {
+        id: string;
+        fullName: string;
+        employeeCode: string;
+        departmentId: string | null;
+      } | null;
+    }>(`${base}/me/staff-context`)
+    .then((r) => r.data);
+
+export const fetchNaacPortalAchievements = (params?: QueryParams) =>
+  api
+    .get<NaacListResponse<NaacFacultyAchievement>>(`${base}/me/achievements`, { params })
+    .then((r) => r.data);
+
+export const createNaacPortalAchievement = (form: FormData) =>
+  api
+    .post<NaacFacultyAchievement>(`${base}/me/achievements`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((r) => r.data);
+
+export const createNaacCalendarEvent = (payload: {
+  title: string;
+  eventType: string;
+  dueDate: string;
+  description?: string;
+}) => api.post<NaacCalendarEvent>(`${base}/calendar`, payload).then((r) => r.data);
+
+export const addNaacMouActivity = (
+  mouId: string,
+  payload: { title: string; activityDate?: string; outcomes?: string; reportNotes?: string },
+) => api.post(`${base}/mous/${mouId}/activities`, payload).then((r) => r.data);
+
+export const updateNaacAqar = (
+  id: string,
+  payload: { title?: string; status?: string; institutionProfile?: Record<string, unknown> },
+) => api.patch<NaacAqar>(`${base}/aqar/${id}`, payload).then((r) => r.data);
 
 export const fetchNaacConstants = () => api.get(`${base}/constants`).then((r) => r.data);

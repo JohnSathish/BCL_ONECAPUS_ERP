@@ -11,32 +11,28 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
-  createNaacAqar,
-  createNaacDepartmentSubmission,
-  createNaacFacultyAchievement,
-  createNaacMou,
-  createNaacStudentAchievement,
+  downloadNaacEvidencePack,
   exportNaacReport,
-  fetchNaacAqar,
-  fetchNaacAqars,
-  fetchNaacCalendar,
   fetchNaacCriteria,
   fetchNaacDashboard,
   fetchNaacDepartmentDashboard,
+  fetchNaacPortalDepartment,
   fetchNaacDvvReadiness,
   fetchNaacEvidence,
-  fetchNaacFacultyAchievements,
   fetchNaacIqacSummary,
-  fetchNaacMous,
-  fetchNaacSettings,
-  fetchNaacStudentAchievements,
   fetchNaacVault,
-  syncNaacAqarSection,
-  updateNaacSettings,
   uploadNaacVault,
 } from '@/services/naac-iqac';
 import type { NaacPage } from '@/types/naac-iqac';
 import { EvidenceTagUploadForm } from '@/components/naac-iqac-module/evidence-tag-upload-form';
+import { NaacAqarPanel } from '@/components/naac-iqac-module/naac-aqar-panel';
+import { NaacCalendarPanel } from '@/components/naac-iqac-module/naac-calendar-panel';
+import { NaacDepartmentPanel } from '@/components/naac-iqac-module/naac-department-panel';
+import { NaacFacultyPanel } from '@/components/naac-iqac-module/naac-faculty-panel';
+import { NaacMouPanel } from '@/components/naac-iqac-module/naac-mou-panel';
+import { NaacSettingsPanel } from '@/components/naac-iqac-module/naac-settings-panel';
+import { NaacStudentPanel } from '@/components/naac-iqac-module/naac-student-panel';
+import { downloadBlob } from '@/utils/download-blob';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -103,7 +99,13 @@ function DataTable({ rows, columns }: { rows: Record<string, unknown>[]; columns
   );
 }
 
-export function NaacWorkspace({ page }: { page: NaacPage }) {
+export function NaacWorkspace({
+  page,
+  portalMode = false,
+}: {
+  page: NaacPage;
+  portalMode?: boolean;
+}) {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [selectedAqarId, setSelectedAqarId] = useState<string | null>(null);
@@ -137,34 +139,9 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
     queryFn: () => fetchNaacVault({ limit: 50 }),
     enabled: enabled && page === 'vault',
   });
-  const aqarsQ = useQuery({
-    queryKey: ['naac-aqars'],
-    queryFn: fetchNaacAqars,
-    enabled: enabled && page === 'aqar',
-  });
-  const aqarDetailQ = useQuery({
-    queryKey: ['naac-aqar', selectedAqarId],
-    queryFn: () => fetchNaacAqar(selectedAqarId!),
-    enabled: !!selectedAqarId && page === 'aqar',
-  });
-  const facultyQ = useQuery({
-    queryKey: ['naac-faculty'],
-    queryFn: () => fetchNaacFacultyAchievements({ limit: 50 }),
-    enabled: enabled && page === 'faculty',
-  });
-  const studentQ = useQuery({
-    queryKey: ['naac-student'],
-    queryFn: () => fetchNaacStudentAchievements({ limit: 50 }),
-    enabled: enabled && page === 'student',
-  });
-  const mousQ = useQuery({
-    queryKey: ['naac-mous'],
-    queryFn: fetchNaacMous,
-    enabled: enabled && page === 'mous',
-  });
   const deptQ = useQuery({
-    queryKey: ['naac-dept'],
-    queryFn: () => fetchNaacDepartmentDashboard(),
+    queryKey: ['naac-dept', portalMode],
+    queryFn: () => (portalMode ? fetchNaacPortalDepartment() : fetchNaacDepartmentDashboard()),
     enabled: enabled && page === 'department',
   });
   const iqacQ = useQuery({
@@ -177,26 +154,6 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
     queryFn: () => fetchNaacDvvReadiness(),
     enabled: enabled && page === 'dvv',
   });
-  const calendarQ = useQuery({
-    queryKey: ['naac-calendar'],
-    queryFn: fetchNaacCalendar,
-    enabled: enabled && page === 'calendar',
-  });
-  const settingsQ = useQuery({
-    queryKey: ['naac-settings'],
-    queryFn: fetchNaacSettings,
-    enabled: enabled && page === 'settings',
-  });
-
-  const syncMut = useMutation({
-    mutationFn: ({ aqarId, sectionKey }: { aqarId: string; sectionKey: string }) =>
-      syncNaacAqarSection(aqarId, sectionKey),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['naac-aqar'] });
-      qc.invalidateQueries({ queryKey: ['naac-aqars'] });
-    },
-    onError: (e) => setError(apiErrorMessage(e)),
-  });
 
   const vaultMut = useMutation({
     mutationFn: uploadNaacVault,
@@ -207,12 +164,12 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
       setVaultUploadKey((k) => k + 1);
       setError('');
     },
-    onError: (e) => setError(apiErrorMessage(e)),
+    onError: (e) => setError(apiErrorMessage(e, 'Upload failed')),
   });
 
   const exportMut = useMutation({
     mutationFn: exportNaacReport,
-    onError: (e) => setError(apiErrorMessage(e)),
+    onError: (e) => setError(apiErrorMessage(e, 'Upload failed')),
   });
 
   const dashboard = dashboardQ.data;
@@ -377,7 +334,7 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
                   metric: t.metricCode ?? '—',
                   year: t.academicYear,
                   activity: t.activityTitle ?? '—',
-                  event: t.eventTitle ?? '—',
+                  event: t.activityTitle ?? '—',
                   source: t.sourceType,
                   file: t.fileName ?? '—',
                   notes: t.evidenceNotes ? String(t.evidenceNotes).slice(0, 40) : '—',
@@ -434,138 +391,23 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
     }
 
     if (page === 'aqar') {
-      const aqars = aqarsQ.data ?? [];
-      const detail = aqarDetailQ.data;
-      return (
-        <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            {aqars.map((a) => (
-              <Button
-                key={a.id}
-                variant={selectedAqarId === a.id ? 'default' : 'outline'}
-                onClick={() => setSelectedAqarId(a.id)}
-              >
-                {a.title} ({a.completionPct}%)
-              </Button>
-            ))}
-          </div>
-          {detail && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{detail.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {(detail.sections ?? []).map((s) => (
-                  <div key={s.id} className="flex items-center justify-between rounded border p-3">
-                    <div>
-                      <p className="font-medium">{s.sectionKey}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.completionPct}% ·{' '}
-                        {s.lastSyncedAt
-                          ? `Synced ${new Date(s.lastSyncedAt).toLocaleString()}`
-                          : 'Not synced'}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={syncMut.isPending}
-                      onClick={() =>
-                        syncMut.mutate({ aqarId: detail.id, sectionKey: s.sectionKey })
-                      }
-                    >
-                      Sync from ERP
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      );
+      return <NaacAqarPanel selectedId={selectedAqarId} onSelect={setSelectedAqarId} />;
     }
 
     if (page === 'department') {
-      const data = deptQ.data as
-        | {
-            departments?: Array<{ id: string; name: string; code: string }>;
-            submissions?: unknown[];
-            pendingDepartments?: unknown[];
-          }
-        | undefined;
-      return (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Department NAAC Portal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3">
-                {data?.departments?.length ?? 0} departments ·{' '}
-                {(data?.pendingDepartments as unknown[])?.length ?? 0} pending submission
-              </p>
-              <Button
-                onClick={() => {
-                  const dept = data?.departments?.[0];
-                  if (!dept) return;
-                  createNaacDepartmentSubmission({
-                    departmentId: dept.id,
-                    academicYear: '2025-26',
-                    submissionType: 'activities',
-                    payload: { note: 'Dept activities submitted' },
-                  }).then(() => qc.invalidateQueries({ queryKey: ['naac-dept'] }));
-                }}
-              >
-                Submit sample dept data
-              </Button>
-            </CardContent>
-          </Card>
-          <DataTable
-            rows={(data?.departments ?? []).map((d) => ({ code: d.code, name: d.name }))}
-            columns={['code', 'name']}
-          />
-        </div>
-      );
+      return <NaacDepartmentPanel data={deptQ.data} canReview={!portalMode} />;
     }
 
     if (page === 'faculty') {
-      return (
-        <DataTable
-          rows={(facultyQ.data?.items ?? []).map((a) => ({
-            type: a.achievementType,
-            title: a.title,
-            status: a.status,
-          }))}
-          columns={['type', 'title', 'status']}
-        />
-      );
+      return <NaacFacultyPanel portalMode={portalMode} canReview={!portalMode} />;
     }
 
     if (page === 'student') {
-      return (
-        <DataTable
-          rows={(studentQ.data?.items ?? []).map((a) => ({
-            type: a.achievementType,
-            title: a.title,
-            status: a.status,
-          }))}
-          columns={['type', 'title', 'status']}
-        />
-      );
+      return <NaacStudentPanel canReview={!portalMode} />;
     }
 
     if (page === 'mous') {
-      return (
-        <DataTable
-          rows={(mousQ.data ?? []).map((m) => ({
-            partner: m.partnerName,
-            type: m.partnerType,
-            status: m.status,
-            activities: m.activities?.length ?? 0,
-          }))}
-          columns={['partner', 'type', 'status', 'activities']}
-        />
-      );
+      return <NaacMouPanel />;
     }
 
     if (page === 'iqac') {
@@ -641,17 +483,7 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
     }
 
     if (page === 'calendar') {
-      return (
-        <DataTable
-          rows={(calendarQ.data ?? []).map((e) => ({
-            title: e.title,
-            type: e.eventType,
-            due: new Date(e.dueDate).toLocaleDateString(),
-            status: e.status,
-          }))}
-          columns={['title', 'type', 'due', 'status']}
-        />
-      );
+      return <NaacCalendarPanel />;
     }
 
     if (page === 'reports') {
@@ -686,36 +518,26 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
             >
               Export Evidence Index (CSV)
             </Button>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const res = await downloadNaacEvidencePack({ academicYear: '2025-26' });
+                  downloadBlob(res.data, 'naac-evidence-pack.zip');
+                } catch (e) {
+                  setError(apiErrorMessage(e, 'ZIP export failed'));
+                }
+              }}
+            >
+              Download Evidence Pack (ZIP)
+            </Button>
           </CardContent>
         </Card>
       );
     }
 
     if (page === 'settings') {
-      const s = settingsQ.data as { activeAqarYear?: string } | undefined;
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>NAAC Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">
-              Active AQAR Year: <strong>{s?.activeAqarYear ?? '2025-26'}</strong>
-            </p>
-            <Button
-              className="mt-3"
-              variant="outline"
-              onClick={() =>
-                updateNaacSettings({ activeAqarYear: '2025-26' }).then(() =>
-                  qc.invalidateQueries({ queryKey: ['naac-settings'] }),
-                )
-              }
-            >
-              Save defaults
-            </Button>
-          </CardContent>
-        </Card>
-      );
+      return <NaacSettingsPanel />;
     }
 
     return null;
@@ -726,23 +548,15 @@ export function NaacWorkspace({ page }: { page: NaacPage }) {
     evidenceQ,
     criteriaQ,
     vaultQ,
-    aqarsQ,
-    aqarDetailQ,
-    facultyQ,
-    studentQ,
-    mousQ,
     deptQ,
     iqacQ,
     dvvQ,
-    calendarQ,
-    settingsQ,
     evidenceCriterion,
     evidenceYear,
     vaultUploadKey,
-    syncMut,
     vaultMut,
     exportMut,
-    qc,
+    portalMode,
     selectedAqarId,
   ]);
 

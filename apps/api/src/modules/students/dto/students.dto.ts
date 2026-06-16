@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEmail,
@@ -11,6 +12,7 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
@@ -230,6 +232,10 @@ export class AdmitStudentDto {
   @IsOptional()
   @IsString()
   rfidNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  abcId?: string;
 }
 
 export class UpdateStudentProfileDto {
@@ -557,6 +563,25 @@ export class StudentListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   recentlyAdded?: string;
+
+  @IsOptional()
+  @IsString()
+  abcStatus?: string;
+}
+
+export class BulkAbcUploadRowDto {
+  @IsString()
+  rollNumber!: string;
+
+  @IsString()
+  abcId!: string;
+}
+
+export class BulkAbcUploadDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkAbcUploadRowDto)
+  rows!: BulkAbcUploadRowDto[];
 }
 
 export class StudentExportQueryDto extends StudentListQueryDto {

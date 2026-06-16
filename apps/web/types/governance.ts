@@ -28,19 +28,32 @@ export type GovernanceCommitteeMember = {
   id: string;
   committeeId: string;
   committeeName?: string;
+  committeeShortCode?: string;
   staffProfileId?: string | null;
   studentId?: string | null;
   userId?: string | null;
   displayName: string;
+  employeeCode?: string | null;
+  departmentName?: string | null;
   designation?: string | null;
   role: string;
   mobile?: string | null;
   email?: string | null;
   joiningDate?: string | null;
+  endDate?: string | null;
+  replacedByMemberId?: string | null;
   status: string;
   isExternal: boolean;
+  replacementRequired?: boolean;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type GovernanceMemberStats = {
+  totalCommittees: number;
+  totalMembers: number;
+  expiringSoon: number;
+  membersNeedingReplacement: number;
 };
 
 export type GovernanceMeetingAgendaItem = {

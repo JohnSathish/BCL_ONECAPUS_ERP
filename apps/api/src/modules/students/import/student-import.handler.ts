@@ -16,6 +16,7 @@ import { AcademicEngineService } from '../../academic-engine/academic-engine.ser
 import { slugifySubject } from '../../academic-engine/domain/nep-categories';
 import type { StudentImportMode } from '../dto/students.dto';
 import { StudentSemesterResolverService } from '../services/student-semester-resolver.service';
+import { StudentAbcService } from '../services/student-abc.service';
 import {
   SEM1_ADMISSION_SAMPLE_ROW,
   SEM1_ADMISSION_TEMPLATE_HEADERS,
@@ -46,6 +47,7 @@ export type NormalizedStudentImportRow = {
   fatherName?: string;
   motherName?: string;
   rfidNumber?: string;
+  abcId?: string;
   majorSubjectSlug?: string;
   minorSubjectSlug?: string;
   academicMapping?: FyugpAcademicMapping;
@@ -221,6 +223,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     { key: 'fullName', header: 'Full Name', required: true },
     { key: 'email', header: 'Email', required: true },
     { key: 'mobile', header: 'Mobile', required: false },
+    { key: 'abcId', header: 'ABC_ID', required: false },
     { key: 'programme', header: 'Programme', required: true },
     { key: 'admissionBatch', header: 'Admission Batch', required: true },
     { key: 'stream', header: 'Stream', required: true },
@@ -276,6 +279,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly prisma: PrismaService,
     private readonly academicEngine: AcademicEngineService,
     private readonly semesterResolver: StudentSemesterResolverService,
+    private readonly abcService: StudentAbcService,
   ) {}
   async parseAndValidate(
     tenantId: string,
@@ -595,6 +599,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const motherName = String(raw.motherName ?? '').trim() || undefined;
     const rfidNumber =
       String(raw.rfid ?? raw.rfidNumber ?? '').trim() || undefined;
+    const abcId =
+      String(raw.abcId ?? raw.abc_id ?? raw.ABC_ID ?? '').trim() || undefined;
     if (!enrollmentNumber)
       errors.push(
         'Registration number is required (use Application Number if roll not assigned yet)',
@@ -860,6 +866,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             fatherName,
             motherName,
             rfidNumber,
+            abcId,
             majorSubjectSlug,
             minorSubjectSlug,
             academicMapping: fyugpMapping,
@@ -1888,6 +1895,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       majorSubjectSlug: n.majorSubjectSlug,
       minorSubjectSlug: n.minorSubjectSlug,
     });
+    if (n.abcId) {
+      await this.abcService.upsertForStudent(tenantId, studentId, n.abcId);
+    }
     return studentId;
   }
   private async mergeStudentRecord(
@@ -2030,6 +2040,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         targetSemester,
       );
     });
+    if (n.abcId) {
+      await this.abcService.upsertForStudent(tenantId, studentId, n.abcId);
+    }
     return studentId;
   }
   private async upsertGuardians(

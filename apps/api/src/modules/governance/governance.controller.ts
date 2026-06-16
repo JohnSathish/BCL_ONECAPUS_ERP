@@ -49,6 +49,7 @@ import {
   PerformanceComputeDto,
   ReportExportDto,
   ReviewImportDraftDto,
+  ReplaceMemberDto,
   UpdateAtrDto,
   UpdateCommitteeDto,
   UpdateEventDto,
@@ -192,10 +193,34 @@ export class GovernanceController {
     return this.members.create(user, { ...dto, committeeId });
   }
 
+  @Get('members/stats')
+  @RequireAnyPermission(...GOV_READ)
+  memberStats(@CurrentUser() user: JwtUser) {
+    return this.members.memberStats(user.tid);
+  }
+
   @Get('members')
   @RequireAnyPermission(...GOV_READ)
   listMembers(@CurrentUser() user: JwtUser, @Query() query: ListQueryDto) {
     return this.members.list(user.tid, query);
+  }
+
+  @Get('staff/:staffProfileId/memberships')
+  @RequireAnyPermission(...GOV_READ)
+  staffMemberships(
+    @CurrentUser() user: JwtUser,
+    @Param('staffProfileId') staffProfileId: string,
+  ) {
+    return this.members.listByStaff(user.tid, staffProfileId);
+  }
+
+  @Get('committees/:committeeId/members/history')
+  @RequireAnyPermission(...GOV_READ)
+  committeeMemberHistory(
+    @CurrentUser() user: JwtUser,
+    @Param('committeeId') committeeId: string,
+  ) {
+    return this.members.listHistory(user.tid, committeeId);
   }
 
   @Get('members/:id')
@@ -233,6 +258,22 @@ export class GovernanceController {
   @RequireAnyPermission(...GOV_MANAGE)
   removeMember(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.members.remove(user, id);
+  }
+
+  @Post('members/:id/deactivate')
+  @RequireAnyPermission(...GOV_MANAGE)
+  deactivateMember(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.members.deactivate(user, id);
+  }
+
+  @Post('members/:id/replace')
+  @RequireAnyPermission(...GOV_MANAGE)
+  replaceMember(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ReplaceMemberDto,
+  ) {
+    return this.members.replaceMember(user, id, dto);
   }
 
   @Get('meetings')

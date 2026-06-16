@@ -40,6 +40,7 @@ export class UpdateBasicSectionDto {
   @IsOptional() @IsUUID() primaryShiftId?: string;
   @IsOptional() @IsUUID() admissionBatchId?: string;
   @IsOptional() @IsString() rfidNumber?: string;
+  @IsOptional() @IsString() abcId?: string;
 }
 
 export class UpdateCategorySectionDto {

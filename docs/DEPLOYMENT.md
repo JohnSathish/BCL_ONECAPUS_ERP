@@ -135,6 +135,56 @@ npm install
 EXPO_PUBLIC_API_URL=http://localhost:3001/api EXPO_PUBLIC_TENANT_SLUG=demo npm start
 ```
 
+## Database Backup Center
+
+The **System Administration → Database Backups** module provides scheduled and manual instance backups, per-tenant export bundles, local repository storage, AWS S3 / Backblaze B2 sync, verification, retention cleanup, and super-admin restore with mandatory safety backup.
+
+### Docker volumes
+
+| Volume        | Mount                          | Contents                                  |
+| ------------- | ------------------------------ | ----------------------------------------- |
+| `nep_backups` | `/data/backups` (api + worker) | Backup artifacts (pg_dump, tar archives)  |
+| `nep_uploads` | `/data/uploads`                | User uploads included in file backups     |
+| `nep_storage` | `/data/storage`                | Document storage included in file backups |
+
+### Environment
+
+```bash
+BACKUP_ROOT=/data/backups
+UPLOAD_ROOT=/data/uploads
+STORAGE_ROOT=/data/storage
+BACKUP_PG_DUMP_PATH=pg_dump          # optional override
+BACKUP_SKIP_DUMP=true                  # Windows dev without pg_dump
+ENCRYPTION_KEY=...                     # encrypts cloud credentials at rest
+```
+
+Backup jobs run on the **worker** container (`postgresql16-client` + `zstd` installed). The API enqueues BullMQ jobs on the `backups` queue.
+
+### Migration
+
+After pulling backup center changes, apply migration `20250613120000_backup_center` and re-seed for backup permissions and notification templates:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+### Smoke test (Docker)
+
+With the stack running (`docker compose up -d`):
+
+```bash
+node scripts/backup-smoke-test.mjs
+```
+
+Set `SMOKE_API_URL=http://localhost:3001/api` if not using the default. The script logs in as demo admin, runs a `DATABASE_ONLY` backup, waits for completion, verifies checksums, and prints dashboard stats.
+
+### Restore safety
+
+Restore (super-admin only) always creates a **PRE_RESTORE_SAFETY** backup first, enables **maintenance mode** (blocks non–super-admin writes), then runs `pg_restore` / file extraction on the worker.
+
+Point-in-time recovery (WAL/PITR) requires managed PostgreSQL infrastructure and is documented as a Phase 2 infra dependency.
+
 ## CI/CD
 
 GitHub Actions workflow at `.github/workflows/ci.yml` runs install, lint, typecheck, and build on PRs and `main`.

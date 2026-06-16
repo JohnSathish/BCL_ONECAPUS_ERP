@@ -24,6 +24,7 @@ import {
   exportStudentsCsv,
   exportStudentsProfileXlsx,
   exportSubjectAllocationsXlsx,
+  fetchAbcCoverage,
   fetchEnhancedStudentsSummary,
   fetchStudents,
 } from '@/services/students';
@@ -68,6 +69,12 @@ export default function StudentReportsPage() {
   const summary = useQuery({
     queryKey: ['students', 'summary', 'enhanced'],
     queryFn: fetchEnhancedStudentsSummary,
+    enabled: Boolean(session) && perms.canRead,
+  });
+
+  const abcCoverage = useQuery({
+    queryKey: ['students', 'abc', 'coverage'],
+    queryFn: fetchAbcCoverage,
     enabled: Boolean(session) && perms.canRead,
   });
 
@@ -183,6 +190,53 @@ export default function StudentReportsPage() {
               <p className="text-lg font-semibold">{summary.data.registrations}</p>
             </div>
           </div>
+        ) : null}
+
+        {abcCoverage.data ? (
+          <CompactCard>
+            <CompactCardHeader
+              title="ABC Coverage Report"
+              description="Academic Bank of Credits ID availability for NEP / NAAC audits"
+            />
+            <CompactCardBody>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <p className="text-muted-foreground">Total students</p>
+                  <p className="text-lg font-semibold">
+                    {abcCoverage.data.totalStudents.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <p className="text-muted-foreground">ABC available</p>
+                  <p className="text-lg font-semibold">
+                    {abcCoverage.data.withAbcId.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <p className="text-muted-foreground">Missing ABC</p>
+                  <p className="text-lg font-semibold">
+                    {abcCoverage.data.missingAbcId.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <p className="text-muted-foreground">Coverage</p>
+                  <p className="text-lg font-semibold">{abcCoverage.data.coveragePct}%</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/admin/students?abc=missing">
+                  <Button type="button" size="sm" variant="outline">
+                    View missing ABC
+                  </Button>
+                </Link>
+                <Link href="/admin/students/abc-upload">
+                  <Button type="button" size="sm" variant="outline">
+                    Upload ABC IDs
+                  </Button>
+                </Link>
+              </div>
+            </CompactCardBody>
+          </CompactCard>
         ) : null}
 
         <CompactCard>

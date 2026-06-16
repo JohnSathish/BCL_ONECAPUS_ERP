@@ -77,6 +77,11 @@ export class TimetableStreamMasterService {
           status: { not: 'CANCELLED' },
           semesterSequence: { in: semesterRows },
         },
+        include: {
+          teachingSubjectGroup: {
+            select: { id: true, code: true, title: true, fyugpCategory: true },
+          },
+        },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
       }),
     ]);
@@ -264,6 +269,7 @@ export class TimetableStreamMasterService {
     sectionById: Map<string, any>,
   ) {
     const course = entry.courseId ? courseById.get(entry.courseId) : null;
+    const subjectGroup = entry.teachingSubjectGroup ?? null;
     const staff = entry.staffProfileId
       ? staffById.get(entry.staffProfileId)
       : null;
@@ -278,8 +284,10 @@ export class TimetableStreamMasterService {
     return {
       id: entry.id,
       periodNo: entry.periodNo,
-      courseCode: course?.code ?? metadata.subjectCode ?? null,
-      courseTitle: course?.title ?? metadata.subjectName ?? null,
+      courseCode:
+        subjectGroup?.code ?? course?.code ?? metadata.subjectCode ?? null,
+      courseTitle:
+        subjectGroup?.title ?? course?.title ?? metadata.subjectName ?? null,
       category: entry.fyugpCategory ?? metadata.paperType ?? null,
       facultyInitial: this.facultyInitial(staff),
       facultyName: staff?.fullName ?? null,

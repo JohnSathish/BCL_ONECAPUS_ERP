@@ -43,6 +43,8 @@ model Tenant {
   mobileDevices                 MobileDevice[]
   mobileAppEvents               MobileAppEvent[]
   mobileAppDailyStats           MobileAppDailyStats[]
+  backupSchedules               BackupSchedule[]
+  backupRuns                    BackupRun[]
 
   @@map("tenants")
   @@schema("platform")
@@ -661,6 +663,131 @@ model AuditLog {
   @@schema("platform")
 }
 
+model BackupSchedule {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String?   @map("tenant_id") @db.Uuid
+  frequency      String    @default("DAILY")
+  cronExpression String?   @map("cron_expression")
+  backupType     String    @default("DATABASE_DOCUMENTS") @map("backup_type")
+  enabled        Boolean   @default(true)
+  nextRunAt      DateTime? @map("next_run_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, nextRunAt])
+  @@map("backup_schedules")
+  @@schema("platform")
+}
+
+model BackupRun {
+  id                String    @id @default(uuid()) @db.Uuid
+  type              String
+  scope             String    @default("INSTANCE")
+  tenantId          String?   @map("tenant_id") @db.Uuid
+  status            String    @default("QUEUED")
+  triggeredBy       String    @map("triggered_by")
+  triggeredByUserId String?   @map("triggered_by_user_id") @db.Uuid
+  safetyForRunId    String?   @map("safety_for_run_id") @db.Uuid
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  sizeBytes         BigInt    @default(0) @map("size_bytes")
+  errorMessage      String?   @map("error_message")
+  progressStep      String?   @map("progress_step")
+  jobId             String?   @map("job_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  artifacts BackupArtifact[]
+  auditLogs BackupAuditLog[]
+
+  @@index([status, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("backup_runs")
+  @@schema("platform")
+}
+
+model BackupArtifact {
+  id              String    @id @default(uuid()) @db.Uuid
+  runId           String    @map("run_id") @db.Uuid
+  kind            String
+  localPath       String    @map("local_path")
+  sizeBytes       BigInt    @default(0) @map("size_bytes")
+  checksumSha256  String?   @map("checksum_sha256")
+  verifiedAt      DateTime? @map("verified_at")
+  cloudStatus     String    @default("PENDING") @map("cloud_status")
+  cloudKey        String?   @map("cloud_key")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  run BackupRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("backup_artifacts")
+  @@schema("platform")
+}
+
+model BackupCloudTarget {
+  id                    String   @id @default(uuid()) @db.Uuid
+  provider              String
+  bucket                String
+  region                String?
+  endpoint              String?
+  pathPrefix            String   @default("nep-backups") @map("path_prefix")
+  credentialsEncrypted  String?  @map("credentials_encrypted")
+  enabled               Boolean  @default(false)
+  lastSyncAt            DateTime? @map("last_sync_at")
+  lastSyncError         String?  @map("last_sync_error")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider])
+  @@map("backup_cloud_targets")
+  @@schema("platform")
+}
+
+model BackupRetentionPolicy {
+  id                 String   @id @default("singleton")
+  keepCount          Int?     @map("keep_count")
+  keepDays           Int      @default(30) @map("keep_days")
+  autoCleanupEnabled Boolean  @default(true) @map("auto_cleanup_enabled")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("backup_retention_policies")
+  @@schema("platform")
+}
+
+model BackupAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  action    String
+  actorId   String?  @map("actor_id") @db.Uuid
+  ipAddress String?  @map("ip_address")
+  runId     String?  @map("run_id") @db.Uuid
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run BackupRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([runId])
+  @@map("backup_audit_logs")
+  @@schema("platform")
+}
+
+model SystemMaintenanceFlag {
+  id              String    @id @default("singleton")
+  active          Boolean   @default(false)
+  reason          String?
+  startedAt       DateTime? @map("started_at")
+  startedByUserId String?   @map("started_by_user_id") @db.Uuid
+  backupRunId     String?   @map("backup_run_id") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("system_maintenance_flags")
+  @@schema("platform")
+}
+
 model UsernameGenerationRule {
   id           String   @id @default(uuid()) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
@@ -1095,6 +1222,7 @@ model Shift {
   campusShiftActiveSemesters CampusShiftActiveSemester[]
   promotionRuns              SemesterPromotionRun[]
   lmsWorkspaces              LmsWorkspace[]
+  teachingSubjectGroups      TeachingSubjectGroup[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -1130,6 +1258,7 @@ model Department {
   courses          Course[]
   students         Student[]
   academicSubjects AcademicSubject[]
+  teachingSubjectGroups TeachingSubjectGroup[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -1189,6 +1318,7 @@ model AcademicYear {
   staffSubjectAssignments    StaffSubjectAssignment[]
   subjectTeachingAssignments SubjectTeachingAssignment[]
   staffWorkloads             StaffWorkload[]
+  teachingSubjectGroups      TeachingSubjectGroup[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -1455,6 +1585,7 @@ model Course {
   staffSubjectEligibility    StaffSubjectEligibility[]
   subjectTeachingAssignments SubjectTeachingAssignment[]
   lmsWorkspaces              LmsWorkspace[]
+  teachingSubjectGroupPapers TeachingSubjectGroupPaper[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2571,6 +2702,7 @@ model StaffProfile {
   recruitmentApplications  RecruitmentApplication[]
   quarterOccupancies       QuarterOccupancy[]
   quarterMonthlyCharges    QuarterMonthlyCharge[]
+  primaryTeachingSubjectGroups TeachingSubjectGroup[] @relation("TeachingSubjectGroupPrimaryStaff")
 
   @@unique([tenantId, employeeCode])
   @@unique([campusId, shortCode])
@@ -4211,6 +4343,8 @@ model OfferingSection {
   registrationLines          SemesterRegistrationLine[]
   eligibleStreams            OfferingSectionStream[]
   lmsWorkspace               LmsWorkspace?
+  teachingSubjectGroups      TeachingSubjectGroup[]
+  teachingSubjectGroupPapers TeachingSubjectGroupPaper[]
 
   @@unique([courseOfferingId, shiftId, sectionCode])
   @@index([tenantId])
@@ -4274,6 +4408,7 @@ model AcademicSubject {
   allowedMinorRules       MajorMinorRule[]         @relation("AllowedMinorRules")
   majorMinorTracksAsMajor StudentMajorMinorTrack[] @relation("MajorMinorTrackMajor")
   majorMinorTracksAsMinor StudentMajorMinorTrack[] @relation("MajorMinorTrackMinor")
+  teachingSubjectGroups   TeachingSubjectGroup[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, institutionId])
@@ -4301,6 +4436,64 @@ model MajorMinorRule {
   @@index([tenantId, majorSubjectId])
   @@index([tenantId, allowedMinorSubjectId])
   @@map("major_minor_rules")
+  @@schema("academic")
+}
+
+/// Classroom teaching unit — timetabled & attendance-marked as one subject (e.g. Major Sociology Sem 3).
+model TeachingSubjectGroup {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  institutionId         String?   @map("institution_id") @db.Uuid
+  code                  String
+  title                 String
+  academicSubjectId     String?   @map("academic_subject_id") @db.Uuid
+  academicYearId        String?   @map("academic_year_id") @db.Uuid
+  semesterNo            Int       @map("semester_no")
+  shiftId               String?   @map("shift_id") @db.Uuid
+  fyugpCategory         String    @map("fyugp_category")
+  departmentId          String?   @map("department_id") @db.Uuid
+  primaryStaffProfileId String?   @map("primary_staff_profile_id") @db.Uuid
+  offeringSectionId     String?   @map("offering_section_id") @db.Uuid
+  status                String    @default("ACTIVE")
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  academicSubject     AcademicSubject?            @relation(fields: [academicSubjectId], references: [id], onDelete: SetNull)
+  academicYear        AcademicYear?               @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+  shift               Shift?                      @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  department          Department?                 @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  primaryStaffProfile StaffProfile?               @relation("TeachingSubjectGroupPrimaryStaff", fields: [primaryStaffProfileId], references: [id], onDelete: SetNull)
+  offeringSection     OfferingSection?            @relation(fields: [offeringSectionId], references: [id], onDelete: SetNull)
+  papers              TeachingSubjectGroupPaper[]
+  timetableEntries    TimetablePlanEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, semesterNo, fyugpCategory])
+  @@index([tenantId, academicSubjectId])
+  @@index([tenantId, shiftId])
+  @@map("teaching_subject_groups")
+  @@schema("academic")
+}
+
+/// University papers linked under a teaching subject group (e.g. SOC-200 + SOC-201 → Major Sociology).
+model TeachingSubjectGroupPaper {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  teachingSubjectGroupId String   @map("teaching_subject_group_id") @db.Uuid
+  courseId               String   @map("course_id") @db.Uuid
+  paperIndex             Int?     @map("paper_index")
+  offeringSectionId      String?  @map("offering_section_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  teachingSubjectGroup TeachingSubjectGroup @relation(fields: [teachingSubjectGroupId], references: [id], onDelete: Cascade)
+  course               Course               @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  offeringSection      OfferingSection?     @relation(fields: [offeringSectionId], references: [id], onDelete: SetNull)
+
+  @@unique([teachingSubjectGroupId, courseId])
+  @@index([tenantId, courseId])
+  @@map("teaching_subject_group_papers")
   @@schema("academic")
 }
 
@@ -4745,9 +4938,10 @@ model StudentAttendanceSession {
   semesterId           String?   @map("semester_id") @db.Uuid
   semesterNo           Int?      @map("semester_no")
   programVersionId     String?   @map("program_version_id") @db.Uuid
-  offeringSectionId    String?   @map("offering_section_id") @db.Uuid
-  courseId             String?   @map("course_id") @db.Uuid
-  shiftId              String?   @map("shift_id") @db.Uuid
+  offeringSectionId       String?   @map("offering_section_id") @db.Uuid
+  courseId                String?   @map("course_id") @db.Uuid
+  teachingSubjectGroupId  String?   @map("teaching_subject_group_id") @db.Uuid
+  shiftId                 String?   @map("shift_id") @db.Uuid
   classroomId          String?   @map("classroom_id") @db.Uuid
   timetablePlanEntryId String?   @map("timetable_plan_entry_id") @db.Uuid
   sessionDate          DateTime  @map("session_date") @db.Date
@@ -4777,6 +4971,7 @@ model StudentAttendanceSession {
   @@index([tenantId, sessionDate])
   @@index([tenantId, offeringSectionId, sessionDate])
   @@index([tenantId, courseId, semesterNo])
+  @@index([tenantId, teachingSubjectGroupId, semesterNo])
   @@index([tenantId, primaryFacultyId, sessionDate])
   @@index([tenantId, status])
   @@map("student_attendance_sessions")
@@ -4964,8 +5159,9 @@ model TimetablePlanEntry {
   endTime           DateTime  @map("end_time") @db.Time(0)
   offeringSectionId String?   @map("offering_section_id") @db.Uuid
   courseOfferingId  String?   @map("course_offering_id") @db.Uuid
-  courseId          String?   @map("course_id") @db.Uuid
-  staffProfileId    String?   @map("staff_profile_id") @db.Uuid
+  courseId                String?   @map("course_id") @db.Uuid
+  teachingSubjectGroupId  String?   @map("teaching_subject_group_id") @db.Uuid
+  staffProfileId          String?   @map("staff_profile_id") @db.Uuid
   classroomId       String?   @map("classroom_id") @db.Uuid
   semesterSequence  Int?      @map("semester_sequence")
   sectionCode       String?   @map("section_code")
@@ -4982,13 +5178,15 @@ model TimetablePlanEntry {
   updatedAt         DateTime  @updatedAt @map("updated_at")
   deletedAt         DateTime? @map("deleted_at")
 
-  plan TimetablePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan                 TimetablePlan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  teachingSubjectGroup TeachingSubjectGroup?  @relation(fields: [teachingSubjectGroupId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, planId])
   @@index([planId, dayOfWeek, startTime])
   @@index([tenantId, staffProfileId, dayOfWeek])
   @@index([tenantId, classroomId, dayOfWeek])
   @@index([tenantId, offeringSectionId, dayOfWeek])
+  @@index([tenantId, teachingSubjectGroupId])
   @@index([combinedGroupKey])
   @@map("timetable_plan_entries")
   @@schema("academic")
@@ -6736,19 +6934,23 @@ model CreditLedgerEntry {
 }
 
 model AbcAccount {
-  id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @map("tenant_id") @db.Uuid
-  studentId String    @unique @map("student_id") @db.Uuid
-  abcId     String?   @map("abc_id")
-  status    String    @default("pending")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  studentId          String    @unique @map("student_id") @db.Uuid
+  abcId              String?   @map("abc_id")
+  abcVerified        Boolean   @default(false) @map("abc_verified")
+  verificationStatus String    @default("pending") @map("verification_status")
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  status             String    @default("pending")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
 
   student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   transactions AbcTransaction[]
 
   @@index([tenantId])
+  @@index([tenantId, abcId])
   @@map("abc_accounts")
   @@schema("compliance")
 }
@@ -7507,11 +7709,15 @@ model GovernanceCommitteeMember {
   studentId       String?   @map("student_id") @db.Uuid
   userId          String?   @map("user_id") @db.Uuid
   displayName     String    @map("display_name")
+  employeeCode    String?   @map("employee_code")
+  departmentName  String?   @map("department_name")
   designation     String?
   role            String
   mobile          String?
   email           String?
   joiningDate     DateTime? @map("joining_date")
+  endDate         DateTime? @map("end_date")
+  replacedByMemberId String? @map("replaced_by_member_id") @db.Uuid
   status          String    @default("ACTIVE")
   isExternal      Boolean   @default(false) @map("is_external")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -7523,6 +7729,7 @@ model GovernanceCommitteeMember {
   @@index([tenantId, committeeId])
   @@index([tenantId, staffProfileId])
   @@index([tenantId, userId])
+  @@index([tenantId, status])
   @@map("governance_committee_members")
   @@schema("core")
 }

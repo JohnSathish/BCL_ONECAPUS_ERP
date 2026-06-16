@@ -31,6 +31,7 @@ import { StudentDirectoryEnrichmentService } from './services/student-directory-
 import { StudentProfileService } from './services/student-profile.service';
 import { StudentSemesterResolverService } from './services/student-semester-resolver.service';
 import { RollNumberService } from './services/roll-number.service';
+import { StudentAbcService } from './services/student-abc.service';
 import { StudentsController } from './students.controller';
 import { StudentPortalController } from './student-portal.controller';
 import { StudentsService } from './students.service';
@@ -73,6 +74,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     StudentLifecycleService,
     StudentSemesterResolverService,
     RollNumberService,
+    StudentAbcService,
     StudentAssetsService,
     StudentImportHandler,
     StudentImportService,
@@ -88,6 +90,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     StudentProfileService,
     StudentSemesterResolverService,
     RollNumberService,
+    StudentAbcService,
     StudentPortalService,
   ],
 })

@@ -4,6 +4,7 @@ import { NAAC_CRITERIA } from '../constants/naac.constants';
 import { naacDb } from './naac-prisma.util';
 import { NaacEvidenceService } from './naac-evidence.service';
 import { NaacAggregatorService } from './naac-aggregator.service';
+import { NaacCalendarNotifyService } from './naac-calendar-notify.service';
 
 @Injectable()
 export class NaacDashboardService {
@@ -11,6 +12,7 @@ export class NaacDashboardService {
     private readonly prisma: PrismaService,
     private readonly evidence: NaacEvidenceService,
     private readonly aggregator: NaacAggregatorService,
+    private readonly calendarNotify: NaacCalendarNotifyService,
   ) {}
 
   private db() {
@@ -43,6 +45,8 @@ export class NaacDashboardService {
               criterionStatus.length,
           )
         : 0;
+
+    void this.calendarNotify.processUpcomingReminders(tenantId);
 
     await this.db().naacReadinessSnapshot.upsert({
       where: { tenantId_academicYear: { tenantId, academicYear } },
@@ -124,7 +128,7 @@ export class NaacDashboardService {
           },
         }),
         this.db().naacDepartmentSubmission.count({
-          where: { tenantId, academicYear, status: 'PENDING' },
+          where: { tenantId, academicYear, status: 'SUBMITTED' },
         }),
         this.db().naacFacultyAchievement.count({
           where: { tenantId, status: 'PENDING' },

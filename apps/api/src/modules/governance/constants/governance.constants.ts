@@ -43,6 +43,7 @@ export const GOVERNANCE_MEMBER_STATUSES = [
   'ACTIVE',
   'INACTIVE',
   'RESIGNED',
+  'REPLACED',
 ] as const;
 
 export const GOVERNANCE_MEETING_MODES = [

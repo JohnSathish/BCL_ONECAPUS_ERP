@@ -44,9 +44,11 @@ export type TimetableEntry = {
   startTime: string;
   endTime: string;
   courseId?: string | null;
+  teachingSubjectGroupId?: string | null;
   staffProfileId?: string | null;
   classroomId?: string | null;
   course?: { code: string; title: string } | null;
+  teachingSubjectGroup?: { code: string; title: string } | null;
   staffProfile?: { shortCode?: string | null; fullName: string } | null;
   classroom?: { code: string; name: string } | null;
   replacementOverlay?: TimetableReplacementOverlay | null;
@@ -317,6 +319,7 @@ export type ManualEntryPayload = {
   offeringSectionId?: string;
   courseOfferingId?: string;
   courseId?: string;
+  teachingSubjectGroupId?: string;
   staffProfileId?: string;
   classroomId?: string;
   semesterSequence?: number;
@@ -483,6 +486,19 @@ export async function publishTimetablePlan(
 ) {
   const { data } = await api.post(`/v1/timetable/plans/${planId}/publish`, payload ?? {});
   return data as TimetablePlan;
+}
+
+export async function fetchDraftRoomEntries(planId: string) {
+  const { data } = await api.get(`/v1/timetable/plans/${planId}/draft-rooms`);
+  return data as TimetableEntry[];
+}
+
+export async function finalizeTimetableRooms(
+  planId: string,
+  payload?: { assignments?: Array<{ entryId: string; classroomId: string }> },
+) {
+  const { data } = await api.post(`/v1/timetable/plans/${planId}/finalize-rooms`, payload ?? {});
+  return data as { updated: number };
 }
 
 export async function deleteTimetablePlan(planId: string) {

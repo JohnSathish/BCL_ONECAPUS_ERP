@@ -21,6 +21,7 @@ export type DirectoryFilters = StudentFilters & {
   uiRecentlyAdded?: string;
   uiNoPhoto?: string;
   uiNoMobile?: string;
+  uiAbcStatus?: string;
 };
 
 type Props = {

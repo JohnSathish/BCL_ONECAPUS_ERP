@@ -3,10 +3,14 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import type { CreateCalendarEventDto } from '../dto/naac-iqac.dto';
 import { naacDb } from './naac-prisma.util';
+import { NaacCalendarNotifyService } from './naac-calendar-notify.service';
 
 @Injectable()
 export class NaacCalendarService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notify: NaacCalendarNotifyService,
+  ) {}
 
   private db() {
     return naacDb(this.prisma);
@@ -20,7 +24,7 @@ export class NaacCalendarService {
   }
 
   async create(user: JwtUser, dto: CreateCalendarEventDto) {
-    return this.db().naacCalendarEvent.create({
+    const event = await this.db().naacCalendarEvent.create({
       data: {
         tenantId: user.tid,
         title: dto.title,
@@ -29,6 +33,8 @@ export class NaacCalendarService {
         description: dto.description,
       },
     });
+    void this.notify.notifyEventCreated(user.tid, event);
+    return event;
   }
 
   async remove(user: JwtUser, id: string) {

@@ -15,6 +15,11 @@ export class StudentPortalChangeRequestDto {
   changes!: Record<string, string | null>;
 }
 
+export class UpdateAbcIdDto {
+  @IsString()
+  abcId!: string;
+}
+
 export class UploadStudentPortalDocumentDto {
   @ApiProperty({
     example: 'AADHAAR',

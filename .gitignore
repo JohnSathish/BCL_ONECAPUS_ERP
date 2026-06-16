@@ -32,3 +32,10 @@ apps/api/uploads/**
 # Misc
 *.tsbuildinfo
 .write-test
+
+# Local migration packs (DB dumps + secrets — copy manually when moving machines)
+_migration-pack/
+
+# Runtime backup artifacts (managed via Backup & DR Center)
+apps/api/backups/**
+!apps/api/backups/.gitkeep

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,10 +12,12 @@ import type {
   CreateMouActivityDto,
   CreateMouDto,
   CreateStudentAchievementDto,
+  ReviewAchievementDto,
 } from '../dto/naac-iqac.dto';
 import { paginate } from '../constants/naac.constants';
 import { naacDb } from './naac-prisma.util';
 import { NaacEvidenceService } from './naac-evidence.service';
+import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 
 @Injectable()
 export class NaacAchievementService {
@@ -22,23 +25,65 @@ export class NaacAchievementService {
     private readonly prisma: PrismaService,
     private readonly evidence: NaacEvidenceService,
     private readonly storage: StorageService,
+    private readonly notifications: UserNotificationsService,
   ) {}
 
   private db() {
     return naacDb(this.prisma);
   }
 
-  async listFaculty(tenantId: string, page?: number, limit?: number) {
+  async resolveStaffProfile(user: JwtUser) {
+    return this.prisma.staffProfile.findFirst({
+      where: { tenantId: user.tid, portalUserId: user.sub, deletedAt: null },
+      select: {
+        id: true,
+        fullName: true,
+        employeeCode: true,
+        departmentId: true,
+      },
+    });
+  }
+
+  private canManageAll(user: JwtUser) {
+    return user.permissions?.includes('naac-iqac:manage') ?? false;
+  }
+
+  private async resolveStaffProfileId(user: JwtUser, requestedId?: string) {
+    const own = await this.resolveStaffProfile(user);
+    if (this.canManageAll(user) && requestedId) return requestedId;
+    if (!own) {
+      throw new BadRequestException(
+        'No staff profile linked to your account. Contact HR to enable NAAC submissions.',
+      );
+    }
+    if (requestedId && requestedId !== own.id) {
+      throw new ForbiddenException(
+        'Cannot submit achievements for another staff member',
+      );
+    }
+    return own.id;
+  }
+
+  async listFaculty(
+    tenantId: string,
+    page?: number,
+    limit?: number,
+    filters?: { status?: string; staffProfileId?: string },
+  ) {
     const { skip, take, page: p, limit: l } = paginate(page, limit);
+    const where: Record<string, unknown> = { tenantId };
+    if (filters?.status) where.status = filters.status;
+    if (filters?.staffProfileId) where.staffProfileId = filters.staffProfileId;
+
     const [items, total] = await Promise.all([
       this.db().naacFacultyAchievement.findMany({
-        where: { tenantId },
+        where,
         skip,
         take,
         orderBy: { createdAt: 'desc' },
         include: { evidenceTag: true },
       }),
-      this.db().naacFacultyAchievement.count({ where: { tenantId } }),
+      this.db().naacFacultyAchievement.count({ where }),
     ]);
     return { items, total, page: p, limit: l };
   }
@@ -51,26 +96,20 @@ export class NaacAchievementService {
     if (!file?.buffer?.length)
       throw new BadRequestException('Evidence file is mandatory');
 
+    const staffProfileId = await this.resolveStaffProfileId(
+      user,
+      dto.staffProfileId,
+    );
+
     const storageKey = `naac/${user.tid}/achievements/faculty/${Date.now()}-${file.originalname}`;
     await this.storage.put(storageKey, file.buffer, {
       contentType: file.mimetype,
     });
 
-    const tag = await this.evidence.create(user, {
-      sourceType: 'faculty_achievement',
-      sourceId: user.sub,
-      criterion: dto.criterion,
-      academicYear: dto.academicYear,
-      metricCode: dto.metricCode,
-      fileName: file.originalname,
-      storageKey,
-      evidenceNotes: dto.title,
-    });
-
-    return this.db().naacFacultyAchievement.create({
+    const achievement = await this.db().naacFacultyAchievement.create({
       data: {
         tenantId: user.tid,
-        staffProfileId: dto.staffProfileId,
+        staffProfileId,
         achievementType: dto.achievementType,
         title: dto.title,
         description: dto.description,
@@ -79,24 +118,116 @@ export class NaacAchievementService {
           : undefined,
         staffPublicationId: dto.staffPublicationId,
         staffAwardId: dto.staffAwardId,
-        evidenceTagId: tag.id,
         status: 'PENDING',
         submittedById: user.sub,
       },
+    });
+
+    const tag = await this.evidence.create(user, {
+      sourceType: 'faculty_achievement',
+      sourceId: achievement.id,
+      criterion: dto.criterion,
+      academicYear: dto.academicYear,
+      metricCode: dto.metricCode,
+      fileName: file.originalname,
+      storageKey,
+      evidenceNotes: dto.title,
+    });
+
+    return this.db().naacFacultyAchievement.update({
+      where: { id: achievement.id },
+      data: { evidenceTagId: tag.id },
       include: { evidenceTag: true },
     });
   }
 
-  async listStudent(tenantId: string, page?: number, limit?: number) {
+  async reviewFaculty(user: JwtUser, id: string, dto: ReviewAchievementDto) {
+    const row = await this.db().naacFacultyAchievement.findFirst({
+      where: { id, tenantId: user.tid },
+    });
+    if (!row) throw new NotFoundException('Faculty achievement not found');
+    if (row.status !== 'PENDING') {
+      throw new BadRequestException(
+        'Only pending achievements can be reviewed',
+      );
+    }
+    if (!['APPROVED', 'REJECTED'].includes(dto.status)) {
+      throw new BadRequestException('Status must be APPROVED or REJECTED');
+    }
+
+    const description = dto.reviewNotes
+      ? [row.description, `[IQAC ${dto.status}]: ${dto.reviewNotes}`]
+          .filter(Boolean)
+          .join('\n\n')
+      : row.description;
+
+    const updated = await this.db().naacFacultyAchievement.update({
+      where: { id },
+      data: { status: dto.status, description },
+      include: { evidenceTag: true },
+    });
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { id: row.staffProfileId, tenantId: user.tid },
+      select: { portalUserId: true, fullName: true },
+    });
+    if (staff?.portalUserId) {
+      await this.notifications.createInApp({
+        tenantId: user.tid,
+        userId: staff.portalUserId,
+        type: 'NAAC_ACHIEVEMENT_REVIEW',
+        title: `Achievement ${dto.status.toLowerCase()}`,
+        body: `${updated.title} was ${dto.status.toLowerCase()} by IQAC`,
+        link: '/staff/naac',
+        metadata: { achievementId: id, status: dto.status },
+      });
+    }
+
+    return updated;
+  }
+
+  async bulkReviewFaculty(
+    user: JwtUser,
+    dto: ReviewAchievementDto & { ids: string[] },
+  ) {
+    const reviewed: string[] = [];
+    const skipped: string[] = [];
+    for (const id of dto.ids) {
+      try {
+        await this.reviewFaculty(user, id, {
+          status: dto.status,
+          reviewNotes: dto.reviewNotes,
+        });
+        reviewed.push(id);
+      } catch {
+        skipped.push(id);
+      }
+    }
+    return {
+      reviewed: reviewed.length,
+      skipped: skipped.length,
+      ids: reviewed,
+    };
+  }
+
+  async listStudent(
+    tenantId: string,
+    page?: number,
+    limit?: number,
+    filters?: { status?: string },
+  ) {
     const { skip, take, page: p, limit: l } = paginate(page, limit);
+    const where: Record<string, unknown> = { tenantId };
+    if (filters?.status) where.status = filters.status;
+
     const [items, total] = await Promise.all([
       this.db().naacStudentAchievement.findMany({
-        where: { tenantId },
+        where,
         skip,
         take,
         orderBy: { createdAt: 'desc' },
       }),
-      this.db().naacStudentAchievement.count({ where: { tenantId } }),
+      this.db().naacStudentAchievement.count({ where }),
     ]);
     return { items, total, page: p, limit: l };
   }
@@ -114,19 +245,7 @@ export class NaacAchievementService {
       contentType: file.mimetype,
     });
 
-    const tag = await this.evidence.create(user, {
-      sourceType: 'student_achievement',
-      sourceId: dto.studentId ?? user.sub,
-      criterion: dto.criterion,
-      academicYear: dto.academicYear,
-      metricCode: dto.metricCode,
-      departmentId: dto.departmentId,
-      fileName: file.originalname,
-      storageKey,
-      evidenceNotes: dto.title,
-    });
-
-    return this.db().naacStudentAchievement.create({
+    const achievement = await this.db().naacStudentAchievement.create({
       data: {
         tenantId: user.tid,
         studentId: dto.studentId,
@@ -137,10 +256,52 @@ export class NaacAchievementService {
           ? new Date(dto.achievementDate)
           : undefined,
         departmentId: dto.departmentId,
-        evidenceTagId: tag.id,
         status: 'PENDING',
         submittedById: user.sub,
       },
+    });
+
+    const tag = await this.evidence.create(user, {
+      sourceType: 'student_achievement',
+      sourceId: achievement.id,
+      criterion: dto.criterion,
+      academicYear: dto.academicYear,
+      metricCode: dto.metricCode,
+      departmentId: dto.departmentId,
+      fileName: file.originalname,
+      storageKey,
+      evidenceNotes: dto.title,
+    });
+
+    return this.db().naacStudentAchievement.update({
+      where: { id: achievement.id },
+      data: { evidenceTagId: tag.id },
+    });
+  }
+
+  async reviewStudent(user: JwtUser, id: string, dto: ReviewAchievementDto) {
+    const row = await this.db().naacStudentAchievement.findFirst({
+      where: { id, tenantId: user.tid },
+    });
+    if (!row) throw new NotFoundException('Student achievement not found');
+    if (row.status !== 'PENDING') {
+      throw new BadRequestException(
+        'Only pending achievements can be reviewed',
+      );
+    }
+    if (!['APPROVED', 'REJECTED'].includes(dto.status)) {
+      throw new BadRequestException('Status must be APPROVED or REJECTED');
+    }
+
+    const description = dto.reviewNotes
+      ? [row.description, `[IQAC ${dto.status}]: ${dto.reviewNotes}`]
+          .filter(Boolean)
+          .join('\n\n')
+      : row.description;
+
+    return this.db().naacStudentAchievement.update({
+      where: { id },
+      data: { status: dto.status, description },
     });
   }
 }
@@ -174,7 +335,12 @@ export class NaacMouService {
     return row;
   }
 
-  async create(user: JwtUser, dto: CreateMouDto, file?: Express.Multer.File) {
+  async create(
+    user: JwtUser,
+    dto: CreateMouDto,
+    file?: Express.Multer.File,
+    academicYear = '2025-26',
+  ) {
     let storageKey: string | undefined;
     let fileName: string | undefined;
     if (file?.buffer?.length) {
@@ -203,7 +369,7 @@ export class NaacMouService {
         sourceType: 'mou',
         sourceId: mou.id,
         criterion: 3,
-        academicYear: '2025-26',
+        academicYear,
         metricCode: '3.5.1',
         fileName,
         storageKey,

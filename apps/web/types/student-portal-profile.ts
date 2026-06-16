@@ -15,6 +15,9 @@ export type StudentPortalProfile360 = {
     category: string | null;
     religion: string | null;
     nationality: string;
+    abcId: string | null;
+    abcIdEditable: boolean;
+    erpStudentId: string;
   };
   academic: {
     programme: string | null;

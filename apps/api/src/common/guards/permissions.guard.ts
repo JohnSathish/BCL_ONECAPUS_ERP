@@ -17,6 +17,8 @@ import type { JwtUser } from '../decorators/current-user.decorator';
 import { PermissionAuditService } from '../permissions/permission-audit.service';
 
 import { extractClientIp } from '../utils/request-host';
+import { isSuperAdmin } from '../permissions/permission-registry';
+import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -24,9 +26,10 @@ export class PermissionsGuard implements CanActivate {
     private readonly reflector: Reflector,
 
     private readonly permissionAudit: PermissionAuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredAll = this.reflector.getAllAndOverride<string[]>(
       REQUIRE_PERMISSIONS_KEY,
 
@@ -45,7 +48,7 @@ export class PermissionsGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<{
       user?: JwtUser;
-
+      method: string;
       headers: Record<string, string | string[] | undefined>;
     }>();
 
@@ -53,6 +56,21 @@ export class PermissionsGuard implements CanActivate {
 
     if (!user) {
       throw new ForbiddenException('Authentication required');
+    }
+
+    const method = request.method?.toUpperCase() ?? 'GET';
+    if (
+      !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+      !isSuperAdmin(user.roles ?? [])
+    ) {
+      const maintenance = await this.prisma.systemMaintenanceFlag.findUnique({
+        where: { id: 'singleton' },
+      });
+      if (maintenance?.active) {
+        throw new ForbiddenException(
+          'System is in maintenance mode during backup restore',
+        );
+      }
     }
 
     const permissions = new Set(user.permissions ?? []);

@@ -88,6 +88,10 @@ export const MODULE_PERMISSIONS = {
     'audit:read',
     'license:read',
     'license:activate',
+    'backup:read',
+    'backup:manage',
+    'backup:download',
+    'backup:restore',
   ],
   platform: ['platform:licenses:read', 'platform:licenses:manage'],
   settings: ['org:read', 'org:manage', 'users:read'],
@@ -321,6 +325,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { prefix: '/admin/academics/timetable', permissions: [...MODULE_PERMISSIONS.timetable] },
   {
     prefix: '/admin/academics/teaching-allocation',
+    permissions: [...MODULE_PERMISSIONS.timetable],
+  },
+  {
+    prefix: '/admin/academics/teaching-subject-groups',
     permissions: [...MODULE_PERMISSIONS.timetable],
   },
   { prefix: '/admin/academics/lms', permissions: [...MODULE_PERMISSIONS.lms] },

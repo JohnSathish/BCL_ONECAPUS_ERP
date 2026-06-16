@@ -87,7 +87,7 @@ export function StudentProfile360Page() {
             <ProfileActivityTimeline profile={profile} />
 
             <div className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-              <ProfilePersonalSection profile={profile} />
+              <ProfilePersonalSection profile={profile} onRefresh={refresh} />
               <ProfileAcademicInfoSection profile={profile} />
               <ProfileContactSection profile={profile} onRefresh={refresh} />
               <ProfileParentSection profile={profile} onRefresh={refresh} />

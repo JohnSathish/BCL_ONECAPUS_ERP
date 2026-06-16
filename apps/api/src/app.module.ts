@@ -66,6 +66,7 @@ import { LoansModule } from './modules/loans/loans.module';
 import { StudentReportsModule } from './modules/student-reports/student-reports.module';
 import { LicensingModule } from './modules/licensing/licensing.module';
 import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
+import { BackupEngineModule } from './modules/backup-engine/backup-engine.module';
 
 @Module({
   imports: [
@@ -133,6 +134,7 @@ import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
     ObeModule,
     RealtimeModule,
     AdministrationModule,
+    BackupEngineModule,
   ],
   controllers: [HealthController],
   providers: [

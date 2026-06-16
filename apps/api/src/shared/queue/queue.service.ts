@@ -7,6 +7,7 @@ export class QueueService {
   constructor(
     @InjectQueue('notifications') private readonly notifications: Queue,
     @InjectQueue('exports') private readonly exports: Queue,
+    @InjectQueue('backups') private readonly backups: Queue,
   ) {}
 
   enqueueNotification(payload: Record<string, unknown>) {
@@ -173,6 +174,41 @@ export class QueueService {
     return this.exports.add('fee-receipt-pdf', payload, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
+    });
+  }
+
+  enqueueBackupRun(payload: {
+    runId: string;
+    type: string;
+    scope?: string;
+    tenantId?: string;
+  }) {
+    return this.backups.add('backup-run', payload, {
+      attempts: 2,
+      removeOnComplete: 50,
+      removeOnFail: 100,
+    });
+  }
+
+  enqueueBackupRestore(payload: {
+    runId: string;
+    mode: string;
+    safetyRunId: string;
+    userId?: string;
+    delayMs?: number;
+    waitForSafety?: boolean;
+  }) {
+    return this.backups.add('backup-restore', payload, {
+      attempts: 10,
+      backoff: { type: 'fixed', delay: 30_000 },
+      delay: payload.delayMs ?? 30_000,
+    });
+  }
+
+  enqueueBackupCloudSync(payload: { runId: string }) {
+    return this.backups.add('backup-cloud-sync', payload, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 10_000 },
     });
   }
 }

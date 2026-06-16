@@ -217,6 +217,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:photos:upload'],
           },
           {
+            label: 'Upload ABC IDs',
+            href: '/admin/students/abc-upload',
+            permissions: ['students:manage'],
+          },
+          {
             label: 'Subject Registration',
             href: '/admin/students/subject-registration',
             permissions: ['students:manage-academic', 'students:manage'],
@@ -532,12 +537,18 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: CalendarDays,
         module: 'timetable',
         permissions: [...P.timetable],
-        activePattern: '^/admin/academics/(?:timetable|teaching-allocation)(?:/.*)?$',
+        activePattern:
+          '^/admin/academics/(?:timetable|teaching-allocation|teaching-subject-groups)(?:/.*)?$',
         children: [
           { label: 'Dashboard', href: '/admin/academics/timetable', permissions: [...P.timetable] },
           {
             label: 'Timetable Plans',
             href: '/admin/academics/timetable/plans',
+            permissions: [...P.timetable],
+          },
+          {
+            label: 'Subject Groups',
+            href: '/admin/academics/teaching-subject-groups',
             permissions: [...P.timetable],
           },
           {
@@ -1440,6 +1451,26 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Import / Export',
             href: '/admin/administration/import-export',
             permissions: ['imports:manage'],
+          },
+          {
+            label: 'Backup & DR Center',
+            href: '/admin/administration/backups',
+            permissions: ['backup:read', 'backup:manage'],
+          },
+          {
+            label: 'Backup Schedule',
+            href: '/admin/administration/backups/schedule',
+            permissions: ['backup:manage'],
+          },
+          {
+            label: 'Backup Repository',
+            href: '/admin/administration/backups/repository',
+            permissions: ['backup:read'],
+          },
+          {
+            label: 'Restore Center',
+            href: '/admin/administration/backups/restore',
+            permissions: ['backup:restore'],
           },
         ],
       },

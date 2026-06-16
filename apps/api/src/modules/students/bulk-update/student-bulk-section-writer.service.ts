@@ -44,6 +44,8 @@ export class StudentBulkSectionWriterService {
         return student.rollNumber ?? null;
       case 'enrollmentNumber':
         return student.enrollmentNumber ?? null;
+      case 'abcId':
+        return student.abcAccount?.abcId ?? null;
       case 'primaryShiftId':
         return student.primaryShiftId ?? null;
       case 'studentStatus':

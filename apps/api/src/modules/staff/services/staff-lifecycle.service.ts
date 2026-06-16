@@ -1,11 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { GovernanceMemberService } from '../../governance/services/governance-member.service';
 
 const TERMINAL_STATUSES = ['RELIEVED', 'RETIRED', 'CONTRACT_ENDED'] as const;
 
 @Injectable()
 export class StaffLifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(forwardRef(() => GovernanceMemberService))
+    private readonly governanceMembers?: GovernanceMemberService,
+  ) {}
 
   async applyRelievingEffects(tenantId: string, staffProfileId: string) {
     const staff = await this.prisma.staffProfile.findFirst({
@@ -58,6 +64,10 @@ export class StaffLifecycleService {
         });
       }
     });
+
+    await this.governanceMembers
+      ?.handleStaffRelieved(tenantId, staffProfileId)
+      .catch(() => undefined);
   }
 
   private async shouldDeactivatePortal(tenantId: string): Promise<boolean> {

@@ -21,7 +21,7 @@ export class ApiResponseInterceptor implements NestInterceptor {
         return {
           success: true,
           message: 'OK',
-          data: payload ?? null,
+          data: jsonSafe(payload ?? null),
           meta: {},
           timestamp: new Date().toISOString(),
           traceId,
@@ -44,4 +44,19 @@ export class ApiResponseInterceptor implements NestInterceptor {
       !contentType.includes('+json'),
     );
   }
+}
+
+function jsonSafe(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value;
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        jsonSafe(v),
+      ]),
+    );
+  }
+  return value;
 }

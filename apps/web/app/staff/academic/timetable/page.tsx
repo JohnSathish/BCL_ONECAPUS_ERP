@@ -44,7 +44,12 @@ export default function StaffAcademicTimetablePage() {
                   >
                     <div>
                       <p className="font-medium">
-                        {session.course?.code ?? session.sessionType} ·{' '}
+                        {session.subjectGroup?.title ??
+                          session.course?.title ??
+                          session.sessionType}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {session.subjectGroup?.code ?? session.course?.code ?? '—'} ·{' '}
                         {session.startTime?.slice(0, 5) ?? '--:--'}–
                         {session.endTime?.slice(0, 5) ?? '--:--'}
                       </p>

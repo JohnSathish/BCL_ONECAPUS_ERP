@@ -306,6 +306,15 @@ export const BULK_UPDATE_FIELD_CATALOG: BulkUpdateFieldDef[] = [
     supportsAppend: false,
   },
   {
+    fieldKey: 'abcId',
+    sectionKey: 'basic',
+    label: 'ABC ID',
+    group: 'Identity',
+    inputType: 'text',
+    permission: 'academic',
+    supportsAppend: false,
+  },
+  {
     fieldKey: 'studentStatus',
     sectionKey: 'basic',
     label: 'Student Status',

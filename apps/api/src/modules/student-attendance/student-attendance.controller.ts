@@ -82,7 +82,11 @@ export class StudentAttendanceController {
   }
 
   @Post('sessions/:id/mark')
-  @RequireAnyPermission('student-attendance:mark', 'student-attendance:admin')
+  @RequireAnyPermission(
+    'student-attendance:mark',
+    'student-attendance:admin',
+    'staff:portal:self',
+  )
   mark(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,

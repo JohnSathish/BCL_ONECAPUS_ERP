@@ -6,6 +6,7 @@ import type {
   GovernanceCommittee,
   GovernanceCommitteeMember,
   GovernanceDashboard,
+  GovernanceMemberStats,
   GovernanceDocument,
   GovernanceEvent,
   GovernanceImportBatch,
@@ -71,6 +72,40 @@ export const updateGovernanceMember = (id: string, payload: Partial<GovernanceCo
 
 export const removeGovernanceMember = (id: string) =>
   api.delete(`${base}/members/${id}`).then((r) => r.data);
+
+export const deactivateGovernanceMember = (id: string) =>
+  api.post(`${base}/members/${id}/deactivate`).then((r) => r.data);
+
+export const replaceGovernanceMember = (
+  id: string,
+  payload: {
+    staffProfileId: string;
+    role: string;
+    startDate?: string;
+    endDateForPrevious?: string;
+  },
+) => api.post(`${base}/members/${id}/replace`, payload).then((r) => r.data);
+
+export const fetchGovernanceMemberStats = () =>
+  api.get<GovernanceMemberStats>(`${base}/members/stats`).then((r) => r.data);
+
+export const fetchCommitteeMemberHistory = (committeeId: string) =>
+  api
+    .get<GovernanceCommitteeMember[]>(`${base}/committees/${committeeId}/members/history`)
+    .then((r) => r.data);
+
+export const fetchStaffCommitteeMemberships = (staffProfileId: string) =>
+  api
+    .get<GovernanceCommitteeMember[]>(`${base}/staff/${staffProfileId}/memberships`)
+    .then((r) => r.data);
+
+export const fetchGovernanceConstants = () =>
+  api.get<{ memberRoles: string[] }>(`${base}/constants`).then((r) => r.data);
+
+export const bulkAssignGovernanceMembers = (payload: {
+  committeeId: string;
+  members: Partial<GovernanceCommitteeMember>[];
+}) => api.post(`${base}/members/bulk`, payload).then((r) => r.data);
 
 // Import (Excel recommended; PDF fallback)
 export const downloadGovernanceImportTemplate = () =>

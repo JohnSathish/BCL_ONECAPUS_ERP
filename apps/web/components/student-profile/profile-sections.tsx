@@ -245,6 +245,83 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
   );
 }
 
+export function AcademicIdentitySection({
+  profile,
+  canEdit,
+}: {
+  profile: StudentProfile;
+  canEdit: boolean;
+}) {
+  const [form, setForm] = useState({
+    abcId: profile.abcId ?? '',
+    enrollmentNumber: profile.enrollmentNumber,
+    admissionNumber: profile.admissionNumber ?? '',
+    rollNumber: profile.rollNumber ?? '',
+  });
+  const savePayload = useMemo(
+    () => ({
+      abcId: form.abcId,
+      enrollmentNumber: form.enrollmentNumber,
+      admissionNumber: form.admissionNumber || undefined,
+      rollNumber: form.rollNumber || undefined,
+    }),
+    [form],
+  );
+  const { message, saving } = useDebouncedSave(profile.id, 'basic', savePayload, canEdit);
+
+  return (
+    <SectionCard
+      title="Academic Identity"
+      description="NEP / UGC identifiers and ERP student reference"
+      footer={saving ? 'Saving…' : message}
+    >
+      <FieldGrid>
+        <Field label="ABC ID">
+          <input
+            className={inputClass}
+            disabled={!canEdit}
+            value={form.abcId}
+            maxLength={20}
+            placeholder="Enter ABC ID"
+            onChange={(e) => setForm((f) => ({ ...f, abcId: e.target.value.trim().slice(0, 20) }))}
+          />
+        </Field>
+        <Field label="NEHU Registration No.">
+          <input
+            className={inputClass}
+            disabled={!canEdit}
+            value={form.enrollmentNumber}
+            onChange={(e) => setForm((f) => ({ ...f, enrollmentNumber: e.target.value }))}
+          />
+        </Field>
+        <Field label="NEHU Roll No.">
+          <input
+            className={inputClass}
+            disabled={!canEdit}
+            value={form.admissionNumber}
+            onChange={(e) => setForm((f) => ({ ...f, admissionNumber: e.target.value }))}
+          />
+        </Field>
+        <Field label="College Roll No.">
+          <input
+            className={inputClass}
+            disabled={!canEdit}
+            value={form.rollNumber}
+            onChange={(e) => setForm((f) => ({ ...f, rollNumber: e.target.value }))}
+          />
+        </Field>
+        <Field label="Student ERP ID">
+          <input
+            className={cn(inputClass, 'bg-muted/40 font-mono text-xs')}
+            disabled
+            value={profile.id}
+          />
+        </Field>
+      </FieldGrid>
+    </SectionCard>
+  );
+}
+
 export function CategorySection({
   profile,
   canEdit,

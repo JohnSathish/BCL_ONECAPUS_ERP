@@ -1,4 +1,12 @@
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListQueryDto {
@@ -207,8 +215,9 @@ export class SyncAqarSectionDto {
 }
 
 export class CreateFacultyAchievementDto {
+  @IsOptional()
   @IsUUID()
-  staffProfileId!: string;
+  staffProfileId?: string;
 
   @IsString()
   achievementType!: string;
@@ -330,11 +339,28 @@ export class CreateDepartmentSubmissionDto {
 
   @IsOptional()
   payload?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsBoolean()
+  submit?: boolean;
 }
 
 export class ReviewDepartmentSubmissionDto {
   @IsString()
   status!: string;
+
+  @IsOptional()
+  @IsString()
+  reviewNotes?: string;
+}
+
+export class ReviewAchievementDto {
+  @IsString()
+  status!: string;
+
+  @IsOptional()
+  @IsString()
+  reviewNotes?: string;
 }
 
 export class CreateCalendarEventDto {

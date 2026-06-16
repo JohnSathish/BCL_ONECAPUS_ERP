@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { ImportReviewPanel } from '@/components/governance-module/import-review-panel';
+import { NaacEvidenceTagButton } from '@/components/naac-iqac-module/naac-evidence-tag-button';
 import { GovernanceReportsCenter } from '@/components/governance-module/governance-reports-center';
 import {
   createGovernanceActionItem,
@@ -1388,10 +1389,50 @@ function DocumentsPanel({
           </div>
         </CardContent>
       </Card>
-      <DataTable
-        columns={['title', 'fileName', 'category', 'folderPath', 'committeeName']}
-        rows={documents.map((d) => ({ ...d, committeeName: d.committeeName ?? '—' }))}
-      />
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">title</th>
+              <th className="px-3 py-2 text-left font-medium">fileName</th>
+              <th className="px-3 py-2 text-left font-medium">category</th>
+              <th className="px-3 py-2 text-left font-medium">folderPath</th>
+              <th className="px-3 py-2 text-left font-medium">committeeName</th>
+              <th className="px-3 py-2 text-left font-medium">NAAC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {documents.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-4 text-muted-foreground">
+                  No records found.
+                </td>
+              </tr>
+            ) : (
+              documents.map((d) => (
+                <tr key={d.id} className="border-t align-top">
+                  <td className="px-3 py-2">{d.title}</td>
+                  <td className="px-3 py-2">{d.fileName}</td>
+                  <td className="px-3 py-2">{d.category}</td>
+                  <td className="px-3 py-2">{d.folderPath}</td>
+                  <td className="px-3 py-2">{d.committeeName ?? '—'}</td>
+                  <td className="px-3 py-2">
+                    <NaacEvidenceTagButton
+                      sourceType="governance_document"
+                      sourceId={d.id}
+                      label="Tag"
+                      defaultCriterion={6}
+                      fileName={d.fileName}
+                      defaultActivityTitle={d.title}
+                      defaultEvidenceNotes={`${d.category} — ${d.title}`}
+                    />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

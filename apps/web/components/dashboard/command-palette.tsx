@@ -3,11 +3,12 @@
 import { Command } from 'cmdk';
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
-import { Loader2, Search, Sparkles } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Loader2, Search, Sparkles, UserRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ADMIN_COMMAND_LINKS, AI_QUICK_PROMPTS } from '@/config/command-palette-items';
 import { askDashboardAi } from '@/services/dashboard-analytics';
+import { fetchStudents } from '@/services/students';
 import type { DashboardAiResponse } from '@/types/dashboard-analytics';
 
 const STAFF_COMMANDS = [
@@ -52,6 +53,13 @@ export function CommandPalette() {
   const askMut = useMutation({
     mutationFn: (question: string) => askDashboardAi(question),
     onSuccess: (res) => setAiResult(res),
+  });
+
+  const studentSearch = useQuery({
+    queryKey: ['command-palette', 'students', search],
+    queryFn: () => fetchStudents({ search: search.trim(), limit: 8 }),
+    enabled: open && isAdminPortal && search.trim().length >= 3,
+    staleTime: 30_000,
   });
 
   function runAi(question: string) {
@@ -199,6 +207,32 @@ export function CommandPalette() {
                       {prompt}
                     </Command.Item>
                   ))}
+                </Command.Group>
+              ) : null}
+
+              {isAdminPortal && search.trim().length >= 3 ? (
+                <Command.Group heading="Students" className="px-2 py-2">
+                  {studentSearch.isFetching ? (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">Searching students…</p>
+                  ) : null}
+                  {(studentSearch.data?.data ?? []).map((row) => (
+                    <Command.Item
+                      key={row.id}
+                      value={`${row.fullName} ${row.rollNumber ?? ''} ${row.mobileNumber ?? ''} ${row.abcId ?? ''} ${row.enrollmentNumber}`}
+                      onSelect={() => go(`/admin/students/${row.id}`)}
+                      className="cursor-pointer rounded-lg px-3 py-2 text-sm aria-selected:bg-primary/10 aria-selected:text-primary"
+                    >
+                      <UserRound className="mr-2 inline h-3.5 w-3.5" />
+                      <span className="font-medium">{row.displayFullName ?? row.fullName}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {row.rollNumber ?? row.enrollmentNumber}
+                        {row.abcId ? ` · ${row.abcId}` : ''}
+                      </span>
+                    </Command.Item>
+                  ))}
+                  {!studentSearch.isFetching && (studentSearch.data?.data?.length ?? 0) === 0 ? (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">No students found.</p>
+                  ) : null}
                 </Command.Group>
               ) : null}
 

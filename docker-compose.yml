@@ -39,11 +39,13 @@ services:
       JWT_REFRESH_SECRET: change-me-refresh-dev-only-32chars-min
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
+      BACKUP_ROOT: /data/backups
     ports:
       - '3001:3001'
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage
+      - nep_backups:/data/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,10 +74,12 @@ services:
       REDIS_URL: redis://redis:6379
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
+      BACKUP_ROOT: /data/backups
       WEB_ORIGIN: http://localhost
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage
+      - nep_backups:/data/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,3 +100,4 @@ volumes:
   nep_pg_data: {}
   nep_uploads: {}
   nep_storage: {}
+  nep_backups: {}

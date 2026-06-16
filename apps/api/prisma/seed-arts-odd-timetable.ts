@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { buildArtsOddTimetableSeedEntries } from '../src/modules/academic-engine/domain/arts-fyugp-odd-catalog';
 import { parseTimeToDate } from '../src/common/utils/shift-scope.util';
+import { syncSubjectGroupsForShift } from './seed-timetable-subject-groups';
 
 const DAY_OF_WEEK: Record<string, number> = {
   Monday: 1,
@@ -106,6 +107,14 @@ export async function seedArtsOddTimetable(ctx: SeedArtsOddTimetableContext) {
       },
     });
   }
+
+  const { groupByCourseId } = await syncSubjectGroupsForShift(
+    prisma,
+    tenantId,
+    dayShift.id,
+    academicYearId,
+    [1, 3, 5],
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const {
@@ -246,6 +255,14 @@ export async function seedArtsOddTimetable(ctx: SeedArtsOddTimetableContext) {
     );
     if (link.courseOfferingId) linked += 1;
 
+    const teachingSubjectGroupId = groupByCourseId.get(courseId);
+    const group = teachingSubjectGroupId
+      ? await (prisma as any).teachingSubjectGroup.findFirst({
+          where: { id: teachingSubjectGroupId },
+          select: { primaryStaffProfileId: true, offeringSectionId: true },
+        })
+      : null;
+
     await prisma.timetablePlanEntry.create({
       data: {
         tenantId,
@@ -257,15 +274,21 @@ export async function seedArtsOddTimetable(ctx: SeedArtsOddTimetableContext) {
         startTime: template.startTime,
         endTime: template.endTime,
         courseId,
+        teachingSubjectGroupId,
         courseOfferingId: link.courseOfferingId,
-        offeringSectionId: link.offeringSectionId,
+        offeringSectionId: group?.offeringSectionId ?? link.offeringSectionId,
+        staffProfileId: group?.primaryStaffProfileId ?? undefined,
         semesterSequence: row.semester,
         sectionCode: link.sectionCode ?? row.section,
         fyugpCategory: row.category,
         slotType: row.category === 'LAB' ? 'LAB' : 'THEORY',
         isLocked: true,
         source: 'MANUAL',
-        metadata: { seededBy: SEED_MARKER },
+        metadata: {
+          seededBy: SEED_MARKER,
+          roomStatus: 'DRAFT',
+          teachingSubjectGroupId,
+        },
       },
     });
     created += 1;

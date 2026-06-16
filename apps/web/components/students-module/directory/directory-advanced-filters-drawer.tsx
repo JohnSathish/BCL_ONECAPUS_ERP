@@ -206,6 +206,18 @@ export function DirectoryAdvancedFiltersDrawer({
             <option value="true">Pending / incomplete</option>
           </select>
         </label>
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium">ABC ID</span>
+          <select
+            className={erpSelectClass}
+            value={filters.uiAbcStatus ?? ''}
+            onChange={(e) => onChange({ uiAbcStatus: e.target.value })}
+          >
+            <option value="">All</option>
+            <option value="available">ABC available</option>
+            <option value="missing">ABC missing</option>
+          </select>
+        </label>
       </FilterDrawerFieldGroup>
     </FilterDrawerShell>
   );

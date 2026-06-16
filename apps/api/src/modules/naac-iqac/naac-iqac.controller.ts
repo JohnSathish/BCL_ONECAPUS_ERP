@@ -41,6 +41,7 @@ import {
   EvidenceSearchDto,
   ListQueryDto,
   ReportExportDto,
+  ReviewAchievementDto,
   ReviewDepartmentSubmissionDto,
   SyncAqarSectionDto,
   UpdateAqarDto,
@@ -168,6 +169,16 @@ export class NaacIqacController {
     return this.evidence.search(user.tid, query);
   }
 
+  @Get('evidence/by-source')
+  @RequireAnyPermission(...NIQ_READ, ...NIQ_COLLECT)
+  evidenceBySource(
+    @CurrentUser() user: JwtUser,
+    @Query('sourceType') sourceType: string,
+    @Query('sourceId') sourceId: string,
+  ) {
+    return this.evidence.findBySource(user.tid, sourceType, sourceId);
+  }
+
   @Post('evidence/tags')
   @RequireAnyPermission(...NIQ_MANAGE, ...NIQ_COLLECT)
   createEvidenceTag(
@@ -250,8 +261,13 @@ export class NaacIqacController {
   listFacultyAchievements(
     @CurrentUser() user: JwtUser,
     @Query() query: ListQueryDto,
+    @Query('status') status?: string,
+    @Query('staffProfileId') staffProfileId?: string,
   ) {
-    return this.achievements.listFaculty(user.tid, query.page, query.limit);
+    return this.achievements.listFaculty(user.tid, query.page, query.limit, {
+      status,
+      staffProfileId,
+    });
   }
 
   @Post('faculty-achievements')
@@ -266,13 +282,35 @@ export class NaacIqacController {
     return this.achievements.createFaculty(user, dto, file);
   }
 
+  @Patch('faculty-achievements/:id')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  reviewFacultyAchievement(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewAchievementDto,
+  ) {
+    return this.achievements.reviewFaculty(user, id, dto);
+  }
+
+  @Post('faculty-achievements/bulk-review')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  bulkReviewFacultyAchievements(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReviewAchievementDto & { ids: string[] },
+  ) {
+    return this.achievements.bulkReviewFaculty(user, dto);
+  }
+
   @Get('student-achievements')
   @RequireAnyPermission(...NIQ_READ)
   listStudentAchievements(
     @CurrentUser() user: JwtUser,
     @Query() query: ListQueryDto,
+    @Query('status') status?: string,
   ) {
-    return this.achievements.listStudent(user.tid, query.page, query.limit);
+    return this.achievements.listStudent(user.tid, query.page, query.limit, {
+      status,
+    });
   }
 
   @Post('student-achievements')
@@ -285,6 +323,16 @@ export class NaacIqacController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.achievements.createStudent(user, dto, file);
+  }
+
+  @Patch('student-achievements/:id')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  reviewStudentAchievement(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewAchievementDto,
+  ) {
+    return this.achievements.reviewStudent(user, id, dto);
   }
 
   @Get('mous')
@@ -327,7 +375,17 @@ export class NaacIqacController {
     @CurrentUser() user: JwtUser,
     @Query('departmentId') departmentId?: string,
   ) {
-    return this.department.dashboard(user.tid, departmentId);
+    return this.department.dashboard(user, departmentId);
+  }
+
+  @Get('department/submissions')
+  @RequireAnyPermission(...NIQ_READ, ...NIQ_COLLECT)
+  listDepartmentSubmissions(
+    @CurrentUser() user: JwtUser,
+    @Query('status') status?: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.department.listSubmissions(user, { status, academicYear });
   }
 
   @Post('department/submissions')
@@ -337,6 +395,12 @@ export class NaacIqacController {
     @Body() dto: CreateDepartmentSubmissionDto,
   ) {
     return this.department.createSubmission(user, dto);
+  }
+
+  @Post('department/submissions/:id/submit')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  submitDepartmentDraft(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.department.submitDraft(user, id);
   }
 
   @Patch('department/submissions/:id')
@@ -413,6 +477,26 @@ export class NaacIqacController {
   @RequireAnyPermission(...NIQ_REPORTS)
   exportReport(@CurrentUser() user: JwtUser, @Body() dto: ReportExportDto) {
     return this.reports.export(user.tid, dto);
+  }
+
+  @Get('reports/evidence-pack')
+  @RequireAnyPermission(...NIQ_REPORTS)
+  async evidencePack(
+    @CurrentUser() user: JwtUser,
+    @Query('criterion') criterion?: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    const buffer = await this.reports.exportEvidencePack(user.tid, {
+      reportType: 'evidence-pack',
+      criterion: criterion ? parseInt(criterion, 10) : undefined,
+      academicYear,
+    });
+    const year = academicYear ?? 'all';
+    const crit = criterion ?? 'all';
+    return new StreamableFile(buffer, {
+      type: 'application/zip',
+      disposition: `attachment; filename="naac-evidence-pack-c${crit}-${year}.zip"`,
+    });
   }
 
   @Get('aggregates')

@@ -20,7 +20,7 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont \
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont postgresql16-client zstd tar \
   && addgroup -g 1001 -S nodejs && adduser -S worker -u 1001
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

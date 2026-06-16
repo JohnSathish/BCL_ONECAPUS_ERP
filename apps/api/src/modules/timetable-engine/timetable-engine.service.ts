@@ -19,6 +19,7 @@ import { TimetableReadinessService } from './timetable-readiness.service';
 import { TimetableRoutineExcelService } from './timetable-routine-excel.service';
 import { TimetableSlotRuleService } from './timetable-slot-rule.service';
 import { TimetableStreamMasterService } from './timetable-stream-master.service';
+import { TeachingSubjectGroupService } from './teaching-subject-group.service';
 import { StudentAttendanceService } from '../student-attendance/student-attendance.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { CacheService } from '../../shared/cache/cache.service';
@@ -65,6 +66,7 @@ type EntryPayload = {
   offeringSectionId?: string;
   courseOfferingId?: string;
   courseId?: string;
+  teachingSubjectGroupId?: string;
   staffProfileId?: string;
   classroomId?: string;
   semesterSequence?: number;
@@ -97,6 +99,7 @@ export class TimetableEngineService {
     private readonly readinessService: TimetableReadinessService,
     private readonly bulk: TimetableBulkService,
     private readonly routineExcel: TimetableRoutineExcelService,
+    private readonly subjectGroups: TeachingSubjectGroupService,
     private readonly attendance: StudentAttendanceService,
     private readonly communication: CommunicationTriggerService,
     private readonly cache: CacheService,
@@ -485,6 +488,13 @@ export class TimetableEngineService {
 
   async createManualEntry(user: JwtUser, dto: EntryPayload) {
     const plan = await this.assertEditablePlan(user.tid, dto.planId);
+    const links = await this.subjectGroups.resolveEntryLinks(
+      user.tid,
+      dto.teachingSubjectGroupId,
+      dto.courseId,
+      dto.offeringSectionId,
+      dto.staffProfileId,
+    );
     const entry = await this.prisma.timetablePlanEntry.create({
       data: {
         tenantId: user.tid,
@@ -495,10 +505,11 @@ export class TimetableEngineService {
         periodNo: dto.periodNo,
         startTime: parseTimeToDate(dto.startTime),
         endTime: parseTimeToDate(dto.endTime),
-        offeringSectionId: dto.offeringSectionId,
+        offeringSectionId: links.offeringSectionId ?? undefined,
         courseOfferingId: dto.courseOfferingId,
-        courseId: dto.courseId,
-        staffProfileId: dto.staffProfileId,
+        courseId: links.courseId ?? undefined,
+        teachingSubjectGroupId: links.teachingSubjectGroupId ?? undefined,
+        staffProfileId: links.staffProfileId ?? undefined,
         classroomId: dto.classroomId,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
@@ -511,6 +522,9 @@ export class TimetableEngineService {
         notes: dto.notes,
         metadata: {
           ...(dto.metadata ?? {}),
+          ...(links.teachingSubjectGroupId
+            ? { teachingSubjectGroupId: links.teachingSubjectGroupId }
+            : {}),
           ...(dto.facultyTeam?.length
             ? {
                 facultyTeam: dto.facultyTeam,
@@ -542,6 +556,13 @@ export class TimetableEngineService {
     });
     if (!existing) throw new NotFoundException('Timetable entry not found');
     await this.assertEditablePlan(user.tid, existing.planId);
+    const links = await this.subjectGroups.resolveEntryLinks(
+      user.tid,
+      dto.teachingSubjectGroupId ?? existing.teachingSubjectGroupId,
+      dto.courseId ?? existing.courseId,
+      dto.offeringSectionId ?? existing.offeringSectionId,
+      dto.staffProfileId ?? existing.staffProfileId,
+    );
     const updated = await this.prisma.timetablePlanEntry.update({
       where: { id: entryId },
       data: {
@@ -551,10 +572,11 @@ export class TimetableEngineService {
         periodNo: dto.periodNo,
         startTime: dto.startTime ? parseTimeToDate(dto.startTime) : undefined,
         endTime: dto.endTime ? parseTimeToDate(dto.endTime) : undefined,
-        offeringSectionId: dto.offeringSectionId,
+        offeringSectionId: links.offeringSectionId ?? undefined,
         courseOfferingId: dto.courseOfferingId,
-        courseId: dto.courseId,
-        staffProfileId: dto.staffProfileId,
+        courseId: links.courseId ?? undefined,
+        teachingSubjectGroupId: links.teachingSubjectGroupId ?? undefined,
+        staffProfileId: links.staffProfileId ?? undefined,
         classroomId: dto.classroomId,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
@@ -565,11 +587,14 @@ export class TimetableEngineService {
         isLocked: dto.isLocked,
         source: 'MANUAL',
         notes: dto.notes,
-        ...(dto.metadata || dto.facultyTeam
+        ...(dto.metadata || dto.facultyTeam || links.teachingSubjectGroupId
           ? {
               metadata: {
                 ...((existing.metadata ?? {}) as object),
                 ...(dto.metadata ?? {}),
+                ...(links.teachingSubjectGroupId
+                  ? { teachingSubjectGroupId: links.teachingSubjectGroupId }
+                  : {}),
                 ...(dto.facultyTeam?.length
                   ? {
                       facultyTeam: dto.facultyTeam,
@@ -732,6 +757,77 @@ export class TimetableEngineService {
       planId,
       (scope as 'draft' | 'published' | 'faculty' | 'room') ?? 'draft',
     );
+  }
+
+  async draftRoomEntries(user: JwtUser, planId: string) {
+    const entries = await this.prisma.timetablePlanEntry.findMany({
+      where: { tenantId: user.tid, planId, deletedAt: null },
+      include: {
+        teachingSubjectGroup: { select: { code: true, title: true } },
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { periodNo: 'asc' }],
+    });
+    return entries.filter((entry) => {
+      const meta = (entry.metadata ?? {}) as Record<string, unknown>;
+      return !entry.classroomId || meta.roomStatus === 'DRAFT';
+    });
+  }
+
+  async finalizePlanRooms(
+    user: JwtUser,
+    planId: string,
+    dto: { assignments?: Array<{ entryId: string; classroomId: string }> },
+  ) {
+    await this.assertEditablePlan(user.tid, planId);
+    let updated = 0;
+
+    if (dto.assignments?.length) {
+      for (const row of dto.assignments) {
+        const entry = await this.prisma.timetablePlanEntry.findFirst({
+          where: {
+            id: row.entryId,
+            tenantId: user.tid,
+            planId,
+            deletedAt: null,
+          },
+        });
+        if (!entry) continue;
+        await this.prisma.timetablePlanEntry.update({
+          where: { id: entry.id },
+          data: {
+            classroomId: row.classroomId,
+            metadata: {
+              ...((entry.metadata as object) ?? {}),
+              roomStatus: 'FINAL',
+            },
+          },
+        });
+        updated += 1;
+      }
+      return { updated };
+    }
+
+    const entries = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId: user.tid,
+        planId,
+        deletedAt: null,
+        classroomId: { not: null },
+      },
+    });
+    for (const entry of entries) {
+      await this.prisma.timetablePlanEntry.update({
+        where: { id: entry.id },
+        data: {
+          metadata: {
+            ...((entry.metadata as object) ?? {}),
+            roomStatus: 'FINAL',
+          },
+        },
+      });
+      updated += 1;
+    }
+    return { updated };
   }
 
   async approve(

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { NaacEvidenceTagButton } from '@/components/naac-iqac-module/naac-evidence-tag-button';
 import { SectionCard } from '@/components/student-profile/student-profile-shell';
 import { buttonVariants } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
@@ -94,6 +95,15 @@ export function StaffPublicationsTab({
                     Remove
                   </button>
                 ) : null}
+                <NaacEvidenceTagButton
+                  sourceType="staff_publication"
+                  sourceId={pub.id}
+                  label="Tag NAAC"
+                  defaultCriterion={3}
+                  defaultDepartmentId={profile.departmentId ?? undefined}
+                  defaultActivityTitle={pub.title}
+                  defaultEvidenceNotes={`${pub.publicationType}${pub.journal ? ` — ${pub.journal}` : ''}`}
+                />
               </li>
             ))}
           </ul>

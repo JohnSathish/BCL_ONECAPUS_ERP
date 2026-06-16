@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StorageModule } from '../../shared/storage/storage.module';
+import { CommunicationModule } from '../communication/communication.module';
 import { GovernanceModule } from '../governance/governance.module';
 import { NaacIqacController } from './naac-iqac.controller';
 import { NaacIqacPortalController } from './naac-iqac-portal.controller';
@@ -13,6 +14,7 @@ import {
   NaacCalendarService,
   NaacSettingsService,
 } from './services/naac-calendar.service';
+import { NaacCalendarNotifyService } from './services/naac-calendar-notify.service';
 import { NaacCriteriaService } from './services/naac-criteria.service';
 import { NaacDashboardService } from './services/naac-dashboard.service';
 import { NaacDepartmentService } from './services/naac-department.service';
@@ -23,7 +25,7 @@ import { NaacReportService } from './services/naac-report.service';
 import { NaacVaultService } from './services/naac-vault.service';
 
 @Module({
-  imports: [StorageModule, GovernanceModule],
+  imports: [StorageModule, GovernanceModule, CommunicationModule],
   controllers: [NaacIqacController, NaacIqacPortalController],
   providers: [
     NaacDashboardService,
@@ -37,6 +39,7 @@ import { NaacVaultService } from './services/naac-vault.service';
     NaacDepartmentService,
     NaacIntegrationService,
     NaacCalendarService,
+    NaacCalendarNotifyService,
     NaacSettingsService,
     NaacDvvService,
     NaacReportService,
