@@ -5,7 +5,9 @@ ENV HUSKY=0
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 RUN npm ci -w web --include=dev --ignore-scripts
-RUN npm rebuild @tailwindcss/oxide lightningcss --workspace=web
+# Lockfile may be Windows-generated; install Linux musl native bindings for Alpine.
+RUN npm install @tailwindcss/oxide-linux-x64-musl@4.3.0 --workspace=web --no-save \
+  && npm rebuild @tailwindcss/oxide lightningcss --workspace=web
 
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -13,6 +15,7 @@ RUN apk add --no-cache libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/package-lock.json ./package-lock.json
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -30,7 +30,7 @@ WORKDIR /app/apps/api
 
 ENV DATABASE_URL=postgresql://nep:nep_dev_password@postgres:5432/nep_erp
 
-RUN npx prisma generate
+RUN rm -f prisma.config.ts && npx --yes prisma@6.19.0 generate --schema=./prisma/schema.prisma
 
 WORKDIR /app/apps/worker
 
