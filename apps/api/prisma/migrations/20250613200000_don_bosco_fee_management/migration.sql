@@ -94,13 +94,4 @@ CREATE TABLE IF NOT EXISTS finance.fee_product_registry (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS fee_product_registry_tenant_code_key ON finance.fee_product_registry(tenant_id, code);
 
-ALTER TABLE finance.student_fee_demands
-  ADD COLUMN IF NOT EXISTS fee_product_code TEXT,
-  ADD COLUMN IF NOT EXISTS monthly_fee_plan_id UUID;
-
-ALTER TABLE finance.fee_concessions
-  ADD COLUMN IF NOT EXISTS scheme_id UUID REFERENCES finance.scholarship_schemes(id) ON DELETE SET NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS student_fee_demands_monthly_unique_idx
-  ON finance.student_fee_demands(tenant_id, student_id, demand_type, billing_period)
-  WHERE demand_type = 'MONTHLY_TUITION' AND billing_period IS NOT NULL AND status NOT IN ('CANCELLED', 'ROLLED_BACK');
+-- student_fee_demands / fee_concessions alters deferred to 20260528001000_higher_ed_fees_module

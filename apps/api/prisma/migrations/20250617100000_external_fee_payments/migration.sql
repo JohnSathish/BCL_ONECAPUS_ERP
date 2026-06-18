@@ -1,8 +1,5 @@
 -- External fee payment reconciliation (Don Bosco College)
-ALTER TABLE finance.payment_transactions
-  ADD COLUMN IF NOT EXISTS payment_source VARCHAR(64),
-  ADD COLUMN IF NOT EXISTS external_reference VARCHAR(128),
-  ADD COLUMN IF NOT EXISTS remarks TEXT;
+-- payment_transactions columns deferred to 20260528001000_higher_ed_fees_module
 
 CREATE TABLE IF NOT EXISTS finance.external_fee_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,5 +34,4 @@ CREATE INDEX IF NOT EXISTS external_fee_payments_tenant_source_status_idx
 CREATE INDEX IF NOT EXISTS external_fee_payments_tenant_txn_date_idx
   ON finance.external_fee_payments (tenant_id, transaction_date);
 
-CREATE INDEX IF NOT EXISTS payment_transactions_tenant_payment_source_idx
-  ON finance.payment_transactions (tenant_id, payment_source);
+-- payment_transactions index deferred to 20260528001000_higher_ed_fees_module

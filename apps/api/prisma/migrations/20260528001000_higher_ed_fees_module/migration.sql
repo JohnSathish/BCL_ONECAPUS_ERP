@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS finance.student_fee_demands (
   locked_at timestamp(3),
   cancelled_at timestamp(3),
   rollback_of_demand_id uuid,
+  fee_cycle_id uuid REFERENCES finance.academic_fee_cycles(id) ON DELETE SET NULL,
+  fee_product_code text,
+  monthly_fee_plan_id uuid,
   generated_by_id uuid,
   metadata jsonb,
   created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -130,6 +133,9 @@ CREATE TABLE IF NOT EXISTS finance.payment_transactions (
   paid_at timestamp(3),
   collected_by_id uuid,
   collection_session_id uuid,
+  payment_source varchar(64),
+  external_reference varchar(128),
+  remarks text,
   metadata jsonb,
   created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -140,6 +146,7 @@ CREATE TABLE IF NOT EXISTS finance.fee_concessions (
   tenant_id uuid NOT NULL,
   student_id uuid NOT NULL,
   demand_id uuid REFERENCES finance.student_fee_demands(id) ON DELETE SET NULL,
+  scheme_id uuid REFERENCES finance.scholarship_schemes(id) ON DELETE SET NULL,
   concession_type text NOT NULL,
   calculation_type text NOT NULL,
   value numeric(12,2) NOT NULL,
@@ -285,3 +292,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS fee_fine_rules_tenant_code_key ON finance.fee_
 CREATE INDEX IF NOT EXISTS payment_gateway_logs_provider_created_idx ON finance.payment_gateway_logs(tenant_id, provider, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS fee_collection_sessions_tenant_session_no_key ON finance.fee_collection_sessions(tenant_id, session_no);
 CREATE INDEX IF NOT EXISTS fee_audit_logs_action_created_idx ON finance.fee_audit_logs(tenant_id, action, created_at);
+
+-- Deferred from earlier fee migrations (tables did not exist yet on fresh deploy)
+CREATE INDEX IF NOT EXISTS student_fee_demands_tenant_fee_cycle_idx ON finance.student_fee_demands(tenant_id, fee_cycle_id);
+CREATE INDEX IF NOT EXISTS student_fee_demands_tenant_balance_idx ON finance.student_fee_demands(tenant_id, balance_amount) WHERE balance_amount > 0;
+CREATE UNIQUE INDEX IF NOT EXISTS student_fee_demands_monthly_unique_idx
+  ON finance.student_fee_demands(tenant_id, student_id, demand_type, billing_period)
+  WHERE demand_type = 'MONTHLY_TUITION' AND billing_period IS NOT NULL AND status NOT IN ('CANCELLED', 'ROLLED_BACK');
+CREATE INDEX IF NOT EXISTS payment_transactions_tenant_payment_source_idx ON finance.payment_transactions(tenant_id, payment_source);

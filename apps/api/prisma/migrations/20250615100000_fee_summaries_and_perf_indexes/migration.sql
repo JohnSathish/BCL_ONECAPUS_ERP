@@ -23,10 +23,6 @@ CREATE INDEX IF NOT EXISTS student_fee_summaries_tenant_outstanding_idx
 CREATE INDEX IF NOT EXISTS student_fee_summaries_tenant_status_idx
   ON finance.student_fee_summaries(tenant_id, fee_status);
 
-CREATE INDEX IF NOT EXISTS student_fee_demands_tenant_balance_idx
-  ON finance.student_fee_demands(tenant_id, balance_amount)
-  WHERE balance_amount > 0;
-
 CREATE INDEX IF NOT EXISTS fee_payment_requests_tenant_payment_idx
   ON finance.fee_payment_requests(tenant_id, payment_id);
 

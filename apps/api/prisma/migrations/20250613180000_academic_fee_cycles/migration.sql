@@ -70,8 +70,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS academic_fee_cycle_lines_cycle_head_key
 CREATE INDEX IF NOT EXISTS academic_fee_cycle_lines_tenant_cycle_idx
   ON finance.academic_fee_cycle_lines(tenant_id, fee_cycle_id);
 
-ALTER TABLE finance.student_fee_demands
-  ADD COLUMN IF NOT EXISTS fee_cycle_id UUID REFERENCES finance.academic_fee_cycles(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS student_fee_demands_tenant_fee_cycle_idx
-  ON finance.student_fee_demands(tenant_id, fee_cycle_id);
+-- student_fee_demands columns/index deferred to 20260528001000_higher_ed_fees_module
