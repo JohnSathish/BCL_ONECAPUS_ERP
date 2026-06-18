@@ -37,6 +37,7 @@ done
 echo "[4/5] Running database migrations…"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db run --rm \
   -e DATABASE_URL="${DATABASE_URL}" \
+  -v "${APP_DIR}/apps/api/prisma:/app/apps/api/prisma:ro" \
   api npx --yes prisma@6.19.0 migrate deploy --schema=./prisma/schema.prisma
 
 echo "[5/5] Starting full stack…"
