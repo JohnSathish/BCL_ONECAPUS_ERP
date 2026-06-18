@@ -278,3 +278,17 @@ CREATE INDEX "staff_attendance_processing_runs_status_idx" ON "academic"."staff_
 ALTER TABLE "academic"."staff_attendance_shift_breaks"
   ADD CONSTRAINT "staff_attendance_shift_breaks_shift_rule_id_fkey"
   FOREIGN KEY ("shift_rule_id") REFERENCES "academic"."staff_attendance_shift_rules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+DO $$ BEGIN
+  ALTER TABLE "academic"."staff_leave_balances"
+    ADD CONSTRAINT "staff_leave_balances_leave_type_id_fkey"
+    FOREIGN KEY ("leave_type_id") REFERENCES "academic"."staff_leave_types"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "academic"."staff_leave_applications"
+    ADD CONSTRAINT "staff_leave_applications_leave_type_id_fkey"
+    FOREIGN KEY ("leave_type_id") REFERENCES "academic"."staff_leave_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
