@@ -16,6 +16,8 @@ services:
   api:
     environment:
       NODE_ENV: production
+      HOST: 0.0.0.0
+      API_HOST: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       WEB_ORIGIN: ${WEB_ORIGIN}
