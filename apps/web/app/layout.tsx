@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import Script from 'next/script';
+import { Suspense } from 'react';
 import { AppProviders } from '@/components/providers/app-providers';
 import { THEME_FOUC_SCRIPT } from '@/lib/theme/css-variables';
 import './globals.css';
@@ -32,7 +33,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} max-w-full overflow-x-hidden antialiased`}
       >
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <Suspense fallback={null}>{children}</Suspense>
+        </AppProviders>
       </body>
     </html>
   );

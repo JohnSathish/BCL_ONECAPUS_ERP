@@ -25,6 +25,7 @@ import { StudentName } from '@/components/students/student-name';
 import { StudentProfileFeesTab } from '@/components/students-module/profile/student-profile-fees-tab';
 import { StudentProfileAttendanceTab } from '@/components/students-module/profile/student-profile-attendance-tab';
 import { StudentProfileLibraryTab } from '@/components/library/student-profile-library-tab';
+import { StudentSubjectsTab } from '@/components/students-module/profile/student-subjects-tab';
 import { AdminStudentIdCardPanel } from '@/components/id-cards/admin-student-id-card-panel';
 import { buttonVariants } from '@/components/ui/button';
 import { uploadStudentPhoto } from '@/services/students';
