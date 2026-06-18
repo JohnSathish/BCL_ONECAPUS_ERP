@@ -70,3 +70,11 @@ ALTER TABLE "academic"."major_minor_rules"
 ALTER TABLE "academic"."major_minor_rules"
     ADD CONSTRAINT "major_minor_rules_academic_year_id_fkey"
     FOREIGN KEY ("academic_year_id") REFERENCES "core"."academic_years"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "academic"."student_major_minor_tracks"
+    ADD CONSTRAINT "student_major_minor_tracks_major_subject_id_fkey"
+    FOREIGN KEY ("major_subject_id") REFERENCES "academic"."academic_subjects"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "academic"."student_major_minor_tracks"
+    ADD CONSTRAINT "student_major_minor_tracks_minor_subject_id_fkey"
+    FOREIGN KEY ("minor_subject_id") REFERENCES "academic"."academic_subjects"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

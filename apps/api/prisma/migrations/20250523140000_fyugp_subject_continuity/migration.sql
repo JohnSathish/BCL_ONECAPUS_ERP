@@ -37,12 +37,6 @@ ALTER TABLE "academic"."student_major_minor_tracks"
   ADD CONSTRAINT "student_major_minor_tracks_student_id_fkey"
   FOREIGN KEY ("student_id") REFERENCES "academic"."students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "academic"."student_major_minor_tracks"
-  ADD CONSTRAINT "student_major_minor_tracks_major_subject_id_fkey"
-  FOREIGN KEY ("major_subject_id") REFERENCES "academic"."academic_subjects"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "academic"."student_major_minor_tracks"
-  ADD CONSTRAINT "student_major_minor_tracks_minor_subject_id_fkey"
-  FOREIGN KEY ("minor_subject_id") REFERENCES "academic"."academic_subjects"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "academic"."student_major_minor_tracks"
   ADD CONSTRAINT "student_major_minor_tracks_unlocked_by_id_fkey"
   FOREIGN KEY ("unlocked_by_id") REFERENCES "platform"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
