@@ -60,7 +60,6 @@ CREATE INDEX "lms_assignment_submissions_tenant_id_student_id_idx" ON "academic"
 CREATE UNIQUE INDEX "lms_assignment_submissions_assignment_id_student_id_key" ON "academic"."lms_assignment_submissions"("assignment_id", "student_id");
 CREATE INDEX "lms_assignment_feedback_tenant_id_submission_id_created_at_idx" ON "academic"."lms_assignment_feedback"("tenant_id", "submission_id", "created_at");
 
-ALTER TABLE "academic"."lms_assignments" ADD CONSTRAINT "lms_assignments_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "academic"."lms_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "academic"."lms_assignments" ADD CONSTRAINT "lms_assignments_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "platform"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "academic"."lms_assignment_submissions" ADD CONSTRAINT "lms_assignment_submissions_assignment_id_fkey" FOREIGN KEY ("assignment_id") REFERENCES "academic"."lms_assignments"("id") ON DELETE CASCADE ON UPDATE CASCADE;

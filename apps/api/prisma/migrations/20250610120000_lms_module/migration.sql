@@ -45,6 +45,13 @@ ALTER TABLE "academic"."lms_workspaces" ADD CONSTRAINT "lms_workspaces_course_of
 ALTER TABLE "academic"."lms_workspaces" ADD CONSTRAINT "lms_workspaces_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "academic"."courses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "academic"."lms_workspaces" ADD CONSTRAINT "lms_workspaces_shift_id_fkey" FOREIGN KEY ("shift_id") REFERENCES "core"."shifts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+DO $$ BEGIN
+  ALTER TABLE "academic"."lms_assignments"
+    ADD CONSTRAINT "lms_assignments_workspace_id_fkey"
+    FOREIGN KEY ("workspace_id") REFERENCES "academic"."lms_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE TABLE "academic"."lms_materials" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "tenant_id" UUID NOT NULL,
