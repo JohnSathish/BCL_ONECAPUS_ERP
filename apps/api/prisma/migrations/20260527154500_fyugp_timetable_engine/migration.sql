@@ -80,6 +80,7 @@ CREATE TABLE "academic"."timetable_plan_entries" (
   "slot_type" TEXT NOT NULL DEFAULT 'THEORY',
   "fyugp_category" TEXT,
   "combined_group_key" TEXT,
+  "teaching_subject_group_id" UUID,
   "is_combined" BOOLEAN NOT NULL DEFAULT false,
   "is_locked" BOOLEAN NOT NULL DEFAULT false,
   "status" TEXT NOT NULL DEFAULT 'SCHEDULED',
@@ -161,6 +162,7 @@ CREATE INDEX "timetable_plan_entries_tenant_id_staff_profile_id_day_of_week_idx"
 CREATE INDEX "timetable_plan_entries_tenant_id_classroom_id_day_of_week_idx" ON "academic"."timetable_plan_entries"("tenant_id", "classroom_id", "day_of_week");
 CREATE INDEX "timetable_plan_entries_tenant_id_offering_section_id_day_of_week_idx" ON "academic"."timetable_plan_entries"("tenant_id", "offering_section_id", "day_of_week");
 CREATE INDEX "timetable_plan_entries_combined_group_key_idx" ON "academic"."timetable_plan_entries"("combined_group_key");
+CREATE INDEX "timetable_plan_entries_subject_group_idx" ON "academic"."timetable_plan_entries"("tenant_id", "teaching_subject_group_id");
 CREATE INDEX "timetable_conflicts_tenant_id_plan_id_status_idx" ON "academic"."timetable_conflicts"("tenant_id", "plan_id", "status");
 CREATE INDEX "timetable_conflicts_conflict_type_idx" ON "academic"."timetable_conflicts"("conflict_type");
 CREATE INDEX "timetable_substitutions_tenant_id_plan_id_idx" ON "academic"."timetable_substitutions"("tenant_id", "plan_id");

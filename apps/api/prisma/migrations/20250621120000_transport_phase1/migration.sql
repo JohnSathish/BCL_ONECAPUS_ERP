@@ -82,3 +82,12 @@ CREATE INDEX IF NOT EXISTS "transport_student_assignments_tenant_id_student_id_s
   ON "core"."transport_student_assignments"("tenant_id", "student_id", "status");
 CREATE INDEX IF NOT EXISTS "transport_student_assignments_tenant_id_route_id_status_idx"
   ON "core"."transport_student_assignments"("tenant_id", "route_id", "status");
+
+-- Transport Phase 2 (deferred from 20250608140000_transport_phase2)
+ALTER TABLE "core"."transport_routes"
+  ADD COLUMN IF NOT EXISTS "capacity_warning_percent" INTEGER NOT NULL DEFAULT 90;
+
+ALTER TABLE "core"."transport_student_assignments"
+  ADD COLUMN IF NOT EXISTS "assigned_by_user_id" UUID,
+  ADD COLUMN IF NOT EXISTS "parent_notified_at" TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS "notification_status" TEXT;

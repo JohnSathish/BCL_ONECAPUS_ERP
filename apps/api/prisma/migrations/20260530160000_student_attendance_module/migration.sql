@@ -19,6 +19,7 @@ CREATE TABLE "academic"."student_attendance_sessions" (
     "lab_batch" TEXT,
     "faculty_mode" TEXT NOT NULL DEFAULT 'PRIMARY',
     "primary_faculty_id" UUID,
+    "teaching_subject_group_id" UUID,
     "marked_by_id" UUID,
     "status" TEXT NOT NULL DEFAULT 'OPEN',
     "lock_at" TIMESTAMP(3),
@@ -116,6 +117,8 @@ CREATE INDEX "student_attendance_sessions_tenant_id_primary_faculty_id_session_d
 ON "academic"."student_attendance_sessions"("tenant_id", "primary_faculty_id", "session_date");
 CREATE INDEX "student_attendance_sessions_tenant_id_status_idx"
 ON "academic"."student_attendance_sessions"("tenant_id", "status");
+CREATE INDEX "student_attendance_sessions_subject_group_idx"
+ON "academic"."student_attendance_sessions"("tenant_id", "teaching_subject_group_id", "semester_no");
 
 CREATE UNIQUE INDEX "student_attendance_entries_session_id_student_id_key"
 ON "academic"."student_attendance_entries"("session_id", "student_id");

@@ -32,12 +32,6 @@ CREATE TABLE IF NOT EXISTS "academic"."teaching_subject_group_papers" (
     CONSTRAINT "teaching_subject_group_papers_pkey" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "academic"."timetable_plan_entries"
-    ADD COLUMN IF NOT EXISTS "teaching_subject_group_id" UUID;
-
-ALTER TABLE "academic"."student_attendance_sessions"
-    ADD COLUMN IF NOT EXISTS "teaching_subject_group_id" UUID;
-
 CREATE UNIQUE INDEX IF NOT EXISTS "teaching_subject_groups_tenant_id_code_key"
     ON "academic"."teaching_subject_groups"("tenant_id", "code");
 
@@ -46,9 +40,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS "teaching_subject_group_papers_group_course_ke
 
 CREATE INDEX IF NOT EXISTS "teaching_subject_groups_semester_category_idx"
     ON "academic"."teaching_subject_groups"("tenant_id", "semester_no", "fyugp_category");
-
-CREATE INDEX IF NOT EXISTS "timetable_plan_entries_subject_group_idx"
-    ON "academic"."timetable_plan_entries"("tenant_id", "teaching_subject_group_id");
-
-CREATE INDEX IF NOT EXISTS "student_attendance_sessions_subject_group_idx"
-    ON "academic"."student_attendance_sessions"("tenant_id", "teaching_subject_group_id", "semester_no");
