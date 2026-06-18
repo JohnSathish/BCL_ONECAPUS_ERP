@@ -26,6 +26,45 @@ export const GOVERNANCE_COMMITTEE_STATUSES = [
   'DISSOLVED',
 ] as const;
 
+export const GOVERNANCE_MEMBER_TYPES = [
+  'INTERNAL_STAFF',
+  'EXTERNAL',
+  'EX_OFFICIO',
+  'STUDENT_REPRESENTATIVE',
+  'ALUMNI_REPRESENTATIVE',
+  'PARENT_REPRESENTATIVE',
+  'INDUSTRY_EXPERT',
+] as const;
+
+export const GOVERNANCE_EX_OFFICIO_POSITIONS = [
+  'PRINCIPAL',
+  'VICE_PRINCIPAL',
+  'IQAC_COORDINATOR',
+  'DEAN',
+  'DEAN_ACADEMICS',
+  'REGISTRAR',
+  'CONTROLLER_OF_EXAMINATIONS',
+  'BURSAR',
+] as const;
+
+export const GOVERNANCE_EX_OFFICIO_DESIGNATION_CODES: Record<
+  (typeof GOVERNANCE_EX_OFFICIO_POSITIONS)[number],
+  string[]
+> = {
+  PRINCIPAL: ['PRINCIPAL'],
+  VICE_PRINCIPAL: ['VICE_PRINCIPAL'],
+  IQAC_COORDINATOR: ['IQAC_COORDINATOR', 'IQAC COORDINATOR'],
+  DEAN: ['DEAN'],
+  DEAN_ACADEMICS: ['DEAN_ACADEMICS', 'DEAN OF ACADEMICS'],
+  REGISTRAR: ['REGISTRAR'],
+  CONTROLLER_OF_EXAMINATIONS: [
+    'CONTROLLER_OF_EXAMINATIONS',
+    'CONTROLLER OF EXAMINATIONS',
+    'COE',
+  ],
+  BURSAR: ['BURSAR'],
+};
+
 export const GOVERNANCE_MEMBER_ROLES = [
   'CHAIRPERSON',
   'CONVENER',
@@ -36,6 +75,11 @@ export const GOVERNANCE_MEMBER_ROLES = [
   'EX_OFFICIO',
   'STUDENT_REPRESENTATIVE',
   'EXTERNAL_EXPERT',
+  'PARENT_REPRESENTATIVE',
+  'ALUMNI_REPRESENTATIVE',
+  'INDUSTRY_EXPERT',
+  'LEGAL_EXPERT',
+  'SPECIAL_INVITEE',
   'OBSERVER',
 ] as const;
 
@@ -190,6 +234,47 @@ export const GOVERNANCE_REPORT_TYPES = [
 ] as const;
 
 export const GOVERNANCE_REPORT_FORMATS = ['pdf', 'xlsx', 'csv'] as const;
+
+/** NAAC composition rules keyed by committee short code (uppercase). */
+export const GOVERNANCE_NAAC_COMPOSITION_RULES: Record<
+  string,
+  {
+    label: string;
+    minMembers: number;
+    requireExternal: boolean;
+    requireFemalePresiding: boolean;
+    requiredRoles: string[];
+  }
+> = {
+  ICC: {
+    label: 'Internal Complaints Committee (ICC / POSH)',
+    minMembers: 5,
+    requireExternal: true,
+    requireFemalePresiding: true,
+    requiredRoles: ['CHAIRPERSON', 'COORDINATOR'],
+  },
+  POSH: {
+    label: 'POSH Committee',
+    minMembers: 5,
+    requireExternal: true,
+    requireFemalePresiding: true,
+    requiredRoles: ['CHAIRPERSON', 'COORDINATOR'],
+  },
+  IQAC: {
+    label: 'Internal Quality Assurance Cell',
+    minMembers: 5,
+    requireExternal: false,
+    requireFemalePresiding: false,
+    requiredRoles: ['COORDINATOR'],
+  },
+  ANTI_RAGGING: {
+    label: 'Anti-Ragging Committee',
+    minMembers: 7,
+    requireExternal: true,
+    requireFemalePresiding: false,
+    requiredRoles: ['CHAIRPERSON'],
+  },
+};
 
 export function paginate(page = 1, limit = 20) {
   const safePage = Math.max(1, page);

@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
-import { paginate } from '../constants/governance.constants';
+import {
+  GOVERNANCE_EX_OFFICIO_DESIGNATION_CODES,
+  GOVERNANCE_NAAC_COMPOSITION_RULES,
+  paginate,
+  type GOVERNANCE_EX_OFFICIO_POSITIONS,
+} from '../constants/governance.constants';
 import type {
   BulkAssignMembersDto,
   CreateMemberDto,
@@ -53,6 +58,12 @@ type MemberWithCommittee = {
   replacedByMemberId: string | null;
   status: string;
   isExternal: boolean;
+  memberType: string;
+  organization: string | null;
+  address: string | null;
+  areaOfExpertise: string | null;
+  exOfficioPosition: string | null;
+  studentId: string | null;
   createdAt: Date;
   updatedAt: Date;
   committee?: { name?: string; shortCode?: string };
@@ -61,6 +72,7 @@ type MemberWithCommittee = {
 type MappedMember = MemberWithCommittee & {
   committeeName?: string;
   committeeShortCode?: string;
+  gender?: string | null;
 };
 
 @Injectable()
@@ -81,6 +93,163 @@ export class GovernanceMemberService {
       committeeName: row.committee?.name,
       committeeShortCode: row.committee?.shortCode,
     };
+  }
+
+  private inferMemberType(row: {
+    memberType?: string | null;
+    isExternal?: boolean;
+    staffProfileId?: string | null;
+    studentId?: string | null;
+    exOfficioPosition?: string | null;
+  }) {
+    if (row.memberType) return row.memberType;
+    if (row.exOfficioPosition) return 'EX_OFFICIO';
+    if (row.studentId) return 'STUDENT_REPRESENTATIVE';
+    if (row.isExternal) return 'EXTERNAL';
+    if (row.staffProfileId) return 'INTERNAL_STAFF';
+    return 'EXTERNAL';
+  }
+
+  private defaultRoleForMemberType(memberType: string) {
+    switch (memberType) {
+      case 'STUDENT_REPRESENTATIVE':
+        return 'STUDENT_REPRESENTATIVE';
+      case 'ALUMNI_REPRESENTATIVE':
+        return 'ALUMNI_REPRESENTATIVE';
+      case 'PARENT_REPRESENTATIVE':
+        return 'PARENT_REPRESENTATIVE';
+      case 'INDUSTRY_EXPERT':
+        return 'INDUSTRY_EXPERT';
+      case 'EX_OFFICIO':
+        return 'EX_OFFICIO';
+      case 'EXTERNAL':
+        return 'EXTERNAL_EXPERT';
+      default:
+        return 'MEMBER';
+    }
+  }
+
+  private async resolveStudent(
+    tenantId: string,
+    studentId: string,
+  ): Promise<{
+    displayName: string;
+    email?: string;
+    mobile?: string;
+    departmentName?: string;
+    userId?: string;
+  }> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId, deletedAt: null },
+      include: {
+        user: { select: { id: true, email: true } },
+        masterProfile: true,
+        programVersion: {
+          include: { program: { select: { name: true } } },
+        },
+        department: { select: { name: true } },
+      },
+    });
+    if (!student) throw new BadRequestException('Student not found');
+    return {
+      displayName: student.masterProfile?.fullName ?? student.enrollmentNumber,
+      email: student.masterProfile?.email ?? student.user.email,
+      mobile: student.masterProfile?.mobileNumber ?? undefined,
+      departmentName:
+        student.department?.name ?? student.programVersion?.program?.name,
+      userId: student.userId,
+    };
+  }
+
+  private async resolveExOfficioPosition(
+    tenantId: string,
+    position: string,
+  ): Promise<StaffSnapshot & { staffProfileId: string }> {
+    const codes = GOVERNANCE_EX_OFFICIO_DESIGNATION_CODES[
+      position as (typeof GOVERNANCE_EX_OFFICIO_POSITIONS)[number]
+    ] ?? [position];
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        designation: {
+          code: { in: codes, mode: 'insensitive' },
+        },
+      },
+      include: {
+        department: { select: { name: true } },
+        designation: { select: { label: true, code: true } },
+      },
+      orderBy: { joiningDate: 'desc' },
+    });
+
+    if (!staff) {
+      throw new BadRequestException(
+        `No active staff found for ex-officio position: ${position.replace(/_/g, ' ')}`,
+      );
+    }
+
+    return {
+      staffProfileId: staff.id,
+      displayName: staff.fullName,
+      employeeCode: staff.employeeCode,
+      departmentName: staff.department?.name ?? undefined,
+      designation: staff.designation?.label ?? position.replace(/_/g, ' '),
+      mobile: staff.mobile ?? undefined,
+      email: staff.email ?? undefined,
+      userId: staff.portalUserId ?? undefined,
+      staffStatus: staff.status,
+    };
+  }
+
+  private async enrichMemberRow(
+    tenantId: string,
+    row: MemberWithCommittee,
+  ): Promise<MappedMember> {
+    const mapped = this.mapMember(row);
+    mapped.memberType = this.inferMemberType(row);
+
+    if (mapped.memberType === 'EX_OFFICIO' && row.exOfficioPosition) {
+      try {
+        const resolved = await this.resolveExOfficioPosition(
+          tenantId,
+          row.exOfficioPosition,
+        );
+        mapped.displayName = resolved.displayName;
+        mapped.employeeCode = resolved.employeeCode ?? mapped.employeeCode;
+        mapped.departmentName =
+          resolved.departmentName ?? mapped.departmentName;
+        mapped.designation = resolved.designation ?? mapped.designation;
+        mapped.mobile = resolved.mobile ?? mapped.mobile;
+        mapped.email = resolved.email ?? mapped.email;
+        mapped.staffProfileId = resolved.staffProfileId;
+        if (resolved.staffProfileId) {
+          const staff = await this.prisma.staffProfile.findFirst({
+            where: { id: resolved.staffProfileId },
+            select: { gender: true },
+          });
+          mapped.gender = staff?.gender ?? null;
+        }
+      } catch {
+        /* keep stored snapshot if position holder not found */
+      }
+    } else if (row.staffProfileId) {
+      const staff = await this.prisma.staffProfile.findFirst({
+        where: { id: row.staffProfileId },
+        select: { gender: true },
+      });
+      mapped.gender = staff?.gender ?? null;
+    } else if (row.studentId) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: row.studentId },
+        include: { masterProfile: { select: { gender: true } } },
+      });
+      mapped.gender = student?.masterProfile?.gender ?? null;
+    }
+
+    return mapped;
   }
 
   private async resolveStaff(
@@ -172,23 +341,26 @@ export class GovernanceMemberService {
         : [];
     const staffStatusById = new Map(staffRows.map((s) => [s.id, s.status]));
 
-    const items = rows.map((row) => {
-      const mapped = this.mapMember(row);
-      const staffStatus = row.staffProfileId
-        ? staffStatusById.get(row.staffProfileId)
-        : undefined;
-      return {
-        ...mapped,
-        replacementRequired:
-          row.status === 'ACTIVE' &&
-          Boolean(
-            staffStatus &&
-            TERMINAL_STAFF.includes(
-              staffStatus as (typeof TERMINAL_STAFF)[number],
+    const items = await Promise.all(
+      rows.map(async (row) => {
+        const mapped = await this.enrichMemberRow(tenantId, row);
+        const staffStatus = row.staffProfileId
+          ? staffStatusById.get(row.staffProfileId)
+          : undefined;
+        return {
+          ...mapped,
+          replacementRequired:
+            row.status === 'ACTIVE' &&
+            mapped.memberType === 'INTERNAL_STAFF' &&
+            Boolean(
+              staffStatus &&
+              TERMINAL_STAFF.includes(
+                staffStatus as (typeof TERMINAL_STAFF)[number],
+              ),
             ),
-          ),
-      };
-    });
+        };
+      }),
+    );
 
     return { items, total, page, limit };
   }
@@ -199,7 +371,7 @@ export class GovernanceMemberService {
       include: { committee: { select: { name: true, shortCode: true } } },
     })) as MemberWithCommittee | null;
     if (!row) throw new NotFoundException('Member not found');
-    return this.mapMember(row);
+    return this.enrichMemberRow(tenantId, row);
   }
 
   async listByCommittee(tenantId: string, committeeId: string) {
@@ -209,7 +381,7 @@ export class GovernanceMemberService {
       orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
       include: { committee: { select: { name: true, shortCode: true } } },
     })) as MemberWithCommittee[];
-    return rows.map((r) => this.mapMember(r));
+    return Promise.all(rows.map((r) => this.enrichMemberRow(tenantId, r)));
   }
 
   async listHistory(tenantId: string, committeeId: string) {
@@ -219,7 +391,7 @@ export class GovernanceMemberService {
       orderBy: [{ joiningDate: 'desc' }, { createdAt: 'desc' }],
       include: { committee: { select: { name: true, shortCode: true } } },
     })) as MemberWithCommittee[];
-    return rows.map((r) => this.mapMember(r));
+    return Promise.all(rows.map((r) => this.enrichMemberRow(tenantId, r)));
   }
 
   async listByStaff(tenantId: string, staffProfileId: string) {
@@ -232,7 +404,154 @@ export class GovernanceMemberService {
       orderBy: [{ status: 'asc' }, { joiningDate: 'desc' }],
       include: { committee: { select: { name: true, shortCode: true } } },
     })) as MemberWithCommittee[];
-    return rows.map((r) => this.mapMember(r));
+    return Promise.all(rows.map((r) => this.enrichMemberRow(tenantId, r)));
+  }
+
+  async getComposition(tenantId: string, committeeId: string) {
+    const committee = await this.committees.getById(tenantId, committeeId);
+    const members = await this.listByCommittee(tenantId, committeeId);
+    const active = members.filter((m) => m.status === 'ACTIVE');
+
+    const byType: Record<string, number> = {};
+    for (const m of active) {
+      const type = m.memberType ?? this.inferMemberType(m);
+      byType[type] = (byType[type] ?? 0) + 1;
+    }
+
+    const naac = this.validateNaacComposition(committee.shortCode, active);
+
+    return {
+      committeeId,
+      committeeName: committee.name,
+      shortCode: committee.shortCode,
+      totalMembers: active.length,
+      internalStaff: byType.INTERNAL_STAFF ?? 0,
+      externalMembers:
+        (byType.EXTERNAL ?? 0) +
+        (byType.INDUSTRY_EXPERT ?? 0) +
+        (byType.ALUMNI_REPRESENTATIVE ?? 0) +
+        (byType.PARENT_REPRESENTATIVE ?? 0),
+      studentMembers: byType.STUDENT_REPRESENTATIVE ?? 0,
+      exOfficio: byType.EX_OFFICIO ?? 0,
+      alumniRepresentatives: byType.ALUMNI_REPRESENTATIVE ?? 0,
+      parentRepresentatives: byType.PARENT_REPRESENTATIVE ?? 0,
+      industryExperts: byType.INDUSTRY_EXPERT ?? 0,
+      byType,
+      naacCompliance: naac,
+    };
+  }
+
+  validateNaacComposition(
+    shortCode: string,
+    activeMembers: Array<{
+      role: string;
+      memberType?: string;
+      isExternal?: boolean;
+      displayName?: string;
+      gender?: string | null;
+    }>,
+  ) {
+    const key = shortCode.toUpperCase();
+    const rule =
+      GOVERNANCE_NAAC_COMPOSITION_RULES[key] ??
+      (key.includes('ICC') || key.includes('POSH')
+        ? GOVERNANCE_NAAC_COMPOSITION_RULES.ICC
+        : undefined) ??
+      (key.includes('IQAC')
+        ? GOVERNANCE_NAAC_COMPOSITION_RULES.IQAC
+        : undefined) ??
+      (key.includes('RAGGING')
+        ? GOVERNANCE_NAAC_COMPOSITION_RULES.ANTI_RAGGING
+        : undefined);
+
+    if (!rule) {
+      return {
+        applicable: false,
+        complete: activeMembers.length > 0,
+        checks: [],
+        message:
+          activeMembers.length > 0
+            ? 'No statutory composition rules configured for this committee.'
+            : 'No active members yet.',
+      };
+    }
+
+    const checks: Array<{
+      id: string;
+      label: string;
+      passed: boolean;
+      detail?: string;
+    }> = [];
+
+    const hasRequiredRole = rule.requiredRoles.some((required) =>
+      activeMembers.some(
+        (m) =>
+          m.role === required ||
+          m.role === 'CONVENER' ||
+          m.role === 'CHAIRPERSON',
+      ),
+    );
+    checks.push({
+      id: 'required_role',
+      label: `Required leadership role (${rule.requiredRoles.join(' or ')})`,
+      passed: hasRequiredRole,
+    });
+
+    const externalCount = activeMembers.filter(
+      (m) =>
+        m.isExternal ||
+        [
+          'EXTERNAL',
+          'INDUSTRY_EXPERT',
+          'ALUMNI_REPRESENTATIVE',
+          'PARENT_REPRESENTATIVE',
+        ].includes(m.memberType ?? '') ||
+        m.role === 'EXTERNAL_EXPERT' ||
+        m.role === 'LEGAL_EXPERT',
+    ).length;
+
+    if (rule.requireExternal) {
+      checks.push({
+        id: 'external_member',
+        label: 'External member present',
+        passed: externalCount > 0,
+        detail: `${externalCount} external member(s)`,
+      });
+    }
+
+    if (rule.requireFemalePresiding) {
+      const presiding = activeMembers.filter((m) =>
+        ['CHAIRPERSON', 'COORDINATOR', 'CONVENER'].includes(m.role),
+      );
+      const femalePresiding = presiding.some((m) =>
+        (m.gender ?? '').toUpperCase().startsWith('F'),
+      );
+      checks.push({
+        id: 'female_presiding',
+        label: 'Female presiding officer present',
+        passed: femalePresiding,
+      });
+    }
+
+    const minOk = activeMembers.length >= rule.minMembers;
+    checks.push({
+      id: 'min_members',
+      label: `Minimum ${rule.minMembers} members`,
+      passed: minOk,
+      detail: `${activeMembers.length} active`,
+    });
+
+    const complete = checks.every((c) => c.passed);
+
+    return {
+      applicable: true,
+      ruleLabel: rule.label,
+      complete,
+      checks,
+      message: complete
+        ? 'Committee composition meets configured NAAC requirements.'
+        : 'Committee composition incomplete — review missing requirements.',
+    };
   }
 
   async memberStats(tenantId: string) {
@@ -306,23 +625,52 @@ export class GovernanceMemberService {
 
   async create(user: JwtUser, dto: CreateMemberDto) {
     const committee = await this.committees.getById(user.tid, dto.committeeId);
+    const memberType =
+      dto.memberType ??
+      (dto.isExternal
+        ? 'EXTERNAL'
+        : dto.exOfficioPosition
+          ? 'EX_OFFICIO'
+          : dto.studentId
+            ? 'STUDENT_REPRESENTATIVE'
+            : dto.staffProfileId
+              ? 'INTERNAL_STAFF'
+              : 'EXTERNAL');
+
+    const role = dto.role || this.defaultRoleForMemberType(memberType);
+
     let data: Record<string, unknown> = {
       tenantId: user.tid,
       committeeId: dto.committeeId,
       displayName: dto.displayName.trim(),
-      role: dto.role,
-      staffProfileId: dto.staffProfileId,
-      studentId: dto.studentId,
+      role,
+      memberType,
+      staffProfileId: null,
+      studentId: null,
       userId: dto.userId,
       designation: dto.designation,
       mobile: dto.mobile,
       email: dto.email?.toLowerCase(),
+      organization: dto.organization,
+      address: dto.address,
+      areaOfExpertise: dto.areaOfExpertise,
+      exOfficioPosition: dto.exOfficioPosition,
       joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : new Date(),
       endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      isExternal: dto.isExternal ?? false,
+      isExternal: [
+        'EXTERNAL',
+        'INDUSTRY_EXPERT',
+        'ALUMNI_REPRESENTATIVE',
+        'PARENT_REPRESENTATIVE',
+      ].includes(memberType),
     };
 
-    if (dto.staffProfileId) {
+    if (memberType === 'INTERNAL_STAFF') {
+      if (!dto.staffProfileId) {
+        throw new BadRequestException(
+          'Staff profile is required for internal members',
+        );
+      }
       await this.assertNoDuplicateActive(
         user.tid,
         dto.committeeId,
@@ -331,6 +679,7 @@ export class GovernanceMemberService {
       const staff = await this.resolveStaff(user.tid, dto.staffProfileId);
       data = {
         ...data,
+        staffProfileId: dto.staffProfileId,
         displayName: staff.displayName,
         employeeCode: staff.employeeCode,
         departmentName: staff.departmentName,
@@ -339,6 +688,72 @@ export class GovernanceMemberService {
         email: staff.email?.toLowerCase() ?? dto.email?.toLowerCase(),
         userId: staff.userId ?? dto.userId,
         isExternal: false,
+      };
+    } else if (memberType === 'EX_OFFICIO') {
+      if (!dto.exOfficioPosition) {
+        throw new BadRequestException('Ex-officio position is required');
+      }
+      const resolved = await this.resolveExOfficioPosition(
+        user.tid,
+        dto.exOfficioPosition,
+      );
+      await this.assertNoDuplicateActive(
+        user.tid,
+        dto.committeeId,
+        resolved.staffProfileId,
+      );
+      data = {
+        ...data,
+        exOfficioPosition: dto.exOfficioPosition,
+        staffProfileId: resolved.staffProfileId,
+        displayName: resolved.displayName,
+        employeeCode: resolved.employeeCode,
+        departmentName: resolved.departmentName,
+        designation: resolved.designation,
+        mobile: resolved.mobile,
+        email: resolved.email?.toLowerCase(),
+        userId: resolved.userId,
+        isExternal: false,
+        role: dto.role || 'EX_OFFICIO',
+      };
+    } else if (memberType === 'STUDENT_REPRESENTATIVE') {
+      if (!dto.studentId) {
+        throw new BadRequestException(
+          'Student is required for student representative',
+        );
+      }
+      const student = await this.resolveStudent(user.tid, dto.studentId);
+      data = {
+        ...data,
+        studentId: dto.studentId,
+        displayName: student.displayName,
+        email: student.email?.toLowerCase(),
+        mobile: student.mobile,
+        departmentName: student.departmentName,
+        userId: student.userId,
+        isExternal: false,
+        role: dto.role || 'STUDENT_REPRESENTATIVE',
+      };
+    } else {
+      if (!dto.displayName?.trim()) {
+        throw new BadRequestException('Full name is required');
+      }
+      if (!dto.designation?.trim()) {
+        throw new BadRequestException(
+          'Designation is required for external members',
+        );
+      }
+      data = {
+        ...data,
+        displayName: dto.displayName.trim(),
+        designation: dto.designation,
+        organization: dto.organization,
+        address: dto.address,
+        areaOfExpertise: dto.areaOfExpertise,
+        mobile: dto.mobile,
+        email: dto.email?.toLowerCase(),
+        isExternal: true,
+        role: dto.role || this.defaultRoleForMemberType(memberType),
       };
     }
 
@@ -367,6 +782,11 @@ export class GovernanceMemberService {
         joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         isExternal: dto.isExternal,
+        memberType: dto.memberType,
+        organization: dto.organization,
+        address: dto.address,
+        areaOfExpertise: dto.areaOfExpertise,
+        exOfficioPosition: dto.exOfficioPosition,
       },
     });
 
@@ -409,13 +829,27 @@ export class GovernanceMemberService {
       throw new BadRequestException('Only active members can be replaced');
     }
 
-    await this.assertNoDuplicateActive(
-      user.tid,
-      oldMember.committeeId,
-      dto.staffProfileId,
-    );
+    const memberType =
+      dto.memberType ?? this.inferMemberType(oldMember as MemberWithCommittee);
 
-    const staff = await this.resolveStaff(user.tid, dto.staffProfileId);
+    const createDto: CreateMemberDto = {
+      committeeId: oldMember.committeeId,
+      displayName: dto.displayName ?? oldMember.displayName,
+      role: dto.role,
+      memberType,
+      staffProfileId: dto.staffProfileId,
+      studentId: dto.studentId,
+      designation: dto.designation,
+      organization: dto.organization,
+      mobile: dto.mobile,
+      email: dto.email,
+      address: dto.address,
+      areaOfExpertise: dto.areaOfExpertise,
+      exOfficioPosition:
+        dto.exOfficioPosition ?? oldMember.exOfficioPosition ?? undefined,
+      joiningDate: dto.startDate,
+    };
+
     const previousEnd = dto.endDateForPrevious
       ? new Date(dto.endDateForPrevious)
       : new Date();
@@ -423,31 +857,23 @@ export class GovernanceMemberService {
       ? new Date(dto.startDate)
       : new Date(previousEnd.getTime() + 86_400_000);
 
-    const newMember = await this.db().governanceCommitteeMember.create({
-      data: {
-        tenantId: user.tid,
-        committeeId: oldMember.committeeId,
-        displayName: staff.displayName,
-        employeeCode: staff.employeeCode,
-        departmentName: staff.departmentName,
-        designation: staff.designation,
-        mobile: staff.mobile,
-        email: staff.email?.toLowerCase(),
-        userId: staff.userId,
-        staffProfileId: dto.staffProfileId,
-        role: dto.role,
-        joiningDate: nextStart,
-        status: 'ACTIVE',
-        isExternal: false,
-      },
-    });
+    if (memberType === 'INTERNAL_STAFF' || memberType === 'EX_OFFICIO') {
+      if (memberType === 'INTERNAL_STAFF' && !dto.staffProfileId) {
+        throw new BadRequestException('Select replacement staff member');
+      }
+    } else if (!dto.displayName?.trim()) {
+      throw new BadRequestException('Replacement member name is required');
+    }
+
+    createDto.joiningDate = nextStart.toISOString().slice(0, 10);
+    const replacement = await this.create(user, createDto);
 
     await this.db().governanceCommitteeMember.update({
       where: { id: oldMember.id },
       data: {
         status: 'REPLACED',
         endDate: previousEnd,
-        replacedByMemberId: newMember.id,
+        replacedByMemberId: replacement.id,
       },
     });
 
@@ -457,15 +883,8 @@ export class GovernanceMemberService {
         committeeName: oldMember.committee.name,
       });
     }
-    if (newMember.userId) {
-      await this.notifications.notifyMemberAssigned(user.tid, {
-        userId: newMember.userId,
-        committeeName: oldMember.committee.name,
-        role: newMember.role,
-      });
-    }
 
-    return { previous: oldMember, replacement: newMember };
+    return { previous: oldMember, replacement };
   }
 
   async bulkAssign(user: JwtUser, dto: BulkAssignMembersDto) {

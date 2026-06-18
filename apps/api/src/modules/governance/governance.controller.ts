@@ -24,6 +24,8 @@ import {
   GOVERNANCE_DOCUMENT_CATEGORIES,
   GOVERNANCE_MEETING_MODES,
   GOVERNANCE_MEMBER_ROLES,
+  GOVERNANCE_MEMBER_TYPES,
+  GOVERNANCE_EX_OFFICIO_POSITIONS,
   GOVERNANCE_NAAC_CRITERIA,
   DEFAULT_GOVERNANCE_PERFORMANCE_WEIGHTS,
 } from './constants/governance.constants';
@@ -130,6 +132,8 @@ export class GovernanceController {
     return {
       committeeCategories: GOVERNANCE_COMMITTEE_CATEGORIES,
       memberRoles: GOVERNANCE_MEMBER_ROLES,
+      memberTypes: GOVERNANCE_MEMBER_TYPES,
+      exOfficioPositions: GOVERNANCE_EX_OFFICIO_POSITIONS,
       meetingModes: GOVERNANCE_MEETING_MODES,
       documentCategories: GOVERNANCE_DOCUMENT_CATEGORIES,
       naacCriteria: GOVERNANCE_NAAC_CRITERIA,
@@ -221,6 +225,15 @@ export class GovernanceController {
     @Param('committeeId') committeeId: string,
   ) {
     return this.members.listHistory(user.tid, committeeId);
+  }
+
+  @Get('committees/:committeeId/composition')
+  @RequireAnyPermission(...GOV_READ)
+  committeeComposition(
+    @CurrentUser() user: JwtUser,
+    @Param('committeeId') committeeId: string,
+  ) {
+    return this.members.getComposition(user.tid, committeeId);
   }
 
   @Get('members/:id')

@@ -43,7 +43,11 @@ export function useAuth() {
 /** Use as React Query `enabled` so protected API calls wait for session restore. */
 export function useAuthQueryEnabled() {
   const { isReady, session } = useAuth();
-  return isReady && Boolean(session?.accessToken);
+  if (!isReady || !session?.accessToken) return false;
+  if (session.expiresAt) {
+    return new Date(session.expiresAt).getTime() > Date.now();
+  }
+  return true;
 }
 
 export function useRequireAuth() {

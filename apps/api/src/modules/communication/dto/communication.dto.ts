@@ -18,6 +18,7 @@ export const AUDIENCE_TYPES = [
   'FACULTY',
   'DEPARTMENTS',
   'INDIVIDUAL',
+  'COMMITTEE',
 ] as const;
 export const CHANNELS = ['EMAIL', 'IN_APP', 'SMS', 'WHATSAPP', 'PUSH'] as const;
 

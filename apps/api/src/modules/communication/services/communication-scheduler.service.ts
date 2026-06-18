@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../database/prisma.service';
 import type { ResolvedRecipient } from './communication-audience.service';
 import { CommunicationTriggerService } from './communication-trigger.service';
+import { CommunicationCampaignsService } from './communication-campaigns.service';
 
 @Injectable()
 export class CommunicationSchedulerService {
@@ -11,7 +12,35 @@ export class CommunicationSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly triggers: CommunicationTriggerService,
+    private readonly campaigns: CommunicationCampaignsService,
   ) {}
+
+  @Cron('*/5 * * * *')
+  async runScheduledCampaigns() {
+    const due = await this.prisma.communicationCampaign.findMany({
+      where: {
+        status: 'SCHEDULED',
+        scheduledAt: { lte: new Date() },
+      },
+      take: 20,
+      select: { id: true, tenantId: true, createdById: true },
+    });
+
+    for (const campaign of due) {
+      try {
+        await this.campaigns.sendScheduled(
+          campaign.tenantId,
+          campaign.id,
+          campaign.createdById ?? undefined,
+        );
+        this.logger.log(`Sent scheduled campaign ${campaign.id}`);
+      } catch (err) {
+        this.logger.error(
+          `Failed scheduled campaign ${campaign.id}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+  }
 
   @Cron('0 8 * * *')
   async runFeeDueReminders() {

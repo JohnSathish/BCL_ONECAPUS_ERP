@@ -215,8 +215,8 @@ export class PayslipsService {
     return where;
   }
 
-  list(tenantId: string, query: PayslipListQuery) {
-    return this.prisma.payslip.findMany({
+  async list(tenantId: string, query: PayslipListQuery) {
+    const rows = await this.prisma.payslip.findMany({
       where: this.buildWhere(tenantId, query),
       include: {
         payrollRun: {
@@ -242,6 +242,15 @@ export class PayslipsService {
         { staffProfile: { fullName: 'asc' } },
       ],
     });
+
+    return rows.map((p) => ({
+      ...p,
+      grossSalary: Number(p.grossSalary),
+      totalDeductions: Number(p.totalDeductions),
+      netSalary: Number(p.netSalary),
+      prorationFactor:
+        p.prorationFactor != null ? Number(p.prorationFactor) : null,
+    }));
   }
 
   async employeeHistory(tenantId: string, staffProfileId: string) {

@@ -27,7 +27,12 @@ import {
 import { extractClientIp } from '../../common/utils/request-host';
 import { PrismaService } from '../../database/prisma.service';
 import {
+  ActivityQueryDto,
+  BookPreviewQueryDto,
   BookQueryDto,
+  CamsLibraryBridgeDto,
+  CopyIncidentQueryDto,
+  CreateAccessionBookDto,
   CreateBookCopyDto,
   CreateBookDto,
   CreateCategoryDto,
@@ -35,18 +40,30 @@ import {
   CreateReadingZoneDto,
   CreateResearchItemDto,
   DigitalAssetQueryDto,
+  HardwareScanDto,
   IssueBookDto,
+  LibraryAssistantAskDto,
+  LinkLibraryNaacEvidenceDto,
+  LibraryMemberQueryDto,
   LibrarySettingsDto,
   LibrarySearchQueryDto,
+  MemberDetailQueryDto,
+  MemberSummaryQueryDto,
+  NaacLibraryReportQueryDto,
   PayFineDto,
+  ReadingAnalyticsQueryDto,
   RegisterVisitorDto,
   RenewLoanDto,
   ReportQueryDto,
   ResearchApprovalDto,
   ResearchItemQueryDto,
+  ReportCopyIncidentDto,
+  ReplaceCopyIncidentDto,
+  ResolveIncidentDto,
   ReserveBookDto,
   ReturnBookDto,
   ScanAccessDto,
+  UpdateAccessionWorkflowDto,
   UpdateBookDto,
   UpdateDigitalAssetDto,
   UpdateReadingZoneDto,
@@ -57,13 +74,19 @@ import {
 import { LibraryAccessService } from './services/library-access.service';
 import { LibraryAnalyticsService } from './services/library-analytics.service';
 import { LibraryCatalogueService } from './services/library-catalogue.service';
+import { LibraryCopyIncidentsService } from './services/library-copy-incidents.service';
 import { LibraryCirculationService } from './services/library-circulation.service';
 import { LibraryDigitalAssetsService } from './services/library-digital-assets.service';
 import { LibraryFinesService } from './services/library-fines.service';
 import { LibraryMemberLookupService } from './services/library-member-lookup.service';
+import { LibraryMembersService } from './services/library-members.service';
+import { LibraryHardwareIntegrationService } from './services/library-hardware-integration.service';
+import { LibraryKnowledgeAssistantService } from './services/library-knowledge-assistant.service';
+import { LibraryNaacReportsService } from './services/library-naac-reports.service';
 import { LibraryNotificationsService } from './services/library-notifications.service';
 import { LibraryQuestionBankBridgeService } from './services/library-question-bank-bridge.service';
 import { LibraryQrService } from './services/library-qr.service';
+import { LibraryRecommendationService } from './services/library-recommendation.service';
 import { LibraryReportsService } from './services/library-reports.service';
 import { LibraryReservationService } from './services/library-reservation.service';
 import { LibrarySearchService } from './services/library-search.service';
@@ -124,8 +147,14 @@ export class LibraryController {
     private readonly analytics: LibraryAnalyticsService,
     private readonly catalogue: LibraryCatalogueService,
     private readonly circulation: LibraryCirculationService,
+    private readonly incidents: LibraryCopyIncidentsService,
     private readonly lookup: LibraryMemberLookupService,
+    private readonly members: LibraryMembersService,
     private readonly reports: LibraryReportsService,
+    private readonly naacReports: LibraryNaacReportsService,
+    private readonly recommendations: LibraryRecommendationService,
+    private readonly assistant: LibraryKnowledgeAssistantService,
+    private readonly hardware: LibraryHardwareIntegrationService,
     private readonly reservations: LibraryReservationService,
     private readonly settings: LibrarySettingsService,
     private readonly visitors: LibraryVisitorService,
@@ -143,6 +172,73 @@ export class LibraryController {
   @RequireAnyPermission(...LIB_READ)
   dashboard(@CurrentUser() user: JwtUser) {
     return this.analytics.dashboard(user.tid);
+  }
+
+  @Get('dashboard/activity')
+  @RequireAnyPermission(...LIB_READ)
+  dashboardActivity(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ActivityQueryDto,
+  ) {
+    return this.analytics.recentActivity(user.tid, query.limit ?? 20);
+  }
+
+  @Get('circulation/member-summary')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_READ)
+  memberSummary(
+    @CurrentUser() user: JwtUser,
+    @Query() query: MemberSummaryQueryDto,
+  ) {
+    return this.circulation.memberSummary(user.tid, query.scanCode);
+  }
+
+  @Get('circulation/book-preview')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_READ)
+  bookPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: BookPreviewQueryDto,
+  ) {
+    return this.circulation.bookPreview(user.tid, query.barcode);
+  }
+
+  @Get('circulation/issue-preview')
+  @RequireAnyPermission(...LIB_CIRCULATE)
+  issuePreview(
+    @CurrentUser() user: JwtUser,
+    @Query('memberScan') memberScan: string,
+    @Query('copyBarcode') copyBarcode: string,
+  ) {
+    return this.circulation.issuePreview(user.tid, memberScan, copyBarcode);
+  }
+
+  @Get('circulation/desk-context')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_READ)
+  circulationDeskContext(@CurrentUser() user: JwtUser) {
+    return this.circulation.deskContext(user.tid);
+  }
+
+  @Get('circulation/return-preview')
+  @RequireAnyPermission(...LIB_CIRCULATE)
+  returnPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: BookPreviewQueryDto,
+  ) {
+    return this.circulation.returnPreview(user.tid, query.barcode);
+  }
+
+  @Get('circulation/renew-preview')
+  @RequireAnyPermission(...LIB_CIRCULATE)
+  renewPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: BookPreviewQueryDto,
+  ) {
+    return this.circulation.renewPreview(user.tid, query.barcode);
+  }
+
+  @Get('copies/:id/qr')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_MANAGE)
+  copyQr(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.qr.getCopyQr(user.tid, id);
   }
 
   @Post('access/scan')
@@ -209,6 +305,50 @@ export class LibraryController {
     return this.notifications.processOverdueReminders(user.tid);
   }
 
+  @Post('circulation/notify-due-tomorrow')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_MANAGE)
+  notifyDueTomorrow(@CurrentUser() user: JwtUser) {
+    return this.notifications.processDueTomorrowReminders(user.tid);
+  }
+
+  @Get('circulation/incidents')
+  @RequireAnyPermission(...LIB_READ)
+  listIncidents(
+    @CurrentUser() user: JwtUser,
+    @Query() query: CopyIncidentQueryDto,
+  ) {
+    return this.incidents.listIncidents(user.tid, query);
+  }
+
+  @Post('circulation/incidents')
+  @RequireAnyPermission(...LIB_CIRCULATE, ...LIB_MANAGE)
+  reportIncident(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReportCopyIncidentDto,
+  ) {
+    return this.incidents.reportIncident(user, dto);
+  }
+
+  @Post('circulation/incidents/:id/replace')
+  @RequireAnyPermission(...LIB_MANAGE)
+  replaceIncident(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ReplaceCopyIncidentDto,
+  ) {
+    return this.incidents.replaceCopy(user, id, dto);
+  }
+
+  @Post('circulation/incidents/:id/resolve')
+  @RequireAnyPermission(...LIB_MANAGE)
+  resolveIncident(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ResolveIncidentDto,
+  ) {
+    return this.incidents.resolveIncident(user, id, dto.notes);
+  }
+
   @Post('circulation/accrue-fines')
   @RequireAnyPermission(...LIB_MANAGE)
   accrueFines(@CurrentUser() user: JwtUser) {
@@ -254,6 +394,12 @@ export class LibraryController {
   @RequireAnyPermission(...LIB_DESK)
   occupancy(@CurrentUser() user: JwtUser) {
     return this.analytics.getOccupancy(user.tid);
+  }
+
+  @Get('access/desk-dashboard')
+  @RequireAnyPermission(...LIB_DESK)
+  accessDeskDashboard(@CurrentUser() user: JwtUser) {
+    return this.access.accessDeskDashboard(user.tid);
   }
 
   @Get('access/visits')
@@ -335,6 +481,50 @@ export class LibraryController {
     return this.catalogue.updateBook(user.tid, id, dto);
   }
 
+  @Get('accession/next')
+  @RequirePermissions('library:manage')
+  nextAccession(@CurrentUser() user: JwtUser) {
+    return this.catalogue.peekNextAccessionNo(user.tid);
+  }
+
+  @Post('books/accession')
+  @RequirePermissions('library:manage')
+  createAccession(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateAccessionBookDto,
+  ) {
+    return this.catalogue.createAccessionEntry(user.tid, dto);
+  }
+
+  @Patch('books/:id/accession')
+  @RequirePermissions('library:manage')
+  updateAccessionWorkflow(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccessionWorkflowDto,
+  ) {
+    return this.catalogue.updateAccessionWorkflow(user.tid, id, dto);
+  }
+
+  @Get('members')
+  @RequireAnyPermission(...LIB_READ)
+  listMembers(
+    @CurrentUser() user: JwtUser,
+    @Query() query: LibraryMemberQueryDto,
+  ) {
+    return this.members.listMembers(user.tid, query);
+  }
+
+  @Get('members/:memberId')
+  @RequireAnyPermission(...LIB_READ)
+  getMember(
+    @CurrentUser() user: JwtUser,
+    @Param('memberId') memberId: string,
+    @Query() query: MemberDetailQueryDto,
+  ) {
+    return this.members.getMemberDetail(user.tid, memberId, query.memberType);
+  }
+
   @Post('copies')
   @RequirePermissions('library:manage')
   addCopy(@CurrentUser() user: JwtUser, @Body() dto: CreateBookCopyDto) {
@@ -383,6 +573,12 @@ export class LibraryController {
     return this.reservations.listActive(user.tid);
   }
 
+  @Get('reservations/queue')
+  @RequireAnyPermission(...LIB_READ)
+  reservationQueue(@CurrentUser() user: JwtUser) {
+    return this.reservations.listQueue(user.tid);
+  }
+
   @Get('settings')
   @RequireAnyPermission(...LIB_SETTINGS)
   getSettings(@CurrentUser() user: JwtUser) {
@@ -426,6 +622,24 @@ export class LibraryController {
   @RequireAnyPermission('library:read')
   myReservations(@CurrentUser() user: JwtUser) {
     return this.prismaStudentReservations(user);
+  }
+
+  @Get('me/dashboard')
+  @RequireAnyPermission('library:read')
+  myLibraryDashboard(@CurrentUser() user: JwtUser) {
+    return this.recommendations.getStudentDashboard(user);
+  }
+
+  @Get('me/recommendations')
+  @RequireAnyPermission('library:read')
+  myRecommendations(
+    @CurrentUser() user: JwtUser,
+    @Query('limit') limit?: string,
+  ) {
+    return this.recommendations.getRecommendations(
+      user,
+      limit ? Math.min(30, Number(limit) || 12) : 12,
+    );
   }
 
   @Get('me/qr')
@@ -551,6 +765,15 @@ export class LibraryController {
     return this.analytics.genderTrends(user.tid);
   }
 
+  @Get('analytics/reading')
+  @RequireAnyPermission(...LIB_REPORTS)
+  readingAnalytics(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ReadingAnalyticsQueryDto,
+  ) {
+    return this.analytics.readingAnalytics(user.tid, query.days ?? 365);
+  }
+
   @Get('reports/export/department-visitors.csv')
   @RequireAnyPermission(...LIB_REPORTS)
   @Header('Content-Type', 'text/csv')
@@ -621,6 +844,78 @@ export class LibraryController {
     @Query() query: ReportQueryDto,
   ) {
     return this.reports.researchUsageReport(user.tid, query);
+  }
+
+  @Get('reports/naac/summary')
+  @RequireAnyPermission(...LIB_REPORTS)
+  naacReportSummary(
+    @CurrentUser() user: JwtUser,
+    @Query() query: NaacLibraryReportQueryDto,
+  ) {
+    return this.naacReports.buildBundle(user.tid, query);
+  }
+
+  @Get('reports/naac/export')
+  @RequireAnyPermission(...LIB_REPORTS)
+  async naacReportExport(
+    @CurrentUser() user: JwtUser,
+    @Query() query: NaacLibraryReportQueryDto,
+    @Query('format') format?: 'pdf' | 'xlsx' | 'csv',
+  ) {
+    const result = await this.naacReports.export(
+      user.tid,
+      query,
+      format ?? 'pdf',
+    );
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename="${result.filename}"`,
+    });
+  }
+
+  @Post('reports/naac/link-evidence')
+  @RequireAnyPermission(...LIB_MANAGE)
+  linkNaacEvidence(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: LinkLibraryNaacEvidenceDto,
+  ) {
+    return this.naacReports.linkEvidence(user, dto);
+  }
+
+  @Get('assistant/prompts')
+  @RequireAnyPermission(...LIB_READ)
+  assistantPrompts(@CurrentUser() user: JwtUser) {
+    const isStudent = user.roles?.includes('student') ?? false;
+    return this.assistant.defaultPrompts(isStudent);
+  }
+
+  @Post('assistant/ask')
+  @RequireAnyPermission(...LIB_READ)
+  askAssistant(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: LibraryAssistantAskDto,
+  ) {
+    return this.assistant.ask(user, dto.question);
+  }
+
+  @Post('integrations/hardware-scan')
+  @RequireAnyPermission(...LIB_DESK, ...LIB_MANAGE)
+  hardwareScan(@CurrentUser() user: JwtUser, @Body() dto: HardwareScanDto) {
+    return this.hardware.hardwareScan(user.tid, dto);
+  }
+
+  @Post('integrations/cams-library')
+  @RequireAnyPermission('cams:manage', ...LIB_MANAGE)
+  camsLibraryBridge(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CamsLibraryBridgeDto,
+  ) {
+    return this.hardware.camsLibraryBridge(
+      user.tid,
+      dto.accessPointCode,
+      dto.scanCode,
+      dto.method,
+    );
   }
 
   @Get('digital-assets')

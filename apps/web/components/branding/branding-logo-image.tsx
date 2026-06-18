@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
 import { cn } from '@/utils/cn';
 
 type Props = {
@@ -26,6 +27,7 @@ export function BrandingLogoImage({
   unoptimized,
 }: Props) {
   const shouldUnoptimize = unoptimized ?? (src.startsWith('http') || src.startsWith('/uploads'));
+  const shouldPriority = priority ?? src === DEFAULT_LOGIN_LOGO;
 
   return (
     <div
@@ -39,7 +41,7 @@ export function BrandingLogoImage({
         sizes={size ? `${size}px` : '96px'}
         className="object-contain"
         unoptimized={shouldUnoptimize}
-        priority={priority}
+        priority={shouldPriority}
       />
     </div>
   );

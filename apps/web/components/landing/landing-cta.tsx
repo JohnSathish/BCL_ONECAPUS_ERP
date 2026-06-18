@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useScrollReveal } from './hooks/use-scroll-reveal';
+import { REQUEST_DEMO_PATH } from './landing.constants';
 
 export function LandingCta() {
   const { ref, inView } = useScrollReveal({ threshold: 0.3 });
@@ -29,18 +30,18 @@ export function LandingCta() {
 
           <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/login"
+              href={REQUEST_DEMO_PATH}
               className="group inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm font-bold text-indigo-700 shadow-xl transition-transform hover:scale-[1.03]"
             >
               Start Free Demo
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <a
-              href="mailto:hello@basecodelabs.com"
+            <Link
+              href={REQUEST_DEMO_PATH}
               className="text-sm font-medium text-white/70 underline-offset-4 hover:text-white hover:underline"
             >
               Contact Sales
-            </a>
+            </Link>
           </div>
         </motion.div>
       </div>

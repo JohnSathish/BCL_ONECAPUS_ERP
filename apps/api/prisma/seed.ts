@@ -11,7 +11,7 @@ import { seedDbcFyugpRules } from './seed-dbc-fyugp-rules';
 import { seedArtsFyugpCatalog } from './seed-arts-fyugp-catalog';
 import { seedArtsOddTimetable } from './seed-arts-odd-timetable';
 import { seedArtsShiftIiTimetable } from './seed-arts-shift-ii-timetable';
-import { seedDemoTimetableFoundation } from './seed-demo-timetable-foundation';
+import { seedDemoLiveReady } from './seed-demo-live-ready';
 import { seedDonBoscoFeeCycles } from './seeds/fee-cycle.seed';
 import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
 import { seedDbcCommittees } from './seeds/seed-dbc-committees';
@@ -718,6 +718,30 @@ const PERMISSIONS: {
     description: 'Library access desk kiosk scan and entry/exit',
   },
   {
+    slug: 'principal-desk:access',
+    resource: 'principal-desk',
+    action: 'access',
+    description: 'Principal command center dashboard and instant lookup',
+  },
+  {
+    slug: 'cams:read',
+    resource: 'cams',
+    action: 'read',
+    description: 'View campus access points and live occupancy',
+  },
+  {
+    slug: 'cams:manage',
+    resource: 'cams',
+    action: 'manage',
+    description: 'Configure access points and kiosk devices',
+  },
+  {
+    slug: 'cams:reports',
+    resource: 'cams',
+    action: 'reports',
+    description: 'Campus access analytics and NAAC footfall reports',
+  },
+  {
     slug: 'library:read',
     resource: 'library',
     action: 'read',
@@ -1083,6 +1107,19 @@ async function main() {
       verified: true,
     },
   });
+
+  const productionHosts = [
+    'erp.donboscocollege.ac.in',
+    'admissions.donboscocollege.ac.in',
+    'library.donboscocollege.ac.in',
+  ];
+  for (const host of productionHosts) {
+    await prisma.tenantDomain.upsert({
+      where: { host },
+      update: { tenantId: tenant.id, verified: true, deletedAt: null },
+      create: { tenantId: tenant.id, host, verified: true },
+    });
+  }
 
   await prisma.tenantBranding.upsert({
     where: { tenantId: tenant.id },
@@ -1560,6 +1597,10 @@ async function main() {
     'payroll:reports',
     'naac-iqac:read',
     'naac-iqac:reports',
+    'principal-desk:access',
+    'governance:read',
+    'staff-attendance:leave-admin',
+    'library:read',
   ]);
   await upsertRole('vice-principal', 'Vice Principal', [
     'students:read',
@@ -1576,6 +1617,10 @@ async function main() {
     'payroll:reports',
     'naac-iqac:read',
     'naac-iqac:reports',
+    'principal-desk:access',
+    'governance:read',
+    'staff-attendance:leave-admin',
+    'library:read',
   ]);
   await upsertRole('erp-administrator', 'ERP Administrator', [
     'users:read',
@@ -1592,6 +1637,14 @@ async function main() {
     'notifications:read',
     'license:read',
     'license:activate',
+    'principal-desk:access',
+    'governance:read',
+    'staff-attendance:leave-admin',
+    'library:read',
+    'students:read',
+    'staff:read',
+    'fees:read',
+    'naac-iqac:read',
   ]);
 
   const adminRole = await prisma.role.findFirstOrThrow({
@@ -1647,6 +1700,35 @@ async function main() {
     data: {
       userId: libraryOperatorUser.id,
       roleId: libraryOperatorRole.id,
+    },
+  });
+
+  const principalRole = await prisma.role.findFirstOrThrow({
+    where: { tenantId: tenant.id, slug: 'principal' },
+  });
+
+  const principalDeskUser = await prisma.user.upsert({
+    where: {
+      tenantId_email: { tenantId: tenant.id, email: 'principal-desk@demo.edu' },
+    },
+    update: { passwordHash, isActive: true },
+    create: {
+      tenantId: tenant.id,
+      email: 'principal-desk@demo.edu',
+      passwordHash,
+      emailVerifiedAt: new Date(),
+      isActive: true,
+    },
+  });
+
+  await prisma.userRole.deleteMany({
+    where: { userId: principalDeskUser.id, roleId: principalRole.id },
+  });
+
+  await prisma.userRole.create({
+    data: {
+      userId: principalDeskUser.id,
+      roleId: principalRole.id,
     },
   });
 
@@ -3755,7 +3837,7 @@ async function main() {
     createdById: adminUser.id,
   });
 
-  await seedDemoTimetableFoundation({
+  await seedDemoLiveReady({
     prisma,
     tenantId: tenant.id,
     institutionId: institution.id,
@@ -4336,6 +4418,95 @@ async function seedTenantLicensing(
   console.log(
     'Sample license key: BCLK-DEMO-2026-0001-KEY1 (365-day extension)',
   );
+
+  await promoteOwnerSuperAdmin('johnsathish16@gmail.com');
+  await seedCampusAccessDemo(tenant.id);
+}
+
+async function seedCampusAccessDemo(tenantId: string) {
+  const existing = await prisma.accessPoint.findFirst({
+    where: { tenantId, code: 'library', deletedAt: null },
+  });
+  if (existing) return;
+
+  const { createHash, randomBytes } = await import('crypto');
+  const token = randomBytes(24).toString('hex');
+  const hash = createHash('sha256').update(token).digest('hex');
+  const prefix = token.slice(0, 8);
+  const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+
+  const point = await prisma.accessPoint.create({
+    data: {
+      tenantId,
+      code: 'library',
+      name: 'Library Entry Gate',
+      accessType: 'LIBRARY',
+      location: 'Main Library Entrance',
+      blockOnFine: false,
+      voiceEnabled: true,
+    },
+  });
+  await prisma.accessKioskDevice.create({
+    data: {
+      tenantId,
+      accessPointId: point.id,
+      name: 'Library Scanner 1',
+      tokenHash: hash,
+      tokenPrefix: prefix,
+    },
+  });
+  console.log(
+    'CAMS library kiosk:',
+    `${origin.replace(/\/$/, '')}/kiosk/library?token=${token}`,
+  );
+}
+
+async function promoteOwnerSuperAdmin(email: string) {
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: 'insensitive' },
+      deletedAt: null,
+    },
+  });
+  if (!user) return;
+
+  const superAdminRole = await prisma.role.findFirst({
+    where: { tenantId: user.tenantId, slug: 'super-admin', deletedAt: null },
+  });
+  const collegeAdminRole = await prisma.role.findFirst({
+    where: { tenantId: user.tenantId, slug: 'college-admin', deletedAt: null },
+  });
+  if (!superAdminRole && !collegeAdminRole) return;
+
+  const facultyRole = await prisma.role.findFirst({
+    where: { tenantId: user.tenantId, slug: 'faculty', deletedAt: null },
+  });
+  if (facultyRole) {
+    await prisma.userRole.deleteMany({
+      where: { userId: user.id, roleId: facultyRole.id },
+    });
+  }
+
+  for (const role of [superAdminRole, collegeAdminRole].filter(Boolean)) {
+    const existing = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role!.id, deletedAt: null },
+    });
+    if (!existing) {
+      await prisma.userRole.create({
+        data: { userId: user.id, roleId: role!.id },
+      });
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isActive: true,
+      emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+    },
+  });
+
+  console.log('Owner super-admin:', email);
 }
 
 const LICENSE_NOTIFICATION_TEMPLATES = [

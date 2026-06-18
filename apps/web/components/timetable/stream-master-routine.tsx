@@ -94,9 +94,13 @@ export function StreamMasterRoutineView({ routine }: { routine?: StreamMasterRou
                                     </span>
                                     <span>{entry.facultyInitial}</span>
                                   </div>
-                                  <div className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                    {entry.courseCode}
-                                  </div>
+                                  {entry.courseCode &&
+                                  entry.courseTitle &&
+                                  entry.courseCode !== entry.courseTitle ? (
+                                    <div className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      {entry.courseCode}
+                                    </div>
+                                  ) : null}
                                   <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
                                     {entry.category ? <span>{entry.category}</span> : null}
                                     {entry.roomCode ? <span>{entry.roomCode}</span> : null}

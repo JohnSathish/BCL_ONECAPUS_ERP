@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { LibraryQrService } from './library-qr.service';
 
 export type LibraryMemberType = 'STUDENT' | 'STAFF' | 'FACULTY' | 'VISITOR';
@@ -52,6 +53,15 @@ export class LibraryMemberLookupService {
           { rfidNumber: code },
           { enrollmentNumber: { equals: code, mode: 'insensitive' } },
           { rollNumber: { equals: code, mode: 'insensitive' } },
+          { applicationNumber: { equals: code, mode: 'insensitive' } },
+          { admissionNumber: { equals: code, mode: 'insensitive' } },
+          {
+            masterProfile: {
+              mobileNumber: {
+                contains: code.replace(/\D/g, '').slice(-10),
+              },
+            },
+          },
         ],
       },
       include: {
@@ -80,9 +90,7 @@ export class LibraryMemberLookupService {
         memberId: student.id,
         studentId: student.id,
         fullName: student.masterProfile?.fullName ?? student.enrollmentNumber,
-        photoUrl: student.masterProfile?.photoPath
-          ? `/uploads/${student.masterProfile.photoPath.replace(/^\/+/, '')}`
-          : null,
+        photoUrl: toPublicUploadUrl(student.masterProfile?.photoPath),
         registrationNumber: student.enrollmentNumber,
         department: student.department?.name ?? null,
         programme:
@@ -104,6 +112,8 @@ export class LibraryMemberLookupService {
         deletedAt: null,
         OR: [
           { rfidNo: code },
+          { biometricId: code },
+          { biometricExternalUserId: code },
           { employeeCode: { equals: code, mode: 'insensitive' } },
         ],
       },

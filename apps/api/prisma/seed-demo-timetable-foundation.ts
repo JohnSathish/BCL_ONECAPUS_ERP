@@ -116,11 +116,12 @@ export async function seedDemoTimetableFoundation(
 ) {
   const facultyByDept = await seedDemoFaculty(ctx);
   const roomByCode = await seedDemoClassrooms(ctx);
+  await ensureShiftIiOfferingSections(ctx);
   await backfillSubjectGroups(ctx);
   await assignSubjectGroupFaculty(ctx, facultyByDept);
   await finalizeTimetableEntries(ctx, facultyByDept, roomByCode);
   await seedTeachingAssignments(ctx);
-  await ensureShiftIiOfferingSections(ctx);
+  await backfillSubjectGroups(ctx);
   const registrationStats = await seedShiftRegistrations(ctx);
   await publishTimetablePlans(ctx);
 
@@ -509,10 +510,24 @@ async function seedShiftRegistrations(ctx: SeedDemoTimetableFoundationContext) {
   if (!shiftIi) return { students: 0, lines: 0 };
 
   let students = await ctx.prisma.student.findMany({
-    where: { tenantId: ctx.tenantId, deletedAt: null },
+    where: {
+      tenantId: ctx.tenantId,
+      deletedAt: null,
+      OR: [
+        { enrollmentNumber: { startsWith: 'DEMO-S3-' } },
+        { importSource: 'DEMO_SEED' },
+      ],
+    },
     take: 20,
     orderBy: { createdAt: 'asc' },
   });
+
+  students = students.filter(
+    (student) =>
+      !shiftIi.id ||
+      student.primaryShiftId == null ||
+      student.primaryShiftId === shiftIi.id,
+  );
 
   if (students.length < 8) {
     const created = await seedDemoStudents(ctx, 12 - students.length);

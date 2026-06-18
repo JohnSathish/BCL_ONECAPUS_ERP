@@ -1,5 +1,5 @@
-import { CommunicationWorkspace } from '@/components/communication/communication-workspace';
+import { CommMissionDashboard } from '@/components/communication/mission-control/comm-mission-dashboard';
 
-export default function CommunicationPage() {
-  return <CommunicationWorkspace />;
+export default function CommunicationDashboardPage() {
+  return <CommMissionDashboard />;
 }

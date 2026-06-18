@@ -7,9 +7,11 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
   BookQueryDto,
+  CreateAccessionBookDto,
   CreateBookCopyDto,
   CreateBookDto,
   CreateCategoryDto,
+  UpdateAccessionWorkflowDto,
   UpdateBookDto,
 } from '../dto/library.dto';
 import { LibrarySettingsService } from './library-settings.service';
@@ -52,6 +54,9 @@ export class LibraryCatalogueService {
       deletedAt: null,
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.accessionStatus
+        ? { accessionStatus: query.accessionStatus }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -181,6 +186,127 @@ export class LibraryCatalogueService {
     });
 
     return copy;
+  }
+
+  async peekNextAccessionNo(tenantId: string) {
+    await this.settings.ensureTenantDefaults(tenantId);
+    const s = await this.prisma.librarySettings.findUniqueOrThrow({
+      where: { tenantId },
+    });
+    const year = new Date().getFullYear();
+    const padded = String(s.accessionNextSeq).padStart(5, '0');
+    return {
+      accessionNo: `${s.accessionPrefix}-${year}-${padded}`,
+      prefix: s.accessionPrefix,
+      nextSeq: s.accessionNextSeq,
+    };
+  }
+
+  private async reserveAccessionNo(tenantId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const s = await tx.librarySettings.findUniqueOrThrow({
+        where: { tenantId },
+      });
+      const seq = s.accessionNextSeq;
+      const year = new Date().getFullYear();
+      const accessionNo = `${s.accessionPrefix}-${year}-${String(seq).padStart(5, '0')}`;
+      await tx.librarySettings.update({
+        where: { tenantId },
+        data: { accessionNextSeq: seq + 1 },
+      });
+      return accessionNo;
+    });
+  }
+
+  async createAccessionEntry(tenantId: string, dto: CreateAccessionBookDto) {
+    const accessionNo = dto.accessionNo?.trim()
+      ? dto.accessionNo.trim()
+      : await this.reserveAccessionNo(tenantId);
+
+    const existing = await this.prisma.libraryBook.findFirst({
+      where: { tenantId, accessionNo, deletedAt: null },
+    });
+    if (existing) {
+      throw new BadRequestException(`Accession ${accessionNo} already exists`);
+    }
+
+    const copies = dto.totalCopies ?? 1;
+    const accessionStatus = dto.accessionStatus ?? 'PENDING';
+    const book = await this.prisma.libraryBook.create({
+      data: {
+        id: randomUUID(),
+        tenantId,
+        accessionNo,
+        bookNumber: dto.bookNumber?.trim(),
+        isbn: dto.isbn?.trim(),
+        title: dto.title.trim(),
+        author: dto.author?.trim(),
+        publisher: dto.publisher?.trim(),
+        edition: dto.edition?.trim(),
+        departmentId: dto.departmentId,
+        categoryId: dto.categoryId,
+        price: dto.price,
+        shelf: dto.shelf?.trim(),
+        rack: dto.rack?.trim(),
+        section: dto.section?.trim(),
+        row: dto.row?.trim(),
+        location: dto.location?.trim(),
+        accessionStatus,
+        totalCopies: copies,
+      },
+    });
+
+    for (let i = 1; i <= copies; i++) {
+      await this.prisma.libraryBookCopy.create({
+        data: {
+          id: randomUUID(),
+          tenantId,
+          bookId: book.id,
+          copyNumber: i,
+          barcode: `${book.accessionNo}-C${i}`,
+          status: accessionStatus === 'ON_SHELF' ? 'AVAILABLE' : 'PROCESSING',
+        },
+      });
+    }
+
+    return this.getBook(tenantId, book.id);
+  }
+
+  async updateAccessionWorkflow(
+    tenantId: string,
+    bookId: string,
+    dto: UpdateAccessionWorkflowDto,
+  ) {
+    const book = await this.getBook(tenantId, bookId);
+    const nextStatus = dto.accessionStatus ?? book.accessionStatus;
+
+    const updated = await this.prisma.libraryBook.update({
+      where: { id: bookId },
+      data: {
+        accessionStatus: dto.accessionStatus,
+        shelf: dto.shelf?.trim(),
+        rack: dto.rack?.trim(),
+        section: dto.section?.trim(),
+        row: dto.row?.trim(),
+        location: dto.location?.trim(),
+        categoryId: dto.categoryId === undefined ? undefined : dto.categoryId,
+      },
+      include: { category: true, copies: true },
+    });
+
+    if (dto.accessionStatus === 'ON_SHELF') {
+      await this.prisma.libraryBookCopy.updateMany({
+        where: { tenantId, bookId, status: 'PROCESSING' },
+        data: { status: 'AVAILABLE' },
+      });
+    } else if (nextStatus === 'WITHDRAWN') {
+      await this.prisma.libraryBookCopy.updateMany({
+        where: { tenantId, bookId },
+        data: { status: 'WITHDRAWN' },
+      });
+    }
+
+    return updated;
   }
 
   async findCopyByBarcode(tenantId: string, barcode: string) {

@@ -125,7 +125,7 @@ export class NaacAggregatorService {
       case 4:
         return {
           governanceDocuments: all.governanceDocuments,
-          message: 'Infrastructure metrics — link assets module when available',
+          library: await this.libraryMetrics(tenantId),
         };
       case 5:
         return {
@@ -156,5 +156,41 @@ export class NaacAggregatorService {
       default:
         return {};
     }
+  }
+
+  private async libraryMetrics(tenantId: string) {
+    const ts = new Date().toISOString();
+    const metric = (value: number, source: string) => ({
+      value,
+      source,
+      asOf: ts,
+    });
+
+    const [titles, copies, digital, visitsYear] = await Promise.all([
+      this.prisma.libraryBook
+        .count({ where: { tenantId, deletedAt: null } })
+        .catch(() => 0),
+      this.prisma.libraryBookCopy.count({ where: { tenantId } }).catch(() => 0),
+      this.prisma.libraryDigitalAsset
+        .count({ where: { tenantId, deletedAt: null } })
+        .catch(() => 0),
+      this.prisma.libraryVisit
+        .count({
+          where: {
+            tenantId,
+            entryAt: {
+              gte: new Date(new Date().getFullYear(), 0, 1),
+            },
+          },
+        })
+        .catch(() => 0),
+    ]);
+
+    return {
+      bookTitles: metric(titles, 'LibraryBook'),
+      bookCopies: metric(copies, 'LibraryBookCopy'),
+      digitalAssets: metric(digital, 'LibraryDigitalAsset'),
+      annualFootfall: metric(visitsYear, 'LibraryVisit'),
+    };
   }
 }

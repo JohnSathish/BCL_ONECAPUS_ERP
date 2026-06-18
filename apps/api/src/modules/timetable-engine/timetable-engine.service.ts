@@ -1028,7 +1028,31 @@ export class TimetableEngineService {
   ) {
     const resolvedStaffId = staffProfileId ?? (await this.staffIdForUser(user));
     if (!resolvedStaffId) return { entries: [] };
-    const plan = await this.latestPublishedPlan(user.tid, filters);
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { tenantId: user.tid, id: resolvedStaffId, deletedAt: null },
+      select: { primaryShiftId: true, teachingShiftCategory: true },
+    });
+
+    const planFilters = { ...filters };
+    if (!planFilters.shiftId) {
+      if (staff?.primaryShiftId) {
+        planFilters.shiftId = staff.primaryShiftId;
+      } else if (staff?.teachingShiftCategory === 'SHIFT_II') {
+        const shiftIi = await this.prisma.shift.findFirst({
+          where: {
+            tenantId: user.tid,
+            code: 'SHIFT_II',
+            deletedAt: null,
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        });
+        if (shiftIi) planFilters.shiftId = shiftIi.id;
+      }
+    }
+
+    const plan = await this.latestPublishedPlan(user.tid, planFilters);
     if (!plan) return { entries: [] };
     const matrix = await this.print.matrix(user.tid, plan.id, {
       staffProfileId: resolvedStaffId,

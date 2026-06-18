@@ -45,6 +45,7 @@ export type OperationsCenter = {
   institution: {
     academicYear: string;
     semester: string;
+    activeSemesters: number[];
     cycle: string | null;
     studentCount: number;
     staffCount: number;

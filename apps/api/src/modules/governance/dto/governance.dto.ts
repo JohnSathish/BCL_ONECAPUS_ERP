@@ -32,6 +32,8 @@ import {
   GOVERNANCE_MEETING_STATUSES,
   GOVERNANCE_MEMBER_ROLES,
   GOVERNANCE_MEMBER_STATUSES,
+  GOVERNANCE_MEMBER_TYPES,
+  GOVERNANCE_EX_OFFICIO_POSITIONS,
   GOVERNANCE_MOM_STATUSES,
   GOVERNANCE_NOTICE_AUDIENCES,
   GOVERNANCE_NOTICE_STATUSES,
@@ -208,6 +210,26 @@ export class CreateMemberDto {
   @IsOptional()
   @IsBoolean()
   isExternal?: boolean;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_MEMBER_TYPES])
+  memberType?: string;
+
+  @IsOptional()
+  @IsString()
+  organization?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  areaOfExpertise?: string;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_EX_OFFICIO_POSITIONS])
+  exOfficioPosition?: string;
 }
 
 export class CreateCommitteeMemberBodyDto extends OmitType(CreateMemberDto, [
@@ -250,6 +272,26 @@ export class UpdateMemberDto {
   @IsOptional()
   @IsBoolean()
   isExternal?: boolean;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_MEMBER_TYPES])
+  memberType?: string;
+
+  @IsOptional()
+  @IsString()
+  organization?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  areaOfExpertise?: string;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_EX_OFFICIO_POSITIONS])
+  exOfficioPosition?: string;
 }
 
 export class BulkAssignMembersDto {
@@ -264,8 +306,49 @@ export class BulkAssignMembersDto {
 }
 
 export class ReplaceMemberDto {
+  @IsOptional()
   @IsUUID()
-  staffProfileId!: string;
+  staffProfileId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_MEMBER_TYPES])
+  memberType?: string;
+
+  @IsOptional()
+  @IsString()
+  designation?: string;
+
+  @IsOptional()
+  @IsString()
+  organization?: string;
+
+  @IsOptional()
+  @IsString()
+  mobile?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  areaOfExpertise?: string;
+
+  @IsOptional()
+  @IsIn([...GOVERNANCE_EX_OFFICIO_POSITIONS])
+  exOfficioPosition?: string;
 
   @IsString()
   @IsNotEmpty()

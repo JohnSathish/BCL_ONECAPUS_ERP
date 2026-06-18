@@ -234,4 +234,105 @@ export class LibraryNotificationsService {
 
     return { checked: overdue.length, sent };
   }
+
+  async notifyDueTomorrowLoan(tenantId: string, loanId: string) {
+    const loan = await this.prisma.libraryLoan.findFirst({
+      where: { tenantId, id: loanId, status: 'ACTIVE' },
+      include: { copy: { include: { book: { select: { title: true } } } } },
+    });
+    if (!loan?.studentId) return;
+
+    const recipient = await this.studentRecipient(tenantId, loan.studentId);
+    if (!recipient) return;
+
+    await this.communication.trigger({
+      tenantId,
+      templateCode: 'LIBRARY_DUE_TOMORROW',
+      triggerKey: 'library.loan.due_tomorrow',
+      entityType: 'library_loan',
+      entityId: loan.id,
+      recipient,
+      variables: {
+        student_name: recipient.displayName,
+        book_title: loan.copy.book.title,
+        due_date: loan.dueAt.toLocaleDateString('en-IN'),
+        institution_name: 'Library',
+      },
+      channels: ['IN_APP', 'EMAIL'],
+    });
+  }
+
+  async processDueTomorrowReminders(tenantId: string) {
+    const libSettings = await this.settings.getSettings(tenantId);
+    if (!libSettings.dueTomorrowNotifyEnabled) {
+      return { checked: 0, sent: 0, skipped: true };
+    }
+
+    const start = new Date();
+    start.setDate(start.getDate() + 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    const sentOn = startOfUtcDay(start);
+    const dueLoans = await this.prisma.libraryLoan.findMany({
+      where: {
+        tenantId,
+        status: 'ACTIVE',
+        studentId: { not: null },
+        dueAt: { gte: start, lt: end },
+      },
+      include: { copy: { include: { book: { select: { title: true } } } } },
+      take: 200,
+    });
+
+    let sent = 0;
+    for (const loan of dueLoans) {
+      if (!loan.studentId) continue;
+
+      const alreadySent = await this.prisma.libraryDueReminderLog.findFirst({
+        where: { tenantId, loanId: loan.id, sentOn },
+      });
+      if (alreadySent) continue;
+
+      try {
+        const recipient = await this.studentRecipient(tenantId, loan.studentId);
+        if (!recipient) continue;
+
+        const result = await this.communication.trigger({
+          tenantId,
+          templateCode: 'LIBRARY_DUE_TOMORROW',
+          triggerKey: 'library.loan.due_tomorrow',
+          entityType: 'library_loan',
+          entityId: loan.id,
+          recipient,
+          variables: {
+            student_name: recipient.displayName,
+            book_title: loan.copy.book.title,
+            due_date: loan.dueAt.toLocaleDateString('en-IN'),
+            institution_name: 'Library',
+          },
+          channels: ['IN_APP', 'EMAIL'],
+        });
+
+        if (!result.skipped) {
+          sent++;
+          await this.prisma.libraryDueReminderLog.create({
+            data: {
+              id: randomUUID(),
+              tenantId,
+              loanId: loan.id,
+              sentOn,
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Due-tomorrow notify failed for loan ${loan.id}: ${String(err)}`,
+        );
+      }
+    }
+
+    return { checked: dueLoans.length, sent };
+  }
 }

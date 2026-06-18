@@ -90,6 +90,11 @@ export class TimetablePrintService {
     const roomIds = Array.from(
       new Set(entries.map((entry) => entry.classroomId).filter(Boolean)),
     ) as string[];
+    const groupIds = Array.from(
+      new Set(
+        entries.map((entry) => entry.teachingSubjectGroupId).filter(Boolean),
+      ),
+    ) as string[];
     const courses = courseIds.length
       ? await this.prisma.course.findMany({
           where: { tenantId, id: { in: courseIds } },
@@ -105,9 +110,18 @@ export class TimetablePrintService {
           where: { tenantId, id: { in: roomIds } },
         })
       : [];
+    const subjectGroups = groupIds.length
+      ? await (this.prisma as any).teachingSubjectGroup.findMany({
+          where: { tenantId, id: { in: groupIds }, deletedAt: null },
+          select: { id: true, code: true, title: true },
+        })
+      : [];
     const courseById = new Map(courses.map((row) => [row.id, row]));
     const staffById = new Map(staff.map((row) => [row.id, row]));
     const roomById = new Map(rooms.map((row) => [row.id, row]));
+    const subjectGroupById = new Map(
+      subjectGroups.map((row: { id: string }) => [row.id, row]),
+    );
     const asOf = plan?.effectiveFrom
       ? new Date(plan.effectiveFrom)
       : new Date();
@@ -149,6 +163,9 @@ export class TimetablePrintService {
             : null,
           classroom: entry.classroomId
             ? (roomById.get(entry.classroomId) ?? null)
+            : null,
+          teachingSubjectGroup: entry.teachingSubjectGroupId
+            ? (subjectGroupById.get(entry.teachingSubjectGroupId) ?? null)
             : null,
           replacementOverlay: entry.staffProfileId
             ? (overlayMap.get(entry.staffProfileId) ?? null)

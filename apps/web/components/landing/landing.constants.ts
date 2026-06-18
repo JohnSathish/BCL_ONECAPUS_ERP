@@ -140,3 +140,11 @@ export const NAV_LINKS = [
   { label: 'AI Assistant', href: '#ai' },
   { label: 'Enterprise', href: '#enterprise' },
 ] as const;
+
+export const REQUEST_DEMO_PATH = '/request-demo';
+
+export const BCL_CONTACT = {
+  phone: '9566363655',
+  phoneDisplay: '+91 95663 63655',
+  emails: ['contact@basecodelabs.com', 'johnsathish16@gmail.com'] as const,
+};

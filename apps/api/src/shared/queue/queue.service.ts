@@ -17,6 +17,17 @@ export class QueueService {
     });
   }
 
+  async getNotificationQueueStats() {
+    const [waiting, active, completed, failed, delayed] = await Promise.all([
+      this.notifications.getWaitingCount(),
+      this.notifications.getActiveCount(),
+      this.notifications.getCompletedCount(),
+      this.notifications.getFailedCount(),
+      this.notifications.getDelayedCount(),
+    ]);
+    return { waiting, active, completed, failed, delayed };
+  }
+
   enqueueExport(payload: Record<string, unknown>) {
     return this.exports.add('generate', payload);
   }

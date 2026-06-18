@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
-import { NAV_LINKS } from './landing.constants';
+import { NAV_LINKS, REQUEST_DEMO_PATH } from './landing.constants';
 
 export function LandingNavbar() {
   const [open, setOpen] = useState(false);
@@ -52,7 +52,7 @@ export function LandingNavbar() {
             Sign In
           </Link>
           <Link
-            href="/login"
+            href={REQUEST_DEMO_PATH}
             className="rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-transform hover:scale-[1.02]"
           >
             Start Free Demo
@@ -87,7 +87,7 @@ export function LandingNavbar() {
               </a>
             ))}
             <Link
-              href="/login"
+              href={REQUEST_DEMO_PATH}
               className="mt-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-2.5 text-center text-sm font-semibold text-white"
             >
               Start Free Demo

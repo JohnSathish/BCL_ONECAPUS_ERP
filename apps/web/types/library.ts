@@ -31,6 +31,8 @@ export type OccupancySnapshot = {
   totalSeats: number;
   occupancyPercent: number;
   hourlyFootfall: { hour: number; count: number }[];
+  maleStaffInside?: number;
+  femaleStaffInside?: number;
 };
 
 export type ScanResult = {
@@ -47,6 +49,54 @@ export type ScanResult = {
   };
   occupancy: OccupancySnapshot;
   zone?: { id: string; name: string; code: string; seatLabel?: string | null } | null;
+  deskContext?: {
+    mobile?: string | null;
+    rfidNumber?: string | null;
+    abcId?: string | null;
+    activeLoans?: number;
+    unpaidFines?: number;
+    membershipStatus?: string;
+    attendancePercent?: number | null;
+    feeStatus?: string | null;
+  } | null;
+};
+
+export type LibraryAccessDeskDashboard = {
+  stats: {
+    entriesToday: number;
+    exitsToday: number;
+    currentlyInside: number;
+    visitorsToday: number;
+    avgStayMinutes: number;
+    scansToday: number;
+    booksIssuedToday?: number;
+    booksReturnedToday?: number;
+    peakHour?: number | null;
+  };
+  occupancy: OccupancySnapshot;
+  visitorSummary: {
+    maleStudents: number;
+    femaleStudents: number;
+    staffTeaching: number;
+    staffNonTeaching: number;
+    guestVisitors: number;
+    totalFootfall: number;
+  };
+  departmentInside?: Array<{ name: string; count: number }>;
+  recentActivity: Array<{
+    at: string;
+    action: 'IN' | 'OUT';
+    memberName: string;
+    department: string | null;
+    memberType: string;
+    photoUrl: string | null;
+  }>;
+  alerts: Array<{
+    id: string;
+    level: 'warn' | 'info';
+    message: string;
+    href?: string;
+  }>;
 };
 
 export type LibraryDashboard = {
@@ -56,7 +106,12 @@ export type LibraryDashboard = {
   activeLoans: number;
   overdueLoans: number;
   totalBooks: number;
+  totalTitles?: number;
   availableCopies: number;
+  issuedToday?: number;
+  returnedToday?: number;
+  digitalViewsToday?: number;
+  fineCollectedToday?: number;
   digitalAssets?: number;
   researchItems?: number;
   unpaidFinesCount?: number;
@@ -74,6 +129,179 @@ export type LibraryDashboard = {
     from: string;
     weekly: { week: number; male: number; female: number; total: number }[];
   };
+  healthScore?: LibraryHealthScore;
+  activity?: LibraryActivityItem[];
+  entryAnalytics?: LibraryEntryAnalytics;
+};
+
+export type LibraryHealthScore = {
+  overall: number;
+  usage: number;
+  circulation: number;
+  digital: number;
+  overdueControl: number;
+  engagement: number;
+  entryAnalytics: boolean;
+};
+
+export type LibraryActivityItem = {
+  at: string;
+  action: 'ISSUE' | 'RETURN' | 'RENEW' | string;
+  memberName: string;
+  bookTitle: string;
+  programme?: string | null;
+};
+
+export type LibraryEntryAnalytics = {
+  active: boolean;
+  male: number;
+  female: number;
+  staff: number;
+  guests: number;
+  total: number;
+};
+
+export type MemberRolePolicy = {
+  loanDays: number;
+  maxBooks: number;
+  maxRenewals: number;
+};
+
+export type CategoryRulePolicy = {
+  loanDays: number;
+  maxBooks: number;
+  allowIssue: boolean;
+  requireApproval?: boolean;
+};
+
+export type CirculationPolicy = {
+  student: MemberRolePolicy;
+  faculty: MemberRolePolicy;
+  researchScholar: MemberRolePolicy;
+  staff: MemberRolePolicy;
+  reference: CategoryRulePolicy;
+  rare: CategoryRulePolicy;
+};
+
+export type FinePolicy = {
+  lostBookPenaltyMultiplier: number;
+  damageChargeDefault: number;
+};
+
+export type LibraryMemberSummary = {
+  profile: LibraryMemberProfile;
+  activeLoans: LibraryLoan[];
+  borrowedCount: number;
+  maxBooks: number;
+  outstandingFine: number;
+  lastVisitAt: string | null;
+  visitCount: number;
+  readingScore: number;
+  membershipStatus: string;
+};
+
+export type LibraryBookPreview = {
+  copy: {
+    id: string;
+    barcode: string;
+    status: string;
+    copyNumber: number;
+  };
+  book: {
+    id: string;
+    title: string;
+    author?: string | null;
+    publisher?: string | null;
+    edition?: string | null;
+    accessionNo: string;
+    category?: string | null;
+    location: string;
+    section?: string | null;
+    rack?: string | null;
+    shelf?: string | null;
+  };
+  availableCopies: number;
+  totalCopies: number;
+  suggestedLoanDays: number;
+};
+
+export type LibraryIssuePreview = {
+  dueAt: string;
+  loanDays: number;
+  finePerDay: number;
+  graceDays: number;
+  bookTitle: string;
+};
+
+export type LibraryCirculationDeskContext = {
+  stats: {
+    issuedToday: number;
+    returnedToday: number;
+    renewalsToday: number;
+    overdueLoans: number;
+    fineCollectedToday: number;
+  };
+  rules: {
+    studentMaxBooks: number;
+    facultyMaxBooks: number;
+    staffMaxBooks: number;
+    studentLoanDays: number;
+    facultyLoanDays: number;
+    studentMaxRenewals: number;
+    facultyMaxRenewals: number;
+    finePerDay: number;
+    graceDays: number;
+    maxFine: number;
+    blockIssueOnUnpaidFines: boolean;
+  };
+  fineSummary: {
+    pending: number;
+    paidTotal: number;
+    waivedTotal: number;
+    collectedToday: number;
+  };
+};
+
+export type LibraryReturnPreview = {
+  loan: {
+    id: string;
+    issuedAt: string;
+    dueAt: string;
+    renewalCount: number;
+  };
+  book: {
+    title: string;
+    author?: string | null;
+    accessionNo: string;
+    barcode: string;
+    location: string;
+  };
+  member: LibraryMemberProfile | null;
+  returnedAt: string;
+  overdueDays: number;
+  projectedFine: number;
+  existingFineId: string | null;
+  existingFineAmount: number;
+  finePerDay: number;
+  graceDays: number;
+};
+
+export type LibraryRenewPreview = {
+  bookTitle: string;
+  barcode: string;
+  currentDueAt: string;
+  renewalCount: number;
+  maxRenewals: number;
+  newDueAt: string;
+  loanDays: number;
+  canRenew: boolean;
+  blockReason: string | null;
+};
+
+export type LibraryCopyQr = {
+  payload: string;
+  barcode: string;
+  qrImageUrl: string;
 };
 
 export type LibraryCategory = {
@@ -105,6 +333,7 @@ export type LibraryBook = {
   shelf?: string | null;
   rack?: string | null;
   location?: string | null;
+  accessionStatus?: string;
   status: string;
   totalCopies: number;
   category?: LibraryCategory | null;
@@ -180,7 +409,28 @@ export type LibrarySettings = {
   zonesEnabled?: boolean;
   blockIssueOnUnpaidFines?: boolean;
   overdueNotifyEnabled?: boolean;
+  dueTomorrowNotifyEnabled?: boolean;
+  assistantEnabled?: boolean;
+  rfidEntryEnabled?: boolean;
   maxRenewals?: number;
+  allowedMimeTypes?: string[];
+  circulationPolicy?: CirculationPolicy;
+  finePolicy?: FinePolicy;
+  accessionPrefix?: string;
+  accessionNextSeq?: number;
+};
+
+export type LibraryAssistantResponse = {
+  answer: string;
+  links: Array<{ label: string; href: string }>;
+  results: Array<{
+    type: 'BOOK' | 'DIGITAL' | 'RESEARCH';
+    title: string;
+    meta: string;
+    id?: string;
+  }>;
+  suggestedFollowUps: string[];
+  source: string;
 };
 
 export type LibraryReadingZone = {
@@ -222,6 +472,153 @@ export type LibraryReservation = {
   status: string;
   reservedAt: string;
   book?: LibraryBook;
+  studentName?: string;
+  enrollmentNumber?: string | null;
+  department?: string | null;
+  queuePosition?: number | null;
+};
+
+export type LibraryReservationQueueGroup = {
+  bookId: string;
+  bookTitle: string;
+  accessionNo: string;
+  queue: LibraryReservation[];
+};
+
+export type LibraryRecommendedBook = {
+  bookId: string;
+  title: string;
+  author: string | null;
+  accessionNo: string;
+  category: string | null;
+  availableCopies: number;
+  score: number;
+  reasons: string[];
+};
+
+export type StudentLibraryDashboard = {
+  profile: {
+    fullName: string;
+    department: string | null;
+    programme: string | null;
+    semester: number | null;
+  };
+  readingScore: {
+    overall: number;
+    visitsPoints: number;
+    loansPoints: number;
+    onTimePoints: number;
+    membershipPoints: number;
+    visitCount: number;
+    totalLoans: number;
+    onTimeReturns: number;
+  };
+  stats: {
+    totalVisits: number;
+    totalLoans: number;
+    activeLoans: number;
+    activeReservations: number;
+    outstandingFine: number;
+  };
+  activeLoans: {
+    id: string;
+    bookTitle: string;
+    dueAt: string;
+    isOverdue: boolean;
+  }[];
+  readingHistory: {
+    id: string;
+    bookTitle: string;
+    author: string | null;
+    issuedAt: string;
+    returnedAt: string | null;
+    wasOverdue: boolean;
+  }[];
+  recommendations: LibraryRecommendedBook[];
+};
+
+export type LibraryNaacReportBundle = {
+  generatedAt: string;
+  period: { from: string; to: string };
+  academicYear?: string;
+  summary: {
+    totalTitles: number;
+    totalCopies: number;
+    availableCopies: number;
+    digitalAssets: number;
+    researchItems: number;
+    activeLoans: number;
+    overdueLoans: number;
+  };
+  footfall: {
+    totalVisits: number;
+    male: number;
+    female: number;
+    other: number;
+    peakHour: number;
+    peakCount: number;
+  };
+  booksAddedYearWise: { year: number; titles: number; copies: number }[];
+  departmentUsage: {
+    departmentName: string;
+    visits: number;
+    issues: number;
+    uniqueReaders: number;
+  }[];
+  studentUsage: {
+    uniqueStudents: number;
+    totalVisits: number;
+    totalIssues: number;
+  };
+  facultyUsage: {
+    uniqueFaculty: number;
+    totalVisits: number;
+    totalIssues: number;
+  };
+  eResourceUsage: {
+    digitalDownloads: number;
+    digitalViews: number;
+    researchAccess: number;
+    topDigital: { title: string; downloads: number }[];
+  };
+  readingStatistics: {
+    topBooks: { title: string; issueCount: number }[];
+    topReaders: {
+      fullName: string;
+      issueCount: number;
+      department?: string | null;
+    }[];
+  };
+  expenditure: {
+    finesCollected: number;
+    finesWaived: number;
+    bookValueOnShelf: number;
+    note: string;
+  };
+  journalSubscriptions: {
+    printJournalTitles: number;
+    digitalJournalAssets: number;
+    eJournalDownloads: number;
+  };
+};
+
+export type LibraryCopyIncident = {
+  id: string;
+  copyId: string;
+  loanId?: string | null;
+  incidentType: string;
+  status: string;
+  notes?: string | null;
+  chargeAmount?: number | null;
+  replacementCopyId?: string | null;
+  reportedById?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  copy?: {
+    barcode: string;
+    book?: { title: string; accessionNo: string };
+  };
+  replacementCopy?: { id: string; barcode: string } | null;
 };
 
 export type LibraryDigitalAsset = {
@@ -269,4 +666,89 @@ export type ResearchItemListResponse = {
   total: number;
   page: number;
   limit: number;
+};
+
+export type LibraryReadingAnalytics = {
+  from: string;
+  days: number;
+  topBooks: {
+    bookId: string;
+    title: string;
+    author: string | null;
+    accessionNo: string;
+    issueCount: number;
+  }[];
+  topReaders: {
+    memberType: string;
+    memberId: string;
+    fullName: string;
+    registrationNumber: string | null;
+    department: string | null;
+    issueCount: number;
+  }[];
+  departmentUsage: {
+    departmentId: string | null;
+    departmentName: string;
+    issueCount: number;
+    uniqueReaders: number;
+    intensity: number;
+  }[];
+};
+
+export type LibraryMemberListItem = {
+  memberType: string;
+  memberId: string;
+  studentId?: string | null;
+  staffProfileId?: string | null;
+  fullName: string;
+  registrationNumber?: string | null;
+  department?: string | null;
+  programme?: string | null;
+  semester?: number | null;
+  loanCount: number;
+  visitCount: number;
+  activeLoans: number;
+  outstandingFine: number;
+  lastVisitAt: string | null;
+  readingScore: number;
+};
+
+export type LibraryMemberListResponse = {
+  items: LibraryMemberListItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type LibraryMemberDetail = {
+  profile: LibraryMemberListItem | undefined;
+  stats: {
+    visitCount: number;
+    loanCount: number;
+    activeLoans: number;
+    outstandingFine: number;
+    readingScore: number;
+  };
+  recentLoans: {
+    id: string;
+    title: string;
+    accessionNo: string;
+    barcode: string;
+    issuedAt: string;
+    dueAt: string;
+    returnedAt: string | null;
+    status: string;
+  }[];
+  recentVisits: {
+    id: string;
+    entryAt: string;
+    exitAt: string | null;
+    durationMinutes?: number | null;
+  }[];
+};
+
+export type LibraryNextAccession = {
+  accessionNo: string;
+  prefix: string;
+  nextSeq: number;
 };

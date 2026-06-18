@@ -289,7 +289,7 @@ export function ProfilePersonalSection({
     <>
       <dl className="space-y-1">
         <InfoRow label="Registration Number" value={profile.personal.registrationNumber} />
-        <InfoRow label="Roll Number" value={profile.personal.rollNumber} />
+        <InfoRow label="College Roll No." value={profile.personal.rollNumber} />
         <InfoRow
           label="ABC ID"
           value={profile.personal.abcId?.trim() ? profile.personal.abcId : 'ABC ID Not Submitted'}

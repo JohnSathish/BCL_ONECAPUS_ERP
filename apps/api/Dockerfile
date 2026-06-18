@@ -11,7 +11,8 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/package-lock.json ./package-lock.json
 COPY apps/api ./apps/api
 WORKDIR /app/apps/api
-RUN npx prisma generate
+ENV DATABASE_URL=postgresql://nep:nep_dev_password@postgres:5432/nep_erp
+RUN rm -f prisma.config.ts && npx --yes prisma@6.19.0 generate --schema=./prisma/schema.prisma
 RUN npm run build
 
 FROM node:22-alpine AS runner
@@ -21,6 +22,7 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/scripts ./scripts
 COPY --from=builder /app/node_modules ./node_modules
 USER nestjs
 EXPOSE 3001

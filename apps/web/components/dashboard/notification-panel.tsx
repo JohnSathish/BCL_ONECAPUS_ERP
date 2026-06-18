@@ -42,6 +42,7 @@ export function NotificationPanel() {
     queryKey: ['notifications', 'unread-count'],
     queryFn: fetchUnreadNotificationCount,
     enabled: authReady,
+    retry: false,
     refetchInterval: 60_000,
   });
 
@@ -49,6 +50,7 @@ export function NotificationPanel() {
     queryKey: ['notifications', 'list'],
     queryFn: () => fetchNotifications(20),
     enabled: authReady,
+    retry: false,
   });
 
   const markRead = useMutation({

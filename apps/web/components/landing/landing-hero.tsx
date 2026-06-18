@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { EcosystemOrbit } from './ecosystem-orbit';
 import { ParticleCanvas } from './particle-canvas';
-import { TRUST_PILLS } from './landing.constants';
+import { REQUEST_DEMO_PATH, TRUST_PILLS } from './landing.constants';
 import { useLandingMotion } from './hooks/use-landing-motion';
 
 export function LandingHero() {
@@ -48,7 +48,7 @@ export function LandingHero() {
 
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
             <Link
-              href="/login"
+              href={REQUEST_DEMO_PATH}
               className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-lime-400 via-emerald-400 to-cyan-400 px-7 py-3.5 text-sm font-bold text-slate-900 shadow-xl shadow-emerald-500/25 transition-transform hover:scale-[1.03]"
             >
               Register Free Demo

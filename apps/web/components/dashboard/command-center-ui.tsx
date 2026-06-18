@@ -126,7 +126,7 @@ export function KpiCard({
       variants={fadeUp}
       whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}
       className={cn(
-        'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-shadow',
+        'group relative h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-shadow',
         'dark:border-border/60 dark:bg-card',
         href && 'cursor-pointer',
       )}
@@ -185,7 +185,13 @@ export function KpiCard({
     </motion.div>
   );
 
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return href ? (
+    <Link href={href} className="block h-full">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
 }
 
 export function CircularProgress({

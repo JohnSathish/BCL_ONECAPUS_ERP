@@ -53,7 +53,10 @@ On Windows you can also run: `Get-NetTCPConnection -LocalPort 3001 | Select Owni
 **DNS (subdomains on one web app):**
 
 - `erp.donboscocollege.ac.in` — staff ERP (`apps/web` default routes)
-- `admission.donboscocollege.ac.in` — applicant portal (middleware rewrites to `/admissions-portal`; see `apps/web/middleware.ts`)
+- `admissions.donboscocollege.ac.in` — applicant portal (middleware rewrites to `/admissions-portal`; see `apps/web/middleware.ts`)
+- `library.donboscocollege.ac.in` — library kiosk (`/library-desk`)
+
+**Don Bosco step-by-step:** [DEPLOY_DBC_PRODUCTION.md](./DEPLOY_DBC_PRODUCTION.md) (LAN office server + live deployment)
 
 **Deploy with external database:**
 

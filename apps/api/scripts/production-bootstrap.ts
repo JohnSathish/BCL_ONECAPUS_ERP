@@ -1,0 +1,149 @@
+/**
+ * Production / LAN bootstrap for Don Bosco College ERP.
+ *
+ * Registers tenant domains, optional admin user, and prints next steps.
+ *
+ * Usage:
+ *   npx tsx scripts/production-bootstrap.ts
+ *   npx tsx scripts/production-bootstrap.ts --register-host 192.168.1.50
+ *   npx tsx scripts/production-bootstrap.ts --admin-email admin@donboscocollege.ac.in
+ */
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
+const prisma = new PrismaClient();
+
+const DEFAULT_TENANT_SLUG = 'demo';
+const PRODUCTION_HOSTS = [
+  'erp.donboscocollege.ac.in',
+  'admissions.donboscocollege.ac.in',
+  'library.donboscocollege.ac.in',
+];
+
+function parseArgs(argv: string[]) {
+  const opts: {
+    registerHosts: string[];
+    adminEmail?: string;
+    adminPassword?: string;
+    adminName?: string;
+  } = { registerHosts: [] };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--register-host' && argv[i + 1]) {
+      opts.registerHosts.push(argv[i + 1]!.trim().toLowerCase());
+      i += 1;
+    } else if (arg === '--admin-email' && argv[i + 1]) {
+      opts.adminEmail = argv[i + 1]!.trim().toLowerCase();
+      i += 1;
+    } else if (arg === '--admin-password' && argv[i + 1]) {
+      opts.adminPassword = argv[i + 1]!;
+      i += 1;
+    } else if (arg === '--admin-name' && argv[i + 1]) {
+      opts.adminName = argv[i + 1]!.trim();
+      i += 1;
+    }
+  }
+
+  return opts;
+}
+
+async function registerHost(tenantId: string, host: string) {
+  const normalized = host.split(':')[0]!.toLowerCase();
+  await prisma.tenantDomain.upsert({
+    where: { host: normalized },
+    update: { tenantId, verified: true, deletedAt: null },
+    create: { tenantId, host: normalized, verified: true },
+  });
+  console.log(`  ✓ tenant domain: ${normalized}`);
+}
+
+async function ensureAdmin(
+  tenantId: string,
+  email: string,
+  password: string,
+  displayName: string,
+) {
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId, email } },
+    update: {
+      passwordHash,
+      displayName,
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      deletedAt: null,
+    },
+    create: {
+      tenantId,
+      email,
+      passwordHash,
+      displayName,
+      isActive: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const superAdmin = await prisma.role.findFirst({
+    where: { tenantId, slug: 'super-admin', deletedAt: null },
+  });
+  if (superAdmin) {
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: superAdmin.id } },
+      update: { deletedAt: null },
+      create: { userId: user.id, roleId: superAdmin.id },
+    });
+  }
+
+  console.log(`  ✓ admin user: ${email}`);
+}
+
+async function main() {
+  const opts = parseArgs(process.argv.slice(2));
+
+  const tenant = await prisma.tenant.findFirst({
+    where: { slug: DEFAULT_TENANT_SLUG, deletedAt: null },
+  });
+  if (!tenant) {
+    throw new Error(
+      `Tenant "${DEFAULT_TENANT_SLUG}" not found. Run: npm run db:seed`,
+    );
+  }
+
+  console.log(`\nBootstrapping tenant: ${tenant.name} (${tenant.slug})\n`);
+
+  console.log('Registering production domains…');
+  for (const host of PRODUCTION_HOSTS) {
+    await registerHost(tenant.id, host);
+  }
+
+  if (opts.registerHosts.length) {
+    console.log('Registering LAN / custom hosts…');
+    for (const host of opts.registerHosts) {
+      await registerHost(tenant.id, host);
+    }
+  }
+
+  if (opts.adminEmail && opts.adminPassword) {
+    console.log('Creating / updating production admin…');
+    await ensureAdmin(
+      tenant.id,
+      opts.adminEmail,
+      opts.adminPassword,
+      opts.adminName ?? 'College Administrator',
+    );
+  }
+
+  console.log('\nDone. Next steps:');
+  console.log('  1. npm run db:migrate');
+  console.log('  2. Set WEB_ORIGIN and JWT secrets in production .env');
+  console.log('  3. For LAN testing: npm run dev:lan');
+  console.log('  4. For live server: see docs/DEPLOY_DBC_PRODUCTION.md\n');
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

@@ -29,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </Script>
       </head>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} max-w-full overflow-x-hidden antialiased`}
       >
         <AppProviders>{children}</AppProviders>

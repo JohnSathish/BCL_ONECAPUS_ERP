@@ -13,6 +13,7 @@
     "dev:setup": "npm run dev:infra && npm run db:migrate && npm run db:seed",
     "dev:free-ports": "npx --yes kill-port 3000 3001",
     "dev:clean": "npm run dev:infra && npm run dev:free-ports && node -e \"process.env.API_HOST='127.0.0.1'; require('child_process').spawn('npx', ['turbo', 'dev'], { stdio: 'inherit', shell: true, env: process.env })\"",
+    "dev:lan": "node scripts/dev-lan.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
@@ -23,7 +24,9 @@
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
     "load:test": "node scripts/load-test/run-k6.mjs pre-launch.js",
-    "load:test:smoke": "node scripts/load-test/run-k6.mjs pre-launch-smoke.js"
+    "load:test:smoke": "node scripts/load-test/run-k6.mjs pre-launch-smoke.js",
+    "demo:prepare": "npm run demo:prepare -w api",
+    "demo:prepare:quick": "npm run demo:prepare:quick -w api"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",

@@ -276,9 +276,14 @@ export class AdmissionsPaymentService {
   }
 
   private resolveApplicationFee(settings: unknown) {
-    const fee = (settings as { applicationFee?: number } | null)
+    const cycleFee = (settings as { applicationFee?: number } | null)
       ?.applicationFee;
-    return typeof fee === 'number' && fee > 0 ? fee : 600;
+    if (typeof cycleFee === 'number' && cycleFee > 0) return cycleFee;
+    const envFee = Number(
+      this.config.get<string>('ADMISSIONS_APPLICATION_FEE'),
+    );
+    if (Number.isFinite(envFee) && envFee > 0) return envFee;
+    return 600;
   }
 
   private async getApplicationForUser(tenantId: string, userId: string) {

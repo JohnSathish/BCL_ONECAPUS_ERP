@@ -79,12 +79,29 @@ export const deactivateGovernanceMember = (id: string) =>
 export const replaceGovernanceMember = (
   id: string,
   payload: {
-    staffProfileId: string;
+    staffProfileId?: string;
+    studentId?: string;
+    displayName?: string;
+    memberType?: string;
     role: string;
+    designation?: string;
+    organization?: string;
+    mobile?: string;
+    email?: string;
+    address?: string;
+    areaOfExpertise?: string;
+    exOfficioPosition?: string;
     startDate?: string;
     endDateForPrevious?: string;
   },
 ) => api.post(`${base}/members/${id}/replace`, payload).then((r) => r.data);
+
+export const fetchCommitteeComposition = (committeeId: string) =>
+  api
+    .get<
+      import('@/types/governance').GovernanceCommitteeComposition
+    >(`${base}/committees/${committeeId}/composition`)
+    .then((r) => r.data);
 
 export const fetchGovernanceMemberStats = () =>
   api.get<GovernanceMemberStats>(`${base}/members/stats`).then((r) => r.data);
@@ -100,7 +117,13 @@ export const fetchStaffCommitteeMemberships = (staffProfileId: string) =>
     .then((r) => r.data);
 
 export const fetchGovernanceConstants = () =>
-  api.get<{ memberRoles: string[] }>(`${base}/constants`).then((r) => r.data);
+  api
+    .get<{
+      memberRoles: string[];
+      memberTypes?: string[];
+      exOfficioPositions?: string[];
+    }>(`${base}/constants`)
+    .then((r) => r.data);
 
 export const bulkAssignGovernanceMembers = (payload: {
   committeeId: string;

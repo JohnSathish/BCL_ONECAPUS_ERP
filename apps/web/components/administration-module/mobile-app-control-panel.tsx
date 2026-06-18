@@ -14,6 +14,7 @@ import {
   fetchMobileAppSettings,
   updateMobileAppSettings,
 } from '@/services/mobile-app';
+import { MobileAppPhonePreview } from '@/components/administration-module/mobile-app-phone-preview';
 
 const STUDENT_CARDS = [
   'attendance',
@@ -103,13 +104,26 @@ export function MobileAppControlPanel() {
         </p>
       </div>
 
-      <Tabs defaultValue="config">
-        <TabsList>
+      <Tabs defaultValue="preview">
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="preview">UI Preview</TabsTrigger>
           <TabsTrigger value="config">App Configuration</TabsTrigger>
           <TabsTrigger value="student">Student Dashboard</TabsTrigger>
           <TabsTrigger value="staff">Staff Dashboard</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="preview">
+          <MobileAppPhonePreview
+            studentAppName={s.studentAppName}
+            staffAppName={s.staffAppName}
+            studentConfig={studentConfig}
+            staffConfig={staffConfig}
+            studentCards={STUDENT_CARDS}
+            staffCards={STAFF_CARDS}
+            primaryColor={s.brandingOverrides?.primaryColor}
+          />
+        </TabsContent>
 
         <TabsContent value="config" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">

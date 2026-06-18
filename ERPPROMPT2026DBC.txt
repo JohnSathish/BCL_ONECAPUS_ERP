@@ -73,6 +73,7 @@ Deployment:
 
 Mobile:
 - React Native (future support)
+.\scripts\create-migration-pack.ps1
 
 ==================================================
 ARCHITECTURE REQUIREMENTS

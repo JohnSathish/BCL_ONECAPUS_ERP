@@ -60,6 +60,19 @@ export class LibraryFinesService {
     return fines.reduce((sum, f) => sum + Number(f.amount), 0);
   }
 
+  async getUnpaidTotalForStaff(tenantId: string, staffProfileId: string) {
+    const fines = await this.prisma.libraryFine.findMany({
+      where: {
+        tenantId,
+        paidAt: null,
+        waivedAt: null,
+        loan: { staffProfileId },
+      },
+      select: { amount: true },
+    });
+    return fines.reduce((sum, f) => sum + Number(f.amount), 0);
+  }
+
   async payFine(user: JwtUser, fineId: string, notes?: string) {
     const fine = await this.prisma.libraryFine.findFirst({
       where: { tenantId: user.tid, id: fineId },

@@ -275,7 +275,7 @@ export class DashboardAnalyticsService {
       staffCount,
       facultyCount,
       academicYear,
-      activeSemester,
+      activeSemesters,
       pendingAdmissions,
       pendingRegistrations,
       pendingLeave,
@@ -317,10 +317,10 @@ export class DashboardAnalyticsService {
         orderBy: { startDate: 'desc' },
         select: { name: true },
       }),
-      this.prisma.semester.findFirst({
+      this.prisma.semester.findMany({
         where: { tenantId, deletedAt: null, isActive: true },
-        orderBy: { progressionOrder: 'desc' },
-        select: { name: true, semesterType: true },
+        orderBy: { progressionOrder: 'asc' },
+        select: { name: true, semesterType: true, semesterNumber: true },
       }),
       this.prisma.admissionApplication.count({
         where: { ...aw, status: { in: ['submitted', 'under_review'] } },
@@ -774,6 +774,14 @@ export class DashboardAnalyticsService {
     const priorityRank = { critical: 0, high: 1, medium: 2 } as const;
     actions.sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]);
 
+    const activeSemesterNumbers = activeSemesters.map((s) => s.semesterNumber);
+    const semesterLabel = activeSemesterNumbers.length
+      ? activeSemesterNumbers.map((s) => `Sem ${s}`).join(', ')
+      : filters.semesterId
+        ? 'Filtered'
+        : '—';
+    const cycleType = activeSemesters[0]?.semesterType;
+
     return {
       greeting: {
         userName,
@@ -787,11 +795,9 @@ export class DashboardAnalyticsService {
       },
       institution: {
         academicYear: academicYear?.name ?? '2026-27',
-        semester:
-          activeSemester?.name ?? (filters.semesterId ? 'Filtered' : '—'),
-        cycle: activeSemester?.semesterType
-          ? String(activeSemester.semesterType).toUpperCase()
-          : null,
+        semester: semesterLabel,
+        activeSemesters: activeSemesterNumbers,
+        cycle: cycleType ? String(cycleType).toUpperCase() : null,
         studentCount,
         staffCount: staffCount || facultyCount,
       },

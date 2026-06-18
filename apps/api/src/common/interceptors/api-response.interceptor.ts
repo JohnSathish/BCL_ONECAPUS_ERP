@@ -5,6 +5,7 @@ import {
   NestInterceptor,
   StreamableFile,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { Response } from 'express';
 import { map, Observable } from 'rxjs';
 
@@ -49,6 +50,7 @@ export class ApiResponseInterceptor implements NestInterceptor {
 function jsonSafe(value: unknown): unknown {
   if (typeof value === 'bigint') return value.toString();
   if (value instanceof Date) return value;
+  if (Prisma.Decimal.isDecimal(value)) return value.toNumber();
   if (Array.isArray(value)) return value.map(jsonSafe);
   if (value && typeof value === 'object') {
     return Object.fromEntries(

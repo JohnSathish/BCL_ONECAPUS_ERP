@@ -1,15 +1,21 @@
 import { Type } from 'class-transformer';
+import { OmitType } from '@nestjs/mapped-types';
 import {
+  IsArray,
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
   Max,
   Min,
 } from 'class-validator';
-
+import type {
+  CirculationPolicy,
+  FinePolicy,
+} from '../domain/library-policy.types';
 export class ScanAccessDto {
   @IsString()
   @IsNotEmpty()
@@ -100,10 +106,62 @@ export class LibrarySettingsDto {
   overdueNotifyEnabled?: boolean;
 
   @IsOptional()
+  dueTomorrowNotifyEnabled?: boolean;
+
+  @IsOptional()
+  assistantEnabled?: boolean;
+
+  @IsOptional()
+  rfidEntryEnabled?: boolean;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   maxRenewals?: number;
+
+  @IsOptional()
+  @IsObject()
+  circulationPolicy?: CirculationPolicy;
+
+  @IsOptional()
+  @IsObject()
+  finePolicy?: FinePolicy;
+
+  @IsOptional()
+  @IsArray()
+  allowedMimeTypes?: string[];
+
+  @IsOptional()
+  @IsString()
+  accessionPrefix?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  accessionNextSeq?: number;
+}
+
+export class MemberSummaryQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  scanCode!: string;
+}
+
+export class BookPreviewQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  barcode!: string;
+}
+
+export class ActivityQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number = 20;
 }
 
 export class CreateReadingZoneDto {
@@ -249,6 +307,14 @@ export class CreateBookDto {
 
   @IsOptional()
   @IsString()
+  section?: string;
+
+  @IsOptional()
+  @IsString()
+  row?: string;
+
+  @IsOptional()
+  @IsString()
   location?: string;
 
   @IsOptional()
@@ -303,6 +369,14 @@ export class UpdateBookDto {
   @IsOptional()
   @IsString()
   rack?: string;
+
+  @IsOptional()
+  @IsString()
+  section?: string;
+
+  @IsOptional()
+  @IsString()
+  row?: string;
 
   @IsOptional()
   @IsString()
@@ -409,6 +483,10 @@ export class BookQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  accessionStatus?: string;
 }
 
 export class ReportQueryDto {
@@ -657,4 +735,218 @@ export class ResearchApprovalDto {
   @IsOptional()
   @IsString()
   comments?: string;
+}
+
+export class ReadingAnalyticsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(7)
+  @Max(730)
+  days?: number = 365;
+}
+
+export class LibraryMemberQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 50;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  memberType?: string;
+}
+
+export class MemberDetailQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  memberType!: string;
+}
+
+export class CreateAccessionBookDto extends OmitType(CreateBookDto, [
+  'accessionNo',
+] as const) {
+  @IsOptional()
+  @IsString()
+  accessionNo?: string;
+
+  @IsOptional()
+  @IsString()
+  accessionStatus?: string;
+}
+
+export class UpdateAccessionWorkflowDto {
+  @IsOptional()
+  @IsString()
+  accessionStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  shelf?: string;
+
+  @IsOptional()
+  @IsString()
+  rack?: string;
+
+  @IsOptional()
+  @IsString()
+  section?: string;
+
+  @IsOptional()
+  @IsString()
+  row?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string | null;
+}
+
+export class ReportCopyIncidentDto {
+  @IsString()
+  @IsNotEmpty()
+  copyBarcode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  incidentType!: 'LOST' | 'DAMAGED' | string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  chargeAmount?: number;
+}
+
+export class ReplaceCopyIncidentDto {
+  @IsOptional()
+  @IsUUID()
+  replacementCopyId?: string;
+
+  @IsOptional()
+  @IsString()
+  replacementBarcode?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CopyIncidentQueryDto {
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  incidentType?: string;
+}
+
+export class ResolveIncidentDto {
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class LinkLibraryNaacEvidenceDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  academicYear!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  criterion?: number;
+
+  @IsOptional()
+  @IsString()
+  metricCode?: string;
+
+  @IsOptional()
+  @IsString()
+  format?: 'pdf' | 'xlsx' | 'csv';
+
+  @IsOptional()
+  @IsString()
+  evidenceNotes?: string;
+}
+
+export class NaacLibraryReportQueryDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsString()
+  academicYear?: string;
+}
+
+export class LibraryAssistantAskDto {
+  @IsString()
+  @IsNotEmpty()
+  question!: string;
+}
+
+export class HardwareScanDto {
+  @IsString()
+  @IsNotEmpty()
+  scanCode!: string;
+
+  @IsOptional()
+  @IsString()
+  method?: string;
+
+  @IsOptional()
+  @IsUUID()
+  accessPointId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  zoneId?: string;
+}
+
+export class CamsLibraryBridgeDto {
+  @IsString()
+  @IsNotEmpty()
+  accessPointCode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  scanCode!: string;
+
+  @IsOptional()
+  @IsString()
+  method?: string;
 }

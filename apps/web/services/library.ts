@@ -1,17 +1,36 @@
 import { api } from '@/services/api';
 import type {
+  LibraryAccessDeskDashboard,
+  LibraryActivityItem,
+  LibraryAssistantResponse,
+  LibraryBookPreview,
+  LibraryCirculationDeskContext,
+  LibraryCopyQr,
   LibraryBook,
   LibraryBookListResponse,
   LibraryCategory,
+  LibraryCopyIncident,
   LibraryDashboard,
   LibraryDigitalAsset,
   LibraryDigitalAssetListResponse,
   LibraryFine,
+  LibraryIssuePreview,
   LibraryLoan,
+  LibraryMemberDetail,
+  LibraryMemberListResponse,
+  LibraryMemberSummary,
+  LibraryNaacReportBundle,
+  LibraryNextAccession,
+  LibraryReadingAnalytics,
   LibraryQrPass,
   LibraryReadingZone,
   LibraryReservation,
+  LibraryReservationQueueGroup,
+  LibraryRenewPreview,
+  LibraryReturnPreview,
+  LibraryRecommendedBook,
   LibrarySearchResult,
+  StudentLibraryDashboard,
   LibrarySettings,
   LibraryVisit,
   LibraryVisitor,
@@ -26,11 +45,54 @@ const base = '/v1/library';
 export const fetchLibraryDashboard = () =>
   api.get<LibraryDashboard>(`${base}/dashboard`).then((r) => r.data);
 
+export const fetchLibraryDashboardActivity = (limit = 20) =>
+  api
+    .get<LibraryActivityItem[]>(`${base}/dashboard/activity`, { params: { limit } })
+    .then((r) => r.data);
+
+export const fetchLibraryMemberSummary = (scanCode: string) =>
+  api
+    .get<LibraryMemberSummary>(`${base}/circulation/member-summary`, {
+      params: { scanCode },
+    })
+    .then((r) => r.data);
+
+export const fetchLibraryBookPreview = (barcode: string) =>
+  api
+    .get<LibraryBookPreview>(`${base}/circulation/book-preview`, { params: { barcode } })
+    .then((r) => r.data);
+
+export const fetchLibraryIssuePreview = (memberScan: string, copyBarcode: string) =>
+  api
+    .get<LibraryIssuePreview>(`${base}/circulation/issue-preview`, {
+      params: { memberScan, copyBarcode },
+    })
+    .then((r) => r.data);
+
+export const fetchLibraryDeskContext = () =>
+  api.get<LibraryCirculationDeskContext>(`${base}/circulation/desk-context`).then((r) => r.data);
+
+export const fetchLibraryReturnPreview = (barcode: string) =>
+  api
+    .get<LibraryReturnPreview>(`${base}/circulation/return-preview`, { params: { barcode } })
+    .then((r) => r.data);
+
+export const fetchLibraryRenewPreview = (barcode: string) =>
+  api
+    .get<LibraryRenewPreview>(`${base}/circulation/renew-preview`, { params: { barcode } })
+    .then((r) => r.data);
+
+export const fetchLibraryCopyQr = (copyId: string) =>
+  api.get<LibraryCopyQr>(`${base}/copies/${copyId}/qr`).then((r) => r.data);
+
 export const scanLibraryAccess = (scanCode: string) =>
   api.post<ScanResult>(`${base}/access/scan`, { scanCode }).then((r) => r.data);
 
 export const fetchLibraryOccupancy = () =>
   api.get<OccupancySnapshot>(`${base}/access/occupancy`).then((r) => r.data);
+
+export const fetchLibraryAccessDeskDashboard = () =>
+  api.get<LibraryAccessDeskDashboard>(`${base}/access/desk-dashboard`).then((r) => r.data);
 
 export const fetchLibraryVisits = (params?: Record<string, string | number | undefined>) =>
   api
@@ -90,11 +152,62 @@ export const cancelLibraryReservation = (id: string) =>
 export const fetchLibraryReservations = () =>
   api.get<LibraryReservation[]>(`${base}/reservations`).then((r) => r.data);
 
+export const fetchLibraryReservationQueue = () =>
+  api.get<LibraryReservationQueueGroup[]>(`${base}/reservations/queue`).then((r) => r.data);
+
+export const fetchLibraryCopyIncidents = (params?: { status?: string; incidentType?: string }) =>
+  api.get<LibraryCopyIncident[]>(`${base}/circulation/incidents`, { params }).then((r) => r.data);
+
+export const reportLibraryCopyIncident = (payload: {
+  copyBarcode: string;
+  incidentType: 'LOST' | 'DAMAGED';
+  notes?: string;
+  chargeAmount?: number;
+}) => api.post<LibraryCopyIncident>(`${base}/circulation/incidents`, payload).then((r) => r.data);
+
+export const replaceLibraryCopyIncident = (
+  id: string,
+  payload?: { replacementBarcode?: string; notes?: string },
+) =>
+  api
+    .post<LibraryCopyIncident>(`${base}/circulation/incidents/${id}/replace`, payload ?? {})
+    .then((r) => r.data);
+
+export const resolveLibraryCopyIncident = (id: string, notes?: string) =>
+  api
+    .post<LibraryCopyIncident>(`${base}/circulation/incidents/${id}/resolve`, { notes })
+    .then((r) => r.data);
+
+export const notifyLibraryDueTomorrow = () =>
+  api
+    .post<{
+      checked: number;
+      sent: number;
+      skipped?: boolean;
+    }>(`${base}/circulation/notify-due-tomorrow`)
+    .then((r) => r.data);
+
 export const fetchLibrarySettings = () =>
   api.get<LibrarySettings>(`${base}/settings`).then((r) => r.data);
 
 export const updateLibrarySettings = (payload: Partial<LibrarySettings>) =>
   api.patch<LibrarySettings>(`${base}/settings`, payload).then((r) => r.data);
+
+export const fetchLibraryAssistantPrompts = () =>
+  api.get<string[]>(`${base}/assistant/prompts`).then((r) => r.data);
+
+export const askLibraryAssistant = (question: string) =>
+  api.post<LibraryAssistantResponse>(`${base}/assistant/ask`, { question }).then((r) => r.data);
+
+export const fetchMyLibraryDashboard = () =>
+  api.get<StudentLibraryDashboard>(`${base}/me/dashboard`).then((r) => r.data);
+
+export const fetchMyLibraryRecommendations = (limit = 12) =>
+  api
+    .get<LibraryRecommendedBook[]>(`${base}/me/recommendations`, {
+      params: { limit },
+    })
+    .then((r) => r.data);
 
 export const fetchMyLibraryVisits = () =>
   api.get<{ items: LibraryVisit[]; totalVisits: number }>(`${base}/me/visits`).then((r) => r.data);
@@ -112,6 +225,41 @@ export const fetchStudentLibraryVisits = (studentId: string) =>
 
 export const fetchLibraryReport = (path: string, params?: Record<string, string | undefined>) =>
   api.get<unknown>(`${base}/reports/${path}`, { params }).then((r) => r.data);
+
+export const fetchLibraryNaacReportSummary = (params?: {
+  from?: string;
+  to?: string;
+  academicYear?: string;
+}) =>
+  api.get<LibraryNaacReportBundle>(`${base}/reports/naac/summary`, { params }).then((r) => r.data);
+
+export const downloadLibraryNaacReport = (
+  format: 'pdf' | 'xlsx' | 'csv',
+  params?: { from?: string; to?: string; academicYear?: string },
+) =>
+  api
+    .get(`${base}/reports/naac/export`, {
+      params: { ...params, format },
+      responseType: 'blob',
+    })
+    .then((r) => r.data as Blob);
+
+export const linkLibraryNaacEvidence = (payload: {
+  academicYear: string;
+  from?: string;
+  to?: string;
+  criterion?: number;
+  metricCode?: string;
+  format?: 'pdf' | 'xlsx' | 'csv';
+  evidenceNotes?: string;
+}) =>
+  api
+    .post<{
+      tag: { id: string };
+      reportId: string;
+      filename: string;
+    }>(`${base}/reports/naac/link-evidence`, payload)
+    .then((r) => r.data);
 
 export const fetchLibraryFootfall = () =>
   api.get<LibraryDashboard['footfallTrends']>(`${base}/analytics/footfall`).then((r) => r.data);
@@ -232,6 +380,30 @@ export const fetchLibraryGenderTrends = () =>
   api
     .get<NonNullable<LibraryDashboard['genderTrends']>>(`${base}/analytics/gender-trends`)
     .then((r) => r.data);
+
+export const fetchLibraryReadingAnalytics = (days = 365) =>
+  api
+    .get<LibraryReadingAnalytics>(`${base}/analytics/reading`, { params: { days } })
+    .then((r) => r.data);
+
+export const fetchLibraryMembers = (params?: Record<string, string | number | undefined>) =>
+  api.get<LibraryMemberListResponse>(`${base}/members`, { params }).then((r) => r.data);
+
+export const fetchLibraryMemberDetail = (memberId: string, memberType: string) =>
+  api
+    .get<LibraryMemberDetail>(`${base}/members/${memberId}`, {
+      params: { memberType },
+    })
+    .then((r) => r.data);
+
+export const fetchNextAccessionNo = () =>
+  api.get<LibraryNextAccession>(`${base}/accession/next`).then((r) => r.data);
+
+export const createAccessionBook = (payload: Record<string, unknown>) =>
+  api.post<LibraryBook>(`${base}/books/accession`, payload).then((r) => r.data);
+
+export const updateAccessionWorkflow = (bookId: string, payload: Record<string, unknown>) =>
+  api.patch<LibraryBook>(`${base}/books/${bookId}/accession`, payload).then((r) => r.data);
 
 export const searchLibrarySuggestions = (q: string) =>
   api

@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import type { LibrarySettingsDto } from '../dto/library.dto';
+import {
+  DEFAULT_CIRCULATION_POLICY,
+  DEFAULT_FINE_POLICY,
+} from '../domain/library-policy.types';
 
 export const DEFAULT_LIBRARY_CATEGORIES = [
   { code: 'REFERENCE', name: 'Reference Books', sortOrder: 1 },
@@ -30,7 +34,12 @@ export class LibrarySettingsService {
     });
     if (!existing) {
       await this.prisma.librarySettings.create({
-        data: { id: randomUUID(), tenantId },
+        data: {
+          id: randomUUID(),
+          tenantId,
+          circulationPolicy: DEFAULT_CIRCULATION_POLICY,
+          finePolicy: DEFAULT_FINE_POLICY,
+        },
       });
     }
 
@@ -73,7 +82,19 @@ export class LibrarySettingsService {
         zonesEnabled: dto.zonesEnabled,
         blockIssueOnUnpaidFines: dto.blockIssueOnUnpaidFines,
         overdueNotifyEnabled: dto.overdueNotifyEnabled,
+        dueTomorrowNotifyEnabled: dto.dueTomorrowNotifyEnabled,
+        assistantEnabled: dto.assistantEnabled,
+        rfidEntryEnabled: dto.rfidEntryEnabled,
         maxRenewals: dto.maxRenewals,
+        ...(dto.circulationPolicy !== undefined
+          ? { circulationPolicy: dto.circulationPolicy }
+          : {}),
+        ...(dto.finePolicy !== undefined ? { finePolicy: dto.finePolicy } : {}),
+        ...(dto.allowedMimeTypes !== undefined
+          ? { allowedMimeTypes: dto.allowedMimeTypes }
+          : {}),
+        accessionPrefix: dto.accessionPrefix,
+        accessionNextSeq: dto.accessionNextSeq,
       },
     });
   }

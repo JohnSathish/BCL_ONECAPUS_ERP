@@ -22,6 +22,8 @@ import {
 import { GlassCard } from '@/components/erp/glass-card';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { fetchStaff } from '@/services/staff';
 import {
   cancelLoanReceipt,
   createLoan,
@@ -242,7 +244,18 @@ export function HrLoansPage() {
   const [detailLoanId, setDetailLoanId] = useState<string | null>(null);
 
   const [staffSearch, setStaffSearch] = useState('');
+  const [showStaffResults, setShowStaffResults] = useState(false);
+  const debouncedStaffSearch = useDebouncedValue(staffSearch, 300);
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState<{
+    id: string;
+    fullName: string;
+    employeeCode: string;
+    photoUrl?: string | null;
+    department?: { name: string };
+    designation?: { label: string };
+    basicPay?: number | null;
+  } | null>(null);
   const [createForm, setCreateForm] = useState({
     loanTypeConfigId: '',
     loanType: 'Staff Welfare Loan',
@@ -346,9 +359,25 @@ export function HrLoansPage() {
   });
 
   const staffQ = useQuery({
-    queryKey: ['loans', 'staff-search', staffSearch],
-    queryFn: () => searchStaffForLoan(staffSearch),
-    enabled: enabled && tab === 'create' && staffSearch.trim().length >= 2,
+    queryKey: ['loans', 'staff-search', debouncedStaffSearch],
+    queryFn: async () => {
+      const q = debouncedStaffSearch.trim();
+      try {
+        return await searchStaffForLoan(q);
+      } catch {
+        const res = await fetchStaff({ search: q, limit: 20, status: 'ACTIVE' });
+        return res.data.map((row) => ({
+          id: row.id,
+          fullName: row.fullName,
+          employeeCode: row.employeeCode,
+          photoUrl: row.photoUrl,
+          department: row.department ? { name: row.department } : undefined,
+          designation: row.designation ? { label: row.designation } : undefined,
+          basicPay: null,
+        }));
+      }
+    },
+    enabled: enabled && tab === 'create' && debouncedStaffSearch.trim().length >= 2,
   });
 
   const detailQ = useQuery({
@@ -364,7 +393,9 @@ export function HrLoansPage() {
     onSuccess: () => {
       setMessage('Loan created successfully');
       setSelectedStaffId('');
+      setSelectedStaff(null);
       setStaffSearch('');
+      setShowStaffResults(false);
       invalidate();
     },
     onError: (e) => setError(apiErrorMessage(e, 'Failed to create loan')),
@@ -419,11 +450,6 @@ export function HrLoansPage() {
     },
     onError: (e) => setError(apiErrorMessage(e, 'Failed to add loan type')),
   });
-
-  const selectedStaff = useMemo(
-    () => (staffQ.data ?? []).find((s) => s.id === selectedStaffId),
-    [staffQ.data, selectedStaffId],
-  );
 
   const salaryDeductionLoans = useMemo(
     () =>
@@ -657,26 +683,53 @@ export function HrLoansPage() {
                 className={inputClass('pl-9')}
                 placeholder="Name, employee code, or mobile..."
                 value={staffSearch}
-                onChange={(e) => setStaffSearch(e.target.value)}
+                onChange={(e) => {
+                  setStaffSearch(e.target.value);
+                  setShowStaffResults(true);
+                  if (!e.target.value.trim()) {
+                    setSelectedStaffId('');
+                    setSelectedStaff(null);
+                  }
+                }}
+                onFocus={() => setShowStaffResults(true)}
               />
-            </div>
-            <div className="max-h-48 space-y-2 overflow-auto">
-              {(staffQ.data ?? []).map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedStaffId(s.id)}
-                  className={cn(
-                    'w-full rounded-lg border p-2 text-left text-sm transition-colors',
-                    selectedStaffId === s.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border/60 hover:bg-muted/30',
+              {showStaffResults && staffSearch.trim().length >= 2 ? (
+                <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg">
+                  {staffQ.isLoading || staffSearch !== debouncedStaffSearch ? (
+                    <p className="p-3 text-xs text-muted-foreground">Searching staff…</p>
+                  ) : staffQ.isError ? (
+                    <p className="p-3 text-xs text-rose-600">
+                      {apiErrorMessage(staffQ.error, 'Staff search failed')}
+                    </p>
+                  ) : (staffQ.data ?? []).length ? (
+                    (staffQ.data ?? []).map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStaffId(s.id);
+                          setSelectedStaff(s);
+                          setStaffSearch(s.fullName);
+                          setShowStaffResults(false);
+                        }}
+                        className={cn(
+                          'flex w-full flex-col border-b border-border/60 px-3 py-2 text-left text-sm last:border-0 hover:bg-muted/60',
+                          selectedStaffId === s.id && 'bg-primary/5',
+                        )}
+                      >
+                        <span className="font-medium">{s.fullName}</span>
+                        <span className="text-xs text-muted-foreground">{s.employeeCode}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-3 text-xs text-muted-foreground">
+                      No staff found for &ldquo;{debouncedStaffSearch}&rdquo;
+                    </p>
                   )}
-                >
-                  <span className="font-medium">{s.fullName}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{s.employeeCode}</span>
-                </button>
-              ))}
+                </div>
+              ) : staffSearch.trim().length > 0 && staffSearch.trim().length < 2 ? (
+                <p className="mt-1 text-xs text-muted-foreground">Type at least 2 characters…</p>
+              ) : null}
             </div>
             {selectedStaff ? <StaffCard staff={selectedStaff} /> : null}
           </GlassCard>

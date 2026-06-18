@@ -290,6 +290,48 @@ Open [ACADEMIC_ENGINE.md](./ACADEMIC_ENGINE.md) talking points if Principal asks
 
 ---
 
+## Section 10b — Principal Command Center (5 minutes)
+
+**Login:** `principal-desk@demo.edu` / `Admin@123` → lands on `/principal-desk`
+
+| Step | Action                                 | What to highlight                                                                                 |
+| ---- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1    | Open Principal Desk homepage           | Today's snapshot: students/staff present, defaulters, library overdue, pending leave              |
+| 2    | **Scan student ID** in Student Scanner | Full command card in one screen: attendance meter, admit eligibility, monthly fees, library fines |
+| 3    | Switch to **Staff Scanner**            | Today's timetable, attendance summary, committee memberships                                      |
+| 4    | Open **Leave Approvals**               | Approve staff or student leave without opening HR module                                          |
+| 5    | Open **NAAC Readiness**                | Criteria-wise readiness score from one dashboard                                                  |
+| 6    | Open **Committee Monitor**             | ICC, IQAC, Anti-Ragging — meetings and pending ATR                                                |
+
+**Talking points:**
+
+- "The Principal never opens ten menus — scan any student or staff ID and see everything in under one second."
+- "Admit card eligibility is computed live: attendance ≥ 75% and no fee dues."
+- "Leave, committees, fees, and NAAC alerts are actionable from one command center."
+
+---
+
+#### Library Gate Kiosk (live demo — 3 minutes)
+
+**Login:** `library-desk@demo.edu` / `Admin@123` → redirects to `/library-desk`
+
+| Step | Action                                             | What to highlight                                                      |
+| ---- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| 1    | Open kiosk on a **second monitor** near the gate   | Click **Kiosk Mode** (fullscreen)                                      |
+| 2    | Scan student ID barcode (USB scanner auto-submits) | Animated scanner: idle → detecting → verifying → **ENTRY ALLOWED**     |
+| 3    | Scan same card again                               | **EXIT RECORDED** with session duration                                |
+| 4    | Point at **Librarian verify** strip                | Membership, attendance %, fee status, loans, fines — no blocking popup |
+| 5    | Show **live side panel**                           | Occupancy, gender split, recent activity, notice board                 |
+| 6    | **Visitor Pass**                                   | Register Parent/Guest/Alumni — auto check-in                           |
+
+**Talking points:**
+
+- "Scanner never blocks the queue — next student can scan while the welcome screen is still showing."
+- "Librarian sees fee and attendance flags instantly without opening the student profile."
+- "Real-time occupancy updates via WebSocket — no page refresh."
+
+---
+
 ## Section 11 — Campus operations (6 minutes)
 
 ### Infrastructure
@@ -309,14 +351,37 @@ Open [ACADEMIC_ENGINE.md](./ACADEMIC_ENGINE.md) talking points if Principal asks
 
 **Path:** `/admin/governance`
 
-1. **Committee Master** — IQAC, Anti-Ragging, Examination, etc.
-2. **Committee Members** — staff assignments with tenure
+1. **Committee Master** — IQAC, Anti-Ragging, ICC/POSH, Examination, etc.
+2. **Committee Members** (`/admin/governance/members`) — full roster with member types
 3. **Meetings** — schedule, minutes, attendance
 4. **Action Taken Reports (ATR)** — follow-up tracking
 5. **Notices** — publish to staff/student portals
 
+#### Committee Members demo (NAAC-focused — 4 minutes)
+
+**Path:** `/admin/governance/members`
+
+| Member type                              | Example use                                                                               |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Internal Staff**                       | Search staff directory — auto-loads designation, dept, mobile                             |
+| **External Member**                      | ICC advocate, NGO rep — manual name, org, expertise                                       |
+| **Ex-Officio**                           | Principal, IQAC Coordinator — **position-based**, auto-updates when office holder changes |
+| **Student / Alumni / Parent / Industry** | Representatives per statutory committee rules                                             |
+
+**Demo flow:**
+
+1. Select **Internal Complaints Committee (ICC)** from filter
+2. Show **Composition dashboard** — internal vs external counts
+3. Show **NAAC compliance panel** — external member present, female presiding officer, minimum members
+4. Add an **External Member** (advocate) — fields: name, designation, organization
+5. Add **Ex-Officio → Principal** — system resolves current Principal automatically
+6. Open **History** — tenure retained when member is replaced (REPLACED status, not deleted)
+7. **Download Excel template** — bulk import from committee PDF rosters
+
 ### Talking points
 
+- "ICC requires external members and a female presiding officer — the system validates composition for NAAC."
+- "When the Principal changes, ex-officio committees update without manual roster correction."
 - "Committee work is usually lost in register books — here it is searchable and reportable."
 - "NAAC assessors ask for IQAC meeting minutes — we produce them from this module."
 
@@ -505,14 +570,16 @@ Use this as a reference card during demo.
 
 ## Appendix B — Specialized role logins
 
-| Role                | Email                    | Password    | Start page              |
-| ------------------- | ------------------------ | ----------- | ----------------------- |
-| Librarian           | `librarian@demo.edu`     | `Admin@123` | `/admin/library`        |
-| Accountant          | `accounts@demo.edu`      | `Admin@123` | `/admin/fees`           |
-| Front office        | `frontoffice@demo.edu`   | `Admin@123` | `/admin/front-office`   |
-| Transport           | `transport@demo.edu`     | `Admin@123` | `/admin/transport`      |
-| Store keeper        | `store@demo.edu`         | `Admin@123` | `/admin/inventory`      |
-| Morning shift admin | `morning.admin@demo.edu` | `Shift@123` | `/admin` (shift-scoped) |
+| Role                | Email                     | Password    | Start page              |
+| ------------------- | ------------------------- | ----------- | ----------------------- |
+| Principal desk      | `principal-desk@demo.edu` | `Admin@123` | `/principal-desk`       |
+| Librarian           | `librarian@demo.edu`      | `Admin@123` | `/admin/library`        |
+| Library gate kiosk  | `library-desk@demo.edu`   | `Admin@123` | `/library-desk`         |
+| Accountant          | `accounts@demo.edu`       | `Admin@123` | `/admin/fees`           |
+| Front office        | `frontoffice@demo.edu`    | `Admin@123` | `/admin/front-office`   |
+| Transport           | `transport@demo.edu`      | `Admin@123` | `/admin/transport`      |
+| Store keeper        | `store@demo.edu`          | `Admin@123` | `/admin/inventory`      |
+| Morning shift admin | `morning.admin@demo.edu`  | `Shift@123` | `/admin` (shift-scoped) |
 
 ---
 

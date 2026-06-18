@@ -54,6 +54,7 @@ export const MODULE_PERMISSIONS = {
     'library:research:read',
     'library:research:manage',
   ],
+  cams: ['cams:read', 'cams:manage', 'cams:reports'],
   infrastructure: ['org:read', 'org:manage'],
   frontOffice: [
     'front-office:read',
@@ -502,7 +503,24 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
       'certificates:read',
       'notifications:read',
     ],
-    defaultHome: '/admin',
+    defaultHome: '/principal-desk',
+  },
+  {
+    slug: 'vice-principal',
+    name: 'Vice Principal Workspace',
+    description: 'Principal command center and institutional oversight',
+    permissions: [
+      'students:read',
+      'staff:read',
+      'academic:read',
+      'fees:read',
+      'reports:read',
+      'admissions:read',
+      'exam:view',
+      'certificates:read',
+      'notifications:read',
+    ],
+    defaultHome: '/principal-desk',
   },
 ];
 

@@ -229,6 +229,7 @@ export function LoginAuthCard({
               src="/branding/basecode-labs-logo.png"
               className="opacity-90"
               size={28}
+              priority
             />
             <p className="text-[10px] text-muted-foreground">
               A Product of{' '}

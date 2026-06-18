@@ -44,6 +44,11 @@ export type GovernanceCommitteeMember = {
   replacedByMemberId?: string | null;
   status: string;
   isExternal: boolean;
+  memberType?: string;
+  organization?: string | null;
+  address?: string | null;
+  areaOfExpertise?: string | null;
+  exOfficioPosition?: string | null;
   replacementRequired?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -54,6 +59,28 @@ export type GovernanceMemberStats = {
   totalMembers: number;
   expiringSoon: number;
   membersNeedingReplacement: number;
+};
+
+export type GovernanceCommitteeComposition = {
+  committeeId: string;
+  committeeName: string;
+  shortCode: string;
+  totalMembers: number;
+  internalStaff: number;
+  externalMembers: number;
+  studentMembers: number;
+  exOfficio: number;
+  alumniRepresentatives: number;
+  parentRepresentatives: number;
+  industryExperts: number;
+  byType: Record<string, number>;
+  naacCompliance: {
+    applicable: boolean;
+    complete?: boolean;
+    ruleLabel?: string;
+    checks?: Array<{ id: string; label: string; passed: boolean; detail?: string }>;
+    message?: string;
+  };
 };
 
 export type GovernanceMeetingAgendaItem = {

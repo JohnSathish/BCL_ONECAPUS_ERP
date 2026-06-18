@@ -29,6 +29,8 @@ import {
 
 import { PAYROLL_READ_ACCESS } from '../../common/permissions/payroll.permissions';
 
+const LOANS_WRITE_ACCESS = ['loans:manage', 'payroll:manage'] as const;
+
 import {
   CancelLoanReceiptDto,
   CreateLoanTypeDto,
@@ -74,7 +76,11 @@ export class LoansController {
   }
 
   @Get('staff/search')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(
+    ...LOANS_WRITE_ACCESS,
+    ...PAYROLL_READ_ACCESS,
+    'loans:read',
+  )
   searchStaff(
     @CurrentUser() user: JwtUser,
     @Query() query: StaffSearchQueryDto,
@@ -89,13 +95,13 @@ export class LoansController {
   }
 
   @Post('types')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   createType(@CurrentUser() user: JwtUser, @Body() dto: CreateLoanTypeDto) {
     return this.setup.createType(user, dto);
   }
 
   @Patch('types/:id')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   updateType(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -111,7 +117,7 @@ export class LoansController {
   }
 
   @Post()
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   create(@CurrentUser() user: JwtUser, @Body() dto: CreateStaffLoanDto) {
     return this.management.create(user, dto);
   }
@@ -289,7 +295,7 @@ export class LoansController {
   }
 
   @Post('transactions/:transactionId/cancel')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   cancelReceipt(
     @CurrentUser() user: JwtUser,
 
@@ -301,7 +307,7 @@ export class LoansController {
   }
 
   @Post('transactions/:transactionId/email')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   emailReceipt(
     @CurrentUser() user: JwtUser,
 
@@ -355,7 +361,7 @@ export class LoansController {
   }
 
   @Post(':id/payments')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   recordPayment(
     @CurrentUser() user: JwtUser,
 
@@ -367,7 +373,7 @@ export class LoansController {
   }
 
   @Patch(':id/restructure')
-  @RequirePermissions('loans:manage', 'payroll:manage')
+  @RequireAnyPermission(...LOANS_WRITE_ACCESS)
   restructure(
     @CurrentUser() user: JwtUser,
 

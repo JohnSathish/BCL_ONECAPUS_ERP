@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CommunicationEmailService } from './communication-email.service';
+import { CommunicationSmsService } from './communication-sms.service';
 import { CommunicationTemplateRendererService } from './communication-template-renderer.service';
 import { UserNotificationsService } from './user-notifications.service';
 import { FcmPushService } from './fcm-push.service';
+import { CommunicationWhatsAppService } from './communication-whatsapp.service';
 import { resolveNotificationLink } from '../utils/notification-link.util';
 
 @Injectable()
@@ -13,12 +15,23 @@ export class CommunicationDeliveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: CommunicationEmailService,
+    private readonly sms: CommunicationSmsService,
     private readonly notifications: UserNotificationsService,
     private readonly renderer: CommunicationTemplateRendererService,
     private readonly fcm: FcmPushService,
+    private readonly whatsapp: CommunicationWhatsAppService,
   ) {}
 
   async deliverCampaign(tenantId: string, campaignId: string) {
+    return this.deliverCampaignBatch(tenantId, campaignId);
+  }
+
+  async deliverCampaignBatch(
+    tenantId: string,
+    campaignId: string,
+    offset = 0,
+    limit = 5000,
+  ) {
     const campaign = await this.prisma.communicationCampaign.findFirst({
       where: { id: campaignId, tenantId },
     });
@@ -55,6 +68,9 @@ export class CommunicationDeliveryService {
 
     const recipients = await this.prisma.communicationRecipient.findMany({
       where: { tenantId, campaignId },
+      skip: offset,
+      take: limit,
+      orderBy: { createdAt: 'asc' },
     });
 
     let sentCount = 0;
@@ -62,16 +78,73 @@ export class CommunicationDeliveryService {
 
     for (const recipient of recipients) {
       for (const channel of channels) {
-        if (channel === 'SMS' || channel === 'WHATSAPP') {
+        if (channel === 'SMS') {
+          if (!recipient.phone) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'FAILED',
+              errorMessage: 'No phone number',
+            });
+            failedCount++;
+            continue;
+          }
+
+          const result = await this.sms.send({
+            to: recipient.phone,
+            message: bodyText ?? subject,
+          });
+
           await this.logDelivery({
             tenantId,
             campaignId,
             recipientId: recipient.id,
             channel,
-            status: 'FAILED',
-            errorMessage: `${channel} integration not configured yet`,
+            status: result.ok ? 'SENT' : 'FAILED',
+            provider: result.provider,
+            providerRef: result.providerRef,
+            errorMessage: result.error,
           });
-          failedCount++;
+
+          if (result.ok) sentCount++;
+          else failedCount++;
+          continue;
+        }
+
+        if (channel === 'WHATSAPP') {
+          if (!recipient.phone) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'FAILED',
+              errorMessage: 'No phone number',
+            });
+            failedCount++;
+            continue;
+          }
+
+          const result = await this.whatsapp.send({
+            to: recipient.phone,
+            body: bodyText ?? subject,
+          });
+
+          await this.logDelivery({
+            tenantId,
+            campaignId,
+            recipientId: recipient.id,
+            channel,
+            status: result.ok ? 'SENT' : 'FAILED',
+            provider: result.provider,
+            providerRef: result.providerRef,
+            errorMessage: result.error,
+          });
+
+          if (result.ok) sentCount++;
+          else failedCount++;
           continue;
         }
 
@@ -236,18 +309,77 @@ export class CommunicationDeliveryService {
       });
     }
 
-    await this.prisma.communicationCampaign.update({
-      where: { id: campaignId },
-      data: {
-        status:
-          failedCount === recipients.length * channels.length
-            ? 'FAILED'
-            : 'SENT',
-        sentAt: new Date(),
-      },
+    const totalRecipients = await this.prisma.communicationRecipient.count({
+      where: { tenantId, campaignId },
     });
+    const isLastBatch = offset + recipients.length >= totalRecipients;
+
+    if (isLastBatch) {
+      await this.prisma.communicationCampaign.update({
+        where: { id: campaignId },
+        data: {
+          status:
+            failedCount === recipients.length * channels.length &&
+            sentCount === 0
+              ? 'FAILED'
+              : 'SENT',
+          sentAt: new Date(),
+        },
+      });
+    }
 
     return { sentCount, failedCount, recipientCount: recipients.length };
+  }
+
+  async trackOpen(logId: string) {
+    const log = await this.prisma.communicationDeliveryLog.findUnique({
+      where: { id: logId },
+    });
+    if (!log || log.openedAt) return;
+    await this.prisma.communicationDeliveryLog.update({
+      where: { id: logId },
+      data: { openedAt: new Date() },
+    });
+  }
+
+  async trackClick(logId: string) {
+    const log = await this.prisma.communicationDeliveryLog.findUnique({
+      where: { id: logId },
+    });
+    if (!log) return;
+    await this.prisma.communicationDeliveryLog.update({
+      where: { id: logId },
+      data: {
+        clickedAt: new Date(),
+        openedAt: log.openedAt ?? new Date(),
+      },
+    });
+  }
+
+  async logDirectSend(input: {
+    tenantId: string;
+    channel: string;
+    status: string;
+    provider?: string;
+    providerRef?: string;
+    errorMessage?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    return this.prisma.communicationDeliveryLog.create({
+      data: {
+        tenantId: input.tenantId,
+        channel: input.channel,
+        status: input.status,
+        provider: input.provider,
+        providerRef: input.providerRef,
+        errorMessage: input.errorMessage,
+        metadata: (input.metadata ?? {}) as object,
+        sentAt: ['SENT', 'DELIVERED'].includes(input.status)
+          ? new Date()
+          : undefined,
+        deliveredAt: input.status === 'DELIVERED' ? new Date() : undefined,
+      },
+    });
   }
 
   private coalesceRendered(...candidates: Array<string | null | undefined>) {

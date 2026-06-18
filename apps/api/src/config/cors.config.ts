@@ -23,10 +23,18 @@ export function buildCorsOptions(config: ConfigService): CorsOptions {
   return {
     origin: isDev
       ? (origin, callback) => {
-          if (
-            !origin ||
-            /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-          ) {
+          if (!origin) {
+            callback(null, true);
+            return;
+          }
+          const localDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(
+            origin,
+          );
+          const lanDev =
+            /^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(
+              origin,
+            );
+          if (localDev || lanDev) {
             callback(null, true);
           } else {
             callback(

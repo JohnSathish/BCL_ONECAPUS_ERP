@@ -9,6 +9,28 @@ export function getApiBaseUrl(): string {
   return 'http://localhost:3001/api';
 }
 
+/** Socket.IO runs on the Nest host, not the Next.js dev server. */
+export function getRealtimeOrigin(): string {
+  const wsFromEnv = process.env.NEXT_PUBLIC_WS_ORIGIN?.trim();
+  if (wsFromEnv) return wsFromEnv.replace(/\/$/, '');
+
+  const apiBase = getApiBaseUrl();
+  if (!apiBase.startsWith('/')) {
+    return apiBase.replace(/\/api\/?$/, '');
+  }
+
+  const explicitApi = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (explicitApi && !explicitApi.startsWith('/')) {
+    return explicitApi.replace(/\/api\/?$/, '');
+  }
+
+  return process.env.NODE_ENV === 'development'
+    ? 'http://127.0.0.1:3001'
+    : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://127.0.0.1:3001';
+}
+
 export const API_BASE_URL = getApiBaseUrl();
 
 export const API_REQUEST_TIMEOUT_MS = 15_000;

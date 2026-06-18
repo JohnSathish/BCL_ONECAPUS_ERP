@@ -890,25 +890,45 @@ export const ADMIN_NAV: NavGroup[] = [
         permissions: [...P.library],
         activePattern: '^/admin/library(?:/.*)?$',
         children: [
-          { label: 'Dashboard', href: '/admin/library', permissions: [...P.library] },
+          { label: 'Library Dashboard', href: '/admin/library', permissions: [...P.library] },
           {
-            label: 'Access Desk',
+            label: 'Library Entry System',
             href: '/admin/library/visits',
             permissions: ['library:access-desk', 'library:circulate', 'library:manage'],
           },
           {
-            label: 'Catalogue',
+            label: 'Catalog',
             href: '/admin/library/catalogue',
             permissions: ['library:read', 'library:manage'],
           },
           {
-            label: 'Circulation',
+            label: 'Book Accession',
+            href: '/admin/library/accession',
+            permissions: ['library:manage'],
+          },
+          {
+            label: 'Circulation Desk',
             href: '/admin/library/circulation',
             permissions: ['library:circulate', 'library:manage'],
           },
           {
+            label: 'Members',
+            href: '/admin/library/members',
+            permissions: ['library:read', 'library:manage'],
+          },
+          {
             label: 'Reservations',
             href: '/admin/library/reservations',
+            permissions: ['library:circulate', 'library:manage'],
+          },
+          {
+            label: 'Fine Management',
+            href: '/admin/library/circulation',
+            permissions: ['library:circulate', 'library:manage'],
+          },
+          {
+            label: 'Incidents',
+            href: '/admin/library/incidents',
             permissions: ['library:circulate', 'library:manage'],
           },
           {
@@ -922,19 +942,29 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:digital:read', 'library:digital:manage'],
           },
           {
+            label: 'Question Papers',
+            href: '/admin/library/digital',
+            permissions: ['library:digital:read', 'library:digital:manage'],
+          },
+          {
             label: 'Research Repository',
             href: '/admin/library/research',
             permissions: ['library:research:read', 'library:research:manage'],
           },
           { label: 'Search', href: '/admin/library/search', permissions: [...P.library] },
           {
-            label: 'Analytics',
+            label: 'Reading Analytics',
             href: '/admin/library/analytics',
             permissions: ['library:reports', 'library:manage'],
           },
           {
             label: 'Reports',
             href: '/admin/library/reports',
+            permissions: ['library:reports', 'library:manage'],
+          },
+          {
+            label: 'NAAC Reports',
+            href: '/admin/library/naac-reports',
             permissions: ['library:reports', 'library:manage'],
           },
           {
@@ -950,6 +980,26 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Campus Operations',
     zone: 'scroll',
     items: [
+      {
+        label: 'Campus Access',
+        href: '/admin/campus-access/dashboard',
+        icon: Fingerprint,
+        module: 'cams',
+        permissions: [...P.cams],
+        activePattern: '^/admin/campus-access(?:/.*)?$',
+        children: [
+          {
+            label: 'Live Dashboard',
+            href: '/admin/campus-access/dashboard',
+            permissions: [...P.cams],
+          },
+          {
+            label: 'Access Points',
+            href: '/admin/campus-access',
+            permissions: ['cams:manage', 'cams:read'],
+          },
+        ],
+      },
       {
         label: 'Infrastructure',
         href: '/admin/organization/infrastructure',
@@ -1180,8 +1230,38 @@ export const ADMIN_NAV: NavGroup[] = [
         activePattern: '^/admin/communication(?:/.*)?$',
         children: [
           {
-            label: 'Communication Center',
+            label: 'Dashboard',
             href: '/admin/communication',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Compose',
+            href: '/admin/communication/compose',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Campaigns',
+            href: '/admin/communication/campaigns',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Templates',
+            href: '/admin/communication/templates',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Audience Builder',
+            href: '/admin/communication/audience',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Analytics',
+            href: '/admin/communication/analytics',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Settings',
+            href: '/admin/communication/settings',
             permissions: [...P.communication],
           },
           {

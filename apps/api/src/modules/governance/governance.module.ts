@@ -56,6 +56,7 @@ import { GovernanceTaskService } from './services/governance-task.service';
     GovernanceNaacService,
     GovernanceAtrService,
     GovernancePerformanceService,
+    GovernanceDashboardService,
   ],
 })
 export class GovernanceModule {}

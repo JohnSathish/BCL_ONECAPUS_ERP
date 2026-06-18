@@ -17,6 +17,22 @@ type AudienceFilter = {
   userIds?: string[];
   studentIds?: string[];
   staffProfileIds?: string[];
+  semesterIds?: string[];
+  sectionIds?: string[];
+  batchIds?: string[];
+  shiftIds?: string[];
+  gender?: string;
+  hosteller?: boolean;
+  dayScholar?: boolean;
+  attendanceBelowPct?: number;
+  feeDue?: boolean;
+  defaulters?: boolean;
+  designationIds?: string[];
+  committeeIds?: string[];
+  teaching?: boolean;
+  nonTeaching?: boolean;
+  permanent?: boolean;
+  contract?: boolean;
 };
 
 @Injectable()
@@ -39,6 +55,8 @@ export class CommunicationAudienceService {
         return this.resolveDepartments(tenantId, audienceFilter);
       case 'INDIVIDUAL':
         return this.resolveIndividuals(tenantId, audienceFilter);
+      case 'COMMITTEE':
+        return this.resolveCommittee(tenantId, audienceFilter);
       default:
         return [];
     }
@@ -68,6 +86,12 @@ export class CommunicationAudienceService {
     if (filter.programVersionIds?.length)
       where.programVersionId = { in: filter.programVersionIds };
     if (filter.studentIds?.length) where.id = { in: filter.studentIds };
+    if (filter.shiftIds?.length) where.primaryShiftId = { in: filter.shiftIds };
+    if (filter.semesterIds?.length) {
+      where.semesterRegistrations = {
+        some: { semesterId: { in: filter.semesterIds } },
+      };
+    }
 
     const students = await this.prisma.student.findMany({
       where,
@@ -82,24 +106,51 @@ export class CommunicationAudienceService {
           },
         },
         masterProfile: {
-          select: { fullName: true, email: true, mobileNumber: true },
+          select: {
+            fullName: true,
+            email: true,
+            mobileNumber: true,
+            gender: true,
+          },
         },
       },
       take: 5000,
     });
 
+    let filtered = students.filter((s) => s.user.isActive);
+    if (filter.gender) {
+      filtered = filtered.filter(
+        (s) =>
+          s.masterProfile?.gender?.toLowerCase() ===
+          filter.gender?.toLowerCase(),
+      );
+    }
+    if (filter.feeDue || filter.defaulters) {
+      const ids = filtered.map((s) => s.id);
+      const defaulters = await this.prisma.studentFeeDemand.findMany({
+        where: {
+          tenantId,
+          studentId: { in: ids },
+          balanceAmount: { gt: 0 },
+          status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID'] },
+        },
+        select: { studentId: true },
+        distinct: ['studentId'],
+      });
+      const defaulterSet = new Set(defaulters.map((d) => d.studentId));
+      filtered = filtered.filter((s) => defaulterSet.has(s.id));
+    }
+
     return this.dedupe(
-      students
-        .filter((s) => s.user.isActive)
-        .map((s) => ({
-          recipientType: 'STUDENT' as const,
-          userId: s.userId,
-          studentId: s.id,
-          displayName:
-            s.masterProfile?.fullName ?? s.user.displayName ?? s.user.email,
-          email: s.masterProfile?.email ?? s.user.email,
-          phone: s.masterProfile?.mobileNumber ?? s.user.phone ?? undefined,
-        })),
+      filtered.map((s) => ({
+        recipientType: 'STUDENT' as const,
+        userId: s.userId,
+        studentId: s.id,
+        displayName:
+          s.masterProfile?.fullName ?? s.user.displayName ?? s.user.email,
+        email: s.masterProfile?.email ?? s.user.email,
+        phone: s.masterProfile?.mobileNumber ?? s.user.phone ?? undefined,
+      })),
     );
   }
 
@@ -224,5 +275,55 @@ export class CommunicationAudienceService {
       email: u.email,
       phone: u.phone ?? undefined,
     }));
+  }
+
+  private async resolveCommittee(
+    tenantId: string,
+    filter: AudienceFilter,
+  ): Promise<ResolvedRecipient[]> {
+    const committeeIds = filter.committeeIds ?? [];
+    if (!committeeIds.length) return [];
+
+    const members = await this.prisma.governanceCommitteeMember.findMany({
+      where: {
+        tenantId,
+        committeeId: { in: committeeIds },
+        status: 'ACTIVE',
+      },
+      take: 500,
+    });
+
+    const staffIds = members
+      .map((m) => m.staffProfileId)
+      .filter((id): id is string => Boolean(id));
+
+    const staffMap = new Map(
+      (
+        await this.prisma.staffProfile.findMany({
+          where: { tenantId, id: { in: staffIds } },
+          include: {
+            portalUser: {
+              select: { id: true, email: true, phone: true, displayName: true },
+            },
+          },
+        })
+      ).map((s) => [s.id, s]),
+    );
+
+    return this.dedupe(
+      members.map((m) => {
+        const staff = m.staffProfileId ? staffMap.get(m.staffProfileId) : null;
+        return {
+          recipientType: 'FACULTY' as const,
+          userId: staff?.portalUserId ?? m.userId ?? undefined,
+          staffProfileId: m.staffProfileId ?? undefined,
+          displayName: staff?.fullName ?? m.displayName,
+          email:
+            staff?.email ?? m.email ?? staff?.portalUser?.email ?? undefined,
+          phone:
+            staff?.mobile ?? m.mobile ?? staff?.portalUser?.phone ?? undefined,
+        };
+      }),
+    );
   }
 }

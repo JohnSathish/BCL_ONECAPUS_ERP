@@ -79,10 +79,10 @@ export function ConnectionLines({
         <motion.circle
           cx="50"
           cy="50"
-          r={radiusPct + 1.5}
           fill="none"
           stroke="rgba(167,139,250,0.12)"
           strokeWidth="0.6"
+          initial={{ r: radiusPct + 1.5, opacity: 0.25 }}
           animate={{
             opacity: [0.25, 0.55, 0.25],
             r: [radiusPct + 1, radiusPct + 2.5, radiusPct + 1],
@@ -100,9 +100,11 @@ export function ConnectionLines({
         stroke={premium ? 'rgba(167,139,250,0.35)' : 'rgba(148,163,255,0.22)'}
         strokeWidth={premium ? 0.45 : 0.35}
         strokeDasharray={premium ? '2 3.5' : '1.5 2.5'}
+        strokeDashoffset={0}
         vectorEffect="non-scaling-stroke"
         {...(animate && !spotlightMode
           ? {
+              initial: { strokeDashoffset: 0 },
               animate: { strokeDashoffset: [0, -20] },
               transition: { duration: 14, repeat: Infinity, ease: 'linear' },
             }
@@ -136,11 +138,15 @@ export function ConnectionLines({
             stroke={active ? `url(#${gradientId})` : 'rgba(129,140,248,0.22)'}
             strokeWidth={active ? 0.7 : 0.38}
             strokeDasharray={animate ? '1.2 1.8' : undefined}
+            strokeDashoffset={animate ? 0 : undefined}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
             {...(animate
               ? {
-                  initial: { opacity: spotlightMode ? 0.18 : 0.2 },
+                  initial: {
+                    opacity: spotlightMode ? 0.18 : 0.2,
+                    strokeDashoffset: 0,
+                  },
                   animate: {
                     opacity: active ? 1 : spotlightMode ? 0.18 : [0.28, 0.5, 0.28],
                     strokeDashoffset: active ? [0, -8] : spotlightMode ? 0 : [0, -4],

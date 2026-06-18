@@ -38,6 +38,7 @@ import { StudentsService } from './students.service';
 import { StudentPortalService } from './services/student-portal.service';
 import { StudentPortalCalendarService } from './services/student-portal-calendar.service';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
+import { StudentLeaveService } from './services/student-leave.service';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     StudentPortalService,
     StudentPortalCalendarService,
     StudentPortalProfileService,
+    StudentLeaveService,
     StudentProfileService,
     StudentDirectoryEnrichmentService,
     StudentProfileSectionsService,
@@ -92,6 +94,7 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
     RollNumberService,
     StudentAbcService,
     StudentPortalService,
+    StudentLeaveService,
   ],
 })
 export class StudentsModule {}

@@ -1,17 +1,27 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
+ENV HUSKY=0
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
-RUN npm ci -w web --ignore-scripts
+RUN npm ci -w web --include=dev --ignore-scripts
+RUN npm rebuild @tailwindcss/oxide lightningcss --workspace=web
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/package-lock.json ./package-lock.json
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL=/api
+ARG NEXT_PUBLIC_LOGIN_HOST=erp.donboscocollege.ac.in
+ARG NEXT_PUBLIC_WS_ORIGIN=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_LOGIN_HOST=$NEXT_PUBLIC_LOGIN_HOST
+ENV NEXT_PUBLIC_WS_ORIGIN=$NEXT_PUBLIC_WS_ORIGIN
 RUN npm run build
 
 FROM node:22-alpine AS runner

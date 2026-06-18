@@ -40,7 +40,7 @@ import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/utils/api-error';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import { fetchDepartments } from '@/services/organization';
-import { fetchStaff } from '@/services/staff';
+import { fetchAllStaff } from '@/services/staff';
 import {
   downloadEmployeeMergedPayslips,
   downloadMergedPayslips,
@@ -217,7 +217,7 @@ export function PayslipsPage() {
   const deptQ = useQuery({ queryKey: ['departments'], queryFn: () => fetchDepartments() });
   const staffQ = useQuery({
     queryKey: ['staff', 'payslip-filter', filters.departmentId],
-    queryFn: () => fetchStaff({ limit: 500, status: 'ACTIVE', departmentId: filters.departmentId }),
+    queryFn: () => fetchAllStaff({ status: 'ACTIVE', departmentId: filters.departmentId }),
   });
   const historyQ = useQuery({
     queryKey: ['payroll', 'payslips', 'history', filters.staffProfileId],

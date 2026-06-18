@@ -17,11 +17,13 @@ type ParsedMemberDraft = {
   displayName: string;
   role?: string;
   designation?: string;
+  organization?: string;
   email?: string;
   mobile?: string;
   employeeCode?: string;
   staffProfileId?: string;
   userId?: string;
+  memberType?: string;
   isExternal?: boolean;
   staffMatchConfidence?: number;
 };
@@ -166,23 +168,55 @@ export class GovernanceImportService {
         name: 'Members',
         headers: [
           'short_code',
+          'member_type',
           'member_name',
           'role',
           'designation',
+          'organization',
           'employee_code',
           'email',
           'mobile',
+          'from_date',
           'external',
         ],
         rows: [
           [
             'IQAC',
+            'INTERNAL_STAFF',
             'Fr. Principal Name',
             'CHAIRPERSON',
             'Principal',
+            'Don Bosco College Tura',
             'DBCTCH-26-001',
             '',
             '',
+            '2026-06-01',
+            'N',
+          ],
+          [
+            'ICC',
+            'EXTERNAL',
+            'Dr Jacqueline R Marak',
+            'EXTERNAL_EXPERT',
+            'Advocate',
+            'District Legal Services Authority',
+            '',
+            'advocate@example.com',
+            '9876543210',
+            '2026-06-01',
+            'Y',
+          ],
+          [
+            'ICC',
+            'EX_OFFICIO',
+            'Principal (auto)',
+            'EX_OFFICIO',
+            'Principal',
+            'Don Bosco College Tura',
+            '',
+            '',
+            '',
+            '2026-06-01',
             'N',
           ],
           [
@@ -333,28 +367,44 @@ export class GovernanceImportService {
         'staffCode',
       ]);
       const email = this.cell(raw, ['email']);
+      const memberTypeRaw = (
+        this.cell(raw, ['member_type', 'memberType', 'type']) ?? ''
+      ).toUpperCase();
+      const organization = this.cell(raw, ['organization', 'institution']);
       const externalFlag = this.cell(raw, [
         'external',
         'is_external',
         'isExternal',
       ]);
-      const isExternal = ['y', 'yes', 'true', '1'].includes(
-        (externalFlag ?? '').toLowerCase(),
-      );
+      const isExternal =
+        memberTypeRaw === 'EXTERNAL' ||
+        memberTypeRaw === 'INDUSTRY_EXPERT' ||
+        memberTypeRaw === 'ALUMNI_REPRESENTATIVE' ||
+        memberTypeRaw === 'PARENT_REPRESENTATIVE' ||
+        ['y', 'yes', 'true', '1'].includes((externalFlag ?? '').toLowerCase());
 
-      const match = !isExternal
-        ? this.matchStaff(staffIndex, { displayName, employeeCode, email })
-        : null;
+      const match =
+        memberTypeRaw === 'EX_OFFICIO' || isExternal
+          ? null
+          : this.matchStaff(staffIndex, { displayName, employeeCode, email });
 
       committee.members!.push({
         displayName,
         role: (this.cell(raw, ['role']) ?? 'MEMBER').toUpperCase(),
         designation: this.cell(raw, ['designation']),
+        organization: organization ?? undefined,
         email: email ?? undefined,
         mobile: this.cell(raw, ['mobile', 'phone']) ?? undefined,
         employeeCode: employeeCode ?? undefined,
         staffProfileId: match?.staffProfileId,
         userId: match?.userId ?? undefined,
+        memberType:
+          memberTypeRaw ||
+          (isExternal
+            ? 'EXTERNAL'
+            : match?.staffProfileId
+              ? 'INTERNAL_STAFF'
+              : 'EXTERNAL'),
         isExternal: isExternal || !match?.staffProfileId,
         staffMatchConfidence: match?.confidence,
       });
@@ -645,10 +695,18 @@ export class GovernanceImportService {
             displayName: member.displayName,
             role: member.role ?? 'MEMBER',
             designation: member.designation,
+            organization: member.organization,
             staffProfileId: member.staffProfileId,
             userId,
             email: member.email,
             mobile: member.mobile,
+            memberType:
+              member.memberType ??
+              (member.isExternal
+                ? 'EXTERNAL'
+                : member.staffProfileId
+                  ? 'INTERNAL_STAFF'
+                  : 'EXTERNAL'),
             isExternal: member.isExternal ?? !member.staffProfileId,
           },
         });

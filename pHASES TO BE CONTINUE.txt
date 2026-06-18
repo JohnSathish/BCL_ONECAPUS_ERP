@@ -1,0 +1,613 @@
+Phase 2A — ERP auto-pull (criteria 2–7)
+Phase 2B — AQAR editor + 5-year import
+move on to Phase 2B (notifications, filters, bulk actions, etc.).
+DBCT26-0002
+Db87bm1q!
+\
+\
+
+Use the Library Operator account (not admin):
+
+Email: library-desk@demo.edu
+Password: Admin@123
+Tenant: demo
+After login, the PC stays on the full-screen kiosk. Keep the browser open and fullscreen (F11).
+
+eCf6F4qy6Pfh
+
+continue with Phase 2 (hostel + main-gate kiosks, visitor passes, NAAC reports) whenever you want.
+
+sikkimskilluniversity.ac.in
+
+
+REG2026048
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Back to NAAC Phase 2B
+kochkabita50@gmail.com
+
+On the new machine (when you arrive)
+Install Node.js 20+, Docker Desktop, Cursor
+Paste the project folder
+In PowerShell:
+cd E:\Projects\1505NEWERP   # your path
+npm install
+.\scripts\restore-migration-pack.ps1
+npm run db:generate
+npm run dev
+Open http://localhost:3000 — login: demo / admin@demo.edu / Admin@123
+In Cursor, say: “Configure and run this project. Migration pack is in _migration-pack/LATEST.”
+Full steps are in _migration-pack\LATEST\RESTORE_ON_NEW_SYSTEM.md.
+
+
+Get Jun–Jul 2026 live (highest priority)
+Finish the Shift II routine — Assign faculty short codes and rooms on all 11 slots (Excel import or manual grid), then publish the plan so Stream Master + staff timetables go live.
+Wire demo students — Seed Sem 3/5 registrations against Shift II offering sections so rosters populate and you can mark attendance end-to-end (currently sessions generate but rosters are empty).
+Timetable Phase 2B (product polish)
+Staff portal by subject group — Faculty timetable + “Mark attendance today” should show Major Sociology, not SOC-200 / SOC-201.
+Stream Master Routine — Grid cells should display subject group title/code as the primary label; papers stay internal.
+Attendance rollup check — One mark on a group session should update all linked papers in student summaries/reports (verify + fix any UI gaps).
+Optional / later
+Draft → final rooms — Allow timetable import/edit without rooms first, then a “finalize rooms” pass.
+Day Shift Sem 1 plan — Mirror what you did for Shift II for the full Arts ODD grid.
+NAAC — Paused unless you want to resume.
+Practical recommendation: Do 1 + 2 first so coordinators can run the real Jun–Jul routine this week; then 3–5 so staff see the FYUGP subject-group model in daily use.
+
+Say which you want to tackle — e.g. 1,2 or staff portal — and we can go straight into it.
+
+
+
+
+
+NIMS Phase 1 — NAAC & IQAC Management System
+Strategic Goal
+Replace last-minute NAAC file hunts with continuous evidence collection. Phase 1 delivers the institutional compliance platform shell: dashboard readiness scoring, criteria/metrics registry, cross-module evidence repository, yearly AQAR instances, department/faculty/student capture, MoU management, IQAC/governance integration, DVV readiness, and reports.
+
+Phase 2 (out of scope): SSR Builder, AI AQAR/SSR generators, AI evidence finder.
+
+Architecture
+Existing ERP Modules
+NIMS Module - naac schema
+sync on read
+link via sourceType/sourceId
+aggregate counts
+aggregate counts
+Admissions
+Examination
+StaffPublication / StaffAward
+CGMS Meetings ATR Docs
+Finance
+Library
+NAAC Dashboard
+Criteria and Metrics
+NaacEvidenceTag + Vault
+AQAR Instances
+Department Submissions
+Faculty and Student Achievements
+MoU Management
+DVV Readiness
+Key decisions
+Decision
+
+Choice
+
+Module namespace
+
+API: /v1/naac-iqac, Web: /admin/naac, Prisma schema: naac
+
+Evidence model
+
+New NaacEvidenceTag (unified, cross-module). Existing GovernanceNaacTag stays; NIMS aggregates governance tags in search/dashboard (no breaking CGMS changes in Phase 1)
+
+IQAC meetings/ATR
+
+Read-only integration via existing GovernanceModule APIs — do not duplicate meeting/ATR tables
+
+Faculty achievements
+
+Extend existing StaffPublication / StaffAward via NIMS submission wrapper + mandatory vault evidence
+
+Storage
+
+New vault uploads via StorageService; resolver bridges storageKey (governance/vault) and /uploads/ paths (staff docs)
+
+Old NAAC nav
+
+Keep /admin/governance/naac working; add redirect banner + update compliance page link to /admin/naac
+
+Prisma Models (naac schema)
+Add to apps/api/prisma/schema.prisma after governance block:
+
+Master data
+
+NaacCriterion — 7 criteria per tenant (seeded)
+
+NaacMetric — metric code (e.g. 3.4.3), title, criterion, dataType, isMandatory, sortOrder
+
+Evidence engine (core)
+
+NaacEvidenceTag — polymorphic sourceType + sourceId, criterion, metricCode?, academicYear, optional departmentId, committeeId, programmeId, activityTitle, eventTitle, evidenceNotes, denormalized fileName/storageKey/fileUrl, createdById
+
+NaacVaultDocument — direct IQAC uploads (storageKey, fileName, mimeType, uploadedById) auto-tagged on upload
+
+AQAR
+
+NaacAqar — academicYear, title, status (DRAFT/IN_REVIEW/SUBMITTED/LOCKED), institutionProfile Json, completionPct
+
+NaacAqarSection — sectionKey (criterion_1..7, best_practices, institutional_distinctiveness, profile), content Json, completionPct, lastSyncedAt
+
+Data collection
+
+NaacFacultyAchievement — staffProfileId, achievementType (publication/book/patent/award/fdp/conference/project), optional FK to StaffPublication/StaffAward, evidenceTagId, status
+
+NaacStudentAchievement — studentId?, achievementType (sports/cultural/academic/competition/placement/higher_studies), title, date, evidence
+
+NaacMou — partnerType (industry/university/ngo/research), partnerName, dates, storageKey for MoU copy, status
+
+NaacMouActivity — linked activities/outcomes/reports
+
+NaacDepartmentSubmission — departmentId, academicYear, submissionType, payload Json, status (PENDING/SUBMITTED/APPROVED)
+
+Operations
+
+NaacCalendarEvent — reminders (AQAR due, IQAC meeting, dept submission, feedback, SSR review), optional linkedSourceType/Id
+
+NaacSettings — tenant config: active AQAR year, institution profile defaults
+
+NaacReadinessSnapshot — cached dashboard metrics (criterion scores, pending counts) — recomputed on evidence/submission changes
+
+Migration: apps/api/prisma/migrations/20250613140000_add_naac_iqac_tables/migration.sql
+
+Permissions & Navigation
+Mirror CGMS pattern in both registries:
+
+apps/api/src/common/permissions/permission-registry.ts
+
+apps/web/lib/permissions/permission-registry.ts
+
+New slugs (add to seed.ts):
+
+naac-iqac:read, manage, collect, publish, reports, portal
+
+Role grants:
+
+college-admin / super-admin — all (auto via full PERMISSIONS list)
+
+registrar — read, manage, reports
+
+principal, vice-principal — read, reports
+
+hod — read, collect
+
+faculty — portal, collect (dept coordinators)
+
+Nav — new top-level group in navigation.ts under "Campus Operations" (after Governance):
+
+Submenu
+
+Route
+
+Permission
+
+Dashboard
+
+/admin/naac
+
+naac-iqac:*
+
+Criteria & Metrics
+
+/admin/naac/criteria
+
+read
+
+Evidence Repository
+
+/admin/naac/evidence
+
+read
+
+Document Vault
+
+/admin/naac/vault
+
+manage
+
+AQAR Management
+
+/admin/naac/aqar
+
+manage
+
+Department Portal
+
+/admin/naac/department
+
+collect
+
+Faculty Achievements
+
+/admin/naac/faculty
+
+collect
+
+Student Achievements
+
+/admin/naac/student
+
+collect
+
+MoU Management
+
+/admin/naac/mous
+
+manage
+
+IQAC Activities
+
+/admin/naac/iqac
+
+read
+
+DVV Readiness
+
+/admin/naac/dvv
+
+reports
+
+NAAC Calendar
+
+/admin/naac/calendar
+
+read
+
+Reports
+
+/admin/naac/reports
+
+reports
+
+Settings
+
+/admin/naac/settings
+
+manage
+
+Staff portal: /staff/naac (faculty achievements + dept coordinator submissions) with naac-iqac:portal.
+
+API Module Structure
+New NestJS module at apps/api/src/modules/naac-iqac/:
+
+naac-iqac.module.ts          — imports StorageModule, GovernanceModule (for IQAC read)
+naac-iqac.controller.ts      — admin routes
+naac-iqac-portal.controller.ts — /me routes for staff
+services/
+  naac-dashboard.service.ts    — readiness score, KPIs, criterion status
+  naac-criteria.service.ts     — criteria + metrics CRUD
+  naac-evidence.service.ts     — tag CRUD, search, governance tag aggregation
+  naac-vault.service.ts        — upload/download via StorageService
+  naac-aqar.service.ts         — AQAR CRUD, section sync from ERP aggregates
+  naac-achievement.service.ts  — faculty + student achievements
+  naac-mou.service.ts          — MoU + activities
+  naac-department.service.ts   — HOD submissions + approval
+  naac-calendar.service.ts     — calendar events
+  naac-dvv.service.ts          — missing evidence/metric/dept/faculty pending
+  naac-report.service.ts       — evidence pack export (CSV/XLSX), criterion reports
+  naac-integration.service.ts  — pulls governance meetings/ATR/committee counts
+  naac-aggregator.service.ts   — ERP auto-pull stubs (admissions, exams, publications)
+constants/naac.constants.ts    — criteria, achievement types, AQAR sections
+dto/naac-iqac.dto.ts
+Register in app.module.ts.
+
+Key API routes:
+
+Area
+
+Routes
+
+Dashboard
+
+GET /dashboard, GET /dashboard/criteria
+
+Criteria
+
+GET/POST/PATCH /criteria, GET/POST /metrics
+
+Evidence
+
+GET /evidence (search: criterion, metric, year, dept), POST /evidence/tags, DELETE /evidence/tags/:id
+
+Vault
+
+POST /vault/upload, GET /vault, GET /vault/:id/download
+
+AQAR
+
+GET/POST /aqar, GET/PATCH /aqar/:id, POST /aqar/:id/sync, GET /aqar/:id/sections
+
+Achievements
+
+GET/POST /faculty-achievements, GET/POST /student-achievements
+
+MoU
+
+CRUD /mous, /mous/:id/activities
+
+Department
+
+GET /department/dashboard, POST /department/submissions
+
+IQAC
+
+GET /iqac/summary (governance delegation), GET /iqac/meetings, GET /iqac/atr
+
+DVV
+
+GET /dvv/readiness
+
+Calendar
+
+CRUD /calendar
+
+Reports
+
+POST /reports/export
+
+Portal
+
+GET /me/dashboard, POST /me/achievements, POST /me/submissions
+
+Seed Data
+New files:
+
+apps/api/prisma/seeds/naac-metrics.json — 7 criteria + ~5–10 key metrics per criterion (NAAC 4.0 representative set; extensible via admin UI)
+
+apps/api/prisma/seeds/seed-naac-iqac.ts — criteria, metrics, default settings, sample AQAR 2026 shell, calendar reminders
+
+Hook into seed.ts main().
+
+Reuse existing IQAC committee from dbc-committees.json via integration service (no duplicate seed).
+
+Web UI
+New workspace component pattern (mirror CGMS):
+
+apps/web/components/naac-iqac-module/naac-workspace.tsx — central page switcher
+
+apps/web/services/naac-iqac.ts — API client (base = '/v1/naac-iqac')
+
+apps/web/types/naac-iqac.ts
+
+Phase 1 UI priorities:
+
+Dashboard — overall readiness %, 7 criterion bars, pending docs/evidence/dept/faculty cards, upcoming deadlines, publication/extension counts
+
+Evidence Repository — searchable table with filters (criterion, metric, year, dept); tag create/edit modal; includes governance tags in results
+
+Document Vault — upload with mandatory tagging fields (academic year, criterion, metric, dept, activity)
+
+AQAR Management — list yearly AQARs; detail view with section tabs; "Sync from ERP" button per section
+
+Criteria Management — read-only criteria tree + admin metric add/edit
+
+Department Portal — HOD dashboard with submission forms (activities, seminars, evidence upload)
+
+Faculty/Student Achievements — submission forms with evidence required
+
+MoU Management — CRUD with document upload and activity log
+
+IQAC Activities — embedded summary + deep links to /admin/governance/meetings and ATR
+
+DVV Readiness — missing evidence/metrics/departments/faculty checklist
+
+Calendar — month view of NAAC deadlines
+
+Reports — evidence index export, criterion-wise pack
+
+Thin route pages under apps/web/app/admin/naac/**/page.tsx (one per nav child).
+
+ERP Auto-Pull (Phase 1 aggregators)
+naac-aggregator.service.ts provides read-only counts for AQAR sync and dashboard:
+
+Criterion
+
+Source
+
+Metric examples
+
+1
+
+Program, Course, academic subjects
+
+programme count, course count
+
+2
+
+Admissions applications, exam results
+
+intake, pass %
+
+3
+
+StaffPublication, governance events
+
+publication count, extension events
+
+4
+
+Infrastructure rooms/labs (if available)
+
+lab count, classroom count
+
+5
+
+Student records, scholarships (stub)
+
+enrollment, placement stub
+
+6
+
+Governance committees, meetings, ATR
+
+committee count, meeting count, ATR completion %
+
+7
+
+Best practices submissions (NIMS)
+
+practice count
+
+Aggregators return { value, source, asOf } — stored in AQAR section content on sync. Missing modules return null with pending: true (feeds DVV).
+
+Governance Integration (no duplication)
+naac-integration.service.ts:
+
+Inject GovernanceNaacService, GovernanceMeetingService, GovernanceAtrService, GovernanceCommitteeService
+
+listGovernanceEvidence() — map GovernanceNaacTag rows into unified evidence DTO
+
+getIqacSummary() — IQAC committee meetings, open ATRs, recent MoM
+
+Criterion 6 readiness derives from CGMS performance snapshots where available
+
+Fix existing web/API mismatches in governance NAAC as a side fix (alias GET /governance/naac/evidence → tags, or update web client) — low risk, prevents confusion.
+
+Implementation Sequence
+Work proceeds in 6 todos (same cadence as CGMS plan):
+
+Todo 1: schema-permissions
+Add all naac schema models + migration SQL
+
+Permissions in seed + both permission registries
+
+ADMIN_NAV entry + route permission rules
+
+Seed criteria/metrics + default settings
+
+Todo 2: api-foundation
+NaacIqacModule registered in app.module
+
+Dashboard, criteria, evidence tag CRUD + search, vault upload
+
+Governance evidence aggregation in evidence service
+
+Todo 3: aqar-engine
+AQAR + section models API
+
+ERP aggregator service (stubs with real queries where data exists)
+
+AQAR sync endpoint
+
+Todo 4: achievements-mou
+Faculty/student achievement APIs with mandatory evidence
+
+MoU + activity CRUD
+
+Staff portal controller basics
+
+Todo 5: department-iqac-dvv
+Department submission portal (admin + staff)
+
+IQAC integration (governance read delegation)
+
+Calendar CRUD
+
+DVV readiness computation
+
+Todo 6: web-reports
+Full admin UI (workspace + all Phase 1 pages)
+
+Staff portal page
+
+Reports export
+
+Update compliance cross-link; governance NAAC redirect banner
+
+Verification
+Script: apps/api/scripts/verify-naac-iqac.ts — login, create vault upload with tags, search evidence, create AQAR 2026, sync section, check dashboard readiness
+
+npm script: verify:naac-iqac
+
+Manual: HOD login submits dept data; faculty submits publication with evidence; dashboard shows criterion scores
+
+Files Most Touched
+Layer
+
+Primary files
+
+Schema
+
+apps/api/prisma/schema.prisma
+
+API
+
+apps/api/src/modules/naac-iqac/**
+
+Seed
+
+apps/api/prisma/seed.ts, seeds/naac-metrics.json
+
+Permissions
+
+Both permission-registry.ts files
+
+Nav
+
+apps/web/config/navigation.ts
+
+Web
+
+apps/web/app/admin/naac/**, components/naac-iqac-module/**
+
+Out of Scope (Phase 2)
+SSR Builder (5-year cycles)
+
+AI AQAR/SSR draft generation
+
+AI evidence finder and criterion mapping suggestions
+
+Full NAAC 4.0 metric handbook seed (Phase 1 seeds representative metrics; admin can add more)
+
+Migrating all legacy /uploads/ paths to StorageService (evidence resolver handles both)
+
+Notice For Interview
+
+Add naac Prisma models, migration SQL, seed criteria/metrics, permissions in seed + both registries, ADMIN_NAV + route rules
+Create NaacIqacModule with dashboard, criteria, evidence tag CRUD/search, vault upload, governance evidence aggregation
+Implement AQAR + sections API, ERP aggregator service, AQAR sync endpoint with auto-pull hooks
+Build faculty/student achievement APIs, MoU + activities CRUD, staff portal controller endpoints
+Department submission portal, IQAC governance integration, calendar, DVV readiness computation
+Full admin workspace UI (all Phase 1 pages), staff portal, reports export, compliance cross-link updates
+139 x 12
+
+
+
+nfzJny5rrY3Q
+If there is meeting of any particular committee or two or more committee we have to generate attendacne sheet for the meeting so please give the provision to generate attendance sheet pdf to print nad it should allow to update the committee members also 
+Enhance this page and how to generate demand ? is that fee structure is already assigned to all the students ? the Monthly Fee and Admission Fee ? 

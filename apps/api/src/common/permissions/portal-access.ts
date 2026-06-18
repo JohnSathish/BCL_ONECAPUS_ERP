@@ -38,6 +38,12 @@ export const STUDENT_PORTAL_ROLES = new Set(['student']);
 
 export const LIBRARY_DESK_ROLES = new Set(['library-operator']);
 
+export const PRINCIPAL_DESK_ROLES = new Set([
+  'principal',
+  'vice-principal',
+  'erp-administrator',
+]);
+
 export const PARENT_PORTAL_ROLES = new Set(['parent']);
 
 export function canAccessLibraryDesk(
@@ -46,6 +52,14 @@ export function canAccessLibraryDesk(
 ) {
   if (roles.some((role) => LIBRARY_DESK_ROLES.has(role))) return true;
   return permissions.includes('library:access-desk');
+}
+
+export function canAccessPrincipalDesk(
+  roles: string[],
+  permissions: string[] = [],
+) {
+  if (roles.some((role) => PRINCIPAL_DESK_ROLES.has(role))) return true;
+  return permissions.includes('principal-desk:access');
 }
 
 export const PLATFORM_PORTAL_ROLES = new Set(['platform-admin']);
@@ -134,6 +148,12 @@ export function canAccessPath(
   if (path.startsWith('/library-desk')) {
     return (
       canAccessLibraryDesk(roles, permissions) ||
+      canAccessAdminPortal(roles, permissions)
+    );
+  }
+  if (path.startsWith('/principal-desk')) {
+    return (
+      canAccessPrincipalDesk(roles, permissions) ||
       canAccessAdminPortal(roles, permissions)
     );
   }

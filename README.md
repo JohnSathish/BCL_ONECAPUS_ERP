@@ -52,5 +52,6 @@ Then retry `npm run db:migrate` and `npm run db:seed`.
 | ---------------------------------------------------- | ---------------------------------------------------------- |
 | [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Full module catalog, architecture, tech stack, credentials |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)           | Step-by-step demo script for Principal & staff (50–70 min) |
+| [docs/DEMO_READINESS.md](docs/DEMO_READINESS.md)     | Pre-live checklist and `npm run demo:prepare`              |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)             | Production deployment on AWS, Azure, or DigitalOcean       |
 | [docs/ACADEMIC_ENGINE.md](docs/ACADEMIC_ENGINE.md)   | NEP FYUGP registration engine                              |

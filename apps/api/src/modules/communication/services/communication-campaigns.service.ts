@@ -14,6 +14,8 @@ import type {
 import { CommunicationAudienceService } from './communication-audience.service';
 import { CommunicationTemplatesService } from './communication-templates.service';
 
+const BATCH_SIZE = 100;
+
 @Injectable()
 export class CommunicationCampaignsService {
   constructor(
@@ -117,6 +119,12 @@ export class CommunicationCampaignsService {
       );
     }
 
+    if (campaign.requiresApproval && campaign.approvalStatus !== 'APPROVED') {
+      throw new BadRequestException(
+        'Campaign requires approval before sending',
+      );
+    }
+
     await this.prisma.communicationCampaign.update({
       where: { id: campaignId },
       data: { status: 'SENDING' },
@@ -136,13 +144,74 @@ export class CommunicationCampaignsService {
       })),
     });
 
-    await this.queue.enqueueNotification({
-      jobType: 'campaign-deliver',
-      tenantId: user.tid,
-      campaignId,
-    });
+    if (recipients.length > BATCH_SIZE) {
+      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+        await this.queue.enqueueNotification({
+          jobType: 'campaign-deliver-batch',
+          tenantId: user.tid,
+          campaignId,
+          offset: i,
+          limit: BATCH_SIZE,
+        });
+      }
+    } else {
+      await this.queue.enqueueNotification({
+        jobType: 'campaign-deliver',
+        tenantId: user.tid,
+        campaignId,
+      });
+    }
 
     return { campaignId, recipientCount: recipients.length, status: 'SENDING' };
+  }
+
+  async cancel(user: JwtUser, campaignId: string) {
+    const campaign = await this.get(user.tid, campaignId);
+    if (!['DRAFT', 'SCHEDULED', 'SENDING'].includes(campaign.status)) {
+      throw new BadRequestException('Campaign cannot be cancelled');
+    }
+    return this.prisma.communicationCampaign.update({
+      where: { id: campaignId },
+      data: {
+        status: 'CANCELLED',
+        metadata: {
+          ...(campaign.metadata as object),
+          cancelledAt: new Date().toISOString(),
+        },
+      },
+    });
+  }
+
+  async retryDelivery(user: JwtUser, logId: string) {
+    const log = await this.prisma.communicationDeliveryLog.findFirst({
+      where: { id: logId, tenantId: user.tid, status: 'FAILED' },
+    });
+    if (!log?.campaignId)
+      throw new NotFoundException('Failed delivery log not found');
+
+    await this.queue.enqueueNotification({
+      jobType: 'campaign-deliver-retry',
+      tenantId: user.tid,
+      campaignId: log.campaignId,
+      recipientId: log.recipientId,
+      channel: log.channel,
+    });
+    return { logId, status: 'QUEUED' };
+  }
+
+  async sendScheduled(
+    tenantId: string,
+    campaignId: string,
+    systemUserId?: string,
+  ) {
+    const campaign = await this.get(tenantId, campaignId);
+    if (campaign.status !== 'SCHEDULED') return null;
+
+    const user = {
+      tid: tenantId,
+      sub: systemUserId ?? campaign.createdById ?? tenantId,
+    } as JwtUser;
+    return this.send(user, campaignId);
   }
 
   recipients(tenantId: string, campaignId: string) {
@@ -179,6 +248,7 @@ export class CommunicationCampaignsService {
   }
 
   async dashboard(tenantId: string) {
+    // Legacy shape kept for backward compatibility; extended fields via CommunicationDashboardService
     const [
       templates,
       campaigns,

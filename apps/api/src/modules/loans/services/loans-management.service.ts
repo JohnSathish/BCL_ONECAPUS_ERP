@@ -158,16 +158,23 @@ export class LoansManagementService {
   async searchStaff(tenantId: string, q?: string) {
     if (!q?.trim()) return [];
     const term = q.trim();
+    const tokens = term.split(/\s+/).filter(Boolean);
+    const tokenClauses = tokens.map((token) => ({
+      OR: [
+        { fullName: { contains: token, mode: 'insensitive' as const } },
+        { employeeCode: { contains: token, mode: 'insensitive' as const } },
+        { shortCode: { contains: token, mode: 'insensitive' as const } },
+        { mobile: { contains: token } },
+        { email: { contains: token, mode: 'insensitive' as const } },
+      ],
+    }));
+
     return this.prisma.staffProfile.findMany({
       where: {
         tenantId,
         deletedAt: null,
         status: 'ACTIVE',
-        OR: [
-          { fullName: { contains: term, mode: 'insensitive' } },
-          { employeeCode: { contains: term, mode: 'insensitive' } },
-          { mobile: { contains: term } },
-        ],
+        ...(tokenClauses.length ? { AND: tokenClauses } : {}),
       },
       select: {
         id: true,

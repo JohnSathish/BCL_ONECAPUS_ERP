@@ -30,6 +30,7 @@ import {
   createGovernanceMember,
   deactivateGovernanceMember,
   downloadGovernanceImportTemplate,
+  fetchCommitteeComposition,
   fetchCommitteeMemberHistory,
   fetchGovernanceCommittees,
   fetchGovernanceConstants,
@@ -43,6 +44,14 @@ import type { StaffListItem } from '@/types/staff';
 import { formatDisplayDate } from '@/utils/format-date';
 import { cn } from '@/utils/cn';
 import { apiErrorMessage } from '@/utils/api-error';
+import {
+  CommitteeMemberAddPanel,
+  MEMBER_TYPE_OPTIONS,
+  buildCreateMemberPayload,
+  defaultAddMemberForm,
+  isAddFormValid,
+  type AddMemberFormState,
+} from '@/components/governance-module/committee-member-add-panel';
 
 const ROLE_LABELS: Record<string, string> = {
   CHAIRPERSON: 'Chairperson',
@@ -51,16 +60,31 @@ const ROLE_LABELS: Record<string, string> = {
   MEMBER: 'Member',
   MEMBER_SECRETARY: 'Member Secretary',
   COORDINATOR: 'Coordinator',
-  EX_OFFICIO: 'Ex Officio',
-  STUDENT_REPRESENTATIVE: 'Student Representative',
-  EXTERNAL_EXPERT: 'External Expert',
+  EX_OFFICIO: 'Ex-Officio Member',
+  STUDENT_REPRESENTATIVE: 'Student Member',
+  EXTERNAL_EXPERT: 'External Member',
+  PARENT_REPRESENTATIVE: 'Parent Member',
+  ALUMNI_REPRESENTATIVE: 'Alumni Member',
+  INDUSTRY_EXPERT: 'Industry Expert',
+  LEGAL_EXPERT: 'Legal Expert',
+  SPECIAL_INVITEE: 'Special Invitee',
   OBSERVER: 'Observer',
 };
+
+const MEMBER_TYPE_LABELS = Object.fromEntries(
+  MEMBER_TYPE_OPTIONS.map((o) => [o.value, o.label]),
+) as Record<string, string>;
 
 const SELECT_CLASS = 'mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm';
 
 function roleLabel(role: string) {
   return ROLE_LABELS[role] ?? role.replace(/_/g, ' ');
+}
+
+function memberTypeLabel(type?: string | null, isExternal?: boolean) {
+  if (type && MEMBER_TYPE_LABELS[type]) return MEMBER_TYPE_LABELS[type];
+  if (isExternal) return 'External Member';
+  return 'Internal Staff';
 }
 
 function StaffSearchPicker({
@@ -176,10 +200,7 @@ export function CommitteeMembersWorkspace() {
   const [filterQ, setFilterQ] = useState('');
 
   const [committeeId, setCommitteeId] = useState('');
-  const [selectedStaff, setSelectedStaff] = useState<StaffListItem | null>(null);
-  const [role, setRole] = useState('MEMBER');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [addForm, setAddForm] = useState<AddMemberFormState>(defaultAddMemberForm());
 
   const [viewMember, setViewMember] = useState<GovernanceCommitteeMember | null>(null);
   const [editMember, setEditMember] = useState<GovernanceCommitteeMember | null>(null);
@@ -218,26 +239,26 @@ export function CommitteeMembersWorkspace() {
     queryFn: () => fetchCommitteeMemberHistory(historyCommitteeId!),
     enabled: Boolean(historyCommitteeId),
   });
+  const compositionQ = useQuery({
+    queryKey: ['governance', 'composition', committeeId || filterCommittee],
+    queryFn: () => fetchCommitteeComposition(committeeId || filterCommittee),
+    enabled: Boolean(committeeId || filterCommittee),
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['governance'] });
   };
 
   const createMut = useMutation({
-    mutationFn: () =>
-      createGovernanceMember(committeeId, {
-        staffProfileId: selectedStaff!.id,
-        displayName: selectedStaff!.fullName,
-        role,
-        joiningDate: startDate || undefined,
-        endDate: endDate || undefined,
-      }),
+    mutationFn: () => {
+      const payload = buildCreateMemberPayload(committeeId, addForm);
+      if (!payload) throw new Error('Incomplete member details');
+      return createGovernanceMember(committeeId, payload);
+    },
     onSuccess: () => {
       setError('');
       setMessage('Member added successfully.');
-      setSelectedStaff(null);
-      setStartDate('');
-      setEndDate('');
+      setAddForm(defaultAddMemberForm());
       invalidate();
     },
     onError: (e) => setError(apiErrorMessage(e, 'Unable to add member.')),
@@ -268,13 +289,18 @@ export function CommitteeMembersWorkspace() {
   });
 
   const replaceMut = useMutation({
-    mutationFn: () =>
-      replaceGovernanceMember(replaceMember!.id, {
-        staffProfileId: replaceStaff!.id,
+    mutationFn: () => {
+      const isExOfficio =
+        replaceMember!.memberType === 'EX_OFFICIO' || Boolean(replaceMember!.exOfficioPosition);
+      return replaceGovernanceMember(replaceMember!.id, {
+        staffProfileId: isExOfficio ? undefined : replaceStaff!.id,
+        memberType: replaceMember!.memberType ?? undefined,
+        exOfficioPosition: replaceMember!.exOfficioPosition ?? undefined,
         role: replaceRole,
-      }),
+      });
+    },
     onSuccess: () => {
-      setMessage('Member replaced successfully.');
+      setMessage('Member replaced successfully. Previous tenure preserved in history.');
       setReplaceMember(null);
       setReplaceStaff(null);
       invalidate();
@@ -285,6 +311,14 @@ export function CommitteeMembersWorkspace() {
   const committees = committeesQ.data?.items ?? [];
   const members = membersQ.data?.items ?? [];
   const roles = constantsQ.data?.memberRoles ?? Object.keys(ROLE_LABELS);
+  const exOfficioPositions = constantsQ.data?.exOfficioPositions ?? [
+    'PRINCIPAL',
+    'VICE_PRINCIPAL',
+    'IQAC_COORDINATOR',
+    'DEAN',
+    'REGISTRAR',
+  ];
+  const composition = compositionQ.data;
 
   const stats = statsQ.data;
 
@@ -344,56 +378,37 @@ export function CommitteeMembersWorkspace() {
           <CardTitle className="text-base">Add committee member</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label>Committee</Label>
-              <select
-                className={SELECT_CLASS}
-                value={committeeId}
-                onChange={(e) => setCommitteeId(e.target.value)}
-              >
-                <option value="">Select committee</option>
-                {committees.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Search staff</Label>
-              <StaffSearchPicker value={selectedStaff} onSelect={setSelectedStaff} />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <select
-                className={SELECT_CLASS}
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                {roles.map((r) => (
-                  <option key={r} value={r}>
-                    {roleLabel(r)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>From date</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>To date</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
+          <div>
+            <Label>Committee</Label>
+            <select
+              className={SELECT_CLASS}
+              value={committeeId}
+              onChange={(e) => {
+                setCommitteeId(e.target.value);
+                if (e.target.value) setFilterCommittee(e.target.value);
+              }}
+            >
+              <option value="">Select committee</option>
+              {committees.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {selectedStaff ? <StaffInfoPanel staff={selectedStaff} /> : null}
+          <CommitteeMemberAddPanel
+            form={addForm}
+            onChange={setAddForm}
+            roles={roles}
+            exOfficioPositions={exOfficioPositions}
+            roleLabel={roleLabel}
+          />
 
           <div className="flex flex-wrap gap-2">
             <Button
               onClick={() => createMut.mutate()}
-              disabled={createMut.isPending || !committeeId || !selectedStaff}
+              disabled={createMut.isPending || !committeeId || !isAddFormValid(addForm)}
             >
               Add member
             </Button>
@@ -404,6 +419,75 @@ export function CommitteeMembersWorkspace() {
           </div>
         </CardContent>
       </Card>
+
+      {composition ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Committee composition — {composition.committeeName}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                { label: 'Total Members', value: composition.totalMembers },
+                { label: 'Internal Staff', value: composition.internalStaff },
+                { label: 'External Members', value: composition.externalMembers },
+                { label: 'Student Members', value: composition.studentMembers },
+                { label: 'Ex-Officio', value: composition.exOfficio },
+              ].map((tile) => (
+                <div
+                  key={tile.label}
+                  className="rounded-lg border bg-muted/30 px-3 py-2 text-center"
+                >
+                  <p className="text-xs text-muted-foreground">{tile.label}</p>
+                  <p className="text-2xl font-semibold tabular-nums">{tile.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {composition.naacCompliance.applicable ? (
+              <div
+                className={cn(
+                  'rounded-lg border px-4 py-3',
+                  composition.naacCompliance.complete
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : 'border-amber-500/40 bg-amber-500/5',
+                )}
+              >
+                <p className="font-medium">
+                  NAAC compliance — {composition.naacCompliance.ruleLabel}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {composition.naacCompliance.message}
+                </p>
+                <ul className="mt-3 space-y-1 text-sm">
+                  {(composition.naacCompliance.checks ?? []).map((check) => (
+                    <li key={check.id} className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          'inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold',
+                          check.passed
+                            ? 'bg-emerald-500/20 text-emerald-700'
+                            : 'bg-red-500/20 text-red-700',
+                        )}
+                      >
+                        {check.passed ? '✓' : '✗'}
+                      </span>
+                      <span>
+                        {check.label}
+                        {check.detail ? (
+                          <span className="text-muted-foreground"> ({check.detail})</span>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Filters + table */}
       <Card>
@@ -443,10 +527,10 @@ export function CommitteeMembersWorkspace() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                <th className="px-4 py-3">Staff</th>
-                <th className="px-4 py-3">Employee ID</th>
+                <th className="px-4 py-3">Member</th>
+                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Committee</th>
-                <th className="px-4 py-3">Department</th>
+                <th className="px-4 py-3">Organization / Dept</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Period</th>
                 <th className="px-4 py-3">Status</th>
@@ -458,13 +542,25 @@ export function CommitteeMembersWorkspace() {
                 <tr key={m.id} className="border-b align-middle hover:bg-muted/20">
                   <td className="px-4 py-3 font-medium">
                     {m.displayName}
+                    {m.employeeCode ? (
+                      <span className="ml-1 font-mono text-xs text-muted-foreground">
+                        ({m.employeeCode})
+                      </span>
+                    ) : null}
                     {m.replacementRequired ? (
                       <span className="ml-2 text-xs text-amber-600">Needs replacement</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">{m.employeeCode ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {memberTypeLabel(m.memberType, m.isExternal)}
+                    {m.exOfficioPosition ? (
+                      <span className="block text-muted-foreground">
+                        {m.exOfficioPosition.replace(/_/g, ' ')}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">{m.committeeName ?? '—'}</td>
-                  <td className="px-4 py-3">{m.departmentName ?? '—'}</td>
+                  <td className="px-4 py-3">{m.organization ?? m.departmentName ?? '—'}</td>
                   <td className="px-4 py-3">{roleLabel(m.role)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {formatDisplayDate(m.joiningDate)} — {formatDisplayDate(m.endDate)}
@@ -540,21 +636,45 @@ export function CommitteeMembersWorkspace() {
           {viewMember ? (
             <dl className="grid gap-2 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-muted-foreground">Employee ID</dt>
-                <dd>{viewMember.employeeCode ?? '—'}</dd>
+                <dt className="text-muted-foreground">Member type</dt>
+                <dd>{memberTypeLabel(viewMember.memberType, viewMember.isExternal)}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Role</dt>
                 <dd>{roleLabel(viewMember.role)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Department</dt>
-                <dd>{viewMember.departmentName ?? '—'}</dd>
+                <dt className="text-muted-foreground">Employee ID</dt>
+                <dd>{viewMember.employeeCode ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Organization / Department</dt>
+                <dd>{viewMember.organization ?? viewMember.departmentName ?? '—'}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Designation</dt>
                 <dd>{viewMember.designation ?? '—'}</dd>
               </div>
+              {viewMember.exOfficioPosition ? (
+                <div>
+                  <dt className="text-muted-foreground">Ex-officio position</dt>
+                  <dd>{viewMember.exOfficioPosition.replace(/_/g, ' ')}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="text-muted-foreground">Mobile</dt>
+                <dd>{viewMember.mobile ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Email</dt>
+                <dd>{viewMember.email ?? '—'}</dd>
+              </div>
+              {viewMember.areaOfExpertise ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-muted-foreground">Expertise</dt>
+                  <dd>{viewMember.areaOfExpertise}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-muted-foreground">From</dt>
                 <dd>{formatDisplayDate(viewMember.joiningDate)}</dd>
@@ -630,15 +750,27 @@ export function CommitteeMembersWorkspace() {
             <DialogTitle>Replace member</DialogTitle>
             <DialogDescription>
               {replaceMember
-                ? `Replacing ${replaceMember.displayName} on ${replaceMember.committeeName}. The previous member will be marked as Replaced with today as end date.`
+                ? `Replacing ${replaceMember.displayName} on ${replaceMember.committeeName}. Previous assignment is marked Replaced — history is retained for NAAC audit.`
                 : null}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label>New member — search staff</Label>
-              <StaffSearchPicker value={replaceStaff} onSelect={setReplaceStaff} />
-            </div>
+            {replaceMember?.memberType === 'EX_OFFICIO' || replaceMember?.exOfficioPosition ? (
+              <p className="text-sm text-muted-foreground">
+                Ex-officio position:{' '}
+                <strong>
+                  {(replaceMember.exOfficioPosition ?? 'PRINCIPAL').replace(/_/g, ' ')}
+                </strong>{' '}
+                — system will assign the current office holder.
+              </p>
+            ) : (
+              <>
+                <div>
+                  <Label>New member — search staff</Label>
+                  <StaffSearchPicker value={replaceStaff} onSelect={setReplaceStaff} />
+                </div>
+              </>
+            )}
             <div>
               <Label>Role</Label>
               <select
@@ -661,7 +793,12 @@ export function CommitteeMembersWorkspace() {
             </Button>
             <Button
               onClick={() => replaceMut.mutate()}
-              disabled={replaceMut.isPending || !replaceStaff}
+              disabled={
+                replaceMut.isPending ||
+                (!replaceMember?.exOfficioPosition &&
+                  replaceMember?.memberType !== 'EX_OFFICIO' &&
+                  !replaceStaff)
+              }
             >
               Save replacement
             </Button>

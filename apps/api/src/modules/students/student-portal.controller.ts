@@ -25,6 +25,7 @@ import {
 } from './dto/student-portal-profile.dto';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
 import { StudentPortalService } from './services/student-portal.service';
+import { StudentLeaveService } from './services/student-leave.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -35,6 +36,7 @@ export class StudentPortalController {
   constructor(
     private readonly portal: StudentPortalService,
     private readonly portalProfile: StudentPortalProfileService,
+    private readonly studentLeave: StudentLeaveService,
   ) {}
 
   @Get('me')
@@ -141,5 +143,40 @@ export class StudentPortalController {
   @RequireAnyPermission('student:portal:self')
   getSessions(@CurrentUser() user: JwtUser) {
     return this.portalProfile.listDeviceSessions(user.tid, user.sub);
+  }
+
+  @Get('leave/types')
+  @RequireAnyPermission(
+    'student:portal:self',
+    'principal-desk:access',
+    'students:read',
+  )
+  listLeaveTypes(@CurrentUser() user: JwtUser) {
+    return this.studentLeave.listTypes(user.tid);
+  }
+
+  @Post('leave/applications')
+  @RequireAnyPermission('student:portal:self')
+  applyLeave(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    dto: {
+      leaveTypeId: string;
+      fromDate: string;
+      toDate: string;
+      reason?: string;
+    },
+  ) {
+    return this.studentLeave.apply(user, dto);
+  }
+
+  @Get('me/leave/applications')
+  @RequireAnyPermission('student:portal:self')
+  myLeaveApplications(@CurrentUser() user: JwtUser) {
+    return this.portal
+      .resolveStudent(user)
+      .then((student) =>
+        this.studentLeave.listForStudent(user.tid, student.id),
+      );
   }
 }

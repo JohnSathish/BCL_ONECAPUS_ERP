@@ -208,7 +208,8 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
                   <strong className="text-[#0F172A]">{ops.institution.academicYear}</strong>
                 </span>
                 <span>
-                  Semester: <strong className="text-[#0F172A]">{ops.institution.semester}</strong>
+                  {(ops.institution.activeSemesters?.length ?? 0) > 1 ? 'Semesters' : 'Semester'}:{' '}
+                  <strong className="text-[#0F172A]">{ops.institution.semester}</strong>
                 </span>
                 {ops.institution.cycle ? (
                   <span>
@@ -271,7 +272,7 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
           className="space-y-6"
         >
           {/* Section 2 — KPI Cards */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <KpiCard
               label="Admissions"
               value={String(ops.admissions?.pendingReview ?? ops.admissions?.submitted ?? 0)}
@@ -284,11 +285,11 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
             <KpiCard
               label="Today's Collection"
               value={money(ops.finance.todayCollection)}
+              subValue={`${money(ops.finance.monthCollection)} this month`}
               hint={`${pct(ops.finance.collectionRate)} overall collection rate`}
               icon={IndianRupee}
               tone="green"
               href="/admin/fees/collections"
-              sparkline={ops.finance.collectionSparkline}
               trend={collectionTrend}
             />
             <KpiCard

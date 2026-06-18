@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout } from '@/services/auth';
+import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
@@ -36,6 +37,7 @@ export function EnterpriseTopbar({
   portalRole?: 'student' | 'staff' | 'admin' | 'shift';
 }) {
   const router = useRouter();
+  const authReady = useAuthQueryEnabled();
   const session = useAuthStore((s) => s.session);
   const sidebarCollapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
@@ -63,7 +65,7 @@ export function EnterpriseTopbar({
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 flex h-16 min-h-16 w-full max-w-full shrink-0 items-center overflow-hidden border-b border-border/60 px-4 shadow-sm backdrop-blur-xl sm:px-5 lg:px-6',
+        'z-30 flex h-16 min-h-16 w-full max-w-full shrink-0 items-center overflow-hidden border-b border-border/60 px-4 shadow-sm backdrop-blur-xl sm:px-5 lg:px-6',
         portalRole === 'staff'
           ? 'bg-gradient-to-r from-primary/10 via-topbar/90 to-accent/10 md:bg-topbar/85'
           : 'bg-topbar/85',
@@ -138,7 +140,7 @@ export function EnterpriseTopbar({
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           <CommandPalette />
           <CampusSwitcher />
-          <NotificationPanel />
+          {authReady ? <NotificationPanel /> : null}
           <ThemeToggle />
 
           {portalRole === 'student' ? (

@@ -66,7 +66,10 @@ import { LoansModule } from './modules/loans/loans.module';
 import { StudentReportsModule } from './modules/student-reports/student-reports.module';
 import { LicensingModule } from './modules/licensing/licensing.module';
 import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
+import { CampusAccessModule } from './modules/campus-access/campus-access.module';
 import { BackupEngineModule } from './modules/backup-engine/backup-engine.module';
+import { PrincipalDeskModule } from './modules/principal-desk/principal-desk.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 
 @Module({
   imports: [
@@ -117,6 +120,7 @@ import { BackupEngineModule } from './modules/backup-engine/backup-engine.module
     CertificatesModule,
     QuestionBankModule,
     LibraryModule,
+    CampusAccessModule,
     FrontOfficeModule,
     GovernanceModule,
     NaacIqacModule,
@@ -134,6 +138,8 @@ import { BackupEngineModule } from './modules/backup-engine/backup-engine.module
     ObeModule,
     RealtimeModule,
     AdministrationModule,
+    PrincipalDeskModule,
+    MarketingModule,
     BackupEngineModule,
   ],
   controllers: [HealthController],

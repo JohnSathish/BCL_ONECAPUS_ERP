@@ -19,7 +19,14 @@ import { LoginPageShell } from './login-page-shell';
 import { ApiError, apiErrorMessage, isApiUnavailableError } from '@/utils/api-error';
 import { loginSchema, type LoginFormValues } from './login-schema';
 
-export function LoginForm() {
+type LoginFormProps = {
+  /** Override default role-based home after successful login. */
+  postLoginPath?: string;
+  /** Full page navigation — reliable on kiosk gate PCs (avoids RSC client fetch). */
+  hardRedirect?: boolean;
+};
+
+export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProps) {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const setPrefs = useAuthStore((s) => s.setPrefs);
@@ -134,7 +141,12 @@ export function LoginForm() {
         setSession(session);
         setPrefs({ rememberMe: values.rememberMe });
         tokenRefreshManager.scheduleProactiveRefresh(session);
-        router.replace(resolveHomePath(session.user.roles));
+        const destination = postLoginPath ?? resolveHomePath(session.user.roles);
+        if (hardRedirect) {
+          window.location.assign(destination);
+        } else {
+          router.replace(destination);
+        }
       } catch (err) {
         if (isApiUnavailableError(err)) {
           setError(
@@ -175,7 +187,16 @@ export function LoginForm() {
         void loadChallenge();
       }
     },
-    [challenge, loadChallenge, resetField, router, setSession, setPrefs],
+    [
+      challenge,
+      hardRedirect,
+      loadChallenge,
+      postLoginPath,
+      resetField,
+      router,
+      setSession,
+      setPrefs,
+    ],
   );
 
   const fillDemoCredentials = useCallback(

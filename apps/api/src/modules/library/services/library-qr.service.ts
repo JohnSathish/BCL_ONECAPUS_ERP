@@ -18,6 +18,9 @@ export class LibraryQrService {
       return { code: trimmed, entryMethod: 'RFID' as const };
 
     const body = trimmed.slice(QR_PREFIX.length);
+    if (body.toUpperCase().startsWith('C:')) {
+      return { code: body.slice(2).trim(), entryMethod: 'QR' as const };
+    }
     if (body.toUpperCase().startsWith('E:')) {
       return { code: body.slice(2).trim(), entryMethod: 'QR' as const };
     }
@@ -35,8 +38,28 @@ export class LibraryQrService {
     return `${QR_PREFIX}V:${passNumber}`;
   }
 
+  buildCopyPayload(barcode: string) {
+    return `${QR_PREFIX}C:${barcode}`;
+  }
+
   qrImageUrl(payload: string) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(payload)}`;
+  }
+
+  async getCopyQr(tenantId: string, copyId: string) {
+    const copy = await this.prisma.libraryBookCopy.findFirst({
+      where: { tenantId, id: copyId },
+      include: { book: { select: { title: true } } },
+    });
+    if (!copy) throw new NotFoundException('Copy not found');
+    const payload = this.buildCopyPayload(copy.barcode);
+    return {
+      copyId: copy.id,
+      barcode: copy.barcode,
+      bookTitle: copy.book.title,
+      payload,
+      qrImageUrl: this.qrImageUrl(payload),
+    };
   }
 
   async getStudentQr(user: JwtUser) {

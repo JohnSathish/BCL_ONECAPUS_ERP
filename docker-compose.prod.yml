@@ -8,6 +8,10 @@ services:
   postgres:
     profiles:
       - local-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nep_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-nep_erp}
 
   api:
     environment:
@@ -31,6 +35,12 @@ services:
       PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-api}
 
   web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        NEXT_PUBLIC_LOGIN_HOST: ${NEXT_PUBLIC_LOGIN_HOST:-erp.donboscocollege.ac.in}
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}

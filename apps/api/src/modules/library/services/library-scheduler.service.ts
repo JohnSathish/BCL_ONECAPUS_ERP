@@ -26,6 +26,7 @@ export class LibrarySchedulerService {
     for (const tenant of tenants) {
       try {
         await this.fines.accrueDailyRunningFines(tenant.id);
+        await this.notifications.processDueTomorrowReminders(tenant.id);
         await this.notifications.processOverdueReminders(tenant.id);
       } catch (err) {
         this.logger.warn(

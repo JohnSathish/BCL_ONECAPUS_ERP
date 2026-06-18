@@ -4,34 +4,41 @@ import { useEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { getApiBaseUrl } from '@/lib/http/env';
-import type { OccupancySnapshot } from '@/types/library';
+import { getRealtimeOrigin } from '@/lib/http/env';
+import type { LibraryActivityItem, OccupancySnapshot, ScanResult } from '@/types/library';
 
-function realtimeOrigin() {
-  const base = getApiBaseUrl();
-  if (base.startsWith('/')) {
-    return typeof window !== 'undefined' ? window.location.origin : '';
-  }
-  return base.replace(/\/api\/?$/, '');
-}
+export type LibraryRealtimeHandlers = {
+  onOccupancy?: (snapshot: OccupancySnapshot) => void;
+  onCirculationActivity?: (item: LibraryActivityItem) => void;
+  onScanResult?: (result: import('@/types/library').ScanResult) => void;
+};
 
-export function useLibraryRealtime(onOccupancy?: (snapshot: OccupancySnapshot) => void) {
+export function useLibraryRealtime(handlers?: LibraryRealtimeHandlers) {
   const { session, isReady } = useAuth();
   const socketRef = useRef<Socket | null>(null);
-  const handlerRef = useRef(onOccupancy);
-  handlerRef.current = onOccupancy;
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
 
   useEffect(() => {
     if (!isReady || !session?.accessToken) return;
 
-    const socket = io(`${realtimeOrigin()}/realtime`, {
+    const socket = io(`${getRealtimeOrigin()}/realtime`, {
       auth: { token: session.accessToken },
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
     });
     socketRef.current = socket;
 
     socket.on('library:occupancy:updated', (payload: OccupancySnapshot) => {
-      handlerRef.current?.(payload);
+      handlersRef.current?.onOccupancy?.(payload);
+    });
+
+    socket.on('library:circulation:activity', (payload: LibraryActivityItem) => {
+      handlersRef.current?.onCirculationActivity?.(payload);
+    });
+
+    socket.on('library:scan:result', (payload: ScanResult) => {
+      handlersRef.current?.onScanResult?.(payload);
     });
 
     return () => {

@@ -38,10 +38,56 @@ export class UserNotificationsService {
     });
   }
 
-  markAllRead(user: JwtUser) {
+  async markAllRead(user: JwtUser) {
     return this.prisma.userNotification.updateMany({
       where: { tenantId: user.tid, userId: user.sub, readAt: null },
       data: { readAt: new Date() },
+    });
+  }
+
+  async dismiss(user: JwtUser, id: string) {
+    const row = await this.prisma.userNotification.findFirst({
+      where: { id, tenantId: user.tid, userId: user.sub },
+    });
+    if (!row) throw new NotFoundException('Notification not found');
+    return this.prisma.userNotification.update({
+      where: { id },
+      data: { dismissedAt: new Date(), readAt: row.readAt ?? new Date() },
+    });
+  }
+
+  async archive(user: JwtUser, id: string) {
+    const row = await this.prisma.userNotification.findFirst({
+      where: { id, tenantId: user.tid, userId: user.sub },
+    });
+    if (!row) throw new NotFoundException('Notification not found');
+    return this.prisma.userNotification.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
+  }
+
+  listInbox(
+    user: JwtUser,
+    filter: 'all' | 'unread' | 'archived' = 'all',
+    limit = 50,
+  ) {
+    const where: Record<string, unknown> = {
+      tenantId: user.tid,
+      userId: user.sub,
+      dismissedAt: null,
+    };
+    if (filter === 'unread') where.readAt = null;
+    if (filter === 'archived') {
+      where.archivedAt = { not: null };
+      delete where.dismissedAt;
+    } else {
+      where.archivedAt = null;
+    }
+    return this.prisma.userNotification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 100),
     });
   }
 

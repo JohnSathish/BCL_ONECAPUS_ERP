@@ -43,7 +43,12 @@ export class CommunicationEmailService {
           : undefined,
       });
 
-      const from = this.config.get<string>('SMTP_FROM', 'noreply@demo.edu');
+      const fromAddress = this.config.get<string>(
+        'SMTP_FROM',
+        'noreply@demo.edu',
+      );
+      const fromName = this.config.get<string>('SMTP_FROM_NAME');
+      const from = fromName ? `"${fromName}" <${fromAddress}>` : fromAddress;
       const info = await transport.sendMail({
         from,
         to: input.to,

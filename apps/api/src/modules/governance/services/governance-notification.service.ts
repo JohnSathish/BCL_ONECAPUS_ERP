@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CommunicationEmailService } from '../../communication/services/communication-email.service';
+import { CommunicationDeliveryService } from '../../communication/services/communication-delivery.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { GovernanceSettingsService } from './governance-settings.service';
 import { governanceDb } from './governance-prisma.util';
@@ -13,6 +14,7 @@ export class GovernanceNotificationService {
     private readonly prisma: PrismaService,
     private readonly notifications: UserNotificationsService,
     private readonly email: CommunicationEmailService,
+    private readonly delivery: CommunicationDeliveryService,
     private readonly settings: GovernanceSettingsService,
   ) {}
 
@@ -45,11 +47,20 @@ export class GovernanceNotificationService {
       }
 
       if (cfg.notifyEmail && recipient.email) {
-        await this.email.send({
+        const result = await this.email.send({
           to: recipient.email,
           subject: `[Governance] ${notice.noticeNo ?? notice.title}`,
           html: `<p>${String(notice.body).replace(/\n/g, '<br/>')}</p>`,
           text: String(notice.body),
+        });
+        await this.delivery.logDirectSend({
+          tenantId,
+          channel: 'EMAIL',
+          status: result.ok ? 'SENT' : 'FAILED',
+          provider: result.provider,
+          providerRef: result.providerRef,
+          errorMessage: result.error,
+          metadata: { source: 'governance_notice', noticeId: notice.id },
         });
       }
     }
