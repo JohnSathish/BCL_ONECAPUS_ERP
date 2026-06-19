@@ -13,6 +13,7 @@ import type { AuthSessionResponse, AuthUserPayload } from './auth.types';
 import { LoginAttemptService } from './login-attempt.service';
 import { PermissionResolverService } from '../../common/permissions/permission-resolver.service';
 import type { DataScope } from '../../common/permissions/permission-resolver.service';
+import { isSuperAdmin } from '../../common/permissions/permission-registry';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -75,7 +76,7 @@ export class AuthService {
     userId: string,
     roles: string[],
   ): Promise<ShiftScope> {
-    if (roles.includes('college-admin')) {
+    if (isSuperAdmin(roles)) {
       return {
         shiftIds: [],
         primaryShiftId: undefined,

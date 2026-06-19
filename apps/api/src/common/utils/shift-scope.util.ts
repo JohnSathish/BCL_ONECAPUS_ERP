@@ -1,5 +1,8 @@
 import type { JwtUser } from '../decorators/current-user.decorator';
 
+/** Sentinel UUID — matches no rows when used in `{ in: [NIL_UUID] }` filters. */
+export const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
 export type ShiftScope = {
   shiftIds: string[];
   primaryShiftId?: string;
@@ -46,7 +49,7 @@ export function shiftFilter(
     return scope.activeShiftId ? { [field]: scope.activeShiftId } : undefined;
   }
   const ids = scope.activeShiftId ? [scope.activeShiftId] : scope.shiftIds;
-  if (!ids.length) return { [field]: '__none__' };
+  if (!ids.length) return { [field]: { in: [NIL_UUID] } };
   return { [field]: { in: ids } };
 }
 

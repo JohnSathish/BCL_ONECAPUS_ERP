@@ -34,12 +34,13 @@ export class DataScopeService {
   applyProgrammeScope<T extends PrismaWhere>(where: T, user: JwtUser): T {
     const scope = user.dataScope;
     if (!scope?.programmeIds?.length) return where;
+    const programFilter =
+      scope.programmeIds.length === 1
+        ? scope.programmeIds[0]
+        : { in: scope.programmeIds };
     return {
       ...where,
-      programId:
-        scope.programmeIds.length === 1
-          ? scope.programmeIds[0]
-          : { in: scope.programmeIds },
+      programVersion: { programId: programFilter },
     };
   }
 
