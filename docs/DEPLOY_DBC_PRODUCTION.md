@@ -124,7 +124,7 @@ NEXT_PUBLIC_LOGIN_HOST=erp.donboscocollege.ac.in
 STORAGE_DRIVER=local
 UPLOAD_ROOT=/data/uploads
 STORAGE_ROOT=/data/storage
-PROCESS_BACKGROUND_JOBS=api
+PROCESS_BACKGROUND_JOBS=worker
 ```
 
 ### Bootstrap production domains
