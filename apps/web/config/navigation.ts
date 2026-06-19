@@ -128,7 +128,7 @@ const QUESTION_BANK_CHILDREN: NavChild[] = [
 
 export const ADMIN_NAV: NavGroup[] = [
   {
-    label: 'Core',
+    label: 'Dashboard',
     zone: 'pin-top',
     items: [
       {
@@ -139,11 +139,85 @@ export const ADMIN_NAV: NavGroup[] = [
         permissions: [...P.dashboard],
       },
       {
-        label: 'Institution Analytics',
+        label: 'Analytics',
         href: '/admin/analytics',
         icon: BarChart3,
-        module: 'dashboard',
+        module: 'analytics',
         permissions: [...P.dashboard, 'reports:read'],
+      },
+    ],
+  },
+  {
+    label: 'Student Lifecycle',
+    zone: 'scroll',
+    items: [
+      {
+        label: 'Students',
+        icon: Users,
+        href: '/admin/students',
+        module: 'students',
+        permissions: [...P.students],
+        activePattern: '^/admin/students(?!/certificates)(?:/.*)?$',
+        children: [
+          {
+            label: 'Student Directory',
+            href: '/admin/students',
+            permissions: ['students:read'],
+            activePattern: '^/admin/students(?:/[0-9a-f-]{36}(?:/academic)?)?$',
+          },
+          {
+            label: 'Admission Management',
+            href: '/admin/admissions',
+            permissions: [...P.admissions],
+            activePattern: '^/admin/admissions',
+          },
+          { label: 'Add Student', href: '/admin/students/new', permissions: ['students:manage'] },
+          {
+            label: 'Academic Records',
+            href: '/admin/students/subject-registration',
+            permissions: ['students:manage-academic', 'students:manage'],
+          },
+          {
+            label: 'Attendance',
+            href: '/admin/academics/attendance',
+            permissions: [...P.studentAttendance],
+          },
+          {
+            label: 'Fee Management',
+            href: '/admin/fees',
+            permissions: [...P.finance],
+          },
+          {
+            label: 'Certificates',
+            href: '/admin/certificates',
+            permissions: [...P.certificates],
+          },
+          {
+            label: 'RFID / ABC ID',
+            href: '/admin/students/rfid',
+            permissions: ['students:manage'],
+          },
+          {
+            label: 'Student Promotion',
+            href: '/admin/students/promotion',
+            permissions: ['students:manage', 'academic-lifecycle:manage'],
+          },
+          {
+            label: 'Bulk Import',
+            href: '/admin/students/import',
+            permissions: ['students:import', 'students:manage'],
+          },
+          {
+            label: 'Bulk Export',
+            href: '/admin/students/export',
+            permissions: ['students:export', 'students:manage'],
+          },
+          {
+            label: 'Audit Logs',
+            href: '/admin/students/audit',
+            permissions: ['students:read', 'audit:read'],
+          },
+        ],
       },
       {
         label: 'Admissions',
@@ -181,131 +255,10 @@ export const ADMIN_NAV: NavGroup[] = [
           },
         ],
       },
-      {
-        label: 'Students',
-        icon: Users,
-        href: '/admin/students',
-        module: 'students',
-        permissions: [...P.students],
-        activePattern: '^/admin/students(?!/certificates)(?:/.*)?$',
-        children: [
-          {
-            label: 'Student Records',
-            href: '/admin/students',
-            permissions: ['students:read'],
-            activePattern: '^/admin/students(?:/[0-9a-f-]{36}(?:/academic)?)?$',
-          },
-          { label: 'Add Student', href: '/admin/students/new', permissions: ['students:manage'] },
-          {
-            label: 'Bulk Import',
-            href: '/admin/students/import',
-            permissions: ['students:import', 'students:manage'],
-          },
-          {
-            label: 'Bulk Export',
-            href: '/admin/students/export',
-            permissions: ['students:export', 'students:manage'],
-          },
-          {
-            label: 'Bulk Update',
-            href: '/admin/students/bulk-update',
-            permissions: ['students:bulk-update'],
-          },
-          {
-            label: 'Bulk Photo Upload',
-            href: '/admin/students/photos/bulk-upload',
-            permissions: ['students:photos:upload'],
-          },
-          {
-            label: 'Upload ABC IDs',
-            href: '/admin/students/abc-upload',
-            permissions: ['students:manage'],
-          },
-          {
-            label: 'Subject Registration',
-            href: '/admin/students/subject-registration',
-            permissions: ['students:manage-academic', 'students:manage'],
-          },
-          {
-            label: 'RFID Management',
-            href: '/admin/students/rfid',
-            permissions: ['students:manage'],
-          },
-          {
-            label: 'Semester Promotion',
-            href: '/admin/students/promotion',
-            permissions: ['students:manage', 'academic-lifecycle:manage'],
-          },
-          {
-            label: 'Student Transfer',
-            href: '/admin/students/transfer',
-            permissions: ['students:manage'],
-          },
-          {
-            label: 'Student Archive',
-            href: '/admin/students/archive',
-            permissions: ['students:manage'],
-          },
-          {
-            label: 'Sem 1 Migration',
-            href: '/admin/students/sem-1-migration',
-            permissions: ['students:manage'],
-          },
-          {
-            label: 'Re-Admission',
-            href: '/admin/students/readmission',
-            permissions: ['students:manage', 'admissions:manage'],
-          },
-          {
-            label: 'Student Communication',
-            href: '/admin/students/communication',
-            permissions: ['communication:read', 'communication:manage', 'students:read'],
-          },
-          {
-            label: 'Audit Logs',
-            href: '/admin/students/audit',
-            permissions: ['students:read', 'audit:read'],
-          },
-        ],
-      },
-      {
-        label: 'Academics',
-        icon: BookOpen,
-        module: 'academics',
-        permissions: [...P.academics],
-        children: [
-          { label: 'Programmes & Courses', href: '/admin/programs', permissions: [...P.academics] },
-          {
-            label: 'Curriculum Mapping',
-            href: '/admin/academic-engine',
-            permissions: ['academic-engine:read', 'academic-engine:manage'],
-          },
-          {
-            label: 'Setup Completion',
-            href: '/admin/academic-engine/curriculum-completion',
-            permissions: ['academic-engine:manage'],
-          },
-          {
-            label: 'Academic Sessions',
-            href: '/admin/academic-lifecycle',
-            permissions: ['academic-lifecycle:read', 'academic-lifecycle:manage'],
-          },
-          {
-            label: 'Semester Lifecycle',
-            href: '/admin/academic-lifecycle',
-            permissions: ['academic-lifecycle:read', 'academic-lifecycle:manage'],
-          },
-          {
-            label: 'Shift Management',
-            href: '/admin/shifts',
-            permissions: [...P.shifts, ...P.academics],
-          },
-        ],
-      },
     ],
   },
   {
-    label: 'People',
+    label: 'Staff & HR',
     zone: 'scroll',
     items: [
       {
@@ -528,9 +481,45 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Teaching & Learning',
+    label: 'Academic Operations',
     zone: 'scroll',
     items: [
+      {
+        label: 'Academics',
+        icon: BookOpen,
+        href: '/admin/programs',
+        module: 'academics',
+        permissions: [...P.academics],
+        activePattern: '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts)(?:/.*)?$',
+        children: [
+          { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
+          {
+            label: 'Curriculum',
+            href: '/admin/academic-engine',
+            permissions: ['academic-engine:read', 'academic-engine:manage'],
+          },
+          {
+            label: 'Course Master',
+            href: '/admin/programs',
+            permissions: [...P.academics],
+          },
+          {
+            label: 'Subject Mapping',
+            href: '/admin/academic-engine/curriculum-completion',
+            permissions: ['academic-engine:manage'],
+          },
+          {
+            label: 'Academic Sessions',
+            href: '/admin/academic-lifecycle',
+            permissions: ['academic-lifecycle:read', 'academic-lifecycle:manage'],
+          },
+          {
+            label: 'Shift Management',
+            href: '/admin/shifts',
+            permissions: [...P.shifts, ...P.academics],
+          },
+        ],
+      },
       {
         label: 'Timetable',
         href: '/admin/academics/timetable',
@@ -727,7 +716,7 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Examination & Results',
+    label: 'Examination',
     zone: 'scroll',
     items: [
       {
@@ -804,7 +793,7 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Finance & Library',
+    label: 'Finance',
     zone: 'scroll',
     items: [
       {
@@ -882,6 +871,12 @@ export const ADMIN_NAV: NavGroup[] = [
           { label: 'Demand Generator', href: '/admin/fees/demands', permissions: ['fees:manage'] },
         ],
       },
+    ],
+  },
+  {
+    label: 'Library',
+    zone: 'scroll',
+    items: [
       {
         label: 'Library',
         icon: Library,
@@ -977,11 +972,158 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    label: 'Governance',
+    zone: 'scroll',
+    items: [
+      {
+        label: 'Principal Desk',
+        href: '/principal-desk',
+        icon: Building2,
+        module: 'governance',
+        permissions: ['principal-desk:access'],
+      },
+      {
+        label: 'Governance',
+        icon: Shield,
+        href: '/admin/governance',
+        module: 'governance',
+        permissions: [...P.governance],
+        activePattern: '^/admin/governance(?:/.*)?$',
+        children: [
+          { label: 'Dashboard', href: '/admin/governance', permissions: [...P.governance] },
+          {
+            label: 'Committees',
+            href: '/admin/governance/committees',
+            permissions: ['governance:read', 'governance:manage'],
+          },
+          {
+            label: 'Committee Members',
+            href: '/admin/governance/members',
+            permissions: ['governance:read', 'governance:manage'],
+          },
+          {
+            label: 'Meetings',
+            href: '/admin/governance/meetings',
+            permissions: ['governance:read', 'governance:manage'],
+          },
+          {
+            label: 'Meeting Calendar',
+            href: '/admin/governance/calendar',
+            permissions: ['governance:read'],
+          },
+          {
+            label: 'Action Taken Reports',
+            href: '/admin/governance/atr',
+            permissions: ['governance:read', 'governance:manage'],
+          },
+          {
+            label: 'Notices & Circulars',
+            href: '/admin/governance/notices',
+            permissions: ['governance:read', 'governance:publish'],
+          },
+          {
+            label: 'Documents',
+            href: '/admin/governance/documents',
+            permissions: ['governance:read', 'governance:manage'],
+          },
+          {
+            label: 'Reports',
+            href: '/admin/governance/reports',
+            permissions: ['governance:reports'],
+          },
+          {
+            label: 'Settings',
+            href: '/admin/governance/settings',
+            permissions: ['governance:manage'],
+          },
+        ],
+      },
+      {
+        label: 'IQAC / NAAC',
+        icon: Award,
+        href: '/admin/naac',
+        module: 'naacIqac',
+        permissions: [...P.naacIqac],
+        activePattern: '^/admin/naac(?:/.*)?$',
+        children: [
+          { label: 'Dashboard', href: '/admin/naac', permissions: [...P.naacIqac] },
+          {
+            label: 'Criteria & Metrics',
+            href: '/admin/naac/criteria',
+            permissions: ['naac-iqac:read', 'naac-iqac:manage'],
+          },
+          {
+            label: 'Evidence Repository',
+            href: '/admin/naac/evidence',
+            permissions: ['naac-iqac:read'],
+          },
+          { label: 'Document Vault', href: '/admin/naac/vault', permissions: ['naac-iqac:manage'] },
+          { label: 'AQAR', href: '/admin/naac/aqar', permissions: ['naac-iqac:manage'] },
+          { label: 'SSR', href: '/admin/naac/reports', permissions: ['naac-iqac:reports'] },
+          { label: 'IQAC Activities', href: '/admin/naac/iqac', permissions: ['naac-iqac:read'] },
+          { label: 'Compliance', href: '/admin/naac/dvv', permissions: ['naac-iqac:reports'] },
+          { label: 'Settings', href: '/admin/naac/settings', permissions: ['naac-iqac:manage'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Communication',
+    zone: 'scroll',
+    items: [
+      {
+        label: 'Communication',
+        href: '/admin/communication',
+        icon: MessageSquare,
+        module: 'communication',
+        permissions: [...P.communication],
+        activePattern: '^/admin/communication(?:/.*)?$',
+        children: [
+          {
+            label: 'Notifications',
+            href: '/admin/communication',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Compose',
+            href: '/admin/communication/compose',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Campaigns',
+            href: '/admin/communication/campaigns',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Templates',
+            href: '/admin/communication/templates',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Audience Builder',
+            href: '/admin/communication/audience',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Analytics',
+            href: '/admin/communication/analytics',
+            permissions: [...P.communication],
+          },
+          {
+            label: 'Settings',
+            href: '/admin/communication/settings',
+            permissions: [...P.communication],
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: 'Campus Operations',
     zone: 'scroll',
     items: [
       {
-        label: 'Campus Access',
+        label: 'In-Out Management',
         href: '/admin/campus-access/dashboard',
         icon: Fingerprint,
         module: 'cams',
@@ -1093,181 +1235,6 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Complaints',
             href: '/admin/front-office/complaints',
             permissions: ['front-office:read', 'front-office:desk'],
-          },
-        ],
-      },
-      {
-        label: 'Governance & Committees',
-        icon: Shield,
-        href: '/admin/governance',
-        module: 'governance',
-        permissions: [...P.governance],
-        activePattern: '^/admin/governance(?:/.*)?$',
-        children: [
-          { label: 'Dashboard', href: '/admin/governance', permissions: [...P.governance] },
-          {
-            label: 'Committee Master',
-            href: '/admin/governance/committees',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Committee Members',
-            href: '/admin/governance/members',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Meetings',
-            href: '/admin/governance/meetings',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Meeting Calendar',
-            href: '/admin/governance/calendar',
-            permissions: ['governance:read'],
-          },
-          {
-            label: 'Action Taken Reports',
-            href: '/admin/governance/atr',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Attendance',
-            href: '/admin/governance/attendance',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Tasks & Responsibilities',
-            href: '/admin/governance/tasks',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Notices & Circulars',
-            href: '/admin/governance/notices',
-            permissions: ['governance:read', 'governance:publish'],
-          },
-          {
-            label: 'Documents',
-            href: '/admin/governance/documents',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Events & Activities',
-            href: '/admin/governance/events',
-            permissions: ['governance:read', 'governance:manage'],
-          },
-          {
-            label: 'Reports',
-            href: '/admin/governance/reports',
-            permissions: ['governance:reports'],
-          },
-          {
-            label: 'NAAC Evidence',
-            href: '/admin/governance/naac',
-            permissions: ['governance:reports'],
-          },
-          {
-            label: 'Analytics',
-            href: '/admin/governance/analytics',
-            permissions: ['governance:read'],
-          },
-          {
-            label: 'Settings',
-            href: '/admin/governance/settings',
-            permissions: ['governance:manage'],
-          },
-        ],
-      },
-      {
-        label: 'NAAC & IQAC',
-        icon: Award,
-        href: '/admin/naac',
-        module: 'naacIqac',
-        permissions: [...P.naacIqac],
-        activePattern: '^/admin/naac(?:/.*)?$',
-        children: [
-          { label: 'Dashboard', href: '/admin/naac', permissions: [...P.naacIqac] },
-          {
-            label: 'Criteria & Metrics',
-            href: '/admin/naac/criteria',
-            permissions: ['naac-iqac:read', 'naac-iqac:manage'],
-          },
-          {
-            label: 'Evidence Repository',
-            href: '/admin/naac/evidence',
-            permissions: ['naac-iqac:read'],
-          },
-          { label: 'Document Vault', href: '/admin/naac/vault', permissions: ['naac-iqac:manage'] },
-          { label: 'AQAR Management', href: '/admin/naac/aqar', permissions: ['naac-iqac:manage'] },
-          {
-            label: 'Department Portal',
-            href: '/admin/naac/department',
-            permissions: ['naac-iqac:collect', 'naac-iqac:manage'],
-          },
-          {
-            label: 'Faculty Achievements',
-            href: '/admin/naac/faculty',
-            permissions: ['naac-iqac:collect', 'naac-iqac:manage'],
-          },
-          {
-            label: 'Student Achievements',
-            href: '/admin/naac/student',
-            permissions: ['naac-iqac:collect', 'naac-iqac:manage'],
-          },
-          { label: 'MoU Management', href: '/admin/naac/mous', permissions: ['naac-iqac:manage'] },
-          { label: 'IQAC Activities', href: '/admin/naac/iqac', permissions: ['naac-iqac:read'] },
-          { label: 'DVV Readiness', href: '/admin/naac/dvv', permissions: ['naac-iqac:reports'] },
-          { label: 'NAAC Calendar', href: '/admin/naac/calendar', permissions: ['naac-iqac:read'] },
-          { label: 'Reports', href: '/admin/naac/reports', permissions: ['naac-iqac:reports'] },
-          { label: 'Settings', href: '/admin/naac/settings', permissions: ['naac-iqac:manage'] },
-        ],
-      },
-      {
-        label: 'Communication',
-        href: '/admin/communication',
-        icon: MessageSquare,
-        module: 'communication',
-        permissions: [...P.communication],
-        activePattern: '^/admin/communication(?:/.*)?$',
-        children: [
-          {
-            label: 'Dashboard',
-            href: '/admin/communication',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Compose',
-            href: '/admin/communication/compose',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Campaigns',
-            href: '/admin/communication/campaigns',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Templates',
-            href: '/admin/communication/templates',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Audience Builder',
-            href: '/admin/communication/audience',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Analytics',
-            href: '/admin/communication/analytics',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Settings',
-            href: '/admin/communication/settings',
-            permissions: [...P.communication],
-          },
-          {
-            label: 'Student Remarks',
-            href: '/admin/students/communication',
-            permissions: ['communication:read', 'students:read'],
           },
         ],
       },
@@ -1458,7 +1425,7 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'System',
+    label: 'System Administration',
     zone: 'pin-bottom',
     items: [
       {

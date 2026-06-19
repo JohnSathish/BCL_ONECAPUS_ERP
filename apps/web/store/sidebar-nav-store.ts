@@ -8,6 +8,7 @@ type SidebarNavState = {
   openGroupsByRole: Record<string, Record<string, boolean>>;
   scrollTopByRole: Record<string, Partial<Record<SidebarScrollSection, number>>>;
   setGroupOpen: (role: string, label: string, open: boolean) => void;
+  setExclusiveGroupOpen: (role: string, label: string) => void;
   toggleGroup: (role: string, label: string) => void;
   mergeOpenGroups: (role: string, labels: Record<string, boolean>) => void;
   setScrollTop: (role: string, section: SidebarScrollSection, top: number) => void;
@@ -27,6 +28,18 @@ export const useSidebarNavStore = create<SidebarNavState>()(
             [role]: { ...(s.openGroupsByRole[role] ?? {}), [label]: open },
           },
         })),
+      setExclusiveGroupOpen: (role, label) =>
+        set((s) => {
+          const current = s.openGroupsByRole[role] ?? {};
+          const next: Record<string, boolean> = {};
+          for (const key of Object.keys(current)) {
+            next[key] = false;
+          }
+          next[label] = true;
+          return {
+            openGroupsByRole: { ...s.openGroupsByRole, [role]: next },
+          };
+        }),
       toggleGroup: (role, label) => {
         const current = get().openGroupsByRole[role]?.[label] ?? false;
         get().setGroupOpen(role, label, !current);

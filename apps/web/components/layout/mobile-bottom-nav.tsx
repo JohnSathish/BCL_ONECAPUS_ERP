@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Menu, Settings, Shield, Users } from 'lucide-react';
+import { BookOpen, GraduationCap, LayoutDashboard, Menu, Wallet } from 'lucide-react';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
 
 const ITEMS = [
-  { label: 'Home', href: '/admin', icon: LayoutDashboard, exact: true },
-  { label: 'Students', href: '/admin/students', icon: Users },
-  { label: 'Admin', href: '/admin/administration', icon: Shield },
-  { label: 'Settings', href: '/admin/organization', icon: Settings },
+  { label: 'Home', href: '/admin', icon: LayoutDashboard, exact: true, color: '#3b82f6' },
+  { label: 'Students', href: '/admin/students', icon: GraduationCap, color: '#22c55e' },
+  { label: 'Finance', href: '/admin/fees', icon: Wallet, color: '#f59e0b' },
+  { label: 'Academics', href: '/admin/programs', icon: BookOpen, color: '#8b5cf6' },
 ] as const;
 
 export function MobileBottomNav() {
@@ -34,11 +34,13 @@ export function MobileBottomNav() {
             href={item.href}
             className={cn(
               'flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium transition',
-              active ? 'text-primary' : 'text-muted-foreground',
+              active ? 'font-semibold' : 'text-muted-foreground',
             )}
+            style={active ? { color: item.color } : undefined}
           >
             <Icon
-              className={cn('h-5 w-5', active && 'drop-shadow-[0_0_8px_hsl(var(--primary))]')}
+              className="h-5 w-5"
+              style={active ? { filter: `drop-shadow(0 0 8px ${item.color}88)` } : undefined}
             />
             <span className="truncate">{item.label}</span>
           </Link>
@@ -51,7 +53,7 @@ export function MobileBottomNav() {
         aria-label="Open full menu"
       >
         <Menu className="h-5 w-5" />
-        <span className="truncate">Menu</span>
+        <span className="truncate">More</span>
       </button>
     </nav>
   );

@@ -2,13 +2,24 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, Search, X } from 'lucide-react';
+import {
+  ChevronDown,
+  Clock,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Star,
+  X,
+  Zap,
+} from 'lucide-react';
 import { useMemo, useState, useLayoutEffect, useRef, useEffect, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
-import { InstitutionBrandMark } from '@/components/branding/institution-brand-mark';
 import {
   ADMIN_NAV,
   ROLE_NAV,
@@ -18,6 +29,12 @@ import {
   type NavGroup,
   type NavItem,
 } from '@/config/navigation';
+import {
+  DEFAULT_FAVORITE_HREFS,
+  NAV_SEARCH_ACTIONS,
+  SIDEBAR_QUICK_ACTIONS,
+  moduleColor,
+} from '@/config/nav-meta';
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-me';
 import { buildStaffNavContext, filterStaffNav } from '@/lib/staff-portal/nav-visibility';
 import { buildAdminNavContext, filterAdminNav } from '@/lib/admin-nav-visibility';
@@ -29,17 +46,22 @@ import {
   useSidebarNavStore,
   type SidebarScrollSection,
 } from '@/store/sidebar-nav-store';
+import { useNavPreferencesStore } from '@/store/nav-preferences-store';
+import { buildNavIndex, findEntryById, navEntryId, resolveNavEntry } from '@/lib/nav-index';
+import { fetchOperationsCenter } from '@/services/dashboard-analytics';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
+import { SidebarInstitutionCard } from '@/components/layout/sidebar-institution-card';
 import { cn } from '@/utils/cn';
 
 const NAV_ITEM_CLASS =
-  'relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors';
-const NAV_ITEM_ACTIVE = 'sidebar-glow-active text-sidebar-foreground';
+  'relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all duration-150';
+const NAV_ITEM_ACTIVE =
+  'sidebar-glow-active font-semibold text-sidebar-foreground shadow-[0_0_16px_hsl(var(--primary)/0.12)]';
 const NAV_ITEM_IDLE = 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground';
 const NAV_PARENT_CLASS = 'font-semibold text-sidebar-foreground';
 
 const SCROLL_NAV_CLASS =
-  'sidebar-scroll-auto min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-2 py-2';
+  'sidebar-scroll-auto min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain px-2 py-2';
 
 const EMPTY_OPEN_GROUPS: Record<string, boolean> = {};
 
@@ -80,6 +102,21 @@ function SidebarNav({
   );
 }
 
+function formatRelativeTime(ts: number) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function hasAnyPermission(userPerms: string[], required?: string[]) {
+  if (!required?.length) return true;
+  return required.some((p) => userPerms.includes(p));
+}
+
 export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'admin' | 'staff' }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -91,16 +128,33 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   const setMobileNavOpen = useDashboardUiStore((s) => s.setMobileNavOpen);
   const mergeOpenGroups = useSidebarNavStore((s) => s.mergeOpenGroups);
   const setGroupOpen = useSidebarNavStore((s) => s.setGroupOpen);
+  const setExclusiveGroupOpen = useSidebarNavStore((s) => s.setExclusiveGroupOpen);
   const openGroups = useSidebarNavStore((s) => s.openGroupsByRole[roleKey] ?? EMPTY_OPEN_GROUPS);
   const staffMe = useStaffMe({ enabled: role === 'staff' });
   const [query, setQuery] = useState('');
   const prevPathname = useRef(pathname);
+  const favoritesInit = useRef(false);
+
+  const toggleFavorite = useNavPreferencesStore((s) => s.toggleFavorite);
+  const recordVisit = useNavPreferencesStore((s) => s.recordVisit);
+  const recents = useNavPreferencesStore((s) => s.recentsByRole[roleKey] ?? []);
+  const favoriteIds = useNavPreferencesStore((s) => s.favoritesByRole[roleKey] ?? []);
+  const setFavorites = useNavPreferencesStore((s) => s.setFavorites);
+
+  const statsQ = useQuery({
+    queryKey: ['sidebar', 'nav-badges'],
+    queryFn: () => fetchOperationsCenter({}),
+    enabled: role === 'admin',
+    staleTime: 120_000,
+    retry: 1,
+  });
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname, setMobileNavOpen]);
 
   const session = useAuthStore((s) => s.session);
+  const userPerms = session?.user?.permissions ?? [];
   const isAdminLayout = role === 'admin';
 
   const groups: NavGroup[] = useMemo(() => {
@@ -135,6 +189,25 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     ];
   }, [role, staffMe.data, session]);
 
+  const navIndex = useMemo(() => buildNavIndex(groups), [groups]);
+
+  useEffect(() => {
+    if (!pathname || role !== 'admin') return;
+    const entry = resolveNavEntry(navIndex, pathname);
+    if (entry) {
+      recordVisit(roleKey, { id: entry.id, href: entry.href, label: entry.label });
+    }
+  }, [pathname, navIndex, recordVisit, role, roleKey]);
+
+  useEffect(() => {
+    if (favoritesInit.current || role !== 'admin' || favoriteIds.length > 0) return;
+    favoritesInit.current = true;
+    const defaults = DEFAULT_FAVORITE_HREFS.map((href) => resolveNavEntry(navIndex, href))
+      .filter(Boolean)
+      .map((e) => e!.id);
+    if (defaults.length) setFavorites(roleKey, defaults);
+  }, [favoriteIds.length, navIndex, role, roleKey, setFavorites]);
+
   useLayoutEffect(() => {
     const parents = activeParentLabels(groups, pathname, isNavChildActive);
     const pathnameChanged = prevPathname.current !== pathname;
@@ -143,7 +216,11 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     if (!parents.length) return;
 
     if (pathnameChanged) {
-      mergeOpenGroups(roleKey, Object.fromEntries(parents.map((label) => [label, true])));
+      if (parents.length === 1) {
+        setExclusiveGroupOpen(roleKey, parents[0]!);
+      } else {
+        mergeOpenGroups(roleKey, Object.fromEntries(parents.map((label) => [label, true])));
+      }
       return;
     }
 
@@ -152,7 +229,24 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     if (!toOpen.length) return;
     if (toOpen.every((label) => current[label] === true)) return;
     mergeOpenGroups(roleKey, Object.fromEntries(toOpen.map((label) => [label, true])));
-  }, [groups, mergeOpenGroups, pathname, roleKey]);
+  }, [groups, mergeOpenGroups, pathname, roleKey, setExclusiveGroupOpen]);
+
+  const badgeMap = useMemo(() => {
+    const s = statsQ.data;
+    if (!s) return {} as Record<string, string>;
+    return {
+      Students: s.institution.studentCount.toLocaleString(),
+      Staff: s.institution.staffCount.toLocaleString(),
+      Finance: s.finance.defaulters > 0 ? String(s.finance.defaulters) : '',
+      'Human Resources': s.actions.find((a) => a.id === 'leave')?.count
+        ? String(s.actions.find((a) => a.id === 'leave')!.count)
+        : '',
+      Library: '',
+      Admissions: s.actions.find((a) => a.id === 'admissions')?.count
+        ? String(s.actions.find((a) => a.id === 'admissions')!.count)
+        : '',
+    };
+  }, [statsQ.data]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return groups;
@@ -163,19 +257,40 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         items: g.items.filter(
           (item) =>
             item.label.toLowerCase().includes(q) ||
+            item.module?.toLowerCase().includes(q) ||
             item.children?.some((c) => c.label.toLowerCase().includes(q)),
         ),
       }))
       .filter((g) => g.items.length > 0);
   }, [groups, query]);
 
-  const scrollGroups = useMemo(
-    () => filtered.filter((group) => group.zone !== 'pin-bottom'),
-    [filtered],
+  const searchAction = useMemo(() => {
+    if (!query.trim()) return null;
+    const q = query.trim().toLowerCase();
+    return NAV_SEARCH_ACTIONS.find(
+      (a) =>
+        hasAnyPermission(userPerms, a.permissions) &&
+        (a.label.toLowerCase().includes(q) ||
+          a.keywords.some((k) => k.includes(q) || q.includes(k))),
+    );
+  }, [query, userPerms]);
+
+  const quickActions = useMemo(
+    () => SIDEBAR_QUICK_ACTIONS.filter((a) => hasAnyPermission(userPerms, a.permissions)),
+    [userPerms],
   );
-  const pinnedGroups = useMemo(
-    () => filtered.filter((group) => group.zone === 'pin-bottom'),
-    [filtered],
+
+  const favoriteEntries = useMemo(
+    () =>
+      favoriteIds
+        .map((id) => findEntryById(navIndex, id))
+        .filter((e): e is NonNullable<typeof e> => Boolean(e)),
+    [favoriteIds, navIndex],
+  );
+
+  const recentEntries = useMemo(
+    () => recents.map((r) => resolveNavEntry(navIndex, r.href) ?? r).slice(0, 5),
+    [navIndex, recents],
   );
 
   const handleLogout = async () => {
@@ -203,12 +318,24 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     return false;
   };
 
+  const handleToggle = (item: NavItem) => {
+    const willOpen = !resolveOpen(item);
+    if (willOpen) {
+      setExclusiveGroupOpen(roleKey, item.label);
+    } else {
+      setGroupOpen(roleKey, item.label, false);
+    }
+  };
+
   const navCollapsed = mobileNavOpen ? false : collapsed;
 
-  const allNavGroups = useMemo(
-    () => [...scrollGroups, ...pinnedGroups],
-    [scrollGroups, pinnedGroups],
-  );
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchAction) {
+      setQuery('');
+      setMobileNavOpen(false);
+      router.push(searchAction.href);
+    }
+  };
 
   const renderGroups = (sectionGroups: NavGroup[]) =>
     sectionGroups.map((group) => (
@@ -218,8 +345,11 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         pathname={pathname}
         collapsed={navCollapsed}
         resolveOpen={resolveOpen}
-        onToggle={(item) => setGroupOpen(roleKey, item.label, !resolveOpen(item))}
+        onToggle={handleToggle}
         onExpandSidebar={toggleSidebar}
+        badgeMap={badgeMap}
+        favoriteIds={favoriteIds}
+        onToggleFavorite={(id) => toggleFavorite(roleKey, id)}
       />
     ));
 
@@ -255,9 +385,8 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                   'cursor-pointer rounded-lg hover:bg-sidebar-active/50',
               )}
               aria-label={collapsed && !mobileNavOpen ? 'Expand sidebar' : undefined}
-              title={collapsed && !mobileNavOpen ? 'Expand sidebar' : undefined}
             >
-              <InstitutionBrandMark
+              <SidebarInstitutionCard
                 branding={branding}
                 active={active}
                 collapsed={collapsed && !mobileNavOpen}
@@ -277,17 +406,37 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         </div>
 
         {mobileNavOpen || !collapsed ? (
-          <div className="shrink-0 px-3 pb-2 pt-1">
+          <div className="shrink-0 space-y-2 px-3 pb-2 pt-1">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-muted" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search modules…"
-                className="h-8 border-0 bg-sidebar-active/40 pl-8 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-muted/70 focus-visible:ring-1 focus-visible:ring-primary/40"
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search modules, actions…"
+                className="h-9 border-0 bg-sidebar-active/40 pl-8 pr-12 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-muted/70 focus-visible:ring-1 focus-visible:ring-primary/40"
                 aria-label="Search navigation"
               />
+              <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-sidebar-border/60 bg-sidebar-active/50 px-1.5 py-0.5 text-[9px] text-sidebar-muted lg:inline">
+                Ctrl K
+              </kbd>
             </div>
+            {searchAction ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setMobileNavOpen(false);
+                  router.push(searchAction.href);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-left text-xs text-primary"
+              >
+                <Zap className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Go to <strong>{searchAction.label}</strong>
+                </span>
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -300,7 +449,103 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           )}
           ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
         >
-          {renderGroups(allNavGroups)}
+          {isAdminLayout && !query.trim() && favoriteEntries.length > 0 && !navCollapsed ? (
+            <SidebarPinSection
+              title="Favorites"
+              icon={Star}
+              iconClass="text-amber-400"
+              collapsed={navCollapsed}
+            >
+              <ul className="space-y-0.5">
+                {favoriteEntries.map((entry) => (
+                  <CompactNavLink
+                    key={entry.id}
+                    href={entry.href}
+                    label={entry.label}
+                    color={moduleColor(entry.module)}
+                    active={pathname === entry.href || pathname.startsWith(`${entry.href}/`)}
+                    onNavigate={() => setMobileNavOpen(false)}
+                  />
+                ))}
+              </ul>
+            </SidebarPinSection>
+          ) : null}
+
+          {isAdminLayout && !query.trim() && quickActions.length > 0 && !navCollapsed ? (
+            <SidebarPinSection
+              title="Quick Actions"
+              icon={Zap}
+              iconClass="text-yellow-400"
+              collapsed={navCollapsed}
+            >
+              <ul className="space-y-0.5">
+                {quickActions.slice(0, 4).map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <li key={action.id}>
+                      <Link
+                        href={action.href}
+                        prefetch={false}
+                        onClick={() => setMobileNavOpen(false)}
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-sidebar-muted transition hover:bg-sidebar-active/45 hover:text-sidebar-foreground"
+                      >
+                        <span
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                          style={{ backgroundColor: `${action.color}22`, color: action.color }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </span>
+                        <span>{action.label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </SidebarPinSection>
+          ) : null}
+
+          {isAdminLayout && !query.trim() && recentEntries.length > 0 && !navCollapsed ? (
+            <SidebarPinSection
+              title="Recently Used"
+              icon={Clock}
+              iconClass="text-sky-400"
+              collapsed={navCollapsed}
+            >
+              <ul className="space-y-0.5">
+                {recentEntries.map((entry) => {
+                  const href = 'href' in entry ? entry.href : '';
+                  const label = 'label' in entry ? entry.label : '';
+                  const visitedAt =
+                    'visitedAt' in entry ? (entry.visitedAt as number | undefined) : undefined;
+                  return (
+                    <li key={href + label}>
+                      <Link
+                        href={href}
+                        prefetch={false}
+                        onClick={() => setMobileNavOpen(false)}
+                        className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs text-sidebar-muted transition hover:bg-sidebar-active/45 hover:text-sidebar-foreground"
+                      >
+                        <span className="truncate">{label}</span>
+                        {visitedAt ? (
+                          <span className="shrink-0 text-[9px] text-sidebar-muted/70">
+                            {formatRelativeTime(visitedAt)}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </SidebarPinSection>
+          ) : null}
+
+          {!navCollapsed && !query.trim() ? (
+            <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted/80">
+              Main Navigation
+            </p>
+          ) : null}
+
+          {renderGroups(filtered)}
         </SidebarNav>
 
         {isAdminLayout && mobileNavOpen ? (
@@ -330,22 +575,78 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                 : 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground',
             )}
             aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {navCollapsed ? (
               <PanelLeftOpen className="h-4 w-4" />
             ) : (
               <PanelLeftClose className="h-4 w-4" />
             )}
-            {!navCollapsed ? (
-              <span>Collapse</span>
-            ) : (
-              <span className="sr-only">Expand sidebar</span>
-            )}
+            {!navCollapsed ? <span>Collapse</span> : <span className="sr-only">Expand</span>}
           </button>
         </div>
       </aside>
     </>
+  );
+}
+
+function SidebarPinSection({
+  title,
+  icon: Icon,
+  iconClass,
+  collapsed,
+  children,
+}: {
+  title: string;
+  icon: typeof Star;
+  iconClass?: string;
+  collapsed: boolean;
+  children: ReactNode;
+}) {
+  if (collapsed) return null;
+  return (
+    <div className="rounded-xl border border-sidebar-border/40 bg-sidebar-active/20 p-2">
+      <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted">
+        <Icon className={cn('h-3 w-3', iconClass)} />
+        {title}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function CompactNavLink({
+  href,
+  label,
+  color,
+  active,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  color: string;
+  active: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <li>
+      <Link
+        href={href}
+        prefetch={false}
+        onClick={onNavigate}
+        className={cn(
+          'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition',
+          active
+            ? 'bg-primary/15 font-medium text-sidebar-foreground'
+            : 'text-sidebar-muted hover:bg-sidebar-active/45 hover:text-sidebar-foreground',
+        )}
+      >
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: color, boxShadow: active ? `0 0 8px ${color}` : undefined }}
+        />
+        {label}
+      </Link>
+    </li>
   );
 }
 
@@ -356,7 +657,9 @@ function NavSection({
   resolveOpen,
   onToggle,
   onExpandSidebar,
-  hideLabel,
+  badgeMap,
+  favoriteIds,
+  onToggleFavorite,
 }: {
   group: NavGroup;
   pathname: string;
@@ -364,11 +667,13 @@ function NavSection({
   resolveOpen: (item: NavItem) => boolean;
   onToggle: (item: NavItem) => void;
   onExpandSidebar: () => void;
-  hideLabel?: boolean;
+  badgeMap: Record<string, string>;
+  favoriteIds: string[];
+  onToggleFavorite: (id: string) => void;
 }) {
   return (
     <div>
-      {!collapsed && !hideLabel ? (
+      {!collapsed ? (
         <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted/80">
           {group.label}
         </p>
@@ -383,6 +688,11 @@ function NavSection({
             open={resolveOpen(item)}
             onToggle={() => onToggle(item)}
             onExpandSidebar={onExpandSidebar}
+            badge={badgeMap[item.label] || item.badge}
+            isFavorited={
+              item.href ? favoriteIds.includes(navEntryId(item.label, item.href)) : false
+            }
+            onToggleFavorite={onToggleFavorite}
           />
         ))}
       </ul>
@@ -397,6 +707,9 @@ function SidebarItem({
   open,
   onToggle,
   onExpandSidebar,
+  badge,
+  isFavorited,
+  onToggleFavorite,
 }: {
   item: NavItem;
   pathname: string;
@@ -404,9 +717,39 @@ function SidebarItem({
   open: boolean;
   onToggle: () => void;
   onExpandSidebar: () => void;
+  badge?: string;
+  isFavorited?: boolean;
+  onToggleFavorite?: (id: string) => void;
 }) {
   const Icon = item.icon;
   const active = isNavItemActive(pathname, item);
+  const accent = moduleColor(item.module);
+
+  const iconNode = (
+    <span
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition',
+        active || open ? 'shadow-[0_0_12px_var(--nav-accent-glow)]' : '',
+      )}
+      style={
+        {
+          '--nav-accent': accent,
+          '--nav-accent-glow': `${accent}55`,
+          backgroundColor: active || open ? `${accent}22` : `${accent}12`,
+          color: accent,
+        } as React.CSSProperties
+      }
+    >
+      <Icon className="h-[16px] w-[16px]" />
+    </span>
+  );
+
+  const badgeNode =
+    badge && !collapsed ? (
+      <span className="ml-auto shrink-0 rounded-full bg-sidebar-active/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-sidebar-muted">
+        {badge}
+      </span>
+    ) : null;
 
   if (item.children?.length) {
     if (collapsed) {
@@ -422,10 +765,9 @@ function SidebarItem({
                 'justify-center px-2',
               )}
               title={item.label}
-              aria-label={item.label}
               aria-current={active ? 'page' : undefined}
             >
-              <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-primary')} />
+              {iconNode}
             </Link>
           </li>
         );
@@ -445,9 +787,8 @@ function SidebarItem({
               'justify-center px-2',
             )}
             title={item.label}
-            aria-label={item.label}
           >
-            <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-primary')} />
+            {iconNode}
           </button>
         </li>
       );
@@ -465,14 +806,15 @@ function SidebarItem({
           )}
           aria-expanded={open}
         >
-          <Icon className={cn('h-[18px] w-[18px] shrink-0', (active || open) && 'text-primary')} />
+          {iconNode}
           <span className="flex-1 text-left">{item.label}</span>
+          {badgeNode}
           <ChevronDown
             className={cn('h-4 w-4 shrink-0 opacity-60 transition', open && 'rotate-180')}
           />
         </button>
         {open ? (
-          <ul className="ml-3 mt-0.5 space-y-0.5 pl-4">
+          <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border/50 pl-3">
             {item.children.map((child) => {
               const childActive = isNavChildActive(pathname, child, item.children ?? []);
               return (
@@ -485,7 +827,7 @@ function SidebarItem({
                     className={cn(
                       'relative block rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       childActive
-                        ? 'sidebar-child-active font-medium text-sidebar-foreground'
+                        ? 'sidebar-child-active font-semibold text-sidebar-foreground'
                         : 'text-sidebar-muted/90 hover:bg-sidebar-active/35 hover:text-sidebar-foreground',
                     )}
                   >
@@ -509,13 +851,12 @@ function SidebarItem({
             'cursor-default text-sidebar-muted/55',
             collapsed && 'justify-center px-2',
           )}
-          title={collapsed ? `${item.label} (Coming soon)` : 'Coming soon'}
         >
-          <Icon className="h-[18px] w-[18px] shrink-0 opacity-60" />
+          {iconNode}
           {!collapsed ? (
             <>
               <span className="flex-1">{item.label}</span>
-              <span className="rounded-full bg-sidebar-active px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+              <span className="rounded-full bg-sidebar-active px-2 py-0.5 text-[10px] font-medium uppercase">
                 Soon
               </span>
             </>
@@ -526,7 +867,7 @@ function SidebarItem({
   }
 
   return (
-    <li>
+    <li className="group/item relative">
       <Link
         href={item.href}
         prefetch={false}
@@ -538,11 +879,33 @@ function SidebarItem({
           collapsed && 'justify-center px-2',
         )}
         title={collapsed ? item.label : undefined}
-        aria-label={collapsed ? item.label : undefined}
       >
-        <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-primary')} />
-        {!collapsed ? <span>{item.label}</span> : null}
+        {iconNode}
+        {!collapsed ? (
+          <>
+            <span className="flex-1">{item.label}</span>
+            {badgeNode}
+          </>
+        ) : null}
       </Link>
+      {!collapsed && onToggleFavorite && item.href ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const id = navEntryId(item.label, item.href!);
+            onToggleFavorite(id);
+          }}
+          className={cn(
+            'absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 opacity-0 transition group-hover/item:opacity-100',
+            isFavorited ? 'text-amber-400 opacity-100' : 'text-sidebar-muted hover:text-amber-400',
+          )}
+          aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Star className={cn('h-3 w-3', isFavorited && 'fill-current')} />
+        </button>
+      ) : null}
     </li>
   );
 }
