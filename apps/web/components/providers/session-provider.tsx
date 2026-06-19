@@ -33,12 +33,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [continueBusy, setContinueBusy] = useState(false);
   const warningShownRef = useRef(false);
   const forcedLogoutRef = useRef(false);
+  const initialBootstrapDoneRef = useRef(false);
 
   const performLogout = useCallback(
     async (broadcast = true, skipUnsavedCheck = false) => {
       if (forcedLogoutRef.current) return;
       if (!skipUnsavedCheck && !confirmGlobalUnsavedDiscard()) return;
       forcedLogoutRef.current = true;
+      initialBootstrapDoneRef.current = false;
       tokenRefreshManager.clearSchedule();
       setWarningOpen(false);
       try {
@@ -55,9 +57,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated) return;
+
     if (pathname === '/login') {
+      initialBootstrapDoneRef.current = false;
       setBootstrapping(false);
       return;
+    }
+
+    if (initialBootstrapDoneRef.current) return;
+
+    const existing = useAuthStore.getState().session;
+    if (existing?.accessToken) {
+      const expiresAtMs = existing.expiresAt ? new Date(existing.expiresAt).getTime() : 0;
+      if (!expiresAtMs || expiresAtMs > Date.now()) {
+        initialBootstrapDoneRef.current = true;
+        setBootstrapping(false);
+        tokenRefreshManager.scheduleProactiveRefresh(existing);
+        return;
+      }
     }
 
     let cancelled = false;
@@ -65,6 +82,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setBootstrapping(true);
       const restored = await bootstrapSession({ maxWaitMs: 30_000 });
       if (cancelled) return;
+      initialBootstrapDoneRef.current = true;
       if (restored) {
         setSession(restored);
         tokenRefreshManager.scheduleProactiveRefresh(restored);
@@ -97,6 +115,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return subscribeSessionBroadcast((message) => {
       if (message.type === 'LOGOUT') {
         forcedLogoutRef.current = true;
+        initialBootstrapDoneRef.current = false;
         clear();
         tokenRefreshManager.clearSchedule();
         router.replace('/login');

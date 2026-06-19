@@ -118,8 +118,10 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
         const status = error.response?.status;
         const proxyDown =
           status === 502 &&
-          (error.response?.data as { errorCode?: string } | undefined)?.errorCode ===
-            'API_PROXY_UNAVAILABLE';
+          ((error.response?.data as { errorCode?: string } | undefined)?.errorCode ===
+            'API_PROXY_UNAVAILABLE' ||
+            (error.response?.data as { errorCode?: string } | undefined)?.errorCode ===
+              'API_GATEWAY_UNAVAILABLE');
         const retryable =
           noResponse || proxyDown || (status != null && status >= 502 && status <= 504);
         if (retryable && attempt < API_GET_RETRY_COUNT) {
