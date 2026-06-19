@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
 import { validateBrandingImage } from '../../common/uploads/image-upload.validator';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 
 @Injectable()
 export class CertificateAssetsService {

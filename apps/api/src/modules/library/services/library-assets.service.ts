@@ -7,6 +7,7 @@ import { createReadStream, existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { basename, extname, join, normalize, resolve } from 'path';
 import { randomUUID } from 'crypto';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 
 export const DEFAULT_LIBRARY_MIME_TYPES = [
   'application/pdf',

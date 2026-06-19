@@ -14,6 +14,7 @@ import { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { QueueService } from '../../../shared/queue/queue.service';
 import { StudentsService } from '../students.service';
 import { toStudentListQuery } from '../dto/students.dto';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import type {
   PhotoBulkApplyDto,
   PhotoBulkDeleteDto,

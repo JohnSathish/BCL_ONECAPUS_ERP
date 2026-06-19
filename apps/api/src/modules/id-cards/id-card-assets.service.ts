@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { randomUUID } from 'crypto';
 
 import {

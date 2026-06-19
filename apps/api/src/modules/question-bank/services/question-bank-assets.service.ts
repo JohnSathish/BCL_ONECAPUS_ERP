@@ -8,6 +8,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { basename, extname, join, normalize, resolve } from 'path';
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 
 const DEFAULT_MIME_TYPES = [
   'application/pdf',

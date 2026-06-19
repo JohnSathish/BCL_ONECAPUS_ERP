@@ -17,6 +17,7 @@ import { LmsAccessService } from './lms-access.service';
 import { LmsAuditService } from './lms-audit.service';
 import { LmsNotificationService } from './lms-notification.service';
 import { LmsSettingsService } from './lms-settings.service';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 
 @Injectable()
 export class LmsMaterialsService {

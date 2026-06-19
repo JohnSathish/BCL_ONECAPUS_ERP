@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import puppeteer from 'puppeteer';
 
 export type PersistedCertificateDocument = {
