@@ -67,6 +67,13 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
   const passwordValue = watch('password') ?? '';
   const challengeAnswer = watch('challengeAnswer') ?? '';
 
+  useEffect(() => {
+    if (!isDemoLoginWorkspaceEnabled()) {
+      setValue('email', '');
+      setValue('password', '');
+    }
+  }, [setValue]);
+
   const loadChallenge = useCallback(async () => {
     setChallengeLoading(true);
     try {

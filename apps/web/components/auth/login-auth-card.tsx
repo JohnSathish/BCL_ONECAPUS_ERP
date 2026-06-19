@@ -219,27 +219,29 @@ export function LoginAuthCard({
         className="shrink-0 border-t border-border/50 bg-muted/15 px-5 py-3 sm:px-6"
         {...fadeUp(0.54, animate)}
       >
-        <div className="flex flex-col items-center gap-1.5 text-center">
-          <Link
-            href="https://basecodelabs.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-2 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <BrandingLogoImage
-              src="/branding/basecode-labs-logo.png"
-              className="opacity-90"
-              size={28}
-              priority
-            />
-            <p className="text-[10px] text-muted-foreground">
-              A Product of{' '}
-              <span className="font-medium text-foreground/80 group-hover:text-primary">
-                BaseCode Labs Pvt. Ltd.
-              </span>
-            </p>
-          </Link>
-        </div>
+        {context?.showPoweredBy !== false ? (
+          <div className="flex flex-col items-center gap-1.5 text-center">
+            <Link
+              href="https://basecodelabs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <BrandingLogoImage
+                src="/branding/basecode-labs-logo.png"
+                className="opacity-90"
+                size={28}
+                priority
+              />
+              <p className="text-[10px] text-muted-foreground">
+                A Product of{' '}
+                <span className="font-medium text-foreground/80 group-hover:text-primary">
+                  BaseCode Labs Pvt. Ltd.
+                </span>
+              </p>
+            </Link>
+          </div>
+        ) : null}
       </motion.footer>
     </motion.article>
   );
