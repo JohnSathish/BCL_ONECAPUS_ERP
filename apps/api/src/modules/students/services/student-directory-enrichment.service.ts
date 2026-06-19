@@ -384,19 +384,25 @@ export class StudentDirectoryEnrichmentService {
   private async countHostellers(tenantId: string): Promise<number> {
     const rows = await this.prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(*)::int AS count
-      FROM academic.student_academic_profiles
-      WHERE tenant_id = ${tenantId}::uuid
-        AND residence_type = 'HOSTELLER'
+      FROM academic.student_academic_profiles sap
+      INNER JOIN academic.students s
+        ON s.id = sap.student_id AND s.tenant_id = sap.tenant_id
+      WHERE sap.tenant_id = ${tenantId}::uuid
+        AND s.deleted_at IS NULL
+        AND sap.residence_type = 'HOSTELLER'
     `;
     return rows[0]?.count ?? 0;
   }
 
   private async listHostellerIds(tenantId: string): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<{ studentId: string }[]>`
-      SELECT student_id AS "studentId"
-      FROM academic.student_academic_profiles
-      WHERE tenant_id = ${tenantId}::uuid
-        AND residence_type = 'HOSTELLER'
+      SELECT sap.student_id AS "studentId"
+      FROM academic.student_academic_profiles sap
+      INNER JOIN academic.students s
+        ON s.id = sap.student_id AND s.tenant_id = sap.tenant_id
+      WHERE sap.tenant_id = ${tenantId}::uuid
+        AND s.deleted_at IS NULL
+        AND sap.residence_type = 'HOSTELLER'
     `;
     return rows.map((row) => row.studentId);
   }
@@ -574,7 +580,19 @@ export class StudentDirectoryEnrichmentService {
       }
     }
 
-    return [...eligibilityIds];
+    return this.filterActiveStudentIds(tenantId, [...eligibilityIds]);
+  }
+
+  private async filterActiveStudentIds(
+    tenantId: string,
+    studentIds: string[],
+  ): Promise<string[]> {
+    if (!studentIds.length) return [];
+    const rows = await this.prisma.student.findMany({
+      where: { tenantId, deletedAt: null, id: { in: studentIds } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
   }
 
   private async countAttendanceShortage(tenantId: string): Promise<number> {

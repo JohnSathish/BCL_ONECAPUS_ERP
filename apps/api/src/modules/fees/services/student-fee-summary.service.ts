@@ -167,11 +167,16 @@ export class StudentFeeSummaryService {
   }
 
   async listDefaulterStudentIds(tenantId: string): Promise<string[]> {
-    const rows = await this.db().studentFeeSummary.findMany({
-      where: { tenantId, totalOutstanding: { gt: 0 } },
-      select: { studentId: true },
-    });
-    return rows.map((r: { studentId: string }) => r.studentId);
+    const rows = await this.prisma.$queryRaw<{ studentId: string }[]>`
+      SELECT sfs.student_id AS "studentId"
+      FROM finance.student_fee_summaries sfs
+      INNER JOIN academic.students s
+        ON s.id = sfs.student_id AND s.tenant_id = sfs.tenant_id
+      WHERE sfs.tenant_id = ${tenantId}::uuid
+        AND s.deleted_at IS NULL
+        AND sfs.total_outstanding > 0
+    `;
+    return rows.map((r) => r.studentId);
   }
 
   private mapRow(row: Record<string, unknown>): StudentFeeSummaryRow {
