@@ -14,6 +14,7 @@
  *   npx tsx scripts/purge-demo-applicants.ts --confirm
  *   npx tsx scripts/purge-demo-applicants.ts --confirm --tenant-slug demo
  *   npx tsx scripts/purge-demo-applicants.ts --confirm --admin-email admin@donboscocollege.ac.in
+ *   npx tsx scripts/purge-demo-applicants.ts --confirm --application-numbers DBCT26-0001,DBCT26-0002
  */
 import { PrismaClient } from '@prisma/client';
 
@@ -22,11 +23,12 @@ const prisma = new PrismaClient();
 type Options = {
   tenantSlug?: string;
   adminEmail?: string;
+  applicationNumbers: string[];
   confirm: boolean;
 };
 
 function parseArgs(argv: string[]): Options {
-  const opts: Options = { confirm: false };
+  const opts: Options = { confirm: false, applicationNumbers: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--confirm') opts.confirm = true;
@@ -35,6 +37,11 @@ function parseArgs(argv: string[]): Options {
       i += 1;
     } else if (arg === '--admin-email' && argv[i + 1]) {
       opts.adminEmail = argv[i + 1]!.trim().toLowerCase();
+      i += 1;
+    } else if (arg === '--application-numbers' && argv[i + 1]) {
+      opts.applicationNumbers = argv[i + 1]!.split(',')
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean);
       i += 1;
     }
   }
@@ -127,7 +134,19 @@ async function main() {
     orderBy: { applicationNumber: 'asc' },
   });
 
-  const appsToPurge = allApplications.filter(isDemoApplicant);
+  const explicitNumbers = new Set(
+    opts.applicationNumbers.map((n) => n.toUpperCase()),
+  );
+
+  const appsToPurge = allApplications.filter(
+    (app) =>
+      isDemoApplicant(app) ||
+      explicitNumbers.has(app.applicationNumber.toUpperCase()),
+  );
+
+  const linkedUserIds = appsToPurge
+    .map((a) => a.applicantUserId)
+    .filter((id): id is string => Boolean(id));
 
   const demoApplicantUsers = await prisma.user.findMany({
     where: {
@@ -136,6 +155,7 @@ async function main() {
       OR: [
         { email: { endsWith: '@example.com', mode: 'insensitive' } },
         { email: { contains: 'applicant.smoke', mode: 'insensitive' } },
+        ...(linkedUserIds.length ? [{ id: { in: linkedUserIds } }] : []),
       ],
     },
     select: {
@@ -149,24 +169,22 @@ async function main() {
     },
   });
 
-  const usersToPurge = demoApplicantUsers.filter(
-    (u) =>
-      !isProtectedApplicantEmail(u.email) &&
-      u.roles.some((r) => r.role.slug === 'applicant'),
-  );
+  const usersToPurge = demoApplicantUsers.filter((u) => {
+    if (isProtectedApplicantEmail(u.email)) return false;
+    if (linkedUserIds.includes(u.id)) return true;
+    return u.roles.some((r) => r.role.slug === 'applicant');
+  });
 
   const appIds = appsToPurge.map((a) => a.id);
-  const linkedUserIds = appsToPurge
-    .map((a) => a.applicantUserId)
-    .filter((id): id is string => Boolean(id));
   const userIds = [
     ...new Set([...usersToPurge.map((u) => u.id), ...linkedUserIds]),
   ].filter((id) => {
     const user = demoApplicantUsers.find((u) => u.id === id);
-    return !user || !isProtectedApplicantEmail(user.email);
+    if (!user) return linkedUserIds.includes(id);
+    return !isProtectedApplicantEmail(user.email);
   });
 
-  console.log('Admission applications (demo):');
+  console.log('Admission applications (to remove):');
   if (appsToPurge.length === 0) console.log('  (none)');
   for (const app of appsToPurge) {
     console.log(

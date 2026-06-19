@@ -4,6 +4,7 @@
 # Usage:
 #   bash scripts/deploy/vps-purge-demo-applicants.sh
 #   bash scripts/deploy/vps-purge-demo-applicants.sh --confirm
+#   bash scripts/deploy/vps-purge-demo-applicants.sh --confirm --application-numbers DBCT26-0001,DBCT26-0002
 #   ADMIN_EMAIL='admin@donboscocollege.ac.in' bash scripts/deploy/vps-purge-demo-applicants.sh --confirm
 set -euo pipefail
 
@@ -12,12 +13,23 @@ cd "$APP_DIR"
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@donboscocollege.ac.in}"
-CONFIRM=()
+EXTRA_ARGS=()
 
-for arg in "$@"; do
-  if [[ "$arg" == "--confirm" ]]; then
-    CONFIRM=(--confirm)
-  fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --confirm)
+      EXTRA_ARGS+=(--confirm)
+      ;;
+    --application-numbers)
+      EXTRA_ARGS+=(--application-numbers "$2")
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
 done
 
 if [[ ! -f apps/api/scripts/purge-demo-applicants.ts ]]; then
@@ -28,4 +40,4 @@ fi
 echo "=== Demo applicant purge (admin tenant: ${ADMIN_EMAIL}) ==="
 "${COMPOSE[@]}" run --rm \
   -v "${APP_DIR}/apps/api/scripts:/app/apps/api/scripts:ro" \
-  api npx tsx scripts/purge-demo-applicants.ts --admin-email "${ADMIN_EMAIL}" "${CONFIRM[@]}"
+  api npx tsx scripts/purge-demo-applicants.ts --admin-email "${ADMIN_EMAIL}" "${EXTRA_ARGS[@]}"
