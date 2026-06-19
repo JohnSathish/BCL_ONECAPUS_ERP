@@ -54,6 +54,15 @@ const password = process.env.SMOKE_PASSWORD;
 const publicApi = process.env.PUBLIC_API;
 const localApi = 'http://127.0.0.1:3001/api';
 
+function tenantHeaders() {
+  // Node fetch to 127.0.0.1 ignores Host — use X-Login-Host (API supports this).
+  return {
+    'X-Login-Host': host,
+    'X-Tenant-Slug': 'demo',
+    Accept: 'application/json',
+  };
+}
+
 function unwrap(json) {
   if (json && typeof json === 'object' && json.success === true && 'data' in json) {
     return json.data;
