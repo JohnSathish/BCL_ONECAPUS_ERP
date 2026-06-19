@@ -13,6 +13,7 @@ import {
   loginApplicant,
   registerApplicant,
   uploadApplicantDocument,
+  type PortalInfo,
 } from '@/services/admissions-portal';
 import { useAuthStore } from '@/store/auth-store';
 import { PhotoUploadDropzone } from '@/components/admissions-portal/photo-upload-dropzone';
@@ -350,15 +351,7 @@ function CollegeHeader({
   );
 }
 
-function RegistrationClosed({
-  info,
-}: {
-  info?: {
-    message?: string;
-    registrationClosesAt?: string | null;
-    cycle?: { registrationClosesAt?: string | null };
-  };
-}) {
+function RegistrationClosed({ info }: { info?: PortalInfo }) {
   const lastDate = info?.registrationClosesAt ?? info?.cycle?.registrationClosesAt;
   return (
     <PublicPageShell>

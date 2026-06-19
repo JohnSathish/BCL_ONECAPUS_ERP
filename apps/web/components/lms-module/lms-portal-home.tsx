@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Megaphone } from 'lucide-react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
-import { fetchLmsMyDashboard, fetchLmsMyWorkspaces } from '@/services/lms';
+import { fetchLmsMyDashboard, fetchLmsMyWorkspaces, type LmsWorkspace } from '@/services/lms';
 import { LmsWorkspaceShell } from '@/components/lms-module/lms-workspace-shell';
 
 type Props = {
@@ -35,7 +35,7 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
   }
 
   const cards = dashboard.data?.cards;
-  const list = workspaces.data?.workspaces ?? dashboard.data?.workspaces ?? [];
+  const list: LmsWorkspace[] = workspaces.data?.workspaces ?? dashboard.data?.workspaces ?? [];
 
   return (
     <div className="space-y-6">

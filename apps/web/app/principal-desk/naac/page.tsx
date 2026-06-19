@@ -21,7 +21,7 @@ export default function NaacPage() {
       ) : data ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-6">
-            <CircularProgress value={data.overallReadiness ?? 0} size={120} />
+            <CircularProgress value={data.overallReadiness ?? 0} size={120} label="Readiness" />
             <div>
               <p className="text-sm text-slate-500">Overall Readiness</p>
               <p className="text-3xl font-black text-indigo-600">{data.overallReadiness ?? 0}%</p>

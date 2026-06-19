@@ -202,7 +202,8 @@ function PaperTable({
   onRefresh: () => void;
   showActions?: boolean;
 }) {
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const canManage = user?.permissions?.includes('question-bank:manage');
   const canPublish = user?.permissions?.includes('question-bank:publish') || canManage;
   const canContribute = user?.permissions?.includes('question-bank:contribute') || canManage;
@@ -381,7 +382,8 @@ function SettingsPanel({
 export function QuestionBankWorkspace({ page = 'dashboard', portal = 'admin' }: Props) {
   const queryEnabled = useAuthQueryEnabled();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [uploadForm, setUploadForm] = useState({
@@ -400,7 +402,7 @@ export function QuestionBankWorkspace({ page = 'dashboard', portal = 'admin' }: 
 
   const isStudent = portal === 'student';
   const canManage = user?.permissions?.includes('question-bank:manage');
-  const canApprove = user?.permissions?.some((p) =>
+  const canApprove = user?.permissions?.some((p: string) =>
     ['question-bank:approve', 'question-bank:publish', 'question-bank:manage'].includes(p),
   );
 

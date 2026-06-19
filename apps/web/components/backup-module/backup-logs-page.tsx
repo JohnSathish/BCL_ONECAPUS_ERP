@@ -15,7 +15,7 @@ export function BackupLogsPage() {
   const [action, setAction] = useState('');
   const logsQ = useQuery({
     queryKey: ['backups', 'logs', action],
-    queryFn: () => fetchBackupLogs({ action: action || undefined, limit: '50' }),
+    queryFn: () => fetchBackupLogs({ action: action || undefined }),
   });
 
   return (

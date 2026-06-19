@@ -192,8 +192,8 @@ export function LibraryAccessDesk() {
   const now = useLiveClock();
   const inputRef = useRef<HTMLInputElement>(null);
   const scanKeyTimesRef = useRef<number[]>([]);
-  const scanAutoTimerRef = useRef<number>();
-  const scanResetTimerRef = useRef<number>();
+  const scanAutoTimerRef = useRef<number | undefined>(undefined);
+  const scanResetTimerRef = useRef<number | undefined>(undefined);
   const [scanInput, setScanInput] = useState('');
   const [displayPhase, setDisplayPhase] = useState<ScannerPhase>('idle');
   const [fullscreen, setFullscreen] = useState(false);

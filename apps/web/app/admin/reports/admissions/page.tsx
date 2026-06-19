@@ -86,10 +86,8 @@ export default function AdmissionRegisterReportPage() {
                 <tr key={row.id} className="border-t border-border">
                   <td className="px-3 py-2">{row.enrollmentNumber}</td>
                   <td className="px-3 py-2">{row.fullName}</td>
-                  <td className="px-3 py-2">
-                    {row.programmeName ?? row.programVersionLabel ?? '—'}
-                  </td>
-                  <td className="px-3 py-2">{row.batchCode ?? '—'}</td>
+                  <td className="px-3 py-2">{row.programme ?? '—'}</td>
+                  <td className="px-3 py-2">{row.batch ?? '—'}</td>
                   <td className="px-3 py-2">{row.academicStatus ?? row.admissionStatus ?? '—'}</td>
                 </tr>
               ))}

@@ -110,9 +110,11 @@ export function StaffPortalSalaryPage() {
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               Last payment:{' '}
-              {(salary?.lastPaymentDate ?? latestPayslip)
+              {latestPayslip
                 ? `${MONTHS[latestPayslip.month - 1]} ${latestPayslip.year}`
-                : '—'}
+                : salary?.lastPaymentDate
+                  ? new Date(salary.lastPaymentDate).toLocaleDateString('en-IN')
+                  : '—'}
             </p>
             {latestPayslip && (
               <p className="text-sm">

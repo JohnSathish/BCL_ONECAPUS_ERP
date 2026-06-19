@@ -14,6 +14,7 @@ import { cn } from '@/utils/cn';
 type StudentRow = {
   id: string;
   enrollmentNumber?: string | null;
+  fullName?: string | null;
   masterProfile?: { fullName?: string | null } | null;
 };
 
@@ -59,7 +60,7 @@ export function DemandScopeForm({
       const row = res.data[0];
       if (row?.id === scope.studentId) {
         setSelectedStudent(row as StudentRow);
-        setStudentSearch(row.enrollmentNumber ?? row.masterProfile?.fullName ?? '');
+        setStudentSearch(row.enrollmentNumber ?? row.fullName ?? '');
       }
     });
   }, [scope.studentId, selectedStudent?.id]);
@@ -88,7 +89,7 @@ export function DemandScopeForm({
 
   const pickStudent = (row: StudentRow) => {
     setSelectedStudent(row);
-    setStudentSearch(row.enrollmentNumber ?? row.masterProfile?.fullName ?? '');
+    setStudentSearch(row.enrollmentNumber ?? row.fullName ?? '');
     setStudentResults([]);
     setScope((prev) => ({ ...prev, studentId: row.id }));
   };
@@ -130,7 +131,7 @@ export function DemandScopeForm({
                   onMouseDown={() => pickStudent(row)}
                 >
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{row.masterProfile?.fullName ?? 'Student'}</span>
+                  <span className="font-medium">{row.fullName ?? 'Student'}</span>
                   <span className="text-xs text-muted-foreground">{row.enrollmentNumber}</span>
                 </button>
               </li>

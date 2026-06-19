@@ -773,6 +773,16 @@ function TemplateStudio(props: {
   );
 }
 
+type TransferCertificateFields = {
+  conduct: string;
+  attendance: string;
+  industry: string;
+  fee_clearance: string;
+  reason_for_leaving: string;
+  date_of_leaving: string;
+  remarks: string;
+};
+
 function IssueConsole(props: {
   categories: CertificateCategory[];
   templates: CertificateTemplate[];
@@ -791,16 +801,8 @@ function IssueConsole(props: {
   issueBlockers?: string[];
   issuePending?: boolean;
   isTransferCertificate?: boolean;
-  tcFields?: {
-    conduct: string;
-    attendance: string;
-    industry: string;
-    fee_clearance: string;
-    reason_for_leaving: string;
-    date_of_leaving: string;
-    remarks: string;
-  };
-  setTcFields?: (value: IssueConsole['tcFields']) => void;
+  tcFields?: TransferCertificateFields;
+  setTcFields?: (value: TransferCertificateFields) => void;
   onRequest: () => void;
   onIssue: () => void;
   onBulkIssue: () => void;

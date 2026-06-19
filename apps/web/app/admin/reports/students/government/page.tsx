@@ -47,7 +47,7 @@ export default function GovernmentReportsPage() {
           {...filterOptions}
         />
 
-        {category.data ? (
+        {category.data && 'title' in category.data ? (
           <DistributionReportPanel
             title={category.data.title}
             total={category.data.total}
@@ -56,7 +56,7 @@ export default function GovernmentReportsPage() {
           />
         ) : null}
 
-        {religion.data ? (
+        {religion.data && 'title' in religion.data ? (
           <DistributionReportPanel
             title={religion.data.title}
             total={religion.data.total}

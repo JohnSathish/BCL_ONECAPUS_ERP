@@ -18,6 +18,7 @@ export function useStudentDashboard(options?: { enabled?: boolean }) {
 
   return {
     data: query.data,
+    qrPass: query.data?.qrPass,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

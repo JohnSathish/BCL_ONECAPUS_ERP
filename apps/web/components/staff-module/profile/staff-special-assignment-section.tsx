@@ -31,7 +31,7 @@ export function StaffSpecialAssignmentSection({
     <SectionCard
       title="Special Assignment"
       description="Study leave, sabbatical, and replacement faculty coverage"
-      action={
+      footer={
         canEdit ? (
           <Button type="button" size="sm" variant="outline" onClick={() => setAssignOpen(true)}>
             Assign Replacement Faculty

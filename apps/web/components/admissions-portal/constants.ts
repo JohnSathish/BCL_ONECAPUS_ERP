@@ -83,7 +83,7 @@ export function stepProgressPercent(step: number) {
 
 export function resolveRequiredDocumentSlots(formData?: Record<string, unknown> | null) {
   const personal = (formData?.personal ?? {}) as { category?: string };
-  const required = DOC_SLOTS.filter((slot) => slot.required).map((slot) => slot.code);
+  const required: string[] = DOC_SLOTS.filter((slot) => slot.required).map((slot) => slot.code);
   if (personal.category === 'EWS') {
     required.push('EWS');
   }

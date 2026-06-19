@@ -12,7 +12,13 @@ import {
   fetchLibraryZoneOccupancy,
   updateLibrarySettings,
 } from '@/services/library';
-import type { CirculationPolicy, FinePolicy, LibrarySettings } from '@/types/library';
+import type {
+  CirculationPolicy,
+  CategoryRulePolicy,
+  FinePolicy,
+  LibrarySettings,
+  MemberRolePolicy,
+} from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
 
 const DEFAULT_CIRCULATION: CirculationPolicy = {
@@ -430,5 +436,3 @@ export function LibrarySettingsPanel() {
     </div>
   );
 }
-
-type MemberRolePolicy = CirculationPolicy['student'];

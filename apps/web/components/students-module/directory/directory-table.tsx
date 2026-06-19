@@ -132,7 +132,7 @@ function InlineActions({
                 {a.label}
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem key={a.label} asChild disabled={'disabled' in a && a.disabled}>
+              <DropdownMenuItem key={a.label} asChild>
                 <Link href={a.href!}>{a.label}</Link>
               </DropdownMenuItem>
             ),

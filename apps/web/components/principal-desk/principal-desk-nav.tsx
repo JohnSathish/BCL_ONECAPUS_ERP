@@ -69,7 +69,7 @@ export function PrincipalDeskNav() {
             Principal Command Center
           </p>
           <p className="truncate text-sm font-bold text-slate-900 dark:text-foreground">
-            {branding.displayName ?? 'OneCampus'}
+            {branding.branding?.displayName ?? 'OneCampus'}
           </p>
         </div>
         <nav className="hidden flex-1 items-center gap-1 overflow-x-auto lg:flex">

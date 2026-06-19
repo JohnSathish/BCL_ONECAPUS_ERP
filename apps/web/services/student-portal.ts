@@ -84,7 +84,16 @@ export async function uploadStudentPortalDocument(documentType: string, file: Fi
   return data;
 }
 
-export async function fetchStudentDeviceSessions() {
+export async function fetchStudentDeviceSessions(): Promise<{
+  lastLoginAt?: string | null;
+  devices: Array<{
+    id: string;
+    label: string;
+    userAgent: string;
+    lastActiveAt: string;
+    isCurrent: boolean;
+  }>;
+}> {
   const { data } = await api.get('/v1/students/me/sessions');
   return data;
 }

@@ -52,6 +52,7 @@ export type AdmissionApplication = {
   admissionFeeReference?: string | null;
   formData?: Record<string, unknown>;
   cycle?: { id: string; code: string; title: string; status: string } | null;
+  enrolledStudent?: { id: string } | null;
   documents?: AdmissionApplicationDocument[];
   intake: {
     id: string;

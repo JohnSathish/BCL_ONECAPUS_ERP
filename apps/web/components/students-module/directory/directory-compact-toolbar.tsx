@@ -167,11 +167,11 @@ export function DirectoryCompactToolbar({
     program: optionsToMap(programOptions),
     batch: optionsToMap(batchOptions),
     shift: optionsToMap(shiftOptions),
-    stream: {},
+    stream: undefined,
     department: optionsToMap(departmentOptions),
-    session: {},
-    category: {},
-    religion: {},
+    session: undefined,
+    category: undefined,
+    religion: undefined,
   };
 
   const bulkUpdateHref = buildBulkHref('/admin/students/bulk-update', selectedIds, filters);

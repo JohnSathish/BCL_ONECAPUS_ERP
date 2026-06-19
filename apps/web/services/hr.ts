@@ -23,7 +23,7 @@ export type LeaveApplication = {
 
 export async function fetchLeaveBalances(params?: { staffProfileId?: string; year?: number }) {
   const { data } = await api.get<{ data: LeaveBalance[] }>('/v1/hr/leave/balances', { params });
-  return data;
+  return data.data;
 }
 
 export async function fetchLeaveApplications(params?: {
@@ -34,7 +34,7 @@ export async function fetchLeaveApplications(params?: {
   const { data } = await api.get<{ data: LeaveApplication[] }>('/v1/hr/leave/applications', {
     params,
   });
-  return data;
+  return data.data;
 }
 
 export async function approveLeaveApplication(
@@ -75,7 +75,7 @@ export async function fetchPortalLeaveSummary() {
 
 export async function fetchPortalLeaveApplications() {
   const { data } = await api.get<{ data: LeaveApplication[] }>('/v1/hr/leave/applications/me');
-  return data;
+  return data.data;
 }
 
 export type RecruitmentVacancy = {
@@ -109,7 +109,7 @@ export async function fetchRecruitmentVacancies(status?: string) {
   const { data } = await api.get<{ data: RecruitmentVacancy[] }>('/v1/hr/recruitment/vacancies', {
     params: { status },
   });
-  return data;
+  return data.data;
 }
 
 export async function createRecruitmentVacancy(body: {
@@ -130,7 +130,7 @@ export async function fetchRecruitmentApplications(vacancyId?: string) {
       params: { vacancyId },
     },
   );
-  return data;
+  return data.data;
 }
 
 export async function createRecruitmentApplication(body: {
@@ -176,7 +176,7 @@ export async function fetchPensionEnrollments(staffProfileId?: string) {
   const { data } = await api.get<{ data: PensionEnrollment[] }>('/v1/hr/pension/enrollments', {
     params: { staffProfileId },
   });
-  return data;
+  return data.data;
 }
 
 export async function fetchPensionLedger(staffProfileId?: string, year?: number) {
@@ -206,7 +206,7 @@ export type StaffAppraisal = {
 
 export async function fetchAppraisalCycles() {
   const { data } = await api.get<{ data: AppraisalCycle[] }>('/v1/hr/appraisal/cycles');
-  return data;
+  return data.data;
 }
 
 export async function createAppraisalCycle(body: {
@@ -231,7 +231,7 @@ export async function fetchAppraisalRecords(params?: {
   const { data } = await api.get<{ data: StaffAppraisal[] }>('/v1/hr/appraisal/records', {
     params,
   });
-  return data;
+  return data.data;
 }
 
 export async function scoreAppraisal(

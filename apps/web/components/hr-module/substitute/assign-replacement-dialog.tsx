@@ -67,7 +67,7 @@ export function AssignReplacementDialog({
   });
   const departments = useQuery({
     queryKey: ['org', 'departments'],
-    queryFn: fetchDepartments,
+    queryFn: () => fetchDepartments(),
     enabled: open,
   });
 

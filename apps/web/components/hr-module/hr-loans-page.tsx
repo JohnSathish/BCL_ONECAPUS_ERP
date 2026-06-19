@@ -174,8 +174,8 @@ function StaffCard({
     fullName: string;
     employeeCode: string;
     photoUrl?: string | null;
-    department?: { name: string };
-    designation?: { label: string };
+    department?: { name: string } | null;
+    designation?: { label: string } | null;
     basicPay?: number | null;
   };
 }) {

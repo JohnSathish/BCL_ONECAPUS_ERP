@@ -72,7 +72,7 @@ export default function AcademicReportsPage() {
           ))}
         </div>
 
-        {data && 'buckets' in data ? (
+        {data && 'title' in data ? (
           <DistributionReportPanel
             title={data.title}
             total={data.total}
