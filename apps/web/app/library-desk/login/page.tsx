@@ -15,6 +15,22 @@ export default function LibraryDeskLoginPage() {
     router.replace(resolveHomePath(session.user.roles ?? [], session.user.permissions ?? []));
   }, [isReady, session, router]);
 
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+        Loading…
+      </div>
+    );
+  }
+
+  if (session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+        Redirecting…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950">
       <LoginForm hardRedirect />

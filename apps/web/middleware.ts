@@ -13,6 +13,45 @@ function isAdmissionsHost(host: string) {
   return hostname(host).startsWith('admissions.');
 }
 
+function handleLibraryHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const loginPath = '/library-desk/login';
+  const deskPath = '/library-desk';
+
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/uploads') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  const refreshCookie = request.cookies.get('nep_refresh')?.value;
+  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
+  const isLogin =
+    pathname === '/login' || pathname === loginPath || pathname.startsWith(`${loginPath}/`);
+
+  if (!hasRefreshCookie && !isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = loginPath;
+    return NextResponse.redirect(url);
+  }
+
+  if (hasRefreshCookie && isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = deskPath;
+    return NextResponse.redirect(url);
+  }
+
+  return handleSubdomainRewrite(request, deskPath, loginPath, [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+  ]);
+}
+
 function handleSubdomainRewrite(
   request: NextRequest,
   basePath: string,
@@ -67,12 +106,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (isLibraryHost(host)) {
-    return handleSubdomainRewrite(request, '/library-desk', '/library-desk/login', [
-      '/admin',
-      '/student',
-      '/staff',
-      '/shift',
-    ]);
+    return handleLibraryHost(request);
   }
 
   return NextResponse.next();
