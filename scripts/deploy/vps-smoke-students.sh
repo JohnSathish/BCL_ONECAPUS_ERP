@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test students API through nginx (same path as the browser).
+# Test students API — direct to Nest and through nginx (same path as browser).
 # Usage on VPS:
 #   SMOKE_EMAIL='admin@donboscocollege.ac.in' SMOKE_PASSWORD='your-password' bash scripts/deploy/vps-smoke-students.sh
 set -euo pipefail
@@ -17,56 +17,115 @@ if [[ -f .env ]]; then
 fi
 
 HOST="${NEXT_PUBLIC_LOGIN_HOST:-erp.donboscocollege.ac.in}"
-API="https://${HOST}/api"
+PUBLIC_API="https://${HOST}/api"
 EMAIL="${SMOKE_EMAIL:-admin@donboscocollege.ac.in}"
 PASS="${SMOKE_PASSWORD:-}"
 
 echo "=== Students API smoke test ==="
-echo "API: ${API}"
+echo "Host: ${HOST}"
 echo "Email: ${EMAIL}"
 echo
 
-echo "--- 1) nginx -> api (inside docker network) ---"
+echo "--- 1) nginx -> api (docker network) ---"
 "${COMPOSE[@]}" exec -T nginx wget -qO- "http://api:3001/api/health/live" || echo "FAIL: nginx cannot reach api:3001"
 echo
 
 echo "--- 2) Public health via HTTPS ---"
-curl -sf "${API}/health/ready" | head -c 300
+curl -sf "${PUBLIC_API}/health/ready" | head -c 300
 echo
 echo
 
 if [[ -z "${PASS}" ]]; then
-  echo "Set SMOKE_PASSWORD to test authenticated /v1/students (login + list)."
-  echo "Example:"
+  echo "Set SMOKE_PASSWORD to test login + /v1/students."
   echo "  SMOKE_EMAIL='admin@donboscocollege.ac.in' SMOKE_PASSWORD='***' bash scripts/deploy/vps-smoke-students.sh"
   exit 0
 fi
 
-echo "--- 3) Login ---"
-LOGIN_JSON=$(curl -sf -X POST "${API}/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -H "Host: ${HOST}" \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASS}\"}")
-TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
-if [[ -z "${TOKEN}" ]]; then
-  echo "FAIL: login did not return accessToken"
-  echo "$LOGIN_JSON" | head -c 400
-  exit 1
-fi
-echo "Login OK"
-echo
+echo "--- 3) Login + students (Node inside API container) ---"
+"${COMPOSE[@]}" exec -T \
+  -e SMOKE_HOST="${HOST}" \
+  -e SMOKE_EMAIL="${EMAIL}" \
+  -e SMOKE_PASSWORD="${PASS}" \
+  -e PUBLIC_API="${PUBLIC_API}" \
+  api node <<'NODE'
+const host = process.env.SMOKE_HOST;
+const email = process.env.SMOKE_EMAIL;
+const password = process.env.SMOKE_PASSWORD;
+const publicApi = process.env.PUBLIC_API;
+const localApi = 'http://127.0.0.1:3001/api';
 
-echo "--- 4) GET /v1/students (through nginx, same as browser) ---"
-HTTP_CODE=$(curl -s -o /tmp/students-smoke.json -w "%{http_code}" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Host: ${HOST}" \
-  "${API}/v1/students?page=1&limit=25")
-echo "HTTP status: ${HTTP_CODE}"
-head -c 500 /tmp/students-smoke.json
-echo
-echo
+function unwrap(json) {
+  if (json && typeof json === 'object' && json.success === true && 'data' in json) {
+    return json.data;
+  }
+  return json;
+}
 
-echo "--- 5) API container logs (last 15 lines) ---"
-"${COMPOSE[@]}" logs api --tail 15
+function solveExpression(expression) {
+  const normalized = String(expression).replace(/×/g, '*').replace(/÷/g, '/');
+  // eslint-disable-next-line no-new-func
+  return Function(`"use strict"; return (${normalized});`)();
+}
+
+async function login(apiBase, label) {
+  const challengeRes = await fetch(`${apiBase}/v1/auth/challenge`, {
+    headers: { Host: host, Accept: 'application/json' },
+  });
+  const challengeBody = unwrap(await challengeRes.json());
+  if (!challengeRes.ok || !challengeBody?.token) {
+    throw new Error(`${label} challenge failed: HTTP ${challengeRes.status}`);
+  }
+  const answer = solveExpression(challengeBody.expression);
+  const loginRes = await fetch(`${apiBase}/v1/auth/login`, {
+    method: 'POST',
+    headers: {
+      Host: host,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      challengeToken: challengeBody.token,
+      challengeAnswer: answer,
+    }),
+  });
+  const loginBody = unwrap(await loginRes.json());
+  if (!loginRes.ok || !loginBody?.accessToken) {
+    const detail = JSON.stringify(loginBody).slice(0, 240);
+    throw new Error(`${label} login failed: HTTP ${loginRes.status} ${detail}`);
+  }
+  console.log(`${label} login OK`);
+  return loginBody.accessToken;
+}
+
+async function students(apiBase, label, token) {
+  const res = await fetch(`${apiBase}/v1/students?page=1&limit=25`, {
+    headers: {
+      Host: host,
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const text = await res.text();
+  console.log(`${label} GET /v1/students -> HTTP ${res.status}`);
+  console.log(text.slice(0, 400));
+  if (!res.ok) process.exitCode = 1;
+}
+
+(async () => {
+  const token = await login(localApi, 'direct-api');
+  await students(localApi, 'direct-api', token);
+  const publicToken = await login(publicApi, 'public-nginx');
+  await students(publicApi, 'public-nginx', publicToken);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+NODE
+
+echo
+echo "--- 4) API logs (last 20 lines) ---"
+"${COMPOSE[@]}" logs api --tail 20
 echo
 echo "=== Done ==="

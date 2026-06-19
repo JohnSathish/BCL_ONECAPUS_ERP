@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -124,6 +125,8 @@ export type StudentListQuery = PaginationQueryDto & {
 
 @Injectable()
 export class StudentsService {
+  private readonly logger = new Logger(StudentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly academicEngine: AcademicEngineService,
@@ -332,6 +335,9 @@ export class StudentsService {
     const scope = this.shiftScope.resolveScope(user, query.shiftId);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    this.logger.log(
+      `Student directory list start tenant=${tenantId} page=${page} limit=${limit}`,
+    );
 
     let where: Prisma.StudentWhereInput = {
       tenantId,

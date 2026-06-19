@@ -46,6 +46,7 @@ import {
 } from '@/services/students';
 import type { AdmitStudentPayload, StudentDirectoryRow, StudentProfile } from '@/types/students';
 import { apiErrorMessage } from '@/utils/api-error';
+import { isRetryableQueryError } from '@/lib/http/api-error-types';
 
 export { DirectoryCommandBar } from '@/components/students-module/directory/directory-command-bar';
 export {
@@ -189,55 +190,58 @@ export function StudentDirectoryPage() {
   const students = useQuery({
     queryKey: ['students', 'list', listParams],
     queryFn: () => fetchStudents(listParams),
-    enabled: authReady && perms.canRead,
+    enabled: authReady && perms.canRead && institutions.isSuccess,
+    retry: (count, error) => count < 1 && isRetryableQueryError(error),
   });
+
+  const filtersReady = authReady && students.isSuccess;
 
   const programs = useQuery({
     queryKey: ['catalog', 'programs'],
     queryFn: () => fetchPrograms(1),
-    enabled: authReady,
+    enabled: filtersReady,
   });
 
   const shifts = useQuery({
     queryKey: ['shifts', campusId, 'ACTIVE'],
     queryFn: () => fetchShifts({ campusId, status: 'ACTIVE' }),
-    enabled: authReady && Boolean(campusId),
+    enabled: filtersReady && Boolean(campusId),
   });
 
   const streams = useQuery({
     queryKey: ['academic-engine', 'streams'],
     queryFn: fetchAcademicStreams,
-    enabled: authReady,
+    enabled: filtersReady,
   });
 
   const batches = useQuery({
     queryKey: ['academic-lifecycle', 'batches', institutionId],
     queryFn: () => fetchAdmissionBatches(institutionId),
-    enabled: authReady && Boolean(institutionId),
+    enabled: filtersReady && Boolean(institutionId),
   });
 
   const sessions = useQuery({
     queryKey: ['academic-lifecycle', 'sessions', institutionId],
     queryFn: () => listAcademicSessions(institutionId),
-    enabled: authReady && Boolean(institutionId),
+    enabled: filtersReady && Boolean(institutionId),
   });
 
   const departments = useQuery({
     queryKey: ['org', 'departments', 'academic'],
     queryFn: () => fetchAcademicDepartments(),
-    enabled: authReady,
+    enabled: filtersReady,
   });
 
   const categories = useQuery({
     queryKey: ['master-lookups', 'CATEGORY'],
     queryFn: () => fetchMasterLookups('CATEGORY'),
-    enabled: authReady,
+    enabled: filtersReady,
   });
 
   const religions = useQuery({
     queryKey: ['master-lookups', 'RELIGION'],
     queryFn: () => fetchMasterLookups('RELIGION'),
-    enabled: authReady,
+    enabled: filtersReady,
   });
 
   const programVersions = useMemo(() => {
