@@ -127,7 +127,10 @@ export async function generateFeeReceiptPdf(tenantId: string, receiptId: string)
       })
     : null;
 
-  const branding = await resolveFeeReceiptBranding(db(), tenantId);
+  const branding = await resolveFeeReceiptBranding(
+    db() as Parameters<typeof resolveFeeReceiptBranding>[0],
+    tenantId,
+  );
   const verifyUrl = `${process.env.WEB_ORIGIN ?? 'http://demo.localhost:3000'}/verify/receipt/${receiptNo}`;
   const masterProfile = student?.masterProfile as
     | { fullName?: string; applicationNumber?: string }
