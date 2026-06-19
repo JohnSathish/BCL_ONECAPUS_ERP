@@ -446,7 +446,8 @@ export class AcademicCatalogService {
     return paginate(data, total, page, limit);
   }
 
-  private async bustProgrammeCache(tenantId: string) {
+  /** Clears cached programme list pages (used after version publish/archive). */
+  async bustProgrammeCache(tenantId: string) {
     await this.cache.delByPrefix(`programmes:${tenantId}:`);
   }
 

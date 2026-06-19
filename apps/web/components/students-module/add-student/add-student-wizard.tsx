@@ -61,7 +61,7 @@ import {
   fetchCampuses,
   fetchInstitutions,
 } from '@/services/organization';
-import { fetchPrograms } from '@/services/programs';
+import { fetchAllPrograms } from '@/services/programs';
 import { fetchShifts } from '@/services/shifts';
 import {
   admitStudentWithRegistration,
@@ -180,8 +180,8 @@ export function AddStudentWizard() {
   }, [campusId, draft.campusId]);
 
   const programs = useQuery({
-    queryKey: ['catalog', 'programs'],
-    queryFn: () => fetchPrograms(1),
+    queryKey: ['catalog', 'programs', 'all'],
+    queryFn: () => fetchAllPrograms(),
     enabled: Boolean(session),
   });
   const shifts = useQuery({

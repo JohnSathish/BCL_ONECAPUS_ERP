@@ -2075,6 +2075,7 @@ export default function AdminProgramsPage() {
           if (!open) setVersionManageProgram(null);
         }}
         canManage={Boolean(canManage)}
+        onVersionsChanged={() => void invalidate()}
       />
     </DashboardShell>
   );

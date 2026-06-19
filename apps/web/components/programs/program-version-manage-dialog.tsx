@@ -86,11 +86,14 @@ export function ProgramVersionManageDialog({
   });
 
   const invalidate = async () => {
-    await qc.invalidateQueries({ queryKey: ['programs'] });
-    await qc.invalidateQueries({ queryKey: ['catalog'] });
-    if (program?.id) {
-      await qc.invalidateQueries({ queryKey: ['program-versions', program.id] });
-    }
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['catalog'] }),
+      qc.invalidateQueries({ queryKey: ['catalog', 'programs'] }),
+      qc.invalidateQueries({ queryKey: ['programs'] }),
+      program?.id
+        ? qc.invalidateQueries({ queryKey: ['program-versions', program.id] })
+        : Promise.resolve(),
+    ]);
     onVersionsChanged?.();
   };
 

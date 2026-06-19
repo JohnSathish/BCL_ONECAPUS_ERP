@@ -48,12 +48,23 @@ export class ProgramsCoursesService {
     return this.catalog.updateProgram(tenantId, id, dto);
   }
 
+  private async withProgrammeCacheBust<T>(
+    tenantId: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const result = await action();
+    await this.catalog.bustProgrammeCache(tenantId);
+    return result;
+  }
+
   createProgramVersion(user: JwtUser, dto: CreateProgramVersionDto) {
-    return this.versionLifecycle.createDraft(user.tid, user.sub, {
-      programId: dto.programId,
-      cbcsEnabled: dto.cbcsEnabled,
-      sourceVersionId: dto.sourceVersionId,
-    });
+    return this.withProgrammeCacheBust(user.tid, () =>
+      this.versionLifecycle.createDraft(user.tid, user.sub, {
+        programId: dto.programId,
+        cbcsEnabled: dto.cbcsEnabled,
+        sourceVersionId: dto.sourceVersionId,
+      }),
+    );
   }
 
   listProgramVersions(tenantId: string, programId: string) {
@@ -65,39 +76,53 @@ export class ProgramsCoursesService {
   }
 
   publishProgramVersion(user: JwtUser, id: string) {
-    return this.versionLifecycle.publish(user.tid, user.sub, id);
+    return this.withProgrammeCacheBust(user.tid, () =>
+      this.versionLifecycle.publish(user.tid, user.sub, id),
+    );
   }
 
   archiveProgramVersion(user: JwtUser, id: string) {
-    return this.versionLifecycle.archive(user.tid, user.sub, id);
+    return this.withProgrammeCacheBust(user.tid, () =>
+      this.versionLifecycle.archive(user.tid, user.sub, id),
+    );
   }
 
   deleteProgramVersion(tenantId: string, id: string) {
-    return this.versionLifecycle.deleteIfSafe(tenantId, id);
+    return this.withProgrammeCacheBust(tenantId, () =>
+      this.versionLifecycle.deleteIfSafe(tenantId, id),
+    );
   }
 
   purgeProgramVersion(tenantId: string, id: string) {
-    return this.versionLifecycle.purgeAndDeleteUnusedVersion(tenantId, id);
+    return this.withProgrammeCacheBust(tenantId, () =>
+      this.versionLifecycle.purgeAndDeleteUnusedVersion(tenantId, id),
+    );
   }
 
   relabelProgramVersion(tenantId: string, id: string, version: number) {
-    return this.versionLifecycle.relabelVersion(tenantId, id, version);
+    return this.withProgrammeCacheBust(tenantId, () =>
+      this.versionLifecycle.relabelVersion(tenantId, id, version),
+    );
   }
 
   normalizeProgramVersions(user: JwtUser, dto: NormalizeProgramVersionsDto) {
-    return this.versionLifecycle.normalizeMistakenProgramVersions(
-      user.tid,
-      user.sub,
-      dto.programCode,
-      {
-        keepVersionNumber: dto.keepVersionNumber,
-        removeVersionNumbers: dto.removeVersionNumbers ?? [1, 2],
-      },
+    return this.withProgrammeCacheBust(user.tid, () =>
+      this.versionLifecycle.normalizeMistakenProgramVersions(
+        user.tid,
+        user.sub,
+        dto.programCode,
+        {
+          keepVersionNumber: dto.keepVersionNumber,
+          removeVersionNumbers: dto.removeVersionNumbers ?? [1, 2],
+        },
+      ),
     );
   }
 
   duplicateProgramVersion(user: JwtUser, sourceVersionId: string) {
-    return this.versionLifecycle.duplicate(user.tid, user.sub, sourceVersionId);
+    return this.withProgrammeCacheBust(user.tid, () =>
+      this.versionLifecycle.duplicate(user.tid, user.sub, sourceVersionId),
+    );
   }
 
   listCourses(
