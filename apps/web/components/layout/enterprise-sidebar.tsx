@@ -29,15 +29,17 @@ import {
   useSidebarNavStore,
   type SidebarScrollSection,
 } from '@/store/sidebar-nav-store';
+import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
 import { cn } from '@/utils/cn';
 
 const NAV_ITEM_CLASS =
   'relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors';
 const NAV_ITEM_ACTIVE = 'sidebar-glow-active text-sidebar-foreground';
 const NAV_ITEM_IDLE = 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground';
+const NAV_PARENT_CLASS = 'font-semibold text-sidebar-foreground';
 
 const SCROLL_NAV_CLASS =
-  'scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain px-1.5 py-1';
+  'sidebar-scroll-auto min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-2 py-2';
 
 const EMPTY_OPEN_GROUPS: Record<string, boolean> = {};
 
@@ -203,8 +205,13 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
 
   const navCollapsed = mobileNavOpen ? false : collapsed;
 
-  const renderGroups = (sectionGroups: NavGroup[], options?: { hideFirstDivider?: boolean }) =>
-    sectionGroups.map((group, index) => (
+  const allNavGroups = useMemo(
+    () => [...scrollGroups, ...pinnedGroups],
+    [scrollGroups, pinnedGroups],
+  );
+
+  const renderGroups = (sectionGroups: NavGroup[]) =>
+    sectionGroups.map((group) => (
       <NavSection
         key={group.label}
         group={group}
@@ -213,7 +220,6 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         resolveOpen={resolveOpen}
         onToggle={(item) => setGroupOpen(roleKey, item.label, !resolveOpen(item))}
         onExpandSidebar={toggleSidebar}
-        showDivider={collapsed && !(options?.hideFirstDivider && index === 0)}
       />
     ));
 
@@ -228,13 +234,16 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         />
       ) : null}
       <aside
-        style={{ width: mobileNavOpen ? 280 : collapsed ? 72 : 240 }}
+        style={{
+          width: mobileNavOpen ? '100%' : collapsed ? SIDEBAR_WIDTH.collapsed : undefined,
+        }}
         className={cn(
           'erp-theme-sidebar pointer-events-auto fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl transition-[transform,width] duration-200 ease-out',
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          !mobileNavOpen && !collapsed && 'w-[260px] lg:w-[280px]',
         )}
       >
-        <div className="shrink-0 border-b border-sidebar-border px-3 py-3">
+        <div className="shrink-0 border-b border-sidebar-border/50 px-3 py-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -268,14 +277,14 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         </div>
 
         {mobileNavOpen || !collapsed ? (
-          <div className="shrink-0 px-3 py-3">
+          <div className="shrink-0 px-3 pb-2 pt-1">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-muted" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search modules…"
-                className="h-8 border-sidebar-border bg-sidebar/50 pl-8 text-xs text-sidebar-foreground placeholder:text-muted-foreground"
+                className="h-8 border-0 bg-sidebar-active/40 pl-8 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-muted/70 focus-visible:ring-1 focus-visible:ring-primary/40"
                 aria-label="Search navigation"
               />
             </div>
@@ -285,49 +294,32 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         <SidebarNav
           roleKey={roleKey}
           section={isAdminLayout ? 'modules' : 'main'}
-          className={SCROLL_NAV_CLASS}
+          className={cn(
+            SCROLL_NAV_CLASS,
+            mobileNavOpen && isAdminLayout && 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
+          )}
           ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
         >
-          {renderGroups(scrollGroups, { hideFirstDivider: true })}
+          {renderGroups(allNavGroups)}
         </SidebarNav>
 
-        {pinnedGroups.length > 0 || isAdminLayout ? (
-          <div
-            className={cn(
-              'shrink-0 border-t border-sidebar-border bg-sidebar',
-              mobileNavOpen ? 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'pb-0',
-            )}
-          >
-            {pinnedGroups.length > 0 ? (
-              <SidebarNav
-                roleKey={roleKey}
-                section={isAdminLayout ? 'system' : 'pinned'}
-                className="max-h-[40vh] space-y-1 overflow-y-auto overscroll-y-contain px-1.5 py-1"
-                ariaLabel="System navigation"
-              >
-                {renderGroups(pinnedGroups)}
-              </SidebarNav>
-            ) : null}
-            {isAdminLayout ? (
-              <div className="border-t border-sidebar-border/80 px-2 py-2">
-                <button
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  className={cn(
-                    NAV_ITEM_CLASS,
-                    'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-danger',
-                    mobileNavOpen ? 'md:hidden' : 'hidden',
-                  )}
-                >
-                  <LogOut className="h-[18px] w-[18px] shrink-0" />
-                  <span>Sign out</span>
-                </button>
-              </div>
-            ) : null}
+        {isAdminLayout && mobileNavOpen ? (
+          <div className="shrink-0 px-2 py-2 md:hidden">
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className={cn(
+                NAV_ITEM_CLASS,
+                'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-danger',
+              )}
+            >
+              <LogOut className="h-[18px] w-[18px] shrink-0" />
+              <span>Sign out</span>
+            </button>
           </div>
         ) : null}
 
-        <div className="hidden shrink-0 border-t border-sidebar-border p-2 md:block">
+        <div className="hidden shrink-0 p-2 md:block">
           <button
             type="button"
             onClick={toggleSidebar}
@@ -365,7 +357,6 @@ function NavSection({
   onToggle,
   onExpandSidebar,
   hideLabel,
-  showDivider,
 }: {
   group: NavGroup;
   pathname: string;
@@ -374,15 +365,11 @@ function NavSection({
   onToggle: (item: NavItem) => void;
   onExpandSidebar: () => void;
   hideLabel?: boolean;
-  showDivider?: boolean;
 }) {
   return (
     <div>
-      {showDivider ? (
-        <div className="mx-2 my-1.5 border-t border-sidebar-border/80" aria-hidden />
-      ) : null}
       {!collapsed && !hideLabel ? (
-        <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted/90 first:pt-0">
+        <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted/80">
           {group.label}
         </p>
       ) : null}
@@ -471,17 +458,21 @@ function SidebarItem({
         <button
           type="button"
           onClick={onToggle}
-          className={cn(NAV_ITEM_CLASS, active ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE)}
+          className={cn(
+            NAV_ITEM_CLASS,
+            active || open ? NAV_PARENT_CLASS : '',
+            active ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE,
+          )}
           aria-expanded={open}
         >
-          <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-primary')} />
+          <Icon className={cn('h-[18px] w-[18px] shrink-0', (active || open) && 'text-primary')} />
           <span className="flex-1 text-left">{item.label}</span>
           <ChevronDown
-            className={cn('h-4 w-4 shrink-0 opacity-70 transition', open && 'rotate-180')}
+            className={cn('h-4 w-4 shrink-0 opacity-60 transition', open && 'rotate-180')}
           />
         </button>
         {open ? (
-          <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border/80 pl-3">
+          <ul className="ml-3 mt-0.5 space-y-0.5 pl-4">
             {item.children.map((child) => {
               const childActive = isNavChildActive(pathname, child, item.children ?? []);
               return (
@@ -492,10 +483,10 @@ function SidebarItem({
                     aria-current={childActive ? 'page' : undefined}
                     scroll={false}
                     className={cn(
-                      'relative z-10 block rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+                      'relative block rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       childActive
-                        ? 'bg-sidebar-active font-medium text-sidebar-foreground'
-                        : 'text-sidebar-muted hover:bg-sidebar-active/40 hover:text-sidebar-foreground',
+                        ? 'sidebar-child-active font-medium text-sidebar-foreground'
+                        : 'text-sidebar-muted/90 hover:bg-sidebar-active/35 hover:text-sidebar-foreground',
                     )}
                   >
                     {child.label}

@@ -265,12 +265,53 @@ html.theme-glass-disabled .glass-panel {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  min-height: 1rem;
+  width: 4px;
+  height: 65%;
+  min-height: 1.125rem;
   border-radius: 9999px;
   background: hsl(var(--primary));
-  box-shadow: 0 0 12px hsl(var(--primary) / 0.45);
+  box-shadow: 0 0 10px hsl(var(--primary) / 0.4);
+}
+
+.sidebar-child-active {
+  position: relative;
+  background: hsl(var(--primary) / 0.14);
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+}
+
+.sidebar-child-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 70%;
+  min-height: 0.875rem;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+}
+
+.sidebar-scroll-auto {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-scroll-auto:hover {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.sidebar-scroll-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll-auto::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.sidebar-scroll-auto:hover::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
 }
 
 .scrollbar-thin::-webkit-scrollbar {

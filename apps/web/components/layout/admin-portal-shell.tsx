@@ -15,7 +15,7 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
-          collapsed ? 'md:pl-[72px]' : 'md:pl-[240px]',
+          collapsed ? 'md:pl-[72px]' : 'md:pl-[260px] lg:pl-[280px]',
         )}
       >
         {children}
