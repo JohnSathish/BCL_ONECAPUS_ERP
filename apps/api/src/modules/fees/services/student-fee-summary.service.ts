@@ -41,6 +41,7 @@ export class StudentFeeSummaryService {
   async getMany(
     tenantId: string,
     studentIds: string[],
+    options?: { recomputeMissing?: boolean },
   ): Promise<Map<string, StudentFeeSummaryRow>> {
     if (!studentIds.length) return new Map();
     const rows = await this.db().studentFeeSummary.findMany({
@@ -48,15 +49,44 @@ export class StudentFeeSummaryService {
     });
     const map = new Map<string, StudentFeeSummaryRow>();
     for (const row of rows) map.set(row.studentId, this.mapRow(row));
+
     const missing = studentIds.filter((id) => !map.has(id));
-    if (missing.length) {
-      await Promise.all(missing.map((id) => this.recompute(tenantId, id)));
-      const fresh = await this.db().studentFeeSummary.findMany({
-        where: { tenantId, studentId: { in: missing } },
-      });
-      for (const row of fresh) map.set(row.studentId, this.mapRow(row));
+    if (!missing.length) return map;
+
+    if (options?.recomputeMissing === false) {
+      for (const studentId of missing) {
+        map.set(studentId, this.clearSummary(studentId));
+      }
+      return map;
+    }
+
+    // Never recompute an entire page in parallel — it OOMs small production VPS hosts.
+    for (const studentId of missing) {
+      map.set(studentId, await this.recompute(tenantId, studentId));
     }
     return map;
+  }
+
+  /** Read cached fee rows only; missing students default to CLEAR (safe for directory list). */
+  async getManyCached(
+    tenantId: string,
+    studentIds: string[],
+  ): Promise<Map<string, StudentFeeSummaryRow>> {
+    return this.getMany(tenantId, studentIds, { recomputeMissing: false });
+  }
+
+  private clearSummary(studentId: string): StudentFeeSummaryRow {
+    return {
+      studentId,
+      totalOutstanding: 0,
+      totalOverdue: 0,
+      admissionOutstanding: 0,
+      monthlyOutstanding: 0,
+      totalPaid: 0,
+      feeStatus: 'CLEAR',
+      lastPaymentAt: null,
+      activeDemandCount: 0,
+    };
   }
 
   async recompute(

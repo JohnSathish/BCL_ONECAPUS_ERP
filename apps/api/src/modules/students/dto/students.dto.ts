@@ -567,6 +567,10 @@ export class StudentListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   abcStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  operational?: string;
 }
 
 export class BulkAbcUploadRowDto {

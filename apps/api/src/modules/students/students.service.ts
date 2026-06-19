@@ -118,6 +118,8 @@ export type StudentListQuery = PaginationQueryDto & {
   noMobile?: string;
   recentlyAdded?: string;
   abcStatus?: string;
+  /** When "true", loads fee/attendance/hostel badges (heavy; off by default on VPS). */
+  operational?: string;
 };
 
 @Injectable()
@@ -595,10 +597,16 @@ export class StudentsService {
       );
     });
 
-    const enrichment = await this.directoryEnrichment.loadForStudents(
-      tenantId,
-      data.map((row) => row.id),
-    );
+    const includeOperational = query.operational === 'true';
+    const enrichment = includeOperational
+      ? await this.directoryEnrichment.loadForStudents(
+          tenantId,
+          data.map((row) => row.id),
+        )
+      : new Map<
+          string,
+          ReturnType<StudentDirectoryEnrichmentService['emptySnapshot']>
+        >();
 
     const nameFormat = await this.displaySettings.getFormat(tenantId);
 

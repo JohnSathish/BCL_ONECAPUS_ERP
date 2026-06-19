@@ -406,7 +406,7 @@ export class StudentDirectoryEnrichmentService {
     studentIds: string[],
   ): Promise<Map<string, DirectoryFeeSnapshot>> {
     const map = new Map<string, DirectoryFeeSnapshot>();
-    const summaries = await this.feeSummary.getMany(tenantId, studentIds);
+    const summaries = await this.feeSummary.getManyCached(tenantId, studentIds);
     for (const studentId of studentIds) {
       const row = summaries.get(studentId);
       if (!row || row.totalOutstanding <= 0) {
