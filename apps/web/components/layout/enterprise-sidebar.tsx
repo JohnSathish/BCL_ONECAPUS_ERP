@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
-import { useMemo, useState, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, Search, X } from 'lucide-react';
+import { useMemo, useState, useLayoutEffect, useRef, useEffect, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { InstitutionBrandMark } from '@/components/branding/institution-brand-mark';
 import {
@@ -81,12 +81,18 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   const { branding, active } = useInstitutionBranding();
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
+  const mobileNavOpen = useDashboardUiStore((s) => s.mobileNavOpen);
+  const setMobileNavOpen = useDashboardUiStore((s) => s.setMobileNavOpen);
   const mergeOpenGroups = useSidebarNavStore((s) => s.mergeOpenGroups);
   const setGroupOpen = useSidebarNavStore((s) => s.setGroupOpen);
   const openGroups = useSidebarNavStore((s) => s.openGroupsByRole[roleKey] ?? EMPTY_OPEN_GROUPS);
   const staffMe = useStaffMe({ enabled: role === 'staff' });
   const [query, setQuery] = useState('');
   const prevPathname = useRef(pathname);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname, setMobileNavOpen]);
 
   const session = useAuthStore((s) => s.session);
   const isAdminLayout = role === 'admin';
@@ -169,13 +175,15 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     return false;
   };
 
+  const navCollapsed = mobileNavOpen ? false : collapsed;
+
   const renderGroups = (sectionGroups: NavGroup[], options?: { hideFirstDivider?: boolean }) =>
     sectionGroups.map((group, index) => (
       <NavSection
         key={group.label}
         group={group}
         pathname={pathname}
-        collapsed={collapsed}
+        collapsed={navCollapsed}
         resolveOpen={resolveOpen}
         onToggle={(item) => setGroupOpen(roleKey, item.label, !resolveOpen(item))}
         onExpandSidebar={toggleSidebar}
@@ -184,71 +192,106 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     ));
 
   return (
-    <aside
-      style={{ width: collapsed ? 72 : 240 }}
-      className="erp-theme-sidebar pointer-events-auto fixed inset-y-0 left-0 z-50 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl transition-[width] duration-200 ease-out md:flex"
-    >
-      <div className="shrink-0 border-b border-sidebar-border px-3 py-3">
+    <>
+      {mobileNavOpen ? (
         <button
           type="button"
-          onClick={collapsed ? toggleSidebar : undefined}
-          className={cn(
-            'w-full text-left',
-            collapsed && 'cursor-pointer rounded-lg hover:bg-sidebar-active/50',
-          )}
-          aria-label={collapsed ? 'Expand sidebar' : undefined}
-          title={collapsed ? 'Expand sidebar' : undefined}
-        >
-          <InstitutionBrandMark branding={branding} active={active} collapsed={collapsed} />
-        </button>
-      </div>
-
-      {!collapsed ? (
-        <div className="shrink-0 px-3 py-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-muted" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search modules…"
-              className="h-8 border-sidebar-border bg-sidebar/50 pl-8 text-xs text-sidebar-foreground placeholder:text-muted-foreground"
-              aria-label="Search navigation"
-            />
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden"
+          aria-label="Close menu"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      ) : null}
+      <aside
+        style={{ width: mobileNavOpen ? 280 : collapsed ? 72 : 240 }}
+        className={cn(
+          'erp-theme-sidebar pointer-events-auto fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl transition-[transform,width] duration-200 ease-out',
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        )}
+      >
+        <div className="shrink-0 border-b border-sidebar-border px-3 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={collapsed && !mobileNavOpen ? toggleSidebar : undefined}
+              className={cn(
+                'min-w-0 flex-1 text-left',
+                collapsed &&
+                  !mobileNavOpen &&
+                  'cursor-pointer rounded-lg hover:bg-sidebar-active/50',
+              )}
+              aria-label={collapsed && !mobileNavOpen ? 'Expand sidebar' : undefined}
+              title={collapsed && !mobileNavOpen ? 'Expand sidebar' : undefined}
+            >
+              <InstitutionBrandMark
+                branding={branding}
+                active={active}
+                collapsed={collapsed && !mobileNavOpen}
+              />
+            </button>
+            {mobileNavOpen ? (
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="inline-flex shrink-0 rounded-lg p-2 text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground md:hidden"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            ) : null}
           </div>
         </div>
-      ) : null}
 
-      <SidebarNav
-        roleKey={roleKey}
-        section={isAdminLayout ? 'modules' : 'main'}
-        className={SCROLL_NAV_CLASS}
-        ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
-      >
-        {renderGroups(filtered, { hideFirstDivider: true })}
-      </SidebarNav>
+        {mobileNavOpen || !collapsed ? (
+          <div className="shrink-0 px-3 py-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-muted" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search modules…"
+                className="h-8 border-sidebar-border bg-sidebar/50 pl-8 text-xs text-sidebar-foreground placeholder:text-muted-foreground"
+                aria-label="Search navigation"
+              />
+            </div>
+          </div>
+        ) : null}
 
-      <div className="shrink-0 border-t border-sidebar-border p-2">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className={cn(
-            'flex w-full items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-sm transition',
-            collapsed
-              ? 'bg-sidebar-active/60 text-sidebar-foreground hover:bg-sidebar-active'
-              : 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground',
-          )}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        <SidebarNav
+          roleKey={roleKey}
+          section={isAdminLayout ? 'modules' : 'main'}
+          className={SCROLL_NAV_CLASS}
+          ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
         >
-          {collapsed ? (
-            <PanelLeftOpen className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-          {!collapsed ? <span>Collapse</span> : <span className="sr-only">Expand sidebar</span>}
-        </button>
-      </div>
-    </aside>
+          {renderGroups(filtered, { hideFirstDivider: true })}
+        </SidebarNav>
+
+        <div className="hidden shrink-0 border-t border-sidebar-border p-2 md:block">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-sm transition',
+              navCollapsed
+                ? 'bg-sidebar-active/60 text-sidebar-foreground hover:bg-sidebar-active'
+                : 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground',
+            )}
+            aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {navCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+            {!navCollapsed ? (
+              <span>Collapse</span>
+            ) : (
+              <span className="sr-only">Expand sidebar</span>
+            )}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
 

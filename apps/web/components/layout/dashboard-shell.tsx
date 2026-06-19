@@ -37,7 +37,7 @@ export function DashboardShell({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-5 lg:px-6"
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 pb-20 sm:px-5 md:pb-4 lg:px-6"
         >
           <div className="w-full max-w-full min-w-0">{children}</div>
         </motion.main>

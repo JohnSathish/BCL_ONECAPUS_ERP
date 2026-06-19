@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, PanelLeftClose, PanelLeftOpen, Search, Settings, User } from 'lucide-react';
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, User } from 'lucide-react';
 import { CampusSwitcher } from '@/components/dashboard/campus-switcher';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { NotificationPanel } from '@/components/dashboard/notification-panel';
@@ -41,6 +41,7 @@ export function EnterpriseTopbar({
   const session = useAuthStore((s) => s.session);
   const sidebarCollapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
+  const toggleMobileNavOpen = useDashboardUiStore((s) => s.toggleMobileNavOpen);
 
   const handleLogout = async () => {
     broadcastSessionMessage({ type: 'LOGOUT' });
@@ -72,6 +73,15 @@ export function EnterpriseTopbar({
       )}
     >
       <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={toggleMobileNavOpen}
+          className="inline-flex shrink-0 items-center justify-center rounded-xl border border-border/80 bg-card/80 p-2.5 text-muted-foreground backdrop-blur transition hover:bg-muted/50 hover:text-foreground md:hidden"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
         <button
           type="button"
           onClick={toggleSidebar}

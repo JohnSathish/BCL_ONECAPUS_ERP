@@ -1,6 +1,7 @@
 'use client';
 
 import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
 
@@ -18,6 +19,7 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
         )}
       >
         {children}
+        <MobileBottomNav />
       </div>
     </div>
   );
