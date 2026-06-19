@@ -19,7 +19,7 @@ source .env
 set +a
 
 echo "=== NEP ERP — quick update ==="
-git pull origin master
+bash scripts/deploy/vps-pull.sh
 
 if [[ -f /etc/letsencrypt/live/erp.donboscocollege.ac.in/fullchain.pem ]]; then
   echo "Applying HTTPS nginx config…"

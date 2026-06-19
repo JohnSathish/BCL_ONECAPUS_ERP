@@ -573,22 +573,27 @@ export class StudentsService {
       }),
     ]);
 
-    const data = await Promise.all(
-      rows.map(async (student) => {
-        const resolved = await this.semesterResolver.resolveForStudent(
-          tenantId,
-          student.id,
-        );
-        const academicStatus = this.semesterResolver.mapAcademicStatus(
-          student.academicStanding,
-        );
-        return this.profileService.toDirectoryRow(
-          student,
-          resolved,
-          academicStatus,
-        );
-      }),
+    const resolvedByStudent = await this.semesterResolver.resolveForStudents(
+      tenantId,
+      rows.map((student) => student.id),
     );
+    const defaultResolved = {
+      semester: 1,
+      batchSemester: null,
+      cycle: null,
+      calendarSemesterId: null,
+    };
+    const data = rows.map((student) => {
+      const resolved = resolvedByStudent.get(student.id) ?? defaultResolved;
+      const academicStatus = this.semesterResolver.mapAcademicStatus(
+        student.academicStanding,
+      );
+      return this.profileService.toDirectoryRow(
+        student,
+        resolved,
+        academicStatus,
+      );
+    });
 
     const enrichment = await this.directoryEnrichment.loadForStudents(
       tenantId,

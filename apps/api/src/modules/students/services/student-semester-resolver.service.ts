@@ -42,6 +42,95 @@ export class StudentSemesterResolverService {
     return 'Studying';
   }
 
+  /** Bulk resolver for student directory — avoids N+1 queries on list pages. */
+  async resolveForStudents(
+    tenantId: string,
+    studentIds: string[],
+  ): Promise<Map<string, ResolvedSemester>> {
+    const map = new Map<string, ResolvedSemester>();
+    if (!studentIds.length) return map;
+
+    const [standings, profiles, students] = await Promise.all([
+      this.prisma.studentAcademicStanding.findMany({
+        where: { studentId: { in: studentIds } },
+      }),
+      this.prisma.studentAcademicProfile.findMany({
+        where: { studentId: { in: studentIds } },
+        include: {
+          admissionBatch: { include: { semesterMapping: true } },
+        },
+      }),
+      this.prisma.student.findMany({
+        where: { id: { in: studentIds }, tenantId },
+        select: { id: true, campusId: true },
+      }),
+    ]);
+
+    const standingByStudent = new Map(
+      standings.map((row) => [row.studentId, row] as const),
+    );
+    const profileByStudent = new Map(
+      profiles.map((row) => [row.studentId, row] as const),
+    );
+    const campusByStudent = new Map(
+      students.map((row) => [row.id, row.campusId] as const),
+    );
+
+    const campusIds = [
+      ...new Set(
+        students
+          .map((row) => row.campusId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const campuses = campusIds.length
+      ? await this.prisma.campus.findMany({
+          where: { id: { in: campusIds } },
+          select: { id: true, institutionId: true },
+        })
+      : [];
+    const institutionIds = [
+      ...new Set(campuses.map((row) => row.institutionId)),
+    ];
+    const configs = institutionIds.length
+      ? await this.prisma.institutionAcademicConfig.findMany({
+          where: { institutionId: { in: institutionIds } },
+        })
+      : [];
+
+    const campusToInstitution = new Map(
+      campuses.map((row) => [row.id, row.institutionId] as const),
+    );
+    const configByInstitution = new Map(
+      configs.map((row) => [row.institutionId, row] as const),
+    );
+
+    for (const studentId of studentIds) {
+      const standing = standingByStudent.get(studentId);
+      const academicProfile = profileByStudent.get(studentId);
+      const campusId = campusByStudent.get(studentId);
+
+      let cycle: string | null = null;
+      const batch = academicProfile?.admissionBatch;
+      if (academicProfile?.admissionBatchId && batch && campusId) {
+        const institutionId = campusToInstitution.get(campusId);
+        if (institutionId) {
+          const config = configByInstitution.get(institutionId);
+          cycle = config?.currentCycle ?? batch.cycleType;
+        }
+      }
+
+      map.set(studentId, {
+        semester: standing?.currentSemesterSequence ?? 1,
+        batchSemester: batch?.currentSemester ?? null,
+        cycle,
+        calendarSemesterId: batch?.semesterMapping?.calendarSemesterId ?? null,
+      });
+    }
+
+    return map;
+  }
+
   async resolveForStudent(
     tenantId: string,
     studentId: string,

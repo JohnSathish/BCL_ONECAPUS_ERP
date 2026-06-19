@@ -83,7 +83,7 @@ const emptyFilters: DirectoryFilters = {
   uiAbcStatus: '',
 };
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 25;
 
 function filtersToParams(filters: DirectoryFilters, page: number, limit: number) {
   const opt = (v: string) => v || undefined;
