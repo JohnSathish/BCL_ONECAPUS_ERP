@@ -93,6 +93,17 @@ async function login(apiBase, label) {
   const loginBody = unwrap(await loginRes.json());
   if (!loginRes.ok || !loginBody?.accessToken) {
     const detail = JSON.stringify(loginBody).slice(0, 240);
+    if (loginRes.status === 401) {
+      console.error(
+        `${label} login failed: invalid email/password for ${email} on tenant host ${host}.`,
+      );
+      console.error(
+        'Run: ADMIN_PASSWORD="..." bash scripts/deploy/vps-reset-admin.sh',
+      );
+      console.error(
+        'Or try demo: SMOKE_EMAIL=admin@demo.edu SMOKE_PASSWORD=Admin@123 bash scripts/deploy/vps-smoke-students.sh',
+      );
+    }
     throw new Error(`${label} login failed: HTTP ${loginRes.status} ${detail}`);
   }
   console.log(`${label} login OK`);
