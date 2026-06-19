@@ -8,6 +8,7 @@ import type { CSSProperties } from 'react';
 import type { FieldErrors, UseFormHandleSubmit, UseFormRegister } from 'react-hook-form';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
 import { useLoginHeroMotion } from '@/components/auth/login-hero/use-login-hero-motion';
+import { isDemoLoginWorkspaceEnabled } from '@/lib/demo-login';
 import { LoginDemoWorkspace } from './login-demo-workspace';
 import { LoginField } from './login-field';
 import { LoginHumanVerification } from './login-human-verification';
@@ -191,7 +192,7 @@ export function LoginAuthCard({
             </motion.div>
           </form>
 
-          {context ? (
+          {context && isDemoLoginWorkspaceEnabled() ? (
             <motion.div {...fadeUp(0.42, animate)}>
               <LoginDemoWorkspace onFillCredentials={onFillDemoCredentials} />
             </motion.div>

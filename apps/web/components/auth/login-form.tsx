@@ -18,6 +18,7 @@ import { LoginHeroPanel } from './login-hero-panel';
 import { LoginPageShell } from './login-page-shell';
 import { ApiError, apiErrorMessage, isApiUnavailableError } from '@/utils/api-error';
 import { loginSchema, type LoginFormValues } from './login-schema';
+import { isDemoLoginWorkspaceEnabled } from '@/lib/demo-login';
 
 type LoginFormProps = {
   /** Override default role-based home after successful login. */
@@ -56,8 +57,8 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@demo.edu',
-      password: 'Admin@123',
+      email: isDemoLoginWorkspaceEnabled() ? 'admin@demo.edu' : '',
+      password: isDemoLoginWorkspaceEnabled() ? 'Admin@123' : '',
       rememberMe: false,
       challengeAnswer: '',
     },
@@ -179,7 +180,9 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         }
         if (status === 401) {
           setError(
-            'Invalid credentials. Use demo credentials below or contact your administrator.',
+            isDemoLoginWorkspaceEnabled()
+              ? 'Invalid credentials. Use demo credentials below or contact your administrator.'
+              : 'Invalid credentials. Contact your college administrator if you need access.',
           );
           return;
         }
