@@ -325,7 +325,8 @@ export class AuthService {
     rememberMe?: boolean,
   ): Promise<AuthSessionResponse> {
     const ip = meta?.ipAddress ?? 'unknown';
-    await this.loginAttempts.assertNotLocked(tenantId, ip, email);
+    const normalizedEmail = email.trim().toLowerCase();
+    await this.loginAttempts.assertNotLocked(tenantId, ip, normalizedEmail);
 
     if (!this.challenge.verify(challengeToken, challengeAnswer)) {
       throw new BadRequestException(
@@ -339,7 +340,12 @@ export class AuthService {
     if (!tenant) throw new UnauthorizedException('Invalid credentials');
 
     const user = await this.prisma.user.findFirst({
-      where: { tenantId: tenant.id, email, deletedAt: null, isActive: true },
+      where: {
+        tenantId: tenant.id,
+        email: normalizedEmail,
+        deletedAt: null,
+        isActive: true,
+      },
       include: {
         roles: {
           where: { deletedAt: null },
@@ -348,17 +354,17 @@ export class AuthService {
       },
     });
     if (!user) {
-      await this.loginAttempts.recordFailure(tenantId, ip, email);
+      await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      await this.loginAttempts.recordFailure(tenantId, ip, email);
+      await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    await this.loginAttempts.resetOnSuccess(tenantId, ip, email);
+    await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
 
     await this.prisma.user.update({
       where: { id: user.id },

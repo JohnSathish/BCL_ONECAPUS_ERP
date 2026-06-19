@@ -41,7 +41,12 @@ if [[ -z "${PASS}" ]]; then
   exit 0
 fi
 
-echo "--- 3) Login + students (Node inside API container) ---"
+echo "--- 3) DB password check (bypasses HTTP) ---"
+"${COMPOSE[@]}" run --rm -e VERIFY_EMAIL="${EMAIL}" -e VERIFY_PASSWORD="${PASS}" api \
+  npx tsx scripts/verify-admin-login.ts || true
+echo
+
+echo "--- 4) Login + students (public HTTPS first, then direct API) ---"
 "${COMPOSE[@]}" exec -T \
   -e SMOKE_HOST="${HOST}" \
   -e SMOKE_EMAIL="${EMAIL}" \
@@ -78,7 +83,7 @@ function solveExpression(expression) {
 
 async function login(apiBase, label) {
   const challengeRes = await fetch(`${apiBase}/v1/auth/challenge`, {
-    headers: { Host: host, Accept: 'application/json' },
+    headers: tenantHeaders(),
   });
   const challengeBody = unwrap(await challengeRes.json());
   if (!challengeRes.ok || !challengeBody?.token) {
@@ -88,12 +93,11 @@ async function login(apiBase, label) {
   const loginRes = await fetch(`${apiBase}/v1/auth/login`, {
     method: 'POST',
     headers: {
-      Host: host,
-      Accept: 'application/json',
+      ...tenantHeaders(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email,
+      email: String(email).trim().toLowerCase(),
       password,
       challengeToken: challengeBody.token,
       challengeAnswer: answer,
@@ -122,8 +126,7 @@ async function login(apiBase, label) {
 async function students(apiBase, label, token) {
   const res = await fetch(`${apiBase}/v1/students?page=1&limit=25`, {
     headers: {
-      Host: host,
-      Accept: 'application/json',
+      ...tenantHeaders(),
       Authorization: `Bearer ${token}`,
     },
   });
@@ -134,10 +137,22 @@ async function students(apiBase, label, token) {
 }
 
 (async () => {
-  const token = await login(localApi, 'direct-api');
-  await students(localApi, 'direct-api', token);
-  const publicToken = await login(publicApi, 'public-nginx');
-  await students(publicApi, 'public-nginx', publicToken);
+  let failed = false;
+  try {
+    const publicToken = await login(publicApi, 'public-nginx');
+    await students(publicApi, 'public-nginx', publicToken);
+  } catch (err) {
+    failed = true;
+    console.error(err);
+  }
+  try {
+    const token = await login(localApi, 'direct-api');
+    await students(localApi, 'direct-api', token);
+  } catch (err) {
+    failed = true;
+    console.error(err);
+  }
+  if (failed) process.exit(1);
 })().catch((err) => {
   console.error(err);
   process.exit(1);
@@ -145,7 +160,7 @@ async function students(apiBase, label, token) {
 NODE
 
 echo
-echo "--- 4) API logs (last 20 lines) ---"
+echo "--- 5) API logs (last 20 lines) ---"
 "${COMPOSE[@]}" logs api --tail 20
 echo
 echo "=== Done ==="
