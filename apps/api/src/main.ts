@@ -8,9 +8,9 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { join } from 'path';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './config/cors.config';
+import { resolveUploadRoot } from './common/uploads/upload-paths';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
@@ -19,7 +19,7 @@ async function bootstrap() {
     { rawBody: true },
   );
 
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+  app.useStaticAssets(resolveUploadRoot(), {
     prefix: '/uploads/',
     maxAge: '7d',
     immutable: true,

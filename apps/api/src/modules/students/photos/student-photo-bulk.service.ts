@@ -52,7 +52,7 @@ type StudentMatch = {
 
 @Injectable()
 export class StudentPhotoBulkService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(
     private readonly prisma: PrismaService,

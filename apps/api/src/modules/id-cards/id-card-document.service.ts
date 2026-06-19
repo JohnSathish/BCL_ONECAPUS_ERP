@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import puppeteer from 'puppeteer';
 
 /** CR80 portrait feed (Evolis Primacy) */
@@ -42,7 +43,7 @@ export class IdCardDocumentService {
     filename: string,
     buffer: Buffer,
   ): Promise<string> {
-    const dir = join(process.cwd(), 'uploads', 'tenants', tenantId, 'id-cards');
+    const dir = join(resolveTenantUploadRoot(), tenantId, 'id-cards');
     await mkdir(dir, { recursive: true });
     const abs = join(dir, filename);
     await writeFile(abs, buffer);

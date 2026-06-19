@@ -20,7 +20,7 @@ import { LmsSettingsService } from './lms-settings.service';
 
 @Injectable()
 export class LmsMaterialsService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(
     private readonly prisma: PrismaService,

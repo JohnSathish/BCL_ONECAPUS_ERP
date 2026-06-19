@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { join } from 'path';
+import { resolveUploadRoot } from '../../common/uploads/upload-paths';
 import { mkdir, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
@@ -20,8 +21,7 @@ const ALLOWED_SLOTS = [
 
 @Injectable()
 export class AdmissionsDocumentService {
-  private readonly uploadRoot =
-    process.env.UPLOAD_ROOT ?? join(process.cwd(), 'uploads');
+  private readonly uploadRoot = resolveUploadRoot();
 
   constructor(
     private readonly prisma: PrismaService,

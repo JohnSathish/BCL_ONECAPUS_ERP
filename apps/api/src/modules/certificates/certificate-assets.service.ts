@@ -6,7 +6,7 @@ import { validateBrandingImage } from '../../common/uploads/image-upload.validat
 
 @Injectable()
 export class CertificateAssetsService {
-  private uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private uploadRoot = resolveTenantUploadRoot();
 
   async saveSignatureAsset(
     tenantId: string,

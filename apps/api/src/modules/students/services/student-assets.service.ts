@@ -10,6 +10,7 @@ import {
   extensionForMime,
   validateProfileImage,
 } from '../../../common/uploads/image-upload.validator';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 
 const DOC_MIMES = new Set([
   'application/pdf',
@@ -20,7 +21,7 @@ const DOC_MIMES = new Set([
 
 @Injectable()
 export class StudentAssetsService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(private readonly prisma: PrismaService) {}
 

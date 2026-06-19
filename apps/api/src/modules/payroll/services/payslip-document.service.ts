@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import { pathToFileURL } from 'url';
 import puppeteer from 'puppeteer';
 import { PrismaService } from '../../../database/prisma.service';
@@ -49,7 +50,7 @@ type PayslipInstitutionHeader = {
 
 @Injectable()
 export class PayslipDocumentService {
-  private uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private uploadRoot = resolveTenantUploadRoot();
 
   constructor(
     private readonly prisma: PrismaService,

@@ -12,6 +12,7 @@ import {
   extensionForMime,
   validateBrandingImage,
 } from '../../../common/uploads/image-upload.validator';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import {
   STAFF_DOCUMENT_SLOTS,
   STAFF_DOCUMENT_SLOT_CODES,
@@ -48,7 +49,7 @@ type DocRow = {
 
 @Injectable()
 export class StaffDocumentsService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(private readonly prisma: PrismaService) {}
 

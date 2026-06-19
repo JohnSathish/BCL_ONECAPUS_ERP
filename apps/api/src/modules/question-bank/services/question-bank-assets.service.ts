@@ -23,7 +23,7 @@ const DEFAULT_MIME_TYPES = [
 
 @Injectable()
 export class QuestionBankAssetsService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   assertAllowedMime(mime: string, allowed: string[]) {
     const list = allowed.length ? allowed : DEFAULT_MIME_TYPES;

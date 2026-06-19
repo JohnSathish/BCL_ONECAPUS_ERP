@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import { randomUUID } from 'crypto';
 
 import {
@@ -19,7 +20,7 @@ export type IdCardBackgroundUploadResult = {
 
 @Injectable()
 export class IdCardAssetsService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   async uploadBackground(
     tenantId: string,

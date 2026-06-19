@@ -8,6 +8,7 @@ import {
   validateBrandingImage,
   type ImageUploadKind,
 } from '../../common/uploads/image-upload.validator';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import type { UpdateBrandingDto } from './dto/update-branding.dto';
 import type { UpdateThemeDto } from './dto/update-theme.dto';
 import {
@@ -62,7 +63,7 @@ export type ThemeSettingsDto = {
 
 @Injectable()
 export class BrandingService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(private readonly prisma: PrismaService) {}
 

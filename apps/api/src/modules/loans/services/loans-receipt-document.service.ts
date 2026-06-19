@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import puppeteer from 'puppeteer';
 
 export type InstitutionHeader = {
@@ -87,7 +88,7 @@ export function financialYearLabel(d: Date): string {
 
 @Injectable()
 export class LoansReceiptDocumentService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'tenants');
+  private readonly uploadRoot = resolveTenantUploadRoot();
 
   buildReceiptHtml(
     data: LoanReceiptData,
