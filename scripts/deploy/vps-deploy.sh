@@ -34,13 +34,20 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-echo "[4/5] Running database migrations…"
+echo "[4/6] Running database migrations…"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db run --rm \
   -e DATABASE_URL="${DATABASE_URL}" \
   -v "${APP_DIR}/apps/api/prisma:/app/apps/api/prisma:ro" \
   api npx --yes prisma@6.19.0 migrate deploy --schema=./prisma/schema.prisma
 
-echo "[5/5] Starting full stack…"
+echo "[5/6] Seeding database (first run may take several minutes)…"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db run --rm \
+  -e DATABASE_URL="${DATABASE_URL}" \
+  -v "${APP_DIR}/apps/api/prisma:/app/apps/api/prisma:ro" \
+  -v "${APP_DIR}/apps/api/src:/app/apps/api/src:ro" \
+  api npx tsx prisma/seed.ts
+
+echo "[6/6] Starting full stack…"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db up -d api web worker nginx
 
 echo

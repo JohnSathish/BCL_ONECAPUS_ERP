@@ -4420,7 +4420,7 @@ async function seedTenantLicensing(
   );
 
   await promoteOwnerSuperAdmin('johnsathish16@gmail.com');
-  await seedCampusAccessDemo(tenant.id);
+  await seedCampusAccessDemo(demoTenantId);
 }
 
 async function seedCampusAccessDemo(tenantId: string) {

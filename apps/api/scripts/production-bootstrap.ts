@@ -88,11 +88,18 @@ async function ensureAdmin(
     where: { tenantId, slug: 'super-admin', deletedAt: null },
   });
   if (superAdmin) {
-    await prisma.userRole.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: superAdmin.id } },
-      update: { deletedAt: null },
-      create: { userId: user.id, roleId: superAdmin.id },
+    const existingRole = await prisma.userRole.findFirst({
+      where: {
+        userId: user.id,
+        roleId: superAdmin.id,
+        deletedAt: null,
+      },
     });
+    if (!existingRole) {
+      await prisma.userRole.create({
+        data: { userId: user.id, roleId: superAdmin.id },
+      });
+    }
   }
 
   console.log(`  ✓ admin user: ${email}`);
