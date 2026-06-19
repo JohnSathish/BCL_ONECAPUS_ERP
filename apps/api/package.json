@@ -26,6 +26,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "production:purge-demo": "tsx scripts/production-purge-demo.ts",
     "verify:odd-semester": "ts-node --transpile-only scripts/verify-odd-semester-config.ts",
     "verify:student-portal": "ts-node --transpile-only scripts/verify-student-portal.ts",
     "provision:lms-workspaces": "ts-node --transpile-only scripts/provision-lms-workspaces.ts",
