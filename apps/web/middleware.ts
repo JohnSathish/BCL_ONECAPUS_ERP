@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isAdmissionsLoginPath, isAdmissionsPublicPath } from '@/lib/admissions-portal-routes';
 
 function hostname(host: string) {
   return host.split(':')[0]?.toLowerCase() ?? '';
@@ -11,6 +12,47 @@ function isLibraryHost(host: string) {
 
 function isAdmissionsHost(host: string) {
   return hostname(host).startsWith('admissions.');
+}
+
+function handleAdmissionsHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const loginPath = '/admissions-portal/login';
+  const portalPath = '/admissions-portal';
+
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/uploads') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  const refreshCookie = request.cookies.get('nep_refresh')?.value;
+  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
+  const effectivePath = pathname === '/' ? portalPath : pathname;
+  const isPublic = isAdmissionsPublicPath(effectivePath);
+  const isLogin = isAdmissionsLoginPath(effectivePath) || pathname === '/login';
+
+  if (!hasRefreshCookie && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = loginPath;
+    return NextResponse.redirect(url);
+  }
+
+  if (hasRefreshCookie && isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/admissions-portal/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  return handleSubdomainRewrite(request, portalPath, loginPath, [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+  ]);
 }
 
 function handleLibraryHost(request: NextRequest) {
@@ -96,13 +138,7 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
 
   if (isAdmissionsHost(host)) {
-    return handleSubdomainRewrite(request, '/admissions-portal', '/admissions-portal/login', [
-      '/admin',
-      '/student',
-      '/staff',
-      '/shift',
-      '/library-desk',
-    ]);
+    return handleAdmissionsHost(request);
   }
 
   if (isLibraryHost(host)) {

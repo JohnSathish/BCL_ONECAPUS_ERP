@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,6 +12,7 @@ import { Lock, User } from 'lucide-react';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { fetchPortalInfo, loginApplicant } from '@/services/admissions-portal';
 import { useAuthStore } from '@/store/auth-store';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -26,10 +27,16 @@ type FormValues = z.infer<typeof schema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { session, isReady } = useAuth();
   const setSession = useAuthStore((s) => s.setSession);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const resetSuccess = searchParams.get('reset') === 'success';
+
+  useEffect(() => {
+    if (!isReady || !session) return;
+    router.replace('/admissions-portal/dashboard');
+  }, [isReady, session, router]);
 
   const portalInfo = useQuery({ queryKey: ['admissions-portal-info'], queryFn: fetchPortalInfo });
   const branding = portalInfo.data?.branding;
@@ -54,6 +61,22 @@ function LoginForm() {
       setError(apiErrorMessage(e, 'Login failed'));
     }
   };
+
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#e8f0fe] text-sm text-slate-500">
+        Loading…
+      </div>
+    );
+  }
+
+  if (session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#e8f0fe] text-sm text-slate-500">
+        Redirecting…
+      </div>
+    );
+  }
 
   return (
     <div

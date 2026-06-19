@@ -7,7 +7,6 @@ import {
   AdmissionsPublicShell,
 } from '@/components/admissions-portal/admissions-public-shell';
 import { AdmissionsInstructionsContent } from '@/components/admissions-portal/admissions-instructions-content';
-import { AdmissionsScheduleBanner } from '@/components/admissions-portal/admissions-schedule-banner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function AdmissionsPortalLandingPage() {
@@ -18,8 +17,6 @@ export default function AdmissionsPortalLandingPage() {
 
   return (
     <AdmissionsPublicShell showHero={false}>
-      <AdmissionsScheduleBanner info={info} />
-
       <Card className="mt-8 border-white/10 bg-white/5 text-white backdrop-blur-md">
         <CardHeader>
           <CardTitle>
