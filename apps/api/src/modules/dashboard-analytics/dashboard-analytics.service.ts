@@ -20,6 +20,7 @@ import type {
   OperationsCenterResponse,
   ShiftIntelligenceResponse,
 } from './dashboard-analytics.types';
+import { getDayPartGreeting } from '../../common/utils/time-greeting';
 
 const SEED_SPARK = {
   attendance: [93, 92, 91, 92, 91, 90, 91],
@@ -732,13 +733,7 @@ export class DashboardAnalyticsService {
       });
     }
 
-    const hour = now.getHours();
-    const greeting =
-      hour < 12
-        ? 'Good morning'
-        : hour < 17
-          ? 'Good afternoon'
-          : 'Good evening';
+    const greeting = getDayPartGreeting(now);
     const userName = user?.email?.split('@')[0] ?? 'Admin';
 
     const aiInsights: string[] = [];

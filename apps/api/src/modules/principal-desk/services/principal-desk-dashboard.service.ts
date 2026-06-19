@@ -5,6 +5,7 @@ import { DashboardAnalyticsService } from '../../dashboard-analytics/dashboard-a
 import { NaacDashboardService } from '../../naac-iqac/services/naac-dashboard.service';
 import { GovernanceDashboardService } from '../../governance/services/governance-dashboard.service';
 import { governanceDb } from '../../governance/services/governance-prisma.util';
+import { getZonedHour } from '../../../common/utils/time-greeting';
 
 @Injectable()
 export class PrincipalDeskDashboardService {
@@ -70,7 +71,7 @@ export class PrincipalDeskDashboardService {
     });
 
     const intelligenceSummary = this.buildIntelligenceSummary({
-      hour: new Date().getHours(),
+      hour: getZonedHour(new Date()),
       feeDefaulters,
       pendingDues: ops.finance.pendingDues,
       attendanceRisk,

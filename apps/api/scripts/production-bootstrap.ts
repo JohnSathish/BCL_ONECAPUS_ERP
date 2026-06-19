@@ -58,12 +58,26 @@ async function registerHost(tenantId: string, host: string) {
   console.log(`  ✓ tenant domain: ${normalized}`);
 }
 
+async function clearLoginLockouts(tenantId: string, email: string) {
+  const normalized = email.trim().toLowerCase();
+  const cleared = await prisma.loginAttempt.deleteMany({
+    where: { tenantId, email: normalized },
+  });
+  if (cleared.count > 0) {
+    console.log(
+      `  ✓ cleared ${cleared.count} login lockout(s) for ${normalized}`,
+    );
+  }
+}
+
 async function ensureAdmin(
   tenantId: string,
   email: string,
   password: string,
   displayName: string,
 ) {
+  await clearLoginLockouts(tenantId, email);
+
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.upsert({
     where: { tenantId_email: { tenantId, email } },
@@ -99,10 +113,13 @@ async function ensureAdmin(
       await prisma.userRole.create({
         data: { userId: user.id, roleId: superAdmin.id },
       });
+      console.log(`  ✓ assigned super-admin role`);
     }
+  } else {
+    console.warn('  ⚠ super-admin role not found — run db:seed first');
   }
 
-  console.log(`  ✓ admin user: ${email}`);
+  console.log(`  ✓ admin user: ${email} (password updated, account active)`);
 }
 
 async function main() {

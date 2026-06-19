@@ -22,6 +22,7 @@ import {
   pursuitVerificationUrlHtml,
   pursuitWatermarkText,
 } from './id-card-pursuit-excellence';
+import { renderBarcodePrintHtml } from './build-barcode-svg';
 import { renderPursuitStaffFieldHtml } from './id-card-pursuit-staff-fields';
 import { isPursuitStaff } from './id-card-pursuit-staff';
 import {

@@ -51,6 +51,7 @@ import {
   staggerContainer,
 } from '@/components/dashboard/command-center-ui';
 import { cn } from '@/utils/cn';
+import { getTimeGreeting } from '@/utils/time-greeting';
 
 const ACTION_ICONS: Record<string, typeof AlertTriangle> = {
   attendance: Users,
@@ -69,9 +70,9 @@ const QUICK_ACTIONS = [
   { label: 'Add Student', href: '/admin/students', icon: UserPlus },
   { label: 'Mark Attendance', href: '/admin/academics/attendance', icon: ClipboardList },
   { label: 'Generate Report', href: '/admin/fees/reports', icon: FileSpreadsheet },
-  { label: 'Send Notice', href: '/admin/lms', icon: Megaphone },
+  { label: 'Send Notice', href: '/admin/communication', icon: Megaphone },
   { label: 'Add Faculty', href: '/admin/hr', icon: Users },
-  { label: 'Settings', href: '/admin/settings', icon: Settings },
+  { label: 'Settings', href: '/admin/organization', icon: Settings },
 ];
 
 const SMART_SHORTCUTS = [
@@ -131,6 +132,7 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
   });
 
   const ops = opsQ.data;
+  const dayGreeting = getTimeGreeting();
   const displayName = userName ?? ops?.greeting.userName ?? 'Admin';
   const institutionName = branding?.displayName ?? 'Don Bosco College, Tura';
 
@@ -198,7 +200,7 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-extrabold tracking-tight text-[#0F172A] dark:text-foreground">
-              {ops?.greeting.dayLabel ?? 'Good morning'}, {displayName} 👋
+              {dayGreeting}, {displayName} 👋
             </h1>
             <p className="mt-1 text-sm font-semibold text-[#2563EB]">{institutionName}</p>
             {ops ? (

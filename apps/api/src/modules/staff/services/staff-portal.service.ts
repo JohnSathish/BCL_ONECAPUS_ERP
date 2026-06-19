@@ -4,6 +4,7 @@ import { AcademicLifecycleService } from '../../academic-lifecycle/academic-life
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { getZonedHour } from '../../../common/utils/time-greeting';
 
 const PRESENT_ATTENDANCE_STATUSES = new Set([
   'PRESENT',
@@ -124,7 +125,7 @@ export class StaffPortalService {
         code: r.roleCode,
         label: r.roleName,
       })),
-      greeting: greetingForHour(new Date().getHours()),
+      greeting: greetingForHour(getZonedHour(new Date())),
       online: staff.portalUser?.isActive ?? false,
     };
   }

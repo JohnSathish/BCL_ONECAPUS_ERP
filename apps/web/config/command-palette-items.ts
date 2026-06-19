@@ -34,7 +34,7 @@ export const ADMIN_COMMAND_LINKS = [
   { label: 'Library', href: '/admin/library', keywords: 'books circulation' },
   { label: 'Transport', href: '/admin/transport', keywords: 'bus routes' },
   { label: 'Hostel', href: '/admin/hostel', keywords: 'residence rooms' },
-  { label: 'Settings', href: '/admin/settings', keywords: 'configuration' },
+  { label: 'Settings', href: '/admin/organization', keywords: 'configuration' },
 ];
 
 export const AI_QUICK_PROMPTS = [
