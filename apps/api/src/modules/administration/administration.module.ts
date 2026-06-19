@@ -17,6 +17,7 @@ import { RbacService } from './services/rbac.service';
 import { RollNumberSettingsService } from './services/roll-number-settings.service';
 import { StudentDisplaySettingsService } from './services/student-display-settings.service';
 import { SecurityService } from './services/security.service';
+import { SecurityCenterService } from './services/security-center.service';
 import { UserProvisioningService } from './services/user-provisioning.service';
 import { UsernameGenerationService } from './services/username-generation.service';
 import { UsersService } from './services/users.service';
@@ -42,6 +43,7 @@ import { UsersService } from './services/users.service';
     RbacService,
     AuditService,
     SecurityService,
+    SecurityCenterService,
     PortalUsersImportHandler,
     ImportCenterService,
   ],

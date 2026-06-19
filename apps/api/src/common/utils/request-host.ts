@@ -31,3 +31,11 @@ export function extractClientIp(req: Request): string {
   }
   return req.ip || 'unknown';
 }
+
+export function extractClientCountry(req: Request): string | null {
+  const cf = req.headers['cf-ipcountry'];
+  if (typeof cf === 'string' && cf.length === 2 && cf !== 'XX') {
+    return cf.toUpperCase();
+  }
+  return null;
+}

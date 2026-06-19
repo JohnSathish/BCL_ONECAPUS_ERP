@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CommunicationModule } from '../communication/communication.module';
+import { AdministrationModule } from '../administration/administration.module';
 import { BackupEngineController } from './backup-engine.controller';
 import {
   BackupCloudProcessor,
@@ -23,7 +24,7 @@ import { SystemMaintenanceService } from './services/system-maintenance.service'
 import { TenantBackupExportService } from './services/tenant-backup-export.service';
 
 @Module({
-  imports: [CommunicationModule],
+  imports: [CommunicationModule, AdministrationModule],
   controllers: [BackupEngineController],
   providers: [
     BackupAuditService,

@@ -7,10 +7,15 @@ import { ClsModule } from 'nestjs-cls';
 import { HttpProblemJsonExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { StepUpGuard } from './common/guards/step-up.guard';
+import { StudentSelfGuard } from './common/guards/student-self.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
+import { CryptoModule } from './common/crypto/crypto.module';
+import { SecurityCommonModule } from './common/security/security-common.module';
 import { PrismaModule } from './database/prisma.module';
 import { PermissionsModule } from './common/permissions/permissions.module';
 import { HealthController } from './health.controller';
@@ -81,10 +86,13 @@ import { MarketingModule } from './modules/marketing/marketing.module';
     }),
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: 60_000,
-        limit: 120,
+        limit: 300,
       },
     ]),
+    CryptoModule,
+    SecurityCommonModule,
     PrismaModule,
     PermissionsModule,
     QueueModule,
@@ -145,11 +153,14 @@ import { MarketingModule } from './modules/marketing/marketing.module';
   controllers: [HealthController],
   providers: [
     HealthService,
+    CsrfMiddleware,
     { provide: APP_FILTER, useClass: HttpProblemJsonExceptionFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ShiftScopeGuard },
+    { provide: APP_GUARD, useClass: StepUpGuard },
+    { provide: APP_GUARD, useClass: StudentSelfGuard },
     { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   ],
@@ -157,7 +168,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(RequestLoggingMiddleware, TenantResolverMiddleware)
+      .apply(RequestLoggingMiddleware, TenantResolverMiddleware, CsrfMiddleware)
       .forRoutes('*');
   }
 }

@@ -19,12 +19,16 @@ import {
   UpdateSecuritySettingsDto,
 } from '../dto/security.dto';
 import { SecurityService } from '../services/security.service';
+import { SecurityCenterService } from '../services/security-center.service';
 
 @ApiBearerAuth()
 @ApiTags('admin-security')
 @Controller({ path: 'admin/security', version: '1' })
 export class SecurityController {
-  constructor(private readonly security: SecurityService) {}
+  constructor(
+    private readonly security: SecurityService,
+    private readonly center: SecurityCenterService,
+  ) {}
 
   @Get('settings')
   @RequirePermissions('sessions:manage')
@@ -69,5 +73,17 @@ export class SecurityController {
     @Query() query: ListLoginHistoryQueryDto,
   ) {
     return this.security.listLoginHistory(user.tid, query);
+  }
+
+  @Get('center')
+  @RequirePermissions('sessions:manage')
+  securityCenter(@CurrentUser() user: JwtUser) {
+    return this.center.getDashboard(user.tid);
+  }
+
+  @Post('sessions/revoke-others')
+  @RequirePermissions('sessions:manage')
+  revokeOtherSessions(@CurrentUser() user: JwtUser) {
+    return this.security.revokeOtherSessions(user.tid, user.sub);
   }
 }

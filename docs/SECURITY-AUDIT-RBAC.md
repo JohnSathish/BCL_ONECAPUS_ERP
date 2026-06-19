@@ -87,8 +87,14 @@ New shared modules:
 | `apps/web/lib/permissions/portal-access.ts`                          | Portal access, path checks, link sanitization |
 | `apps/api/src/common/permissions/portal-access.ts`                   | Server-side mirror                            |
 | `apps/api/src/modules/communication/utils/notification-link.util.ts` | Trigger → destination mapping                 |
+| `scripts/security/audit-rbac-endpoints.ts`                           | CI static audit — fails on unguarded routes   |
 
-**Recommendation:** Extend with `route-permissions.ts` mapping every `/admin/**` path to required permission slugs.
+Run before each release:
+
+```bash
+npx tsx scripts/security/audit-rbac-endpoints.ts
+# or: npm run audit:rbac-endpoints -w api
+```
 
 ---
 

@@ -136,6 +136,7 @@ export class UsersController {
   }
 
   @Post('impersonate/end')
+  @RequirePermissions('users:impersonate')
   async endImpersonation(
     @CurrentUser() user: JwtUser,
     @Body() body: { impersonationSessionId?: string },

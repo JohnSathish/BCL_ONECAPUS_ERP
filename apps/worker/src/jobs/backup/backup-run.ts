@@ -6,6 +6,8 @@ import { basename, dirname, join } from 'path';
 import { promisify } from 'util';
 import { pipeline } from 'stream/promises';
 import { backupDb, backupPaths } from './shared';
+import { encryptFileInPlace, resolveBackupKey } from '../../lib/backup-encryption';
+import { rename, unlink } from 'fs/promises';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,6 +53,15 @@ async function archiveInstanceFiles(outputPath: string, uploadRoot: string, stor
   await unlink(tarPath).catch(() => undefined);
 }
 
+async function maybeEncrypt(path: string) {
+  const key = resolveBackupKey(process.env.BACKUP_ENCRYPTION_KEY);
+  if (!key) return path;
+  const encPath = await encryptFileInPlace(path, key);
+  await unlink(path).catch(() => undefined);
+  await rename(encPath, path);
+  return path;
+}
+
 export async function runBackupJob(runId: string) {
   const db = backupDb();
   const paths = backupPaths();
@@ -85,6 +96,7 @@ export async function runBackupJob(runId: string) {
       ]);
     }
     const dbStat = await stat(dbPath);
+    await maybeEncrypt(dbPath);
     const dbChecksum = await sha256File(dbPath);
     await db.backupArtifact.create({
       data: {
@@ -110,6 +122,7 @@ export async function runBackupJob(runId: string) {
         await writeFile(filesPath, '');
       }
       const fStat = await stat(filesPath);
+      await maybeEncrypt(filesPath);
       const fChecksum = await sha256File(filesPath);
       await db.backupArtifact.create({
         data: {

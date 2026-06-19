@@ -29,4 +29,6 @@ export type AuthSessionResponse = {
   /** Plain refresh token — set HttpOnly cookie in controller; omit from JSON body */
   refreshToken: string;
   refreshMaxAgeSeconds: number;
+  mfaRequired?: boolean;
+  mfaToken?: string;
 };

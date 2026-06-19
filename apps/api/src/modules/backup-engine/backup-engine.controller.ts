@@ -22,8 +22,10 @@ import {
   RequirePermissions,
   RequireAnyPermission,
 } from '../../common/decorators/require-permissions.decorator';
+import { RequireStepUp } from '../../common/decorators/require-step-up.decorator';
 import { isSuperAdmin } from '../../common/permissions/permission-registry';
 import { extractClientIp } from '../../common/utils/request-host';
+import { AdminAuditHelper } from '../administration/admin-audit.helper';
 import {
   ListBackupLogsQueryDto,
   ListBackupRunsQueryDto,
@@ -52,6 +54,7 @@ export class BackupEngineController {
     private readonly orchestrator: BackupOrchestratorService,
     private readonly restore: BackupRestoreService,
     private readonly audit: BackupAuditService,
+    private readonly adminAudit: AdminAuditHelper,
   ) {}
 
   @Get('dashboard')
@@ -123,20 +126,32 @@ export class BackupEngineController {
   }
 
   @Get('runs/:id/download/:artifactId')
-  @RequireAnyPermission('backup:download', 'backup:manage')
+  @RequirePermissions('backup:download')
+  @RequireStepUp()
   async download(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
     @Param('artifactId') artifactId: string,
     @Req() req: Request,
   ): Promise<StreamableFile> {
+    requireSuperAdmin(user);
     const file = await this.orchestrator.downloadArtifact(id, artifactId);
+    const ip = extractClientIp(req);
     await this.audit.log({
       action: 'DOWNLOAD',
       actorId: user.sub,
-      ipAddress: extractClientIp(req),
+      ipAddress: ip,
       runId: id,
       metadata: { artifactId },
+    });
+    await this.adminAudit.log({
+      tenantId: user.tid,
+      userId: user.sub,
+      module: 'backup',
+      action: 'backup.download',
+      entityType: 'backup_artifact',
+      entityId: artifactId,
+      metadata: { runId: id, ipAddress: ip },
     });
     return file;
   }

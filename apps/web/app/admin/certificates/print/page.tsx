@@ -7,7 +7,7 @@ import { Printer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
 import { fetchCertificateIssue } from '@/services/certificates';
-import '@/styles/certificate-print.css';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 function CertificatePrintPageContent() {
   useRequireAuth();
@@ -79,7 +79,7 @@ function CertificatePrintPageContent() {
       ) : (
         <div
           className="certificate-print-document"
-          dangerouslySetInnerHTML={{ __html: issue?.renderedHtml ?? '' }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(issue?.renderedHtml ?? '') }}
         />
       )}
     </div>

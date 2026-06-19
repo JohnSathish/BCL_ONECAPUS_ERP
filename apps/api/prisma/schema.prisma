@@ -294,6 +294,8 @@ model User {
   mobileDevices                  MobileDevice[]
   passwordHistory                PasswordHistory[]
   passwordResetTokens            PasswordResetToken[]
+  mfaSecret                      UserMfaSecret?
+  mfaRecoveryCodes               UserMfaRecoveryCode[]
   impersonationsAsAdmin          ImpersonationSession[]      @relation("ImpersonationAdmin")
   impersonationsAsTarget         ImpersonationSession[]      @relation("ImpersonationTarget")
   auditLogs                      AuditLog[]                  @relation("AuditActor")
@@ -924,12 +926,41 @@ model TenantSecuritySettings {
   forceResetOnFirstLogin Boolean  @default(true) @map("force_reset_on_first_login")
   sessionTimeoutMinutes  Int      @default(480) @map("session_timeout_minutes")
   mfaEnforced            Boolean  @default(false) @map("mfa_enforced")
+  mfaEnforcedRoles       Json     @default("[\"super-admin\",\"principal\",\"accountant\",\"examination-cell\"]") @map("mfa_enforced_roles")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_security_settings")
+  @@schema("platform")
+}
+
+model UserMfaSecret {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  encryptedSecret String    @map("encrypted_secret")
+  verifiedAt      DateTime? @map("verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_mfa_secrets")
+  @@schema("platform")
+}
+
+model UserMfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_mfa_recovery_codes")
   @@schema("platform")
 }
 

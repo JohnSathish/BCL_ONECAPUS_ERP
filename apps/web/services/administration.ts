@@ -192,6 +192,16 @@ export async function fetchLoginHistory(params?: Record<string, string | undefin
   return data;
 }
 
+export async function fetchSecurityCenter() {
+  const { data } = await api.get('/v1/admin/security/center');
+  return data;
+}
+
+export async function revokeOtherSessions() {
+  const { data } = await api.post('/v1/admin/security/sessions/revoke-others');
+  return data;
+}
+
 export async function fetchLookupTypeGroups(): Promise<LookupTypeGroup[]> {
   const { data } = await api.get('/v1/master-lookups/types');
   return data;

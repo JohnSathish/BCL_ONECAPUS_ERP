@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -7,6 +8,12 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import {
+  CurrentUser,
+  type JwtUser,
+} from '../../common/decorators/current-user.decorator';
+import { isSuperAdmin } from '../../common/permissions/permission-registry';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { TenantsService } from './tenants.service';
 
@@ -30,7 +37,11 @@ export class TenantsController {
 
   @ApiBearerAuth()
   @Get()
-  list(@Query() query: PaginationQueryDto) {
+  @RequirePermissions('platform:licenses:read')
+  list(@CurrentUser() user: JwtUser, @Query() query: PaginationQueryDto) {
+    if (!isSuperAdmin(user.roles ?? [])) {
+      throw new ForbiddenException('Platform admin access required');
+    }
     return this.tenants.list(query);
   }
 }

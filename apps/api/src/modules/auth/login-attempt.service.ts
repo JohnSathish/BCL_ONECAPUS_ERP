@@ -1,10 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
-const MAX_FAILURES = 5;
+const MAX_FAILURES = 10;
 const WINDOW_MS = 15 * 60 * 1000;
-const LOCK_MS = 5 * 60 * 1000;
-
+const LOCK_MS = 30 * 60 * 1000;
 @Injectable()
 export class LoginAttemptService {
   constructor(private readonly prisma: PrismaService) {}
@@ -23,7 +22,7 @@ export class LoginAttemptService {
 
     if (record?.lockedUntil && record.lockedUntil > new Date()) {
       throw new HttpException(
-        'Too many attempts. Try again in a few minutes.',
+        'Too many attempts. Try again in 30 minutes.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -74,7 +73,7 @@ export class LoginAttemptService {
 
     if (lockedUntil && lockedUntil > now) {
       throw new HttpException(
-        'Too many attempts. Try again in a few minutes.',
+        'Too many attempts. Try again in 30 minutes.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

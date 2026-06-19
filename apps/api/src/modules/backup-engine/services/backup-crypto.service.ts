@@ -13,6 +13,7 @@ export class BackupCryptoService {
 
   private key(): Buffer {
     const secret =
+      this.config.get<string>('BACKUP_ENCRYPTION_KEY') ??
       this.config.get<string>('ENCRYPTION_KEY') ??
       this.config.get<string>('JWT_ACCESS_SECRET') ??
       'dev-backup-encryption-key-change-me';

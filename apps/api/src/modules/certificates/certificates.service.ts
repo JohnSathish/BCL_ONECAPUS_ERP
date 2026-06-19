@@ -658,6 +658,16 @@ export class CertificatesService {
       throw new NotFoundException('Certificate file missing on disk');
     const ext = publicPath.endsWith('.pdf') ? '.pdf' : '.html';
     const filename = `${issue.certificateNo.replace(/\//g, '-')}${ext}`;
+    if (user) {
+      await this.db().certificateDownloadLog.create({
+        data: {
+          tenantId,
+          issueId: issue.id,
+          downloadedById: user.sub,
+          ipAddress: (user as JwtUser & { _ip?: string })._ip ?? null,
+        },
+      });
+    }
     return {
       stream: createReadStream(absolutePath),
       filename,

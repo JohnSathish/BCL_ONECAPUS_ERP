@@ -13,18 +13,26 @@ import type { ActiveSessionRow } from '@/types/administration';
 import {
   fetchActiveSessions,
   fetchLoginHistory,
+  fetchSecurityCenter,
   fetchSecuritySettings,
+  revokeOtherSessions,
   revokeSession,
   updateSecuritySettings,
 } from '@/services/administration';
 import { formatDisplayDateTime } from '@/utils/format-date';
 
-type Tab = 'sessions' | 'history' | 'policy';
+type Tab = 'center' | 'sessions' | 'history' | 'policy';
 
 export function SecurityPage() {
   useRequireAuth();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>('sessions');
+  const [tab, setTab] = useState<Tab>('center');
+
+  const centerQ = useQuery({
+    queryKey: ['admin', 'security', 'center'],
+    queryFn: fetchSecurityCenter,
+    enabled: tab === 'center',
+  });
 
   const settingsQ = useQuery({
     queryKey: ['admin', 'security', 'settings'],
@@ -74,21 +82,69 @@ export function SecurityPage() {
           subtitle="Active sessions, login history, password policy"
         />
         <div className="mb-4 flex gap-2">
-          {(['sessions', 'history', 'policy'] as Tab[]).map((t) => (
+          {(['center', 'sessions', 'history', 'policy'] as Tab[]).map((t) => (
             <Button
               key={t}
               size="sm"
               variant={tab === t ? 'default' : 'outline'}
               onClick={() => setTab(t)}
             >
-              {t === 'sessions'
-                ? 'Active Sessions'
-                : t === 'history'
-                  ? 'Login History'
-                  : 'Password Policy'}
+              {t === 'center'
+                ? 'Security Center'
+                : t === 'sessions'
+                  ? 'Active Sessions'
+                  : t === 'history'
+                    ? 'Login History'
+                    : 'Password Policy'}
             </Button>
           ))}
         </div>
+
+        {tab === 'center' && centerQ.data ? (
+          <AdminGlassCard className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Failed logins (24h)</p>
+              <p className="text-2xl font-semibold">{centerQ.data.failedLogins24h}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Active sessions</p>
+              <p className="text-2xl font-semibold">{centerQ.data.activeSessions}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Permission denials (7d)</p>
+              <p className="text-2xl font-semibold">{centerQ.data.permissionDenials7d}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Backup encryption</p>
+              <p className="text-sm font-medium">
+                {centerQ.data.backup?.encryptionConfigured ? 'Enabled' : 'Not configured'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Last backup</p>
+              <p className="text-sm">
+                {centerQ.data.backup?.lastSuccessAt
+                  ? formatDisplayDateTime(centerQ.data.backup.lastSuccessAt)
+                  : '—'}
+              </p>
+            </div>
+          </AdminGlassCard>
+        ) : null}
+
+        {tab === 'sessions' ? (
+          <div className="mb-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                await revokeOtherSessions();
+                sessionsQ.refetch();
+              }}
+            >
+              Logout all other devices
+            </Button>
+          </div>
+        ) : null}
 
         {tab === 'sessions' ? (
           <AdminGlassCard className="overflow-x-auto p-0">

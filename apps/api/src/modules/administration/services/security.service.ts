@@ -174,6 +174,30 @@ export class SecurityService {
     return { count: result.count };
   }
 
+  async revokeOtherSessions(tenantId: string, userId: string) {
+    const currentSessions = await this.prisma.refreshSession.findMany({
+      where: {
+        tenantId,
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    });
+    const keepId = currentSessions[0]?.id;
+    const result = await this.prisma.refreshSession.updateMany({
+      where: {
+        tenantId,
+        userId,
+        revokedAt: null,
+        ...(keepId ? { id: { not: keepId } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
+    return { count: result.count };
+  }
+
   async listLoginHistory(tenantId: string, query: ListLoginHistoryQueryDto) {
     const page = Math.max(1, parseInt(query.page ?? '1', 10) || 1);
     const limit = Math.min(
@@ -227,11 +251,13 @@ export class SecurityService {
         email: l.user?.email,
         user: l.user,
         ipAddress: (l.metadata as { ipAddress?: string })?.ipAddress ?? null,
+        country: (l.metadata as { country?: string })?.country ?? null,
         createdAt: l.createdAt,
       })),
       failedAttempts: failedAttempts.map((a) => ({
         email: a.email,
         ipAddress: a.ipAddress,
+        country: null,
         failedCount: a.failedCount,
         lockedUntil: a.lockedUntil,
         lastAttemptAt: a.lastAttemptAt,

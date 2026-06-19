@@ -31,6 +31,7 @@ export class LicenseController {
   }
 
   @Get('renewal-contact')
+  @RequireAnyPermission('license:read', 'tenant:manage')
   renewalContact() {
     return this.license.getRenewalContact();
   }

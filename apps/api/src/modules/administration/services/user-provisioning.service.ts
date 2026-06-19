@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { AdminAuditHelper } from '../admin-audit.helper';
+import { PasswordPolicyService } from '../../../common/security/password-policy.service';
 import { UsernameGenerationService } from './username-generation.service';
 
 export type ProvisionUserInput = {
@@ -33,6 +34,7 @@ export class UserProvisioningService {
     private readonly prisma: PrismaService,
     private readonly usernameGen: UsernameGenerationService,
     private readonly audit: AdminAuditHelper,
+    private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
   generatePassword(length = 12): string {
@@ -252,6 +254,13 @@ export class UserProvisioningService {
     const historyCount = settings?.passwordHistoryCount ?? 5;
 
     const plainPassword = options.newPassword ?? this.generatePassword();
+    if (options.newPassword) {
+      await this.passwordPolicy.validateForUser(
+        tenantId,
+        userId,
+        plainPassword,
+      );
+    }
     const passwordHash = await bcrypt.hash(plainPassword, 12);
 
     const history = await this.prisma.passwordHistory.findMany({

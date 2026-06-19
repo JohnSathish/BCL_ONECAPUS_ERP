@@ -27,6 +27,7 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
+import { RequireStepUp } from '../../common/decorators/require-step-up.decorator';
 import {
   AdmitStudentDto,
   AdmitFullStudentDto,
@@ -122,6 +123,7 @@ export class StudentsController {
   }
 
   @Get('export.csv')
+  @RequirePermissions('students:export')
   async exportCsv(
     @CurrentUser() user: JwtUser,
     @Res() res: Response,
@@ -499,6 +501,7 @@ export class StudentsController {
   }
 
   @Get(':id/profile/completion')
+  @RequireAnyPermission('students:read', 'students:manage')
   getProfileCompletion(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.sectionsService.getCompletion(user.tid, id);
   }
@@ -671,6 +674,7 @@ export class StudentsController {
 
   @Delete(':id')
   @RequirePermissions('students:manage')
+  @RequireStepUp()
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.students.remove(user.tid, id);
   }

@@ -25,14 +25,13 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 
+import { extractClientIp } from '../../common/utils/request-host';
 import { Public } from '../../common/decorators/public.decorator';
 
 import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
-
-import { extractClientIp } from '../../common/utils/request-host';
 
 import { CertificatesService } from './certificates.service';
 
@@ -241,8 +240,16 @@ export class CertificatesController {
 
   @Get('issues/:id/download')
   @RequireAnyPermission(...CERT_READ, ...CERT_SELF)
-  async downloadIssue(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    const doc = await this.service.getIssueDocumentStream(user.tid, id, user);
+  async downloadIssue(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const doc = await this.service.getIssueDocumentStream(
+      user.tid,
+      id,
+      Object.assign(user, { _ip: extractClientIp(req) }),
+    );
 
     return new StreamableFile(doc.stream, {
       type: doc.mimeType,

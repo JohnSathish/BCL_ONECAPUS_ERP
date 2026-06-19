@@ -434,15 +434,6 @@ export class FeesController {
     return this.gateways.syncStatus(user, provider, orderId);
   }
 
-  @Post('payments/webhook/:provider')
-  webhook(
-    @CurrentUser() user: JwtUser,
-    @Param('provider') provider: string,
-    @Body() payload: Record<string, unknown>,
-  ) {
-    return this.gateways.webhook(user.tid, provider, payload);
-  }
-
   @Get('fines')
   @RequireAnyPermission('fees:read', 'fees:manage')
   fineRules(@CurrentUser() user: JwtUser) {

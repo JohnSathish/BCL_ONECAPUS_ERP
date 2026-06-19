@@ -14,6 +14,8 @@ import { LoginAttemptService } from './login-attempt.service';
 import { PermissionResolverService } from '../../common/permissions/permission-resolver.service';
 import type { DataScope } from '../../common/permissions/permission-resolver.service';
 import { isSuperAdmin } from '../../common/permissions/permission-registry';
+import { PasswordPolicyService } from '../../common/security/password-policy.service';
+import { MfaService } from './mfa/mfa.service';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -33,6 +35,7 @@ type IssueTokensOptions = {
     appVersion?: string;
     deviceId?: string;
     deviceLabel?: string;
+    country?: string;
   };
   impersonatedBy?: string;
   impersonationSessionId?: string;
@@ -48,6 +51,8 @@ export class AuthService {
     private readonly challenge: ChallengeService,
     private readonly loginAttempts: LoginAttemptService,
     private readonly permissionResolver: PermissionResolverService,
+    private readonly passwordPolicy: PasswordPolicyService,
+    private readonly mfa: MfaService,
   ) {}
 
   private hashToken(token: string) {
@@ -322,6 +327,8 @@ export class AuthService {
       appType?: string;
       appVersion?: string;
       deviceId?: string;
+      deviceLabel?: string;
+      country?: string;
     },
     rememberMe?: boolean,
   ): Promise<AuthSessionResponse> {
@@ -367,12 +374,47 @@ export class AuthService {
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
 
+    const roles = user.roles.map((r) => r.role.slug);
+    const mfaRequired =
+      user.mfaEnabled ||
+      (await this.mfa.isRequiredForUser(tenant.id, user.id, roles));
+    if (mfaRequired && (await this.mfa.userHasVerifiedMfa(user.id))) {
+      const mfaToken = await this.mfa.createPendingLoginToken(
+        user.id,
+        tenant.id,
+        { rememberMe, meta },
+      );
+      return {
+        mfaRequired: true,
+        mfaToken,
+        accessToken: '',
+        expiresIn: 0,
+        expiresAt: new Date().toISOString(),
+        refreshToken: '',
+        refreshMaxAgeSeconds: 0,
+        user: this.buildUserPayload(
+          user,
+          tenant.slug,
+          roles,
+          [],
+          { shiftIds: [], allShifts: false },
+          {
+            departmentIds: [],
+            campusIds: [],
+            programmeIds: [],
+            semesterNos: [],
+            allDepartments: false,
+            allCampuses: false,
+          },
+        ),
+      };
+    }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
 
-    const roles = user.roles.map((r) => r.role.slug);
     const resolved = await this.resolveUserPermissions(user.id, roles);
     const shiftScope = await this.resolveShiftScope(user.id, roles);
     const session = await this.issueTokens(
@@ -393,7 +435,7 @@ export class AuthService {
         action: 'auth.login',
         entityType: 'user',
         entityId: user.id,
-        metadata: { ipAddress: ip },
+        metadata: { ipAddress: ip, country: meta?.country },
       },
     });
 
@@ -535,13 +577,32 @@ export class AuthService {
     throw new UnauthorizedException('Invalid refresh token');
   }
 
-  async logout(refreshToken: string | undefined) {
+  async logout(
+    refreshToken: string | undefined,
+    meta?: { userId?: string; tenantId?: string; ipAddress?: string },
+  ) {
     if (!refreshToken) return { success: true };
     const hashed = this.hashToken(refreshToken);
+    const session = await this.prisma.refreshSession.findFirst({
+      where: { hashedToken: hashed, revokedAt: null },
+    });
     await this.prisma.refreshSession.updateMany({
       where: { hashedToken: hashed, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (session) {
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId: session.tenantId,
+          userId: session.userId,
+          module: 'auth',
+          action: 'auth.logout',
+          entityType: 'user',
+          entityId: session.userId,
+          metadata: { ipAddress: meta?.ipAddress },
+        },
+      });
+    }
     return { success: true };
   }
 
@@ -579,14 +640,83 @@ export class AuthService {
   async resetPasswordAndRevokeSessions(
     userId: string,
     newPassword: string,
+    tenantId?: string,
   ): Promise<{ success: true }> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    if (tenantId ?? user.tenantId) {
+      await this.passwordPolicy.validateForUser(
+        tenantId ?? user.tenantId,
+        userId,
+        newPassword,
+      );
+    }
     const passwordHash = await bcrypt.hash(newPassword, 12);
+    const rules = await this.passwordPolicy.getRules(user.tenantId);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: { passwordHash, passwordChangedAt: new Date() },
     });
+    await this.passwordPolicy.recordHistory(
+      userId,
+      passwordHash,
+      rules.historyCount,
+    );
     await this.revokeAllSessionsForUser(userId);
     return { success: true };
+  }
+
+  async completeMfaLogin(
+    userId: string,
+    tenantId: string,
+    rememberMe?: boolean,
+    meta?: IssueTokensOptions['meta'],
+  ) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId, deletedAt: null, isActive: true },
+      include: {
+        roles: { where: { deletedAt: null }, include: { role: true } },
+      },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null, status: 'active' },
+    });
+    if (!tenant) throw new UnauthorizedException('Tenant not found');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const roles = user.roles.map((r) => r.role.slug);
+    const resolved = await this.resolveUserPermissions(user.id, roles);
+    const shiftScope = await this.resolveShiftScope(user.id, roles);
+    const session = await this.issueTokens(
+      user,
+      tenant.slug,
+      roles,
+      resolved.permissions,
+      shiftScope,
+      resolved.dataScope,
+      { rememberMe, meta },
+    );
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        userId: user.id,
+        module: 'auth',
+        action: 'auth.login',
+        entityType: 'user',
+        entityId: user.id,
+        metadata: { mfa: true, ipAddress: meta?.ipAddress },
+      },
+    });
+
+    return session;
   }
 
   verifyEmail(token: string) {
