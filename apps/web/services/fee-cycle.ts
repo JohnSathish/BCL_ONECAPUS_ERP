@@ -1,12 +1,15 @@
 import { api } from '@/services/api';
 import type {
   AcademicFeeCycle,
+  ExternalFeePayment,
   FeeFinanceSettings,
   FeeHeadListResponse,
   FeeHeadMaster,
   FeePaymentRequest,
   FeeReceiptListItem,
+  MonthlyFeePlan,
   PaymentRequestCheckout,
+  ScholarshipScheme,
   StudentFeeAccount,
 } from '@/types/fee-cycle';
 

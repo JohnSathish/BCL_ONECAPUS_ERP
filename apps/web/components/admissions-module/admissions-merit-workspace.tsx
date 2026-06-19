@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { canManageAdmissions } from '@/lib/can-manage-academic';
 import {
   fetchAllocations,
   fetchIntakes,
@@ -28,7 +29,7 @@ export function AdmissionsMeritWorkspace() {
   const [selectedIntakeId, setSelectedIntakeId] = useState('');
   const [selectedMeritListId, setSelectedMeritListId] = useState('');
 
-  const canManage = useMemo(() => session?.user.roles.includes('college-admin'), [session]);
+  const canManage = useMemo(() => canManageAdmissions(session), [session]);
 
   const intakes = useQuery({
     queryKey: ['admissions', 'intakes'],

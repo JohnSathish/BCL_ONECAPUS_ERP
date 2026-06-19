@@ -69,7 +69,7 @@ export function isApiUnavailableError(error: unknown): boolean {
   return false;
 }
 
-export function apiErrorMessage(error: unknown, fallback: string): string {
+export function apiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (error instanceof ApiError) {
     return error.message || fallback;
   }

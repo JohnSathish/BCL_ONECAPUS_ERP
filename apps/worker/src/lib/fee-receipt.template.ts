@@ -1060,7 +1060,39 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
 </html>`;
 }
 
-export async function resolveFeeReceiptBranding(db: Record<string, any>, tenantId: string) {
+export async function resolveFeeReceiptBranding(
+  db: {
+    tenant: {
+      findUnique: (args: {
+        where: { id: string };
+        select: { name: true };
+      }) => Promise<{ name: string } | null>;
+    };
+    tenantBranding: {
+      findUnique: (args: {
+        where: { tenantId: string };
+        select: {
+          displayName: true;
+          address: true;
+          badges: true;
+          logoUrl: true;
+          primaryColor: true;
+          accentColor: true;
+          portalSubtitle: true;
+        };
+      }) => Promise<{
+        displayName?: string | null;
+        address?: string | null;
+        badges?: unknown;
+        logoUrl?: string | null;
+        primaryColor?: string | null;
+        accentColor?: string | null;
+        portalSubtitle?: string | null;
+      } | null>;
+    };
+  },
+  tenantId: string,
+) {
   const [tenant, branding] = await Promise.all([
     db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
     db.tenantBranding.findUnique({

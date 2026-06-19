@@ -15,3 +15,15 @@ export function canManageOrganization(session: SessionLike): boolean {
   const perms = session?.user?.permissions ?? [];
   return isSuperAdmin(roles) || perms.includes('org:manage');
 }
+
+export function canManageAdmissions(session: SessionLike): boolean {
+  const roles = session?.user?.roles ?? [];
+  const perms = session?.user?.permissions ?? [];
+  return isSuperAdmin(roles) || perms.includes('admissions:manage');
+}
+
+export function canManageAcademicLifecycle(session: SessionLike): boolean {
+  const roles = session?.user?.roles ?? [];
+  const perms = session?.user?.permissions ?? [];
+  return isSuperAdmin(roles) || perms.includes('academic-lifecycle:manage');
+}

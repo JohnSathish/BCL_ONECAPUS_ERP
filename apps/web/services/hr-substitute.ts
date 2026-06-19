@@ -65,58 +65,71 @@ export type SubstituteStaffRow = {
   } | null;
 };
 
-export function fetchSubstituteDashboard() {
-  return api.get<SubstituteDashboard>('/v1/hr/substitute/dashboard');
+export async function fetchSubstituteDashboard() {
+  const { data } = await api.get<SubstituteDashboard>('/v1/hr/substitute/dashboard');
+  return data;
 }
 
-export function fetchSubstituteStaff(
+export async function fetchSubstituteStaff(
   params?: Record<string, string | number | boolean | undefined>,
 ) {
-  return api.get<{ data: SubstituteStaffRow[]; meta: { total: number } }>(
+  const { data } = await api.get<{ data: SubstituteStaffRow[]; meta: { total: number } }>(
     '/v1/hr/substitute/staff',
     { params },
   );
+  return data;
 }
 
-export function fetchSubstituteStaffDetail(id: string) {
-  return api.get<
+export async function fetchSubstituteStaffDetail(id: string) {
+  const { data } = await api.get<
     SubstituteStaffRow & { documents: unknown[]; assignments: ReplacementAssignmentRow[] }
   >(`/v1/hr/substitute/staff/${id}`);
+  return data;
 }
 
-export function fetchReplacementAssignments(
+export async function fetchReplacementAssignments(
   params?: Record<string, string | number | boolean | undefined>,
 ) {
-  return api.get<{ data: ReplacementAssignmentRow[]; meta: { total: number } }>(
+  const { data } = await api.get<{ data: ReplacementAssignmentRow[]; meta: { total: number } }>(
     '/v1/hr/substitute/assignments',
     { params },
   );
+  return data;
 }
 
-export function fetchActiveReplacementForStaff(staffProfileId: string) {
-  return api.get<ReplacementAssignmentRow | null>(
+export async function fetchActiveReplacementForStaff(staffProfileId: string) {
+  const { data } = await api.get<ReplacementAssignmentRow | null>(
     `/v1/hr/substitute/assignments/active/${staffProfileId}`,
   );
+  return data;
 }
 
-export function createReplacementAssignment(payload: Record<string, unknown>) {
-  return api.post<ReplacementAssignmentRow>('/v1/hr/substitute/assignments', payload);
+export async function createReplacementAssignment(payload: Record<string, unknown>) {
+  const { data } = await api.post<ReplacementAssignmentRow>(
+    '/v1/hr/substitute/assignments',
+    payload,
+  );
+  return data;
 }
 
-export function createSubstituteStaff(payload: Record<string, unknown>) {
-  return api.post('/v1/hr/substitute/staff', payload);
+export async function createSubstituteStaff(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/hr/substitute/staff', payload);
+  return data;
 }
 
-export function completeReplacementAssignment(id: string, remarks?: string) {
-  return api.post(`/v1/hr/substitute/assignments/${id}/complete`, { remarks });
+export async function completeReplacementAssignment(id: string, remarks?: string) {
+  const { data } = await api.post(`/v1/hr/substitute/assignments/${id}/complete`, { remarks });
+  return data;
 }
 
-export function cancelReplacementAssignment(id: string, remarks?: string) {
-  return api.post(`/v1/hr/substitute/assignments/${id}/cancel`, { remarks });
+export async function cancelReplacementAssignment(id: string, remarks?: string) {
+  const { data } = await api.post(`/v1/hr/substitute/assignments/${id}/cancel`, { remarks });
+  return data;
 }
 
-export function fetchReplacementReport(type: 'active' | 'study-leave' | 'history') {
-  return api.get<ReplacementAssignmentRow[]>(`/v1/hr/substitute/reports/${type}`);
+export async function fetchReplacementReport(type: 'active' | 'study-leave' | 'history') {
+  const { data } = await api.get<ReplacementAssignmentRow[]>(`/v1/hr/substitute/reports/${type}`);
+  return data;
 }
 
 export const REPLACEMENT_REASON_OPTIONS = [

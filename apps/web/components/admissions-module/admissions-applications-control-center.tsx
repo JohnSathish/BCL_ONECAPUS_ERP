@@ -29,6 +29,7 @@ import {
 } from '@/services/admissions';
 import { enrollStudentFromApplication } from '@/services/students';
 import type { AdmissionApplication } from '@/types/admissions';
+import { canManageAdmissions } from '@/lib/can-manage-academic';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -60,7 +61,7 @@ export function AdmissionsApplicationsControlCenter({ preset }: Props) {
   const [page, setPage] = useState(1);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
 
-  const canManage = Boolean(session?.user.roles.includes('college-admin'));
+  const canManage = canManageAdmissions(session);
 
   const cycles = useQuery({
     queryKey: ['admissions', 'cycles'],

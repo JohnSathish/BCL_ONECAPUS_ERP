@@ -12,6 +12,7 @@ import { SemesterLifecycleTable } from '@/components/academic-lifecycle/semester
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { canManageAcademicLifecycle } from '@/lib/can-manage-academic';
 import {
   activateEvenCycle,
   activateOddCycle,
@@ -99,7 +100,7 @@ export default function AdminAcademicLifecyclePage() {
     enabled: Boolean(session) && Boolean(institutionId),
   });
 
-  const canManage = useMemo(() => session?.user.roles.includes('college-admin'), [session]);
+  const canManage = useMemo(() => canManageAcademicLifecycle(session), [session]);
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['academic-lifecycle'] });

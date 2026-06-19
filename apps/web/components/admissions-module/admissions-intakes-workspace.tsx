@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFormDraft } from '@/hooks/use-form-draft';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { canManageAdmissions } from '@/lib/can-manage-academic';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { fetchPrograms } from '@/services/programs';
 import { fetchAcademicYears } from '@/services/organization';
@@ -33,7 +34,7 @@ const selectClass = 'h-10 w-full rounded-md border border-border bg-card px-3 te
 export function AdmissionsIntakesWorkspace() {
   const session = useRequireAuth();
   const qc = useQueryClient();
-  const canManage = Boolean(session?.user.roles.includes('college-admin'));
+  const canManage = canManageAdmissions(session);
 
   const intakes = useQuery({
     queryKey: ['admissions', 'intakes'],

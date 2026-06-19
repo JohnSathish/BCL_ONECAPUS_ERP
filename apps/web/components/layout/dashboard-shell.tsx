@@ -14,11 +14,11 @@ import { cn } from '@/utils/cn';
 type Role = keyof typeof ROLE_NAV | 'admin' | 'shift' | 'staff';
 
 export function DashboardShell({
-  role,
+  role = 'admin',
   title,
   children,
 }: {
-  role: Role;
+  role?: Role;
   title?: string;
   children: React.ReactNode;
 }) {

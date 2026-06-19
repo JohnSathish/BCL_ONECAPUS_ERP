@@ -5,11 +5,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../..'),
   eslint: {
-    // Production Docker builds must not fail on pre-existing lint debt.
+    // ESLint runs in CI (web-lint job); Docker build stays resilient.
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // Unblock production deploy; fix type errors incrementally in dev.
+    // Typecheck runs in CI with a regression baseline (scripts/ci/web-typecheck-gate.mjs).
     ignoreBuildErrors: true,
   },
   async rewrites() {

@@ -2,16 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, main, develop]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  api-quality:
+    name: API — lint & typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,14 +28,98 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
-      - name: Lint
-        run: npm run lint
-
       - name: Typecheck
-        run: npm run typecheck
+        run: npm run typecheck -w api
 
       - name: Unit tests
         run: npm run test:ci -w api
+
+  worker-quality:
+    name: Worker — lint & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: ESLint
+        run: npm run lint:ci -w worker
+
+      - name: Typecheck
+        run: npm run typecheck -w worker
+
+  web-quality:
+    name: Web — typecheck (baseline gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck web
+        run: npm run typecheck -w web 2>&1 | tee typecheck-web.log
+
+      - name: Enforce typecheck baseline
+        run: node scripts/ci/web-typecheck-gate.mjs typecheck-web.log
+
+      - name: Upload typecheck log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-typecheck-log
+          path: typecheck-web.log
+          retention-days: 7
+
+  web-lint:
+    name: Web — ESLint
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint (informational)
+        run: npm run lint -w web
+
+  build:
+    name: Production build
+    needs: [api-quality, worker-quality, web-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
 
       - name: Build
         run: npm run build
