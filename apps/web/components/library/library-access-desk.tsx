@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Bell,
   BookOpen,
@@ -188,7 +187,6 @@ const SIDEBAR = [
 
 export function LibraryAccessDesk() {
   const qc = useQueryClient();
-  const router = useRouter();
   const enabled = useAuthQueryEnabled();
   const { session } = useAuth();
   const now = useLiveClock();
@@ -449,7 +447,7 @@ export function LibraryAccessDesk() {
     } catch {
       /* ignore */
     }
-    router.replace('/library-desk/login');
+    window.location.assign('/login');
   };
 
   return (

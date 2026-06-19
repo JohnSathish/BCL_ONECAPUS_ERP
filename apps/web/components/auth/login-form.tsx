@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { resolveHomePath } from '@/hooks/use-auth';
+import { resolveHomePath } from '@/lib/permissions/portal-access';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import type { ApiStartupRetryOptions } from '@/lib/http/wait-for-api';
 import { fetchLoginChallenge, fetchLoginContext, login } from '@/services/auth';
@@ -149,7 +149,8 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         setSession(session);
         setPrefs({ rememberMe: values.rememberMe });
         tokenRefreshManager.scheduleProactiveRefresh(session);
-        const destination = postLoginPath ?? resolveHomePath(session.user.roles);
+        const destination =
+          postLoginPath ?? resolveHomePath(session.user.roles, session.user.permissions ?? []);
         if (hardRedirect) {
           window.location.assign(destination);
         } else {
