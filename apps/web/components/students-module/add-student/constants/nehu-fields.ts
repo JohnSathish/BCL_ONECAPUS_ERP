@@ -14,9 +14,19 @@ export function validateNehuRollNumber(value: string): string | null {
 
 export function validateNehuRegistrationNumber(value: string): string | null {
   const trimmed = value.trim();
-  if (!trimmed) return 'NEHU Registration Number is required.';
+  if (!trimmed) return null;
   if (!NEHU_REGISTRATION_PATTERN.test(trimmed)) {
     return 'Use letters, numbers, / or - only.';
   }
   return null;
+}
+
+/** Sem 3+ — informational only; never blocks admission. */
+export function nehuRegistrationPendingWarning(
+  semester: number,
+  enrollmentNumber: string,
+): string | null {
+  if (semester < 3) return null;
+  if (enrollmentNumber.trim()) return null;
+  return 'University registration pending — NEHU Registration Number has not been assigned yet. You can update it later from the student profile.';
 }

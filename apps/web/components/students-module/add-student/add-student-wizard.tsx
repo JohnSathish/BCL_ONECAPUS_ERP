@@ -13,7 +13,13 @@ import {
   AddStudentSummaryMobileBar,
   AddStudentSummaryPanel,
 } from '@/components/students-module/add-student/add-student-summary-panel';
+import { nehuRegistrationPendingWarning } from '@/components/students-module/add-student/constants/nehu-fields';
 import { WIZARD_STEPS } from '@/components/students-module/add-student/constants';
+import {
+  AdmissionIncompleteBanner,
+  AdmissionValidationPanel,
+} from '@/components/students-module/add-student/ui/admission-validation-panel';
+import { scrollToAdmissionField } from '@/components/students-module/add-student/ui/admission-form-field';
 import { StepAcademic } from '@/components/students-module/add-student/steps/step-academic';
 import { StepBasic } from '@/components/students-module/add-student/steps/step-basic';
 import { StepFyugpBasket } from '@/components/students-module/add-student/steps/step-fyugp-basket';
@@ -341,10 +347,20 @@ export function AddStudentWizard() {
         draft.subjectBasketMeta.minorRequired ?? (draft.programVersionId ? undefined : false),
     });
     setFieldErrors(errors);
-    const msg = firstStepError(errors);
-    if (msg) setBannerError(msg);
-    return !msg;
+    const keys = Object.keys(errors);
+    if (keys.length > 0) {
+      setBannerError('');
+      scrollToAdmissionField(keys[0]!);
+      return false;
+    }
+    return true;
   }, [step.id, draft]);
+
+  const nehuWarnings = useMemo(() => {
+    const semester = draft.currentSemester ?? 1;
+    const warning = nehuRegistrationPendingWarning(semester, draft.enrollmentNumber);
+    return warning ? [warning] : [];
+  }, [draft.currentSemester, draft.enrollmentNumber]);
 
   const goNext = () => {
     if (!validateCurrentStep()) return;
@@ -369,7 +385,8 @@ export function AddStudentWizard() {
     const errors = validateAdmissionSubmit(draft, mode, validationIssues);
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
-      setBannerError(firstStepError(errors) ?? 'Fix validation errors');
+      setBannerError('');
+      scrollToAdmissionField(Object.keys(errors)[0]!);
       return;
     }
     setBannerError('');
@@ -475,6 +492,8 @@ export function AddStudentWizard() {
                   {bannerError}
                 </p>
               ) : null}
+              <AdmissionIncompleteBanner errors={fieldErrors} />
+              <AdmissionValidationPanel errors={fieldErrors} nehuWarnings={nehuWarnings} />
               <AnimatePresence mode="wait">
                 <motion.div
                   key={step.id}

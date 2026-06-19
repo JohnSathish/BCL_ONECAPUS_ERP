@@ -37,7 +37,24 @@ describe('admission validation', () => {
     const errors = validateStepFields('basic', draft);
     expect(errors.fullName).toBeTruthy();
     expect(errors.email).toBeTruthy();
+    expect(errors.mobileNumber).toBeTruthy();
+    expect(errors.enrollmentNumber).toBeUndefined();
     expect(firstStepError(errors)).toBeTruthy();
+  });
+
+  it('does not require NEHU registration for Semester 1', () => {
+    const draft = {
+      ...createEmptyDraft(),
+      fullName: 'Jane Doe',
+      email: 'jane@example.com',
+      mobileNumber: '9876543210',
+      enrollmentNumber: '',
+      nehuRollNumber: '',
+      currentSemester: 1,
+    };
+    const errors = validateStepFields('basic', draft);
+    expect(errors.enrollmentNumber).toBeUndefined();
+    expect(errors.nehuRollNumber).toBeUndefined();
   });
 
   it('validates academic programme selection', () => {
@@ -45,7 +62,7 @@ describe('admission validation', () => {
       ...createEmptyDraft(),
       fullName: 'Jane Doe',
       email: 'jane@example.com',
-      enrollmentNumber: 'REG001',
+      mobileNumber: '9876543210',
     };
     const errors = validateStepFields('academic', draft);
     expect(errors.programVersionId).toBeTruthy();
@@ -84,6 +101,16 @@ describe('buildAdmitFullPayload', () => {
     const draft = { ...draftWithClass12(), nehuRollNumber: 'NEHU/2026/001' };
     const payload = buildAdmitFullPayload(draft);
     expect(payload.admissionNumber).toBe('NEHU/2026/001');
+  });
+
+  it('uses application number when NEHU registration is blank', () => {
+    const draft = {
+      ...draftWithClass12(),
+      enrollmentNumber: '',
+      applicationNumber: 'APP-2026-1234',
+    };
+    const payload = buildAdmitFullPayload(draft);
+    expect(payload.enrollmentNumber).toBe('APP-2026-1234');
   });
 });
 

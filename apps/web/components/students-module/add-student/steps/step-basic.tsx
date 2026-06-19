@@ -2,6 +2,8 @@
 
 import { IdCard, RefreshCw, Tags, UserRound } from 'lucide-react';
 
+import { AdmissionFormField } from '@/components/students-module/add-student/ui/admission-form-field';
+import { nehuRegistrationPendingWarning } from '@/components/students-module/add-student/constants/nehu-fields';
 import { AdmissionFormSection } from '@/components/students-module/add-student/ui/admission-form-section';
 import { AdmissionPhotoUpload } from '@/components/students-module/add-student/ui/admission-photo-upload';
 import {
@@ -19,6 +21,9 @@ import type { LookupOptions } from '@/components/students-module/add-student/typ
 import { SupportDataSelect } from '@/components/administration-module/support-data/support-data-select';
 import { useSupportDataOptions } from '@/hooks/use-support-data';
 import { cn } from '@/utils/cn';
+
+const NEHU_HELPER =
+  'Issued later by NEHU. Semester 1 students can be admitted without this — update when the university assigns the number.';
 
 type Props = {
   draft: AddStudentDraft;
@@ -38,9 +43,23 @@ export function StepBasic({
   onRefreshRollPreview,
 }: Props) {
   const genderOptions = useSupportDataOptions('gender');
+  const semester = draft.currentSemester ?? 1;
+  const nehuWarning = nehuRegistrationPendingWarning(semester, draft.enrollmentNumber);
+
+  const fieldSuccess = (key: keyof AddStudentDraft, minLen = 1) => {
+    const v = draft[key];
+    if (typeof v !== 'string' || errors[key as string]) return false;
+    return v.trim().length >= minLen;
+  };
 
   return (
     <div className="space-y-5">
+      {nehuWarning ? (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:text-amber-50">
+          {nehuWarning}
+        </p>
+      ) : null}
+
       <AdmissionFormSection
         icon={UserRound}
         title="Identity"
@@ -48,7 +67,14 @@ export function StepBasic({
       >
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1 space-y-4">
-            <GlassField label="Full Name" error={errors.fullName} className="max-w-none">
+            <AdmissionFormField
+              label="Full Name"
+              fieldKey="fullName"
+              required
+              error={errors.fullName}
+              success={fieldSuccess('fullName', 2)}
+              className="max-w-none"
+            >
               <input
                 className={glassInputClass}
                 value={draft.fullName}
@@ -57,35 +83,56 @@ export function StepBasic({
                   setDraft((d) => ({ ...d, fullName: capitalizeName(e.target.value) }))
                 }
                 autoComplete="name"
+                placeholder="Student full name as per records"
               />
-            </GlassField>
+            </AdmissionFormField>
 
             <div className={cn(admissionFormGridClass)}>
-              <GlassField label="Email" error={errors.email}>
+              <AdmissionFormField
+                label="Email"
+                fieldKey="email"
+                required
+                error={errors.email}
+                success={fieldSuccess('email', 3) && draft.email.includes('@')}
+              >
                 <input
                   type="email"
                   className={glassInputClass}
                   value={draft.email}
                   onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
                   autoComplete="email"
+                  placeholder="student@example.com"
                 />
-              </GlassField>
-              <GlassField label="Application No.">
+              </AdmissionFormField>
+              <AdmissionFormField label="Application No." fieldKey="applicationNumber">
                 <input
                   className={cn(glassInputClass, 'bg-muted/40')}
                   value={draft.applicationNumber}
                   readOnly
                 />
-              </GlassField>
-              <GlassField label="NEHU Registration Number" error={errors.enrollmentNumber}>
+              </AdmissionFormField>
+              <AdmissionFormField
+                label="NEHU Registration Number"
+                fieldKey="enrollmentNumber"
+                optional
+                error={errors.enrollmentNumber}
+                hint={NEHU_HELPER}
+                success={fieldSuccess('enrollmentNumber', 2)}
+              >
                 <input
                   className={glassInputClass}
                   value={draft.enrollmentNumber}
                   onChange={(e) => setDraft((d) => ({ ...d, enrollmentNumber: e.target.value }))}
-                  placeholder="e.g. REG-2026-001"
+                  placeholder="Leave blank for Semester 1 — add when NEHU assigns"
                 />
-              </GlassField>
-              <GlassField label="Mobile" error={errors.mobileNumber}>
+              </AdmissionFormField>
+              <AdmissionFormField
+                label="Mobile Number"
+                fieldKey="mobileNumber"
+                required
+                error={errors.mobileNumber}
+                success={fieldSuccess('mobileNumber', 10)}
+              >
                 <input
                   className={glassInputClass}
                   inputMode="numeric"
@@ -99,9 +146,10 @@ export function StepBasic({
                   autoComplete="tel"
                   placeholder="10-digit mobile"
                 />
-              </GlassField>
-              <GlassField
+              </AdmissionFormField>
+              <AdmissionFormField
                 label="Roll Number"
+                fieldKey="rollNumber"
                 error={errors.rollNumber}
                 hint={
                   draft.rollNumberAutoGenerated
@@ -147,7 +195,7 @@ export function StepBasic({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-11 shrink-0 px-2"
+                      className="h-12 shrink-0 px-2"
                       disabled={rollPreviewLoading || !onRefreshRollPreview}
                       onClick={onRefreshRollPreview}
                       title="Refresh preview"
@@ -156,20 +204,29 @@ export function StepBasic({
                     </Button>
                   ) : null}
                 </div>
-              </GlassField>
-              <GlassField label="NEHU Roll Number" error={errors.nehuRollNumber} optional>
+              </AdmissionFormField>
+              <AdmissionFormField
+                label="NEHU Roll Number"
+                fieldKey="nehuRollNumber"
+                optional
+                error={errors.nehuRollNumber}
+                hint={NEHU_HELPER}
+                success={fieldSuccess('nehuRollNumber', 2)}
+              >
                 <input
                   className={glassInputClass}
                   value={draft.nehuRollNumber}
                   onChange={(e) => setDraft((d) => ({ ...d, nehuRollNumber: e.target.value }))}
-                  placeholder="University roll no."
+                  placeholder="University roll no. (optional for Sem 1)"
                 />
-              </GlassField>
-              <GlassField
+              </AdmissionFormField>
+              <AdmissionFormField
                 label="ABC ID"
-                error={errors.abcId}
+                fieldKey="abcId"
                 optional
-                hint="Academic Bank of Credits ID"
+                error={errors.abcId}
+                hint="Academic Bank of Credits ID — alphanumeric, optional at admission."
+                success={fieldSuccess('abcId', 1)}
               >
                 <input
                   className={glassInputClass}
@@ -177,13 +234,13 @@ export function StepBasic({
                   onChange={(e) =>
                     setDraft((d) => ({
                       ...d,
-                      abcId: e.target.value.trim().slice(0, 20),
+                      abcId: e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 50),
                     }))
                   }
                   placeholder="Enter ABC ID"
-                  maxLength={20}
+                  maxLength={50}
                 />
-              </GlassField>
+              </AdmissionFormField>
             </div>
           </div>
 
@@ -217,13 +274,18 @@ export function StepBasic({
               onChange={(gender) => setDraft((d) => ({ ...d, gender }))}
             />
           </GlassField>
-          <GlassField label="Date of Birth" error={errors.dateOfBirth}>
+          <AdmissionFormField
+            label="Date of Birth"
+            fieldKey="dateOfBirth"
+            error={errors.dateOfBirth}
+            success={fieldSuccess('dateOfBirth', 8)}
+          >
             <DateInput
               className={glassInputClass}
               value={draft.dateOfBirth}
               onChange={(dateOfBirth) => setDraft((d) => ({ ...d, dateOfBirth }))}
             />
-          </GlassField>
+          </AdmissionFormField>
           <GlassField label="Aadhaar / National ID" error={errors.nationalId} optional>
             <input
               className={glassInputClass}

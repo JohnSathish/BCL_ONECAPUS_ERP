@@ -95,7 +95,7 @@ export function buildAdmitFullPayload(draft: AddStudentDraft): AdmitStudentFullP
 
   return {
     email: draft.email,
-    enrollmentNumber: draft.enrollmentNumber,
+    enrollmentNumber: draft.enrollmentNumber.trim() || draft.applicationNumber,
     applicationNumber: draft.applicationNumber || undefined,
     fullName: draft.fullName,
     programVersionId: draft.programVersionId,

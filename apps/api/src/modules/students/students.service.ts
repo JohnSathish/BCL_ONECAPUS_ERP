@@ -918,10 +918,15 @@ export class StudentsService {
       await this.purgeAdmissionAttempt(tenantId, existingUser.student.id);
     }
 
+    const enrollmentNumber =
+      dto.enrollmentNumber?.trim() ||
+      dto.applicationNumber?.trim() ||
+      (await this.generateEnrollmentNumber(tenantId, batch.batchCode ?? 'ADM'));
+
     const enrollmentTaken = await this.prisma.student.findFirst({
       where: {
         tenantId,
-        enrollmentNumber: dto.enrollmentNumber,
+        enrollmentNumber,
         deletedAt: null,
       },
     });
@@ -981,7 +986,7 @@ export class StudentsService {
         data: {
           tenantId,
           userId: portalUser.id,
-          enrollmentNumber: dto.enrollmentNumber,
+          enrollmentNumber,
           applicationNumber: dto.applicationNumber?.trim() || undefined,
           admissionNumber: dto.admissionNumber?.trim() || undefined,
           rollNumber: dto.rollNumber,

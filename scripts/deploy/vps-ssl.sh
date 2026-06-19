@@ -48,6 +48,12 @@ for d in "${EXTRA[@]}"; do
   [[ -n "$d" ]] && DOMAIN_ARGS+=(-d "$d")
 done
 
+EXPAND_FLAG=()
+if [[ -f "/etc/letsencrypt/renewal/${DOMAIN}.conf" ]]; then
+  echo "Existing certificate found for ${DOMAIN} — will expand if needed."
+  EXPAND_FLAG=(--expand)
+fi
+
 echo "Requesting Let's Encrypt certificate…"
 certbot certonly \
   --webroot -w "${APP_DIR}/certbot/www" \
@@ -55,7 +61,8 @@ certbot certonly \
   --email "$EMAIL" \
   --agree-tos \
   --no-eff-email \
-  --non-interactive
+  --non-interactive \
+  "${EXPAND_FLAG[@]}"
 
 # Step 2: switch to full SSL nginx config
 cp nginx/nginx.ssl.conf nginx/nginx.conf

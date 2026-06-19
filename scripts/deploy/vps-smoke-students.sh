@@ -30,9 +30,16 @@ echo "--- 1) nginx -> api (docker network) ---"
 "${COMPOSE[@]}" exec -T nginx wget -qO- "http://api:3001/api/health/live" || echo "FAIL: nginx cannot reach api:3001"
 echo
 
-echo "--- 2) Public health via HTTPS ---"
-curl -sf "${PUBLIC_API}/health/ready" | head -c 300
-echo
+echo "--- 2) Public health (HTTPS, then localhost HTTP) ---"
+if curl -sf "${PUBLIC_API}/health/ready" 2>/dev/null | head -c 300; then
+  echo
+elif curl -sf "http://localhost/api/health/ready" 2>/dev/null | head -c 300; then
+  echo
+  echo "(HTTPS check failed from this host — often hairpin NAT; localhost HTTP OK)"
+else
+  echo "FAIL: neither https://${HOST}/api/health/ready nor http://localhost/api/health/ready"
+  exit 1
+fi
 echo
 
 if [[ -z "${PASS}" ]]; then

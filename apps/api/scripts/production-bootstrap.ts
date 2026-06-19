@@ -70,6 +70,93 @@ async function clearLoginLockouts(tenantId: string, email: string) {
   }
 }
 
+async function resolveTenant(adminEmail?: string) {
+  const duplicates = await prisma.$queryRaw<{ slug: string; n: bigint }[]>`
+    SELECT slug, COUNT(*)::bigint AS n
+    FROM platform.tenants
+    WHERE deleted_at IS NULL
+    GROUP BY slug
+    HAVING COUNT(*) > 1
+  `;
+
+  if (duplicates.length > 0) {
+    console.warn(
+      'Duplicate tenant slugs detected:',
+      duplicates.map((d) => `${d.slug}×${d.n}`).join(', '),
+    );
+  }
+
+  if (adminEmail) {
+    const user = await prisma.user.findFirst({
+      where: {
+        email: { equals: adminEmail, mode: 'insensitive' },
+        deletedAt: null,
+      },
+      include: { tenant: true },
+    });
+    if (user?.tenant) {
+      console.log(
+        `Tenant resolved via admin user: ${user.tenant.name} (${user.tenant.slug})`,
+      );
+      return user.tenant;
+    }
+  }
+
+  const tenants = await prisma.tenant.findMany({
+    where: { slug: DEFAULT_TENANT_SLUG, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (tenants.length === 0) {
+    throw new Error(
+      `Tenant "${DEFAULT_TENANT_SLUG}" not found. Run: npm run db:seed`,
+    );
+  }
+
+  if (tenants.length > 1) {
+    console.warn(
+      `Multiple "${DEFAULT_TENANT_SLUG}" tenants — using oldest (${tenants[0]!.id})`,
+    );
+  }
+
+  return tenants[0]!;
+}
+
+async function ensureTenantLicense(tenantId: string, createdById?: string) {
+  const existing = await prisma.tenantLicense.findUnique({
+    where: { tenantId },
+  });
+  if (existing) {
+    console.log('  ✓ tenant license exists');
+    return;
+  }
+
+  const start = new Date();
+  const expiry = new Date(start);
+  expiry.setFullYear(expiry.getFullYear() + 1);
+  const year = start.getFullYear();
+  const suffix = tenantId.replace(/-/g, '').slice(0, 4).toUpperCase();
+
+  await prisma.tenantLicense.create({
+    data: {
+      tenantId,
+      licenseNumber: `BCL-${year}-${suffix}`,
+      licenseType: 'ANNUAL_1Y',
+      subscriptionPlan: 'Annual License',
+      startDate: start,
+      expiryDate: expiry,
+      gracePeriodDays: 15,
+      maxStudents: 5000,
+      maxStaff: 500,
+      storageLimitMb: 10240,
+      ...(createdById ? { createdById } : {}),
+    },
+  });
+  console.log(
+    `  ✓ created tenant license (expires ${expiry.toISOString().slice(0, 10)})`,
+  );
+}
+
 async function ensureAdmin(
   tenantId: string,
   email: string,
@@ -127,15 +214,7 @@ async function ensureAdmin(
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { slug: DEFAULT_TENANT_SLUG, deletedAt: null },
-  });
-  if (!tenant) {
-    throw new Error(
-      `Tenant "${DEFAULT_TENANT_SLUG}" not found. Run: npm run db:seed`,
-    );
-  }
-
+  const tenant = await resolveTenant(opts.adminEmail);
   console.log(`\nBootstrapping tenant: ${tenant.name} (${tenant.slug})\n`);
 
   console.log('Registering production domains…');
@@ -150,6 +229,7 @@ async function main() {
     }
   }
 
+  let adminUserId: string | undefined;
   if (opts.adminEmail && opts.adminPassword) {
     console.log('Creating / updating production admin…');
     await ensureAdmin(
@@ -158,10 +238,24 @@ async function main() {
       opts.adminPassword,
       opts.adminName ?? 'College Administrator',
     );
+    const adminUser = await prisma.user.findFirst({
+      where: {
+        tenantId: tenant.id,
+        email: opts.adminEmail,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    adminUserId = adminUser?.id;
   }
 
+  console.log('Ensuring tenant license…');
+  await ensureTenantLicense(tenant.id, adminUserId);
+
   console.log('\nDone. Next steps:');
-  console.log('  1. npm run db:migrate');
+  console.log(
+    '  1. bash scripts/deploy/vps-migrate.sh  (if not already migrated)',
+  );
   console.log('  2. Set WEB_ORIGIN and JWT secrets in production .env');
   console.log('  3. For LAN testing: npm run dev:lan');
   console.log('  4. For live server: see docs/DEPLOY_DBC_PRODUCTION.md\n');

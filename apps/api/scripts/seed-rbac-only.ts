@@ -110,6 +110,43 @@ async function resolveTenant(adminEmail?: string) {
   return tenants[0]!;
 }
 
+async function ensureTenantLicense(tenantId: string, createdById?: string) {
+  try {
+    const existing = await prisma.tenantLicense.findUnique({
+      where: { tenantId },
+    });
+    if (existing) return;
+
+    const start = new Date();
+    const expiry = new Date(start);
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    const year = start.getFullYear();
+    const suffix = tenantId.replace(/-/g, '').slice(0, 4).toUpperCase();
+
+    await prisma.tenantLicense.create({
+      data: {
+        tenantId,
+        licenseNumber: `BCL-${year}-${suffix}`,
+        licenseType: 'ANNUAL_1Y',
+        subscriptionPlan: 'Annual License',
+        startDate: start,
+        expiryDate: expiry,
+        gracePeriodDays: 15,
+        maxStudents: 5000,
+        maxStaff: 500,
+        storageLimitMb: 10240,
+        ...(createdById ? { createdById } : {}),
+      },
+    });
+    console.log(`  ✓ created tenant license`);
+  } catch (err) {
+    console.warn(
+      '  ⚠ could not ensure tenant license (run bash scripts/deploy/vps-migrate.sh first)',
+    );
+    console.warn(`    ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 async function ensureRole(
   tenantId: string,
   slug: string,
@@ -162,6 +199,8 @@ async function main() {
 
   const tenant = await resolveTenant(adminEmail);
   console.log(`Tenant: ${tenant.name} (${tenant.id})\n`);
+
+  await ensureTenantLicense(tenant.id);
 
   const permissions = await prisma.permission.findMany({
     where: { deletedAt: null },

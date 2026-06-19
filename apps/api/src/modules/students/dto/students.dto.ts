@@ -100,9 +100,10 @@ export class AdmitStudentDto {
   @IsEmail()
   email!: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(2)
-  enrollmentNumber!: string;
+  enrollmentNumber?: string;
 
   @IsString()
   @MinLength(2)

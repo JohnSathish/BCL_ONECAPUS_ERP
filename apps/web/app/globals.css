@@ -1078,6 +1078,23 @@ html.theme-glass-disabled .glass-panel {
   border-color: hsl(var(--primary) / 0.4);
 }
 
+@keyframes admission-field-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.admission-field-shake {
+  animation: admission-field-shake 0.35s ease-in-out;
+}
+
 .login-institution-themed {
   --login-institution-primary: var(--login-institution-primary, #2563eb);
   --login-institution-accent: var(--login-institution-accent, #7c3aed);
