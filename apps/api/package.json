@@ -55,6 +55,7 @@
     "verify:inventory-phase3": "ts-node --transpile-only scripts/verify-inventory-phase3.ts",
     "verify:subject-group-attendance": "ts-node --transpile-only scripts/verify-subject-group-attendance.ts",
     "promote:super-admin": "ts-node --transpile-only scripts/promote-super-admin.ts",
+    "seed:rbac": "tsx scripts/seed-rbac-only.ts",
     "demo:prepare": "ts-node --transpile-only scripts/prepare-live-demo.ts",
     "demo:prepare:quick": "ts-node --transpile-only scripts/prepare-live-demo.ts --skip-tests",
     "production:bootstrap": "tsx scripts/production-bootstrap.ts",

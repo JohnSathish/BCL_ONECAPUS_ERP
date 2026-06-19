@@ -21,6 +21,11 @@ if [[ -z "${ADMIN_PASSWORD}" ]]; then
 fi
 
 echo "=== Reset admin: ${ADMIN_EMAIL} ==="
+"${COMPOSE[@]}" run --rm \
+  -v "${APP_DIR}/apps/api/scripts:/app/apps/api/scripts:ro" \
+  -v "${APP_DIR}/apps/api/prisma:/app/apps/api/prisma:ro" \
+  api npx tsx scripts/seed-rbac-only.ts "${ADMIN_EMAIL}"
+
 "${COMPOSE[@]}" run --rm api \
   npx tsx scripts/production-bootstrap.ts \
   --admin-email "${ADMIN_EMAIL}" \
