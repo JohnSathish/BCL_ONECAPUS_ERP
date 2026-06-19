@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -19,6 +20,8 @@ export const MFA_ENFORCED_ROLE_SLUGS = [
 
 @Injectable()
 export class MfaService {
+  private readonly log = new Logger(MfaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: FieldEncryptionService,
@@ -93,25 +96,39 @@ export class MfaService {
 
   async isRequiredForUser(
     tenantId: string,
-    userId: string,
+    _userId: string,
     roleSlugs: string[],
   ): Promise<boolean> {
-    const settings = await this.prisma.tenantSecuritySettings.findUnique({
-      where: { tenantId },
-    });
-    if (!settings?.mfaEnforced) return false;
+    try {
+      const settings = await this.prisma.tenantSecuritySettings.findUnique({
+        where: { tenantId },
+      });
+      if (!settings?.mfaEnforced) return false;
 
-    const enforcedRoles = (settings.mfaEnforcedRoles as string[] | null) ?? [
-      ...MFA_ENFORCED_ROLE_SLUGS,
-    ];
-    return roleSlugs.some((r) => enforcedRoles.includes(r));
+      const enforcedRoles = (settings.mfaEnforcedRoles as string[] | null) ?? [
+        ...MFA_ENFORCED_ROLE_SLUGS,
+      ];
+      return roleSlugs.some((r) => enforcedRoles.includes(r));
+    } catch (err) {
+      this.log.warn(
+        `MFA settings unavailable (${(err as Error).message}); treating as not required`,
+      );
+      return false;
+    }
   }
 
   async userHasVerifiedMfa(userId: string): Promise<boolean> {
-    const row = await this.prisma.userMfaSecret.findUnique({
-      where: { userId },
-    });
-    return Boolean(row?.verifiedAt);
+    try {
+      const row = await this.prisma.userMfaSecret.findUnique({
+        where: { userId },
+      });
+      return Boolean(row?.verifiedAt);
+    } catch (err) {
+      this.log.warn(
+        `MFA secret lookup failed (${(err as Error).message}); treating as not verified`,
+      );
+      return false;
+    }
   }
 
   async createPendingLoginToken(

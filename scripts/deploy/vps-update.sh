@@ -35,6 +35,9 @@ echo "Rebuilding web + api (required after frontend/auth fixes)…"
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis
 
+echo "Applying database migrations…"
+bash scripts/deploy/vps-migrate.sh
+
 echo "Starting API and waiting until healthy…"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
 
