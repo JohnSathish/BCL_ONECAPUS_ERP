@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label';
 import { useFormDraft } from '@/hooks/use-form-draft';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { canManageAcademic } from '@/lib/can-manage-academic';
 import {
   fetchAcademicYears,
   fetchCampuses,
@@ -326,7 +327,7 @@ export default function AdminProgramsPage() {
     enabled: Boolean(session),
   });
 
-  const canManage = useMemo(() => session?.user.roles.includes('college-admin'), [session]);
+  const canManage = useMemo(() => canManageAcademic(session), [session]);
 
   const programVersions = useMemo(() => {
     const list: (ProgramVersion & {

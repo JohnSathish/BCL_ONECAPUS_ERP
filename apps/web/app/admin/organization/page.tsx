@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { canManageOrganization } from '@/lib/can-manage-academic';
 import { formatShortDate } from '@/utils/format-date';
 import {
   createAcademicYear,
@@ -185,7 +186,7 @@ export default function AdminOrganizationSetupPage() {
     enabled: Boolean(session),
   });
 
-  const canManage = useMemo(() => session?.user.roles.includes('college-admin'), [session]);
+  const canManage = useMemo(() => canManageOrganization(session), [session]);
 
   const invalidate = async () => {
     await Promise.all([

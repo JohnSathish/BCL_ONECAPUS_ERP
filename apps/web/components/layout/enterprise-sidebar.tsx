@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, Search, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, Search, X } from 'lucide-react';
 import { useMemo, useState, useLayoutEffect, useRef, useEffect, type ReactNode } from 'react';
+import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
+import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
+import { logout } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
 import { InstitutionBrandMark } from '@/components/branding/institution-brand-mark';
 import {
@@ -77,6 +80,7 @@ function SidebarNav({
 
 export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'admin' | 'staff' }) {
   const pathname = usePathname();
+  const router = useRouter();
   const roleKey = String(role);
   const { branding, active } = useInstitutionBranding();
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
@@ -162,6 +166,28 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
       }))
       .filter((g) => g.items.length > 0);
   }, [groups, query]);
+
+  const scrollGroups = useMemo(
+    () => filtered.filter((group) => group.zone !== 'pin-bottom'),
+    [filtered],
+  );
+  const pinnedGroups = useMemo(
+    () => filtered.filter((group) => group.zone === 'pin-bottom'),
+    [filtered],
+  );
+
+  const handleLogout = async () => {
+    setMobileNavOpen(false);
+    broadcastSessionMessage({ type: 'LOGOUT' });
+    tokenRefreshManager.clearSchedule();
+    useAuthStore.getState().clear();
+    try {
+      await logout();
+    } catch {
+      /* ignore */
+    }
+    router.replace('/login');
+  };
 
   const resolveOpen = (item: NavItem) => {
     const stored = openGroups[item.label];
@@ -262,8 +288,44 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           className={SCROLL_NAV_CLASS}
           ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
         >
-          {renderGroups(filtered, { hideFirstDivider: true })}
+          {renderGroups(scrollGroups, { hideFirstDivider: true })}
         </SidebarNav>
+
+        {pinnedGroups.length > 0 || isAdminLayout ? (
+          <div
+            className={cn(
+              'shrink-0 border-t border-sidebar-border bg-sidebar',
+              mobileNavOpen ? 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'pb-0',
+            )}
+          >
+            {pinnedGroups.length > 0 ? (
+              <SidebarNav
+                roleKey={roleKey}
+                section={isAdminLayout ? 'system' : 'pinned'}
+                className="max-h-[40vh] space-y-1 overflow-y-auto overscroll-y-contain px-1.5 py-1"
+                ariaLabel="System navigation"
+              >
+                {renderGroups(pinnedGroups)}
+              </SidebarNav>
+            ) : null}
+            {isAdminLayout ? (
+              <div className="border-t border-sidebar-border/80 px-2 py-2">
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className={cn(
+                    NAV_ITEM_CLASS,
+                    'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-danger',
+                    mobileNavOpen ? 'md:hidden' : 'hidden',
+                  )}
+                >
+                  <LogOut className="h-[18px] w-[18px] shrink-0" />
+                  <span>Sign out</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="hidden shrink-0 border-t border-sidebar-border p-2 md:block">
           <button

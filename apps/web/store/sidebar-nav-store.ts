@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { NavChild, NavGroup } from '@/config/navigation';
 
-export type SidebarScrollSection = 'modules' | 'main';
+export type SidebarScrollSection = 'modules' | 'main' | 'system' | 'pinned';
 
 type SidebarNavState = {
   openGroupsByRole: Record<string, Record<string, boolean>>;

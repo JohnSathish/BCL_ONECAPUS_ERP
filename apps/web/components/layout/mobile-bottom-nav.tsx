@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GraduationCap, IndianRupee, LayoutDashboard, Menu, Users } from 'lucide-react';
+import { LayoutDashboard, Menu, Settings, Shield, Users } from 'lucide-react';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
 
 const ITEMS = [
   { label: 'Home', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Students', href: '/admin/students', icon: Users },
-  { label: 'Admit', href: '/admin/admissions', icon: GraduationCap },
-  { label: 'Fees', href: '/admin/fees', icon: IndianRupee },
+  { label: 'Admin', href: '/admin/administration', icon: Shield },
+  { label: 'Settings', href: '/admin/organization', icon: Settings },
 ] as const;
 
 export function MobileBottomNav() {

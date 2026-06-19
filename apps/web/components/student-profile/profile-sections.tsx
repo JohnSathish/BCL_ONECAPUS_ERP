@@ -41,6 +41,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { formatDisplayDateTime } from '@/utils/format-date';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
 
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
 
@@ -1087,14 +1088,14 @@ export function BoardExamSection({
         subjectName: m.subjectName,
         marksObtained: m.marksObtained ?? undefined,
         maxMarks: m.maxMarks ?? undefined,
-      })) ??
-      Array.from({ length: 5 }, (_, i) => ({
-        subjectName: `Subject ${i + 1}`,
-        marksObtained: undefined as number | undefined,
-        maxMarks: undefined as number | undefined,
-      })),
+      })) ?? emptyBoardExamSubjectRows(),
   });
-  const { message, saving } = useDebouncedSave(profile.id, 'board_exam', form, canEdit);
+  const { message, saving } = useDebouncedSave(
+    profile.id,
+    'board_exam',
+    sanitizeBoardExamPayload(form),
+    canEdit,
+  );
   const subjectsQuery = useQuery({
     queryKey: ['support-data', 'board-subjects', 'board-exam'],
     queryFn: () => fetchBoardSubjects({ activeOnly: true }),
