@@ -114,6 +114,8 @@ async function ensureAdmin(
         data: { userId: user.id, roleId: superAdmin.id },
       });
       console.log(`  ✓ assigned super-admin role`);
+    } else {
+      console.log(`  ✓ super-admin role already assigned`);
     }
   } else {
     console.warn('  ⚠ super-admin role not found — run db:seed first');
