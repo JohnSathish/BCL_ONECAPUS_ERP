@@ -352,7 +352,7 @@ export class StudentProfileService {
       shiftCode: student.primaryShift?.code,
       batch: student.academicProfile?.admissionBatch?.batchCode,
       admissionYear: student.academicProfile?.admissionBatch?.admissionYear,
-      entrySession: student.academicProfile?.admissionBatch?.entrySession.name,
+      entrySession: student.academicProfile?.admissionBatch?.entrySession?.name,
       admissionStatus: student.masterProfile?.admissionStatus ?? 'ACTIVE',
       academicStatus,
       registrationStatus,
