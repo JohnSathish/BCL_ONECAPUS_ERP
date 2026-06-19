@@ -25,7 +25,7 @@ import {
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { useRequireAuth } from '@/hooks/use-auth';
+import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
 import { fetchAcademicStreams } from '@/services/academic-engine';
@@ -143,6 +143,7 @@ function clearAdvancedFilters(filters: DirectoryFilters): DirectoryFilters {
 
 export function StudentDirectoryPage() {
   const session = useRequireAuth();
+  const authReady = useAuthQueryEnabled();
   const perms = useStudentPermissions();
   const qc = useQueryClient();
   const [filters, setFilters] = useState<DirectoryFilters>(emptyFilters);
@@ -166,21 +167,21 @@ export function StudentDirectoryPage() {
   const institutions = useQuery({
     queryKey: ['org', 'institutions'],
     queryFn: fetchInstitutions,
-    enabled: Boolean(session),
+    enabled: authReady,
   });
   const institutionId = institutions.data?.[0]?.id ?? '';
 
   const campuses = useQuery({
     queryKey: ['org', 'campuses', institutionId],
     queryFn: () => fetchCampuses(institutionId || undefined),
-    enabled: Boolean(session) && Boolean(institutionId),
+    enabled: authReady && Boolean(institutionId),
   });
   const campusId = campuses.data?.[0]?.id ?? '';
 
   const summary = useQuery({
     queryKey: ['students', 'summary', 'enhanced'],
     queryFn: fetchEnhancedStudentsSummary,
-    enabled: Boolean(session) && perms.canRead,
+    enabled: authReady && perms.canRead,
   });
 
   const listParams = useMemo(() => filtersToParams(filters, page, limit), [filters, page, limit]);
@@ -188,55 +189,55 @@ export function StudentDirectoryPage() {
   const students = useQuery({
     queryKey: ['students', 'list', listParams],
     queryFn: () => fetchStudents(listParams),
-    enabled: Boolean(session) && perms.canRead,
+    enabled: authReady && perms.canRead,
   });
 
   const programs = useQuery({
     queryKey: ['catalog', 'programs'],
     queryFn: () => fetchPrograms(1),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const shifts = useQuery({
     queryKey: ['shifts', campusId, 'ACTIVE'],
     queryFn: () => fetchShifts({ campusId, status: 'ACTIVE' }),
-    enabled: Boolean(session) && Boolean(campusId),
+    enabled: authReady && Boolean(campusId),
   });
 
   const streams = useQuery({
     queryKey: ['academic-engine', 'streams'],
     queryFn: fetchAcademicStreams,
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const batches = useQuery({
     queryKey: ['academic-lifecycle', 'batches', institutionId],
     queryFn: () => fetchAdmissionBatches(institutionId),
-    enabled: Boolean(session) && Boolean(institutionId),
+    enabled: authReady && Boolean(institutionId),
   });
 
   const sessions = useQuery({
     queryKey: ['academic-lifecycle', 'sessions', institutionId],
     queryFn: () => listAcademicSessions(institutionId),
-    enabled: Boolean(session) && Boolean(institutionId),
+    enabled: authReady && Boolean(institutionId),
   });
 
   const departments = useQuery({
     queryKey: ['org', 'departments', 'academic'],
     queryFn: () => fetchAcademicDepartments(),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const categories = useQuery({
     queryKey: ['master-lookups', 'CATEGORY'],
     queryFn: () => fetchMasterLookups('CATEGORY'),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const religions = useQuery({
     queryKey: ['master-lookups', 'RELIGION'],
     queryFn: () => fetchMasterLookups('RELIGION'),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const programVersions = useMemo(() => {

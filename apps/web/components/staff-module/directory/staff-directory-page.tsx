@@ -21,7 +21,7 @@ import {
   type StaffDirectoryFilters,
 } from '@/components/staff-module/directory/staff-filter-utils';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { useRequireAuth } from '@/hooks/use-auth';
+import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
 import { fetchDepartments, fetchCampuses, fetchInstitutions } from '@/services/organization';
@@ -40,6 +40,7 @@ const DEFAULT_LIMIT = 50;
 
 export function StaffDirectoryPage() {
   const session = useRequireAuth();
+  const authReady = useAuthQueryEnabled();
   const perms = useStaffPermissions();
   const [filters, setFilters] = useState<StaffDirectoryFilters>(emptyStaffFilters());
   const [searchInput, setSearchInput] = useState('');
@@ -58,21 +59,21 @@ export function StaffDirectoryPage() {
   const institutions = useQuery({
     queryKey: ['org', 'institutions'],
     queryFn: fetchInstitutions,
-    enabled: Boolean(session),
+    enabled: authReady,
   });
   const institutionId = institutions.data?.[0]?.id ?? '';
 
   const campuses = useQuery({
     queryKey: ['org', 'campuses', institutionId],
     queryFn: () => fetchCampuses(institutionId || undefined),
-    enabled: Boolean(session) && Boolean(institutionId),
+    enabled: authReady && Boolean(institutionId),
   });
   const campusId = campuses.data?.[0]?.id ?? '';
 
   const summary = useQuery({
     queryKey: ['staff', 'summary', 'enhanced'],
     queryFn: fetchEnhancedStaffSummary,
-    enabled: Boolean(session) && perms.canRead,
+    enabled: authReady && perms.canRead,
   });
 
   const listParams = useMemo(
@@ -83,31 +84,31 @@ export function StaffDirectoryPage() {
   const staffList = useQuery({
     queryKey: ['staff', 'list', listParams],
     queryFn: () => fetchStaff(listParams),
-    enabled: Boolean(session) && perms.canRead,
+    enabled: authReady && perms.canRead,
   });
 
   const shifts = useQuery({
     queryKey: ['shifts', campusId, 'ACTIVE'],
     queryFn: () => fetchShifts({ campusId, status: 'ACTIVE' }),
-    enabled: Boolean(session) && Boolean(campusId),
+    enabled: authReady && Boolean(campusId),
   });
 
   const departments = useQuery({
     queryKey: ['org', 'departments'],
     queryFn: () => fetchDepartments(),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const designations = useQuery({
     queryKey: ['staff', 'designations'],
     queryFn: () => fetchDesignations(),
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const academicRoles = useQuery({
     queryKey: ['staff', 'academic-roles'],
     queryFn: fetchAcademicRoles,
-    enabled: Boolean(session),
+    enabled: authReady,
   });
 
   const shiftOptions = useMemo(() => toShiftOptions(shifts.data ?? []), [shifts.data]);

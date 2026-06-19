@@ -14,8 +14,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nep_erp}
 
   api:
+    restart: unless-stopped
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: ${API_NODE_OPTIONS:---max-old-space-size=768}
       HOST: 0.0.0.0
       API_HOST: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL}
@@ -39,6 +41,7 @@ services:
       PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-api}
 
   web:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/web/Dockerfile

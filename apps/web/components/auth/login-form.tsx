@@ -148,6 +148,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         });
         setSession(session);
         setPrefs({ rememberMe: values.rememberMe });
+        useAuthStore.getState().setBootstrapping(false);
         tokenRefreshManager.scheduleProactiveRefresh(session);
         const destination =
           postLoginPath ?? resolveHomePath(session.user.roles, session.user.permissions ?? []);

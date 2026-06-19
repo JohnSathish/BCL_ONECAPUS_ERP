@@ -136,14 +136,20 @@ export function normalizeAxiosError(error: unknown): ApiError {
 
 export function isRetryableQueryError(error: unknown): boolean {
   if (error instanceof ApiError) {
-    return error.kind === 'NetworkError' || error.kind === 'TimeoutError';
+    return (
+      error.kind === 'NetworkError' ||
+      error.kind === 'TimeoutError' ||
+      (error.kind === 'ServerError' && (error.status ?? 0) >= 502)
+    );
   }
   if (!axios.isAxiosError(error)) return false;
   if (!error.response) return true;
   const status = error.response.status;
   if (status >= 502 && status <= 504) return true;
   const data = error.response.data as { errorCode?: string } | undefined;
-  return data?.errorCode === 'API_PROXY_UNAVAILABLE';
+  return (
+    data?.errorCode === 'API_PROXY_UNAVAILABLE' || data?.errorCode === 'API_GATEWAY_UNAVAILABLE'
+  );
 }
 
 export function sleep(ms: number) {

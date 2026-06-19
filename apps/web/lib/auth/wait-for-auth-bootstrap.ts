@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/store/auth-store';
 
-const BOOTSTRAP_WAIT_MS = 10_000;
+const BOOTSTRAP_WAIT_MS = 30_000;
 
 /** Wait until persisted prefs are loaded and the refresh-cookie bootstrap has finished. */
 export function waitForAuthBootstrap(): Promise<void> {
