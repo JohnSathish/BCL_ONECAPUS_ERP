@@ -148,7 +148,7 @@ export function groupPermissionsByModule(permissions: PermissionRow[]): ModulePe
   if (other.length) {
     grouped.push({
       module: {
-        id: 'other-permissions',
+        id: 'settings',
         label: 'Other permissions',
         permissions: [],
         defaultHome: '/admin',

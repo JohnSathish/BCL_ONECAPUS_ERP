@@ -9,7 +9,7 @@ export default function IaSettingsPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="Examination Settings">
+    <DashboardShell role="admin" pageHeader={false} title="Examination Settings">
       <IaExaminationShell>
         <IaSettingsWorkspace />
       </IaExaminationShell>

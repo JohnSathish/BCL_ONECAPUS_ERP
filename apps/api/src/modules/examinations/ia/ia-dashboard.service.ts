@@ -1,37 +1,65 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { IaDefaulterService } from './ia-defaulter.service';
 import { IA_EXAM_TYPES } from './ia.constants';
 
 @Injectable()
 export class IaDashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly defaulters: IaDefaulterService,
+  ) {}
 
   async adminDashboard(tenantId: string) {
-    const [sessions, papers, marks, sheets, students, pendingMarks] =
-      await Promise.all([
-        (this.prisma as any).examSession.count({
-          where: {
-            tenantId,
-            deletedAt: null,
-            examType: { in: [...IA_EXAM_TYPES] },
-          },
-        }),
-        (this.prisma as any).examPaperSchedule.count({
-          where: { tenantId, deletedAt: null },
-        }),
-        (this.prisma as any).iaComponentMark.count({
-          where: { tenantId, deletedAt: null },
-        }),
-        (this.prisma as any).iaConsolidationSheet.count({
-          where: { tenantId, deletedAt: null },
-        }),
-        this.prisma.student.count({
-          where: { tenantId, deletedAt: null },
-        }),
-        (this.prisma as any).iaComponentMark.count({
-          where: { tenantId, deletedAt: null, marks: null, isAbsent: false },
-        }),
-      ]);
+    const [
+      sessions,
+      papers,
+      marks,
+      marksCompleted,
+      sheets,
+      students,
+      pendingMarks,
+      admitCardsGenerated,
+      expectedRegistrations,
+      defaulterSummary,
+    ] = await Promise.all([
+      (this.prisma as any).examSession.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          examType: { in: [...IA_EXAM_TYPES] },
+        },
+      }),
+      (this.prisma as any).examPaperSchedule.count({
+        where: { tenantId, deletedAt: null },
+      }),
+      (this.prisma as any).iaComponentMark.count({
+        where: { tenantId, deletedAt: null },
+      }),
+      (this.prisma as any).iaComponentMark.count({
+        where: { tenantId, deletedAt: null, marks: { not: null } },
+      }),
+      (this.prisma as any).iaConsolidationSheet.count({
+        where: { tenantId, deletedAt: null },
+      }),
+      this.prisma.student.count({
+        where: { tenantId, deletedAt: null },
+      }),
+      (this.prisma as any).iaComponentMark.count({
+        where: { tenantId, deletedAt: null, marks: null, isAbsent: false },
+      }),
+      (this.prisma as any).iaAdmitCardIssue.count({
+        where: { tenantId, deletedAt: null },
+      }),
+      (this.prisma as any).examPaperSchedule.aggregate({
+        where: { tenantId, deletedAt: null },
+        _sum: { expectedCount: true },
+      }),
+      this.defaulters.list(tenantId),
+    ]);
+
+    const registeredStudents = expectedRegistrations._sum?.expectedCount ?? 0;
+    const defaulters = defaulterSummary.total;
 
     const workflowPending = await (
       this.prisma as any
@@ -50,12 +78,17 @@ export class IaDashboardService {
     return {
       summary: {
         totalStudents: students,
+        registeredStudents,
+        eligibleStudents: Math.max(registeredStudents - defaulters, 0),
+        defaulters,
         iaSessions: sessions,
         scheduledPapers: papers,
         markEntries: marks,
+        marksCompleted,
         consolidationSheets: sheets,
         pendingMarkEntry: pendingMarks,
-        studentsAppeared: marks,
+        admitCardsGenerated,
+        studentsAppeared: marksCompleted,
         studentsAbsent: await (this.prisma as any).iaComponentMark.count({
           where: { tenantId, deletedAt: null, isAbsent: true },
         }),

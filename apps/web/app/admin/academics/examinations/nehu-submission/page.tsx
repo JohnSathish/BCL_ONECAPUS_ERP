@@ -9,7 +9,7 @@ export default function NehuSubmissionPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="NEHU Submission">
+    <DashboardShell role="admin" pageHeader={false} title="NEHU Submission">
       <IaExaminationShell>
         <IaNehuExportWorkspace />
       </IaExaminationShell>

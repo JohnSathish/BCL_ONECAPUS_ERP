@@ -9,7 +9,7 @@ export default function IaDefaultersPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="Defaulters">
+    <DashboardShell role="admin" pageHeader={false} title="Defaulters">
       <IaExaminationShell>
         <IaDefaultersWorkspace />
       </IaExaminationShell>

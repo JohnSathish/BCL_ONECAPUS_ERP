@@ -17,9 +17,14 @@ import {
   Shield,
   ShieldAlert,
 } from 'lucide-react';
-import { AdminPageHeader } from '@/components/administration-module/admin-page-header';
 import { AdminShell, AdminGlassCard } from '@/components/administration-module/ui/admin-shell';
+import { AcademicContextStrip } from '@/components/layout/academic-context-strip';
+import { ErpPageHero } from '@/components/layout/erp-page-layout';
 import { BackupManualDialog } from '@/components/backup-module/backup-manual-dialog';
+import {
+  BackupDiagnosticsCard,
+  BackupHealthChecksPanel,
+} from '@/components/backup-module/backup-diagnostics-card';
 import { BackupRepositoryTable } from '@/components/backup-module/backup-repository-table';
 import {
   BACKUP_TYPE_LABELS,
@@ -141,13 +146,62 @@ export function BackupDashboardPage() {
     ].join(' · ');
   };
 
+  const backupHealthLabel =
+    d?.health?.backup === 'healthy'
+      ? 'Healthy'
+      : d?.health?.backup === 'warning'
+        ? 'Needs attention'
+        : 'Unknown';
+
   return (
-    <DashboardShell role="admin" title="Database Backup & Disaster Recovery Center">
+    <DashboardShell role="admin" pageHeader={false}>
       <AdminShell>
-        <AdminPageHeader
-          title="Database Backup & Disaster Recovery Center"
-          subtitle="Automated backups, cloud synchronization, restore points, and disaster recovery management."
-        />
+        <div className="mb-2">
+          <AcademicContextStrip className="whitespace-normal sm:truncate" />
+        </div>
+
+        <ErpPageHero
+          icon={<Shield className="h-5 w-5 text-primary" />}
+          title="Backup & Disaster Recovery"
+        >
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Last backup
+              </dt>
+              <dd className="mt-1 font-semibold">
+                {latest?.completedAt
+                  ? `${formatBackupDate(latest.completedAt)} ${formatBackupTime(latest.completedAt)}`
+                  : 'No backup yet'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Next backup
+              </dt>
+              <dd className="mt-1 font-semibold">
+                {schedule?.nextRunAt
+                  ? `${formatBackupDate(schedule.nextRunAt)} ${formatBackupTime(schedule.nextRunAt)}`
+                  : '02:00 AM daily'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Status
+              </dt>
+              <dd
+                className={cn(
+                  'mt-1 font-semibold',
+                  backupHealthLabel === 'Healthy'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-amber-600',
+                )}
+              >
+                {backupHealthLabel}
+              </dd>
+            </div>
+          </dl>
+        </ErpPageHero>
 
         {d?.maintenance?.active ? (
           <AdminGlassCard className="mb-4 border-amber-500/40 bg-amber-500/10 p-4 text-sm">
@@ -209,6 +263,13 @@ export function BackupDashboardPage() {
             <p className="text-sm font-medium leading-relaxed">{cloudStatusLine()}</p>
           </MetricCard>
         </div>
+
+        {/* Failure diagnostics */}
+        {(d?.failedBackups ?? 0) > 0 || d?.diagnostics?.runId ? (
+          <div className="mb-6">
+            <BackupDiagnosticsCard dashboard={d} canManage={canManage} />
+          </div>
+        ) : null}
 
         {/* Quick actions */}
         <AdminGlassCard className="mb-6 p-4">
@@ -288,9 +349,14 @@ export function BackupDashboardPage() {
           <AdminGlassCard className="p-5 lg:col-span-1">
             <div className="mb-3 flex items-center gap-2 font-medium">
               <Shield className="h-4 w-4 text-primary" />
-              Backup Health
+              Backup Health Check
             </div>
-            <div className="space-y-2">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Verified before every backup — PostgreSQL, storage paths, disk space, repository write
+              access, and cloud credentials.
+            </p>
+            <BackupHealthChecksPanel preflight={d?.preflight} />
+            <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
               <HealthRow label="Database Health" status={d?.health?.database} />
               <HealthRow label="Storage Health" status={d?.health?.storage} />
               <HealthRow label="Backup Health" status={d?.health?.backup} />
@@ -299,7 +365,10 @@ export function BackupDashboardPage() {
             {d?.failedBackups ? (
               <p className="mt-3 flex items-center gap-1 text-xs text-amber-600">
                 <ShieldAlert className="h-3.5 w-3.5" />
-                {d.failedBackups} failed backup(s) — review logs
+                {d.failedBackups} failed backup(s) —{' '}
+                <Link href="/admin/administration/backups/logs" className="underline">
+                  review logs
+                </Link>
               </p>
             ) : null}
           </AdminGlassCard>

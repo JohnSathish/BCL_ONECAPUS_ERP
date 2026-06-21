@@ -45,6 +45,7 @@ export function EnterpriseTopbar({
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
   const toggleMobileNavOpen = useDashboardUiStore((s) => s.toggleMobileNavOpen);
   const showQuickCreate = useNavPreferencesStore((s) => s.sidebarLayout.showQuickCreate);
+  const isAdminChrome = portalRole === 'admin';
 
   const handleLogout = async () => {
     broadcastSessionMessage({ type: 'LOGOUT' });
@@ -68,14 +69,16 @@ export function EnterpriseTopbar({
 
   return (
     <header
+      id="erp-topbar"
       className={cn(
-        'z-30 flex h-16 min-h-16 w-full max-w-full shrink-0 items-center overflow-hidden border-b border-border/60 px-4 shadow-sm backdrop-blur-xl sm:px-5 lg:px-6',
+        'sticky top-0 z-[var(--erp-z-topbar,40)] flex w-full max-w-full shrink-0 border-b border-border/60 shadow-sm backdrop-blur-xl',
+        'min-h-14 py-2',
         portalRole === 'staff'
-          ? 'bg-gradient-to-r from-primary/10 via-topbar/90 to-accent/10 md:bg-topbar/85'
-          : 'bg-topbar/85',
+          ? 'bg-gradient-to-r from-primary/10 via-topbar/95 to-accent/10 md:bg-topbar/95'
+          : 'bg-topbar/95 supports-[backdrop-filter]:bg-topbar/90',
       )}
     >
-      <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex w-full min-w-0 items-center gap-2 px-4 sm:gap-3 sm:px-5 lg:px-6">
         <button
           type="button"
           onClick={toggleMobileNavOpen}
@@ -103,50 +106,64 @@ export function EnterpriseTopbar({
           <span className="hidden lg:inline">{sidebarCollapsed ? 'Expand menu' : 'Collapse'}</span>
         </button>
 
-        <div className="min-w-0 shrink">
-          {portalRole === 'staff' && staffProfile ? (
-            <div className="flex min-w-0 items-center gap-2.5 md:hidden">
-              <StaffPortalAvatar
-                photoUrl={staffProfile.photoUrl}
-                name={staffDisplayName}
-                size="md"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold leading-tight">{staffInstitution}</p>
-                <p className="truncate text-xs font-medium text-foreground">{staffDisplayName}</p>
-                {staffProfile.designation ? (
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {staffProfile.designation}
-                  </p>
-                ) : null}
+        {/* Admin: page titles live in ErpPageHeaderSection — topbar is toolbar only */}
+        {!isAdminChrome && (
+          <div className="min-w-0 flex-1 sm:max-w-[40%] lg:max-w-none">
+            {portalRole === 'staff' && staffProfile ? (
+              <div className="flex min-w-0 items-center gap-2.5 md:hidden">
+                <StaffPortalAvatar
+                  photoUrl={staffProfile.photoUrl}
+                  name={staffDisplayName}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold leading-tight">{staffInstitution}</p>
+                  <p className="truncate text-xs font-medium text-foreground">{staffDisplayName}</p>
+                  {staffProfile.designation ? (
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {staffProfile.designation}
+                    </p>
+                  ) : null}
+                </div>
               </div>
+            ) : null}
+            {title && portalRole !== 'staff' ? (
+              <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                {title}
+              </h1>
+            ) : title ? (
+              <h1 className="hidden truncate text-base font-semibold tracking-tight sm:text-lg md:block">
+                {title}
+              </h1>
+            ) : null}
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <AcademicContextStrip />
+              <LicenseStatusBadge className="hidden sm:inline-flex" />
             </div>
-          ) : null}
-          {title && portalRole !== 'staff' ? (
-            <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg md:text-xl">
-              {title}
-            </h1>
-          ) : title ? (
-            <h1 className="hidden truncate text-base font-semibold tracking-tight sm:text-lg md:block md:text-xl">
-              {title}
-            </h1>
-          ) : null}
-          <div className="mt-0.5 flex flex-wrap items-center gap-2">
-            <AcademicContextStrip />
-            <LicenseStatusBadge className="hidden sm:inline-flex" />
           </div>
-        </div>
+        )}
 
-        <div className="relative hidden min-w-0 max-w-[280px] flex-1 lg:block xl:max-w-[320px]">
+        {isAdminChrome ? (
+          <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
+            <LicenseStatusBadge />
+          </div>
+        ) : null}
+
+        <div
+          className={cn(
+            'relative hidden min-w-0 flex-1 lg:block xl:max-w-[320px]',
+            isAdminChrome && 'lg:max-w-[280px]',
+          )}
+        >
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             readOnly
             onFocus={() =>
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
             }
-            placeholder="Ask OneCampus AI…"
+            placeholder="Search students, staff, fees, reports…"
             className="h-9 w-full min-w-0 cursor-pointer rounded-xl border-border/80 bg-card/60 pl-9 text-sm backdrop-blur"
-            aria-label="Open AI search"
+            aria-label="Open search"
           />
         </div>
 
@@ -183,7 +200,7 @@ export function EnterpriseTopbar({
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="z-[var(--erp-z-dropdown,45)] w-52">
                 <DropdownMenuLabel>
                   <p className="font-medium">{displayName}</p>
                   <p className="text-xs font-normal text-muted-foreground">{session?.user.email}</p>

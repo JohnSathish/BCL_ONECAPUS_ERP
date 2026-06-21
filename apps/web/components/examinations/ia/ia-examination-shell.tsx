@@ -12,15 +12,14 @@ const BASE = '/admin/academics/examinations';
 
 const NAV_ITEMS = [
   { href: BASE, label: 'Dashboard', exact: true },
-  { href: `${BASE}/internal-assessments`, label: 'Internal Assessments' },
+  { href: `${BASE}/ia-exams`, label: 'IA Exams' },
   { href: `${BASE}/timetable`, label: 'IA Timetable' },
-  { href: `${BASE}/mark-entry`, label: 'IA Mark Entry' },
-  { href: `${BASE}/consolidation`, label: 'Consolidation' },
-  { href: `${BASE}/nehu-submission`, label: 'NEHU Submission' },
+  { href: `${BASE}/admit-cards`, label: 'Admit Cards' },
+  { href: `${BASE}/mark-entry`, label: 'Mark Entry' },
   { href: `${BASE}/defaulters`, label: 'Defaulters' },
   { href: `${BASE}/analytics`, label: 'Analytics' },
-  { href: `${BASE}/admit-cards`, label: 'Admit Cards' },
   { href: `${BASE}/reports`, label: 'Reports' },
+  { href: `${BASE}/nehu-submission`, label: 'University Submission' },
   { href: `${BASE}/settings`, label: 'Settings' },
 ];
 
@@ -42,10 +41,10 @@ export function IaExaminationShell({ children }: { children: React.ReactNode }) 
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">
               NEHU Internal Assessment
             </p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+            <h2 className="mt-1 flex items-center gap-2 text-xl font-bold sm:text-2xl">
               <ClipboardList className="h-6 w-6 text-primary" />
               Examination Module
-            </h1>
+            </h2>
             <p className="max-w-3xl text-sm text-muted-foreground">
               Internal Assessment &amp; Continuous Evaluation for Don Bosco College Tura.
               End-semester university exams remain with NEHU.

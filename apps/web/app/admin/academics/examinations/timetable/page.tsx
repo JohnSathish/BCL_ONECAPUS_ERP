@@ -9,7 +9,7 @@ export default function IaTimetablePage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="IA Timetable">
+    <DashboardShell role="admin" pageHeader={false} title="IA Timetable">
       <IaExaminationShell>
         <IaTimetableWorkspace />
       </IaExaminationShell>

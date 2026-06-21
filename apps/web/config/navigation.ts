@@ -734,38 +734,13 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: [...P.examinations],
           },
           {
-            label: 'Internal Assessments',
-            href: '/admin/academics/examinations/internal-assessments',
+            label: 'IA Exams',
+            href: '/admin/academics/examinations/ia-exams',
             permissions: [...P.examinations],
           },
           {
             label: 'IA Timetable',
             href: '/admin/academics/examinations/timetable',
-            permissions: [...P.examinations],
-          },
-          {
-            label: 'IA Mark Entry',
-            href: '/admin/academics/examinations/mark-entry',
-            permissions: [...P.examinations, 'ia:marks:enter'],
-          },
-          {
-            label: 'Consolidation',
-            href: '/admin/academics/examinations/consolidation',
-            permissions: [...P.examinations],
-          },
-          {
-            label: 'NEHU Submission',
-            href: '/admin/academics/examinations/nehu-submission',
-            permissions: [...P.examinations, 'ia:export:nehu'],
-          },
-          {
-            label: 'Defaulters',
-            href: '/admin/academics/examinations/defaulters',
-            permissions: [...P.examinations],
-          },
-          {
-            label: 'Analytics',
-            href: '/admin/academics/examinations/analytics',
             permissions: [...P.examinations],
           },
           ...(IA_ADMIT_CARDS_ADMIN_ENABLED
@@ -778,9 +753,29 @@ export const ADMIN_NAV: NavGroup[] = [
               ]
             : []),
           {
+            label: 'Mark Entry',
+            href: '/admin/academics/examinations/mark-entry',
+            permissions: [...P.examinations, 'ia:marks:enter'],
+          },
+          {
+            label: 'Defaulters',
+            href: '/admin/academics/examinations/defaulters',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Analytics',
+            href: '/admin/academics/examinations/analytics',
+            permissions: [...P.examinations],
+          },
+          {
             label: 'Reports',
             href: '/admin/academics/examinations/reports',
             permissions: [...P.examinations],
+          },
+          {
+            label: 'University Submission',
+            href: '/admin/academics/examinations/nehu-submission',
+            permissions: [...P.examinations, 'ia:export:nehu'],
           },
           {
             label: 'Settings',

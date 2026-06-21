@@ -28,8 +28,9 @@ export function LicenseAlertBanner() {
 
   return (
     <div
+      id="erp-license-banner"
       className={cn(
-        'relative z-20 shrink-0 overflow-hidden border-b text-sm',
+        'relative z-[calc(var(--erp-z-topbar,40)-1)] shrink-0 overflow-hidden border-b text-sm',
         critical
           ? 'border-destructive/40 bg-destructive/10 text-destructive'
           : 'border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100',

@@ -12,6 +12,7 @@ import { IaAuditService } from './ia/ia-audit.service';
 import { IaConsolidationService } from './ia/ia-consolidation.service';
 import { IaDashboardService } from './ia/ia-dashboard.service';
 import { IaDefaulterService } from './ia/ia-defaulter.service';
+import { IaExamProvisioningService } from './ia/ia-exam-provisioning.service';
 import { IaMarkEntryService } from './ia/ia-mark-entry.service';
 import { IaNehuExportService } from './ia/ia-nehu-export.service';
 import { IaPortalService } from './ia/ia-portal.service';
@@ -29,6 +30,7 @@ import { IaWorkflowService } from './ia/ia-workflow.service';
     IaAuditService,
     IaSchemeService,
     IaSessionService,
+    IaExamProvisioningService,
     IaMarkEntryService,
     IaWorkflowService,
     IaConsolidationService,

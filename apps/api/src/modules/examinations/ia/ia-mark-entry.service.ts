@@ -110,25 +110,48 @@ export class IaMarkEntryService {
     }
   }
 
-  async getRoster(user: JwtUser, paperId: string, schemeId: string) {
+  async getRoster(user: JwtUser, paperId: string, schemeId?: string) {
     const paper = await this.sessions.getPaper(user.tid, paperId);
-    const scheme = await this.schemes.get(user.tid, schemeId);
+    let scheme;
+    if (schemeId) {
+      scheme = await this.schemes.get(user.tid, schemeId);
+    } else {
+      const paperMeta = (paper.metadata ?? {}) as { schemeId?: string };
+      if (paperMeta.schemeId) {
+        scheme = await this.schemes.get(user.tid, paperMeta.schemeId);
+      } else {
+        const found = await this.schemes.findForOffering(
+          user.tid,
+          paper.offeringId,
+          paper.courseId,
+        );
+        if (!found) {
+          throw new BadRequestException(
+            'No mark scheme linked to this subject. Create an IA Exam first or configure a scheme in Settings.',
+          );
+        }
+        scheme = found;
+      }
+    }
 
-    const registrations = paper.offeringId
-      ? await this.prisma.registration.findMany({
+    const lines = paper.offeringId
+      ? await this.prisma.semesterRegistrationLine.findMany({
           where: {
             tenantId: user.tid,
             offeringId: paper.offeringId,
-            deletedAt: null,
-            status: { in: ['registered', 'approved', 'confirmed'] },
+            status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
           },
           include: {
-            student: {
-              select: {
-                id: true,
-                rollNumber: true,
-                enrollmentNumber: true,
-                user: { select: { displayName: true } },
+            registration: {
+              include: {
+                student: {
+                  select: {
+                    id: true,
+                    rollNumber: true,
+                    enrollmentNumber: true,
+                    user: { select: { displayName: true } },
+                  },
+                },
               },
             },
           },
@@ -136,15 +159,24 @@ export class IaMarkEntryService {
       : [];
 
     const students =
-      registrations.length > 0
-        ? registrations.map((r) => r.student)
+      lines.length > 0
+        ? Array.from(
+            new Map(
+              lines.map((line) => [
+                line.registration.student.id,
+                line.registration.student,
+              ]),
+            ).values(),
+          )
         : await this.studentsForPaper(user.tid, paper);
+
+    const resolvedSchemeId = scheme.id;
 
     const marks = await (this.prisma as any).iaComponentMark.findMany({
       where: {
         tenantId: user.tid,
         paperId,
-        schemeId,
+        schemeId: resolvedSchemeId,
         deletedAt: null,
       },
     });
@@ -249,8 +281,40 @@ export class IaMarkEntryService {
 
   private async studentsForPaper(
     tenantId: string,
-    paper: { courseId?: string | null },
+    paper: { courseId?: string | null; offeringId?: string | null },
   ) {
+    if (paper.offeringId) {
+      const lines = await this.prisma.semesterRegistrationLine.findMany({
+        where: {
+          tenantId,
+          offeringId: paper.offeringId,
+          status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        },
+        include: {
+          registration: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  rollNumber: true,
+                  enrollmentNumber: true,
+                  user: { select: { displayName: true } },
+                },
+              },
+            },
+          },
+        },
+        take: 1000,
+      });
+      return Array.from(
+        new Map(
+          lines.map((line) => [
+            line.registration.student.id,
+            line.registration.student,
+          ]),
+        ).values(),
+      );
+    }
     if (!paper.courseId) return [];
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {

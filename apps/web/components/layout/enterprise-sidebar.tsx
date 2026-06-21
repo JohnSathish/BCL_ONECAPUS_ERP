@@ -362,7 +362,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
       {mobileNavOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden"
+          className="fixed inset-0 z-[calc(var(--erp-z-sidebar,50)-1)] bg-black/50 backdrop-blur-[1px] md:hidden"
           aria-label="Close menu"
           onClick={() => setMobileNavOpen(false)}
         />
@@ -372,7 +372,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           width: mobileNavOpen ? '100%' : collapsed ? SIDEBAR_WIDTH.collapsed : undefined,
         }}
         className={cn(
-          'erp-theme-sidebar pointer-events-auto fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl transition-[transform,width] duration-200 ease-out',
+          'erp-theme-sidebar pointer-events-auto fixed inset-y-0 left-0 z-[var(--erp-z-sidebar,50)] flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl transition-[transform,width] duration-200 ease-out',
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           !mobileNavOpen && !collapsed && 'w-[260px] lg:w-[280px]',
         )}

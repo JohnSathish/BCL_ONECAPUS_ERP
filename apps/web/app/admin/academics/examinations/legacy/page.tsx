@@ -17,7 +17,7 @@ export default function LegacyExaminationsPage() {
 
   if (!settings.data?.legacyUniversityExamMode) {
     return (
-      <DashboardShell role="admin" title="Legacy Examinations">
+      <DashboardShell role="admin" pageHeader={false} title="Legacy Examinations">
         <IaExaminationShell>
           <div className="rounded-2xl border border-border/60 bg-card p-6 text-sm">
             <p className="font-medium">Legacy university exam mode is disabled.</p>
@@ -38,7 +38,7 @@ export default function LegacyExaminationsPage() {
   }
 
   return (
-    <DashboardShell role="admin" title="Legacy Examinations">
+    <DashboardShell role="admin" pageHeader={false} title="Legacy Examinations">
       <IaExaminationShell>
         <ExaminationManagementWorkspace />
       </IaExaminationShell>

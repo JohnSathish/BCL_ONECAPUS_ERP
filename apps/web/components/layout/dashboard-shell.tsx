@@ -3,6 +3,12 @@
 import { motion } from 'framer-motion';
 import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
 import { EnterpriseTopbar } from '@/components/layout/enterprise-topbar';
+import {
+  ErpChromeMeasurer,
+  ErpPageContent,
+  ErpPageHeaderSection,
+  ErpPageLayoutProvider,
+} from '@/components/layout/erp-page-layout';
 import { LicenseAlertBanner } from '@/components/licensing/license-alert-banner';
 import { LicenseWriteBlockedBanner } from '@/components/licensing/license-write-blocked-banner';
 import { StaffMobileBottomNav } from '@/components/staff-portal/layout/staff-mobile-bottom-nav';
@@ -16,29 +22,43 @@ type Role = keyof typeof ROLE_NAV | 'admin' | 'shift' | 'staff';
 export function DashboardShell({
   role = 'admin',
   title,
+  subtitle,
+  pageHeader,
   children,
 }: {
   role?: Role;
   title?: string;
+  /** Optional description under the page title (admin layout). */
+  subtitle?: string;
+  /** Set false to suppress auto page header when using a custom hero. */
+  pageHeader?: boolean;
   children: React.ReactNode;
 }) {
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
+  const showPageHeader = pageHeader !== false && Boolean(title) && role === 'admin';
 
   if (role === 'admin') {
     return (
-      <>
-        <EnterpriseTopbar title={title} portalRole="admin" />
-        <LicenseAlertBanner />
-        <LicenseWriteBlockedBanner />
-        <motion.main
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 pb-20 sm:px-5 md:pb-4 lg:px-6"
-        >
-          <div className="w-full max-w-full min-w-0">{children}</div>
-        </motion.main>
-      </>
+      <ErpPageLayoutProvider shellTitle={title}>
+        <ErpChromeMeasurer />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <EnterpriseTopbar portalRole="admin" />
+          <LicenseAlertBanner />
+          <LicenseWriteBlockedBanner />
+          <motion.main
+            id="erp-main-scroll"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="relative z-0 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-20 sm:px-5 md:pb-4 lg:px-6"
+          >
+            <ErpPageContent>
+              {showPageHeader ? <ErpPageHeaderSection title={title!} subtitle={subtitle} /> : null}
+              {children}
+            </ErpPageContent>
+          </motion.main>
+        </div>
+      </ErpPageLayoutProvider>
     );
   }
 
@@ -62,7 +82,7 @@ export function DashboardShell({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
           className={cn(
-            'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-5 lg:px-6',
+            'relative z-0 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-5 lg:px-6',
             (role === 'staff' || role === 'student') && 'pb-20 md:pb-4',
           )}
         >

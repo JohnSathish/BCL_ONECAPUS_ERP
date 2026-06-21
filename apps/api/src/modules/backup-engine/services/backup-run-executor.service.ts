@@ -10,6 +10,7 @@ import { BackupCloudSyncService } from './backup-cloud-sync.service';
 import { BackupRetentionService } from './backup-retention.service';
 import { SystemMaintenanceService } from './system-maintenance.service';
 import { BackupNotificationService } from './backup-notification.service';
+import { BackupHealthService } from './backup-health.service';
 
 @Injectable()
 export class BackupRunExecutorService {
@@ -25,6 +26,7 @@ export class BackupRunExecutorService {
     private readonly retention: BackupRetentionService,
     private readonly maintenance: SystemMaintenanceService,
     private readonly notifications: BackupNotificationService,
+    private readonly health: BackupHealthService,
   ) {}
 
   async updateProgress(runId: string, step: string) {
@@ -48,6 +50,7 @@ export class BackupRunExecutorService {
     let totalSize = 0n;
     try {
       await this.updateProgress(runId, 'PREPARING');
+      await this.health.assertReadyForBackup();
       const runDir = this.files.runDir(runId);
       await mkdir(runDir, { recursive: true });
 

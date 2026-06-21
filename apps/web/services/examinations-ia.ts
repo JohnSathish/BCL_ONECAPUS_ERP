@@ -131,9 +131,65 @@ export async function fetchFacultyIaSubjects() {
   return data;
 }
 
-export async function fetchIaRoster(paperId: string, schemeId: string) {
+export type IaExamSummary = IaSession & {
+  metadata?: {
+    programmeName?: string;
+    programmeCode?: string;
+    maxMarks?: number;
+  };
+  stats?: {
+    subjectsScheduled: number;
+    expectedRegistrations: number;
+  };
+};
+
+export type CreateIaExamPayload = {
+  name: string;
+  semesterNo: number;
+  programVersionId: string;
+  departmentId?: string;
+  academicYearId?: string;
+  examType: string;
+  maxMarks: number;
+  startDate?: string;
+  endDate?: string;
+  remarks?: string;
+};
+
+export async function fetchIaExams() {
+  const { data } = await api.get<IaExamSummary[]>('/v1/examinations/ia/exams');
+  return data;
+}
+
+export async function createIaExam(payload: CreateIaExamPayload) {
+  const { data } = await api.post('/v1/examinations/ia/exams', payload);
+  return data as {
+    session: IaSession;
+    summary: {
+      subjectsLoaded: number;
+      papersCreated: number;
+      schemesCreated: number;
+      studentsRegistered: number;
+      programme?: string;
+      semesterNo: number;
+      maxMarks: number;
+    };
+  };
+}
+
+export async function generateIaTimetable(payload: {
+  sessionId: string;
+  startDate: string;
+  durationMinutes?: number;
+  defaultStartTime?: string;
+}) {
+  const { data } = await api.post('/v1/examinations/ia/exams/generate-timetable', payload);
+  return data as { updated: number };
+}
+
+export async function fetchIaRoster(paperId: string, schemeId?: string) {
   const { data } = await api.get(`/v1/examinations/ia/papers/${paperId}/roster`, {
-    params: { schemeId },
+    params: schemeId ? { schemeId } : undefined,
   });
   return data;
 }

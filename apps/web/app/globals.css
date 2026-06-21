@@ -47,6 +47,16 @@
   --radius: 1rem;
   --shadow-soft: 0 1px 2px hsl(222 47% 11% / 0.04), 0 8px 24px hsl(222 47% 11% / 0.06);
   --shadow-glow: 0 0 0 1px hsl(221 83% 53% / 0.08), 0 12px 40px hsl(221 83% 53% / 0.12);
+  /* ERP layout chrome — heights updated at runtime by ErpChromeMeasurer */
+  --erp-topbar-height: 3.5rem;
+  --erp-banner-height: 0px;
+  --erp-page-header-gap: 0.75rem;
+  --erp-content-offset: calc(var(--erp-topbar-height) + var(--erp-banner-height));
+  --erp-z-sidebar: 50;
+  --erp-z-topbar: 40;
+  --erp-z-dropdown: 45;
+  --erp-z-modal: 60;
+  --erp-z-toast: 70;
 }
 
 .dark {
@@ -140,6 +150,7 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  scroll-padding-top: var(--erp-content-offset);
 }
 
 body {

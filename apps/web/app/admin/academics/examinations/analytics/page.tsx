@@ -9,7 +9,7 @@ export default function IaAnalyticsPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="IA Analytics">
+    <DashboardShell role="admin" pageHeader={false} title="IA Analytics">
       <IaExaminationShell>
         <IaPlaceholderWorkspace
           title="Student Performance Analytics"

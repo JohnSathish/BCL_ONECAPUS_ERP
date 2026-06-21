@@ -57,6 +57,12 @@ export class BackupEngineController {
     private readonly adminAudit: AdminAuditHelper,
   ) {}
 
+  @Get('health-check')
+  @RequirePermissions('backup:read')
+  healthCheck() {
+    return this.orchestrator.runHealthCheck();
+  }
+
   @Get('dashboard')
   @RequirePermissions('backup:read')
   dashboard() {
@@ -116,6 +122,23 @@ export class BackupEngineController {
       page: query.page ? Number(query.page) : 1,
       limit: query.limit ? Number(query.limit) : 20,
       status: query.status,
+    });
+  }
+
+  @Post('runs/:id/retry')
+  @RequirePermissions('backup:manage')
+  retryRun(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.orchestrator.retryRun(id, user.sub);
+  }
+
+  @Get('runs/:id/log')
+  @RequirePermissions('backup:read')
+  async downloadLog(@Param('id') id: string) {
+    const text = await this.orchestrator.getRunLog(id);
+    const { Readable } = await import('stream');
+    return new StreamableFile(Readable.from([text]), {
+      type: 'text/plain; charset=utf-8',
+      disposition: `attachment; filename="backup-run-${id}.log"`,
     });
   }
 

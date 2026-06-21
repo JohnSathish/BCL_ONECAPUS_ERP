@@ -1,8 +1,40 @@
 import { api } from '@/services/api';
 
+export type BackupHealthCheckItem = {
+  id: string;
+  label: string;
+  status: 'pass' | 'fail' | 'warn' | 'skip';
+  message: string;
+};
+
+export type BackupHealthCheckResult = {
+  allPassed: boolean;
+  checkedAt: string;
+  checks: BackupHealthCheckItem[];
+};
+
+export type BackupDiagnostics = {
+  lastSuccessfulAt?: string | null;
+  lastFailedAt?: string | null;
+  failureReason?: string | null;
+  failedComponent?: string | null;
+  likelyCause?: string | null;
+  runId?: string;
+};
+
+export type BackupRunDiagnostic = {
+  failedComponent: string;
+  failedComponentLabel: string;
+  failureReason: string;
+  likelyCause: string;
+};
+
 export type BackupDashboard = {
   totalBackups: number;
   latestBackup: BackupRunRow | null;
+  lastFailedBackup?: BackupRunRow | null;
+  diagnostics?: BackupDiagnostics | null;
+  preflight?: BackupHealthCheckResult;
   storageUsedBytes: string;
   storageAvailableBytes: string | null;
   diskFreePct: number | null;
@@ -54,6 +86,9 @@ export type BackupRunRow = {
   errorMessage?: string;
   progressStep?: string;
   verified?: boolean;
+  durationMs?: number | null;
+  diagnostic?: BackupRunDiagnostic | null;
+  stepStatus?: { database: string; storage: string };
   artifacts?: Array<{
     id: string;
     kind: string;
@@ -63,6 +98,24 @@ export type BackupRunRow = {
     verifiedAt?: string;
   }>;
 };
+
+export async function fetchBackupHealthCheck(): Promise<BackupHealthCheckResult> {
+  const { data } = await api.get('/v1/admin/backups/health-check');
+  return data;
+}
+
+export async function retryBackupRun(id: string) {
+  const { data } = await api.post(`/v1/admin/backups/runs/${id}/retry`);
+  return data;
+}
+
+export async function downloadBackupRunLog(runId: string) {
+  const { data } = await api.get(`/v1/admin/backups/runs/${runId}/log`, {
+    responseType: 'blob',
+  });
+  const { downloadBlob } = await import('@/utils/download-blob');
+  downloadBlob(data as Blob, `backup-run-${runId}.log`);
+}
 
 export async function fetchBackupDashboard(): Promise<BackupDashboard> {
   const { data } = await api.get('/v1/admin/backups/dashboard');

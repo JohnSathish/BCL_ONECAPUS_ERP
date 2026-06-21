@@ -9,7 +9,7 @@ export default function IaAdmitCardsPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="IA Admit Cards">
+    <DashboardShell role="admin" pageHeader={false} title="IA Admit Cards">
       <IaExaminationShell>
         <IaAdmitCardsWorkspace />
       </IaExaminationShell>

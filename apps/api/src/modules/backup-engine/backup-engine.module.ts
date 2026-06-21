@@ -12,6 +12,7 @@ import { BackupCloudSyncService } from './services/backup-cloud-sync.service';
 import { BackupCryptoService } from './services/backup-crypto.service';
 import { BackupDatabaseService } from './services/backup-database.service';
 import { BackupFilesService } from './services/backup-files.service';
+import { BackupHealthService } from './services/backup-health.service';
 import { BackupNotificationService } from './services/backup-notification.service';
 import { BackupOrchestratorService } from './services/backup-orchestrator.service';
 import { BackupRetentionService } from './services/backup-retention.service';
@@ -39,6 +40,7 @@ import { TenantBackupExportService } from './services/tenant-backup-export.servi
     BackupRestoreService,
     BackupRunExecutorService,
     BackupNotificationService,
+    BackupHealthService,
     BackupOrchestratorService,
     BackupSchedulerService,
     SystemMaintenanceService,

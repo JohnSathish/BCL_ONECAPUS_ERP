@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Download, Loader2, Plus, Save, Send } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  Loader2,
+  Plus,
+  Save,
+  Send,
+  Sparkles,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   actOnIaApproval,
@@ -14,6 +23,7 @@ import {
   fetchIaAdminDashboard,
   fetchIaConsolidationSheets,
   fetchIaDefaulters,
+  fetchIaExams,
   fetchIaPapers,
   fetchIaRoster,
   fetchIaSchemes,
@@ -21,6 +31,7 @@ import {
   fetchIaSettings,
   fetchPendingIaApprovals,
   generateIaConsolidation,
+  generateIaTimetable,
   importIaMarks,
   saveIaMarks,
   submitIaSheet,
@@ -54,15 +65,20 @@ export function IaDashboardWorkspace() {
   const summary = dashboard.data?.summary ?? {};
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <Kpi label="Total Students" value={summary.totalStudents ?? 0} />
-      <Kpi label="IA Sessions" value={summary.iaSessions ?? 0} />
-      <Kpi label="Scheduled Papers" value={summary.scheduledPapers ?? 0} />
-      <Kpi label="Pending Mark Entry" value={summary.pendingMarkEntry ?? 0} />
-      <Kpi label="Mark Entries" value={summary.markEntries ?? 0} />
-      <Kpi label="Consolidation Sheets" value={summary.consolidationSheets ?? 0} />
-      <Kpi label="Appeared" value={summary.studentsAppeared ?? 0} />
-      <Kpi label="Absent" value={summary.studentsAbsent ?? 0} />
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Total IA Exams" value={summary.iaSessions ?? 0} />
+        <Kpi
+          label="Registered Students"
+          value={summary.registeredStudents ?? summary.totalStudents ?? 0}
+        />
+        <Kpi label="Eligible Students" value={summary.eligibleStudents ?? '—'} />
+        <Kpi label="Defaulters" value={summary.defaulters ?? '—'} />
+        <Kpi label="Subjects Scheduled" value={summary.scheduledPapers ?? 0} />
+        <Kpi label="Admit Cards Generated" value={summary.admitCardsGenerated ?? 0} />
+        <Kpi label="Marks Pending" value={summary.pendingMarkEntry ?? 0} />
+        <Kpi label="Marks Completed" value={summary.marksCompleted ?? summary.markEntries ?? 0} />
+      </div>
       {(dashboard.data?.workflow ?? []).length > 0 && (
         <Card title="Workflow Status">
           <ul className="space-y-1 text-sm">
@@ -250,68 +266,124 @@ export function IaSessionsWorkspace() {
 
 export function IaTimetableWorkspace() {
   const qc = useQueryClient();
-  const sessions = useQuery({ queryKey: ['ia', 'sessions'], queryFn: () => fetchIaSessions() });
+  const exams = useQuery({ queryKey: ['ia', 'exams'], queryFn: fetchIaExams });
   const papers = useQuery({ queryKey: ['ia', 'papers'], queryFn: () => fetchIaPapers() });
   const [sessionId, setSessionId] = useState('');
-  const activeSession = sessionId || sessions.data?.[0]?.id || '';
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [durationMinutes, setDurationMinutes] = useState(120);
+  const [message, setMessage] = useState('');
 
-  const create = useMutation({
+  const activeSession = sessionId || exams.data?.[0]?.id || '';
+  const sessionPapers = (papers.data ?? []).filter((p) => p.sessionId === activeSession);
+
+  const generate = useMutation({
     mutationFn: () =>
-      createIaPaper({
+      generateIaTimetable({
         sessionId: activeSession,
-        paperCode: 'SOC101',
-        paperName: 'Introduction to Sociology',
-        examDate: new Date().toISOString().slice(0, 10),
-        startTime: '10:00',
-        endTime: '12:00',
-        semesterNo: 3,
+        startDate,
+        durationMinutes,
+        defaultStartTime: '10:00',
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['ia', 'papers'] }),
+    onSuccess: (result) => {
+      setMessage(
+        `Timetable generated for ${result.updated} subjects. You can edit dates and venues manually below.`,
+      );
+      qc.invalidateQueries({ queryKey: ['ia', 'papers'] });
+    },
+    onError: () =>
+      setMessage('Could not generate timetable. Ensure an IA exam exists with scheduled subjects.'),
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={activeSession}
-          onChange={(e) => setSessionId(e.target.value)}
-          className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-        >
-          {(sessions.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <Button
-          size="sm"
-          onClick={() => create.mutate()}
-          disabled={!activeSession || create.isPending}
-        >
-          <Plus className="h-4 w-4" /> Add Paper Row
-        </Button>
-      </div>
-      <Card title="IA Timetable">
+      <Card title="Auto Scheduling Wizard">
+        <p className="mb-3 text-xs text-muted-foreground">
+          Select an IA exam, start date, and duration. The system distributes subjects across days
+          automatically. Override individual rows in the table below if needed.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">IA Exam</p>
+            <select
+              value={activeSession}
+              onChange={(e) => setSessionId(e.target.value)}
+              className="h-9 min-w-[220px] rounded-xl border border-border bg-background px-3 text-sm"
+            >
+              {(exams.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Start date</p>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Duration (minutes)</p>
+            <input
+              type="number"
+              min={30}
+              max={480}
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Number(e.target.value) || 120)}
+              className="h-9 w-24 rounded-xl border border-border bg-background px-3 text-sm"
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={() => generate.mutate()}
+            disabled={!activeSession || generate.isPending}
+          >
+            {generate.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            Generate Timetable
+          </Button>
+        </div>
+        {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
+      </Card>
+      <Card title="IA Timetable — Table View">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
               <th className="py-2">Code</th>
-              <th className="py-2">Paper</th>
+              <th className="py-2">Subject</th>
               <th className="py-2">Date</th>
+              <th className="py-2">Time</th>
               <th className="py-2">Status</th>
             </tr>
           </thead>
           <tbody>
-            {(papers.data ?? []).map((p) => (
+            {sessionPapers.map((p) => (
               <tr key={p.id} className="border-b border-border/40">
                 <td className="py-2">{p.paperCode}</td>
                 <td className="py-2">{p.paperName}</td>
                 <td className="py-2">{String(p.examDate).slice(0, 10)}</td>
+                <td className="py-2">
+                  {p.startTime && p.endTime
+                    ? `${String(p.startTime).slice(11, 16)} – ${String(p.endTime).slice(11, 16)}`
+                    : '—'}
+                </td>
                 <td className="py-2">{p.status}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {!sessionPapers.length && (
+          <p className="py-4 text-sm text-muted-foreground">
+            No subjects for this exam. Create an IA exam first — subjects load from curriculum
+            automatically.
+          </p>
+        )}
       </Card>
     </div>
   );
@@ -323,9 +395,7 @@ export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolea
     queryKey: ['ia', staffMode ? 'faculty-subjects' : 'papers'],
     queryFn: staffMode ? fetchFacultyIaSubjects : () => fetchIaPapers(),
   });
-  const schemes = useQuery({ queryKey: ['ia', 'schemes'], queryFn: () => fetchIaSchemes() });
   const [paperId, setPaperId] = useState('');
-  const [schemeId, setSchemeId] = useState('');
 
   const paperOptions = useMemo((): Array<{ id: string; label: string }> => {
     if (staffMode) {
@@ -347,31 +417,34 @@ export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolea
   }, [staffMode, subjects.data]);
 
   const activePaper = paperId || paperOptions[0]?.id || '';
-  const activeScheme = schemeId || schemes.data?.[0]?.id || '';
 
   const roster = useQuery({
-    queryKey: ['ia', 'roster', activePaper, activeScheme],
-    queryFn: () => fetchIaRoster(activePaper, activeScheme),
-    enabled: Boolean(activePaper && activeScheme),
+    queryKey: ['ia', 'roster', activePaper],
+    queryFn: () => fetchIaRoster(activePaper),
+    enabled: Boolean(activePaper),
   });
+
+  const resolvedSchemeId = roster.data?.scheme?.id ?? '';
 
   const [draft, setDraft] = useState<Record<string, number | null>>({});
 
   const save = useMutation({
     mutationFn: () => {
+      if (!resolvedSchemeId) throw new Error('No mark scheme linked to this subject');
       const rows = Object.entries(draft).map(([key, marks]) => {
         const [studentId, componentId] = key.split(':');
         return { studentId, componentId, marks };
       });
-      return saveIaMarks(activePaper, { schemeId: activeScheme, rows });
+      return saveIaMarks(activePaper, { schemeId: resolvedSchemeId, rows });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper, activeScheme] });
+      qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper] });
       setDraft({});
     },
   });
 
   const onImportCsv = async (file: File) => {
+    if (!resolvedSchemeId) return;
     const text = await file.text();
     const lines = text.trim().split('\n').slice(1);
     const rows = lines
@@ -382,8 +455,8 @@ export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolea
         componentCode: componentCode.trim(),
         marks: Number(marks),
       }));
-    await importIaMarks(activePaper, { schemeId: activeScheme, rows });
-    qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper, activeScheme] });
+    await importIaMarks(activePaper, { schemeId: resolvedSchemeId, rows });
+    qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper] });
   };
 
   return (
@@ -400,17 +473,12 @@ export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolea
             </option>
           ))}
         </select>
-        <select
-          value={activeScheme}
-          onChange={(e) => setSchemeId(e.target.value)}
-          className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-        >
-          {(schemes.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        {roster.data?.scheme ? (
+          <span className="inline-flex items-center rounded-xl border border-border px-3 py-1.5 text-xs text-muted-foreground">
+            Max {Number(roster.data.scheme.totalMaxMarks)} marks ·{' '}
+            {roster.data.scheme.components?.length ?? 0} component(s)
+          </span>
+        ) : null}
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-1.5 text-xs">
           Import CSV
           <input
@@ -423,12 +491,12 @@ export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolea
         <Button
           size="sm"
           onClick={() => save.mutate()}
-          disabled={save.isPending || !Object.keys(draft).length}
+          disabled={save.isPending || !Object.keys(draft).length || !resolvedSchemeId}
         >
           <Save className="h-4 w-4" /> Save Marks
         </Button>
       </div>
-      <Card title="Component Mark Grid">
+      <Card title="Mark Entry">
         {roster.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading roster…</p>
         ) : (
@@ -731,37 +799,50 @@ export function IaSettingsWorkspace() {
   const cfg = settings.data;
 
   return (
-    <Card title="Examination Settings">
-      <div className="space-y-4 text-sm">
-        <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-          <div>
-            <p className="font-medium">Legacy University Exam Mode</p>
-            <p className="text-xs text-muted-foreground">
-              Show end-semester room allocation, invigilators, and result publish (hidden by default
-              for DBC).
-            </p>
-          </div>
-          <input
-            type="checkbox"
-            checked={cfg?.legacyUniversityExamMode ?? false}
-            onChange={(e) => update.mutate({ legacyUniversityExamMode: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-          <div>
-            <p className="font-medium">IA Pass Mark (%)</p>
-          </div>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            defaultValue={cfg?.iaPassMarkPercent ?? 40}
-            onBlur={(e) => update.mutate({ iaPassMarkPercent: Number(e.target.value) })}
-            className="h-9 w-20 rounded-lg border border-border bg-background px-2 text-center"
-          />
-        </label>
+    <div className="space-y-6">
+      <Card title="Examination Settings">
+        <div className="space-y-4 text-sm">
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+            <div>
+              <p className="font-medium">Legacy University Exam Mode</p>
+              <p className="text-xs text-muted-foreground">
+                Show end-semester room allocation, invigilators, and result publish (hidden by
+                default for DBC).
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={cfg?.legacyUniversityExamMode ?? false}
+              onChange={(e) => update.mutate({ legacyUniversityExamMode: e.target.checked })}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+            <div>
+              <p className="font-medium">IA Pass Mark (%)</p>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              defaultValue={cfg?.iaPassMarkPercent ?? 40}
+              onBlur={(e) => update.mutate({ iaPassMarkPercent: Number(e.target.value) })}
+              className="h-9 w-20 rounded-lg border border-border bg-background px-2 text-center"
+            />
+          </label>
+        </div>
+      </Card>
+
+      <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+        <p className="text-sm font-semibold">Advanced configuration</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Assessment schemes, weightages, and consolidation are managed here for power users only.
+          Normal IA workflow uses auto-provisioned schemes when you create an IA exam.
+        </p>
       </div>
-    </Card>
+
+      <IaSchemesWorkspace />
+      <IaConsolidationWorkspace />
+    </div>
   );
 }
 

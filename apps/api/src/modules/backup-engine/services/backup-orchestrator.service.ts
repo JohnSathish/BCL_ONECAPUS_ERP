@@ -15,6 +15,64 @@ import { BackupRetentionService } from './backup-retention.service';
 import { BackupVerifyService } from './backup-verify.service';
 import { BackupFilesService } from './backup-files.service';
 import { SystemMaintenanceService } from './system-maintenance.service';
+import { BackupHealthService } from './backup-health.service';
+import {
+  buildRunLogText,
+  diagnoseRun,
+  failedComponentLabel,
+} from '../backup-diagnostics.util';
+
+function enrichRun<
+  T extends {
+    status: string;
+    progressStep?: string | null;
+    errorMessage?: string | null;
+    startedAt?: Date | string | null;
+    completedAt?: Date | string | null;
+    artifacts?: Array<{ kind: string }>;
+  },
+>(run: T) {
+  const diagnostic = run.status === 'FAILED' ? diagnoseRun(run) : null;
+  const durationMs =
+    run.startedAt && run.completedAt
+      ? new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()
+      : null;
+  const artifactKinds = new Set((run.artifacts ?? []).map((a) => a.kind));
+  return {
+    ...run,
+    diagnostic: diagnostic
+      ? {
+          failedComponent: diagnostic.failedComponent,
+          failedComponentLabel: failedComponentLabel(
+            diagnostic.failedComponent,
+          ),
+          failureReason: diagnostic.failureReason,
+          likelyCause: diagnostic.likelyCause,
+        }
+      : null,
+    durationMs: durationMs && durationMs > 0 ? durationMs : null,
+    stepStatus: {
+      database:
+        run.status === 'SUCCESS' || artifactKinds.has('DATABASE')
+          ? 'pass'
+          : run.status === 'FAILED' &&
+              (run.progressStep === 'DUMPING_DB' ||
+                !artifactKinds.has('DATABASE'))
+            ? 'fail'
+            : 'na',
+      storage:
+        run.status === 'SUCCESS' ||
+        artifactKinds.has('FILES') ||
+        artifactKinds.has('TENANT_DATA')
+          ? 'pass'
+          : run.status === 'FAILED' &&
+              (run.progressStep === 'ARCHIVING_FILES' ||
+                run.progressStep === 'PREPARING')
+            ? 'fail'
+            : 'na',
+    },
+  };
+}
 
 function serializeRun<
   T extends { sizeBytes?: bigint; artifacts?: Array<{ sizeBytes?: bigint }> },
@@ -40,12 +98,14 @@ export class BackupOrchestratorService {
     private readonly verify: BackupVerifyService,
     private readonly files: BackupFilesService,
     private readonly maintenance: SystemMaintenanceService,
+    private readonly health: BackupHealthService,
   ) {}
 
   async getDashboard() {
     const [
       totalBackups,
       latestSuccess,
+      latestFailed,
       failedCount,
       restorePoints,
       cloudTargets,
@@ -54,12 +114,18 @@ export class BackupOrchestratorService {
       schedule,
       retention,
       recentRuns,
+      preflight,
     ] = await Promise.all([
       this.prisma.backupRun.count({
         where: { status: 'SUCCESS', scope: 'INSTANCE' },
       }),
       this.prisma.backupRun.findFirst({
         where: { status: 'SUCCESS', scope: 'INSTANCE' },
+        orderBy: { completedAt: 'desc' },
+        include: { artifacts: true },
+      }),
+      this.prisma.backupRun.findFirst({
+        where: { status: 'FAILED' },
         orderBy: { completedAt: 'desc' },
         include: { artifacts: true },
       }),
@@ -89,6 +155,7 @@ export class BackupOrchestratorService {
           },
         },
       }),
+      this.health.runChecks(),
     ]);
 
     let storageUsedBytes = 0n;
@@ -132,9 +199,30 @@ export class BackupOrchestratorService {
       (t) => !t.enabled || (!t.lastSyncError && t.lastSyncAt),
     );
 
+    const failedDiagnostic = latestFailed ? diagnoseRun(latestFailed) : null;
+
     return {
       totalBackups,
       latestBackup: latestSuccess ? serializeRun(latestSuccess) : null,
+      lastFailedBackup: latestFailed
+        ? {
+            ...serializeRun(latestFailed),
+            ...enrichRun(latestFailed),
+          }
+        : null,
+      diagnostics: latestFailed
+        ? {
+            lastSuccessfulAt: latestSuccess?.completedAt ?? null,
+            lastFailedAt: latestFailed.completedAt,
+            failureReason: latestFailed.errorMessage,
+            failedComponent: failedDiagnostic
+              ? failedComponentLabel(failedDiagnostic.failedComponent)
+              : null,
+            likelyCause: failedDiagnostic?.likelyCause ?? null,
+            runId: latestFailed.id,
+          }
+        : null,
+      preflight,
       storageUsedBytes: storageUsedBytes.toString(),
       storageAvailableBytes: storageAvailableBytes?.toString() ?? null,
       diskFreePct,
@@ -220,6 +308,10 @@ export class BackupOrchestratorService {
     });
   }
 
+  async runHealthCheck() {
+    return this.health.runChecks();
+  }
+
   async triggerRun(input: {
     type: string;
     tenantId?: string;
@@ -231,6 +323,8 @@ export class BackupOrchestratorService {
     if (scope === 'TENANT' && !input.tenantId) {
       throw new BadRequestException('tenantId required for tenant export');
     }
+
+    await this.health.assertReadyForBackup();
 
     const run = await this.prisma.backupRun.create({
       data: {
@@ -290,17 +384,49 @@ export class BackupOrchestratorService {
       this.prisma.backupRun.count({ where }),
     ]);
     return {
-      items: items.map((r) => ({
-        ...serializeRun(r),
-        artifacts: r.artifacts.map((a) => ({
-          ...a,
-          sizeBytes: a.sizeBytes.toString(),
-        })),
-      })),
+      items: items.map((r) =>
+        enrichRun({
+          ...serializeRun(r),
+          artifacts: r.artifacts.map((a) => ({
+            ...a,
+            sizeBytes: a.sizeBytes.toString(),
+          })),
+        }),
+      ),
       total,
       page,
       limit,
     };
+  }
+
+  async retryRun(id: string, userId?: string) {
+    const failed = await this.prisma.backupRun.findUnique({ where: { id } });
+    if (!failed) throw new NotFoundException('Backup run not found');
+    if (failed.status !== 'FAILED') {
+      throw new BadRequestException('Only failed backup runs can be retried');
+    }
+    return this.triggerRun({
+      type: failed.type,
+      tenantId: failed.tenantId ?? undefined,
+      userId,
+      triggeredBy: 'RETRY',
+    });
+  }
+
+  async getRunLog(id: string) {
+    const run = await this.prisma.backupRun.findUnique({
+      where: { id },
+      include: { artifacts: true },
+    });
+    if (!run) throw new NotFoundException('Backup run not found');
+    return buildRunLogText({
+      ...run,
+      artifacts: run.artifacts.map((a) => ({
+        kind: a.kind,
+        sizeBytes: a.sizeBytes,
+        cloudStatus: a.cloudStatus,
+      })),
+    });
   }
 
   async getRun(id: string) {
@@ -309,13 +435,14 @@ export class BackupOrchestratorService {
       include: { artifacts: true },
     });
     if (!run) throw new NotFoundException('Backup run not found');
-    return {
+    const serialized = {
       ...serializeRun(run),
       artifacts: run.artifacts.map((a) => ({
         ...a,
         sizeBytes: a.sizeBytes.toString(),
       })),
     };
+    return enrichRun(serialized);
   }
 
   async downloadArtifact(runId: string, artifactId: string) {

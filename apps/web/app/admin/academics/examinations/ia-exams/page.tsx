@@ -2,16 +2,16 @@
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { IaExaminationShell } from '@/components/examinations/ia/ia-examination-shell';
-import { IaMarkEntryWorkspace } from '@/components/examinations/ia/ia-admin-workspaces';
+import { IaExamsWorkspace } from '@/components/examinations/ia/ia-exams-workspace';
 import { useRequireAuth } from '@/hooks/use-auth';
 
-export default function IaMarkEntryPage() {
+export default function IaExamsPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" pageHeader={false} title="IA Mark Entry">
+    <DashboardShell role="admin" pageHeader={false} title="IA Exams">
       <IaExaminationShell>
-        <IaMarkEntryWorkspace />
+        <IaExamsWorkspace />
       </IaExaminationShell>
     </DashboardShell>
   );

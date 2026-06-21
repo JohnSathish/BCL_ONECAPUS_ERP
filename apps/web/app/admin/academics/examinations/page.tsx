@@ -9,7 +9,7 @@ export default function AdminIaDashboardPage() {
   const session = useRequireAuth();
   if (!session) return null;
   return (
-    <DashboardShell role="admin" title="Internal Assessments">
+    <DashboardShell role="admin" pageHeader={false} title="Examination Dashboard">
       <IaExaminationShell>
         <IaDashboardWorkspace />
       </IaExaminationShell>

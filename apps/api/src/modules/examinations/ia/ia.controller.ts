@@ -27,10 +27,15 @@ import {
   SaveIaMarksDto,
 } from './dto/ia.dto';
 import { IaComponentDto } from './dto/ia.dto';
+import {
+  CreateIaExamDto,
+  GenerateIaTimetableDto,
+} from './dto/create-ia-exam.dto';
 import { IaAdmitCardService } from './ia-admit-card.service';
 import { IaConsolidationService } from './ia-consolidation.service';
 import { IaDashboardService } from './ia-dashboard.service';
 import { IaDefaulterService } from './ia-defaulter.service';
+import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { IaMarkEntryService } from './ia-mark-entry.service';
 import { IaNehuExportService } from './ia-nehu-export.service';
 import { IaPortalService } from './ia-portal.service';
@@ -47,6 +52,7 @@ export class IaController {
     private readonly settings: IaSettingsService,
     private readonly schemes: IaSchemeService,
     private readonly sessions: IaSessionService,
+    private readonly exams: IaExamProvisioningService,
     private readonly marks: IaMarkEntryService,
     private readonly workflow: IaWorkflowService,
     private readonly consolidation: IaConsolidationService,
@@ -121,6 +127,27 @@ export class IaController {
     return this.sessions.createSession(user, dto);
   }
 
+  @Get('exams')
+  @RequireAnyPermission('ia:view', 'exam:view', 'exam:admin', 'academic:read')
+  listExams(@CurrentUser() user: JwtUser) {
+    return this.exams.listExamsWithSummary(user.tid);
+  }
+
+  @Post('exams')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:create')
+  createExam(@CurrentUser() user: JwtUser, @Body() dto: CreateIaExamDto) {
+    return this.exams.createExam(user, dto);
+  }
+
+  @Post('exams/generate-timetable')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:create')
+  generateTimetable(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: GenerateIaTimetableDto,
+  ) {
+    return this.exams.generateTimetable(user, dto);
+  }
+
   @Get('papers')
   @RequireAnyPermission('ia:view', 'exam:view', 'exam:admin')
   listPapers(@CurrentUser() user: JwtUser, @Query() query: IaQueryDto) {
@@ -149,7 +176,7 @@ export class IaController {
   getRoster(
     @CurrentUser() user: JwtUser,
     @Param('paperId') paperId: string,
-    @Query('schemeId') schemeId: string,
+    @Query('schemeId') schemeId?: string,
   ) {
     return this.marks.getRoster(user, paperId, schemeId);
   }
