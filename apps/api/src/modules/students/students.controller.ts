@@ -53,7 +53,6 @@ import {
 import {
   BulkShiftTransferDto,
   ReserveRollNumberDto,
-  RollShiftCapacityQueryDto,
   UpsertRollShiftRangesDto,
 } from './dto/roll-shift-range.dto';
 import {
@@ -423,12 +422,13 @@ export class StudentsController {
   @RequirePermissions('students:manage', 'lookups:read')
   getRollShiftCapacity(
     @CurrentUser() user: JwtUser,
-    @Query() query: RollShiftCapacityQueryDto,
+    @Query('institutionId') institutionId?: string,
+    @Query('admissionYear') admissionYear?: string,
   ) {
     return this.students.getRollShiftCapacity(
       user.tid,
-      query.institutionId,
-      query.admissionYear,
+      institutionId,
+      admissionYear ? Number(admissionYear) : undefined,
     );
   }
 

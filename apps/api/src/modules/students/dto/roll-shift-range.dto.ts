@@ -16,20 +16,24 @@ export class RollShiftRangeItemDto {
   @IsUUID()
   shiftId!: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1900)
   @Max(2100)
   admissionYear!: number;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   sequenceStart!: number;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   sequenceEnd!: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   nextSequence?: number;
@@ -52,7 +56,10 @@ export class RollShiftCapacityQueryDto {
   institutionId?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
+  @Min(1900)
+  @Max(2100)
   admissionYear?: number;
 }
 
