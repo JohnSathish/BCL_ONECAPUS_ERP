@@ -455,6 +455,9 @@ async function main() {
     'library:digital:download',
     'library:research:read',
     'library:research:submit',
+    'ia:view',
+    'ia:marks:enter',
+    'exam:marks',
   ]);
   await upsertRole('staff', 'Staff', [
     'reports:read',
@@ -476,6 +479,7 @@ async function main() {
     'student:portal:self',
     'fees:read',
     'exam:view',
+    'ia:view',
   ]);
   await upsertRole('accountant', 'Accounts Staff', [
     'fees:read',
@@ -529,6 +533,15 @@ async function main() {
     'exam:edit',
     'exam:admin',
     'exam:results',
+    'exam:marks',
+    'exam:reports',
+    'ia:view',
+    'ia:manage',
+    'ia:marks:enter',
+    'ia:marks:approve:hod',
+    'ia:marks:approve:controller',
+    'ia:marks:approve:principal',
+    'ia:export:nehu',
     'question-bank:read',
     'question-bank:manage',
     'reports:read',

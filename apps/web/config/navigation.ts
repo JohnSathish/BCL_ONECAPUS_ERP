@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { IA_ADMIT_CARDS_ADMIN_ENABLED } from '@/lib/examinations/ia-feature-flags';
 import { MODULE_PERMISSIONS } from '@/lib/permissions/permission-registry';
 import {
   Award,
@@ -728,9 +729,63 @@ export const ADMIN_NAV: NavGroup[] = [
         activePattern: '^/admin/academics/examinations(?:/.*)?$',
         children: [
           {
-            label: 'Examination Management',
+            label: 'Dashboard',
             href: '/admin/academics/examinations',
             permissions: [...P.examinations],
+          },
+          {
+            label: 'Internal Assessments',
+            href: '/admin/academics/examinations/internal-assessments',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'IA Timetable',
+            href: '/admin/academics/examinations/timetable',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'IA Mark Entry',
+            href: '/admin/academics/examinations/mark-entry',
+            permissions: [...P.examinations, 'ia:marks:enter'],
+          },
+          {
+            label: 'Consolidation',
+            href: '/admin/academics/examinations/consolidation',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'NEHU Submission',
+            href: '/admin/academics/examinations/nehu-submission',
+            permissions: [...P.examinations, 'ia:export:nehu'],
+          },
+          {
+            label: 'Defaulters',
+            href: '/admin/academics/examinations/defaulters',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Analytics',
+            href: '/admin/academics/examinations/analytics',
+            permissions: [...P.examinations],
+          },
+          ...(IA_ADMIT_CARDS_ADMIN_ENABLED
+            ? [
+                {
+                  label: 'Admit Cards',
+                  href: '/admin/academics/examinations/admit-cards',
+                  permissions: [...P.examinations],
+                },
+              ]
+            : []),
+          {
+            label: 'Reports',
+            href: '/admin/academics/examinations/reports',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Settings',
+            href: '/admin/academics/examinations/settings',
+            permissions: ['ia:manage', 'exam:admin'],
           },
         ],
       },
@@ -1375,7 +1430,7 @@ export const ADMIN_NAV: NavGroup[] = [
           },
           {
             label: 'Examination Reports',
-            href: '/admin/academics/examinations',
+            href: '/admin/academics/examinations/reports',
             permissions: [...P.examinations],
           },
           {
@@ -1470,6 +1525,21 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:manage'],
           },
           {
+            label: 'Roll Number Generation',
+            href: '/admin/administration/roll-number-generation',
+            permissions: ['students:manage'],
+          },
+          {
+            label: 'Roll Number History',
+            href: '/admin/administration/roll-number-history',
+            permissions: ['students:manage'],
+          },
+          {
+            label: 'Roll Number Reports',
+            href: '/admin/administration/roll-number-reports',
+            permissions: ['students:manage'],
+          },
+          {
             label: 'Security & Sessions',
             href: '/admin/administration/security',
             permissions: ['sessions:manage', 'audit:read'],
@@ -1561,7 +1631,8 @@ export const STAFF_NAV: NavGroup[] = [
           { label: 'Lesson Plans', href: '/staff/academic/lms' },
           { label: 'Homework / Assignments', href: '/staff/academic/lms' },
           { label: 'Question Bank', href: '/staff/academic/question-bank' },
-          { label: 'Examinations', href: '/staff/academic/examinations' },
+          { label: 'Internal Assessment', href: '/staff/academic/ia' },
+          { label: 'Examinations (Legacy)', href: '/staff/academic/examinations' },
           { label: 'Student Lists', href: '/staff/academic/students' },
           { label: 'Marks Entry', href: '/staff/academic/marks' },
           { label: 'Attendance Entry', href: '/staff/academic/attendance-entry' },

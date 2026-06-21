@@ -10,7 +10,7 @@ export function LandingCta() {
   const { ref, inView } = useScrollReveal({ threshold: 0.3 });
 
   return (
-    <section ref={ref} className="relative py-20 sm:py-24">
+    <section id="contact" ref={ref} className="relative py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           className="landing-cta-panel relative overflow-hidden rounded-3xl px-6 py-14 text-center sm:px-12 sm:py-16"

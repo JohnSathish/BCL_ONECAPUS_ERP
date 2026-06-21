@@ -121,4 +121,97 @@ export class RollNumberSettingsService {
 
     return after;
   }
+
+  async resetConfig(tenantId: string, actorId?: string) {
+    const before = await this.getConfig(tenantId);
+    await this.prisma.rollNumberSettings.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        sequenceLength: 3,
+        separator: '-',
+        autoGenerateOnAdmit: true,
+      },
+      update: {
+        sequenceLength: 3,
+        separator: '-',
+        autoGenerateOnAdmit: true,
+      },
+    });
+    const after = await this.getConfig(tenantId);
+    await this.audit.log({
+      tenantId,
+      userId: actorId,
+      module: 'roll-number-settings',
+      action: 'RESET',
+      entityType: 'RollNumberSettings',
+      entityId: tenantId,
+      metadata: { before, after },
+    });
+    return after;
+  }
+
+  async getDepartmentMappings(tenantId: string) {
+    const departments = await this.prisma.department.findMany({
+      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' },
+    });
+    return departments.map((d) => ({
+      departmentId: d.id,
+      departmentName: d.name,
+      departmentCode: d.code ?? '',
+    }));
+  }
+
+  async getSequenceOverview(tenantId: string) {
+    const settings = await this.prisma.rollNumberSettings.findUnique({
+      where: { tenantId },
+    });
+    const sequenceLength = settings?.sequenceLength ?? 3;
+    const separator = settings?.separator ?? '-';
+
+    const sequences = await this.prisma.rollNumberSequence.findMany({
+      where: { tenantId },
+      orderBy: [{ admissionYear: 'desc' }, { prefix: 'asc' }],
+    });
+
+    const rows = [];
+    for (const seq of sequences) {
+      const yearSuffix = String(seq.admissionYear).slice(-2);
+      const rollPrefix = `${seq.prefix}${yearSuffix}`;
+      const padded = String(seq.nextSequence).padStart(sequenceLength, '0');
+      const nextRollNumber = `${seq.prefix}${yearSuffix}${separator}${padded}`;
+
+      const [lastStudent, totalGenerated] = await Promise.all([
+        this.prisma.student.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            rollNumber: { startsWith: rollPrefix },
+          },
+          select: { rollNumber: true },
+          orderBy: { rollNumber: 'desc' },
+        }),
+        this.prisma.student.count({
+          where: {
+            tenantId,
+            deletedAt: null,
+            rollNumber: { startsWith: rollPrefix },
+          },
+        }),
+      ]);
+
+      rows.push({
+        prefix: seq.prefix,
+        admissionYear: seq.admissionYear,
+        currentSequence: Math.max(0, seq.nextSequence - 1),
+        nextSequence: seq.nextSequence,
+        nextRollNumber,
+        lastGeneratedRollNumber: lastStudent?.rollNumber ?? null,
+        totalGenerated,
+      });
+    }
+    return rows;
+  }
 }

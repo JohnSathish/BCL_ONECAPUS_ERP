@@ -17,6 +17,7 @@ import {
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { FeeEnforcementService } from '../fees/services/fee-enforcement.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
+import { IaSettingsService } from './ia/ia-settings.service';
 
 @Injectable()
 export class ExaminationsService {
@@ -25,7 +26,12 @@ export class ExaminationsService {
     private readonly communication: CommunicationTriggerService,
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly feeEnforcement: FeeEnforcementService,
+    private readonly iaSettings: IaSettingsService,
   ) {}
+
+  private async assertLegacyUniversityMode(tenantId: string) {
+    await this.iaSettings.assertLegacyEnabled(tenantId);
+  }
 
   async dashboard(tenantId: string) {
     const [sessions, papers, rooms, seats, invigilators, marks, results] =
@@ -210,6 +216,7 @@ export class ExaminationsService {
   }
 
   async allocateRooms(user: JwtUser, paperId: string, dto: AllocateRoomsDto) {
+    await this.assertLegacyUniversityMode(user.tid);
     const paper = await this.paperOrThrow(user.tid, paperId);
     const requested = dto.roomIds?.length
       ? await this.prisma.classroom.findMany({
@@ -290,6 +297,7 @@ export class ExaminationsService {
     paperId: string,
     dto: GenerateSeatingDto,
   ) {
+    await this.assertLegacyUniversityMode(user.tid);
     const paper = await this.paperOrThrow(user.tid, paperId);
     const allocations = await (this.prisma as any).examRoomAllocation.findMany({
       where: { tenantId: user.tid, paperId, deletedAt: null },
@@ -351,6 +359,7 @@ export class ExaminationsService {
   }
 
   async assignInvigilator(user: JwtUser, paperId: string, dto: InvigilatorDto) {
+    await this.assertLegacyUniversityMode(user.tid);
     const paper = await this.paperOrThrow(user.tid, paperId);
     const room = await (this.prisma as any).examRoomAllocation.findFirst({
       where: {
@@ -504,6 +513,7 @@ export class ExaminationsService {
   }
 
   async calculateResults(user: JwtUser, sessionId: string) {
+    await this.assertLegacyUniversityMode(user.tid);
     await this.sessionOrThrow(user.tid, sessionId);
     const entries = await (this.prisma as any).examMarkEntry.findMany({
       where: { tenantId: user.tid, sessionId, deletedAt: null },
@@ -565,6 +575,7 @@ export class ExaminationsService {
   }
 
   async publishResults(user: JwtUser, sessionId: string) {
+    await this.assertLegacyUniversityMode(user.tid);
     await this.licenseEnforcement.assertWriteAllowed(
       user.tid,
       'examination.write',

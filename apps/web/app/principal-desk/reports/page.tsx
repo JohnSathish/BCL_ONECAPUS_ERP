@@ -10,7 +10,7 @@ const REPORT_LINKS = [
   { label: 'Fee Collection Reports', href: '/admin/fees/reports' },
   { label: 'Student Directory', href: '/admin/students' },
   { label: 'Staff Directory', href: '/admin/hr' },
-  { label: 'Examination Reports', href: '/admin/examinations' },
+  { label: 'Examination Reports', href: '/admin/academics/examinations' },
   { label: 'NAAC Reports', href: '/admin/naac-iqac' },
   { label: 'Governance Reports', href: '/admin/governance/reports' },
   { label: 'Library Analytics', href: '/admin/library' },

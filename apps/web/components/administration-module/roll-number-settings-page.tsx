@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Eye, RotateCcw } from 'lucide-react';
 
 import { AdminPageHeader } from '@/components/administration-module/admin-page-header';
 import { AdminShell, AdminGlassCard } from '@/components/administration-module/ui/admin-shell';
@@ -11,12 +12,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
 import {
-  bulkGenerateRollNumbers,
   fetchRollNumberConfig,
-  syncRollNumberSequences,
+  fetchRollNumberDepartmentMappings,
+  fetchRollNumberSequences,
+  resetRollNumberConfig,
   updateRollNumberConfig,
-  type BulkGenerateRollNumbersResult,
 } from '@/services/roll-number';
+
+function formatPreviewSamples(
+  prefix: string,
+  year: number,
+  sequenceLength: number,
+  separator: string,
+  startSeq = 1,
+  count = 3,
+) {
+  const yearSuffix = String(year).slice(-2);
+  return Array.from({ length: count }, (_, i) => {
+    const seq = String(startSeq + i).padStart(sequenceLength, '0');
+    return `${prefix}${yearSuffix}${separator}${seq}`;
+  });
+}
 
 export function RollNumberSettingsPage() {
   useRequireAuth();
@@ -26,13 +42,20 @@ export function RollNumberSettingsPage() {
     queryKey: ['admin', 'roll-number-config'],
     queryFn: fetchRollNumberConfig,
   });
+  const sequencesQ = useQuery({
+    queryKey: ['admin', 'roll-number-sequences'],
+    queryFn: fetchRollNumberSequences,
+  });
+  const departmentsQ = useQuery({
+    queryKey: ['admin', 'roll-number-departments'],
+    queryFn: fetchRollNumberDepartmentMappings,
+  });
 
   const [sequenceLength, setSequenceLength] = useState(3);
   const [separator, setSeparator] = useState('-');
   const [autoGenerateOnAdmit, setAutoGenerateOnAdmit] = useState(true);
   const [prefixDraft, setPrefixDraft] = useState<Record<string, string>>({});
-  const [bulkResult, setBulkResult] = useState<BulkGenerateRollNumbersResult | null>(null);
-  const [admissionYear, setAdmissionYear] = useState('');
+  const [previewYear, setPreviewYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     if (!configQ.data) return;
@@ -44,16 +67,20 @@ export function RollNumberSettingsPage() {
 
   const saveMut = useMutation({
     mutationFn: updateRollNumberConfig,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'roll-number-config'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'roll-number-config'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'roll-number-sequences'] });
+    },
   });
 
-  const bulkMut = useMutation({
-    mutationFn: bulkGenerateRollNumbers,
-    onSuccess: (data) => setBulkResult(data),
-  });
-
-  const syncMut = useMutation({
-    mutationFn: () => syncRollNumberSequences(),
+  const resetMut = useMutation({
+    mutationFn: resetRollNumberConfig,
+    onSuccess: (data) => {
+      setSequenceLength(data.settings.sequenceLength);
+      setSeparator(data.settings.separator);
+      setAutoGenerateOnAdmit(data.settings.autoGenerateOnAdmit);
+      qc.invalidateQueries({ queryKey: ['admin', 'roll-number-config'] });
+    },
   });
 
   const handleSave = () => {
@@ -70,20 +97,30 @@ export function RollNumberSettingsPage() {
     });
   };
 
+  const previewPrefix =
+    Object.values(prefixDraft).find((p) => p.trim()) ??
+    configQ.data?.prefixes.find((p) => p.prefix)?.prefix ??
+    'BA';
+
+  const formatSamples = useMemo(
+    () => formatPreviewSamples(previewPrefix, previewYear, sequenceLength, separator),
+    [previewPrefix, previewYear, sequenceLength, separator],
+  );
+
   return (
     <DashboardShell role="admin" title="Roll Number Settings">
       <AdminShell>
         <AdminPageHeader
           title="Roll Number Settings"
-          subtitle="Configure college roll number prefixes, sequence format, and bulk generation for legacy students."
+          subtitle="Configure roll number format, programme prefixes, and sequence rules. Generation is handled separately in Roll Number Generation."
         />
 
         <div className="space-y-4">
           <AdminGlassCard className="p-4">
-            <h2 className="text-sm font-semibold">Sequence format</h2>
+            <h2 className="text-sm font-semibold">Roll Number Format Configuration</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Roll numbers use stream prefix + admission year (last 2 digits) + running sequence,
-              e.g. BA26-001.
+              Pattern: Programme Prefix + Admission Year (2 digits) + Separator + Sequence (e.g.
+              BA26-001, BC26-001).
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
@@ -120,12 +157,15 @@ export function RollNumberSettingsPage() {
           </AdminGlassCard>
 
           <AdminGlassCard className="p-4">
-            <h2 className="text-sm font-semibold">Stream prefixes</h2>
+            <h2 className="text-sm font-semibold">Programme Mapping</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Map each academic stream (programme) to its roll number prefix.
+            </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
-                    <th className="pb-2 pr-3 font-medium">Stream</th>
+                    <th className="pb-2 pr-3 font-medium">Programme</th>
                     <th className="pb-2 pr-3 font-medium">Code</th>
                     <th className="pb-2 font-medium">Prefix</th>
                   </tr>
@@ -153,115 +193,129 @@ export function RollNumberSettingsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" onClick={handleSave} disabled={saveMut.isPending}>
-                Save settings
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => syncMut.mutate()}
-                disabled={syncMut.isPending}
-              >
-                Sync sequences from existing rolls
-              </Button>
-              {syncMut.data ? (
-                <span className="self-center text-xs text-muted-foreground">
-                  Synced {syncMut.data.synced} counter(s)
-                </span>
-              ) : null}
+          </AdminGlassCard>
+
+          <AdminGlassCard className="p-4">
+            <h2 className="text-sm font-semibold">Department Mapping</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Reference mapping of departments to codes (managed in Organization setup).
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[360px] text-sm">
+                <thead>
+                  <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+                    <th className="pb-2 pr-3 font-medium">Department</th>
+                    <th className="pb-2 font-medium">Code</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(departmentsQ.data ?? []).map((row) => (
+                    <tr key={row.departmentId} className="border-b border-border/40">
+                      <td className="py-2 pr-3">{row.departmentName}</td>
+                      <td className="py-2 font-mono text-xs">{row.departmentCode || '—'}</td>
+                    </tr>
+                  ))}
+                  {!departmentsQ.data?.length && (
+                    <tr>
+                      <td colSpan={2} className="py-4 text-center text-xs text-muted-foreground">
+                        No departments configured
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </AdminGlassCard>
 
           <AdminGlassCard className="p-4">
-            <h2 className="text-sm font-semibold">Generate missing roll numbers</h2>
+            <h2 className="text-sm font-semibold">Sequence Management</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Backfill college roll numbers for admitted students without a roll number. Use preview
-              first.
+              Current counters per prefix and admission year. Sync from Generation if rolls were
+              assigned outside the system.
             </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-xs">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 pr-2">Prefix</th>
+                    <th className="pb-2 pr-2">Year</th>
+                    <th className="pb-2 pr-2">Current Seq</th>
+                    <th className="pb-2 pr-2">Next Roll</th>
+                    <th className="pb-2 pr-2">Last Generated</th>
+                    <th className="pb-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(sequencesQ.data ?? []).map((row) => (
+                    <tr
+                      key={`${row.prefix}-${row.admissionYear}`}
+                      className="border-b border-border/40"
+                    >
+                      <td className="py-2 pr-2 font-mono font-semibold">{row.prefix}</td>
+                      <td className="py-2 pr-2">{row.admissionYear}</td>
+                      <td className="py-2 pr-2">{row.currentSequence}</td>
+                      <td className="py-2 pr-2 font-mono text-primary">{row.nextRollNumber}</td>
+                      <td className="py-2 pr-2 font-mono">{row.lastGeneratedRollNumber ?? '—'}</td>
+                      <td className="py-2">{row.totalGenerated}</td>
+                    </tr>
+                  ))}
+                  {!sequencesQ.data?.length && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                        No sequences yet — counters are created on first generation
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </AdminGlassCard>
+
+          <AdminGlassCard className="p-4">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Eye className="h-4 w-4" />
+              Preview Format
+            </h2>
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="bulk-year">Admission year (optional)</Label>
+                <Label htmlFor="preview-year">Admission year</Label>
                 <Input
-                  id="bulk-year"
+                  id="preview-year"
                   type="number"
-                  placeholder="2026"
-                  className="w-32"
-                  value={admissionYear}
-                  onChange={(e) => setAdmissionYear(e.target.value)}
+                  className="w-28"
+                  value={previewYear}
+                  onChange={(e) => setPreviewYear(Number(e.target.value) || previewYear)}
                 />
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={bulkMut.isPending}
-                onClick={() =>
-                  bulkMut.mutate({
-                    dryRun: true,
-                    admissionYear: admissionYear ? Number(admissionYear) : undefined,
-                  })
-                }
-              >
-                Preview
+              <div className="flex flex-wrap gap-2">
+                {formatSamples.map((sample) => (
+                  <span
+                    key={sample}
+                    className="rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono text-sm"
+                  >
+                    {sample}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" onClick={handleSave} disabled={saveMut.isPending}>
+                Save Settings
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                disabled={bulkMut.isPending}
-                onClick={() =>
-                  bulkMut.mutate({
-                    dryRun: true,
-                    admissionYear: admissionYear ? Number(admissionYear) : undefined,
-                  })
-                }
+                onClick={() => {
+                  if (window.confirm('Reset format settings to defaults (prefixes unchanged)?')) {
+                    resetMut.mutate();
+                  }
+                }}
+                disabled={resetMut.isPending}
               >
-                Dry run
-              </Button>
-              <Button
-                size="sm"
-                disabled={bulkMut.isPending}
-                onClick={() =>
-                  bulkMut.mutate({
-                    dryRun: false,
-                    admissionYear: admissionYear ? Number(admissionYear) : undefined,
-                  })
-                }
-              >
-                Generate
+                <RotateCcw className="mr-1 h-3 w-3" />
+                Reset Settings
               </Button>
             </div>
-
-            {bulkResult ? (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  {bulkResult.generated > 0
-                    ? `Generated ${bulkResult.generated} roll number(s).`
-                    : `Preview: ${bulkResult.preview.length} of ${bulkResult.totalCandidates} candidate(s).`}
-                </p>
-                {bulkResult.preview.length > 0 ? (
-                  <div className="max-h-48 overflow-auto rounded-lg border border-border/50">
-                    <table className="w-full text-xs">
-                      <thead className="sticky top-0 bg-muted/80">
-                        <tr>
-                          <th className="px-2 py-1 text-left">Student name</th>
-                          <th className="px-2 py-1 text-left">Roll number</th>
-                          <th className="px-2 py-1 text-left">Stream</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bulkResult.preview.map((row) => (
-                          <tr key={row.studentId} className="border-t border-border/40">
-                            <td className="px-2 py-1">{row.fullName ?? '—'}</td>
-                            <td className="px-2 py-1 font-semibold">{row.rollNumber}</td>
-                            <td className="px-2 py-1">{row.streamCode ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
           </AdminGlassCard>
         </div>
       </AdminShell>

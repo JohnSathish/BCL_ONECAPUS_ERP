@@ -364,6 +364,18 @@ export class StudentsController {
     return this.students.bulkGenerateRollNumbers(user.tid, dto, user.sub);
   }
 
+  @Get('roll-numbers/data-cleanup')
+  @RequirePermissions('students:manage')
+  scanRollNumberDataCleanup(@CurrentUser() user: JwtUser) {
+    return this.students.scanRollNumberDataCleanup(user.tid);
+  }
+
+  @Get('roll-numbers/history')
+  @RequirePermissions('students:manage')
+  listRollNumberHistory(@CurrentUser() user: JwtUser) {
+    return this.students.listRollNumberGenerationHistory(user.tid);
+  }
+
   @Post('roll-numbers/sync-sequences')
   @RequirePermissions('students:manage')
   syncRollSequences(

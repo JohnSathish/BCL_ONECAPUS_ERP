@@ -40,7 +40,15 @@ export const MODULE_PERMISSIONS = {
     'staff-attendance:edit',
     'staff-attendance:shift-admin',
   ],
-  examinations: ['exam:view', 'exam:admin', 'exam:create', 'exam:edit'],
+  examinations: [
+    'exam:view',
+    'exam:admin',
+    'exam:create',
+    'exam:edit',
+    'ia:view',
+    'ia:manage',
+    'ia:marks:enter',
+  ],
   certificates: ['certificates:read', 'certificates:manage', 'certificates:approve'],
   finance: ['fees:read', 'fees:manage', 'fees:cash:collect'],
   library: [

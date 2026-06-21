@@ -35,6 +35,7 @@ model Tenant {
   staffEmployeeCodeSettings     StaffEmployeeCodeSettings?
   staffEmployeeCodeTypePrefixes StaffEmployeeCodeTypePrefix[]
   securitySettings              TenantSecuritySettings?
+  examinationSettings           TenantExaminationSettings?
   impersonationSessions         ImpersonationSession[]
   permissionAuditLogs           PermissionAuditLog[]
   tenantLicense                 TenantLicense?
@@ -933,6 +934,22 @@ model TenantSecuritySettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_security_settings")
+  @@schema("platform")
+}
+
+model TenantExaminationSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @unique @map("tenant_id") @db.Uuid
+  legacyUniversityExamMode Boolean  @default(false) @map("legacy_university_exam_mode")
+  iaPassMarkPercent        Decimal  @default(40) @map("ia_pass_mark_percent") @db.Decimal(5, 2)
+  attendanceMinPercent     Decimal  @default(75) @map("attendance_min_percent") @db.Decimal(5, 2)
+  blockAdmitOnDefaulter    Boolean  @default(false) @map("block_admit_on_defaulter")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_examination_settings")
   @@schema("platform")
 }
 
@@ -1934,6 +1951,7 @@ model Student {
   lmsQuizAttempts       LmsQuizAttempt[]
   idCardIssues          IdCardIssue[]
   idCardPrintRequests   IdCardPrintRequest[]
+  iaAdmitCardIssues     IaAdmitCardIssue[]
 
   @@unique([tenantId, enrollmentNumber])
   @@unique([tenantId, rollNumber])
@@ -5645,6 +5663,214 @@ model ExamAuditLog {
   @@index([tenantId, entity, entityId])
   @@index([tenantId, action])
   @@map("exam_audit_logs")
+  @@schema("academic")
+}
+
+model IaAssessmentScheme {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  departmentId   String?   @map("department_id") @db.Uuid
+  programmeId    String?   @map("programme_id") @db.Uuid
+  courseId       String?   @map("course_id") @db.Uuid
+  offeringId     String?   @map("offering_id") @db.Uuid
+  semesterNo     Int?      @map("semester_no")
+  name           String
+  totalMaxMarks  Decimal   @default(40) @map("total_max_marks") @db.Decimal(6, 2)
+  passMark       Decimal?  @map("pass_mark") @db.Decimal(6, 2)
+  status         String    @default("ACTIVE")
+  isLocked       Boolean   @default(false) @map("is_locked")
+  metadata       Json      @default("{}")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  components IaAssessmentComponent[]
+
+  @@index([tenantId, semesterNo])
+  @@index([tenantId, courseId])
+  @@index([tenantId, offeringId])
+  @@map("ia_assessment_schemes")
+  @@schema("academic")
+}
+
+model IaAssessmentComponent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  schemeId    String   @map("scheme_id") @db.Uuid
+  code        String
+  label       String
+  maxMarks    Decimal  @map("max_marks") @db.Decimal(6, 2)
+  weightage   Decimal? @db.Decimal(5, 2)
+  isMandatory Boolean  @default(true) @map("is_mandatory")
+  sortOrder   Int      @default(0) @map("sort_order")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  scheme IaAssessmentScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  marks  IaComponentMark[]
+
+  @@unique([schemeId, code])
+  @@index([tenantId, schemeId])
+  @@map("ia_assessment_components")
+  @@schema("academic")
+}
+
+model IaComponentMark {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  sessionId   String?   @map("session_id") @db.Uuid
+  paperId     String?   @map("paper_id") @db.Uuid
+  schemeId    String    @map("scheme_id") @db.Uuid
+  componentId String    @map("component_id") @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  marks       Decimal?  @db.Decimal(6, 2)
+  maxMarks    Decimal   @map("max_marks") @db.Decimal(6, 2)
+  status      String    @default("DRAFT")
+  isAbsent    Boolean   @default(false) @map("is_absent")
+  remarks     String?
+  enteredById String?   @map("entered_by_id") @db.Uuid
+  lockedAt    DateTime? @map("locked_at")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  component IaAssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@unique([componentId, studentId, paperId])
+  @@index([tenantId, schemeId])
+  @@index([tenantId, paperId])
+  @@index([tenantId, studentId])
+  @@map("ia_component_marks")
+  @@schema("academic")
+}
+
+model IaConsolidationSheet {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  departmentId   String?   @map("department_id") @db.Uuid
+  semesterNo     Int?      @map("semester_no")
+  sessionId      String?   @map("session_id") @db.Uuid
+  name           String
+  status         String    @default("DRAFT")
+  submittedAt    DateTime? @map("submitted_at")
+  lockedAt       DateTime? @map("locked_at")
+  metadata       Json      @default("{}")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  rows     IaConsolidationRow[]
+  approvals IaApprovalStep[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, departmentId, semesterNo])
+  @@map("ia_consolidation_sheets")
+  @@schema("academic")
+}
+
+model IaConsolidationRow {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  sheetId      String   @map("sheet_id") @db.Uuid
+  studentId    String   @map("student_id") @db.Uuid
+  courseId     String?  @map("course_id") @db.Uuid
+  offeringId   String?  @map("offering_id") @db.Uuid
+  schemeId     String?  @map("scheme_id") @db.Uuid
+  totalMarks   Decimal  @default(0) @map("total_marks") @db.Decimal(8, 2)
+  maxMarks     Decimal  @default(0) @map("max_marks") @db.Decimal(8, 2)
+  percentage   Decimal  @default(0) @db.Decimal(5, 2)
+  resultStatus String   @default("PENDING") @map("result_status")
+  componentJson Json    @default("{}") @map("component_json")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sheet IaConsolidationSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, studentId, offeringId])
+  @@index([tenantId, sheetId])
+  @@index([tenantId, studentId])
+  @@map("ia_consolidation_rows")
+  @@schema("academic")
+}
+
+model IaApprovalStep {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  sheetId     String    @map("sheet_id") @db.Uuid
+  stepCode    String    @map("step_code")
+  stepName    String    @map("step_name")
+  roleSlug    String    @map("role_slug")
+  sequence    Int
+  status      String    @default("PENDING")
+  actedById   String?   @map("acted_by_id") @db.Uuid
+  actedAt     DateTime? @map("acted_at")
+  remarks     String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  sheet IaConsolidationSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, stepCode])
+  @@index([tenantId, sheetId])
+  @@index([tenantId, status])
+  @@map("ia_approval_steps")
+  @@schema("academic")
+}
+
+model IaAdmitCardIssue {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  sessionId          String    @map("session_id") @db.Uuid
+  studentId          String    @map("student_id") @db.Uuid
+  admitCardNumber    String    @map("admit_card_number")
+  verifyToken        String    @map("verify_token")
+  verifyHash         String    @map("verify_hash")
+  status             String    @default("GENERATED")
+  eligibilitySnapshot Json     @default("{}") @map("eligibility_snapshot")
+  cardSnapshot       Json      @default("{}") @map("card_snapshot")
+  generatedById      String?   @map("generated_by_id") @db.Uuid
+  generatedAt        DateTime  @default(now()) @map("generated_at")
+  downloadCount      Int       @default(0) @map("download_count")
+  printCount         Int       @default(0) @map("print_count")
+  regeneratedCount   Int       @default(0) @map("regenerated_count")
+  lastDownloadAt     DateTime? @map("last_download_at")
+  lastPrintAt        DateTime? @map("last_print_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  student Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  events  IaAdmitCardEvent[]
+
+  @@unique([tenantId, admitCardNumber])
+  @@unique([tenantId, sessionId, studentId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, verifyToken])
+  @@map("ia_admit_card_issues")
+  @@schema("academic")
+}
+
+model IaAdmitCardEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  issueId   String   @map("issue_id") @db.Uuid
+  action    String
+  actorId   String?  @map("actor_id") @db.Uuid
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  issue IaAdmitCardIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, issueId])
+  @@index([tenantId, action, createdAt])
+  @@map("ia_admit_card_events")
   @@schema("academic")
 }
 

@@ -6,6 +6,11 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import {
+  evaluateRollEligibility,
+  isTestOrDummyRecord,
+  issueLabel,
+} from './roll-number-eligibility';
 
 export type RollNumberContext = {
   institutionId: string;
@@ -477,10 +482,15 @@ export class RollNumberService {
     options: {
       institutionId?: string;
       admissionYear?: number;
+      departmentId?: string;
+      streamId?: string;
+      semesterNo?: number;
       dryRun?: boolean;
       actorId?: string;
+      excludeStudentIds?: string[];
     },
   ) {
+    const exclude = new Set(options.excludeStudentIds ?? []);
     const admissionBatchFilter =
       options.admissionYear || options.institutionId
         ? {
@@ -493,54 +503,116 @@ export class RollNumberService {
           }
         : undefined;
 
+    const academicProfileWhere = {
+      streamId: options.streamId ? options.streamId : { not: null },
+      admissionBatchId: { not: null },
+      ...(admissionBatchFilter ? { admissionBatch: admissionBatchFilter } : {}),
+    };
+
+    const scopeWhere = {
+      tenantId,
+      deletedAt: null,
+      ...(options.departmentId ? { departmentId: options.departmentId } : {}),
+      academicProfile: { is: academicProfileWhere },
+      ...(options.semesterNo
+        ? {
+            academicStanding: {
+              is: { currentSemesterSequence: options.semesterNo },
+            },
+          }
+        : {}),
+    };
+
+    const alreadyAssigned = await this.prisma.student.count({
+      where: {
+        ...scopeWhere,
+        rollNumber: { not: null },
+        NOT: { rollNumber: '' },
+      },
+    });
+
     const students = await this.prisma.student.findMany({
       where: {
-        tenantId,
-        deletedAt: null,
+        ...scopeWhere,
         OR: [{ rollNumber: null }, { rollNumber: '' }],
-        academicProfile: {
-          is: {
-            streamId: { not: null },
-            admissionBatchId: { not: null },
-            ...(admissionBatchFilter
-              ? { admissionBatch: admissionBatchFilter }
-              : {}),
-          },
-        },
       },
       include: {
-        masterProfile: { select: { fullName: true } },
+        masterProfile: {
+          select: {
+            fullName: true,
+            gender: true,
+            studentStatus: true,
+            admissionStatus: true,
+            photoPath: true,
+          },
+        },
+        department: { select: { id: true, name: true, code: true } },
+        programVersion: {
+          include: {
+            program: { select: { id: true, name: true, code: true } },
+          },
+        },
         academicProfile: {
           include: {
             admissionBatch: { include: { entrySession: true } },
             stream: true,
           },
         },
+        academicStanding: { select: { currentSemesterSequence: true } },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'asc' }],
     });
 
-    const preview: Array<{
+    const settings = await this.getSettings(tenantId);
+    const dryRunCounters = new Map<string, number>();
+    const previewRows: Array<Record<string, unknown>> = [];
+    const attention: Array<{
       studentId: string;
       fullName?: string;
-      rollNumber: string;
-      streamCode?: string;
-      admissionYear?: number;
+      reasons: string[];
     }> = [];
-
-    const dryRunCounters = new Map<string, number>();
 
     for (const student of students) {
       const profile = student.academicProfile;
-      if (!profile?.streamId || !profile.admissionBatchId) continue;
+      const batch = profile?.admissionBatch;
+      const fullName = student.masterProfile?.fullName?.trim() || undefined;
 
-      try {
-        if (options.dryRun) {
+      const eligibility = evaluateRollEligibility({
+        fullName,
+        applicationNumber: student.applicationNumber,
+        enrollmentNumber: student.enrollmentNumber,
+        importSource: student.importSource,
+        admissionSource: student.admissionSource,
+        programmeId: student.programVersionId,
+        departmentId: student.departmentId,
+        admissionYear: batch?.admissionYear,
+        admissionStatus: student.masterProfile?.admissionStatus,
+        studentStatus: student.masterProfile?.studentStatus,
+        streamId: profile?.streamId,
+        admissionBatchId: profile?.admissionBatchId,
+      });
+
+      let generationStatus: 'READY' | 'BLOCKED' | 'SKIPPED' = 'READY';
+      let newRollNumber: string | undefined;
+      let contextError: string | undefined;
+      const remarks = [...eligibility.remarks];
+
+      if (exclude.has(student.id)) {
+        generationStatus = 'SKIPPED';
+        remarks.push('Excluded by admin');
+      } else if (eligibility.blocked) {
+        generationStatus = 'BLOCKED';
+        attention.push({
+          studentId: student.id,
+          fullName,
+          reasons: eligibility.remarks,
+        });
+      } else if (profile?.streamId && profile.admissionBatchId) {
+        try {
           const ctx = await this.resolveContext(tenantId, {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
           });
-          const settings = await this.getSettings(tenantId);
           const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
           const baseSeq = await this.readNextSequence(
             this.prisma,
@@ -551,27 +623,130 @@ export class RollNumberService {
           );
           const simulated = dryRunCounters.get(counterKey) ?? baseSeq;
           dryRunCounters.set(counterKey, simulated + 1);
-          const rollNumber = this.formatRollNumber(
+          newRollNumber = this.formatRollNumber(
             ctx.prefix,
             ctx.yearSuffix,
             simulated,
             settings,
           );
-          preview.push({
+        } catch (err) {
+          generationStatus = 'BLOCKED';
+          contextError =
+            err instanceof Error
+              ? err.message
+              : 'Roll context could not be resolved';
+          remarks.push(contextError);
+          attention.push({
             studentId: student.id,
-            fullName: student.masterProfile?.fullName?.trim() || undefined,
-            rollNumber,
-            streamCode: ctx.streamCode,
-            admissionYear: ctx.admissionYear,
+            fullName,
+            reasons: [contextError],
           });
-        } else {
+        }
+      }
+
+      previewRows.push({
+        studentId: student.id,
+        photoPath: student.masterProfile?.photoPath ?? null,
+        fullName,
+        applicationNumber: student.applicationNumber,
+        admissionNumber: student.admissionNumber,
+        programme: student.programVersion?.program?.name,
+        programmeCode: student.programVersion?.program?.code,
+        department: student.department?.name,
+        departmentCode: student.department?.code,
+        batch: batch?.batchCode ?? String(batch?.admissionYear ?? ''),
+        semester:
+          student.academicStanding?.currentSemesterSequence ??
+          batch?.admissionYear ??
+          null,
+        gender: student.masterProfile?.gender,
+        currentRollNumber: student.rollNumber,
+        newRollNumber,
+        streamCode: profile?.stream?.code,
+        admissionYear: batch?.admissionYear,
+        generationStatus,
+        remarks,
+        issues: eligibility.issues,
+      });
+    }
+
+    const rollCounts = new Map<string, number>();
+    for (const row of previewRows) {
+      const roll = row.newRollNumber as string | undefined;
+      if (roll) rollCounts.set(roll, (rollCounts.get(roll) ?? 0) + 1);
+    }
+    for (const row of previewRows) {
+      const roll = row.newRollNumber as string | undefined;
+      if (roll && (rollCounts.get(roll) ?? 0) > 1) {
+        if (row.generationStatus === 'READY') {
+          row.generationStatus = 'BLOCKED';
+          const remarks = row.remarks as string[];
+          remarks.push('Duplicate roll number in preview');
+          attention.push({
+            studentId: row.studentId as string,
+            fullName: row.fullName as string | undefined,
+            reasons: ['Duplicate roll number in preview'],
+          });
+        }
+      }
+    }
+
+    const readyRows = previewRows.filter((r) => r.generationStatus === 'READY');
+    const blockedRows = previewRows.filter(
+      (r) => r.generationStatus === 'BLOCKED',
+    );
+    const testRecords = previewRows.filter((r) =>
+      (r.issues as string[] | undefined)?.includes('TEST_RECORD'),
+    ).length;
+
+    const patternSamples: string[] = [];
+    const expectedNextByPrefix: Array<{
+      prefix: string;
+      yearSuffix: string;
+      nextSequence: number;
+      sample: string;
+    }> = [];
+    for (const [key, seq] of dryRunCounters) {
+      const [, prefix, year] = key.split(':');
+      const yearSuffix = String(year).slice(-2);
+      const sample = this.formatRollNumber(prefix, yearSuffix, seq, settings);
+      patternSamples.push(sample);
+      expectedNextByPrefix.push({
+        prefix,
+        yearSuffix,
+        nextSequence: seq,
+        sample,
+      });
+    }
+
+    const warnings: string[] = [];
+    if (testRecords > 0) {
+      warnings.push(
+        `${testRecords} test record(s) detected — excluded from generation`,
+      );
+    }
+    const dupCount = previewRows.filter((r) =>
+      (r.remarks as string[])?.some((x) => x.includes('Duplicate')),
+    ).length;
+    if (dupCount > 0)
+      warnings.push(`${dupCount} duplicate roll number(s) in preview`);
+
+    let generated = 0;
+    const generatedRolls: string[] = [];
+
+    if (!options.dryRun) {
+      for (const row of readyRows) {
+        const student = students.find((s) => s.id === row.studentId);
+        const profile = student?.academicProfile;
+        if (!profile?.streamId || !profile.admissionBatchId) continue;
+        try {
           const allocated = await this.allocateNextRollNumber(tenantId, {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
           });
           await this.assignRollNumber(
             tenantId,
-            student.id,
+            student!.id,
             allocated.rollNumber,
             {
               manualOverride: false,
@@ -586,23 +761,274 @@ export class RollNumberService {
               },
             },
           );
-          preview.push({
-            studentId: student.id,
-            fullName: student.masterProfile?.fullName?.trim() || undefined,
-            rollNumber: allocated.rollNumber,
-            streamCode: allocated.streamCode,
-            admissionYear: allocated.admissionYear,
-          });
+          row.newRollNumber = allocated.rollNumber;
+          generatedRolls.push(allocated.rollNumber);
+          generated += 1;
+        } catch {
+          row.generationStatus = 'BLOCKED';
+          (row.remarks as string[]).push('Generation failed');
         }
-      } catch {
-        // skip students that cannot resolve context
+      }
+
+      if (generated > 0 && options.actorId) {
+        const batchNo =
+          (await this.prisma.studentRollNumberAuditLog.count({
+            where: { tenantId, action: 'BULK_GENERATE_BATCH' },
+          })) + 1;
+        await this.writeAuditLog(tenantId, {
+          action: 'BULK_GENERATE_BATCH',
+          rollNumber: generatedRolls[0] ?? 'BATCH',
+          institutionId: options.institutionId,
+          createdById: options.actorId,
+          metadata: {
+            batchNumber: batchNo,
+            generated,
+            admissionYear: options.admissionYear,
+            departmentId: options.departmentId,
+            streamId: options.streamId,
+            semesterNo: options.semesterNo,
+            firstRollNumber: generatedRolls[0],
+            lastRollNumber: generatedRolls[generatedRolls.length - 1],
+            excludedCount: exclude.size,
+            blockedCount: blockedRows.length,
+          },
+        });
       }
     }
 
     return {
-      preview,
-      generated: options.dryRun ? 0 : preview.length,
+      preview: previewRows,
+      blocked: blockedRows,
+      attention,
+      summary: {
+        totalFound: students.length + alreadyAssigned,
+        candidatesWithoutRoll: students.length,
+        alreadyAssigned,
+        ready: readyRows.length,
+        blocked: blockedRows.length,
+        skipped: previewRows.filter((r) => r.generationStatus === 'SKIPPED')
+          .length,
+        testRecords,
+        missingData: previewRows.filter((r) =>
+          (r.issues as string[] | undefined)?.some((i) =>
+            [
+              'MISSING_NAME',
+              'MISSING_PROGRAMME',
+              'MISSING_DEPARTMENT',
+              'MISSING_ACADEMIC_YEAR',
+            ].includes(i),
+          ),
+        ).length,
+        duplicatesDetected: dupCount,
+        errors: blockedRows.filter((r) =>
+          (r.remarks as string[])?.some(
+            (x) => x.includes('failed') || x.includes('context'),
+          ),
+        ).length,
+      },
+      analysis: {
+        warnings,
+        patternSamples: patternSamples.slice(0, 10),
+        expectedNextByPrefix,
+        patternDescription: `${settings.separator ? 'Prefix + YY + separator + sequence' : 'Prefix + YY + sequence'}`,
+      },
+      generated: options.dryRun ? 0 : generated,
       totalCandidates: students.length,
+      audit:
+        generatedRolls.length > 0
+          ? {
+              firstRollNumber: generatedRolls[0],
+              lastRollNumber: generatedRolls[generatedRolls.length - 1],
+              studentsGenerated: generated,
+            }
+          : undefined,
     };
+  }
+
+  async scanStudentDataCleanup(tenantId: string) {
+    const students = await this.prisma.student.findMany({
+      where: { tenantId, deletedAt: null },
+      include: {
+        masterProfile: { select: { fullName: true, admissionStatus: true } },
+        department: { select: { name: true } },
+        programVersion: { include: { program: { select: { name: true } } } },
+      },
+      take: 5000,
+    });
+
+    const categories = {
+      testRecords: [] as Array<{
+        studentId: string;
+        fullName?: string;
+        reason: string;
+      }>,
+      duplicateNames: [] as Array<{
+        name: string;
+        count: number;
+        studentIds: string[];
+      }>,
+      missingProgrammes: [] as Array<{ studentId: string; fullName?: string }>,
+      missingDepartments: [] as Array<{ studentId: string; fullName?: string }>,
+      invalidAdmissionNumbers: [] as Array<{
+        studentId: string;
+        fullName?: string;
+        value: string;
+      }>,
+      duplicateRollNumbers: [] as Array<{ rollNumber: string; count: number }>,
+    };
+
+    const nameMap = new Map<string, string[]>();
+    const rollMap = new Map<string, number>();
+
+    for (const s of students) {
+      const fullName = s.masterProfile?.fullName?.trim();
+      if (
+        isTestOrDummyRecord({
+          fullName,
+          applicationNumber: s.applicationNumber,
+          enrollmentNumber: s.enrollmentNumber,
+          importSource: s.importSource,
+          admissionSource: s.admissionSource,
+        })
+      ) {
+        categories.testRecords.push({
+          studentId: s.id,
+          fullName,
+          reason: issueLabel('TEST_RECORD'),
+        });
+      }
+      if (!s.programVersionId) {
+        categories.missingProgrammes.push({ studentId: s.id, fullName });
+      }
+      if (!s.departmentId) {
+        categories.missingDepartments.push({ studentId: s.id, fullName });
+      }
+      if (s.admissionNumber && !/^[A-Za-z0-9/-]+$/.test(s.admissionNumber)) {
+        categories.invalidAdmissionNumbers.push({
+          studentId: s.id,
+          fullName,
+          value: s.admissionNumber,
+        });
+      }
+      if (fullName) {
+        const key = fullName.toLowerCase();
+        if (!nameMap.has(key)) nameMap.set(key, []);
+        nameMap.get(key)!.push(s.id);
+      }
+      if (s.rollNumber?.trim()) {
+        const r = s.rollNumber.trim();
+        rollMap.set(r, (rollMap.get(r) ?? 0) + 1);
+      }
+    }
+
+    for (const [name, ids] of nameMap) {
+      if (ids.length > 1) {
+        categories.duplicateNames.push({
+          name,
+          count: ids.length,
+          studentIds: ids,
+        });
+      }
+    }
+    for (const [rollNumber, count] of rollMap) {
+      if (count > 1)
+        categories.duplicateRollNumbers.push({ rollNumber, count });
+    }
+
+    return {
+      scanned: students.length,
+      categories,
+      totals: {
+        testRecords: categories.testRecords.length,
+        duplicateNames: categories.duplicateNames.length,
+        missingProgrammes: categories.missingProgrammes.length,
+        missingDepartments: categories.missingDepartments.length,
+        invalidAdmissionNumbers: categories.invalidAdmissionNumbers.length,
+        duplicateRollNumbers: categories.duplicateRollNumbers.length,
+      },
+    };
+  }
+
+  async getSequenceOverview(tenantId: string) {
+    const settings = await this.getSettings(tenantId);
+    const sequences = await this.prisma.rollNumberSequence.findMany({
+      where: { tenantId },
+      orderBy: [{ admissionYear: 'desc' }, { prefix: 'asc' }],
+    });
+
+    const rows = [];
+    for (const seq of sequences) {
+      const yearSuffix = String(seq.admissionYear).slice(-2);
+      const rollPrefix = `${seq.prefix}${yearSuffix}`;
+      const [lastStudent, totalGenerated] = await Promise.all([
+        this.prisma.student.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            rollNumber: { startsWith: rollPrefix },
+          },
+          select: { rollNumber: true },
+          orderBy: { rollNumber: 'desc' },
+        }),
+        this.prisma.student.count({
+          where: {
+            tenantId,
+            deletedAt: null,
+            rollNumber: { startsWith: rollPrefix },
+          },
+        }),
+      ]);
+
+      rows.push({
+        prefix: seq.prefix,
+        admissionYear: seq.admissionYear,
+        currentSequence: Math.max(0, seq.nextSequence - 1),
+        nextSequence: seq.nextSequence,
+        nextRollNumber: this.formatRollNumber(
+          seq.prefix,
+          yearSuffix,
+          seq.nextSequence,
+          settings,
+        ),
+        lastGeneratedRollNumber: lastStudent?.rollNumber ?? null,
+        totalGenerated,
+      });
+    }
+    return rows;
+  }
+
+  async listGenerationHistory(tenantId: string, take = 50) {
+    const logs = await this.prisma.studentRollNumberAuditLog.findMany({
+      where: { tenantId, action: 'BULK_GENERATE_BATCH' },
+      orderBy: { generatedAt: 'desc' },
+      take,
+      include: {
+        createdBy: { select: { displayName: true, email: true } },
+      },
+    });
+
+    const total = await this.prisma.studentRollNumberAuditLog.count({
+      where: { tenantId, action: 'BULK_GENERATE_BATCH' },
+    });
+
+    return logs.map((log, index) => {
+      const meta = (log.metadata ?? {}) as Record<string, unknown>;
+      return {
+        id: log.id,
+        batchNumber: (meta.batchNumber as number | undefined) ?? total - index,
+        generatedAt: log.generatedAt,
+        generatedBy:
+          log.createdBy?.displayName ?? log.createdBy?.email ?? 'System',
+        admissionYear: meta.admissionYear ?? null,
+        studentsProcessed: Number(meta.generated ?? 0),
+        firstRollNumber: meta.firstRollNumber ?? null,
+        lastRollNumber: meta.lastRollNumber ?? null,
+        blockedCount: Number(meta.blockedCount ?? 0),
+        excludedCount: Number(meta.excludedCount ?? 0),
+        departmentId: meta.departmentId ?? null,
+        streamId: meta.streamId ?? null,
+        semesterNo: meta.semesterNo ?? null,
+      };
+    });
   }
 }

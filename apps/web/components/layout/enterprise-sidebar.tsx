@@ -512,13 +512,13 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
               collapsed={navCollapsed}
             >
               <ul className="space-y-0.5">
-                {recentEntries.map((entry) => {
+                {recentEntries.map((entry, index) => {
                   const href = 'href' in entry ? entry.href : '';
                   const label = 'label' in entry ? entry.label : '';
                   const visitedAt =
                     'visitedAt' in entry ? (entry.visitedAt as number | undefined) : undefined;
                   return (
-                    <li key={href + label}>
+                    <li key={`${href}::${label}::${visitedAt ?? index}`}>
                       <Link
                         href={href}
                         prefetch={false}

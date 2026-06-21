@@ -1388,3 +1388,20 @@ html.institution-branded .erp-theme-sidebar {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* IA admit card bulk print */
+@media print {
+  body.ia-admit-printing * {
+    visibility: hidden !important;
+  }
+  body.ia-admit-printing #ia-admit-print-area,
+  body.ia-admit-printing #ia-admit-print-area * {
+    visibility: visible !important;
+  }
+  body.ia-admit-printing #ia-admit-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

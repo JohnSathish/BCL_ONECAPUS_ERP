@@ -1424,6 +1424,10 @@ export class StudentsService {
       dryRun?: boolean;
       institutionId?: string;
       admissionYear?: number;
+      departmentId?: string;
+      streamId?: string;
+      semesterNo?: number;
+      excludeStudentIds?: string[];
     },
     actorId?: string,
   ) {
@@ -1431,6 +1435,14 @@ export class StudentsService {
       ...options,
       actorId,
     });
+  }
+
+  async listRollNumberGenerationHistory(tenantId: string) {
+    return this.rollNumbers.listGenerationHistory(tenantId);
+  }
+
+  async scanRollNumberDataCleanup(tenantId: string) {
+    return this.rollNumbers.scanStudentDataCleanup(tenantId);
   }
 
   async syncRollNumberSequences(tenantId: string, institutionId?: string) {

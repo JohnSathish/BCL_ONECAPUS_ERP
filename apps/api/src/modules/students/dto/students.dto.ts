@@ -422,6 +422,23 @@ export class BulkGenerateRollNumbersDto {
   @IsOptional()
   @IsInt()
   admissionYear?: number;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  streamId?: string;
+
+  @IsOptional()
+  @IsInt()
+  semesterNo?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludeStudentIds?: string[];
 }
 
 export class CreateLifecycleEventDto {

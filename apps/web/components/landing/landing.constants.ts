@@ -139,6 +139,29 @@ export const NAV_LINKS = [
   { label: 'Modules', href: '#modules' },
   { label: 'AI Assistant', href: '#ai' },
   { label: 'Enterprise', href: '#enterprise' },
+  { label: 'Resources', href: '#modules' },
+  { label: 'Contact', href: '#contact' },
+] as const;
+
+export const LOGIN_PATH = '/login';
+
+export const QUICK_ACCESS_LINKS = [
+  {
+    label: 'Sign In',
+    subtitle: 'Access Existing Account',
+    href: LOGIN_PATH,
+    primary: true,
+  },
+  {
+    label: 'Student Portal',
+    href: LOGIN_PATH,
+    primary: false,
+  },
+  {
+    label: 'Staff Portal',
+    href: LOGIN_PATH,
+    primary: false,
+  },
 ] as const;
 
 export const REQUEST_DEMO_PATH = '/request-demo';
