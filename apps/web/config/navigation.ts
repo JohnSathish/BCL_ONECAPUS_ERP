@@ -1540,6 +1540,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:manage'],
           },
           {
+            label: 'Shift Transfer',
+            href: '/admin/administration/roll-number-shift-transfer',
+            permissions: ['students:manage', 'shift:students:manage'],
+          },
+          {
             label: 'Security & Sessions',
             href: '/admin/administration/security',
             permissions: ['sessions:manage', 'audit:read'],

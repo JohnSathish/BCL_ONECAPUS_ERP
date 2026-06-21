@@ -193,7 +193,6 @@ export function IaSessionsWorkspace() {
         name,
         examType,
         semesterNo: 3,
-        status: 'DRAFT',
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ia', 'sessions'] }),
   });
@@ -263,10 +262,9 @@ export function IaTimetableWorkspace() {
         paperCode: 'SOC101',
         paperName: 'Introduction to Sociology',
         examDate: new Date().toISOString().slice(0, 10),
-        startTime: new Date('1970-01-01T10:00:00Z').toISOString(),
-        endTime: new Date('1970-01-01T12:00:00Z').toISOString(),
+        startTime: '10:00',
+        endTime: '12:00',
         semesterNo: 3,
-        status: 'SCHEDULED',
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ia', 'papers'] }),
   });

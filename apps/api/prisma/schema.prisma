@@ -32,6 +32,7 @@ model Tenant {
   rollNumberSettings            RollNumberSettings?
   studentDisplaySettings        StudentDisplaySettings?
   rollPrefixConfigs             RollPrefixConfig[]
+  rollShiftRangeConfigs         RollShiftRangeConfig[]
   staffEmployeeCodeSettings     StaffEmployeeCodeSettings?
   staffEmployeeCodeTypePrefixes StaffEmployeeCodeTypePrefix[]
   securitySettings              TenantSecuritySettings?
@@ -321,6 +322,7 @@ model User {
   staffBulkUpdateBatches         StaffBulkUpdateBatch[]      @relation("StaffBulkUpdateActor")
   studentPhotoBulkBatches        StudentPhotoBulkBatch[]     @relation("PhotoBulkActor")
   studentRollNumberAuditLogs     StudentRollNumberAuditLog[] @relation("RollNumberAuditActor")
+  rollNumberVacanciesCreated     RollNumberVacancy[]         @relation("RollVacancyActor")
   staffEmployeeCodeAuditLogs     StaffEmployeeCodeAuditLog[] @relation("EmployeeCodeAuditActor")
   studentLifecycleEvents         StudentLifecycleEvent[]     @relation("StudentLifecycleActor")
   studentRemarks                 StudentRemark[]             @relation("StudentRemarkActor")
@@ -855,6 +857,29 @@ model RollPrefixConfig {
   @@schema("platform")
 }
 
+model RollShiftRangeConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  institutionId String   @map("institution_id") @db.Uuid
+  shiftId       String   @map("shift_id") @db.Uuid
+  admissionYear Int      @map("admission_year")
+  sequenceStart Int      @map("sequence_start")
+  sequenceEnd   Int      @map("sequence_end")
+  nextSequence  Int      @map("next_sequence")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  shift       Shift       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, institutionId, shiftId, admissionYear])
+  @@index([tenantId, admissionYear])
+  @@map("roll_shift_range_configs")
+  @@schema("platform")
+}
+
 model StaffEmployeeCodeSettings {
   tenantId             String   @id @map("tenant_id") @db.Uuid
   orgPrefix            String   @default("DBC") @map("org_prefix")
@@ -1287,6 +1312,7 @@ model Institution {
   academicSubjects           AcademicSubject[]
 
   rollNumberSequences        RollNumberSequence[]
+  rollShiftRangeConfigs      RollShiftRangeConfig[]
   staffEmployeeCodeSequences StaffEmployeeCodeSequence[]
 
   @@index([tenantId])
@@ -1365,6 +1391,8 @@ model Shift {
   promotionRuns              SemesterPromotionRun[]
   lmsWorkspaces              LmsWorkspace[]
   teachingSubjectGroups      TeachingSubjectGroup[]
+  rollShiftRangeConfigs      RollShiftRangeConfig[]
+  rollNumberVacancies        RollNumberVacancy[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -1943,6 +1971,7 @@ model Student {
   bulkUpdateChanges     StudentBulkUpdateChange[]
   photoBulkChanges      StudentPhotoBulkChange[]
   rollNumberAuditLogs   StudentRollNumberAuditLog[]
+  rollNumberVacancies   RollNumberVacancy[]
   lifecycleEvents       StudentLifecycleEvent[]
   remarks               StudentRemark[]
   leaveApplications     StudentLeaveApplication[]
@@ -2290,6 +2319,34 @@ model RollNumberSequence {
   @@unique([institutionId, prefix, admissionYear])
   @@index([tenantId])
   @@map("roll_number_sequences")
+  @@schema("academic")
+}
+
+model RollNumberVacancy {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  institutionId String   @map("institution_id") @db.Uuid
+  rollNumber    String   @map("roll_number")
+  shiftId       String?  @map("shift_id") @db.Uuid
+  sequenceNo    Int?     @map("sequence_no")
+  admissionYear Int?     @map("admission_year")
+  studentId     String?  @map("student_id") @db.Uuid
+  status        String   @default("VACANT")
+  reason        String?
+  reservedNote  String?  @map("reserved_note")
+  vacatedAt     DateTime @default(now()) @map("vacated_at")
+  createdById   String?  @map("created_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  student   Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  shift     Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  createdBy User?    @relation("RollVacancyActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, rollNumber])
+  @@index([tenantId, shiftId, status])
+  @@index([tenantId, institutionId, admissionYear])
+  @@map("roll_number_vacancies")
   @@schema("academic")
 }
 
@@ -2693,17 +2750,19 @@ model SeatAllocation {
 }
 
 model StudentShiftTransfer {
-  id           String    @id @default(uuid()) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  studentId    String    @map("student_id") @db.Uuid
-  fromShiftId  String    @map("from_shift_id") @db.Uuid
-  toShiftId    String    @map("to_shift_id") @db.Uuid
-  status       String    @default("pending")
-  reason       String?
-  approvedById String?   @map("approved_by_id") @db.Uuid
-  approvedAt   DateTime? @map("approved_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  fromShiftId   String    @map("from_shift_id") @db.Uuid
+  toShiftId     String    @map("to_shift_id") @db.Uuid
+  status        String    @default("pending")
+  reason        String?
+  oldRollNumber String?   @map("old_roll_number")
+  newRollNumber String?   @map("new_roll_number")
+  approvedById  String?   @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime? @map("approved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
   fromShift  Shift   @relation("ShiftTransferFrom", fields: [fromShiftId], references: [id], onDelete: Restrict)

@@ -6,6 +6,7 @@ import { CampusSwitcher } from '@/components/dashboard/campus-switcher';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { NotificationPanel } from '@/components/dashboard/notification-panel';
 import { AcademicContextStrip } from '@/components/layout/academic-context-strip';
+import { QuickCreateMenu } from '@/components/layout/quick-create-menu';
 import { LicenseStatusBadge } from '@/components/licensing/license-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { StudentUserMenu } from '@/components/student-portal/layout/student-user-menu';
@@ -27,6 +28,7 @@ import { logout } from '@/services/auth';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
+import { useNavPreferencesStore } from '@/store/nav-preferences-store';
 import { cn } from '@/utils/cn';
 
 export function EnterpriseTopbar({
@@ -42,6 +44,7 @@ export function EnterpriseTopbar({
   const sidebarCollapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
   const toggleMobileNavOpen = useDashboardUiStore((s) => s.toggleMobileNavOpen);
+  const showQuickCreate = useNavPreferencesStore((s) => s.sidebarLayout.showQuickCreate);
 
   const handleLogout = async () => {
     broadcastSessionMessage({ type: 'LOGOUT' });
@@ -148,6 +151,7 @@ export function EnterpriseTopbar({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {portalRole === 'admin' && showQuickCreate ? <QuickCreateMenu /> : null}
           <CommandPalette />
           <CampusSwitcher />
           {authReady ? <NotificationPanel /> : null}

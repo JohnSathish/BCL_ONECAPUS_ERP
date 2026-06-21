@@ -209,3 +209,145 @@ export async function fetchRollNumberHistory(): Promise<RollNumberGenerationBatc
   const { data } = await api.get<RollNumberGenerationBatch[]>('/v1/students/roll-numbers/history');
   return data;
 }
+
+export type RollShiftRangeRow = {
+  shiftId: string;
+  shiftCode: string;
+  shiftName: string;
+  institutionId: string;
+  admissionYear: number;
+  sequenceStart: number | null;
+  sequenceEnd: number | null;
+  nextSequence: number | null;
+  currentSequence: number | null;
+  availableSeats: number;
+  capacity: number;
+  configured: boolean;
+  isActive: boolean;
+};
+
+export type RollShiftRangesResponse = {
+  admissionYear: number;
+  shifts: RollShiftRangeRow[];
+};
+
+export type ShiftCapacityRow = {
+  shiftId: string;
+  shiftCode: string;
+  shiftName: string;
+  admissionYear: number;
+  rangeStart: number;
+  rangeEnd: number;
+  capacity: number;
+  used: number;
+  vacant: number;
+  reserved: number;
+  available: number;
+  nextSequence: number;
+  configured: boolean;
+};
+
+export type StudentRollShiftHistory = {
+  currentRollNumber: string | null;
+  currentShift: { id: string; code: string; name: string } | null;
+  previousRollNumber: string | null;
+  previousShift: { id: string; code: string; name: string } | null;
+  transferHistory: Array<{
+    id: string;
+    fromShift: { id: string; code: string; name: string };
+    toShift: { id: string; code: string; name: string };
+    oldRollNumber: string | null;
+    newRollNumber: string | null;
+    status: string;
+    reason: string | null;
+    changedBy: { id: string; displayName: string | null; email: string } | null;
+    changedAt: string;
+  }>;
+  rollAuditHistory: Array<{
+    id: string;
+    action: string;
+    rollNumber: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: { id: string; displayName: string | null; email: string } | null;
+    changedAt: string;
+    metadata: unknown;
+  }>;
+};
+
+export async function fetchRollShiftRanges(params?: {
+  institutionId?: string;
+  admissionYear?: number;
+}): Promise<RollShiftRangesResponse> {
+  const { data } = await api.get<RollShiftRangesResponse>(
+    '/v1/students/roll-numbers/shift-ranges',
+    { params },
+  );
+  return data;
+}
+
+export async function updateRollShiftRanges(payload: {
+  institutionId: string;
+  ranges: Array<{
+    shiftId: string;
+    admissionYear: number;
+    sequenceStart: number;
+    sequenceEnd: number;
+    nextSequence?: number;
+  }>;
+}): Promise<RollShiftRangesResponse> {
+  const { data } = await api.patch<RollShiftRangesResponse>(
+    '/v1/students/roll-numbers/shift-ranges',
+    payload,
+  );
+  return data;
+}
+
+export async function fetchRollShiftCapacity(params?: {
+  institutionId?: string;
+  admissionYear?: number;
+}): Promise<ShiftCapacityRow[]> {
+  const { data } = await api.get<ShiftCapacityRow[]>('/v1/students/roll-numbers/shift-capacity', {
+    params,
+  });
+  return data;
+}
+
+export async function reserveRollNumber(payload: {
+  institutionId: string;
+  rollNumber: string;
+  shiftId?: string;
+  note?: string;
+}) {
+  const { data } = await api.post('/v1/students/roll-numbers/reserve', payload);
+  return data;
+}
+
+export async function bulkShiftTransfer(payload: {
+  studentIds: string[];
+  toShiftId: string;
+  reason?: string;
+}) {
+  const { data } = await api.post<{
+    total: number;
+    succeeded: number;
+    failed: number;
+    results: Array<{
+      studentId: string;
+      status: 'success' | 'failed';
+      oldRollNumber?: string | null;
+      newRollNumber?: string | null;
+      error?: string;
+    }>;
+  }>('/v1/students/shift-transfers/bulk', payload);
+  return data;
+}
+
+export async function fetchStudentRollShiftHistory(
+  studentId: string,
+): Promise<StudentRollShiftHistory> {
+  const { data } = await api.get<StudentRollShiftHistory>(
+    `/v1/students/${studentId}/roll-number-history`,
+  );
+  return data;
+}

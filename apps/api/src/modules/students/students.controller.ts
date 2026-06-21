@@ -51,6 +51,12 @@ import {
   ValidateStudentImportDto,
 } from './dto/students.dto';
 import {
+  BulkShiftTransferDto,
+  ReserveRollNumberDto,
+  RollShiftCapacityQueryDto,
+  UpsertRollShiftRangesDto,
+} from './dto/roll-shift-range.dto';
+import {
   UpsertProfileFieldConfigDto,
   VerifyDocumentDto,
 } from './dto/profile-section.dto';
@@ -383,6 +389,74 @@ export class StudentsController {
     @Body() body: { institutionId?: string },
   ) {
     return this.students.syncRollNumberSequences(user.tid, body.institutionId);
+  }
+
+  @Get('roll-numbers/shift-ranges')
+  @RequirePermissions('students:manage', 'lookups:read')
+  listRollShiftRanges(
+    @CurrentUser() user: JwtUser,
+    @Query('institutionId') institutionId?: string,
+    @Query('admissionYear') admissionYear?: string,
+  ) {
+    return this.students.listRollShiftRanges(
+      user.tid,
+      institutionId,
+      admissionYear ? Number(admissionYear) : undefined,
+    );
+  }
+
+  @Patch('roll-numbers/shift-ranges')
+  @RequirePermissions('students:manage', 'lookups:manage')
+  upsertRollShiftRanges(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: UpsertRollShiftRangesDto,
+  ) {
+    return this.students.upsertRollShiftRanges(
+      user.tid,
+      dto.institutionId,
+      dto.ranges,
+      user.sub,
+    );
+  }
+
+  @Get('roll-numbers/shift-capacity')
+  @RequirePermissions('students:manage', 'lookups:read')
+  getRollShiftCapacity(
+    @CurrentUser() user: JwtUser,
+    @Query() query: RollShiftCapacityQueryDto,
+  ) {
+    return this.students.getRollShiftCapacity(
+      user.tid,
+      query.institutionId,
+      query.admissionYear,
+    );
+  }
+
+  @Post('roll-numbers/reserve')
+  @RequirePermissions('students:manage')
+  reserveRollNumber(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReserveRollNumberDto,
+  ) {
+    return this.students.reserveRollNumber(user.tid, dto, user.sub);
+  }
+
+  @Post('shift-transfers/bulk')
+  @RequirePermissions('shift:students:manage', 'students:manage')
+  bulkShiftTransfer(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: BulkShiftTransferDto,
+  ) {
+    return this.students.bulkShiftTransfer(user.tid, dto, user.sub);
+  }
+
+  @Get(':id/roll-number-history')
+  @RequirePermissions('students:read', 'students:manage')
+  getStudentRollHistory(
+    @CurrentUser() user: JwtUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.students.getStudentRollShiftHistory(user.tid, id);
   }
 
   @Post(':id/roll-number/regenerate')

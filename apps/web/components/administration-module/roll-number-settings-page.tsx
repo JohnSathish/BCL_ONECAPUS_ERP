@@ -18,6 +18,7 @@ import {
   resetRollNumberConfig,
   updateRollNumberConfig,
 } from '@/services/roll-number';
+import { RollNumberShiftConfigSection } from '@/components/administration-module/roll-number-shift-config';
 
 function formatPreviewSamples(
   prefix: string,
@@ -194,6 +195,8 @@ export function RollNumberSettingsPage() {
               </table>
             </div>
           </AdminGlassCard>
+
+          <RollNumberShiftConfigSection />
 
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Department Mapping</h2>

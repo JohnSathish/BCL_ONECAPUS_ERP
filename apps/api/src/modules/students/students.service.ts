@@ -37,6 +37,7 @@ import { SubjectRegistrationEngineService } from '../academic-engine/services/su
 import { MajorMinorEligibilityService } from '../academic-engine/services/major-minor-eligibility.service';
 import { UserProvisioningService } from '../administration/services/user-provisioning.service';
 import { RollNumberService } from './services/roll-number.service';
+import { RollShiftRangeService } from './services/roll-shift-range.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
 import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service';
@@ -142,6 +143,7 @@ export class StudentsService {
     private readonly provisioning: UserProvisioningService,
     private readonly organization: OrganizationService,
     private readonly rollNumbers: RollNumberService,
+    private readonly rollShiftRange: RollShiftRangeService,
     private readonly communication: CommunicationTriggerService,
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
@@ -1389,6 +1391,7 @@ export class StudentsService {
       admissionBatchId: string;
       preview?: boolean;
       studentId?: string;
+      shiftId?: string;
     },
     actorId?: string,
   ) {
@@ -1396,10 +1399,20 @@ export class StudentsService {
       return this.previewRollNumber(tenantId, input, actorId);
     }
 
-    const allocated = await this.rollNumbers.allocateNextRollNumber(
-      tenantId,
-      input,
-    );
+    let shiftId = input.shiftId;
+    if (!shiftId && input.studentId) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: input.studentId, tenantId, deletedAt: null },
+        select: { primaryShiftId: true },
+      });
+      shiftId = student?.primaryShiftId ?? undefined;
+    }
+
+    const allocated = await this.rollNumbers.allocateNextRollNumber(tenantId, {
+      streamId: input.streamId,
+      admissionBatchId: input.admissionBatchId,
+      shiftId,
+    });
     if (input.studentId) {
       const ctx = await this.rollNumbers.resolveContext(tenantId, input);
       await this.rollNumbers.assignRollNumber(
@@ -1527,9 +1540,15 @@ export class StudentsService {
 
     if (!shouldAuto) return;
 
+    const studentShift = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId, deletedAt: null },
+      select: { primaryShiftId: true },
+    });
+
     const allocated = await this.rollNumbers.allocateNextRollNumber(tenantId, {
       streamId: input.streamId,
       admissionBatchId: input.admissionBatchId,
+      shiftId: studentShift?.primaryShiftId ?? undefined,
     });
 
     await this.rollNumbers.assignRollNumber(
@@ -2021,28 +2040,145 @@ export class StudentsService {
       throw new BadRequestException('Transfer is not pending');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.studentShiftTransfer.update({
-        where: { id: transferId },
-        data: {
-          status: 'approved',
-          approvedById: actorId,
-          approvedAt: new Date(),
+    await this.prisma.studentShiftTransfer.update({
+      where: { id: transferId },
+      data: {
+        status: 'approved',
+        approvedById: actorId,
+        approvedAt: new Date(),
+      },
+    });
+
+    const student = await this.prisma.student.findFirst({
+      where: { id: transfer.studentId, tenantId, deletedAt: null },
+      include: {
+        academicProfile: {
+          include: { admissionBatch: { include: { entrySession: true } } },
         },
-      }),
-      this.prisma.student.update({
-        where: { id: transfer.studentId },
-        data: { primaryShiftId: transfer.toShiftId },
-      }),
-      this.prisma.studentAcademicProfile.updateMany({
-        where: { studentId: transfer.studentId },
-        data: { preferredShiftId: transfer.toShiftId },
-      }),
-    ]);
+      },
+    });
+
+    const institutionId =
+      student?.academicProfile?.admissionBatch?.entrySession?.institutionId;
+    const admissionYear =
+      student?.academicProfile?.admissionBatch?.admissionYear;
+    const shiftRangesActive =
+      institutionId && admissionYear
+        ? await this.rollShiftRange.hasActiveShiftRanges(
+            tenantId,
+            institutionId,
+            admissionYear,
+          )
+        : false;
+
+    if (shiftRangesActive) {
+      await this.rollShiftRange.processShiftTransferRollChange(tenantId, {
+        studentId: transfer.studentId,
+        fromShiftId: transfer.fromShiftId,
+        toShiftId: transfer.toShiftId,
+        transferId,
+        reason: transfer.reason ?? undefined,
+        actorId,
+      });
+    } else {
+      await this.prisma.$transaction([
+        this.prisma.student.update({
+          where: { id: transfer.studentId },
+          data: { primaryShiftId: transfer.toShiftId },
+        }),
+        this.prisma.studentAcademicProfile.updateMany({
+          where: { studentId: transfer.studentId },
+          data: { preferredShiftId: transfer.toShiftId },
+        }),
+      ]);
+    }
 
     return this.prisma.studentShiftTransfer.findFirst({
       where: { id: transferId },
+      include: {
+        fromShift: { select: { id: true, code: true, name: true } },
+        toShift: { select: { id: true, code: true, name: true } },
+      },
     });
+  }
+
+  async listRollShiftRanges(
+    tenantId: string,
+    institutionId?: string,
+    admissionYear?: number,
+  ) {
+    return this.rollShiftRange.listShiftRanges(
+      tenantId,
+      institutionId,
+      admissionYear,
+    );
+  }
+
+  async upsertRollShiftRanges(
+    tenantId: string,
+    institutionId: string,
+    ranges: Array<{
+      shiftId: string;
+      admissionYear: number;
+      sequenceStart: number;
+      sequenceEnd: number;
+      nextSequence?: number;
+    }>,
+    actorId?: string,
+  ) {
+    return this.rollShiftRange.upsertShiftRanges(
+      tenantId,
+      institutionId,
+      ranges,
+      actorId,
+    );
+  }
+
+  async getRollShiftCapacity(
+    tenantId: string,
+    institutionId?: string,
+    admissionYear?: number,
+  ) {
+    return this.rollShiftRange.getCapacityDashboard(
+      tenantId,
+      institutionId,
+      admissionYear,
+    );
+  }
+
+  async reserveRollNumber(
+    tenantId: string,
+    input: {
+      rollNumber: string;
+      shiftId?: string;
+      note?: string;
+      institutionId: string;
+    },
+    actorId?: string,
+  ) {
+    return this.rollShiftRange.reserveRollNumber(tenantId, {
+      ...input,
+      actorId,
+    });
+  }
+
+  async bulkShiftTransfer(
+    tenantId: string,
+    input: {
+      studentIds: string[];
+      toShiftId: string;
+      reason?: string;
+    },
+    actorId?: string,
+  ) {
+    return this.rollShiftRange.bulkShiftTransferWithRollRegeneration(tenantId, {
+      ...input,
+      actorId,
+    });
+  }
+
+  async getStudentRollShiftHistory(tenantId: string, studentId: string) {
+    return this.rollShiftRange.getStudentRollShiftHistory(tenantId, studentId);
   }
 
   private academicStatusWhere(status: string): Prisma.StudentWhereInput {

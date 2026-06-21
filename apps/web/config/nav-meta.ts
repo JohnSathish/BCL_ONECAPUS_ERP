@@ -1,5 +1,13 @@
 import type { LucideIcon } from 'lucide-react';
-import { ClipboardList, Megaphone, UserPlus, Users, Wallet } from 'lucide-react';
+import {
+  CalendarDays,
+  ClipboardList,
+  GraduationCap,
+  Megaphone,
+  UserPlus,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
 /** Accent colors for module icons (matches premium ERP mockup). */
 export const MODULE_COLORS: Record<string, string> = {
@@ -33,9 +41,10 @@ export const MODULE_COLORS: Record<string, string> = {
   students_module: '#22c55e',
 };
 
-export type SidebarQuickAction = {
+export type QuickCreateAction = {
   id: string;
   label: string;
+  shortLabel?: string;
   href: string;
   icon: LucideIcon;
   color: string;
@@ -43,10 +52,14 @@ export type SidebarQuickAction = {
   keywords?: string[];
 };
 
-export const SIDEBAR_QUICK_ACTIONS: SidebarQuickAction[] = [
+/** @deprecated Use QUICK_CREATE_ACTIONS — kept for imports during migration */
+export type SidebarQuickAction = QuickCreateAction;
+
+export const QUICK_CREATE_ACTIONS: QuickCreateAction[] = [
   {
     id: 'add-student',
     label: 'Add Student',
+    shortLabel: 'Student',
     href: '/admin/students/new',
     icon: UserPlus,
     color: '#22c55e',
@@ -56,6 +69,7 @@ export const SIDEBAR_QUICK_ACTIONS: SidebarQuickAction[] = [
   {
     id: 'add-staff',
     label: 'Add Staff',
+    shortLabel: 'Staff',
     href: '/admin/staff/new',
     icon: Users,
     color: '#f59e0b',
@@ -65,6 +79,7 @@ export const SIDEBAR_QUICK_ACTIONS: SidebarQuickAction[] = [
   {
     id: 'collect-fee',
     label: 'Collect Fee',
+    shortLabel: 'Fee Collection',
     href: '/admin/fees/collections',
     icon: Wallet,
     color: '#f97316',
@@ -74,6 +89,7 @@ export const SIDEBAR_QUICK_ACTIONS: SidebarQuickAction[] = [
   {
     id: 'create-notice',
     label: 'Create Notice',
+    shortLabel: 'Notice',
     href: '/admin/communication/compose',
     icon: Megaphone,
     color: '#8b5cf6',
@@ -89,7 +105,28 @@ export const SIDEBAR_QUICK_ACTIONS: SidebarQuickAction[] = [
     permissions: ['student-attendance:read', 'student-attendance:manage'],
     keywords: ['attendance', 'mark attendance'],
   },
+  {
+    id: 'create-event',
+    label: 'Event',
+    href: '/admin/governance/events',
+    icon: CalendarDays,
+    color: '#6366f1',
+    permissions: ['governance:read', 'governance:manage'],
+    keywords: ['event', 'calendar'],
+  },
+  {
+    id: 'new-admission',
+    label: 'Admission',
+    href: '/admin/admissions/applications',
+    icon: GraduationCap,
+    color: '#06b6d4',
+    permissions: ['admissions:read', 'admissions:manage'],
+    keywords: ['admission', 'application', 'apply'],
+  },
 ];
+
+/** @deprecated Use QUICK_CREATE_ACTIONS */
+export const SIDEBAR_QUICK_ACTIONS = QUICK_CREATE_ACTIONS;
 
 export const DEFAULT_FAVORITE_HREFS = [
   '/admin/students',

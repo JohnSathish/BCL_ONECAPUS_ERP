@@ -100,7 +100,18 @@ export async function fetchIaSessions(params?: Record<string, string | number | 
   return data;
 }
 
-export async function createIaSession(payload: Partial<IaSession>) {
+export type CreateIaSessionPayload = {
+  name: string;
+  examType: string;
+  academicYearId?: string;
+  shiftId?: string;
+  semesterNo?: number;
+  startDate?: string;
+  endDate?: string;
+  instructions?: string;
+};
+
+export async function createIaSession(payload: CreateIaSessionPayload) {
   const { data } = await api.post('/v1/examinations/ia/sessions', payload);
   return data;
 }

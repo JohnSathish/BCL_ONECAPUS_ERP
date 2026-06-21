@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { RollShiftRangeService } from './roll-shift-range.service';
 
 export type LifecycleEventType =
   | 'READMISSION'
@@ -16,7 +17,10 @@ export type LifecycleEventType =
 
 @Injectable()
 export class StudentLifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rollShiftRange: RollShiftRangeService,
+  ) {}
 
   async listEvents(tenantId: string, studentId?: string, limit = 100) {
     return this.prisma.studentLifecycleEvent.findMany({
@@ -51,6 +55,11 @@ export class StudentLifecycleService {
   ) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
+      include: {
+        academicProfile: {
+          include: { admissionBatch: { include: { entrySession: true } } },
+        },
+      },
     });
     if (!student) throw new NotFoundException('Student not found');
 
@@ -100,6 +109,46 @@ export class StudentLifecycleService {
         where: { id: student.userId },
         data: { isActive: true },
       });
+    }
+
+    const vacatingEvents: LifecycleEventType[] = [
+      'LEAVING',
+      'DROPOUT',
+      'MIGRATION',
+      'DEACTIVATE',
+    ];
+    if (
+      vacatingEvents.includes(payload.eventType) &&
+      student.rollNumber?.trim()
+    ) {
+      const institutionId =
+        student.academicProfile?.admissionBatch?.entrySession?.institutionId;
+      if (institutionId) {
+        await this.rollShiftRange.vacateRollNumber(tenantId, {
+          rollNumber: student.rollNumber,
+          institutionId,
+          shiftId: student.primaryShiftId,
+          studentId,
+          reason: payload.eventType,
+          actorId,
+        });
+        await this.prisma.studentRollNumberAuditLog.create({
+          data: {
+            tenantId,
+            institutionId,
+            studentId,
+            action: 'VACATED',
+            rollNumber: student.rollNumber,
+            oldValue: student.rollNumber,
+            newValue: null,
+            createdById: actorId,
+            metadata: {
+              eventType: payload.eventType,
+              reason: payload.reason,
+            },
+          },
+        });
+      }
     }
 
     return event;

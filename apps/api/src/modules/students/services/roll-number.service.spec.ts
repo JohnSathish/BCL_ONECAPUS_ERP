@@ -24,7 +24,16 @@ describe('RollNumberService', () => {
     $transaction: jest.fn(),
   };
 
-  const service = new RollNumberService(prisma as never);
+  const rollShiftRange = {
+    allocateInShiftRange: jest.fn().mockResolvedValue(null),
+    findShiftConfig: jest.fn().mockResolvedValue(null),
+    hasActiveShiftRanges: jest.fn().mockResolvedValue(false),
+  };
+
+  const service = new RollNumberService(
+    prisma as never,
+    rollShiftRange as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();

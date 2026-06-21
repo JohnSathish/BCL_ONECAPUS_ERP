@@ -8,7 +8,6 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
   Search,
   Star,
   X,
@@ -29,12 +28,7 @@ import {
   type NavGroup,
   type NavItem,
 } from '@/config/navigation';
-import {
-  DEFAULT_FAVORITE_HREFS,
-  NAV_SEARCH_ACTIONS,
-  SIDEBAR_QUICK_ACTIONS,
-  moduleColor,
-} from '@/config/nav-meta';
+import { DEFAULT_FAVORITE_HREFS, NAV_SEARCH_ACTIONS, moduleColor } from '@/config/nav-meta';
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-me';
 import { buildStaffNavContext, filterStaffNav } from '@/lib/staff-portal/nav-visibility';
 import { buildAdminNavContext, filterAdminNav } from '@/lib/admin-nav-visibility';
@@ -51,6 +45,7 @@ import { buildNavIndex, findEntryById, navEntryId, resolveNavEntry } from '@/lib
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
 import { SidebarInstitutionCard } from '@/components/layout/sidebar-institution-card';
+import { SidebarPersonalizationMenu } from '@/components/layout/sidebar-personalization-menu';
 import { cn } from '@/utils/cn';
 
 const NAV_ITEM_CLASS =
@@ -140,6 +135,18 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   const recents = useNavPreferencesStore((s) => s.recentsByRole[roleKey] ?? []);
   const favoriteIds = useNavPreferencesStore((s) => s.favoritesByRole[roleKey] ?? []);
   const setFavorites = useNavPreferencesStore((s) => s.setFavorites);
+  const sidebarLayout = useNavPreferencesStore((s) => s.sidebarLayout);
+  const toggleFavoritesExpanded = useNavPreferencesStore((s) => s.toggleFavoritesExpanded);
+  const toggleRecentExpanded = useNavPreferencesStore((s) => s.toggleRecentExpanded);
+
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const statsQ = useQuery({
     queryKey: ['sidebar', 'nav-badges'],
@@ -275,11 +282,6 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     );
   }, [query, userPerms]);
 
-  const quickActions = useMemo(
-    () => SIDEBAR_QUICK_ACTIONS.filter((a) => hasAnyPermission(userPerms, a.permissions)),
-    [userPerms],
-  );
-
   const favoriteEntries = useMemo(
     () =>
       favoriteIds
@@ -328,6 +330,8 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   };
 
   const navCollapsed = mobileNavOpen ? false : collapsed;
+
+  const showSidebarWidgets = isAdminLayout && isDesktop && !navCollapsed && !query.trim();
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchAction) {
@@ -449,12 +453,14 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           )}
           ariaLabel={isAdminLayout ? 'Admin navigation' : 'Navigation'}
         >
-          {isAdminLayout && !query.trim() && favoriteEntries.length > 0 && !navCollapsed ? (
-            <SidebarPinSection
+          {showSidebarWidgets && sidebarLayout.showFavorites && favoriteEntries.length > 0 ? (
+            <CollapsibleSidebarWidget
               title="Favorites"
               icon={Star}
               iconClass="text-amber-400"
-              collapsed={navCollapsed}
+              count={favoriteEntries.length}
+              expanded={sidebarLayout.favoritesExpanded}
+              onToggle={toggleFavoritesExpanded}
             >
               <ul className="space-y-0.5">
                 {favoriteEntries.map((entry) => (
@@ -468,48 +474,17 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                   />
                 ))}
               </ul>
-            </SidebarPinSection>
+            </CollapsibleSidebarWidget>
           ) : null}
 
-          {isAdminLayout && !query.trim() && quickActions.length > 0 && !navCollapsed ? (
-            <SidebarPinSection
-              title="Quick Actions"
-              icon={Zap}
-              iconClass="text-yellow-400"
-              collapsed={navCollapsed}
-            >
-              <ul className="space-y-0.5">
-                {quickActions.slice(0, 4).map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <li key={action.id}>
-                      <Link
-                        href={action.href}
-                        prefetch={false}
-                        onClick={() => setMobileNavOpen(false)}
-                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-sidebar-muted transition hover:bg-sidebar-active/45 hover:text-sidebar-foreground"
-                      >
-                        <span
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-                          style={{ backgroundColor: `${action.color}22`, color: action.color }}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </span>
-                        <span>{action.label}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </SidebarPinSection>
-          ) : null}
-
-          {isAdminLayout && !query.trim() && recentEntries.length > 0 && !navCollapsed ? (
-            <SidebarPinSection
-              title="Recently Used"
+          {showSidebarWidgets && sidebarLayout.showRecentItems && recentEntries.length > 0 ? (
+            <CollapsibleSidebarWidget
+              title="Recent"
               icon={Clock}
               iconClass="text-sky-400"
-              collapsed={navCollapsed}
+              count={recentEntries.length}
+              expanded={sidebarLayout.recentExpanded}
+              onToggle={toggleRecentExpanded}
             >
               <ul className="space-y-0.5">
                 {recentEntries.map((entry, index) => {
@@ -536,13 +511,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                   );
                 })}
               </ul>
-            </SidebarPinSection>
-          ) : null}
-
-          {!navCollapsed && !query.trim() ? (
-            <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted/80">
-              Main Navigation
-            </p>
+            </CollapsibleSidebarWidget>
           ) : null}
 
           {renderGroups(filtered)}
@@ -564,7 +533,8 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           </div>
         ) : null}
 
-        <div className="hidden shrink-0 p-2 md:block">
+        <div className="hidden shrink-0 space-y-1 p-2 md:block">
+          {isAdminLayout ? <SidebarPersonalizationMenu collapsed={navCollapsed} /> : null}
           <button
             type="button"
             onClick={toggleSidebar}
@@ -589,27 +559,39 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   );
 }
 
-function SidebarPinSection({
+function CollapsibleSidebarWidget({
   title,
   icon: Icon,
   iconClass,
-  collapsed,
+  count,
+  expanded,
+  onToggle,
   children,
 }: {
   title: string;
   icon: typeof Star;
   iconClass?: string;
-  collapsed: boolean;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
   children: ReactNode;
 }) {
-  if (collapsed) return null;
   return (
     <div className="rounded-xl border border-sidebar-border/40 bg-sidebar-active/20 p-2">
-      <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted">
-        <Icon className={cn('h-3 w-3', iconClass)} />
-        {title}
-      </p>
-      {children}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-1.5 px-1 py-0.5 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted transition hover:text-sidebar-foreground"
+        aria-expanded={expanded}
+      >
+        <Icon className={cn('h-3 w-3 shrink-0', iconClass)} />
+        <span className="flex-1">{title}</span>
+        <span className="tabular-nums text-sidebar-muted/80">({count})</span>
+        <ChevronDown
+          className={cn('h-3 w-3 shrink-0 opacity-70 transition', expanded && 'rotate-180')}
+        />
+      </button>
+      {expanded ? <div className="mt-1.5">{children}</div> : null}
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function DashboardShell({
   if (role === 'admin') {
     return (
       <>
-        <EnterpriseTopbar title={title} portalRole={undefined} />
+        <EnterpriseTopbar title={title} portalRole="admin" />
         <LicenseAlertBanner />
         <LicenseWriteBlockedBanner />
         <motion.main

@@ -26,6 +26,7 @@ import { StudentProfileFeesTab } from '@/components/students-module/profile/stud
 import { StudentProfileAttendanceTab } from '@/components/students-module/profile/student-profile-attendance-tab';
 import { StudentProfileLibraryTab } from '@/components/library/student-profile-library-tab';
 import { StudentSubjectsTab } from '@/components/students-module/profile/student-subjects-tab';
+import { StudentRollShiftHistoryCard } from '@/components/students-module/profile/student-roll-shift-history-card';
 import { AdminStudentIdCardPanel } from '@/components/id-cards/admin-student-id-card-panel';
 import { buttonVariants } from '@/components/ui/button';
 import { uploadStudentPhoto } from '@/services/students';
@@ -87,6 +88,7 @@ function ProfileTabPanel({
         <div className="grid gap-3 xl:grid-cols-2">
           <BasicSection profile={profile} canEdit={canEdit} />
           <AcademicIdentitySection profile={profile} canEdit={canEdit} />
+          <StudentRollShiftHistoryCard studentId={profile.id} />
           <CategorySection profile={profile} canEdit={canEdit} />
           <AddressSection profile={profile} canEdit={canEdit} />
           <GuardiansSection profile={profile} canEdit={canEdit} />

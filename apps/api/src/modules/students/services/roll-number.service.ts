@@ -11,6 +11,7 @@ import {
   isTestOrDummyRecord,
   issueLabel,
 } from './roll-number-eligibility';
+import { RollShiftRangeService } from './roll-shift-range.service';
 
 export type RollNumberContext = {
   institutionId: string;
@@ -35,7 +36,10 @@ const ROLL_PATTERN = /^([A-Z]{2,4})(\d{2})-(\d+)$/;
 
 @Injectable()
 export class RollNumberService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rollShiftRange: RollShiftRangeService,
+  ) {}
 
   formatRollNumber(
     prefix: string,
@@ -162,12 +166,37 @@ export class RollNumberService {
 
   async allocateNextRollNumber(
     tenantId: string,
-    input: { streamId: string; admissionBatchId: string },
+    input: { streamId: string; admissionBatchId: string; shiftId?: string },
   ): Promise<RollNumberPreview> {
     const ctx = await this.resolveContext(tenantId, input);
     const settings = await this.getSettings(tenantId);
 
     return this.prisma.$transaction(async (tx) => {
+      if (input.shiftId) {
+        const shiftAllocated = await this.rollShiftRange.allocateInShiftRange(
+          tx,
+          tenantId,
+          {
+            institutionId: ctx.institutionId,
+            shiftId: input.shiftId,
+            admissionYear: ctx.admissionYear,
+            prefix: ctx.prefix,
+            yearSuffix: ctx.yearSuffix,
+            streamCode: ctx.streamCode,
+            settings,
+          },
+        );
+        if (shiftAllocated) {
+          await this.validateRollNumberUniqueTx(
+            tx,
+            tenantId,
+            ctx.institutionId,
+            shiftAllocated.rollNumber,
+          );
+          return shiftAllocated;
+        }
+      }
+
       const existing = await tx.rollNumberSequence.findUnique({
         where: {
           institutionId_prefix_admissionYear: {
@@ -613,16 +642,60 @@ export class RollNumberService {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
           });
-          const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
-          const baseSeq = await this.readNextSequence(
-            this.prisma,
-            tenantId,
-            ctx.institutionId,
-            ctx.prefix,
-            ctx.admissionYear,
-          );
-          const simulated = dryRunCounters.get(counterKey) ?? baseSeq;
-          dryRunCounters.set(counterKey, simulated + 1);
+          const institutionId =
+            profile.admissionBatch?.entrySession?.institutionId;
+          const shiftId = student.primaryShiftId ?? undefined;
+          let simulated: number;
+
+          if (shiftId && institutionId) {
+            const shiftRangesActive =
+              await this.rollShiftRange.hasActiveShiftRanges(
+                tenantId,
+                institutionId,
+                ctx.admissionYear,
+              );
+            if (shiftRangesActive && !shiftId) {
+              throw new BadRequestException(
+                'Primary shift required when shift roll ranges are configured',
+              );
+            }
+            const shiftConfig = await this.rollShiftRange.findShiftConfig(
+              this.prisma,
+              tenantId,
+              institutionId,
+              shiftId,
+              ctx.admissionYear,
+            );
+            if (shiftConfig) {
+              const counterKey = `shift:${institutionId}:${shiftId}:${ctx.admissionYear}`;
+              const baseSeq = shiftConfig.nextSequence;
+              simulated = dryRunCounters.get(counterKey) ?? baseSeq;
+              dryRunCounters.set(counterKey, simulated + 1);
+            } else {
+              const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
+              const baseSeq = await this.readNextSequence(
+                this.prisma,
+                tenantId,
+                ctx.institutionId,
+                ctx.prefix,
+                ctx.admissionYear,
+              );
+              simulated = dryRunCounters.get(counterKey) ?? baseSeq;
+              dryRunCounters.set(counterKey, simulated + 1);
+            }
+          } else {
+            const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
+            const baseSeq = await this.readNextSequence(
+              this.prisma,
+              tenantId,
+              ctx.institutionId,
+              ctx.prefix,
+              ctx.admissionYear,
+            );
+            simulated = dryRunCounters.get(counterKey) ?? baseSeq;
+            dryRunCounters.set(counterKey, simulated + 1);
+          }
+
           newRollNumber = this.formatRollNumber(
             ctx.prefix,
             ctx.yearSuffix,
@@ -743,6 +816,7 @@ export class RollNumberService {
           const allocated = await this.allocateNextRollNumber(tenantId, {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
+            shiftId: student?.primaryShiftId ?? undefined,
           });
           await this.assignRollNumber(
             tenantId,
