@@ -8,6 +8,7 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useStepUpAction } from '@/hooks/use-step-up-action';
 import {
   fetchBackupRun,
   triggerBackupRun,
@@ -30,6 +31,9 @@ const STEPS = [
 
 export function BackupManualPage() {
   useRequireAuth();
+  const { withStepUp, stepUpDialog } = useStepUpAction({
+    description: 'Re-enter your password to download backup files.',
+  });
   const [type, setType] = useState('DATABASE_DOCUMENTS');
   const [runId, setRunId] = useState<string | null>(null);
 
@@ -58,6 +62,7 @@ export function BackupManualPage() {
 
   return (
     <DashboardShell role="admin" title="Manual Backup">
+      {stepUpDialog}
       <AdminShell>
         <AdminPageHeader title="Manual Backup" subtitle="Run an on-demand instance backup" />
         <AdminGlassCard className="max-w-xl space-y-4 p-6">
@@ -115,10 +120,13 @@ export function BackupManualPage() {
                       size="sm"
                       variant="outline"
                       onClick={() =>
-                        downloadBackupArtifact(
-                          run.id,
-                          a.id,
-                          `${run.type.toLowerCase()}-${a.kind.toLowerCase()}.bin`,
+                        withStepUp((token) =>
+                          downloadBackupArtifact(
+                            run.id,
+                            a.id,
+                            `${run.type.toLowerCase()}-${a.kind.toLowerCase()}.bin`,
+                            token,
+                          ),
                         )
                       }
                     >

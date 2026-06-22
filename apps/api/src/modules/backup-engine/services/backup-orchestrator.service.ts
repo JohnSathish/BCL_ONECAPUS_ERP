@@ -191,35 +191,41 @@ export class BackupOrchestratorService {
       }
     }
 
+    const failedAfterLastSuccess =
+      latestFailed &&
+      (!latestSuccess?.completedAt ||
+        !latestFailed.completedAt ||
+        latestFailed.completedAt > latestSuccess.completedAt);
+    const activeFailure = failedAfterLastSuccess ? latestFailed : null;
+    const failedDiagnostic = activeFailure ? diagnoseRun(activeFailure) : null;
+
     const dbHealthy = readyHealth.status === 'ready';
     const storageHealthy =
       diskFreePct == null ? storageAvailableBytes != null : diskFreePct >= 10;
-    const backupHealthy = failedCount === 0 && totalBackups > 0;
+    const backupHealthy = !activeFailure && totalBackups > 0;
     const cloudHealthy = cloudTargets.every(
       (t) => !t.enabled || (!t.lastSyncError && t.lastSyncAt),
     );
 
-    const failedDiagnostic = latestFailed ? diagnoseRun(latestFailed) : null;
-
     return {
       totalBackups,
       latestBackup: latestSuccess ? serializeRun(latestSuccess) : null,
-      lastFailedBackup: latestFailed
+      lastFailedBackup: activeFailure
         ? {
-            ...serializeRun(latestFailed),
-            ...enrichRun(latestFailed),
+            ...serializeRun(activeFailure),
+            ...enrichRun(activeFailure),
           }
         : null,
-      diagnostics: latestFailed
+      diagnostics: activeFailure
         ? {
             lastSuccessfulAt: latestSuccess?.completedAt ?? null,
-            lastFailedAt: latestFailed.completedAt,
-            failureReason: latestFailed.errorMessage,
+            lastFailedAt: activeFailure.completedAt,
+            failureReason: activeFailure.errorMessage,
             failedComponent: failedDiagnostic
               ? failedComponentLabel(failedDiagnostic.failedComponent)
               : null,
             likelyCause: failedDiagnostic?.likelyCause ?? null,
-            runId: latestFailed.id,
+            runId: activeFailure.id,
           }
         : null,
       preflight,

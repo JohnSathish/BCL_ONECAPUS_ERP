@@ -198,9 +198,15 @@ export async function triggerTenantExport(tenantId: string) {
   return data;
 }
 
-export async function downloadBackupArtifact(runId: string, artifactId: string, filename: string) {
+export async function downloadBackupArtifact(
+  runId: string,
+  artifactId: string,
+  filename: string,
+  stepUpToken?: string,
+) {
   const { data } = await api.get(`/v1/admin/backups/runs/${runId}/download/${artifactId}`, {
     responseType: 'blob',
+    headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
   });
   const { downloadBlob } = await import('@/utils/download-blob');
   downloadBlob(data as Blob, filename);

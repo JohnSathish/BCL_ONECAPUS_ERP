@@ -155,7 +155,7 @@ export class BackupEngineController {
   }
 
   @Get('runs/:id/download/:artifactId')
-  @RequirePermissions('backup:download')
+  @RequireAnyPermission('backup:download', 'backup:manage')
   @RequireStepUp()
   async download(
     @CurrentUser() user: JwtUser,
@@ -163,7 +163,6 @@ export class BackupEngineController {
     @Param('artifactId') artifactId: string,
     @Req() req: Request,
   ): Promise<StreamableFile> {
-    requireSuperAdmin(user);
     const file = await this.orchestrator.downloadArtifact(id, artifactId);
     const ip = extractClientIp(req);
     await this.audit.log({

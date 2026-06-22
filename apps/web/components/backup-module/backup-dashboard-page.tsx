@@ -42,6 +42,7 @@ import {
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useStepUpAction } from '@/hooks/use-step-up-action';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
@@ -99,6 +100,9 @@ export function BackupDashboardPage() {
   const { branding } = useInstitutionBranding();
   const qc = useQueryClient();
   const [manualOpen, setManualOpen] = useState(false);
+  const { withStepUp, stepUpDialog } = useStepUpAction({
+    description: 'Re-enter your password to download this backup file.',
+  });
   const canDownload = canAny('backup:download', 'backup:manage');
   const canManage = canAny('backup:manage');
 
@@ -128,11 +132,8 @@ export function BackupDashboardPage() {
   const downloadLatest = () => {
     if (!latest?.artifacts?.length) return;
     const artifact = latest.artifacts[0];
-    downloadBackupArtifact(
-      latest.id,
-      artifact.id,
-      buildBackupDownloadName(institutionSlug, latest.completedAt, 'zip'),
-    );
+    const filename = buildBackupDownloadName(institutionSlug, latest.completedAt, 'zip');
+    withStepUp((token) => downloadBackupArtifact(latest.id, artifact.id, filename, token));
   };
 
   const cloudStatusLine = () => {
@@ -607,6 +608,7 @@ export function BackupDashboardPage() {
           onOpenChange={setManualOpen}
           cloudSync={d?.cloudSync ?? []}
         />
+        {stepUpDialog}
       </AdminShell>
     </DashboardShell>
   );
