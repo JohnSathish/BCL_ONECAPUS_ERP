@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { access, mkdir, stat, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { execFile } from 'child_process';
@@ -25,9 +25,15 @@ export type BackupHealthCheckResult = {
   checks: BackupHealthCheckItem[];
 };
 
+export type BackupHealthCheckContext = 'dashboard' | 'enqueue' | 'execute';
+
 @Injectable()
 export class BackupHealthService {
   private readonly logger = new Logger(BackupHealthService.name);
+
+  private workerRunsBackups() {
+    return process.env.PROCESS_BACKGROUND_JOBS === 'worker';
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,15 +42,22 @@ export class BackupHealthService {
     private readonly cloud: BackupCloudSyncService,
   ) {}
 
-  async runChecks(): Promise<BackupHealthCheckResult> {
-    const checks = await Promise.all([
-      this.checkPostgresql(),
-      this.checkPgDump(),
-      this.checkStoragePaths(),
-      this.checkDiskSpace(),
-      this.checkRepositoryWritable(),
-      this.checkCloudCredentials(),
-    ]);
+  async runChecks(
+    context: BackupHealthCheckContext = 'dashboard',
+  ): Promise<BackupHealthCheckResult> {
+    const workerMode = this.workerRunsBackups();
+    const enqueueOnly = context === 'enqueue' && workerMode;
+
+    const checks = enqueueOnly
+      ? await Promise.all([this.checkPostgresql()])
+      : await Promise.all([
+          this.checkPostgresql(),
+          this.checkPgDump(workerMode && context !== 'execute'),
+          this.checkStoragePaths(),
+          this.checkDiskSpace(),
+          this.checkRepositoryWritable(),
+          this.checkCloudCredentials(),
+        ]);
 
     const allPassed =
       checks.every(
@@ -59,14 +72,17 @@ export class BackupHealthService {
     };
   }
 
-  async assertReadyForBackup() {
-    const result = await this.runChecks();
+  /** Called before enqueueing a job (API) or executing a run (worker/API executor). */
+  async assertReadyForBackup(context: BackupHealthCheckContext = 'execute') {
+    const result = await this.runChecks(context);
     const failures = result.checks.filter((c) => c.status === 'fail');
     if (failures.length) {
       const summary = failures
         .map((f) => `${f.label}: ${f.message}`)
         .join('; ');
-      throw new Error(`Pre-backup health check failed — ${summary}`);
+      throw new BadRequestException(
+        `Pre-backup health check failed — ${summary}`,
+      );
     }
     return result;
   }
@@ -90,7 +106,17 @@ export class BackupHealthService {
     }
   }
 
-  private async checkPgDump(): Promise<BackupHealthCheckItem> {
+  private async checkPgDump(
+    deferToWorker = false,
+  ): Promise<BackupHealthCheckItem> {
+    if (deferToWorker) {
+      return {
+        id: 'pg_dump',
+        label: 'pg_dump availability',
+        status: 'skip',
+        message: 'Backup runs on worker container — verified at execution time',
+      };
+    }
     if (this.db.skipDump()) {
       return {
         id: 'pg_dump',

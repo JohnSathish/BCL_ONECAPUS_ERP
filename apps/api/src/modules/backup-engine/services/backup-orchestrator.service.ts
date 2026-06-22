@@ -324,7 +324,9 @@ export class BackupOrchestratorService {
       throw new BadRequestException('tenantId required for tenant export');
     }
 
-    await this.health.assertReadyForBackup();
+    await this.health.assertReadyForBackup(
+      process.env.PROCESS_BACKGROUND_JOBS === 'worker' ? 'enqueue' : 'execute',
+    );
 
     const run = await this.prisma.backupRun.create({
       data: {
