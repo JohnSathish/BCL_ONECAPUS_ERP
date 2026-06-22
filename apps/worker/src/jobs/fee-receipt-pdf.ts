@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import puppeteer from 'puppeteer';
+import { loadPrismaClientCtor } from '../lib/prisma-client';
 import {
   buildFeeReceiptHtml,
   buildFeeReceiptStorageKey,
@@ -12,25 +12,6 @@ import {
   resolveReceiptLines,
   resolveReceiptTemplateFormat,
 } from '../lib/fee-receipt.template';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const nodeRequire = createRequire(__filename);
-
-function loadPrismaClientCtor(): new () => Record<string, unknown> {
-  const moduleDir = join(__dirname);
-  const candidates = [
-    join(moduleDir, '../../node_modules/.prisma/client'),
-    join(moduleDir, '../../../api/node_modules/.prisma/client'),
-  ];
-  for (const candidate of candidates) {
-    try {
-      return nodeRequire(candidate).PrismaClient;
-    } catch {
-      // try next path
-    }
-  }
-  throw new Error('Prisma client not found. Run: npm run db:generate -w api');
-}
 
 function storageRoot() {
   return process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage');

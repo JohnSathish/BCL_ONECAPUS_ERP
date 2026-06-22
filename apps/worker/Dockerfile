@@ -58,7 +58,9 @@ COPY --from=builder /app/apps/worker/package.json ./package.json
 
 COPY --from=builder /app/node_modules ./node_modules
 
+# Generated client lives under apps/api after prisma generate.
 COPY --from=builder /app/apps/api/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/apps/api/node_modules/@prisma ./node_modules/@prisma
 
 USER worker
 
