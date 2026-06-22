@@ -13,6 +13,7 @@ import { IaAdmitEligibilityService } from './ia-admit-eligibility.service';
 import { IaAdmitPdfService } from './ia-admit-pdf.service';
 import { IaAuditService } from './ia-audit.service';
 import { IaDefaulterService } from './ia-defaulter.service';
+import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { IaSettingsService } from './ia-settings.service';
 import {
   renderIaAdmitCardHtml,
@@ -41,6 +42,7 @@ export class IaAdmitCardService {
     private readonly eligibility: IaAdmitEligibilityService,
     private readonly pdf: IaAdmitPdfService,
     private readonly audit: IaAuditService,
+    private readonly provisioning: IaExamProvisioningService,
   ) {}
 
   private db() {
@@ -145,6 +147,53 @@ export class IaAdmitCardService {
       if (m.maxMarks != null) return Number(m.maxMarks);
     }
     return 20;
+  }
+
+  private async papersForStudentFromRegistrations(
+    tenantId: string,
+    studentId: string,
+    semesterNo: number,
+    sessionPapers: PaperRow[],
+  ) {
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId,
+        status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        registration: { studentId, semesterSequence: semesterNo },
+      },
+      include: { offering: { select: { courseId: true } } },
+    });
+
+    const paperByOffering = new Map(
+      sessionPapers
+        .filter((p) => p.offeringId)
+        .map((p) => [p.offeringId as string, p]),
+    );
+    const paperByCourse = new Map(
+      sessionPapers
+        .filter((p) => p.courseId)
+        .map((p) => [p.courseId as string, p]),
+    );
+
+    const matched: PaperRow[] = [];
+    const seen = new Set<string>();
+    for (const line of lines) {
+      const paper =
+        paperByOffering.get(line.offeringId) ??
+        (line.offering.courseId
+          ? paperByCourse.get(line.offering.courseId)
+          : undefined);
+      if (paper && !seen.has(paper.id)) {
+        seen.add(paper.id);
+        matched.push(paper);
+      }
+    }
+
+    return matched.sort((a, b) => {
+      const dateCmp = a.examDate.getTime() - b.examDate.getTime();
+      if (dateCmp !== 0) return dateCmp;
+      return a.startTime.getTime() - b.startTime.getTime();
+    });
   }
 
   private async studentsForPaper(tenantId: string, paper: PaperRow) {
@@ -324,6 +373,10 @@ export class IaAdmitCardService {
     },
   ) {
     const session = await this.getSession(tenantId, sessionId);
+    await this.provisioning.syncSessionPapersFromRegistrations(
+      tenantId,
+      sessionId,
+    );
     const papers: PaperRow[] = await this.db().examPaperSchedule.findMany({
       where: { tenantId, sessionId, deletedAt: null },
       orderBy: [{ examDate: 'asc' }],
@@ -488,6 +541,10 @@ export class IaAdmitCardService {
     studentId: string,
   ) {
     const session = await this.getSession(tenantId, sessionId);
+    await this.provisioning.syncSessionPapersFromRegistrations(
+      tenantId,
+      sessionId,
+    );
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
       include: {
@@ -523,14 +580,24 @@ export class IaAdmitCardService {
       orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
     });
 
-    const studentPaperIds = new Set<string>();
-    for (const paper of papers) {
-      const roster = await this.studentsForPaper(tenantId, paper);
-      if (roster.some((s) => s.id === studentId)) {
-        studentPaperIds.add(paper.id);
+    let studentPapers: PaperRow[];
+    if (session.semesterNo != null) {
+      studentPapers = await this.papersForStudentFromRegistrations(
+        tenantId,
+        studentId,
+        session.semesterNo,
+        papers,
+      );
+    } else {
+      const studentPaperIds = new Set<string>();
+      for (const paper of papers) {
+        const roster = await this.studentsForPaper(tenantId, paper);
+        if (roster.some((s) => s.id === studentId)) {
+          studentPaperIds.add(paper.id);
+        }
       }
+      studentPapers = papers.filter((p) => studentPaperIds.has(p.id));
     }
-    const studentPapers = papers.filter((p) => studentPaperIds.has(p.id));
 
     const father = student.guardians.find((g) =>
       /father/i.test(g.guardianType),

@@ -158,33 +158,83 @@ export class IaExamProvisioningService {
     tenantId: string,
     semesterNos: number[],
     programVersionIds: string[],
+    scope?: { departmentIds?: string[]; streamId?: string },
   ) {
-    if (!programVersionIds.length) return [];
-
-    return this.prisma.courseOffering.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        programVersionId: { in: programVersionIds },
-        semesterSequence: { in: semesterNos },
-      },
-      include: {
-        course: { select: { id: true, code: true, title: true } },
-        programVersion: {
-          select: {
-            id: true,
-            program: {
-              select: { id: true, name: true, code: true, departmentId: true },
-            },
+    const offeringInclude = {
+      course: { select: { id: true, code: true, title: true } },
+      programVersion: {
+        select: {
+          id: true,
+          program: {
+            select: { id: true, name: true, code: true, departmentId: true },
           },
         },
       },
+    } as const;
+
+    const programOfferings = programVersionIds.length
+      ? await this.prisma.courseOffering.findMany({
+          where: {
+            tenantId,
+            deletedAt: null,
+            programVersionId: { in: programVersionIds },
+            semesterSequence: { in: semesterNos },
+          },
+          include: offeringInclude,
+          orderBy: [
+            { semesterSequence: 'asc' },
+            { category: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        })
+      : [];
+
+    const registeredLines = await this.prisma.semesterRegistrationLine.findMany(
+      {
+        where: {
+          tenantId,
+          status: { in: [...REGISTRATION_STATUSES] },
+          registration: {
+            semesterSequence: { in: semesterNos },
+            student: {
+              deletedAt: null,
+              ...(scope?.departmentIds?.length
+                ? { departmentId: { in: scope.departmentIds } }
+                : {}),
+              ...(scope?.streamId
+                ? { academicProfile: { streamId: scope.streamId } }
+                : {}),
+            },
+          },
+        },
+        select: { offeringId: true },
+        distinct: ['offeringId'],
+      },
+    );
+
+    const knownIds = new Set(programOfferings.map((o) => o.id));
+    const extraIds = registeredLines
+      .map((l) => l.offeringId)
+      .filter((id) => !knownIds.has(id));
+
+    if (!extraIds.length) return programOfferings;
+
+    const extraOfferings = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        id: { in: extraIds },
+        semesterSequence: { in: semesterNos },
+      },
+      include: offeringInclude,
       orderBy: [
         { semesterSequence: 'asc' },
         { category: 'asc' },
         { createdAt: 'asc' },
       ],
     });
+
+    return [...programOfferings, ...extraOfferings];
   }
 
   private async countStudentsForOffering(
@@ -293,6 +343,7 @@ export class IaExamProvisioningService {
       user.tid,
       input.semesterNos,
       programVersionIds,
+      { departmentIds: input.departmentIds, streamId: input.streamId },
     );
 
     let streamName = 'All Streams';
@@ -383,6 +434,7 @@ export class IaExamProvisioningService {
       user.tid,
       input.semesterNos,
       programVersionIds,
+      { departmentIds: input.departmentIds, streamId: input.streamId },
     );
 
     const examDate = input.startDate ? new Date(input.startDate) : new Date();
@@ -691,5 +743,167 @@ export class IaExamProvisioningService {
     );
 
     return { updated: papers.length };
+  }
+
+  /**
+   * Ensure every offering with registered students in the exam semester has a
+   * scheduled paper. Fills gaps when registrations were added after exam creation.
+   */
+  async syncSessionPapersFromRegistrations(
+    tenantId: string,
+    sessionId: string,
+  ) {
+    const session = await (this.prisma as any).examSession.findFirst({
+      where: { id: sessionId, tenantId, deletedAt: null },
+    });
+    if (!session?.semesterNo) return { added: 0 };
+
+    const meta = (session.metadata ?? {}) as Record<string, unknown>;
+    const departmentIds = meta.departmentIds as string[] | undefined;
+    const streamId = meta.streamId as string | undefined;
+    const maxMarks = (meta.maxMarks as number | undefined) ?? 20;
+    const passMark = Math.ceil(maxMarks * 0.4);
+    const semesterNo = session.semesterNo as number;
+    const examDate = session.startDate
+      ? new Date(session.startDate)
+      : new Date();
+
+    const existingPapers = await (
+      this.prisma as any
+    ).examPaperSchedule.findMany({
+      where: { tenantId, sessionId, deletedAt: null },
+      select: { offeringId: true },
+    });
+    const existingOfferingIds = new Set(
+      existingPapers
+        .map((p: { offeringId: string | null }) => p.offeringId)
+        .filter(Boolean),
+    );
+
+    const registeredLines = await this.prisma.semesterRegistrationLine.findMany(
+      {
+        where: {
+          tenantId,
+          status: { in: [...REGISTRATION_STATUSES] },
+          registration: {
+            semesterSequence: semesterNo,
+            student: {
+              deletedAt: null,
+              ...(departmentIds?.length
+                ? { departmentId: { in: departmentIds } }
+                : {}),
+              ...(streamId ? { academicProfile: { streamId } } : {}),
+            },
+          },
+        },
+        select: { offeringId: true },
+        distinct: ['offeringId'],
+      },
+    );
+
+    const missingIds = registeredLines
+      .map((l) => l.offeringId)
+      .filter((id) => !existingOfferingIds.has(id));
+    if (!missingIds.length) return { added: 0 };
+
+    const offerings = await this.prisma.courseOffering.findMany({
+      where: { tenantId, deletedAt: null, id: { in: missingIds } },
+      include: {
+        course: { select: { id: true, code: true, title: true } },
+        programVersion: {
+          select: {
+            program: { select: { id: true, code: true, departmentId: true } },
+          },
+        },
+      },
+    });
+
+    let added = 0;
+    for (const offering of offerings) {
+      const studentCount = await this.countStudentsForOffering(
+        tenantId,
+        offering.id,
+        semesterNo,
+        departmentIds,
+        streamId,
+      );
+      if (studentCount === 0) continue;
+
+      const departmentId =
+        departmentIds?.length === 1
+          ? departmentIds[0]
+          : (offering.programVersion?.program?.departmentId ?? null);
+
+      const scheme = await (this.prisma as any).iaAssessmentScheme.create({
+        data: {
+          tenantId,
+          name: `${session.name} — ${offering.course?.title ?? offering.course?.code}`,
+          academicYearId: session.academicYearId,
+          departmentId,
+          programmeId: offering.programVersion?.program?.id,
+          courseId: offering.courseId,
+          offeringId: offering.id,
+          semesterNo,
+          totalMaxMarks: maxMarks,
+          passMark,
+          status: 'ACTIVE',
+          components: {
+            create: [
+              {
+                tenantId,
+                code: session.examType,
+                label: session.name,
+                maxMarks,
+                isMandatory: true,
+                sortOrder: 1,
+              },
+            ],
+          },
+        },
+      });
+
+      await (this.prisma as any).examPaperSchedule.create({
+        data: {
+          tenantId,
+          sessionId,
+          paperCode: (offering.course?.code ?? 'SUB').trim().toUpperCase(),
+          paperName:
+            offering.course?.title ?? offering.course?.code ?? 'Subject',
+          examDate,
+          startTime: this.timeDate('10:00'),
+          endTime: this.timeDate('12:00'),
+          courseId: offering.courseId,
+          offeringId: offering.id,
+          semesterNo,
+          expectedCount: studentCount,
+          metadata: {
+            module: 'ia',
+            schemeId: scheme.id,
+            category: offering.category,
+            maxMarks,
+            programmeCode: offering.programVersion?.program?.code,
+            syncedFromRegistrations: true,
+          },
+        },
+      });
+      added += 1;
+    }
+
+    if (added > 0) {
+      const paperCount = await (this.prisma as any).examPaperSchedule.count({
+        where: { tenantId, sessionId, deletedAt: null },
+      });
+      await (this.prisma as any).examSession.update({
+        where: { id: sessionId },
+        data: {
+          metadata: {
+            ...meta,
+            subjectsLoaded: paperCount,
+          },
+        },
+      });
+    }
+
+    return { added };
   }
 }
