@@ -83,10 +83,12 @@ export class BackupFilesService {
     const sources: Array<{ parent: string; name: string }> = [];
     for (const root of [this.uploadRoot(), this.storageRoot()]) {
       await mkdir(root, { recursive: true });
+      const parent = dirname(root);
+      await mkdir(parent, { recursive: true });
       try {
         const info = await stat(root);
         if (info.isDirectory()) {
-          sources.push({ parent: dirname(root), name: basename(root) });
+          sources.push({ parent, name: basename(root) });
         }
       } catch {
         // skip unreadable paths
@@ -106,6 +108,9 @@ export class BackupFilesService {
     if (!sources.length) {
       await writeFile(tarPath, '');
     } else {
+      for (const { parent } of sources) {
+        await mkdir(parent, { recursive: true });
+      }
       await execFileAsync('tar', [
         '-cf',
         tarPath,

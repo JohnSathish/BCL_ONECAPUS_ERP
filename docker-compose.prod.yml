@@ -29,6 +29,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
+      BACKUP_ROOT: /data/backups
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
       AWS_REGION: ${AWS_REGION:-}
@@ -40,6 +41,10 @@ services:
       R2_BUCKET: ${R2_BUCKET:-}
       # "worker" = HTTP-only API; background jobs run in the worker container.
       PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-worker}
+    volumes:
+      - nep_uploads:/data/uploads
+      - nep_storage:/data/storage
+      - nep_backups:/data/backups
 
   web:
     restart: unless-stopped
@@ -64,7 +69,12 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN}
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
+      BACKUP_ROOT: /data/backups
       PROCESS_BACKGROUND_JOBS: worker
+    volumes:
+      - nep_uploads:/data/uploads
+      - nep_storage:/data/storage
+      - nep_backups:/data/backups
 
   redis:
     restart: unless-stopped
@@ -83,3 +93,8 @@ services:
         condition: service_healthy
       web:
         condition: service_started
+
+volumes:
+  nep_uploads: {}
+  nep_storage: {}
+  nep_backups: {}

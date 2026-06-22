@@ -24,6 +24,7 @@ async function archiveInstanceFiles(outputPath: string, uploadRoot: string, stor
 
   for (const root of [uploadRoot, storageRoot]) {
     await mkdir(root, { recursive: true });
+    await mkdir(dirname(root), { recursive: true });
     try {
       const info = await stat(root);
       if (info.isDirectory()) {
@@ -37,6 +38,9 @@ async function archiveInstanceFiles(outputPath: string, uploadRoot: string, stor
   if (!sources.length) {
     await writeFile(tarPath, '');
   } else {
+    for (const { parent } of sources) {
+      await mkdir(parent, { recursive: true });
+    }
     await execFileAsync('tar', [
       '-cf',
       tarPath,
