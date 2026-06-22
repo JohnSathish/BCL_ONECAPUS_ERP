@@ -377,6 +377,15 @@ export async function downloadIaAdmitPdf(sessionId: string, studentIds: string[]
   return data as Blob;
 }
 
+export async function fetchIaAdmitPrintHtml(sessionId: string, studentIds: string[]) {
+  const { data } = await api.post<string>(
+    '/v1/examinations/ia/admit-cards/export/html',
+    { sessionId, studentIds },
+    { responseType: 'text' },
+  );
+  return data;
+}
+
 export async function downloadIaAdmitZip(sessionId: string, studentIds: string[]) {
   const { data } = await api.post(
     '/v1/examinations/ia/admit-cards/export/zip',

@@ -842,16 +842,18 @@ export class IaAdmitCardService {
     }));
   }
 
-  async exportPdf(
+  private async buildExportTemplates(
     tenantId: string,
     sessionId: string,
     studentIds: string[],
     user?: JwtUser,
-  ) {
+    audit?: 'download' | 'print',
+  ): Promise<IaAdmitCardTemplateInput[]> {
     if (!studentIds.length) {
       throw new BadRequestException('No students selected');
     }
     const templates: IaAdmitCardTemplateInput[] = [];
+    const session = await this.getSession(tenantId, sessionId);
     for (const studentId of studentIds) {
       const card = await this.generateCard(
         tenantId,
@@ -862,10 +864,7 @@ export class IaAdmitCardService {
       if (card.blocked || !('admitCardNumber' in card)) continue;
       const [institution, academicYear] = await Promise.all([
         this.institutionContext(tenantId),
-        this.academicYearLabel(
-          tenantId,
-          (await this.getSession(tenantId, sessionId)).academicYearId,
-        ),
+        this.academicYearLabel(tenantId, session.academicYearId),
       ]);
       templates.push(
         this.buildTemplateInput(
@@ -877,13 +876,50 @@ export class IaAdmitCardService {
           card.verifyCode,
         ),
       );
-      if ('issueId' in card && card.issueId && user) {
-        await this.recordDownload(user, card.issueId);
+      if ('issueId' in card && card.issueId && user && audit) {
+        if (audit === 'download') {
+          await this.recordDownload(user, card.issueId);
+        } else {
+          await this.recordPrint(user, card.issueId);
+        }
       }
     }
     if (!templates.length) {
       throw new BadRequestException('No eligible admit cards to export');
     }
+    return templates;
+  }
+
+  async exportHtml(
+    tenantId: string,
+    sessionId: string,
+    studentIds: string[],
+    user?: JwtUser,
+  ) {
+    const templates = await this.buildExportTemplates(
+      tenantId,
+      sessionId,
+      studentIds,
+      user,
+      'print',
+    );
+    const html = this.pdf.renderDocumentHtml(templates);
+    return { html, count: templates.length };
+  }
+
+  async exportPdf(
+    tenantId: string,
+    sessionId: string,
+    studentIds: string[],
+    user?: JwtUser,
+  ) {
+    const templates = await this.buildExportTemplates(
+      tenantId,
+      sessionId,
+      studentIds,
+      user,
+      'download',
+    );
     const buffer =
       templates.length === 1
         ? await this.pdf.renderCardPdf(templates[0])

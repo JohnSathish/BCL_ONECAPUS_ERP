@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -20,9 +20,11 @@ import {
   downloadIaAdmitZip,
   fetchIaAdmitCard,
   fetchIaAdmitDashboard,
+  fetchIaAdmitPrintHtml,
   fetchIaAdmitSessions,
   fetchIaAdmitStudents,
 } from '@/services/examinations-ia';
+import { printHtmlDocument } from '@/lib/print-html-document';
 import { IaAdmitCardPrint, type IaAdmitCardData } from './ia-admit-card-print';
 
 type StudentRow = {
@@ -52,14 +54,12 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function IaAdmitCardsWorkspace() {
-  const printRef = useRef<HTMLDivElement>(null);
   const [sessionId, setSessionId] = useState('');
   const [programmeFilter, setProgrammeFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewCard, setPreviewCard] = useState<IaAdmitCardData | null>(null);
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
-  const [printCards, setPrintCards] = useState<IaAdmitCardData[]>([]);
   const [showIneligible, setShowIneligible] = useState(false);
 
   const sessions = useQuery({ queryKey: ['ia', 'admit-sessions'], queryFn: fetchIaAdmitSessions });
@@ -125,33 +125,26 @@ export function IaAdmitCardsWorkspace() {
     },
   });
 
-  const triggerPrint = (cards: IaAdmitCardData[]) => {
-    setPrintCards(cards);
-    document.body.classList.add('ia-admit-printing');
-
-    const cleanup = () => {
-      document.body.classList.remove('ia-admit-printing');
-      setPrintCards([]);
-    };
-
-    const onAfterPrint = () => {
-      window.removeEventListener('afterprint', onAfterPrint);
-      cleanup();
-    };
-    window.addEventListener('afterprint', onAfterPrint);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTimeout(() => window.print(), 250);
-      });
-    });
-  };
+  const admitPrint = useMutation({
+    mutationFn: async (studentIds: string[]) => {
+      const html = await fetchIaAdmitPrintHtml(activeSession, studentIds);
+      await printHtmlDocument(html);
+    },
+    onSuccess: () => {
+      roster.refetch();
+      dashboard.refetch();
+    },
+  });
 
   const bulkPrint = useMutation({
-    mutationFn: (ids: string[]) => bulkGenerateIaAdmitCards(activeSession, ids),
-    onSuccess: (data) => {
-      const cards = (data.cards ?? []).filter((c: IaAdmitCardData) => !c.blocked);
-      triggerPrint(cards);
+    mutationFn: async (ids: string[]) => {
+      await bulkGenerateIaAdmitCards(activeSession, ids);
+      const html = await fetchIaAdmitPrintHtml(activeSession, ids);
+      await printHtmlDocument(html);
+    },
+    onSuccess: () => {
+      roster.refetch();
+      dashboard.refetch();
     },
   });
 
@@ -436,7 +429,7 @@ export function IaAdmitCardsWorkspace() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border/60 bg-card p-4 print:hidden lg:sticky lg:top-4 lg:self-start">
+        <section className="ia-admit-preview-only rounded-2xl border border-border/60 bg-card p-4 lg:sticky lg:top-4 lg:self-start">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Admit Card Preview</h3>
             {previewCard && !previewCard.blocked ? (
@@ -450,8 +443,17 @@ export function IaAdmitCardsWorkspace() {
                   <Download className="mr-1 h-3 w-3" />
                   Download PDF
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => triggerPrint([previewCard])}>
-                  <Printer className="mr-1 h-3 w-3" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => previewStudentId && admitPrint.mutate([previewStudentId])}
+                  disabled={admitPrint.isPending || !previewStudentId}
+                >
+                  {admitPrint.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Printer className="mr-1 h-3 w-3" />
+                  )}
                   Print
                 </Button>
               </div>
@@ -467,8 +469,8 @@ export function IaAdmitCardsWorkspace() {
               <div className="mx-auto max-w-[210mm] bg-white shadow-sm">
                 <IaAdmitCardPrint card={previewCard} />
               </div>
-              <p className="mt-2 text-center text-[10px] text-muted-foreground no-print">
-                Preview is A4 width. Use Print or Download PDF for production output.
+              <p className="mt-2 text-center text-[10px] text-muted-foreground">
+                Preview is approximate. Print and Download PDF use the same server layout (A4).
               </p>
             </div>
           ) : (
@@ -477,17 +479,6 @@ export function IaAdmitCardsWorkspace() {
             </p>
           )}
         </section>
-      </div>
-
-      <div
-        id="ia-admit-print-area"
-        ref={printRef}
-        className="pointer-events-none fixed -left-[100vw] top-0 z-[-1] opacity-0"
-        aria-hidden={printCards.length === 0}
-      >
-        {printCards.map((card, i) => (
-          <IaAdmitCardPrint key={card.admitCardNumber ?? i} card={card} />
-        ))}
       </div>
     </div>
   );

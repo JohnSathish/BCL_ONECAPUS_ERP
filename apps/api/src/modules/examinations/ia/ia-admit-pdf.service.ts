@@ -3,6 +3,7 @@ import puppeteer from 'puppeteer';
 import { resolvePdfImageSrc } from '../../../common/uploads/pdf-asset.util';
 import {
   renderIaAdmitCardHtml,
+  renderIaAdmitCardsDocumentHtml,
   type IaAdmitCardTemplateInput,
 } from './templates/ia-admit-card.template';
 
@@ -48,15 +49,17 @@ export class IaAdmitPdfService {
     }
   }
 
+  renderDocumentHtml(cards: IaAdmitCardTemplateInput[]) {
+    const prepared = cards.map((c) => embedAdmitCardImages(c));
+    return renderIaAdmitCardsDocumentHtml(prepared);
+  }
+
   async renderCardPdf(card: IaAdmitCardTemplateInput) {
     const html = renderIaAdmitCardHtml(embedAdmitCardImages(card));
     return this.htmlToPdf(html);
   }
 
   async renderBatchPdf(cards: IaAdmitCardTemplateInput[]) {
-    const combined = cards
-      .map((c) => renderIaAdmitCardHtml(embedAdmitCardImages(c)))
-      .join('');
-    return this.htmlToPdf(combined);
+    return this.htmlToPdf(this.renderDocumentHtml(cards));
   }
 }

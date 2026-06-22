@@ -405,6 +405,23 @@ export class IaController {
     res.send(buffer);
   }
 
+  @Post('admit-cards/export/html')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'ia:view')
+  async exportAdmitHtml(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { sessionId: string; studentIds: string[] },
+    @Res() res: Response,
+  ) {
+    const { html } = await this.admitCards.exportHtml(
+      user.tid,
+      body.sessionId,
+      body.studentIds,
+      user,
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
   @Post('admit-cards/export/zip')
   @RequireAnyPermission('ia:manage', 'exam:admin')
   async exportAdmitZip(

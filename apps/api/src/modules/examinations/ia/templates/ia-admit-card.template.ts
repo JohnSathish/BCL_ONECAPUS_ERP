@@ -64,13 +64,35 @@ function fmtDate(value?: string | null) {
 function fmtTime(value?: string | null) {
   if (!value) return '—';
   const s = String(value);
-  if (/^\d{2}:\d{2}/.test(s)) {
-    const [h, m] = s.slice(0, 5).split(':').map(Number);
+  const plainTime = s.match(/^(\d{1,2}):(\d{2})/);
+  if (plainTime && !/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const h = Number(plainTime[1]);
+    const m = Number(plainTime[2]);
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hr = h % 12 || 12;
     return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
   }
-  return s.slice(11, 16);
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const h = d.getUTCHours();
+    const m = d.getUTCMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hr = h % 12 || 12;
+    return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
+  }
+  return '—';
+}
+
+function qrImg(card: IaAdmitCardTemplateInput) {
+  const src =
+    card.qrDataUrl ??
+    (card.verifyUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(card.verifyUrl)}`
+      : null);
+  if (src) {
+    return `<img src="${esc(src)}" alt="QR" width="72" height="72" />`;
+  }
+  return `<div>Verify: ${esc(card.verifyCode)}</div>`;
 }
 
 const DEFAULT_INSTRUCTIONS = [
@@ -81,7 +103,203 @@ const DEFAULT_INSTRUCTIONS = [
   'Malpractice will lead to cancellation of examination.',
 ];
 
-export function renderIaAdmitCardHtml(card: IaAdmitCardTemplateInput) {
+const IA_ADMIT_CARD_STYLES = `
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #0f172a;
+    font-size: 11px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page {
+    position: relative;
+    width: 100%;
+    max-width: 190mm;
+    margin: 0 auto;
+    padding: 8mm;
+    border: 2px solid #1e3a8a;
+    background: #fff;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .page + .page {
+    page-break-before: always;
+    break-before: page;
+  }
+  .watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 72px;
+    font-weight: 700;
+    color: rgba(30, 58, 138, 0.04);
+    transform: rotate(-28deg);
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  .content { position: relative; z-index: 1; }
+  .header {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    border-bottom: 2px solid #1e3a8a;
+    padding-bottom: 10px;
+  }
+  .logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+    flex-shrink: 0;
+  }
+  .header-main { flex: 1; text-align: center; min-width: 0; }
+  .header-main h1 {
+    margin: 0;
+    font-size: 18px;
+    color: #1e3a8a;
+    text-transform: uppercase;
+  }
+  .header-main p { margin: 2px 0; color: #475569; font-size: 10px; }
+  .badge {
+    background: #1e3a8a;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+  .exam-bar {
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  .exam-bar strong { color: #1e3a8a; font-size: 12px; }
+  .verify-block { text-align: right; font-size: 9px; flex-shrink: 0; }
+  .verify-block img { width: 72px; height: 72px; display: block; margin-left: auto; }
+  .student-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    gap: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+  }
+  .field label {
+    display: block;
+    font-size: 8px;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 0.04em;
+  }
+  .field span { font-weight: 600; font-size: 11px; }
+  .photo-box {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 6px;
+    text-align: center;
+    background: #f8fafc;
+  }
+  .photo-box img {
+    width: 96px;
+    height: 112px;
+    object-fit: cover;
+    border: 1px solid #94a3b8;
+    background: #e2e8f0;
+    display: block;
+    margin: 0 auto;
+  }
+  .sig-line {
+    margin-top: 8px;
+    border-top: 1px solid #64748b;
+    padding-top: 4px;
+    font-size: 9px;
+    font-style: italic;
+  }
+  table.papers {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  table.papers th, table.papers td {
+    border: 1px solid #cbd5e1;
+    padding: 5px 6px;
+    text-align: left;
+  }
+  table.papers th {
+    background: #1e3a8a;
+    color: #fff;
+    font-size: 9px;
+    text-transform: uppercase;
+  }
+  table.papers tr:nth-child(even) td { background: #f8fafc; }
+  .footer {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: 1fr 160px;
+    gap: 12px;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .footer ol { margin: 4px 0 0 16px; padding: 0; }
+  .footer li { margin-bottom: 3px; color: #334155; }
+  .auth { text-align: center; }
+  .auth .line {
+    margin-top: 36px;
+    border-top: 1px solid #334155;
+    padding-top: 4px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .disclaimer {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 8px;
+    color: #64748b;
+  }
+  .card-no {
+    font-family: monospace;
+    font-size: 10px;
+    color: #1e3a8a;
+    font-weight: 700;
+  }
+`;
+
+export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
   const inst = card.institution;
   const wm = esc(card.watermark ?? 'INTERNAL ASSESSMENT');
   const paperRows = card.papers
@@ -103,181 +321,7 @@ export function renderIaAdmitCardHtml(card: IaAdmitCardTemplateInput) {
     ? card.session.instructions.split(/\n+/).filter(Boolean)
     : DEFAULT_INSTRUCTIONS;
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>IA Admit Card — ${esc(card.student.rollNumber)}</title>
-  <style>
-    @page { size: A4 portrait; margin: 12mm; }
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      color: #0f172a;
-      margin: 0;
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    .page {
-      position: relative;
-      min-height: 260mm;
-      padding: 8mm;
-      border: 2px solid #1e3a8a;
-      background: #fff;
-    }
-    .watermark {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 72px;
-      font-weight: 700;
-      color: rgba(30, 58, 138, 0.04);
-      transform: rotate(-28deg);
-      pointer-events: none;
-      user-select: none;
-      z-index: 0;
-    }
-    .content { position: relative; z-index: 1; }
-    .header {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      border-bottom: 2px solid #1e3a8a;
-      padding-bottom: 10px;
-    }
-    .logo {
-      width: 64px;
-      height: 64px;
-      object-fit: contain;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      background: #f8fafc;
-    }
-    .header-main { flex: 1; text-align: center; }
-    .header-main h1 {
-      margin: 0;
-      font-size: 18px;
-      color: #1e3a8a;
-      text-transform: uppercase;
-    }
-    .header-main p { margin: 2px 0; color: #475569; font-size: 10px; }
-    .badge {
-      background: #1e3a8a;
-      color: #fff;
-      padding: 8px 10px;
-      border-radius: 6px;
-      font-size: 9px;
-      font-weight: 700;
-      text-align: center;
-      line-height: 1.3;
-      min-width: 110px;
-    }
-    .exam-bar {
-      margin-top: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      padding: 8px 10px;
-      border-radius: 6px;
-    }
-    .exam-bar strong { color: #1e3a8a; font-size: 12px; }
-    .verify-block { text-align: right; font-size: 9px; }
-    .verify-block img { width: 72px; height: 72px; }
-    .student-grid {
-      margin-top: 10px;
-      display: grid;
-      grid-template-columns: 1fr 120px;
-      gap: 10px;
-    }
-    .fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px 12px;
-    }
-    .field label {
-      display: block;
-      font-size: 8px;
-      text-transform: uppercase;
-      color: #64748b;
-      letter-spacing: 0.04em;
-    }
-    .field span { font-weight: 600; font-size: 11px; }
-    .photo-box {
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 6px;
-      text-align: center;
-      background: #f8fafc;
-    }
-    .photo-box img {
-      width: 96px;
-      height: 112px;
-      object-fit: cover;
-      border: 1px solid #94a3b8;
-      background: #e2e8f0;
-    }
-    .sig-line {
-      margin-top: 8px;
-      border-top: 1px solid #64748b;
-      padding-top: 4px;
-      font-size: 9px;
-      font-style: italic;
-    }
-    table.papers {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 10px;
-    }
-    table.papers th, table.papers td {
-      border: 1px solid #cbd5e1;
-      padding: 5px 6px;
-      text-align: left;
-    }
-    table.papers th {
-      background: #1e3a8a;
-      color: #fff;
-      font-size: 9px;
-      text-transform: uppercase;
-    }
-    table.papers tr:nth-child(even) td { background: #f8fafc; }
-    .footer {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: 1fr 160px;
-      gap: 12px;
-      border-top: 1px solid #cbd5e1;
-      padding-top: 10px;
-    }
-    .footer ol { margin: 4px 0 0 16px; padding: 0; }
-    .footer li { margin-bottom: 3px; color: #334155; }
-    .auth { text-align: center; }
-    .auth .line {
-      margin-top: 36px;
-      border-top: 1px solid #334155;
-      padding-top: 4px;
-      font-size: 9px;
-      font-weight: 600;
-    }
-    .disclaimer {
-      margin-top: 8px;
-      text-align: center;
-      font-size: 8px;
-      color: #64748b;
-    }
-    .card-no {
-      font-family: monospace;
-      font-size: 10px;
-      color: #1e3a8a;
-      font-weight: 700;
-    }
-  </style>
-</head>
-<body>
+  return `
   <div class="page">
     <div class="watermark">${wm}</div>
     <div class="content">
@@ -300,7 +344,7 @@ export function renderIaAdmitCardHtml(card: IaAdmitCardTemplateInput) {
         </div>
         <div class="verify-block">
           <div class="card-no">${esc(card.admitCardNumber)}</div>
-          ${card.qrDataUrl ? `<img src="${card.qrDataUrl}" alt="QR" />` : `<div>Verify: ${esc(card.verifyCode)}</div>`}
+          ${qrImg(card)}
         </div>
       </div>
 
@@ -353,19 +397,33 @@ export function renderIaAdmitCardHtml(card: IaAdmitCardTemplateInput) {
       </div>
       <p class="disclaimer">Note: This is a computer generated admit card. QR verification available at ${esc(card.verifyUrl ?? 'college portal')}.</p>
     </div>
-  </div>
+  </div>`;
+}
+
+export function renderIaAdmitCardsDocumentHtml(
+  cards: IaAdmitCardTemplateInput[],
+) {
+  const titleRoll = esc(cards[0]?.student.rollNumber ?? 'batch');
+  const pages = cards.map((c) => renderIaAdmitCardPage(c)).join('\n');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>IA Admit Card — ${titleRoll}</title>
+  <style>${IA_ADMIT_CARD_STYLES}</style>
+</head>
+<body>
+${pages}
 </body>
 </html>`;
 }
 
+/** Single-card document — used by PDF renderer and browser print. */
+export function renderIaAdmitCardHtml(card: IaAdmitCardTemplateInput) {
+  return renderIaAdmitCardsDocumentHtml([card]);
+}
+
+/** @deprecated Use renderIaAdmitCardsDocumentHtml */
 export function renderIaAdmitCardsBatchHtml(cards: IaAdmitCardTemplateInput[]) {
-  return cards
-    .map((c) =>
-      renderIaAdmitCardHtml(c)
-        .replace('<!DOCTYPE html>', '')
-        .replace(/<\/?html[^>]*>/g, '')
-        .replace(/<\/?head>[\s\S]*?<\/head>/, '')
-        .replace(/<\/?body[^>]*>/g, ''),
-    )
-    .join('<div style="page-break-after:always"></div>');
+  return renderIaAdmitCardsDocumentHtml(cards);
 }
