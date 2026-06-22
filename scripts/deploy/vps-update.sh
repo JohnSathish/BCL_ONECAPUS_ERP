@@ -29,8 +29,8 @@ fi
 echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
-echo "Rebuilding web + api (required after frontend/auth fixes)…"
-"${COMPOSE[@]}" build --no-cache web api
+echo "Rebuilding web + api + worker…"
+"${COMPOSE[@]}" build --no-cache web api worker
 
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis
@@ -44,9 +44,11 @@ echo "Starting API and waiting until healthy…"
 echo "Starting web, worker, nginx…"
 "${COMPOSE[@]}" up -d web worker nginx
 
-echo "Fixing upload volume permissions…"
+echo "Fixing data volume permissions…"
 "${COMPOSE[@]}" exec -u root api \
   chown -R nestjs:nodejs /data/uploads /data/storage /data/backups 2>/dev/null || true
+"${COMPOSE[@]}" exec -u root worker \
+  chown -R worker:nodejs /data/uploads /data/storage /data/backups 2>/dev/null || true
 
 echo
 "${COMPOSE[@]}" ps

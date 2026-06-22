@@ -360,6 +360,36 @@ export class BackupOrchestratorService {
     return serializeRun(run);
   }
 
+  /** Re-enqueue backup runs stuck in QUEUED (e.g. after API consumed jobs in worker mode). */
+  async reconcileQueuedRuns() {
+    const staleBefore = new Date(Date.now() - 30_000);
+    const stuck = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'QUEUED',
+        createdAt: { lt: staleBefore },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+    });
+
+    const runs = [];
+    for (const run of stuck) {
+      const job = await this.queue.enqueueBackupRun({
+        runId: run.id,
+        type: run.type,
+        scope: run.scope,
+        tenantId: run.tenantId ?? undefined,
+      });
+      await this.prisma.backupRun.update({
+        where: { id: run.id },
+        data: { jobId: String(job.id), errorMessage: null },
+      });
+      runs.push({ runId: run.id, jobId: String(job.id) });
+    }
+
+    return { requeued: runs.length, runs };
+  }
+
   async listRuns(query: { page?: number; limit?: number; status?: string }) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);

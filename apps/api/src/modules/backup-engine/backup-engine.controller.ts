@@ -115,6 +115,12 @@ export class BackupEngineController {
     });
   }
 
+  @Post('reconcile-queue')
+  @RequirePermissions('backup:manage')
+  reconcileQueue() {
+    return this.orchestrator.reconcileQueuedRuns();
+  }
+
   @Get('runs')
   @RequirePermissions('backup:read')
   listRuns(@Query() query: ListBackupRunsQueryDto) {

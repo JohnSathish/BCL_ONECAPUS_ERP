@@ -53,6 +53,21 @@ export class BackupSchedulerService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`Backup schedule bootstrap skipped: ${String(err)}`);
     }
+
+    if (process.env.PROCESS_BACKGROUND_JOBS === 'worker') {
+      setTimeout(() => {
+        this.orchestrator
+          .reconcileQueuedRuns()
+          .then((r) => {
+            if (r.requeued > 0) {
+              this.logger.log(`Re-queued ${r.requeued} stuck backup run(s)`);
+            }
+          })
+          .catch((err) =>
+            this.logger.warn(`Backup queue reconcile skipped: ${String(err)}`),
+          );
+      }, 15_000);
+    }
   }
 
   /** Daily auto backup at 2:00 AM (server local time). */

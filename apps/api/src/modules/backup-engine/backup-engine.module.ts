@@ -24,6 +24,13 @@ import { BackupVerifyService } from './services/backup-verify.service';
 import { SystemMaintenanceService } from './services/system-maintenance.service';
 import { TenantBackupExportService } from './services/tenant-backup-export.service';
 
+/** API must not consume backup queue jobs when the worker container handles them. */
+const API_RUNS_BACKUP_JOBS = process.env.PROCESS_BACKGROUND_JOBS !== 'worker';
+
+const backupQueueProcessors = API_RUNS_BACKUP_JOBS
+  ? [BackupRunProcessor, BackupRestoreProcessor, BackupCloudProcessor]
+  : [];
+
 @Module({
   imports: [CommunicationModule, AdministrationModule],
   controllers: [BackupEngineController],
@@ -44,9 +51,7 @@ import { TenantBackupExportService } from './services/tenant-backup-export.servi
     BackupOrchestratorService,
     BackupSchedulerService,
     SystemMaintenanceService,
-    BackupRunProcessor,
-    BackupRestoreProcessor,
-    BackupCloudProcessor,
+    ...backupQueueProcessors,
   ],
   exports: [SystemMaintenanceService, BackupOrchestratorService],
 })
