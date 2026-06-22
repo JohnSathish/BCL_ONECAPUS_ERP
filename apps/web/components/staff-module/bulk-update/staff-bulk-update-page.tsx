@@ -19,7 +19,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { fetchDepartments } from '@/services/organization';
-import { fetchDesignations, fetchStaff } from '@/services/staff';
+import { fetchDesignations, fetchAllStaff } from '@/services/staff';
 import { fetchShifts } from '@/services/shifts';
 import {
   applyStaffBulkUpdate,
@@ -108,8 +108,15 @@ export function StaffBulkUpdatePage() {
     enabled: Boolean(session) && perms.canBulkUpdate,
   });
   const staffRows = useQuery({
-    queryKey: ['staff-bulk-update', 'staff-sample'],
-    queryFn: () => fetchStaff({ page: 1, limit: 100 }),
+    queryKey: ['staff-bulk-update', 'staff-sample', mode, templateFilters],
+    queryFn: () =>
+      fetchAllStaff({
+        staffType: templateFilters.staffType || undefined,
+        departmentId: templateFilters.departmentId || undefined,
+        designationId: templateFilters.designationId || undefined,
+        shiftId: templateFilters.shiftId || undefined,
+        status: templateFilters.status || undefined,
+      }),
     enabled: Boolean(session) && perms.canBulkUpdate && mode === 'inline',
   });
   const departments = useQuery({
@@ -146,7 +153,12 @@ export function StaffBulkUpdatePage() {
   }, [fieldKeys, matchingKey]);
 
   useEffect(() => {
-    if (mode !== 'inline' || !staffRows.data?.data.length || inlineRows.length > 0) return;
+    if (mode !== 'inline') return;
+    setInlineRows([]);
+  }, [mode, templateFilters]);
+
+  useEffect(() => {
+    if (mode !== 'inline' || !staffRows.data?.data.length) return;
     setInlineRows(
       staffRows.data.data.map((row) => ({
         employeeCode: row.employeeCode,
@@ -165,7 +177,7 @@ export function StaffBulkUpdatePage() {
         rfidNo: row.rfidNo ?? '',
       })),
     );
-  }, [mode, staffRows.data, inlineRows.length]);
+  }, [mode, staffRows.data, templateFilters]);
 
   const previewMut = useMutation({
     mutationFn: async () => {
@@ -681,7 +693,8 @@ function DataStep(props: {
       <div className="rounded-xl border border-border p-3">
         <h2 className="text-sm font-semibold">Template staff filter</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Downloaded templates are prefilled from the database using these filters.
+          Excel templates and the manual edit grid both load staff from the database using these
+          filters.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-5">
           <TemplateSelect
