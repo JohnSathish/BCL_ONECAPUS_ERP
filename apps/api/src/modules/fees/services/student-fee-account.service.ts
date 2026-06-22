@@ -154,6 +154,15 @@ export class StudentFeeAccountService {
       },
     );
 
+    const admissionPaid = admissionDemands.reduce(
+      (s: number, d: { paidAmount?: number }) => s + Number(d.paidAmount ?? 0),
+      0,
+    );
+    const monthlyPaid = monthlyFees.reduce(
+      (s: number, d: { paidAmount?: number }) => s + Number(d.paidAmount ?? 0),
+      0,
+    );
+
     const concessionTotal = concessions.reduce(
       (s: number, c: { approvedAmount: unknown }) =>
         s + Number(c.approvedAmount ?? 0),
@@ -224,6 +233,8 @@ export class StudentFeeAccountService {
         totalDue: summary.totalOutstanding,
         admissionOutstanding: summary.admissionOutstanding,
         monthlyOutstanding: summary.monthlyOutstanding,
+        admissionPaid,
+        monthlyPaid,
         currentDue: summary.totalOutstanding,
       },
       admissionFeeStatus,

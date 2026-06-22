@@ -825,50 +825,84 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
     </Card>
   );
 
-  const cashierKpis = (
-    <div
-      className={cn(
-        'grid gap-3',
-        isCollection ? 'sm:grid-cols-2 lg:grid-cols-5' : 'sm:grid-cols-2 xl:grid-cols-4',
-      )}
-    >
-      <KpiCard
-        icon={Wallet}
-        label={isCollection ? "Today's collection" : "Today's collections"}
-        value={formatInr(kpis?.todayCollection ?? 0)}
-      />
-      {isCollection ? (
-        <>
-          <KpiCard
-            icon={Banknote}
-            label="Monthly collected"
-            value={formatInr(kpis?.monthlyCollection ?? 0)}
-          />
+  const cashierKpis =
+    isCollection && account ? (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          icon={Banknote}
+          label="Admission paid (this student)"
+          value={formatInr(account.summary.admissionPaid ?? 0)}
+          sub="Cycle 1 = ₹10,600 for new admits"
+        />
+        <KpiCard
+          icon={Wallet}
+          label="Monthly paid (this student)"
+          value={formatInr(account.summary.monthlyPaid ?? 0)}
+        />
+        <KpiCard
+          icon={BarChart3}
+          label="Outstanding (this student)"
+          value={formatInr(account.summary.outstanding)}
+        />
+        <KpiCard
+          icon={FileText}
+          label="Total paid (this student)"
+          value={formatInr(account.summary.totalPaid)}
+        />
+      </div>
+    ) : (
+      <div
+        className={cn(
+          'grid gap-3',
+          isCollection ? 'sm:grid-cols-2 lg:grid-cols-5' : 'sm:grid-cols-2 xl:grid-cols-4',
+        )}
+      >
+        <KpiCard
+          icon={Wallet}
+          label={isCollection ? "Today's collection (college)" : "Today's collections"}
+          value={formatInr(kpis?.todayCollection ?? 0)}
+        />
+        {isCollection ? (
+          <>
+            <KpiCard
+              icon={Banknote}
+              label="Monthly collected (college)"
+              value={formatInr(kpis?.monthlyCollection ?? 0)}
+            />
+            <KpiCard
+              icon={BarChart3}
+              label="Admission collected (college)"
+              value={formatInr(kpis?.admissionCollection ?? 0)}
+              sub="All students — not the searched student"
+            />
+          </>
+        ) : null}
+        <KpiCard
+          icon={FileText}
+          label="Receipts today"
+          value={String(kpis?.receiptCount ?? '—')}
+          sub={isCollection ? undefined : 'receipts issued'}
+        />
+        <KpiCard
+          icon={Users}
+          label={isCollection ? 'Students with dues' : 'Students with dues'}
+          value={String(kpis?.defaulterCount ?? defaulterRows.length)}
+        />
+        {!isCollection ? (
           <KpiCard
             icon={BarChart3}
-            label="Admission collected"
-            value={formatInr(kpis?.admissionCollection ?? 0)}
+            label="Pending dues"
+            value={formatInr(kpis?.outstanding ?? 0)}
           />
-        </>
-      ) : null}
-      <KpiCard
-        icon={FileText}
-        label="Receipts today"
-        value={String(kpis?.receiptCount ?? '—')}
-        sub={isCollection ? undefined : 'receipts issued'}
-      />
-      <KpiCard
-        icon={Users}
-        label={isCollection ? 'Students with dues' : 'Students with dues'}
-        value={String(kpis?.defaulterCount ?? defaulterRows.length)}
-      />
-      {!isCollection ? (
-        <KpiCard icon={BarChart3} label="Pending dues" value={formatInr(kpis?.outstanding ?? 0)} />
-      ) : (
-        <KpiCard icon={BarChart3} label="Outstanding" value={formatInr(kpis?.outstanding ?? 0)} />
-      )}
-    </div>
-  );
+        ) : (
+          <KpiCard
+            icon={BarChart3}
+            label="Outstanding (college)"
+            value={formatInr(kpis?.outstanding ?? 0)}
+          />
+        )}
+      </div>
+    );
 
   return (
     <div className="space-y-4">
@@ -1560,6 +1594,8 @@ function FinancialSnapshot({ account }: { account: StudentFeeAccount }) {
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <Row label="Total demand" value={formatInr(account.summary.totalDemand)} />
+        <Row label="Admission paid" value={formatInr(account.summary.admissionPaid ?? 0)} />
+        <Row label="Monthly paid" value={formatInr(account.summary.monthlyPaid ?? 0)} />
         <Row label="Total paid" value={formatInr(account.summary.totalPaid)} />
         <Row label="Outstanding" value={formatInr(account.summary.outstanding)} bold />
         <Row label="Admission fee" value={admissionStatus} />
@@ -1722,7 +1758,15 @@ function AdmissionFeeCard({
             <p className="font-medium">{c.cycleName}</p>
             <p className="text-xs text-muted-foreground">{c.covers}</p>
             <p className="mt-1 font-semibold">
-              {formatInr(c.totalAmount ?? c.configuredAmount)} · <StatusPill status={c.status} />
+              {formatInr(c.totalAmount ?? c.configuredAmount)}
+              {c.paidAmount != null && c.paidAmount > 0 ? (
+                <span className="font-normal text-muted-foreground">
+                  {' '}
+                  · paid {formatInr(c.paidAmount)}
+                </span>
+              ) : null}
+              {' · '}
+              <StatusPill status={c.status} />
             </p>
           </div>
         ))}

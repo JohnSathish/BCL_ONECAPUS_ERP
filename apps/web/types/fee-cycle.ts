@@ -152,6 +152,8 @@ export type StudentFeeAccount = {
     scholarshipTotal?: number;
     admissionOutstanding?: number;
     monthlyOutstanding?: number;
+    admissionPaid?: number;
+    monthlyPaid?: number;
     currentDue?: number;
   };
   admissionFeeStatus?: {
