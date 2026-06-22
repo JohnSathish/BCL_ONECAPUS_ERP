@@ -136,25 +136,73 @@ export type IaExamSummary = IaSession & {
     programmeName?: string;
     programmeCode?: string;
     maxMarks?: number;
+    semesterNos?: number[];
+    streamName?: string;
+    departmentCount?: number;
+    studentsRegistered?: number;
   };
   stats?: {
     subjectsScheduled: number;
     expectedRegistrations: number;
+    registeredStudents: number;
+    marksEntered: number;
+    marksPending: number;
+    completionPercent: number;
+    semesterNos: number[];
+    streamName: string;
+    departmentCount: number;
+    maxMarks?: number;
   };
 };
 
 export type CreateIaExamPayload = {
   name: string;
-  semesterNo: number;
-  programVersionId: string;
-  departmentId?: string;
+  semesterNos: number[];
+  streamId?: string;
+  departmentIds?: string[];
   academicYearId?: string;
   examType: string;
   maxMarks: number;
   startDate?: string;
   endDate?: string;
   remarks?: string;
+  /** @deprecated legacy single-semester API */
+  semesterNo?: number;
+  programVersionId?: string;
+  departmentId?: string;
 };
+
+export type IaExamPreview = {
+  examName: string;
+  academicYear: string;
+  academicYearId: string;
+  semesters: number[];
+  streamId: string | null;
+  streamName: string;
+  departmentCount: number;
+  departmentIds: string[];
+  students: number;
+  subjects: number;
+  subjectsWithStudents: number;
+  maxMarks: number;
+  examType: string;
+  programVersions: number;
+  ready: boolean;
+  warnings: string[];
+};
+
+export async function fetchIaExamDepartments(streamId?: string) {
+  const { data } = await api.get<{ id: string; name: string; code: string }[]>(
+    '/v1/examinations/ia/exams/departments',
+    { params: streamId ? { streamId } : undefined },
+  );
+  return data;
+}
+
+export async function previewIaExam(payload: CreateIaExamPayload) {
+  const { data } = await api.post<IaExamPreview>('/v1/examinations/ia/exams/preview', payload);
+  return data;
+}
 
 export async function fetchIaExams() {
   const { data } = await api.get<IaExamSummary[]>('/v1/examinations/ia/exams');
@@ -170,8 +218,9 @@ export async function createIaExam(payload: CreateIaExamPayload) {
       papersCreated: number;
       schemesCreated: number;
       studentsRegistered: number;
-      programme?: string;
-      semesterNo: number;
+      semesters: number[];
+      streamName: string;
+      departmentCount: number;
       maxMarks: number;
     };
   };

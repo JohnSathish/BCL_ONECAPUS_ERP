@@ -1,4 +1,6 @@
 import {
+  ArrayMinSize,
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -16,15 +18,39 @@ export class CreateIaExamDto {
   @IsString()
   name!: string;
 
+  /** @deprecated Use semesterNos — kept for backward compatibility */
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(12)
-  semesterNo!: number;
+  semesterNo?: number;
 
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(12, { each: true })
+  semesterNos?: number[];
+
+  @IsOptional()
   @IsUUID()
-  programVersionId!: string;
+  programVersionId?: string;
 
+  /** Omit or null = all streams */
+  @IsOptional()
+  @IsUUID()
+  streamId?: string;
+
+  /** Empty = all departments in selected stream */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  departmentIds?: string[];
+
+  /** @deprecated Use departmentIds */
   @IsOptional()
   @IsUUID()
   departmentId?: string;
@@ -54,6 +80,8 @@ export class CreateIaExamDto {
   @IsString()
   remarks?: string;
 }
+
+export class PreviewIaExamDto extends CreateIaExamDto {}
 
 export class GenerateIaTimetableDto {
   @IsUUID()

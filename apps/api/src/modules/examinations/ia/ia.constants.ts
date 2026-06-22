@@ -7,6 +7,9 @@ export const IA_EXAM_TYPES = [
   'IA_VIVA',
   'IA_SEMINAR',
   'IA_PROJECT',
+  'IA_PRESENTATION',
+  'IA_PROJECT_WORK',
+  'IA_CIE',
 ] as const;
 
 export const LEGACY_EXAM_TYPES = ['SEMESTER_END'] as const;

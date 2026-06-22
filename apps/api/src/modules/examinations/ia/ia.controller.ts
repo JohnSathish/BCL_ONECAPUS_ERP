@@ -30,6 +30,7 @@ import { IaComponentDto } from './dto/ia.dto';
 import {
   CreateIaExamDto,
   GenerateIaTimetableDto,
+  PreviewIaExamDto,
 } from './dto/create-ia-exam.dto';
 import { IaAdmitCardService } from './ia-admit-card.service';
 import { IaConsolidationService } from './ia-consolidation.service';
@@ -131,6 +132,21 @@ export class IaController {
   @RequireAnyPermission('ia:view', 'exam:view', 'exam:admin', 'academic:read')
   listExams(@CurrentUser() user: JwtUser) {
     return this.exams.listExamsWithSummary(user.tid);
+  }
+
+  @Get('exams/departments')
+  @RequireAnyPermission('ia:view', 'ia:manage', 'exam:view', 'exam:admin')
+  listExamDepartments(
+    @CurrentUser() user: JwtUser,
+    @Query('streamId') streamId?: string,
+  ) {
+    return this.exams.listDepartmentsForStream(user.tid, streamId || undefined);
+  }
+
+  @Post('exams/preview')
+  @RequireAnyPermission('ia:manage', 'exam:admin')
+  previewExam(@CurrentUser() user: JwtUser, @Body() dto: PreviewIaExamDto) {
+    return this.exams.previewExam(user, dto);
   }
 
   @Post('exams')
