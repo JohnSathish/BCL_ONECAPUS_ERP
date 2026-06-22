@@ -145,6 +145,8 @@ import { SubstitutePayrollBridgeService } from './services/substitute-payroll-br
 
     PayrollAnalyticsService,
 
+    PayStructureService,
+
     StaffPayAssignmentService,
 
     StaffPfConfigService,

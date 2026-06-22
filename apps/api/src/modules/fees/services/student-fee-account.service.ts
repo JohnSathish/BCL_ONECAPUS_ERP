@@ -95,7 +95,11 @@ export class StudentFeeAccountService {
       }),
       this.financeSettings.get(tenantId),
       this.db().paymentTransaction.findMany({
-        where: { tenantId, studentId, status: 'SUCCESS' },
+        where: {
+          tenantId,
+          studentId,
+          status: { in: ['SUCCESS', 'PENDING_CLEARANCE', 'PAID'] },
+        },
         include: { allocations: true },
         orderBy: { paidAt: 'desc' },
         take: 80,
@@ -190,10 +194,11 @@ export class StudentFeeAccountService {
       monthlyTracker,
       summary,
     );
-    const paymentHistory = this.buildPaymentHistory(
+    const paymentHistory = await this.buildPaymentHistory(
       payments,
       receipts,
       demands,
+      tenantId,
     );
     const feeLedger = this.buildFeeLedger(ledgerEntries, payments, demands);
 
@@ -393,19 +398,44 @@ export class StudentFeeAccountService {
     return { year, months, paidMonths, pendingMonths };
   }
 
-  private buildPaymentHistory(
+  private async buildPaymentHistory(
     payments: Array<Record<string, unknown>>,
     receipts: Array<Record<string, unknown>>,
     demands: Array<Record<string, unknown>>,
+    tenantId: string,
   ) {
     const receiptByPayment = new Map(
       receipts.filter((r) => r.paymentId).map((r) => [String(r.paymentId), r]),
     );
     const demandMap = new Map(demands.map((d) => [String(d.id), d]));
 
+    const collectorIds = [
+      ...new Set(
+        payments
+          .map((p) => p.collectedById)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const collectors = collectorIds.length
+      ? await this.db().user.findMany({
+          where: { tenantId, id: { in: collectorIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const collectorMap = new Map(
+      collectors.map(
+        (u: { id: string; displayName?: string; email?: string }) => [
+          u.id,
+          u.displayName ?? u.email ?? 'Finance Office',
+        ],
+      ),
+    );
+
     return payments.map((payment) => {
+      const meta = (payment.metadata ?? {}) as Record<string, unknown>;
+      const audit = (meta.audit ?? {}) as Record<string, unknown>;
       const source = (payment.paymentSource ??
-        (payment.metadata as { paymentSource?: string })?.paymentSource ??
+        meta.paymentSource ??
         payment.paymentMode) as FeePaymentSource | string;
       const receipt = receiptByPayment.get(String(payment.id));
       const allocationDemandIds = (
@@ -420,6 +450,10 @@ export class StudentFeeAccountService {
         })
         .filter(Boolean);
 
+      const collectedById = payment.collectedById
+        ? String(payment.collectedById)
+        : null;
+
       return {
         id: payment.id,
         transactionNo: payment.transactionNo,
@@ -429,11 +463,27 @@ export class StudentFeeAccountService {
         paymentSourceLabel:
           FEE_PAYMENT_SOURCE_LABELS[source as FeePaymentSource] ??
           String(source).replace(/_/g, ' '),
+        paymentMethodLabel:
+          (meta.collectionMethodLabel as string) ??
+          FEE_PAYMENT_SOURCE_LABELS[source as FeePaymentSource] ??
+          String(payment.paymentMode).replace(/_/g, ' '),
         externalReference: payment.externalReference ?? null,
+        utrNumber: (meta.utrNumber as string) ?? null,
+        transactionReference: (meta.transactionReference as string) ?? null,
+        clearanceStatus:
+          payment.status === 'PENDING_CLEARANCE'
+            ? 'PENDING'
+            : ((meta.clearanceStatus as string) ?? 'CLEARED'),
+        collectedByName:
+          (meta.collectedByName as string) ??
+          (collectedById ? collectorMap.get(collectedById) : null) ??
+          (audit.collectedByEmail as string) ??
+          null,
         receiptId: receipt?.id ?? null,
         receiptNo: receipt?.receiptNo ?? null,
         feeHeads,
         remarks: payment.remarks ?? null,
+        status: payment.status,
       };
     });
   }

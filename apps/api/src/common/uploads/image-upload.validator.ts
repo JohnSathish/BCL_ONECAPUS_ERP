@@ -12,6 +12,8 @@ const MAX_BYTES_BY_KIND: Record<ImageUploadKind, number> = {
   logo: 2 * 1024 * 1024,
   favicon: 512 * 1024,
   profile: 5 * 1024 * 1024,
+  'principal-photo': 5 * 1024 * 1024,
+  'careers-hero': 5 * 1024 * 1024,
 };
 
 const PNG = [0x89, 0x50, 0x4e, 0x47];
@@ -54,8 +56,8 @@ function assertDimensions(
   kind: ImageUploadKind,
 ) {
   if (!dims) return;
-  const max = kind === 'logo' ? 2048 : kind === 'profile' ? 4096 : 512;
-  const min = kind === 'logo' ? 64 : kind === 'profile' ? 32 : 16;
+  const max = kind === 'logo' ? 2048 : kind === 'favicon' ? 512 : 4096;
+  const min = kind === 'logo' ? 64 : kind === 'favicon' ? 16 : 32;
   if (dims.width > max || dims.height > max) {
     throw new BadRequestException(
       `${kind} dimensions must be at most ${max}×${max}px`,
@@ -68,7 +70,12 @@ function assertDimensions(
   }
 }
 
-export type ImageUploadKind = 'logo' | 'favicon' | 'profile';
+export type ImageUploadKind =
+  | 'logo'
+  | 'favicon'
+  | 'profile'
+  | 'principal-photo'
+  | 'careers-hero';
 
 export function validateBrandingImage(
   file: Express.Multer.File | undefined,

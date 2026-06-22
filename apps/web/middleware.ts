@@ -14,6 +14,21 @@ function isAdmissionsHost(host: string) {
   return hostname(host).startsWith('admissions.');
 }
 
+function isCareerHost(host: string) {
+  return hostname(host).startsWith('career.');
+}
+
+function handleCareerHost(request: NextRequest) {
+  return handleSubdomainRewrite(request, '/careers-portal', '/careers-portal', [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+    '/admissions-portal',
+  ]);
+}
+
 function handleAdmissionsHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginPath = '/admissions-portal/login';
@@ -139,6 +154,10 @@ export function middleware(request: NextRequest) {
 
   if (isAdmissionsHost(host)) {
     return handleAdmissionsHost(request);
+  }
+
+  if (isCareerHost(host)) {
+    return handleCareerHost(request);
   }
 
   if (isLibraryHost(host)) {

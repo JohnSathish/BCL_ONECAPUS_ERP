@@ -110,6 +110,7 @@ export function paymentModeToCollectionMode(
   if (source === 'BANK_TRANSFER') return 'bank_transfer';
   if (source === 'SCHOLARSHIP') return 'scholarship';
   if (source === 'ADJUSTMENT' || source === 'FEE_WAIVER') return 'fee_waiver';
+  if (source === 'COLLEGE_QR') return 'upi_qr';
   if (source === 'ERP_GATEWAY' || paymentMode === 'ONLINE') return 'gateway';
   if (source === 'OFFICE_QR' || paymentMode === 'OFFICE_QR') return 'upi_qr';
 
@@ -128,7 +129,7 @@ export function externalSourceAllowed(
   const map: Record<string, CollectionModeKey> = {
     SBI_ICOLLECT: 'sbi_icollect',
     BANK_TRANSFER: 'bank_transfer',
-    COLLEGE_QR: 'bank_transfer',
+    COLLEGE_QR: 'upi_qr',
     SCHOLARSHIP: 'scholarship',
     ADJUSTMENT: 'fee_waiver',
   };

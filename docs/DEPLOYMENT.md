@@ -55,6 +55,7 @@ On Windows you can also run: `Get-NetTCPConnection -LocalPort 3001 | Select Owni
 - `erp.donboscocollege.ac.in` — staff ERP (`apps/web` default routes)
 - `admissions.donboscocollege.ac.in` — applicant portal (middleware rewrites to `/admissions-portal`; see `apps/web/middleware.ts`)
 - `library.donboscocollege.ac.in` — library kiosk (`/library-desk`)
+- `career.donboscocollege.ac.in` — public careers / recruitment portal (`/careers-portal`; see [CAREERS_PORTAL_DEPLOYMENT.md](./CAREERS_PORTAL_DEPLOYMENT.md))
 
 **Don Bosco step-by-step:** [DEPLOY_DBC_PRODUCTION.md](./DEPLOY_DBC_PRODUCTION.md) (LAN office server + live deployment)
 

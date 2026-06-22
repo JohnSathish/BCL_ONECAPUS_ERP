@@ -6,8 +6,15 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
@@ -28,6 +35,10 @@ import {
   CreateOfferDto,
   CreateRecruitmentApplicationDto,
   CreateVacancyDto,
+  SendDocumentsReminderDto,
+  UpdateApplicationStatusDto,
+  UpdateInterviewDto,
+  UpdateVacancyDto,
   UpdateVacancyStatusDto,
 } from './dto/recruitment.dto';
 import {
@@ -42,6 +53,7 @@ import { LeaveService } from './services/leave.service';
 import { RecruitmentService } from './services/recruitment.service';
 import { PensionService } from './services/pension.service';
 import { AppraisalService } from './services/appraisal.service';
+import { RecruitmentInterviewDocumentService } from './services/recruitment-interview-document.service';
 
 @ApiBearerAuth()
 @ApiTags('hr')
@@ -52,6 +64,7 @@ export class HrController {
     private readonly recruitment: RecruitmentService,
     private readonly pension: PensionService,
     private readonly appraisal: AppraisalService,
+    private readonly interviewDocuments: RecruitmentInterviewDocumentService,
   ) {}
 
   // Leave
@@ -148,6 +161,12 @@ export class HrController {
     return this.recruitment.pipelineStats(user.tid);
   }
 
+  @Get('recruitment/analytics')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  recruitmentAnalytics(@CurrentUser() user: JwtUser) {
+    return this.recruitment.recruitmentAnalytics(user.tid);
+  }
+
   @Get('recruitment/vacancies')
   @RequireAnyPermission('payroll:read', 'staff:manage')
   listVacancies(
@@ -163,6 +182,22 @@ export class HrController {
     return this.recruitment.createVacancy(user, dto);
   }
 
+  @Get('recruitment/vacancies/:id')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  getVacancy(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.recruitment.getVacancy(user.tid, id);
+  }
+
+  @Patch('recruitment/vacancies/:id')
+  @RequirePermissions('staff:manage')
+  updateVacancy(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateVacancyDto,
+  ) {
+    return this.recruitment.updateVacancy(user, id, dto);
+  }
+
   @Patch('recruitment/vacancies/:id/status')
   @RequirePermissions('staff:manage')
   updateVacancyStatus(
@@ -171,6 +206,92 @@ export class HrController {
     @Body() dto: UpdateVacancyStatusDto,
   ) {
     return this.recruitment.updateVacancyStatus(user, id, dto);
+  }
+
+  @Get('recruitment/pipeline')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  recruitmentPipeline(
+    @CurrentUser() user: JwtUser,
+    @Query('vacancyId') vacancyId?: string,
+  ) {
+    return this.recruitment.pipelineBoard(user.tid, vacancyId);
+  }
+
+  @Get('recruitment/applications/:id')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  getApplication(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.recruitment.getApplication(user.tid, id);
+  }
+
+  @Get('recruitment/interviews')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  listInterviews(
+    @CurrentUser() user: JwtUser,
+    @Query('status') status?: string,
+  ) {
+    return this.recruitment.listInterviews(user.tid, status);
+  }
+
+  @Get('recruitment/interviews/bulk/call-letters')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  async bulkInterviewCallLetters(
+    @CurrentUser() user: JwtUser,
+    @Query('date') date: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.interviewDocuments.bulkPdfForDate(
+      user.tid,
+      date ?? new Date().toISOString().slice(0, 10),
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Get('recruitment/interviews/:id/call-letter/preview')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  async previewInterviewCallLetter(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const html = await this.interviewDocuments.previewHtml(user.tid, id);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
+  @Get('recruitment/interviews/:id/call-letter')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  async downloadInterviewCallLetter(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.interviewDocuments.pdfBuffer(
+      user.tid,
+      id,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Post('recruitment/interviews/:id/minutes')
+  @RequirePermissions('staff:manage')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  uploadInterviewMinutes(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    return this.recruitment.uploadInterviewMinutes(user, id, file);
   }
 
   @Get('recruitment/applications')
@@ -196,9 +317,19 @@ export class HrController {
   updateApplicationStatus(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
-    @Body('status') status: string,
+    @Body() dto: UpdateApplicationStatusDto,
   ) {
-    return this.recruitment.updateApplicationStatus(user, id, status);
+    return this.recruitment.updateApplicationStatus(user, id, dto);
+  }
+
+  @Post('recruitment/applications/:id/notify/documents')
+  @RequirePermissions('staff:manage')
+  sendDocumentsReminder(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SendDocumentsReminderDto,
+  ) {
+    return this.recruitment.sendDocumentsReminder(user, id, dto.message);
   }
 
   @Post('recruitment/interviews')
@@ -208,6 +339,16 @@ export class HrController {
     @Body() dto: CreateInterviewDto,
   ) {
     return this.recruitment.scheduleInterview(user, dto);
+  }
+
+  @Patch('recruitment/interviews/:id')
+  @RequirePermissions('staff:manage')
+  updateInterview(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateInterviewDto,
+  ) {
+    return this.recruitment.updateInterview(user, id, dto);
   }
 
   @Post('recruitment/offers')

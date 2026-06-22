@@ -7,6 +7,7 @@ import { cn } from '@/utils/cn';
 import { BrandingAccreditationSection } from './branding-accreditation-section';
 import { BrandingAssetsSection } from './branding-assets-section';
 import { BrandingAuditTimeline } from './branding-audit-timeline';
+import { BrandingCareersPortalSection } from './branding-careers-portal-section';
 import { BrandingIdentitySection } from './branding-identity-section';
 import { BrandingLoginPreview } from './branding-login-preview';
 import { BrandingPageHeader } from './branding-page-header';
@@ -154,6 +155,12 @@ export function BrandingStudio({ initialData, initialTheme, audit, canManage }: 
               onLogoUpload={(file) => studio.logoMutation.mutate(file)}
               onFaviconUpload={(file) => studio.faviconMutation.mutate(file)}
               onClearLogoPreview={() => studio.setLogoPreview(undefined)}
+            />
+            <BrandingCareersPortalSection
+              disabled={!canManage}
+              register={studio.register}
+              watch={studio.watch}
+              setValue={studio.setValue}
             />
             <BrandingThemeSection
               register={studio.register}

@@ -13,6 +13,7 @@ import { AuthService } from '../auth/auth.service';
 import { UserProvisioningService } from '../administration/services/user-provisioning.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { AdmissionsCycleService } from './admissions-cycle.service';
+import { sanitizeDisplayText } from '../../common/utils/display-text.util';
 
 @Injectable()
 export class AdmissionsPortalService {
@@ -84,7 +85,9 @@ export class AdmissionsPortalService {
     return {
       displayName: branding?.displayName ?? 'Don Bosco College Tura',
       shortName: branding?.shortName ?? 'DBC Tura',
-      portalSubtitle: branding?.portalSubtitle ?? 'FYUGP Online Admission',
+      portalSubtitle:
+        sanitizeDisplayText(branding?.portalSubtitle) ??
+        'FYUGP Online Admission',
       primaryColor: branding?.primaryColor ?? '#1e3a5f',
       accentColor: branding?.accentColor ?? '#c8102e',
       logoUrl: branding?.logoUrl ?? null,

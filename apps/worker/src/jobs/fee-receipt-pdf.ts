@@ -122,16 +122,29 @@ export async function generateFeeReceiptPdf(tenantId: string, receiptId: string)
   const payment = receipt.payment as
     | {
         paymentMode?: string;
+        paymentSource?: string;
         status?: string;
         paidAt?: string;
         providerPaymentId?: string;
         externalReference?: string;
         transactionNo?: string;
+        metadata?: Record<string, unknown>;
       }
     | undefined;
 
+  const paymentMeta = payment?.metadata ?? {};
   const transactionRef =
-    payment?.providerPaymentId ?? payment?.externalReference ?? payment?.transactionNo ?? receiptNo;
+    payment?.providerPaymentId ??
+    (paymentMeta.transactionReference as string) ??
+    payment?.externalReference ??
+    payment?.transactionNo ??
+    receiptNo;
+  const utrNumber = (paymentMeta.utrNumber as string) ?? null;
+  const paymentModeLabel =
+    (paymentMeta.collectionMethodLabel as string) ??
+    payment?.paymentSource ??
+    payment?.paymentMode ??
+    'ONLINE';
   const paymentStatus =
     payment?.status === 'SUCCESS' || payment?.status === 'PAID'
       ? 'SUCCESS'
@@ -153,9 +166,10 @@ export async function generateFeeReceiptPdf(tenantId: string, receiptId: string)
       feeCycle: String(resolveFeeCycleLabel(receipt)),
       lines: resolveReceiptLines(receipt),
       amount: Number(receipt.amount),
-      paymentMode: String(payment?.paymentMode ?? 'ONLINE'),
+      paymentMode: String(paymentModeLabel),
       paymentStatus,
       transactionRef: String(transactionRef),
+      utrNumber,
       collectedBy: String(collector?.displayName ?? collector?.email ?? 'Finance Office'),
       verifyUrl,
     },

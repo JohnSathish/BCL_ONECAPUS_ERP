@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'crypto';
 import JSZip from 'jszip';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
+import { sanitizeDisplayText } from '../../../common/utils/display-text.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { IA_EXAM_TYPES } from './ia.constants';
 import { IaAdmitEligibilityService } from './ia-admit-eligibility.service';
@@ -97,7 +98,7 @@ export class IaAdmitCardService {
       logoUrl:
         toPublicUploadUrl(branding?.logoUrl) ?? branding?.logoUrl ?? null,
       affiliation:
-        branding?.portalSubtitle ??
+        sanitizeDisplayText(branding?.portalSubtitle) ??
         'Affiliated to North-Eastern Hill University (NEHU)',
       contact: null as string | null,
     };

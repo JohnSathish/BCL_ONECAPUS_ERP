@@ -94,12 +94,18 @@ export async function collectFee(payload: {
   demandIds?: string[];
   amount: number;
   paymentMode: string;
+  paymentSource?: string;
   provider?: string;
   externalReference?: string;
   remarks?: string;
   metadata?: Record<string, unknown>;
 }) {
   const { data } = await api.post('/v1/fees/collections', payload);
+  return data;
+}
+
+export async function clearChequePayment(paymentId: string) {
+  const { data } = await api.post(`/v1/fees/collections/${paymentId}/clear-cheque`, {});
   return data;
 }
 

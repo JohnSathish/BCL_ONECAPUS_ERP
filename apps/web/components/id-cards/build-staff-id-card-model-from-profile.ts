@@ -1,4 +1,5 @@
 import { toBrandingDocumentContext } from '@/lib/branding-document';
+import { sanitizeDisplayText } from '@/utils/display-text';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import type { InstitutionBranding } from '@/types/branding';
 import type { StaffIdCardModel } from '@/types/id-card';
@@ -6,7 +7,7 @@ import type { StaffProfile } from '@/types/staff';
 import { isAcademicSessionText } from './id-card-programme-utils';
 
 function safeAffiliationLine(branding?: InstitutionBranding | null): string | null {
-  const sub = branding?.portalSubtitle?.trim();
+  const sub = sanitizeDisplayText(branding?.portalSubtitle);
   if (sub && !isAcademicSessionText(sub)) return sub;
   return 'Affiliated to North-Eastern Hill University (NEHU)';
 }

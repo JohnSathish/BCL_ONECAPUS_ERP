@@ -11,6 +11,12 @@ import {
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import type { UpdateBrandingDto } from './dto/update-branding.dto';
 import type { UpdateThemeDto } from './dto/update-theme.dto';
+import { sanitizeDisplayText } from '../../common/utils/display-text.util';
+import {
+  mergePortalExtras,
+  parsePortalExtras,
+  type PortalExtrasJson,
+} from '../../common/types/portal-extras.types';
 import {
   getPreset,
   PRESET_LIST,
@@ -34,6 +40,7 @@ export type BrandingDto = {
   showPoweredBy: boolean;
   brandingEnabled: boolean;
   badges: string[];
+  portalExtras?: PortalExtrasJson;
 };
 
 export type ThemeSettingsDto = {
@@ -82,14 +89,15 @@ export class BrandingService {
     showPoweredBy: boolean;
     brandingEnabled: boolean;
     badges: unknown;
+    portalExtrasJson?: unknown;
   }): BrandingDto {
     const badges = Array.isArray(row.badges) ? (row.badges as string[]) : [];
     return {
       displayName: row.displayName,
       shortName: row.shortName ?? undefined,
       campusName: row.campusName ?? undefined,
-      portalSubtitle: row.portalSubtitle ?? undefined,
-      address: row.address ?? undefined,
+      portalSubtitle: sanitizeDisplayText(row.portalSubtitle),
+      address: sanitizeDisplayText(row.address),
       logoUrl: row.logoUrl ?? undefined,
       faviconUrl: row.faviconUrl ?? undefined,
       primaryColor: row.primaryColor ?? undefined,
@@ -99,6 +107,7 @@ export class BrandingService {
       showPoweredBy: row.showPoweredBy,
       brandingEnabled: row.brandingEnabled,
       badges,
+      portalExtras: parsePortalExtras(row.portalExtrasJson),
     };
   }
 
@@ -139,8 +148,8 @@ export class BrandingService {
         displayName: dto.displayName,
         shortName: dto.shortName ?? null,
         campusName: dto.campusName ?? null,
-        portalSubtitle: dto.portalSubtitle ?? null,
-        address: dto.address ?? null,
+        portalSubtitle: sanitizeDisplayText(dto.portalSubtitle) ?? null,
+        address: sanitizeDisplayText(dto.address) ?? null,
         primaryColor: dto.primaryColor ?? null,
         accentColor: dto.accentColor ?? null,
         sidebarColor: dto.sidebarColor ?? null,
@@ -148,6 +157,10 @@ export class BrandingService {
         showPoweredBy: dto.showPoweredBy ?? true,
         brandingEnabled: dto.brandingEnabled ?? true,
         badges: dto.badges ?? [],
+        portalExtrasJson: mergePortalExtras(
+          existing.portalExtras,
+          dto.portalExtras as PortalExtrasJson | undefined,
+        ),
       },
     });
 
@@ -161,6 +174,71 @@ export class BrandingService {
         metadata: {
           before: existing,
           after: this.toDto(updated),
+        },
+      },
+    });
+
+    return this.toDto(updated);
+  }
+
+  async uploadCareersPortalImage(
+    tenantId: string,
+    userId: string,
+    kind: 'principal-photo' | 'careers-hero',
+    file: Express.Multer.File,
+    slot = 1,
+  ): Promise<BrandingDto> {
+    const valid = validateBrandingImage(file, kind);
+    await this.getOrCreate(tenantId);
+
+    const dir = join(this.uploadRoot, tenantId, 'branding');
+    await mkdir(dir, { recursive: true });
+
+    const ext = extensionForMime(valid.mimetype);
+    const filename =
+      kind === 'principal-photo'
+        ? `principal-photo.${ext}`
+        : `careers-hero-${slot}.${ext}`;
+    await writeFile(join(dir, filename), valid.buffer);
+
+    const publicPath = `/uploads/tenants/${tenantId}/branding/${filename}`;
+    const row = await this.prisma.tenantBranding.findUnique({
+      where: { tenantId },
+    });
+    const extras = parsePortalExtras(row?.portalExtrasJson);
+    const careers = { ...extras.careersPortal };
+
+    if (kind === 'principal-photo') {
+      careers.principalPhotoUrl = publicPath;
+    } else {
+      const images = [...(careers.heroImages ?? [])];
+      const index = Math.max(0, Math.min(slot - 1, 4));
+      images[index] = publicPath;
+      careers.heroImages = images.filter(Boolean).slice(0, 5);
+    }
+
+    const updated = await this.prisma.tenantBranding.update({
+      where: { tenantId },
+      data: {
+        portalExtrasJson: mergePortalExtras(row?.portalExtrasJson, {
+          careersPortal: careers,
+        }),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action:
+          kind === 'principal-photo'
+            ? 'branding.careers_principal_photo_uploaded'
+            : 'branding.careers_hero_uploaded',
+        entityType: 'tenant_branding',
+        entityId: updated.id,
+        metadata: {
+          path: publicPath,
+          slot: kind === 'careers-hero' ? slot : undefined,
         },
       },
     });

@@ -181,6 +181,7 @@ model TenantBranding {
   showPoweredBy        Boolean  @default(true) @map("show_powered_by")
   brandingEnabled      Boolean  @default(true) @map("branding_enabled")
   badges               Json     @default("[]")
+  portalExtrasJson     Json     @default("{}") @map("portal_extras_json")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -1429,6 +1430,7 @@ model Department {
   students         Student[]
   academicSubjects AcademicSubject[]
   teachingSubjectGroups TeachingSubjectGroup[]
+  recruitmentVacancies RecruitmentVacancy[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -2786,6 +2788,7 @@ model Designation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   staffProfiles StaffProfile[]
+  recruitmentVacancies RecruitmentVacancy[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2903,6 +2906,8 @@ model StaffProfile {
   pensionLedgerEntries       PensionLedgerEntry[]
   staffAppraisals            StaffAppraisal[]
   recruitmentApplications  RecruitmentApplication[]
+  appointmentOrders        AppointmentOrder[]         @relation("AppointmentOrderStaff")
+  joiningReports             JoiningReport[]            @relation("JoiningReportStaff")
   quarterOccupancies       QuarterOccupancy[]
   quarterMonthlyCharges    QuarterMonthlyCharge[]
   primaryTeachingSubjectGroups TeachingSubjectGroup[] @relation("TeachingSubjectGroupPrimaryStaff")
@@ -3700,25 +3705,53 @@ model ReplacementAssignmentAuditLog {
 }
 
 model RecruitmentVacancy {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @map("tenant_id") @db.Uuid
-  title           String
-  departmentId    String?   @map("department_id") @db.Uuid
-  designationId   String?   @map("designation_id") @db.Uuid
-  staffType       String?   @map("staff_type")
-  vacanciesCount  Int       @default(1) @map("vacancies_count")
-  description     String?
-  status          String    @default("DRAFT")
-  publishedAt     DateTime? @map("published_at")
-  closingDate     DateTime? @map("closing_date") @db.Date
-  createdById     String?   @map("created_by_id") @db.Uuid
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  title                String
+  slug                 String?
+  departmentId         String?   @map("department_id") @db.Uuid
+  designationId        String?   @map("designation_id") @db.Uuid
+  staffType            String?   @map("staff_type")
+  vacanciesCount       Int       @default(1) @map("vacancies_count")
+  description          String?
+  jobDescriptionHtml   String?   @map("job_description_html") @db.Text
+  qualificationRequired String?  @map("qualification_required")
+  experienceRequired   String?   @map("experience_required")
+  eligibilityJson      Json?     @map("eligibility_json")
+  salaryMin            Decimal?  @map("salary_min") @db.Decimal(12, 2)
+  salaryMax            Decimal?  @map("salary_max") @db.Decimal(12, 2)
+  importantDatesJson   Json?     @map("important_dates_json")
+  advertisementPdfUrl  String?   @map("advertisement_pdf_url")
+  termsPdfUrl          String?   @map("terms_pdf_url")
+  instructionsHtml     String?   @map("instructions_html") @db.Text
+  status               String    @default("DRAFT")
+  publishedAt          DateTime? @map("published_at")
+  closingDate          DateTime? @map("closing_date") @db.Date
+  createdById          String?   @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   applications RecruitmentApplication[]
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designation  Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, slug])
   @@index([tenantId, status])
   @@map("recruitment_vacancies")
+  @@schema("academic")
+}
+
+model RecruitmentApplicationSequence {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  year      Int
+  currentNo Int      @default(0) @map("current_no")
+  prefix    String   @default("DBC-APP")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, year])
+  @@map("recruitment_application_sequences")
   @@schema("academic")
 }
 
@@ -3726,12 +3759,20 @@ model RecruitmentApplication {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
   vacancyId   String   @map("vacancy_id") @db.Uuid
+  applicationNo String? @map("application_no")
   fullName    String   @map("full_name")
+  fatherName  String?  @map("father_name")
   email       String?
   mobile      String?
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  addressJson Json?    @map("address_json")
+  photoUrl    String?  @map("photo_url")
   resumeUrl   String?  @map("resume_url")
   qualification String?
   experienceYears Int? @map("experience_years")
+  applicationDetailsJson Json? @map("application_details_json")
+  certificatesJson Json? @map("certificates_json")
+  source        String   @default("INTERNAL")
   status      String   @default("SUBMITTED")
   appliedAt   DateTime @default(now()) @map("applied_at")
   notes       String?
@@ -3743,6 +3784,7 @@ model RecruitmentApplication {
   interviews RecruitmentInterview[]
   offers     RecruitmentOffer[]
   hiredStaff StaffProfile?         @relation(fields: [hiredStaffProfileId], references: [id], onDelete: SetNull)
+  appointmentOrders AppointmentOrder[]
 
   @@index([tenantId, vacancyId])
   @@index([tenantId, status])
@@ -3786,6 +3828,167 @@ model RecruitmentOffer {
 
   @@index([tenantId, applicationId])
   @@map("recruitment_offers")
+  @@schema("academic")
+}
+
+model AppointmentOrderSequence {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  year         Int
+  currentNo    Int      @default(0) @map("current_no")
+  prefix       String   @default("DBC/APPT")
+  format       String   @default("{{prefix}}/{{year}}/{{number}}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, year])
+  @@map("appointment_order_sequences")
+  @@schema("academic")
+}
+
+model AppointmentOrderTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  description String?
+  staffType   String?  @map("staff_type")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  versions AppointmentOrderTemplateVersion[]
+  orders   AppointmentOrder[]
+
+  @@unique([tenantId, code])
+  @@map("appointment_order_templates")
+  @@schema("academic")
+}
+
+model AppointmentOrderTemplateVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  versionNo  Int      @default(1) @map("version_no")
+  bodyHtml   String   @map("body_html") @db.Text
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  template AppointmentOrderTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, templateId])
+  @@map("appointment_order_template_versions")
+  @@schema("academic")
+}
+
+model AppointmentOrder {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  applicationId         String    @map("application_id") @db.Uuid
+  vacancyId             String?   @map("vacancy_id") @db.Uuid
+  offerId               String?   @map("offer_id") @db.Uuid
+  staffProfileId        String?   @map("staff_profile_id") @db.Uuid
+  templateId            String?   @map("template_id") @db.Uuid
+  supersedesOrderId     String?   @map("supersedes_order_id") @db.Uuid
+  revisionNo            Int       @default(1) @map("revision_no")
+  orderNo               String?   @map("order_no")
+  referenceNo           String?   @map("reference_no")
+  status                String    @default("DRAFT")
+  candidateName         String    @map("candidate_name")
+  fatherName            String?   @map("father_name")
+  addressText           String?   @map("address_text")
+  mobile                String?
+  email                 String?
+  dateOfBirth           DateTime? @map("date_of_birth") @db.Date
+  qualification         String?
+  photoUrl              String?   @map("photo_url")
+  appointmentType       String    @map("appointment_type")
+  employmentMode        String    @default("FULL_TIME") @map("employment_mode")
+  staffType             String    @map("staff_type")
+  designationId         String?   @map("designation_id") @db.Uuid
+  departmentId          String?   @map("department_id") @db.Uuid
+  shiftId               String?   @map("shift_id") @db.Uuid
+  joiningDate           DateTime? @map("joining_date") @db.Date
+  reportingTo           String?   @map("reporting_to")
+  basicPay              Decimal?  @map("basic_pay") @db.Decimal(12, 2)
+  grossSalary           Decimal?  @map("gross_salary") @db.Decimal(12, 2)
+  totalDeductions       Decimal?  @map("total_deductions") @db.Decimal(12, 2)
+  netSalary             Decimal?  @map("net_salary") @db.Decimal(12, 2)
+  payStructureTemplateId String?  @map("pay_structure_template_id") @db.Uuid
+  salaryBreakup         Json?     @map("salary_breakup")
+  termsHtml             String?   @map("terms_html") @db.Text
+  renderedHtml          String?   @map("rendered_html") @db.Text
+  pdfPath               String?   @map("pdf_path")
+  verifyToken           String?   @unique @map("verify_token")
+  verifyHash            String?   @map("verify_hash")
+  verifyCode            String?   @map("verify_code")
+  signedCopyUrl         String?   @map("signed_copy_url")
+  generatedById         String?   @map("generated_by_id") @db.Uuid
+  generatedAt           DateTime? @map("generated_at")
+  sentAt                DateTime? @map("sent_at")
+  acceptedAt            DateTime? @map("accepted_at")
+  acceptedById          String?   @map("accepted_by_id") @db.Uuid
+  rejectedAt            DateTime? @map("rejected_at")
+  rejectionReason       String?   @map("rejection_reason")
+  cancelledAt           DateTime? @map("cancelled_at")
+  metadata              Json?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  application  RecruitmentApplication      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  template     AppointmentOrderTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  staffProfile StaffProfile?               @relation("AppointmentOrderStaff", fields: [staffProfileId], references: [id], onDelete: SetNull)
+  joiningReport JoiningReport?
+  auditLogs    AppointmentOrderAuditLog[]
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId, status])
+  @@index([tenantId, applicationId])
+  @@index([tenantId, departmentId])
+  @@map("appointment_orders")
+  @@schema("academic")
+}
+
+model AppointmentOrderAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order AppointmentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId, createdAt])
+  @@map("appointment_order_audit_logs")
+  @@schema("academic")
+}
+
+model JoiningReport {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  appointmentOrderId String    @unique @map("appointment_order_id") @db.Uuid
+  staffProfileId     String?   @map("staff_profile_id") @db.Uuid
+  actualJoiningDate  DateTime  @map("actual_joining_date") @db.Date
+  reportingDate      DateTime? @map("reporting_date") @db.Date
+  status             String    @default("SUBMITTED")
+  remarks            String?
+  documentUrl        String?   @map("document_url")
+  submittedById      String?   @map("submitted_by_id") @db.Uuid
+  verifiedById       String?   @map("verified_by_id") @db.Uuid
+  verifiedAt         DateTime? @map("verified_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  appointmentOrder AppointmentOrder @relation(fields: [appointmentOrderId], references: [id], onDelete: Cascade)
+  staffProfile     StaffProfile?    @relation("JoiningReportStaff", fields: [staffProfileId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@map("joining_reports")
   @@schema("academic")
 }
 

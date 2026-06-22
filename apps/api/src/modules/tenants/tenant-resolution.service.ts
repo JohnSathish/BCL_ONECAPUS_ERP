@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
+import { sanitizeDisplayText } from '../../common/utils/display-text.util';
 
 export type LoginContextDto = {
   tenantSlug: string;
@@ -148,8 +149,9 @@ export class TenantResolutionService {
         displayName: branding?.displayName ?? institution?.name ?? tenant.name,
         shortName: branding?.shortName ?? undefined,
         campusName: branding?.campusName ?? campus?.name,
-        portalSubtitle: branding?.portalSubtitle ?? 'Campus ERP Portal',
-        address: branding?.address ?? undefined,
+        portalSubtitle:
+          sanitizeDisplayText(branding?.portalSubtitle) ?? 'Campus ERP Portal',
+        address: sanitizeDisplayText(branding?.address),
         logoUrl: branding?.logoUrl ?? undefined,
         faviconUrl: branding?.faviconUrl ?? undefined,
         badges: badges.length > 0 ? badges : undefined,

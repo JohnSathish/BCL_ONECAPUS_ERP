@@ -82,7 +82,13 @@ export type FeePaymentHistoryRow = {
   paidAt: string;
   paymentSource: string;
   paymentSourceLabel: string;
+  paymentMethodLabel?: string;
   externalReference?: string | null;
+  utrNumber?: string | null;
+  transactionReference?: string | null;
+  clearanceStatus?: string;
+  collectedByName?: string | null;
+  status?: string;
   receiptId?: string | null;
   receiptNo?: string | null;
   feeHeads: string[];

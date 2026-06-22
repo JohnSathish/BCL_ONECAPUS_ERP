@@ -99,8 +99,11 @@ Server: `ssh root@82.25.110.120` · IP `82.25.110.120`
 | `erp`        | A / CNAME | App server IP                   |
 | `admissions` | A / CNAME | Same server (admissions portal) |
 | `library`    | A / CNAME | Same server (library kiosk)     |
+| `career`     | A / CNAME | Same server (careers portal)    |
 
 Enable **Proxied** (orange cloud) for free HTTPS.
+
+Careers portal: see [CAREERS_PORTAL_DEPLOYMENT.md](./CAREERS_PORTAL_DEPLOYMENT.md).
 
 ### Production `.env` (app server)
 
@@ -114,14 +117,15 @@ JWT_ACCESS_SECRET=<generate-64-char-random>
 JWT_REFRESH_SECRET=<generate-64-char-random>
 
 WEB_ORIGIN=https://erp.donboscocollege.ac.in
-CORS_EXTRA_ORIGINS=https://admissions.donboscocollege.ac.in,https://library.donboscocollege.ac.in
+CORS_EXTRA_ORIGINS=https://admissions.donboscocollege.ac.in,https://library.donboscocollege.ac.in,https://career.donboscocollege.ac.in
 COOKIE_SECURE=true
 NODE_ENV=production
 
 NEXT_PUBLIC_API_URL=/api
 NEXT_PUBLIC_LOGIN_HOST=erp.donboscocollege.ac.in
-
-STORAGE_DRIVER=local
+NEXT_PUBLIC_CAREER_HOST=career.donboscocollege.ac.in
+CAREERS_HR_EMAIL=career@donboscocollege.ac.in
+CAREERS_PUBLIC_URL=https://career.donboscocollege.ac.in
 UPLOAD_ROOT=/data/uploads
 STORAGE_ROOT=/data/storage
 PROCESS_BACKGROUND_JOBS=worker

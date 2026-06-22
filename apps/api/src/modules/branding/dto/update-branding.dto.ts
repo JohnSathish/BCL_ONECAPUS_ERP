@@ -3,13 +3,13 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
-
 const HEX_COLOR = /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/;
 
 export class UpdateBrandingDto {
@@ -71,4 +71,8 @@ export class UpdateBrandingDto {
   @IsString({ each: true })
   @MaxLength(80, { each: true })
   badges?: string[];
+
+  @IsOptional()
+  @IsObject()
+  portalExtras?: Record<string, unknown>;
 }

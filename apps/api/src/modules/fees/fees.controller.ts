@@ -256,6 +256,15 @@ export class FeesController {
     });
   }
 
+  @Post('collections/:paymentId/clear-cheque')
+  @RequireAnyPermission('fees:manage', 'fees:cash:collect')
+  clearCheque(
+    @CurrentUser() user: JwtUser,
+    @Param('paymentId') paymentId: string,
+  ) {
+    return this.collections.clearChequePayment(user, paymentId);
+  }
+
   @Get('external-payments/sources')
   @RequireAnyPermission('fees:read', 'fees:manage', 'student:portal:self')
   externalPaymentSources(@CurrentUser() user: JwtUser) {

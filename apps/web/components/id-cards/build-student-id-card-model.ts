@@ -1,4 +1,5 @@
 import { toBrandingDocumentContext } from '@/lib/branding-document';
+import { sanitizeDisplayText } from '@/utils/display-text';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import type { LibraryQrPass } from '@/types/library';
 import type { StudentIdCardModel } from '@/types/id-card';
@@ -10,7 +11,7 @@ import { abbreviateProgramme, isAcademicSessionText } from './id-card-programme-
 import { computeStudentCardValidity } from './id-card-validity-utils';
 
 function safeAffiliationLine(branding?: InstitutionBranding | null): string | null {
-  const sub = branding?.portalSubtitle?.trim();
+  const sub = sanitizeDisplayText(branding?.portalSubtitle);
   if (sub && !isAcademicSessionText(sub)) return sub;
   return null;
 }

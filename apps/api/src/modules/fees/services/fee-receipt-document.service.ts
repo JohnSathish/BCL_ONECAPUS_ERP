@@ -204,11 +204,19 @@ export class FeeReceiptDocumentService {
     const branding = await resolveFeeReceiptBranding(this.db(), tenantId);
     const verifyUrl = `${process.env.WEB_ORIGIN ?? 'http://demo.localhost:3000'}/verify/receipt/${receipt.receiptNo}`;
     const payment = receipt.payment;
+    const paymentMeta = (payment?.metadata ?? {}) as Record<string, unknown>;
     const transactionRef =
       payment?.providerPaymentId ??
+      (paymentMeta.transactionReference as string) ??
       payment?.externalReference ??
       payment?.transactionNo ??
       receipt.receiptNo;
+    const utrNumber = (paymentMeta.utrNumber as string) ?? null;
+    const paymentModeLabel =
+      (paymentMeta.collectionMethodLabel as string) ??
+      payment?.paymentSource ??
+      payment?.paymentMode ??
+      'ONLINE';
     const paymentStatus =
       payment?.status === 'SUCCESS' || payment?.status === 'PAID'
         ? 'SUCCESS'
@@ -234,9 +242,10 @@ export class FeeReceiptDocumentService {
       feeCycle: String(resolveFeeCycleLabel(receipt)),
       lines: resolveReceiptLines(receipt),
       amount: Number(receipt.amount),
-      paymentMode: payment?.paymentMode ?? 'ONLINE',
+      paymentMode: String(paymentModeLabel),
       paymentStatus,
       transactionRef: String(transactionRef),
+      utrNumber,
       collectedBy:
         collector?.displayName ?? collector?.email ?? 'Finance Office',
       verifyUrl,

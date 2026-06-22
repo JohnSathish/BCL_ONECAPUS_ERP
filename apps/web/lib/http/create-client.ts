@@ -8,6 +8,7 @@ import axios, {
 } from 'axios';
 import { API_BASE_URL, API_GET_RETRY_COUNT, API_REQUEST_TIMEOUT_MS } from '@/lib/http/env';
 import { isRetryableQueryError, normalizeAxiosError, sleep } from '@/lib/http/api-error-types';
+import { unwrapApiPayload } from '@/lib/http/api-envelope';
 import { dispatchLicenseWriteBlocked } from '@/components/licensing/license-write-blocked-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { waitForAuthBootstrap } from '@/lib/auth/wait-for-auth-bootstrap';
@@ -29,19 +30,8 @@ function requestId() {
   return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function isApiEnvelope(value: unknown): value is { success: boolean; data?: unknown } {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    'success' in value &&
-    typeof (value as { success?: unknown }).success === 'boolean',
-  );
-}
-
 function unwrapApiEnvelope(res: AxiosResponse) {
-  if (isApiEnvelope(res.data) && res.data.success) {
-    res.data = 'data' in res.data ? res.data.data : null;
-  }
+  res.data = unwrapApiPayload(res.data);
   return res;
 }
 

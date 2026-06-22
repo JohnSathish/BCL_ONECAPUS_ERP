@@ -1400,3 +1400,116 @@ html.institution-branded .erp-theme-sidebar {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Careers recruitment portal ── */
+
+.careers-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 20%, transparent 75%);
+}
+
+.careers-hero-grid-drift {
+  animation: careers-grid-drift 60s linear infinite;
+}
+
+@keyframes careers-grid-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 56px 56px;
+  }
+}
+
+.careers-hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.careers-hero-orb-1 {
+  top: -8%;
+  right: 5%;
+  width: min(280px, 40vw);
+  height: min(280px, 40vw);
+  background: rgba(200, 16, 46, 0.18);
+  animation: careers-orb-float 14s ease-in-out infinite;
+}
+
+.careers-hero-orb-2 {
+  bottom: 10%;
+  left: -5%;
+  width: min(320px, 45vw);
+  height: min(320px, 45vw);
+  background: rgba(30, 58, 95, 0.55);
+  animation: careers-orb-float 18s ease-in-out infinite reverse;
+}
+
+@keyframes careers-orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(12px, -16px) scale(1.05);
+  }
+}
+
+.careers-hero-tagline {
+  background: linear-gradient(90deg, rgba(186, 230, 253, 0.98) 0%, rgba(255, 255, 255, 0.92) 50%, rgba(186, 230, 253, 0.85) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.careers-stats-panel {
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.careers-step-connector {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.4), rgba(200, 16, 46, 0.4));
+}
+
+.careers-cta-panel {
+  background:
+    radial-gradient(ellipse 70% 80% at 10% 50%, rgba(200, 16, 46, 0.25), transparent 55%),
+    radial-gradient(ellipse 60% 70% at 90% 30%, rgba(30, 58, 95, 0.5), transparent 50%),
+    linear-gradient(135deg, #0f2744 0%, #1e3a5f 45%, #152a45 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .careers-hero-grid-drift,
+  .careers-hero-orb-1,
+  .careers-hero-orb-2 {
+    animation: none !important;
+  }
+}
+
+.careers-ticker-mask {
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+
+.careers-ticker-track {
+  animation: careers-ticker-scroll 28s linear infinite;
+}
+
+@keyframes careers-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .careers-ticker-track {
+    animation: none;
+  }
+}

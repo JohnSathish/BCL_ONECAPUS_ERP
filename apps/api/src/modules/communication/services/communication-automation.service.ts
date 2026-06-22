@@ -64,6 +64,27 @@ export class CommunicationAutomationService {
         schedule: '0 9 * * *',
         templateCode: 'LIBRARY_DUE_REMINDER',
       },
+      {
+        code: 'hr.probation.30d',
+        name: 'Probation End — 30 Days',
+        category: 'HR',
+        schedule: '0 8 * * *',
+        templateCode: 'HR_PROBATION_REMINDER',
+      },
+      {
+        code: 'hr.probation.15d',
+        name: 'Probation End — 15 Days',
+        category: 'HR',
+        schedule: '0 8 * * *',
+        templateCode: 'HR_PROBATION_REMINDER',
+      },
+      {
+        code: 'hr.probation.7d',
+        name: 'Probation End — 7 Days',
+        category: 'HR',
+        schedule: '0 8 * * *',
+        templateCode: 'HR_PROBATION_REMINDER',
+      },
     ];
 
     for (const rule of defaults) {

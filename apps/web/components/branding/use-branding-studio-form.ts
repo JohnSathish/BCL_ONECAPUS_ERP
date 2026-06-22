@@ -137,6 +137,7 @@ export function useBrandingStudioForm(
         showPoweredBy: values.showPoweredBy,
         brandingEnabled: values.brandingEnabled,
         badges: values.badges,
+        portalExtras: values.portalExtras,
       }),
       saveThemeMutation.mutateAsync({
         themeName: themeValues.themeName,

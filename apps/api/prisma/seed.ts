@@ -73,10 +73,21 @@ async function main() {
     },
   });
 
+  await prisma.tenantDomain.upsert({
+    where: { host: 'career.demo.localhost' },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      host: 'career.demo.localhost',
+      verified: true,
+    },
+  });
+
   const productionHosts = [
     'erp.donboscocollege.ac.in',
     'admissions.donboscocollege.ac.in',
     'library.donboscocollege.ac.in',
+    'career.donboscocollege.ac.in',
   ];
   for (const host of productionHosts) {
     await prisma.tenantDomain.upsert({
@@ -92,8 +103,8 @@ async function main() {
       displayName: 'Don Bosco College Tura',
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
-      portalSubtitle: 'FYUGP Â· AY 2026-27 Â· ODD Semester',
-      address: 'Tura, West Garo Hills, Meghalaya â€“ 794002',
+      portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
         'NAAC Accredited',
@@ -112,8 +123,8 @@ async function main() {
       displayName: 'Don Bosco College Tura',
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
-      portalSubtitle: 'FYUGP Â· AY 2026-27 Â· ODD Semester',
-      address: 'Tura, West Garo Hills, Meghalaya â€“ 794002',
+      portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
         'NAAC Accredited',

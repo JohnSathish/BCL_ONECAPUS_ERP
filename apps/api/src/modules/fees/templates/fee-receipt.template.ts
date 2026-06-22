@@ -59,6 +59,7 @@ export type FeeReceiptHtmlInput = {
   paymentMode: string;
   paymentStatus: string;
   transactionRef: string;
+  utrNumber?: string | null;
   collectedBy: string;
   verifyUrl: string;
 };
@@ -606,6 +607,7 @@ function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
         <div class="panel-body">
           <div class="kv"><span class="k">Mode</span><span class="v">${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></div>
           <div class="kv"><span class="k">Transaction</span><span class="v">${escapeHtml(data.transactionRef)}</span></div>
+          ${data.utrNumber ? `<div class="kv"><span class="k">UTR</span><span class="v">${escapeHtml(data.utrNumber)}</span></div>` : ''}
           <div class="kv"><span class="k">Payment Date</span><span class="v">${formatReceiptDateTime(paidAt)}</span></div>
           <div class="kv"><span class="k">Collected By</span><span class="v">${escapeHtml(data.collectedBy)}</span></div>
           <div class="kv"><span class="k">Status</span><span class="v ${statusClass}">${escapeHtml(data.paymentStatus)}</span></div>
@@ -1033,6 +1035,7 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
           <div class="panel-body">
             <p class="field"><strong>Payment Mode:</strong> <span>${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></p>
             <p class="field"><strong>Transaction Ref.:</strong> <span>${escapeHtml(data.transactionRef)}</span></p>
+            ${data.utrNumber ? `<p class="field"><strong>UTR No.:</strong> <span>${escapeHtml(data.utrNumber)}</span></p>` : ''}
             <p class="field"><strong>Payment Date/Time:</strong> <span>${paidAtText}</span></p>
             <p class="field"><strong>Collected By:</strong> <span>${escapeHtml(data.collectedBy)}</span></p>
             <p class="field"><strong>Payment Status:</strong> <span class="${statusClass}">${escapeHtml(data.paymentStatus)}</span></p>

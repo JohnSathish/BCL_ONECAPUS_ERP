@@ -35,7 +35,7 @@ async function main() {
       displayName: 'Don Bosco College Tura',
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
-      portalSubtitle: 'FYUGP · AY 2026-27 · ODD Semester',
+      portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
       address: 'Tura, West Garo Hills, Meghalaya',
       badges: ['Affiliated to NEHU', 'NEP 2020', 'FYUGP'],
       primaryColor: '#1e3a5f',
@@ -43,13 +43,21 @@ async function main() {
       sidebarColor: '#152a45',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
+      portalExtrasJson: {
+        careersPortal: {
+          principalName: 'Rev. Fr. Principal',
+          principalTitle: 'Principal, Don Bosco College Tura',
+          principalMessage:
+            'We welcome passionate educators committed to academic excellence, research, and the holistic development of our students. Join us in shaping the future of Northeast India.',
+        },
+      },
     },
     create: {
       tenantId: tenant.id,
       displayName: 'Don Bosco College Tura',
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
-      portalSubtitle: 'FYUGP · AY 2026-27 · ODD Semester',
+      portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
       address: 'Tura, West Garo Hills, Meghalaya',
       badges: ['Affiliated to NEHU', 'NEP 2020', 'FYUGP'],
       primaryColor: '#1e3a5f',
@@ -57,6 +65,14 @@ async function main() {
       sidebarColor: '#152a45',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
+      portalExtrasJson: {
+        careersPortal: {
+          principalName: 'Rev. Fr. Principal',
+          principalTitle: 'Principal, Don Bosco College Tura',
+          principalMessage:
+            'We welcome passionate educators committed to academic excellence, research, and the holistic development of our students. Join us in shaping the future of Northeast India.',
+        },
+      },
     },
   });
 

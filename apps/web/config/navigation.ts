@@ -418,6 +418,21 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['staff:manage', 'payroll:read'],
           },
           {
+            label: 'Appointment Orders',
+            href: '/admin/hr/appointment-orders',
+            permissions: ['hr:appointment:read', 'staff:manage', 'payroll:read'],
+          },
+          {
+            label: 'Joining Reports',
+            href: '/admin/hr/joining-reports',
+            permissions: ['hr:joining:verify', 'hr:appointment:read', 'staff:manage'],
+          },
+          {
+            label: 'Probation Management',
+            href: '/admin/hr/probation',
+            permissions: ['hr:appointment:read', 'staff:manage', 'payroll:read'],
+          },
+          {
             label: 'Salary Components',
             href: '/admin/hr/salary-components',
             permissions: ['payroll:manage'],

@@ -1,5 +1,6 @@
 import { resolveBrandingAssetUrl } from '@/lib/branding-asset';
 import type { InstitutionBranding } from '@/types/branding';
+import { sanitizeDisplayText } from '@/utils/display-text';
 
 /** Header block for PDFs, certificates, and ID cards (future-ready). */
 export type BrandingDocumentContext = {
@@ -22,8 +23,8 @@ export function toBrandingDocumentContext(
     institutionName: branding.displayName,
     shortName: branding.shortName,
     campusName: branding.campusName,
-    tagline: branding.portalSubtitle,
-    address: branding.address,
+    tagline: sanitizeDisplayText(branding.portalSubtitle),
+    address: sanitizeDisplayText(branding.address),
     logoUrl: resolveBrandingAssetUrl(branding.logoUrl),
     primaryColor: branding.primaryColor ?? '#2563eb',
     accentColor: branding.accentColor ?? '#7c3aed',

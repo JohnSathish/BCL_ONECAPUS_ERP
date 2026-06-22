@@ -60,7 +60,16 @@ import type {
   StudentFeeAccount,
 } from '@/types/fee-cycle';
 import { BulkReceiptPrintPanel } from '@/components/fees-module/bulk-receipt-print-panel';
+import { FeeCollectionPaymentFields } from '@/components/fees-module/fee-collection-method-card';
+import { FeePaymentHistoryCard } from '@/components/fees-module/fee-payment-history-card';
 import { MonthlyFeeSetupGuide } from '@/components/fees-module/monthly-fee-setup-guide';
+import {
+  buildCollectionPayload,
+  enabledDeskPaymentMethods,
+  validateDeskPaymentForm,
+  type DeskPaymentFormValues,
+  type DeskPaymentMethodId,
+} from '@/lib/fee-collection-methods';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -140,6 +149,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   } | null>(null);
   const [payChannel, setPayChannel] = useState<'OFFICE_QR' | 'PAYMENT_LINK'>('OFFICE_QR');
   const [manualReference, setManualReference] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState<DeskPaymentMethodId | ''>('');
+  const [paymentFormValues, setPaymentFormValues] = useState<DeskPaymentFormValues>({});
 
   const settingsQ = useQuery({ queryKey: ['fee-settings'], queryFn: fetchFeeSettings });
   const dashboardQ = useQuery({ queryKey: ['fees', 'dashboard'], queryFn: fetchFeeDashboard });
@@ -224,6 +235,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   useEffect(() => {
     setSelectedPayables(new Set());
     setMonthsToGenerate(new Set());
+    setPaymentMethodId('');
+    setPaymentFormValues({});
   }, [studentId]);
 
   const selectedTotal = useMemo(() => {
@@ -298,52 +311,53 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
     onError: (e) => setMessage(apiErrorMessage(e, 'Failed to generate payment request')),
   });
 
-  const cashCollectMut = useMutation({
+  const deskCollectMut = useMutation({
     mutationFn: () => {
+      const modes = settingsQ.data?.collectionModes;
+      const method = enabledDeskPaymentMethods(modes).find((m) => m.id === paymentMethodId);
+      const validationError = validateDeskPaymentForm(method, paymentFormValues, selectedTotal);
+      if (validationError) throw new Error(validationError);
+      if (method!.id === 'cash' && !canCollectCash) {
+        throw new Error('You do not have permission to collect cash.');
+      }
       const demandIds = [
         ...new Set(payables.filter((p) => selectedPayables.has(p.id)).map((p) => p.demandId)),
       ];
-      return collectFee({
-        studentId,
-        demandIds,
-        amount: selectedTotal,
-        paymentMode: 'CASH',
-      });
+      const collectorName = session?.user?.displayName ?? session?.user?.email ?? 'Cashier';
+      return collectFee(
+        buildCollectionPayload(
+          method!,
+          paymentFormValues,
+          studentId,
+          demandIds,
+          selectedTotal,
+          collectorName,
+        ),
+      );
     },
     onSuccess: (res) => {
-      setLastReceiptId(res.receipt?.id ?? null);
+      if (res.pendingClearance) {
+        setMessage(
+          `Cheque recorded — pending clearance. Reference ${res.payment?.externalReference ?? ''}. Fees will be marked paid after accounts clears the cheque.`,
+        );
+      } else {
+        setLastReceiptId(res.receipt?.id ?? null);
+        setMessage(
+          isCollection
+            ? `Payment collected — receipt ${res.receipt?.receiptNo ?? 'issued'}. Print receipt, then click Next student.`
+            : `Payment collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`,
+        );
+      }
+      setPaymentFormValues({});
+      void accountQ.refetch();
+      void dashboardQ.refetch();
+    },
+    onError: (e) =>
       setMessage(
-        isCollection
-          ? `Cash collected — receipt ${res.receipt?.receiptNo ?? 'issued'}. Print receipt, then click Next student.`
-          : `Cash collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`,
-      );
-      void accountQ.refetch();
-      void dashboardQ.refetch();
-    },
-    onError: (e) => setMessage(apiErrorMessage(e, 'Cash collection failed')),
-  });
-
-  const manualCollectMut = useMutation({
-    mutationFn: (paymentMode: 'CHEQUE' | 'DD') => {
-      const demandIds = [
-        ...new Set(payables.filter((p) => selectedPayables.has(p.id)).map((p) => p.demandId)),
-      ];
-      return collectFee({
-        studentId,
-        demandIds,
-        amount: selectedTotal,
-        paymentMode,
-        externalReference: manualReference.trim() || undefined,
-      });
-    },
-    onSuccess: (res, paymentMode) => {
-      setLastReceiptId(res.receipt?.id ?? null);
-      setMessage(`${paymentMode} collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`);
-      setManualReference('');
-      void accountQ.refetch();
-      void dashboardQ.refetch();
-    },
-    onError: (e) => setMessage(apiErrorMessage(e, 'Collection failed')),
+        e instanceof Error && e.message && !('response' in e)
+          ? e.message
+          : apiErrorMessage(e, 'Collection failed'),
+      ),
   });
 
   const cancelRequestMut = useMutation({
@@ -660,12 +674,10 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   const defaulterRows =
     (defaultersQ.data as { rows?: unknown[] })?.rows ?? dashboardQ.data?.defaulters ?? [];
   const collectionModes = settingsQ.data?.collectionModes;
-  const enabledMethods = settingsQ.data?.availablePaymentMethods ?? [];
   const upiQrEnabled = collectionModes?.upi_qr ?? settingsQ.data?.officeQrEnabled !== false;
-  const cashModeEnabled = collectionModes?.cash ?? settingsQ.data?.cashCollectionEnabled;
-  const chequeModeEnabled = collectionModes?.cheque;
-  const ddModeEnabled = collectionModes?.dd;
-  const showManualReference = chequeModeEnabled || ddModeEnabled;
+  const deskPaymentMethods = enabledDeskPaymentMethods(collectionModes);
+  const selectedDeskMethod = deskPaymentMethods.find((m) => m.id === paymentMethodId);
+  const collectorName = session?.user?.displayName ?? session?.user?.email ?? 'Cashier';
   const isCollection = variant === 'collection';
 
   function resetForNextStudent() {
@@ -679,6 +691,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
     setActiveCheckout(null);
     setLastReceiptId(null);
     setManualReference('');
+    setPaymentMethodId('');
+    setPaymentFormValues({});
     setMessage('Ready for next student — scan roll number or search.');
     window.setTimeout(() => searchRef.current?.focus(), 80);
   }
@@ -996,8 +1010,10 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
           {/* Student profile */}
           <div className="space-y-4 xl:col-span-3">
             <StudentSummaryCard account={account} student={selectedStudent} tone={tone} />
-            <PaymentMethodsCard methods={enabledMethods} />
-            <FinancialSnapshot account={account} />
+            <FeePaymentHistoryCard
+              rows={account.paymentHistory ?? []}
+              onUpdated={() => void accountQ.refetch()}
+            />
             {monthlyNeedsActivation ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                 <p className="font-semibold">Monthly fee not activated</p>
@@ -1137,8 +1153,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
             </Card>
           </div>
 
-          {/* Payment facilitation */}
-          <div className="space-y-4 xl:col-span-4">
+          {/* Payment facilitation — sticky on desktop for cashier flow */}
+          <div className="space-y-4 xl:col-span-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-5rem)] xl:self-start xl:overflow-y-auto">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -1148,35 +1164,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-xs text-muted-foreground">
-                  Use enabled collection methods for this institution. External payments (SBI
-                  iCollect, bank transfer) are recorded under Finance → External Payment Entry.
+                  Select fees → choose payment method → enter transaction details → collect receipt.
                 </p>
-
-                {upiQrEnabled ? (
-                  <div>
-                    <Label className="mb-2 block">UPI / link collection</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          name="payChannel"
-                          checked={payChannel === 'OFFICE_QR'}
-                          onChange={() => setPayChannel('OFFICE_QR')}
-                        />
-                        Dynamic UPI QR
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          name="payChannel"
-                          checked={payChannel === 'PAYMENT_LINK'}
-                          onChange={() => setPayChannel('PAYMENT_LINK')}
-                        />
-                        Payment link
-                      </label>
-                    </div>
-                  </div>
-                ) : null}
 
                 <div className="rounded-lg border bg-muted/30 px-3 py-2">
                   {selectedBreakdown.length ? (
@@ -1229,61 +1218,78 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   </div>
                 </div>
 
-                {cashModeEnabled && canCollectCash ? (
+                <FeeCollectionPaymentFields
+                  collectionModes={collectionModes}
+                  methodId={paymentMethodId}
+                  values={paymentFormValues}
+                  collectedByName={collectorName}
+                  onMethodChange={setPaymentMethodId}
+                  onValuesChange={setPaymentFormValues}
+                />
+
+                {paymentMethodId && paymentMethodId !== 'gateway' ? (
                   <Button
                     className="w-full"
-                    variant="secondary"
-                    disabled={!selectedTotal || !payables.length || cashCollectMut.isPending}
-                    onClick={() => cashCollectMut.mutate()}
+                    disabled={
+                      !selectedTotal ||
+                      !payables.length ||
+                      deskCollectMut.isPending ||
+                      !paymentMethodId
+                    }
+                    onClick={() => deskCollectMut.mutate()}
                   >
-                    {cashCollectMut.isPending ? (
+                    {deskCollectMut.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Recording cash…
+                        Saving…
+                      </>
+                    ) : selectedDeskMethod?.pendingClearance ? (
+                      <>
+                        <Banknote className="mr-2 h-4 w-4" />
+                        Submit cheque (pending clearance)
                       </>
                     ) : (
                       <>
                         <Banknote className="mr-2 h-4 w-4" />
-                        Collect cash & generate receipt
+                        Collect & generate receipt
                       </>
                     )}
                   </Button>
+                ) : !paymentMethodId ? (
+                  <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    Select a <strong>payment method</strong> above before collecting.
+                  </p>
                 ) : null}
 
-                {showManualReference ? (
-                  <div className="space-y-1">
-                    <Label>Cheque / DD reference (optional)</Label>
-                    <Input
-                      placeholder="Cheque no. or DD no."
-                      value={manualReference}
-                      onChange={(e) => setManualReference(e.target.value)}
-                    />
+                {(upiQrEnabled && paymentMethodId === 'gateway') ||
+                (upiQrEnabled && !paymentMethodId) ? (
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="block">Online gateway — UPI QR / payment link</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
+                        <input
+                          type="radio"
+                          name="payChannel"
+                          checked={payChannel === 'OFFICE_QR'}
+                          onChange={() => setPayChannel('OFFICE_QR')}
+                        />
+                        Dynamic UPI QR
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
+                        <input
+                          type="radio"
+                          name="payChannel"
+                          checked={payChannel === 'PAYMENT_LINK'}
+                          onChange={() => setPayChannel('PAYMENT_LINK')}
+                        />
+                        Payment link
+                      </label>
+                    </div>
                   </div>
                 ) : null}
 
-                {chequeModeEnabled ? (
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    disabled={!selectedTotal || !payables.length || manualCollectMut.isPending}
-                    onClick={() => manualCollectMut.mutate('CHEQUE')}
-                  >
-                    Collect cheque & generate receipt
-                  </Button>
-                ) : null}
-
-                {ddModeEnabled ? (
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    disabled={!selectedTotal || !payables.length || manualCollectMut.isPending}
-                    onClick={() => manualCollectMut.mutate('DD')}
-                  >
-                    Collect DD & generate receipt
-                  </Button>
-                ) : null}
-
-                {upiQrEnabled && (!activeCheckout || activeRequest?.status !== 'PENDING') ? (
+                {(upiQrEnabled && paymentMethodId === 'gateway') ||
+                (upiQrEnabled && !paymentMethodId) ? (
                   <Button
                     className="w-full"
                     disabled={!selectedTotal || qrRequestMut.isPending || !payables.length}
@@ -1500,30 +1506,6 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
         </div>
       ) : null}
     </div>
-  );
-}
-
-function PaymentMethodsCard({ methods }: { methods: Array<{ key: string; label: string }> }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Payment methods available</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5">
-        {methods.length ? (
-          methods.map((m) => (
-            <div key={m.key} className="flex items-center gap-2 text-sm text-emerald-800">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              {m.label}
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No collection methods enabled. Configure in Fee Settings.
-          </p>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

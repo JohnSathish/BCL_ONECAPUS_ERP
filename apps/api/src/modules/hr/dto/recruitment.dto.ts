@@ -34,13 +34,165 @@ export class CreateVacancyDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  jobDescriptionHtml?: string;
+
+  @IsOptional()
+  @IsString()
+  qualificationRequired?: string;
+
+  @IsOptional()
+  @IsString()
+  experienceRequired?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  salaryMin?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  salaryMax?: number;
+
+  @IsOptional()
   @IsDateString()
   closingDate?: string;
+
+  @IsOptional()
+  @IsString()
+  advertisementPdfUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  termsPdfUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  instructionsHtml?: string;
+
+  @IsOptional()
+  eligibilityJson?: unknown;
 }
 
 export class UpdateVacancyStatusDto {
   @IsString()
   status!: string;
+}
+
+export class UpdateVacancyDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  designationId?: string;
+
+  @IsOptional()
+  @IsString()
+  staffType?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  vacanciesCount?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  jobDescriptionHtml?: string;
+
+  @IsOptional()
+  @IsString()
+  qualificationRequired?: string;
+
+  @IsOptional()
+  @IsString()
+  experienceRequired?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  salaryMin?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  salaryMax?: number;
+
+  @IsOptional()
+  @IsDateString()
+  closingDate?: string;
+
+  @IsOptional()
+  @IsString()
+  advertisementPdfUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  termsPdfUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  instructionsHtml?: string;
+
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
+  @IsOptional()
+  selectionCommitteeJson?: unknown;
+}
+
+export class UpdateApplicationStatusDto {
+  @IsString()
+  status!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  notify?: boolean;
+}
+
+export class SendDocumentsReminderDto {
+  @IsOptional()
+  @IsString()
+  message?: string;
+}
+
+export class UpdateInterviewDto {
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+
+  @IsOptional()
+  @IsString()
+  venue?: string;
+
+  @IsOptional()
+  panelJson?: unknown;
+
+  @IsOptional()
+  @IsNumber()
+  score?: number;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class CreateRecruitmentApplicationDto {

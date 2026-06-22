@@ -144,6 +144,186 @@ const DEFAULT_TEMPLATES: CommunicationTemplateDto[] = [
     channels: ['EMAIL', 'IN_APP'],
   },
   {
+    code: 'RECRUITMENT_APPLICATION_RECEIVED',
+    name: 'Application Received',
+    category: 'HR',
+    subject: 'Application received — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>We have received your application <strong>{{application_no}}</strong> for <strong>{{vacancy_title}}</strong> at {{institution_name}}.</p><p>You can track status at our careers portal.</p>',
+    bodyText:
+      'Dear {{candidate_name}}, application {{application_no}} for {{vacancy_title}} received.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_INTERVIEW_CALL',
+    name: 'Interview Call Letter',
+    category: 'HR',
+    subject: 'Interview scheduled — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>You are invited for an interview for <strong>{{vacancy_title}}</strong> on <strong>{{interview_date}}</strong> at {{interview_venue}}.</p><p>Application No: {{application_no}}</p>',
+    bodyText:
+      'Interview for {{vacancy_title}} on {{interview_date}} at {{interview_venue}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'interview_date',
+      'interview_venue',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_SELECTED',
+    name: 'Selection Notice',
+    category: 'HR',
+    subject: 'Selected for {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>Congratulations! You have been selected for <strong>{{vacancy_title}}</strong> at {{institution_name}}. HR will contact you regarding appointment formalities.</p>',
+    bodyText: 'Selected for {{vacancy_title}} at {{institution_name}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_REJECTED',
+    name: 'Rejection Notice',
+    category: 'HR',
+    subject: 'Application update — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>Thank you for applying for <strong>{{vacancy_title}}</strong>. After careful consideration, we will not be proceeding with your application at this time.</p>',
+    bodyText: 'Application for {{vacancy_title}} not successful.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'rejection_reason',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_INTERVIEW_REMINDER',
+    name: 'Interview Reminder',
+    category: 'HR',
+    subject: 'Reminder: Interview tomorrow — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>This is a reminder that your interview for <strong>{{vacancy_title}}</strong> is scheduled on <strong>{{interview_date}}</strong> at {{interview_venue}}.</p><p>Application No: {{application_no}}</p>',
+    bodyText:
+      'Interview reminder for {{vacancy_title}} on {{interview_date}} at {{interview_venue}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'interview_date',
+      'interview_venue',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_DOCUMENTS_PENDING',
+    name: 'Documents Required',
+    category: 'HR',
+    subject: 'Documents required — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>Please submit the pending documents for your application <strong>{{application_no}}</strong> ({{vacancy_title}}).</p><p>{{document_message}}</p><p>Contact HR at {{institution_name}} if you need assistance.</p>',
+    bodyText:
+      'Documents required for application {{application_no}}. {{document_message}}',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'document_message',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_JOINING_REMINDER',
+    name: 'Joining Date Reminder',
+    category: 'HR',
+    subject: 'Joining reminder — {{joining_date}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>This is a reminder that your joining date for <strong>{{vacancy_title}}</strong> at {{institution_name}} is <strong>{{joining_date}}</strong>.</p><p>Please report as instructed and submit your Joining Report.</p>',
+    bodyText:
+      'Joining reminder for {{vacancy_title}} on {{joining_date}} at {{institution_name}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'joining_date',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_APPOINTMENT_SENT',
+    name: 'Appointment Order Issued',
+    category: 'HR',
+    subject: 'Appointment order — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>Your appointment order <strong>{{order_no}}</strong> for <strong>{{vacancy_title}}</strong> at {{institution_name}} has been issued.</p><p>Expected joining date: <strong>{{joining_date}}</strong>.</p><p>Please contact HR to complete acceptance formalities.</p>',
+    bodyText:
+      'Appointment order {{order_no}} issued. Joining date {{joining_date}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'order_no',
+      'joining_date',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_STATUS_UPDATE',
+    name: 'Application Status Update',
+    category: 'HR',
+    subject: 'Application update — {{vacancy_title}}',
+    bodyHtml:
+      '<p>Dear {{candidate_name}},</p><p>Your application <strong>{{application_no}}</strong> for <strong>{{vacancy_title}}</strong> at {{institution_name}} is now: <strong>{{status_label}}</strong>.</p><p>Track your application on our careers portal.</p>',
+    bodyText:
+      'Application {{application_no}} status: {{status_label}} for {{vacancy_title}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'status_label',
+      'institution_name',
+    ],
+    channels: ['EMAIL', 'WHATSAPP'],
+  },
+  {
+    code: 'RECRUITMENT_HR_NEW_APPLICATION',
+    name: 'HR — New Application',
+    category: 'HR',
+    subject: 'New application — {{vacancy_title}}',
+    bodyHtml:
+      '<p>A new careers portal application has been submitted.</p><ul><li><strong>Candidate:</strong> {{candidate_name}}</li><li><strong>Application No:</strong> {{application_no}}</li><li><strong>Position:</strong> {{vacancy_title}}</li><li><strong>Mobile:</strong> {{candidate_mobile}}</li><li><strong>Email:</strong> {{candidate_email}}</li></ul><p>Review in ERP → HR → Recruitment → ATS.</p>',
+    bodyText:
+      'New application {{application_no}} — {{candidate_name}} for {{vacancy_title}}.',
+    variables: [
+      'candidate_name',
+      'application_no',
+      'vacancy_title',
+      'candidate_mobile',
+      'candidate_email',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
     code: 'BACKUP_SUCCESS',
     name: 'Backup Completed Successfully',
     category: 'GENERAL',

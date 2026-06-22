@@ -469,6 +469,30 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Rollback staff bulk update batches',
   },
   {
+    slug: 'hr:appointment:read',
+    resource: 'hr-appointment',
+    action: 'read',
+    description: 'View appointment orders and probation lists',
+  },
+  {
+    slug: 'hr:appointment:manage',
+    resource: 'hr-appointment',
+    action: 'manage',
+    description: 'Create and manage appointment orders',
+  },
+  {
+    slug: 'hr:appointment:issue',
+    resource: 'hr-appointment',
+    action: 'issue',
+    description: 'Generate and issue appointment order PDFs',
+  },
+  {
+    slug: 'hr:joining:verify',
+    resource: 'hr-joining',
+    action: 'verify',
+    description: 'Verify joining reports and activate staff',
+  },
+  {
     slug: 'staff-attendance:view',
     resource: 'staff-attendance',
     action: 'view',

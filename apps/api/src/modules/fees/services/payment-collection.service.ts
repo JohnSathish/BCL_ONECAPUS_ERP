@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
@@ -48,6 +49,25 @@ export class PaymentCollectionService {
         'Payment amount must be greater than zero.',
       );
 
+    const pendingClearance = dto.paymentMode.toUpperCase() === 'CHEQUE';
+    const collectionMeta = {
+      ...(dto.metadata ?? {}),
+      ...(dto.paymentSource ? { paymentSource: dto.paymentSource } : {}),
+      ...(dto.externalReference
+        ? { externalReference: dto.externalReference }
+        : {}),
+      demandIds: dto.demandIds ?? [],
+      audit: {
+        collectedById: user.sub,
+        collectedByEmail: user.email,
+        collectedAt: new Date().toISOString(),
+        clientIp: audit?.clientIp ?? null,
+        userAgent: audit?.userAgent ?? null,
+        collectionDevice: audit?.userAgent ?? null,
+        immutable: true,
+      },
+    };
+
     const payment = await this.db().paymentTransaction.create({
       data: {
         tenantId: user.tid,
@@ -59,26 +79,29 @@ export class PaymentCollectionService {
         externalReference: dto.externalReference ?? null,
         remarks: dto.remarks ?? null,
         provider: dto.provider,
-        status: 'SUCCESS',
+        status: pendingClearance ? 'PENDING_CLEARANCE' : 'SUCCESS',
         amount: dto.amount,
-        paidAt: new Date(),
+        paidAt: pendingClearance ? null : new Date(),
         collectedById: user.sub,
-        metadata: {
-          ...(dto.metadata ?? {}),
-          ...(dto.paymentSource ? { paymentSource: dto.paymentSource } : {}),
-          ...(dto.externalReference
-            ? { externalReference: dto.externalReference }
-            : {}),
-          audit: {
-            collectedById: user.sub,
-            collectedByEmail: user.email,
-            collectedAt: new Date().toISOString(),
-            clientIp: audit?.clientIp ?? null,
-            userAgent: audit?.userAgent ?? null,
-          },
-        },
+        metadata: collectionMeta,
       },
     });
+
+    if (pendingClearance) {
+      await this.logCollectionAudit(
+        user,
+        payment,
+        dto,
+        audit,
+        'CHEQUE_PENDING',
+      );
+      return {
+        payment,
+        allocations: [],
+        receipt: null,
+        pendingClearance: true,
+      };
+    }
 
     const allocations = await this.allocate(user, payment, dto.demandIds ?? []);
     const allocatedAmount = allocations.reduce(
@@ -122,7 +145,136 @@ export class PaymentCollectionService {
       receiptId: receipt.id,
     });
 
+    await this.logCollectionAudit(user, updated, dto, audit, 'FEE_COLLECTED');
+
     return { payment: updated, allocations, receipt };
+  }
+
+  async clearChequePayment(user: JwtUser, paymentId: string) {
+    const payment = await this.db().paymentTransaction.findFirst({
+      where: {
+        id: paymentId,
+        tenantId: user.tid,
+        status: 'PENDING_CLEARANCE',
+        paymentMode: 'CHEQUE',
+      },
+    });
+    if (!payment) {
+      throw new NotFoundException('Pending cheque payment not found.');
+    }
+
+    const demandIds = (
+      (payment.metadata as { demandIds?: string[] })?.demandIds ?? []
+    ).filter(Boolean);
+
+    const updated = await this.db().paymentTransaction.update({
+      where: { id: payment.id },
+      data: {
+        status: 'SUCCESS',
+        paidAt: new Date(),
+        metadata: {
+          ...(payment.metadata as Record<string, unknown>),
+          clearanceStatus: 'CLEARED',
+          clearedById: user.sub,
+          clearedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    const allocations = await this.allocateToDemands(
+      user.tid,
+      updated,
+      demandIds,
+    );
+    const allocatedAmount = allocations.reduce(
+      (sum, allocation) => sum + Number(allocation.amount ?? 0),
+      0,
+    );
+    const finalPayment = await this.db().paymentTransaction.update({
+      where: { id: payment.id },
+      data: {
+        allocatedAmount,
+        unallocatedAmount: Math.max(
+          0,
+          Number(payment.amount) - allocatedAmount,
+        ),
+      },
+      include: { allocations: true },
+    });
+
+    const receipt = await this.issueReceipt(
+      user.tid,
+      payment.studentId,
+      payment.id,
+      Number(payment.amount),
+      user.sub,
+      allocations.map((a) => a.id),
+      'CHEQUE',
+    );
+
+    await this.ledger.post({
+      tenantId: user.tid,
+      studentId: payment.studentId,
+      paymentId: payment.id,
+      entryType: 'PAYMENT',
+      creditAmount: Number(payment.amount),
+      referenceType: 'PAYMENT',
+      referenceId: payment.id,
+      description: `Cheque cleared · ref ${payment.externalReference ?? ''}`,
+      postedById: user.sub,
+      metadata: { immutable: true },
+    });
+
+    void this.queue.enqueueFeeReceiptPdf({
+      tenantId: user.tid,
+      receiptId: receipt.id,
+    });
+
+    await this.logCollectionAudit(
+      user,
+      finalPayment,
+      {
+        studentId: payment.studentId,
+        amount: Number(payment.amount),
+        paymentMode: 'CHEQUE',
+        demandIds,
+      } as CollectionDto,
+      undefined,
+      'CHEQUE_CLEARED',
+    );
+
+    return { payment: finalPayment, allocations, receipt };
+  }
+
+  private async logCollectionAudit(
+    user: JwtUser,
+    payment: { id: string; studentId: string; amount: unknown },
+    dto: CollectionDto,
+    audit: CollectAuditMeta | undefined,
+    action: string,
+  ) {
+    await this.db().feeAuditLog.create({
+      data: {
+        tenantId: user.tid,
+        actorId: user.sub,
+        action,
+        ipAddress: audit?.clientIp ?? null,
+        after: {
+          paymentId: payment.id,
+          studentId: payment.studentId,
+          amount: Number(payment.amount),
+          paymentMode: dto.paymentMode,
+          paymentSource: dto.paymentSource ?? null,
+          externalReference: dto.externalReference ?? null,
+        },
+        metadata: {
+          immutable: true,
+          demandIds: dto.demandIds ?? [],
+          collectionDetails: dto.metadata ?? {},
+          userAgent: audit?.userAgent ?? null,
+        },
+      },
+    });
   }
 
   private async assertCollectionAllowed(
@@ -172,6 +324,7 @@ export class PaymentCollectionService {
     if (mode === 'CASH') return 'CASH';
     if (mode === 'CHEQUE') return 'CHEQUE';
     if (mode === 'DD') return 'DD';
+    if (mode === 'ADJUSTMENT') return 'ADJUSTMENT';
     return null;
   }
 

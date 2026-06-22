@@ -106,6 +106,10 @@ export const MODULE_PERMISSIONS = {
   settings: ['org:read', 'org:manage', 'users:read'],
   shifts: ['shift:read', 'shift:manage'],
   hr: [
+    'hr:appointment:read',
+    'hr:appointment:manage',
+    'hr:appointment:issue',
+    'hr:joining:verify',
     'payroll:read',
     'payroll:manage',
     'payroll:process',

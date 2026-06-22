@@ -71,6 +71,15 @@ export type InstitutionBranding = {
   showPoweredBy: boolean;
   brandingEnabled: boolean;
   badges: string[];
+  portalExtras?: {
+    careersPortal?: {
+      principalName?: string;
+      principalTitle?: string;
+      principalMessage?: string;
+      principalPhotoUrl?: string;
+      heroImages?: string[];
+    };
+  };
 };
 
 export type BrandingAuditEntry = {

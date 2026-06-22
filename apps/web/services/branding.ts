@@ -36,6 +36,29 @@ export async function uploadInstitutionFavicon(file: File): Promise<InstitutionB
   return data;
 }
 
+export async function uploadCareersPrincipalPhoto(file: File): Promise<InstitutionBranding> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<InstitutionBranding>(
+    '/v1/branding/careers-principal-photo',
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data;
+}
+
+export async function uploadCareersHeroImage(
+  file: File,
+  slot: number,
+): Promise<InstitutionBranding> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<InstitutionBranding>(`/v1/branding/careers-hero/${slot}`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
 export async function fetchBrandingAudit(limit = 20): Promise<BrandingAuditEntry[]> {
   const { data } = await api.get<BrandingAuditEntry[]>('/v1/branding/audit', {
     params: { limit },

@@ -87,6 +87,51 @@ export class BrandingController {
     return this.branding.uploadAsset(user.tid, user.sub, 'favicon', file);
   }
 
+  @Post('careers-principal-photo')
+  @RequirePermissions('tenant:manage')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_FILE_BYTES },
+    }),
+  )
+  uploadCareersPrincipalPhoto(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.branding.uploadCareersPortalImage(
+      user.tid,
+      user.sub,
+      'principal-photo',
+      file,
+    );
+  }
+
+  @Post('careers-hero/:slot')
+  @RequirePermissions('tenant:manage')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  uploadCareersHero(
+    @CurrentUser() user: JwtUser,
+    @Param('slot') slot: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const n = Math.min(5, Math.max(1, Number(slot) || 1));
+    return this.branding.uploadCareersPortalImage(
+      user.tid,
+      user.sub,
+      'careers-hero',
+      file,
+      n,
+    );
+  }
+
   @Get('theme')
   getTheme(@CurrentUser() user: JwtUser) {
     return this.branding.getOrCreateTheme(user.tid);
