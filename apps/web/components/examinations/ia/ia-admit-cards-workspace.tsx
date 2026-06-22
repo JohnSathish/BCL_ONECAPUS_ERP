@@ -128,10 +128,23 @@ export function IaAdmitCardsWorkspace() {
   const triggerPrint = (cards: IaAdmitCardData[]) => {
     setPrintCards(cards);
     document.body.classList.add('ia-admit-printing');
-    setTimeout(() => {
-      window.print();
+
+    const cleanup = () => {
       document.body.classList.remove('ia-admit-printing');
-    }, 200);
+      setPrintCards([]);
+    };
+
+    const onAfterPrint = () => {
+      window.removeEventListener('afterprint', onAfterPrint);
+      cleanup();
+    };
+    window.addEventListener('afterprint', onAfterPrint);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => window.print(), 250);
+      });
+    });
   };
 
   const bulkPrint = useMutation({
@@ -450,8 +463,13 @@ export function IaAdmitCardsWorkspace() {
               Loading preview…
             </div>
           ) : previewCard ? (
-            <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
-              <IaAdmitCardPrint card={previewCard} />
+            <div className="max-h-[calc(100vh-12rem)] overflow-y-auto rounded-lg border border-border/60 bg-slate-100/50 p-3">
+              <div className="mx-auto max-w-[210mm] bg-white shadow-sm">
+                <IaAdmitCardPrint card={previewCard} />
+              </div>
+              <p className="mt-2 text-center text-[10px] text-muted-foreground no-print">
+                Preview is A4 width. Use Print or Download PDF for production output.
+              </p>
             </div>
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
@@ -464,7 +482,8 @@ export function IaAdmitCardsWorkspace() {
       <div
         id="ia-admit-print-area"
         ref={printRef}
-        className="pointer-events-none fixed -left-[9999px] top-0 w-full print:static print:left-0"
+        className="pointer-events-none fixed -left-[100vw] top-0 z-[-1] opacity-0"
+        aria-hidden={printCards.length === 0}
       >
         {printCards.map((card, i) => (
           <IaAdmitCardPrint key={card.admitCardNumber ?? i} card={card} />

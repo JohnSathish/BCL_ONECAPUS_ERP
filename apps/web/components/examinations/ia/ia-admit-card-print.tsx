@@ -128,7 +128,7 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
   const qrTarget = card.verifyUrl ?? card.qrPayload ?? '';
 
   return (
-    <article className="ia-admit-card relative overflow-hidden rounded-xl border-2 border-[#1e3a8a] bg-white p-5 text-slate-900 shadow-sm print:break-after-page print:shadow-none">
+    <article className="ia-admit-card relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-xl border-2 border-[#1e3a8a] bg-white p-5 text-slate-900 shadow-sm print:max-w-none print:rounded-none print:shadow-none">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl font-bold text-[#1e3a8a]/[0.04] rotate-[-28deg]"

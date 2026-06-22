@@ -1,0 +1,91 @@
+/* IA admit card print — A4 portrait, one card per page */
+
+@media screen {
+  .no-print {
+    /* visible on screen only */
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.ia-admit-printing * {
+    visibility: hidden !important;
+  }
+
+  body.ia-admit-printing #ia-admit-print-area,
+  body.ia-admit-printing #ia-admit-print-area * {
+    visibility: visible !important;
+  }
+
+  body.ia-admit-printing #ia-admit-print-area {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 1 !important;
+    z-index: 2147483647 !important;
+    overflow: visible !important;
+    transform: none !important;
+    background: #fff !important;
+  }
+
+  body.ia-admit-printing .ia-admit-card {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 190mm !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    padding: 8mm !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    transform: none !important;
+    zoom: 1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body.ia-admit-printing .ia-admit-card:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  body.ia-admit-printing .ia-admit-card table {
+    width: 100% !important;
+    font-size: 9pt !important;
+  }
+
+  body.ia-admit-printing .ia-admit-card img {
+    max-width: 100% !important;
+  }
+}
+
+/* Off-screen staging — keep A4 width so print layout is computed correctly */
+#ia-admit-print-area {
+  width: 210mm;
+  max-width: 210mm;
+}

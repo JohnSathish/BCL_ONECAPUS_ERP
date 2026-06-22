@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../styles/ia-admit-print.css';
 
 :root {
   --background: 210 40% 98%;
@@ -1397,22 +1398,5 @@ html.institution-branded .erp-theme-sidebar {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* IA admit card bulk print */
-@media print {
-  body.ia-admit-printing * {
-    visibility: hidden !important;
-  }
-  body.ia-admit-printing #ia-admit-print-area,
-  body.ia-admit-printing #ia-admit-print-area * {
-    visibility: visible !important;
-  }
-  body.ia-admit-printing #ia-admit-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
   }
 }
