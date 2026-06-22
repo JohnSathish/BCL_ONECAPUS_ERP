@@ -26,6 +26,7 @@ type PaperRow = {
   examDate: Date;
   startTime: Date;
   endTime: Date;
+  semesterNo?: number | null;
   metadata?: unknown;
   courseId?: string | null;
   offeringId?: string | null;
@@ -146,67 +147,71 @@ export class IaAdmitCardService {
   }
 
   private async studentsForPaper(tenantId: string, paper: PaperRow) {
+    const studentSelect = {
+      id: true,
+      rollNumber: true,
+      enrollmentNumber: true,
+      admissionNumber: true,
+      departmentId: true,
+      programVersionId: true,
+      user: { select: { displayName: true } },
+      programVersion: {
+        include: { program: { select: { name: true, code: true } } },
+      },
+      department: { select: { name: true, code: true } },
+    } as const;
+
     if (paper.offeringId) {
-      const registrations = await this.prisma.registration.findMany({
+      const lines = await this.prisma.semesterRegistrationLine.findMany({
         where: {
           tenantId,
           offeringId: paper.offeringId,
-          deletedAt: null,
-          status: { in: ['registered', 'approved', 'confirmed'] },
+          status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+          ...(paper.semesterNo != null
+            ? { registration: { semesterSequence: paper.semesterNo } }
+            : {}),
         },
         include: {
-          student: {
-            select: {
-              id: true,
-              rollNumber: true,
-              enrollmentNumber: true,
-              admissionNumber: true,
-              departmentId: true,
-              programVersionId: true,
-              user: { select: { displayName: true } },
-              programVersion: {
-                include: { program: { select: { name: true, code: true } } },
-              },
-              department: { select: { name: true, code: true } },
+          registration: {
+            include: {
+              student: { select: studentSelect },
             },
           },
         },
       });
-      return registrations.map((r) => r.student);
+      return Array.from(
+        new Map(
+          lines.map((line) => [
+            line.registration.student.id,
+            line.registration.student,
+          ]),
+        ).values(),
+      );
     }
+
     if (!paper.courseId) return [];
+
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
         tenantId,
         offering: { courseId: paper.courseId },
         status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        ...(paper.semesterNo != null
+          ? { registration: { semesterSequence: paper.semesterNo } }
+          : {}),
       },
       include: {
         registration: {
           include: {
-            student: {
-              select: {
-                id: true,
-                rollNumber: true,
-                enrollmentNumber: true,
-                admissionNumber: true,
-                departmentId: true,
-                programVersionId: true,
-                user: { select: { displayName: true } },
-                programVersion: {
-                  include: { program: { select: { name: true, code: true } } },
-                },
-                department: { select: { name: true, code: true } },
-              },
-            },
+            student: { select: studentSelect },
           },
         },
       },
       take: 2000,
-    } as any);
+    });
     return Array.from(
       new Map(
-        (lines as any[]).map((line) => [
+        lines.map((line) => [
           line.registration.student.id,
           line.registration.student,
         ]),
