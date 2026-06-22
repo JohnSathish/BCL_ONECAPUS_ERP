@@ -107,7 +107,9 @@ function dueTone(account?: StudentFeeAccount) {
   return 'partial';
 }
 
-export function FeeCollectionDesk() {
+export type FeeCollectionDeskVariant = 'setup' | 'collection';
+
+export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollectionDeskVariant }) {
   const qc = useQueryClient();
   const { session } = useAuth();
   const permissions = session?.user?.permissions ?? [];
@@ -310,7 +312,11 @@ export function FeeCollectionDesk() {
     },
     onSuccess: (res) => {
       setLastReceiptId(res.receipt?.id ?? null);
-      setMessage(`Cash collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`);
+      setMessage(
+        isCollection
+          ? `Cash collected — receipt ${res.receipt?.receiptNo ?? 'issued'}. Print receipt, then click Next student.`
+          : `Cash collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`,
+      );
       void accountQ.refetch();
       void dashboardQ.refetch();
     },
@@ -660,205 +666,295 @@ export function FeeCollectionDesk() {
   const chequeModeEnabled = collectionModes?.cheque;
   const ddModeEnabled = collectionModes?.dd;
   const showManualReference = chequeModeEnabled || ddModeEnabled;
+  const isCollection = variant === 'collection';
+
+  function resetForNextStudent() {
+    setStudentId('');
+    setSelectedStudent(null);
+    setQuery('');
+    setSelectedPayables(new Set());
+    setMonthsToGenerate(new Set());
+    setExpandedDemand(null);
+    setActiveRequest(null);
+    setActiveCheckout(null);
+    setLastReceiptId(null);
+    setManualReference('');
+    setMessage('Ready for next student — scan roll number or search.');
+    window.setTimeout(() => searchRef.current?.focus(), 80);
+  }
+
+  useEffect(() => {
+    if (!isCollection) return;
+    searchRef.current?.focus();
+  }, [isCollection]);
+
+  const searchCard = (
+    <Card
+      className={cn(
+        'glass-card border-0',
+        isCollection && 'border border-primary/20 shadow-md shadow-primary/5',
+      )}
+    >
+      <CardHeader className={cn('pb-3', isCollection && 'pb-2')}>
+        <CardTitle
+          className={cn(
+            'flex items-center gap-2',
+            isCollection ? 'text-lg font-bold' : 'text-base',
+          )}
+        >
+          <Search className={cn(isCollection ? 'h-6 w-6 text-primary' : 'h-5 w-5')} />
+          {isCollection ? 'Find student to collect fee' : 'Search student — outstanding fees'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Enrollment no · Roll no · Application no · Name · Mobile · Aadhaar · RFID · Barcode · ABC
+          ID
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <div
+            className={cn('relative min-w-[280px] flex-1', isCollection ? 'max-w-3xl' : 'max-w-xl')}
+          >
+            <Input
+              ref={searchRef}
+              className={cn('pr-9', isCollection && 'h-12 text-base')}
+              placeholder={
+                isCollection
+                  ? 'Scan barcode or type enrollment / roll / name / mobile / ABC ID'
+                  : 'Enrollment No / Roll No / Name / Mobile'
+              }
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSearchFocused(true);
+                if (message.includes('No student')) setMessage('');
+              }}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => window.setTimeout(() => setSearchFocused(false), 180)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && query.trim()) void runExplicitSearch();
+                if (e.key === 'Escape') setSearchFocused(false);
+              }}
+              autoFocus={scanMode || isCollection}
+              autoComplete="off"
+            />
+            {typeaheadQ.isFetching && debouncedQuery.trim().length >= 2 ? (
+              <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+            ) : null}
+
+            {showSuggestions ? (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-card shadow-lg">
+                {typeaheadQ.isFetching && !suggestions.length ? (
+                  <p className="px-3 py-3 text-sm text-muted-foreground">Searching…</p>
+                ) : suggestions.length ? (
+                  <>
+                    <p className="sticky top-0 border-b bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                      {suggestions.length} student{suggestions.length === 1 ? '' : 's'} found
+                    </p>
+                    {suggestions.map((row) => (
+                      <button
+                        key={row.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectStudent(row)}
+                        className="flex w-full items-center justify-between gap-3 border-b border-border/50 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted/70"
+                      >
+                        <span>
+                          <strong>{row.fullName}</strong>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {row.enrollmentNumber}
+                            {row.rollNumber ? ` · Roll ${row.rollNumber}` : ''}
+                            {row.mobileNumber ? ` · ${row.mobileNumber}` : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-xs text-muted-foreground">
+                          {row.programme ?? '—'}
+                          {row.shift ? ` · ${row.shift}` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <p className="px-3 py-3 text-sm text-muted-foreground">
+                    No students match &ldquo;{debouncedQuery.trim()}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+          <Button
+            size={isCollection ? 'default' : 'default'}
+            className={cn(isCollection && 'h-12 px-6')}
+            disabled={!query.trim() || typeaheadQ.isFetching}
+            onClick={() => void runExplicitSearch()}
+          >
+            Search
+          </Button>
+          <Button
+            variant="outline"
+            className={cn(isCollection && 'h-12')}
+            onClick={() => {
+              setScanMode(true);
+              searchRef.current?.focus();
+              setMessage('Scan mode — scan ID card or RFID barcode, then press Enter.');
+            }}
+          >
+            <QrCode className="mr-2 h-4 w-4" />
+            Scan ID card
+          </Button>
+          {isCollection && account ? (
+            <Button variant="secondary" className="h-12" onClick={resetForNextStudent}>
+              Next student
+            </Button>
+          ) : null}
+        </div>
+
+        {message && !account && !showSuggestions ? (
+          <p
+            className={cn(
+              'text-sm',
+              message.includes('failed') || message.includes('No student')
+                ? 'text-destructive'
+                : 'text-muted-foreground',
+            )}
+          >
+            {message}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+
+  const cashierKpis = (
+    <div
+      className={cn(
+        'grid gap-3',
+        isCollection ? 'sm:grid-cols-2 lg:grid-cols-5' : 'sm:grid-cols-2 xl:grid-cols-4',
+      )}
+    >
+      <KpiCard
+        icon={Wallet}
+        label={isCollection ? "Today's collection" : "Today's collections"}
+        value={formatInr(kpis?.todayCollection ?? 0)}
+      />
+      {isCollection ? (
+        <>
+          <KpiCard
+            icon={Banknote}
+            label="Monthly collected"
+            value={formatInr(kpis?.monthlyCollection ?? 0)}
+          />
+          <KpiCard
+            icon={BarChart3}
+            label="Admission collected"
+            value={formatInr(kpis?.admissionCollection ?? 0)}
+          />
+        </>
+      ) : null}
+      <KpiCard
+        icon={FileText}
+        label="Receipts today"
+        value={String(kpis?.receiptCount ?? '—')}
+        sub={isCollection ? undefined : 'receipts issued'}
+      />
+      <KpiCard
+        icon={Users}
+        label={isCollection ? 'Students with dues' : 'Students with dues'}
+        value={String(kpis?.defaulterCount ?? defaulterRows.length)}
+      />
+      {!isCollection ? (
+        <KpiCard icon={BarChart3} label="Pending dues" value={formatInr(kpis?.outstanding ?? 0)} />
+      ) : (
+        <KpiCard icon={BarChart3} label="Outstanding" value={formatInr(kpis?.outstanding ?? 0)} />
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      {/* Payment facilitation dashboard */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          icon={Wallet}
-          label="Today's collections"
-          value={formatInr(kpis?.todayCollection ?? 0)}
-        />
-        <KpiCard
-          icon={FileText}
-          label="Transactions today"
-          value={String(kpis?.receiptCount ?? '—')}
-          sub="receipts issued"
-        />
-        <KpiCard icon={BarChart3} label="Pending dues" value={formatInr(kpis?.outstanding ?? 0)} />
-        <KpiCard icon={Users} label="Students with dues" value={String(defaulterRows.length)} />
-      </div>
-
-      {/* Bulk operations */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={bulkGenMut.isPending}
-          onClick={() => bulkGenMut.mutate()}
-        >
-          Generate monthly fees
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={remindersMut.isPending}
-          onClick={() => remindersMut.mutate()}
-        >
-          <Bell className="mr-2 h-4 w-4" />
-          {remindersMut.isPending ? 'Sending…' : 'Send due reminders'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={async () => {
-            const res = await exportFeeReport('collections', 'csv');
-            downloadCsv(res.content ?? '', res.filename ?? 'collections.csv');
-          }}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export collection report
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={async () => {
-            const res = await exportFeeReport('outstanding', 'csv');
-            downloadCsv(res.content ?? '', res.filename ?? 'outstanding.csv');
-          }}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export outstanding report
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => window.location.assign('/admin/fees/day-closing')}
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          Day closing report
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => window.location.assign('/admin/fees/cash-register')}
-        >
-          <Banknote className="mr-2 h-4 w-4" />
-          Cash register
-        </Button>
-      </div>
-
-      <BulkReceiptPrintPanel extraReceiptIds={account?.receipts?.slice(0, 5).map((r) => r.id)} />
-
-      <MonthlyFeeSetupGuide compact />
-
-      {message && !account ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {message}
-        </div>
-      ) : null}
-
-      {/* Smart search */}
-      <Card className="glass-card border-0">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Search className="h-5 w-5" />
-            Search student — outstanding fees
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Enrollment no · Roll no · Application no · Name · Mobile · Aadhaar · RFID / Barcode
-          </p>
+      {isCollection ? (
+        <>
+          <div className="sticky top-0 z-20 -mx-1 rounded-xl bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/90">
+            {searchCard}
+          </div>
+          {cashierKpis}
+        </>
+      ) : (
+        <>
+          {cashierKpis}
           <div className="flex flex-wrap gap-2">
-            <div className="relative max-w-xl min-w-[240px] flex-1">
-              <Input
-                ref={searchRef}
-                className="pr-9"
-                placeholder="Enrollment No / Roll No / Name / Mobile"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSearchFocused(true);
-                  if (message.includes('No student')) setMessage('');
-                }}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => window.setTimeout(() => setSearchFocused(false), 180)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && query.trim()) void runExplicitSearch();
-                  if (e.key === 'Escape') setSearchFocused(false);
-                }}
-                autoFocus={scanMode}
-                autoComplete="off"
-              />
-              {typeaheadQ.isFetching && debouncedQuery.trim().length >= 2 ? (
-                <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-              ) : null}
-
-              {showSuggestions ? (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-card shadow-lg">
-                  {typeaheadQ.isFetching && !suggestions.length ? (
-                    <p className="px-3 py-3 text-sm text-muted-foreground">Searching…</p>
-                  ) : suggestions.length ? (
-                    <>
-                      <p className="sticky top-0 border-b bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                        {suggestions.length} student{suggestions.length === 1 ? '' : 's'} found
-                      </p>
-                      {suggestions.map((row) => (
-                        <button
-                          key={row.id}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectStudent(row)}
-                          className="flex w-full items-center justify-between gap-3 border-b border-border/50 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted/70"
-                        >
-                          <span>
-                            <strong>{row.fullName}</strong>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {row.enrollmentNumber}
-                              {row.rollNumber ? ` · Roll ${row.rollNumber}` : ''}
-                              {row.mobileNumber ? ` · ${row.mobileNumber}` : ''}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-right text-xs text-muted-foreground">
-                            {row.programme ?? '—'}
-                            {row.shift ? ` · ${row.shift}` : ''}
-                          </span>
-                        </button>
-                      ))}
-                    </>
-                  ) : (
-                    <p className="px-3 py-3 text-sm text-muted-foreground">
-                      No students match &ldquo;{debouncedQuery.trim()}&rdquo;
-                    </p>
-                  )}
-                </div>
-              ) : null}
-            </div>
             <Button
-              disabled={!query.trim() || typeaheadQ.isFetching}
-              onClick={() => void runExplicitSearch()}
+              size="sm"
+              variant="outline"
+              disabled={bulkGenMut.isPending}
+              onClick={() => bulkGenMut.mutate()}
             >
-              Search
+              Generate monthly fees
             </Button>
             <Button
+              size="sm"
               variant="outline"
-              onClick={() => {
-                setScanMode(true);
-                searchRef.current?.focus();
-                setMessage('Scan mode — scan ID card or RFID barcode, then press Enter.');
+              disabled={remindersMut.isPending}
+              onClick={() => remindersMut.mutate()}
+            >
+              <Bell className="mr-2 h-4 w-4" />
+              {remindersMut.isPending ? 'Sending…' : 'Send due reminders'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const res = await exportFeeReport('collections', 'csv');
+                downloadCsv(res.content ?? '', res.filename ?? 'collections.csv');
               }}
             >
-              <QrCode className="mr-2 h-4 w-4" />
-              Scan ID card
+              <Download className="mr-2 h-4 w-4" />
+              Export collection report
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const res = await exportFeeReport('outstanding', 'csv');
+                downloadCsv(res.content ?? '', res.filename ?? 'outstanding.csv');
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export outstanding report
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.assign('/admin/fees/day-closing')}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Day closing report
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.assign('/admin/fees/cash-register')}
+            >
+              <Banknote className="mr-2 h-4 w-4" />
+              Cash register
             </Button>
           </div>
 
-          {message && !account && !showSuggestions ? (
-            <p
-              className={cn(
-                'text-sm',
-                message.includes('failed') || message.includes('No student')
-                  ? 'text-destructive'
-                  : 'text-muted-foreground',
-              )}
-            >
+          <BulkReceiptPrintPanel
+            extraReceiptIds={account?.receipts?.slice(0, 5).map((r) => r.id)}
+          />
+
+          <MonthlyFeeSetupGuide compact />
+
+          {message && !account && !isCollection ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               {message}
-            </p>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+
+          {searchCard}
+        </>
+      )}
 
       {/* ERP desk split */}
       {account && selectedStudent ? (
@@ -1013,7 +1109,7 @@ export function FeeCollectionDesk() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <QrCode className="h-4 w-4" />
-                  Payment facilitation
+                  {isCollection ? 'Quick collection' : 'Payment facilitation'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1358,6 +1454,15 @@ export function FeeCollectionDesk() {
               </CardContent>
             </Card>
           </div>
+        </div>
+      ) : isCollection ? (
+        <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-16 text-center">
+          <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+          <p className="text-lg font-semibold">Search or scan to begin fee collection</p>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
+            Use the search bar above — scan a roll number or enrollment barcode and press Enter for
+            the next student.
+          </p>
         </div>
       ) : null}
     </div>

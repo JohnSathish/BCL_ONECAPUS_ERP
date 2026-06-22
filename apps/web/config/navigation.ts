@@ -852,12 +852,12 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: Wallet,
         module: 'finance',
         permissions: [...P.finance],
-        activePattern: '^/admin/fees(?:/.*)?$',
+        activePattern: '^/(admin/fees|finance)(?:/.*)?$',
         children: [
           { label: 'Fee Dashboard', href: '/admin/fees', permissions: [...P.finance] },
           {
-            label: 'Admission Fee Structure',
-            href: '/admin/fees/admission-structure',
+            label: 'Fee Structure',
+            href: '/admin/fees/structures',
             permissions: ['fees:manage'],
           },
           {
@@ -865,15 +865,18 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/fees/monthly-plans',
             permissions: ['fees:manage'],
           },
-          { label: 'Fee Settings', href: '/admin/fees/settings', permissions: ['fees:manage'] },
-          { label: 'Fee Head Master', href: '/admin/fees/masters', permissions: ['fees:manage'] },
           {
-            label: 'Fee Cycle Configuration',
-            href: '/admin/fees/cycles',
+            label: 'Demand Generator',
+            href: '/admin/fees/demands',
             permissions: ['fees:manage'],
           },
           {
-            label: 'Payment Facilitation Desk',
+            label: 'Fee Collection Center',
+            href: '/admin/fees/fee-collection',
+            permissions: ['fees:manage', 'fees:read', 'fees:cash:collect'],
+          },
+          {
+            label: 'Finance Setup Center',
             href: '/admin/fees/collections',
             permissions: ['fees:manage', 'fees:read'],
           },
@@ -881,16 +884,6 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'External Payment Entry',
             href: '/admin/fees/external-payments',
             permissions: ['fees:manage'],
-          },
-          {
-            label: 'Day Closing Report',
-            href: '/admin/fees/day-closing',
-            permissions: ['fees:read', 'fees:manage'],
-          },
-          {
-            label: 'Cash Register',
-            href: '/admin/fees/cash-register',
-            permissions: ['fees:read', 'fees:manage'],
           },
           {
             label: 'Scholarships & Concessions',
@@ -903,22 +896,38 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: [...P.finance],
           },
           {
-            label: 'Financial Reports Center',
-            href: '/admin/fees/reports',
-            permissions: ['fees:read', 'reports:read'],
-          },
-          {
             label: 'Defaulter Intelligence',
             href: '/admin/fees/defaulters',
             permissions: [...P.finance],
           },
           {
-            label: 'Fee Structure Studio (Advanced)',
-            href: '/admin/fees/structures',
+            label: 'Financial Reports',
+            href: '/admin/fees/reports',
+            permissions: ['fees:read', 'reports:read'],
+          },
+          { label: 'Fee Settings', href: '/admin/fees/settings', permissions: ['fees:manage'] },
+          { label: 'Fee Head Master', href: '/admin/fees/masters', permissions: ['fees:manage'] },
+          {
+            label: 'Fee Cycle Configuration',
+            href: '/admin/fees/cycles',
             permissions: ['fees:manage'],
           },
+          {
+            label: 'Admission Fee Structure',
+            href: '/admin/fees/admission-structure',
+            permissions: ['fees:manage'],
+          },
+          {
+            label: 'Day Closing Report',
+            href: '/admin/fees/day-closing',
+            permissions: ['fees:read', 'fees:manage'],
+          },
+          {
+            label: 'Cash Register',
+            href: '/admin/fees/cash-register',
+            permissions: ['fees:read', 'fees:manage'],
+          },
           { label: 'Renewal Center', href: '/admin/fees/renewals', permissions: ['fees:manage'] },
-          { label: 'Demand Generator', href: '/admin/fees/demands', permissions: ['fees:manage'] },
         ],
       },
     ],
@@ -1722,7 +1731,8 @@ export const ROLE_NAV: Record<string, { label: string; href: string; icon: Lucid
   parent: [{ label: 'Dashboard', href: '/parent', icon: LayoutDashboard }],
   accountant: [
     { label: 'Dashboard', href: '/admin/fees', icon: LayoutDashboard },
-    { label: 'Fees', href: '/admin/fees', icon: Wallet },
+    { label: 'Fee Collection', href: '/admin/fees/fee-collection', icon: Wallet },
+    { label: 'Finance Setup', href: '/admin/fees/collections', icon: FileText },
   ],
   librarian: [
     { label: 'Dashboard', href: '/admin/library', icon: LayoutDashboard },

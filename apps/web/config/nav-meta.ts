@@ -80,11 +80,11 @@ export const QUICK_CREATE_ACTIONS: QuickCreateAction[] = [
     id: 'collect-fee',
     label: 'Collect Fee',
     shortLabel: 'Fee Collection',
-    href: '/admin/fees/collections',
+    href: '/admin/fees/fee-collection',
     icon: Wallet,
     color: '#f97316',
-    permissions: ['fees:manage', 'fees:read'],
-    keywords: ['collect fee', 'fee collection', 'payment'],
+    permissions: ['fees:manage', 'fees:read', 'fees:cash:collect'],
+    keywords: ['collect fee', 'fee collection', 'payment', 'cashier'],
   },
   {
     id: 'create-notice',
@@ -130,7 +130,7 @@ export const SIDEBAR_QUICK_ACTIONS = QUICK_CREATE_ACTIONS;
 
 export const DEFAULT_FAVORITE_HREFS = [
   '/admin/students',
-  '/admin/fees/collections',
+  '/admin/fees/fee-collection',
   '/admin/academics/attendance',
   '/admin/library',
   '/admin/governance',
@@ -158,9 +158,9 @@ export const NAV_SEARCH_ACTIONS: NavSearchAction[] = [
   },
   {
     label: 'Collect Fee',
-    href: '/admin/fees/collections',
-    keywords: ['collect fee', 'fee payment'],
-    permissions: ['fees:manage', 'fees:read'],
+    href: '/admin/fees/fee-collection',
+    keywords: ['collect fee', 'fee payment', 'cashier'],
+    permissions: ['fees:manage', 'fees:read', 'fees:cash:collect'],
   },
   {
     label: 'Student Directory',
