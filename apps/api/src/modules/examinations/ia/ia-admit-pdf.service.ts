@@ -1,9 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
+import { resolvePdfImageSrc } from '../../../common/uploads/pdf-asset.util';
 import {
   renderIaAdmitCardHtml,
   type IaAdmitCardTemplateInput,
 } from './templates/ia-admit-card.template';
+
+function embedAdmitCardImages(
+  card: IaAdmitCardTemplateInput,
+): IaAdmitCardTemplateInput {
+  return {
+    ...card,
+    institution: {
+      ...card.institution,
+      logoUrl: resolvePdfImageSrc(card.institution.logoUrl),
+    },
+    student: {
+      ...card.student,
+      photoUrl: resolvePdfImageSrc(card.student.photoUrl),
+    },
+    qrDataUrl: resolvePdfImageSrc(card.qrDataUrl),
+  };
+}
 
 @Injectable()
 export class IaAdmitPdfService {
@@ -31,12 +49,14 @@ export class IaAdmitPdfService {
   }
 
   async renderCardPdf(card: IaAdmitCardTemplateInput) {
-    const html = renderIaAdmitCardHtml(card);
+    const html = renderIaAdmitCardHtml(embedAdmitCardImages(card));
     return this.htmlToPdf(html);
   }
 
   async renderBatchPdf(cards: IaAdmitCardTemplateInput[]) {
-    const combined = cards.map((c) => renderIaAdmitCardHtml(c)).join('');
+    const combined = cards
+      .map((c) => renderIaAdmitCardHtml(embedAdmitCardImages(c)))
+      .join('');
     return this.htmlToPdf(combined);
   }
 }

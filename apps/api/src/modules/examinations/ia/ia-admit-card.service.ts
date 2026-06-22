@@ -92,7 +92,8 @@ export class IaAdmitCardService {
       name: tenant?.name ?? 'College',
       displayName: branding?.displayName ?? institution?.name ?? tenant?.name,
       address: branding?.address ?? null,
-      logoUrl: branding?.logoUrl ?? null,
+      logoUrl:
+        toPublicUploadUrl(branding?.logoUrl) ?? branding?.logoUrl ?? null,
       affiliation:
         branding?.portalSubtitle ??
         'Affiliated to North-Eastern Hill University (NEHU)',
