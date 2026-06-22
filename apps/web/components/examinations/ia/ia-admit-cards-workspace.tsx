@@ -26,6 +26,7 @@ import {
 } from '@/services/examinations-ia';
 import { printHtmlDocument } from '@/lib/print-html-document';
 import { IaAdmitCardPrint, type IaAdmitCardData } from './ia-admit-card-print';
+import { apiErrorMessage } from '@/utils/api-error';
 
 type StudentRow = {
   id: string;
@@ -60,6 +61,7 @@ export function IaAdmitCardsWorkspace() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewCard, setPreviewCard] = useState<IaAdmitCardData | null>(null);
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   const [showIneligible, setShowIneligible] = useState(false);
 
   const sessions = useQuery({ queryKey: ['ia', 'admit-sessions'], queryFn: fetchIaAdmitSessions });
@@ -127,6 +129,7 @@ export function IaAdmitCardsWorkspace() {
 
   const admitPrint = useMutation({
     mutationFn: async (studentIds: string[]) => {
+      setPrintError(null);
       const html = await fetchIaAdmitPrintHtml(activeSession, studentIds);
       await printHtmlDocument(html);
     },
@@ -134,10 +137,14 @@ export function IaAdmitCardsWorkspace() {
       roster.refetch();
       dashboard.refetch();
     },
+    onError: (error) => {
+      setPrintError(apiErrorMessage(error, 'Unable to open print dialog. Try Download PDF.'));
+    },
   });
 
   const bulkPrint = useMutation({
     mutationFn: async (ids: string[]) => {
+      setPrintError(null);
       await bulkGenerateIaAdmitCards(activeSession, ids);
       const html = await fetchIaAdmitPrintHtml(activeSession, ids);
       await printHtmlDocument(html);
@@ -145,6 +152,9 @@ export function IaAdmitCardsWorkspace() {
     onSuccess: () => {
       roster.refetch();
       dashboard.refetch();
+    },
+    onError: (error) => {
+      setPrintError(apiErrorMessage(error, 'Unable to open print dialog. Try Download PDF.'));
     },
   });
 
@@ -472,6 +482,9 @@ export function IaAdmitCardsWorkspace() {
               <p className="mt-2 text-center text-[10px] text-muted-foreground">
                 Preview is approximate. Print and Download PDF use the same server layout (A4).
               </p>
+              {printError ? (
+                <p className="mt-2 text-center text-xs text-destructive">{printError}</p>
+              ) : null}
             </div>
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
