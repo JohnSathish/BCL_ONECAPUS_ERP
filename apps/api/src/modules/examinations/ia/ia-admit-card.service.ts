@@ -155,6 +155,7 @@ export class IaAdmitCardService {
       departmentId: true,
       programVersionId: true,
       user: { select: { displayName: true } },
+      masterProfile: { select: { fullName: true } },
       programVersion: {
         include: { program: { select: { name: true, code: true } } },
       },
@@ -358,10 +359,10 @@ export class IaAdmitCardService {
         } else {
           byStudent.set(s.id, {
             id: s.id,
-            rollNumber: s.rollNumber,
+            rollNumber: s.rollNumber ?? s.enrollmentNumber ?? s.admissionNumber,
             enrollmentNumber: s.enrollmentNumber,
             admissionNumber: s.admissionNumber,
-            fullName: s.user?.displayName,
+            fullName: s.masterProfile?.fullName ?? s.user?.displayName,
             programme: s.programVersion?.program?.name,
             programmeCode: s.programVersion?.program?.code,
             department: s.department?.name,
