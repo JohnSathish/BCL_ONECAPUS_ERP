@@ -28,18 +28,24 @@ export const useSidebarNavStore = create<SidebarNavState>()(
             [role]: { ...(s.openGroupsByRole[role] ?? {}), [label]: open },
           },
         })),
-      setExclusiveGroupOpen: (role, label) =>
+      setExclusiveGroupOpen: (role, label) => {
+        const current = get().openGroupsByRole[role] ?? {};
+        const alreadyExclusive =
+          current[label] === true &&
+          Object.entries(current).every(([key, open]) => (key === label ? open === true : !open));
+        if (alreadyExclusive) return;
         set((s) => {
-          const current = s.openGroupsByRole[role] ?? {};
+          const prev = s.openGroupsByRole[role] ?? {};
           const next: Record<string, boolean> = {};
-          for (const key of Object.keys(current)) {
+          for (const key of Object.keys(prev)) {
             next[key] = false;
           }
           next[label] = true;
           return {
             openGroupsByRole: { ...s.openGroupsByRole, [role]: next },
           };
-        }),
+        });
+      },
       toggleGroup: (role, label) => {
         const current = get().openGroupsByRole[role]?.[label] ?? false;
         get().setGroupOpen(role, label, !current);

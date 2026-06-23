@@ -172,11 +172,11 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
       const ctx = staffMe.data
         ? buildStaffNavContext({
             ...staffMe.data,
-            permissions: session?.user?.permissions,
+            permissions: userPerms,
           })
         : buildStaffNavContext({
             staffType: 'TEACHING',
-            permissions: session?.user?.permissions,
+            permissions: userPerms,
           });
       return filterStaffNav(STAFF_NAV, ctx);
     }
@@ -194,7 +194,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         })),
       },
     ];
-  }, [role, staffMe.data, session]);
+  }, [role, staffMe.data, userPerms, session]);
 
   const navIndex = useMemo(() => buildNavIndex(groups), [groups]);
 

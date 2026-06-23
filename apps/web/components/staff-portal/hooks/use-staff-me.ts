@@ -9,20 +9,24 @@ import {
   fetchStaffDashboard,
   fetchStaffMe,
 } from '@/services/staff-portal';
+import { useAuthQueryEnabled } from '@/hooks/use-auth';
 
 export function useStaffMe({ enabled = true }: { enabled?: boolean } = {}) {
+  const authReady = useAuthQueryEnabled();
   return useQuery({
     queryKey: ['staff-portal', 'me'],
     queryFn: fetchStaffMe,
-    enabled,
+    enabled: enabled && authReady,
     staleTime: 60_000,
   });
 }
 
 export function useStaffDashboard() {
+  const authReady = useAuthQueryEnabled();
   return useQuery({
     queryKey: ['staff-portal', 'dashboard'],
     queryFn: fetchStaffDashboard,
+    enabled: authReady,
     staleTime: 30_000,
   });
 }

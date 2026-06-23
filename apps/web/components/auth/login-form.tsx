@@ -152,11 +152,8 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         tokenRefreshManager.scheduleProactiveRefresh(session);
         const destination =
           postLoginPath ?? resolveHomePath(session.user.roles, session.user.permissions ?? []);
-        if (hardRedirect) {
-          window.location.assign(destination);
-        } else {
-          router.replace(destination);
-        }
+        // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
+        window.location.assign(destination);
       } catch (err) {
         if (isApiUnavailableError(err)) {
           setError(

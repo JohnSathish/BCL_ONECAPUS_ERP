@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { useTheme as useNextTheme } from 'next-themes';
@@ -130,12 +130,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     canManageBranding,
     isFetched: brandingFetched,
   } = useInstitutionBranding();
-  const { resolvedTheme, setTheme: setNextTheme } = useNextTheme();
+  const { theme: nextTheme, resolvedTheme, setTheme: setNextTheme } = useNextTheme();
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const setStoreTheme = useThemeStore((s) => s.setTheme);
   const draft = useThemeStore((s) => s.draft);
   const setSidebarCollapsed = useDashboardUiStore((s) => s.setSidebarCollapsed);
+  const compactSidebarAppliedForThemeId = useRef<string | null>(null);
+  const brandingFavicon = branding?.faviconUrl;
+  const brandingTitle = branding?.shortName ?? branding?.displayName;
 
   const themeQuery = useQuery({
     queryKey: ['theme-settings', tenantId],
@@ -161,15 +164,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setStoreTheme(theme);
       cacheThemePayload(tenantId, theme);
     }
-    if (theme.compactSidebar && !useDashboardUiStore.getState().sidebarCollapsed) {
+    if (
+      theme.compactSidebar &&
+      compactSidebarAppliedForThemeId.current !== theme.id &&
+      !useDashboardUiStore.getState().sidebarCollapsed
+    ) {
       setSidebarCollapsed(true);
+      compactSidebarAppliedForThemeId.current = theme.id;
     }
   }, [theme, tenantId, setStoreTheme, setSidebarCollapsed]);
 
   useEffect(() => {
-    if (!userAppearance) return;
+    if (!userAppearance || nextTheme === userAppearance) return;
     setNextTheme(userAppearance);
-  }, [userAppearance, setNextTheme]);
+  }, [userAppearance, nextTheme, setNextTheme]);
 
   const effectiveTheme = useMemo(() => {
     if (!theme) return null;
@@ -188,24 +196,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       effectiveTheme,
       active,
       resolvedTheme === 'dark',
-      branding?.faviconUrl,
-      branding?.shortName ?? branding?.displayName,
+      brandingFavicon,
+      brandingTitle,
     );
-  }, [effectiveTheme, active, brandingFetched, resolvedTheme, branding]);
+  }, [effectiveTheme, active, brandingFetched, resolvedTheme, brandingFavicon, brandingTitle]);
 
   useEffect(() => {
     if (!tenantId || theme) return;
     const cached = readCachedTheme(tenantId);
     if (cached && active) {
-      applyThemeToDom(
-        cached,
-        true,
-        resolvedTheme === 'dark',
-        branding?.faviconUrl,
-        branding?.shortName ?? branding?.displayName,
-      );
+      applyThemeToDom(cached, true, resolvedTheme === 'dark', brandingFavicon, brandingTitle);
     }
-  }, [tenantId, theme, active, resolvedTheme, branding]);
+  }, [tenantId, theme, active, resolvedTheme, brandingFavicon, brandingTitle]);
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['theme-settings'] });
@@ -213,7 +215,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: ['institution-branding-audit'] });
   }, [queryClient]);
 
-  const updateMutation = useMutation({
+  const { mutateAsync: updateThemeMutate } = useMutation({
     mutationFn: updateThemeSettings,
     onSuccess: (result) => {
       setStoreTheme(result);
@@ -222,7 +224,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const presetMutation = useMutation({
+  const { mutateAsync: applyPresetMutate } = useMutation({
     mutationFn: applyThemePreset,
     onSuccess: (result) => {
       setStoreTheme(result);
@@ -232,7 +234,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const importMutation = useMutation({
+  const { mutateAsync: importThemeMutate } = useMutation({
     mutationFn: importThemeSettings,
     onSuccess: (result) => {
       setStoreTheme(result);
@@ -241,6 +243,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  const applyPreset = useCallback(
+    async (presetId: string) => {
+      await applyPresetMutate(presetId);
+    },
+    [applyPresetMutate],
+  );
+
+  const updateTheme = useCallback(
+    async (patch: Partial<AppThemeSettings>) => {
+      await updateThemeMutate(patch);
+    },
+    [updateThemeMutate],
+  );
+
+  const resetTheme = useCallback(async () => {
+    await applyPresetMutate('dbc-enterprise-blue');
+  }, [applyPresetMutate]);
+
+  const importTheme = useCallback(
+    async (payload: Record<string, unknown>) => {
+      await importThemeMutate(payload);
+    },
+    [importThemeMutate],
+  );
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme: effectiveTheme,
@@ -248,19 +275,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       canManage: canManageBranding,
       isLoading: themeQuery.isLoading,
       darkModeEnabled: theme?.darkModeEnabled ?? true,
-      applyPreset: async (presetId) => {
-        await presetMutation.mutateAsync(presetId);
-      },
-      updateTheme: async (patch) => {
-        await updateMutation.mutateAsync(patch);
-      },
-      resetTheme: async () => {
-        await presetMutation.mutateAsync('dbc-enterprise-blue');
-      },
+      applyPreset,
+      updateTheme,
+      resetTheme,
       exportTheme: exportThemeSettings,
-      importTheme: async (payload) => {
-        await importMutation.mutateAsync(payload as Record<string, unknown>);
-      },
+      importTheme,
     }),
     [
       effectiveTheme,
@@ -268,9 +287,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       theme,
       canManageBranding,
       themeQuery.isLoading,
-      presetMutation,
-      updateMutation,
-      importMutation,
+      applyPreset,
+      updateTheme,
+      resetTheme,
+      importTheme,
     ],
   );
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Command } from 'cmdk';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Loader2, Search, Sparkles, UserRound } from 'lucide-react';
@@ -92,13 +92,16 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const wasOpen = useRef(false);
+
   useEffect(() => {
-    if (!open) {
+    if (wasOpen.current && !open) {
       setSearch('');
       setAiResult(null);
       askMut.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when dialog closes
+    wasOpen.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when palette closes
   }, [open]);
 
   const showAskAiItem = search.trim().length >= 4 && !isStaffPortal;
