@@ -38,9 +38,11 @@ export const useDashboardUiStore = create<DashboardUiState>()(
       mobileNavOpen: false,
       campusId: 'tura',
       widgets: defaultWidgets,
-      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+      setSidebarCollapsed: (sidebarCollapsed) =>
+        set((s) => (s.sidebarCollapsed === sidebarCollapsed ? s : { sidebarCollapsed })),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-      setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
+      setMobileNavOpen: (mobileNavOpen) =>
+        set((s) => (s.mobileNavOpen === mobileNavOpen ? s : { mobileNavOpen })),
       toggleMobileNavOpen: () => set((s) => ({ mobileNavOpen: !s.mobileNavOpen })),
       setCampusId: (campusId) => set({ campusId }),
       setWidget: (key, visible) => set((s) => ({ widgets: { ...s.widgets, [key]: visible } })),

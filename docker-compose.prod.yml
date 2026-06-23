@@ -1,8 +1,14 @@
 # Production overlay: app server with external managed PostgreSQL.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Set DATABASE_URL to your managed PostgreSQL connection string (SSL required).
-# Omit the local postgres service when using managed DB.
+# VPS with local postgres container (DBC Hostinger):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db build web
+#
+# Managed PostgreSQL only (omit local postgres):
+#   Set DATABASE_URL in .env — do NOT pass --profile local-db
+#
+# Without --profile local-db on a VPS that uses the postgres service, compose fails with:
+#   service "api" depends on undefined service "postgres"
 
 services:
   postgres:
