@@ -40,7 +40,7 @@ import {
   useSidebarNavStore,
   type SidebarScrollSection,
 } from '@/store/sidebar-nav-store';
-import { useNavPreferencesStore } from '@/store/nav-preferences-store';
+import { useNavPreferencesStore, type NavRecentEntry } from '@/store/nav-preferences-store';
 import { buildNavIndex, findEntryById, navEntryId, resolveNavEntry } from '@/lib/nav-index';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
@@ -59,6 +59,8 @@ const SCROLL_NAV_CLASS =
   'sidebar-scroll-auto min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain px-2 py-2';
 
 const EMPTY_OPEN_GROUPS: Record<string, boolean> = {};
+const EMPTY_RECENTS: NavRecentEntry[] = [];
+const EMPTY_FAVORITE_IDS: string[] = [];
 
 function SidebarNav({
   roleKey,
@@ -132,8 +134,10 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
 
   const toggleFavorite = useNavPreferencesStore((s) => s.toggleFavorite);
   const recordVisit = useNavPreferencesStore((s) => s.recordVisit);
-  const recents = useNavPreferencesStore((s) => s.recentsByRole[roleKey] ?? []);
-  const favoriteIds = useNavPreferencesStore((s) => s.favoritesByRole[roleKey] ?? []);
+  const recents = useNavPreferencesStore((s) => s.recentsByRole[roleKey] ?? EMPTY_RECENTS);
+  const favoriteIds = useNavPreferencesStore(
+    (s) => s.favoritesByRole[roleKey] ?? EMPTY_FAVORITE_IDS,
+  );
   const setFavorites = useNavPreferencesStore((s) => s.setFavorites);
   const sidebarLayout = useNavPreferencesStore((s) => s.sidebarLayout);
   const toggleFavoritesExpanded = useNavPreferencesStore((s) => s.toggleFavoritesExpanded);
