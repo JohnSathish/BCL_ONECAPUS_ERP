@@ -23,7 +23,14 @@ bash scripts/deploy/vps-pull.sh
 
 if [[ -f /etc/letsencrypt/live/erp.donboscocollege.ac.in/fullchain.pem ]]; then
   echo "Applying HTTPS nginx config…"
-  cp nginx/nginx.ssl.conf nginx/nginx.conf
+  if docker ps --format '{{.Names}}' | grep -q '^donboscocollege-web$' \
+    && [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+    && [[ -f /etc/letsencrypt/live/donboscocollege.ac.in/fullchain.pem ]]; then
+    echo "Using combined ERP + college website nginx config (career → ERP)."
+    cp nginx/nginx.combined-dbc.ssl.conf nginx/nginx.conf
+  else
+    cp nginx/nginx.ssl.conf nginx/nginx.conf
+  fi
 fi
 
 echo "Validating nginx config…"
