@@ -22,7 +22,7 @@ const ACTIONS = [
   { label: 'View Students', href: '/staff/academic/students', icon: Users },
   {
     label: 'Enter Marks',
-    href: '/staff/academic/internal-marks',
+    href: '/staff/academic/marks',
     icon: PenLine,
   },
 ];
