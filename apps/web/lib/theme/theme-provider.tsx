@@ -155,12 +155,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const userAppearance = userPrefsQuery.data?.appearanceMode;
 
   useEffect(() => {
-    if (theme) {
+    if (!theme) return;
+    const store = useThemeStore.getState();
+    if (store.theme?.id !== theme.id || store.theme?.themeName !== theme.themeName) {
       setStoreTheme(theme);
       cacheThemePayload(tenantId, theme);
-      if (theme.compactSidebar) {
-        setSidebarCollapsed(true);
-      }
+    }
+    if (theme.compactSidebar && !useDashboardUiStore.getState().sidebarCollapsed) {
+      setSidebarCollapsed(true);
     }
   }, [theme, tenantId, setStoreTheme, setSidebarCollapsed]);
 
