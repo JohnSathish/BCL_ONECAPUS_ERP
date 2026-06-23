@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { GraduationCap, LogIn, Menu, Users, X } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, LogIn, Menu, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
+import { useAuth } from '@/hooks/use-auth';
+import { resolveHomePath } from '@/lib/permissions/portal-access';
 import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
 import { cn } from '@/utils/cn';
 import { LOGIN_PATH, NAV_LINKS, QUICK_ACCESS_LINKS, REQUEST_DEMO_PATH } from './landing.constants';
@@ -16,6 +18,10 @@ const demoButtonClass =
   'inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 px-5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
 
 export function LandingNavbar() {
+  const { session } = useAuth();
+  const dashboardPath = session
+    ? resolveHomePath(session.user.roles ?? [], session.user.permissions ?? [])
+    : null;
   const [open, setOpen] = useState(false);
   const { scrollY } = useScroll();
   const bgOpacity = useTransform(scrollY, [0, 80], [0.4, 0.92]);
@@ -72,12 +78,22 @@ export function LandingNavbar() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href={LOGIN_PATH}
-            className="text-sm font-medium text-white/80 transition-colors hover:text-white"
-          >
-            Sign In
-          </Link>
+          {dashboardPath ? (
+            <Link
+              href={dashboardPath}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              <LayoutDashboard className="h-4 w-4" aria-hidden />
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href={LOGIN_PATH}
+              className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              Sign In
+            </Link>
+          )}
           <Link
             href={REQUEST_DEMO_PATH}
             className="rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-transform hover:scale-[1.02]"
@@ -88,14 +104,25 @@ export function LandingNavbar() {
 
         {/* Mobile: Sign In always visible + menu toggle */}
         <div className="flex shrink-0 items-center gap-1.5 md:hidden">
-          <Link
-            href={LOGIN_PATH}
-            className={signInButtonClass}
-            aria-label="Sign in to your account"
-          >
-            <LogIn className="h-4 w-4 shrink-0" aria-hidden />
-            <span>Sign In</span>
-          </Link>
+          {dashboardPath ? (
+            <Link
+              href={dashboardPath}
+              className={signInButtonClass}
+              aria-label="Open your dashboard"
+            >
+              <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
+              <span>Dashboard</span>
+            </Link>
+          ) : (
+            <Link
+              href={LOGIN_PATH}
+              className={signInButtonClass}
+              aria-label="Sign in to your account"
+            >
+              <LogIn className="h-4 w-4 shrink-0" aria-hidden />
+              <span>Sign In</span>
+            </Link>
+          )}
           <button
             type="button"
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
