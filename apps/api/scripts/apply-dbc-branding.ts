@@ -1,8 +1,8 @@
 /**
  * Apply Don Bosco College Tura branding to an existing tenant (no full re-seed).
  *
- *   npx ts-node --transpile-only scripts/apply-dbc-branding.ts
- *   npx ts-node --transpile-only scripts/apply-dbc-branding.ts --tenant=demo
+ *   npx tsx scripts/apply-dbc-branding.ts
+ *   npx tsx scripts/apply-dbc-branding.ts --tenant=demo
  */
 import { PrismaClient } from '@prisma/client';
 

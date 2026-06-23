@@ -5,7 +5,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
 DOMAIN="${SSL_DOMAIN:-erp.donboscocollege.ac.in}"
-EXTRA_DOMAINS="${SSL_EXTRA_DOMAINS:-admissions.donboscocollege.ac.in,library.donboscocollege.ac.in}"
+EXTRA_DOMAINS="${SSL_EXTRA_DOMAINS:-admissions.donboscocollege.ac.in,library.donboscocollege.ac.in,career.donboscocollege.ac.in}"
 EMAIL="${SSL_EMAIL:-admin@donboscocollege.ac.in}"
 
 cd "$APP_DIR"
@@ -32,7 +32,7 @@ events { worker_connections 1024; }
 http {
   server {
     listen 80;
-    server_name erp.donboscocollege.ac.in admissions.donboscocollege.ac.in library.donboscocollege.ac.in;
+    server_name erp.donboscocollege.ac.in admissions.donboscocollege.ac.in library.donboscocollege.ac.in career.donboscocollege.ac.in;
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
     location / { return 200 'ok'; add_header Content-Type text/plain; }
   }

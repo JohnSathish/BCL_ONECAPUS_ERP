@@ -27,6 +27,7 @@ In your domain DNS panel (Cloudflare recommended):
 | A    | `erp`        | `82.25.110.120` | Proxied (orange) |
 | A    | `admissions` | `82.25.110.120` | Proxied          |
 | A    | `library`    | `82.25.110.120` | Proxied          |
+| A    | `career`     | `82.25.110.120` | Proxied          |
 
 **Cloudflare SSL/TLS:** set mode to **Full** (not Flexible) once origin responds on port 80.
 

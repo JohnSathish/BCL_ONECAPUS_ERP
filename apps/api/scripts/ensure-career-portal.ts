@@ -1,8 +1,8 @@
 /**
  * Ensure careers portal tenant domains and default branding extras exist.
  *
- *   npx ts-node --transpile-only scripts/ensure-career-portal.ts
- *   npx ts-node --transpile-only scripts/ensure-career-portal.ts --tenant=demo
+ *   npx tsx scripts/ensure-career-portal.ts
+ *   npx tsx scripts/ensure-career-portal.ts --tenant=demo
  */
 import { PrismaClient } from '@prisma/client';
 

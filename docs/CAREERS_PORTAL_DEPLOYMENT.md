@@ -20,7 +20,7 @@ The API resolves the tenant from `platform.tenant_domains.host`.
 
 ```bash
 cd apps/api
-npx ts-node --transpile-only scripts/ensure-career-portal.ts --tenant=demo
+npx tsx scripts/ensure-career-portal.ts --tenant=demo
 ```
 
 Production hosts registered by seed / script:
@@ -99,7 +99,7 @@ Open the **Branding** tab, scroll to **Careers portal — public website**:
 Run DBC defaults:
 
 ```bash
-npx ts-node --transpile-only scripts/apply-dbc-branding.ts --tenant=demo
+npx tsx scripts/apply-dbc-branding.ts --tenant=demo
 ```
 
 ---
@@ -118,7 +118,7 @@ npx ts-node --transpile-only scripts/apply-dbc-branding.ts --tenant=demo
 
 ```bash
 cd apps/api
-npx ts-node --transpile-only scripts/verify-careers-portal-e2e.ts
+npx tsx scripts/verify-careers-portal-e2e.ts
 ```
 
 Manual checklist:
@@ -162,8 +162,8 @@ npm run db:migrate -w api
 
 # 3. Register career subdomain + branding defaults
 cd apps/api
-npx ts-node --transpile-only scripts/ensure-career-portal.ts --tenant=demo
-npx ts-node --transpile-only scripts/apply-dbc-branding.ts --tenant=demo
+npx tsx scripts/ensure-career-portal.ts --tenant=demo
+npx tsx scripts/apply-dbc-branding.ts --tenant=demo
 
 # 4. Seed communication templates (required for apply/status emails)
 #    In ERP: Admin → Communication → Templates → Seed defaults
@@ -179,7 +179,7 @@ npm run build -w worker
 cd apps/api
 CAREER_HOST=career.donboscocollege.ac.in \
   API_INTERNAL_URL=http://127.0.0.1:3001/api \
-  npx ts-node --transpile-only scripts/verify-careers-portal-e2e.ts
+  npx tsx scripts/verify-careers-portal-e2e.ts
 ```
 
 **Docker (recommended for production):**
@@ -187,7 +187,7 @@ CAREER_HOST=career.donboscocollege.ac.in \
 ```bash
 git pull origin main
 npm run db:migrate -w api
-cd apps/api && npx ts-node --transpile-only scripts/ensure-career-portal.ts --tenant=demo && cd ../..
+cd apps/api && npx tsx scripts/ensure-career-portal.ts --tenant=demo && cd ../..
 
 docker build -f apps/api/Dockerfile -t nep-erp-api .
 docker build -f apps/web/Dockerfile \
