@@ -53,6 +53,7 @@ import {
   upsertBiometricMapping,
   type AttendanceDevice,
   type AttendanceMapping,
+  type DeviceConfigPayload,
   type DevicePulledUser,
   type DailyAttendanceRecord,
   type PushPreviewRow,
@@ -1660,18 +1661,38 @@ function deviceToForm(device: AttendanceDevice): DeviceFormState {
   };
 }
 
-function toDevicePayload(form: DeviceFormState) {
+function toDevicePayload(form: DeviceFormState): DeviceConfigPayload {
   return {
-    ...form,
+    name: form.name,
+    model: form.model,
+    serialNumber: form.serialNumber,
     deviceCode: form.deviceCode || undefined,
+    location: form.location || undefined,
+    building: form.building || undefined,
+    floor: form.floor || undefined,
+    description: form.description || undefined,
     departmentScope: form.departmentScope ? { scope: form.departmentScope } : undefined,
+    connectionType: form.connectionType,
+    ipAddress: form.ipAddress || undefined,
     port: Number(form.port || 4370),
+    protocol: form.protocol || undefined,
     timeoutSec: Number(form.timeoutSec || 30),
     retryCount: Number(form.retryCount || 3),
+    sslEnabled: form.sslEnabled,
+    devicePassword: form.devicePassword || undefined,
+    deviceKey: form.deviceKey || undefined,
+    machineNumber: form.machineNumber || undefined,
+    communicationKey: form.communicationKey || undefined,
+    firmwareVersion: form.firmwareVersion || undefined,
+    timezone: form.timezone || undefined,
     heartbeatIntervalSec: Number(form.heartbeatIntervalSec || 60),
+    autoSyncEnabled: form.autoSyncEnabled,
     syncFrequencyMin: Number(form.syncFrequencyMin || 15),
+    syncDirection: form.syncDirection,
+    punchMode: form.punchMode,
     duplicatePunchThresholdMin: Number(form.duplicatePunchThresholdMin || 5),
     timeDriftToleranceSec: Number(form.timeDriftToleranceSec || 60),
+    processingStrategy: form.processingStrategy,
     settings: {
       etimeTrackLite: {
         webServiceUrl: form.webServiceUrl || undefined,
