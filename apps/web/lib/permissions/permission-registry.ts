@@ -101,6 +101,8 @@ export const MODULE_PERMISSIONS = {
     'backup:manage',
     'backup:download',
     'backup:restore',
+  ],
+  officialDocuments: [
     'official-documents:read',
     'official-documents:manage',
     'official-documents:approve',
@@ -243,6 +245,12 @@ export const ERP_MODULES: ErpModule[] = [
     label: 'Governance & Committees',
     permissions: MODULE_PERMISSIONS.governance,
     defaultHome: '/admin/governance',
+  },
+  {
+    id: 'officialDocuments',
+    label: 'Official Documents',
+    permissions: MODULE_PERMISSIONS.officialDocuments,
+    defaultHome: '/admin/administration/official-documents',
   },
   {
     id: 'naacIqac',

@@ -28,6 +28,7 @@ export const MODULE_COLORS: Record<string, string> = {
   finance: '#f59e0b',
   library: '#10b981',
   governance: '#64748b',
+  officialDocuments: '#1e3a5f',
   naacIqac: '#8b5cf6',
   communication: '#3b82f6',
   cams: '#06b6d4',

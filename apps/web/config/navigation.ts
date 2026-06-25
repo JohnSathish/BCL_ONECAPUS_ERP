@@ -87,6 +87,7 @@ export function isNavItemActive(pathname: string, item: NavItem): boolean {
 
 const P = MODULE_PERMISSIONS;
 const QB = P.questionBank;
+const OD = P.officialDocuments;
 
 const QUESTION_BANK_CHILDREN: NavChild[] = [
   { label: 'Dashboard', href: '/admin/academics/question-bank', permissions: [...QB] },
@@ -124,6 +125,59 @@ const QUESTION_BANK_CHILDREN: NavChild[] = [
     label: 'Settings',
     href: '/admin/academics/question-bank/settings',
     permissions: ['question-bank:manage'],
+  },
+];
+
+const OFFICIAL_DOCUMENTS_CHILDREN: NavChild[] = [
+  {
+    label: 'Dashboard',
+    href: '/admin/administration/official-documents',
+    permissions: ['official-documents:read', 'official-documents:manage'],
+  },
+  {
+    label: 'Create Document',
+    href: '/admin/administration/official-documents/create',
+    permissions: ['official-documents:manage'],
+  },
+  {
+    label: 'Notices',
+    href: '/admin/administration/official-documents/notices',
+    permissions: ['official-documents:read', 'official-documents:manage'],
+  },
+  {
+    label: 'Circulars',
+    href: '/admin/administration/official-documents/circulars',
+    permissions: ['official-documents:read', 'official-documents:manage'],
+  },
+  {
+    label: 'Office Orders',
+    href: '/admin/administration/official-documents/office-orders',
+    permissions: ['official-documents:read', 'official-documents:manage'],
+  },
+  {
+    label: 'Archive',
+    href: '/admin/administration/official-documents/archive',
+    permissions: ['official-documents:read', 'official-documents:archive'],
+  },
+  {
+    label: 'Search',
+    href: '/admin/administration/official-documents/search',
+    permissions: ['official-documents:read', 'official-documents:manage'],
+  },
+  {
+    label: 'Templates',
+    href: '/admin/administration/official-documents/templates',
+    permissions: ['official-documents:settings', 'official-documents:read'],
+  },
+  {
+    label: 'Digital Signatures',
+    href: '/admin/administration/official-documents/signatures',
+    permissions: ['official-documents:settings'],
+  },
+  {
+    label: 'Settings',
+    href: '/admin/administration/official-documents/settings',
+    permissions: ['official-documents:settings'],
   },
 ];
 
@@ -1091,7 +1145,7 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['governance:read', 'governance:manage'],
           },
           {
-            label: 'Notices & Circulars',
+            label: 'Committee Notices',
             href: '/admin/governance/notices',
             permissions: ['governance:read', 'governance:publish'],
           },
@@ -1592,56 +1646,6 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Import / Export',
             href: '/admin/administration/import-export',
             permissions: ['imports:manage'],
-          },
-          {
-            label: 'Official Documents',
-            href: '/admin/administration/official-documents',
-            permissions: ['official-documents:read', 'official-documents:manage'],
-          },
-          {
-            label: 'Create Document',
-            href: '/admin/administration/official-documents/create',
-            permissions: ['official-documents:manage'],
-          },
-          {
-            label: 'Notices',
-            href: '/admin/administration/official-documents/notices',
-            permissions: ['official-documents:read', 'official-documents:manage'],
-          },
-          {
-            label: 'Circulars',
-            href: '/admin/administration/official-documents/circulars',
-            permissions: ['official-documents:read', 'official-documents:manage'],
-          },
-          {
-            label: 'Office Orders',
-            href: '/admin/administration/official-documents/office-orders',
-            permissions: ['official-documents:read', 'official-documents:manage'],
-          },
-          {
-            label: 'Document Archive',
-            href: '/admin/administration/official-documents/archive',
-            permissions: ['official-documents:read', 'official-documents:archive'],
-          },
-          {
-            label: 'Search Documents',
-            href: '/admin/administration/official-documents/search',
-            permissions: ['official-documents:read', 'official-documents:manage'],
-          },
-          {
-            label: 'Document Templates',
-            href: '/admin/administration/official-documents/templates',
-            permissions: ['official-documents:settings', 'official-documents:read'],
-          },
-          {
-            label: 'Digital Signatures',
-            href: '/admin/administration/official-documents/signatures',
-            permissions: ['official-documents:settings'],
-          },
-          {
-            label: 'Document Settings',
-            href: '/admin/administration/official-documents/settings',
-            permissions: ['official-documents:settings'],
           },
           {
             label: 'Backup & DR Center',
