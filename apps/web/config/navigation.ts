@@ -1196,6 +1196,21 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    label: 'Official Documents',
+    zone: 'scroll',
+    items: [
+      {
+        label: 'Official Documents',
+        icon: FileText,
+        href: '/admin/administration/official-documents',
+        module: 'officialDocuments',
+        permissions: [...OD],
+        activePattern: '^/admin/administration/official-documents(?:/.*)?$',
+        children: OFFICIAL_DOCUMENTS_CHILDREN,
+      },
+    ],
+  },
+  {
     label: 'Communication',
     zone: 'scroll',
     items: [
