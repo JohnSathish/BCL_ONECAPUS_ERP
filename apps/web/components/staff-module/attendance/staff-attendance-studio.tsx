@@ -21,6 +21,10 @@ import {
 } from 'lucide-react';
 
 import { BulkActionButton, BulkActionToolbar, BulkEmptyState } from '@/components/erp/bulk-actions';
+import {
+  AttendanceCommandCenter,
+  AttendanceLiveFeed,
+} from '@/components/staff-module/attendance/attendance-command-center';
 import { Button } from '@/components/ui/button';
 import {
   autoMapBiometricStaff,
@@ -35,6 +39,7 @@ import {
   fetchBiometricDevices,
   fetchDeviceUsers,
   fetchBiometricMappings,
+  fetchAttendanceCommandCenter,
   fetchDailyAttendance,
   fetchLiveAttendance,
   fetchMonthlyAttendance,
@@ -71,9 +76,13 @@ type DashboardRibbonData = {
   earlyOut?: number;
   overtime?: number;
   missingPunch?: number;
+  leaveToday?: number;
+  wfhToday?: number;
+  holidayToday?: number;
   deviceOnline?: number;
   liveActiveStaff?: number;
   pendingRawLogs?: number;
+  pendingCorrections?: number;
 };
 
 type DiagnosticStepResult = {
@@ -244,6 +253,11 @@ export function StaffAttendanceStudio({ page }: { page: PageKind }) {
     queryKey: ['staff-attendance', 'dashboard'],
     queryFn: fetchStaffAttendanceDashboard,
   });
+  const commandCenter = useQuery({
+    queryKey: ['staff-attendance', 'command-center'],
+    queryFn: fetchAttendanceCommandCenter,
+    refetchInterval: 30_000,
+  });
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
@@ -283,7 +297,16 @@ export function StaffAttendanceStudio({ page }: { page: PageKind }) {
         </div>
       </section>
 
-      <DashboardRibbon loading={dashboard.isLoading} data={dashboard.data} />
+      <DashboardRibbon
+        loading={dashboard.isLoading || commandCenter.isLoading}
+        data={{
+          ...dashboard.data,
+          leaveToday: commandCenter.data?.today.onLeave ?? dashboard.data?.leaveToday,
+          wfhToday: commandCenter.data?.today.wfh,
+          holidayToday: commandCenter.data?.today.holiday,
+          pendingCorrections: commandCenter.data?.pendingCorrections,
+        }}
+      />
 
       {page === 'dashboard' ? <DashboardHome /> : null}
       {page === 'devices' ? <DeviceConsole /> : null}
@@ -334,28 +357,34 @@ function DashboardRibbon({ data, loading }: { data?: DashboardRibbonData; loadin
       tone: 'success',
     },
     {
-      label: 'Absent',
-      value: data?.absent ?? 0,
-      icon: <AlertTriangle className="h-4 w-4" />,
-      tone: 'error',
-    },
-    {
       label: 'Late',
       value: data?.late ?? 0,
       icon: <Clock3 className="h-4 w-4" />,
       tone: 'warning',
     },
     {
-      label: 'Half Day',
-      value: data?.halfDay ?? 0,
-      icon: <CalendarDays className="h-4 w-4" />,
-      tone: 'warning',
+      label: 'Absent',
+      value: data?.absent ?? 0,
+      icon: <AlertTriangle className="h-4 w-4" />,
+      tone: 'error',
     },
     {
-      label: 'OT Staff',
-      value: data?.overtime ?? 0,
-      icon: <Activity className="h-4 w-4" />,
-      tone: 'success',
+      label: 'On Leave',
+      value: data?.leaveToday ?? 0,
+      icon: <CalendarDays className="h-4 w-4" />,
+      tone: 'default',
+    },
+    {
+      label: 'WFH',
+      value: data?.wfhToday ?? 0,
+      icon: <Users className="h-4 w-4" />,
+      tone: 'default',
+    },
+    {
+      label: 'Holiday',
+      value: data?.holidayToday ?? 0,
+      icon: <CalendarDays className="h-4 w-4" />,
+      tone: 'default',
     },
     {
       label: 'Missing Punch',
@@ -364,26 +393,20 @@ function DashboardRibbon({ data, loading }: { data?: DashboardRibbonData; loadin
       tone: 'warning',
     },
     {
-      label: 'Device Online',
+      label: 'Devices Online',
       value: data?.deviceOnline ?? 0,
       icon: <ShieldCheck className="h-4 w-4" />,
       tone: 'success',
     },
     {
-      label: 'Live Active Staff',
-      value: data?.liveActiveStaff ?? 0,
-      icon: <Users className="h-4 w-4" />,
-      tone: 'default',
-    },
-    {
-      label: 'Pending Raw Logs',
-      value: data?.pendingRawLogs ?? 0,
-      icon: <Database className="h-4 w-4" />,
-      tone: 'default',
+      label: 'Pending Corrections',
+      value: data?.pendingCorrections ?? 0,
+      icon: <History className="h-4 w-4" />,
+      tone: 'warning',
     },
   ];
   return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       {cards.map((card) => (
         <div
           key={card.label}
@@ -414,64 +437,7 @@ function DashboardRibbon({ data, loading }: { data?: DashboardRibbonData; loadin
 }
 
 function DashboardHome() {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="rounded-3xl border border-border/60 bg-card/85 p-5 shadow-lg shadow-black/5">
-        <h2 className="text-sm font-semibold">Attendance Operations Command Center</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure devices, push staff, pull logs, process attendance, and monitor anomalies from
-          this workspace.
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            ['Biometric Devices', '/admin/staff/attendance/devices'],
-            ['Live Attendance', '/admin/staff/attendance/live'],
-            ['Daily Register', '/admin/staff/attendance/daily'],
-            ['Mappings', '/admin/staff/attendance/mappings'],
-            ['Rules', '/admin/staff/attendance/rules'],
-            ['Reports', '/admin/staff/attendance/reports'],
-          ].map(([label, href]) => (
-            <Link
-              key={href}
-              href={href}
-              className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm font-semibold transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-md"
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-      </section>
-      <DeviceHealthPanel />
-    </div>
-  );
-}
-
-function DeviceHealthPanel() {
-  const devices = useQuery({
-    queryKey: ['staff-attendance', 'devices'],
-    queryFn: fetchBiometricDevices,
-  });
-  return (
-    <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5">
-      <h2 className="text-sm font-semibold">Device Health Monitor</h2>
-      <div className="mt-3 space-y-2">
-        {(devices.data ?? []).slice(0, 5).map((device) => (
-          <div key={device.id} className="rounded-2xl bg-muted/35 p-3 text-xs">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-medium">{device.name}</p>
-              <StatusPill status={device.status} />
-            </div>
-            <p className="mt-1 text-muted-foreground">
-              {device.model} · Last sync {formatDateTime(device.lastSyncAt)}
-            </p>
-          </div>
-        ))}
-        {!devices.data?.length ? (
-          <p className="text-xs text-muted-foreground">No devices configured yet.</p>
-        ) : null}
-      </div>
-    </section>
-  );
+  return <AttendanceCommandCenter />;
 }
 
 function DeviceConsole() {
@@ -1124,7 +1090,9 @@ function DeviceDiagnosticsRow({ device }: { device: AttendanceDevice }) {
         <p className="mt-2 text-muted-foreground">IP: {device.ipAddress ?? '-'}</p>
         <p className="text-muted-foreground">Port: {device.port ?? '-'}</p>
         <p className="text-muted-foreground">Heartbeat: {formatDateTime(device.lastHeartbeatAt)}</p>
-        <p className="text-muted-foreground">Failure: {device.failureReason ?? '-'}</p>
+        <p className="text-muted-foreground">
+          Failure: {formatFailureReason(device.failureReason)}
+        </p>
       </div>
       <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
         <p className="font-semibold">Device Info</p>
@@ -2481,21 +2449,47 @@ function MappingTable({
 }
 
 function LiveAttendanceWall() {
-  const punches = useQuery({
-    queryKey: ['staff-attendance', 'live'],
-    queryFn: fetchLiveAttendance,
-    refetchInterval: 15000,
-  });
   return (
-    <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Incoming Punch Stream</h2>
-        <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-          Auto refresh 15s
-        </span>
-      </div>
-      <PunchTable rows={punches.data ?? []} loading={punches.isLoading} />
-    </section>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <AttendanceLiveFeed />
+      <LiveStatusSidebar />
+    </div>
+  );
+}
+
+function LiveStatusSidebar() {
+  const center = useQuery({
+    queryKey: ['staff-attendance', 'command-center'],
+    queryFn: fetchAttendanceCommandCenter,
+    refetchInterval: 15_000,
+  });
+  const data = center.data;
+  return (
+    <div className="space-y-5">
+      <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5">
+        <h3 className="text-sm font-semibold">Live Campus Status</h3>
+        <div className="mt-3 space-y-2 text-sm">
+          <p>🟢 Inside: {data?.liveStatus.currentlyInside ?? '—'}</p>
+          <p>🔴 Left: {data?.liveStatus.alreadyLeft ?? '—'}</p>
+          <p>🟡 Not punched: {data?.liveStatus.notYetPunched ?? '—'}</p>
+          <p>⚠ Missing OUT: {data?.liveStatus.missingOut ?? '—'}</p>
+        </div>
+      </section>
+      <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5">
+        <h3 className="text-sm font-semibold">Device Activity Today</h3>
+        <div className="mt-3 space-y-2">
+          {(data?.devices ?? []).map((device) => (
+            <div
+              key={device.id}
+              className="flex items-center justify-between rounded-xl bg-muted/35 px-3 py-2 text-xs"
+            >
+              <span>{device.name}</span>
+              <span className="font-semibold">{device.punchesToday}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -3453,6 +3447,23 @@ function formatDateTime(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function formatFailureReason(value: unknown) {
+  if (value == null || value === '') return '-';
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'object') {
+    const record = value as { message?: string; err?: { message?: string } };
+    if (record.err?.message) return record.err.message;
+    if (record.message) return record.message;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[object Object]';
+    }
+  }
+  return String(value);
 }
 
 function timeOnly(value?: string | null) {

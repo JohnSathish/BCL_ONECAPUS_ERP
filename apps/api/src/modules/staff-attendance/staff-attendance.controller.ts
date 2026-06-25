@@ -14,17 +14,37 @@ import {
   CorrectionDto,
 } from './dto/staff-attendance.dto';
 import { StaffAttendanceService } from './staff-attendance.service';
+import { AttendanceAnalyticsService } from './attendance-analytics.service';
 
 @ApiBearerAuth()
 @ApiTags('staff-attendance')
 @Controller({ path: 'staff/attendance', version: '1' })
 export class StaffAttendanceController {
-  constructor(private readonly service: StaffAttendanceService) {}
+  constructor(
+    private readonly service: StaffAttendanceService,
+    private readonly analytics: AttendanceAnalyticsService,
+  ) {}
 
   @Get('dashboard')
   @RequireAnyPermission('staff-attendance:view', 'staff-biometric:admin')
   dashboard(@CurrentUser() user: JwtUser) {
     return this.service.dashboard(user.tid);
+  }
+
+  @Get('analytics/command-center')
+  @RequireAnyPermission('staff-attendance:view', 'staff-biometric:admin')
+  commandCenter(@CurrentUser() user: JwtUser) {
+    return this.analytics.commandCenter(user.tid);
+  }
+
+  @Get('analytics/staff/:staffProfileId/timeline')
+  @RequireAnyPermission('staff-attendance:view', 'staff-biometric:admin')
+  staffTimeline(
+    @CurrentUser() user: JwtUser,
+    @Param('staffProfileId') staffProfileId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.analytics.staffTimeline(user.tid, staffProfileId, date);
   }
 
   @Get('live')

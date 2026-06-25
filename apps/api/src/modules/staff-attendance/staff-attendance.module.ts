@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { QueueModule } from '../../shared/queue/queue.module';
 import { AttendanceProcessingOrchestratorService } from './attendance-processing-orchestrator.service';
+import { AttendanceAnalyticsService } from './attendance-analytics.service';
 import { AttendancePolicyEngineService } from './attendance-policy-engine.service';
 import { AttendanceSettingsController } from './attendance-settings.controller';
 import { AttendanceSettingsService } from './attendance-settings.service';
@@ -29,6 +30,7 @@ import { StaffAttendanceService } from './staff-attendance.service';
     StaffAttendanceService,
     StaffAttendanceEngineService,
     AttendancePolicyEngineService,
+    AttendanceAnalyticsService,
     AttendanceProcessingOrchestratorService,
     AttendanceSettingsService,
     DeviceHealthService,

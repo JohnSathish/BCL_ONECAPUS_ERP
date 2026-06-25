@@ -554,7 +554,18 @@ export class DirectZkBiometricConnector implements BiometricConnector {
   }
 
   private errorMessage(error: unknown) {
-    return error instanceof Error ? error.message : String(error);
+    if (error instanceof Error && error.message) return error.message;
+    if (error && typeof error === 'object') {
+      const nested = error as { message?: string; err?: { message?: string } };
+      if (nested.err?.message) return nested.err.message;
+      if (nested.message) return nested.message;
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+    return String(error);
   }
 
   private async disconnect(client: ZkClient | null) {

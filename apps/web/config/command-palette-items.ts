@@ -34,12 +34,30 @@ export const ADMIN_COMMAND_LINKS = [
   { label: 'Library', href: '/admin/library', keywords: 'books circulation' },
   { label: 'Transport', href: '/admin/transport', keywords: 'bus routes' },
   { label: 'Hostel', href: '/admin/hostel', keywords: 'residence rooms' },
+  {
+    label: 'Staff attendance',
+    href: '/admin/staff/attendance',
+    keywords: 'biometric punch hr faculty',
+  },
+  {
+    label: 'Live staff attendance',
+    href: '/admin/staff/attendance/live',
+    keywords: 'punch feed realtime',
+  },
+  {
+    label: 'Biometric devices',
+    href: '/admin/staff/attendance/devices',
+    keywords: 'essl zk device sync',
+  },
   { label: 'Settings', href: '/admin/organization', keywords: 'configuration' },
 ];
 
 export const AI_QUICK_PROMPTS = [
   'How many students have pending fees?',
   "Show today's attendance summary",
+  "Show today's staff absentees",
+  'Which department has lowest staff attendance this month?',
+  'Show missing OUT punches today',
   'Generate finance report',
   'List admission applications pending',
 ];

@@ -107,6 +107,8 @@ export class StaffAttendanceService {
           r.status === 'INCOMPLETE_PUNCH',
       ).length,
       leaveToday: records.filter((r: any) => r.status === 'ON_LEAVE').length,
+      wfhToday: records.filter((r: any) => r.status === 'WFH').length,
+      holidayToday: records.filter((r: any) => r.status === 'HOLIDAY').length,
       weeklyOff: records.filter((r: any) => r.status === 'WEEKLY_OFF').length,
       deviceOnline: devices.filter(
         (d: any) =>

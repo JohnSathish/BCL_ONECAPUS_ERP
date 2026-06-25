@@ -97,11 +97,135 @@ export type AttendanceDashboard = {
   halfDay?: number;
   leaveToday?: number;
   weeklyOff?: number;
+  holidayToday?: number;
+  wfhToday?: number;
   deviceOnline?: number;
   missingPunch: number;
   liveActiveStaff: number;
   pendingRawLogs: number;
   devices: AttendanceDevice[];
+};
+
+export type AttendanceCommandCenter = {
+  generatedAt: string;
+  today: {
+    present: number;
+    late: number;
+    absent: number;
+    onLeave: number;
+    wfh: number;
+    holiday: number;
+    weeklyOff: number;
+    halfDay: number;
+  };
+  liveStatus: {
+    activeStaff: number;
+    currentlyInside: number;
+    alreadyLeft: number;
+    notYetPunched: number;
+    missingOut: number;
+  };
+  arrivalTimeline: Array<{ hour: number; label: string; count: number; intensity: number }>;
+  devices: Array<{
+    id: string;
+    name: string;
+    location: string;
+    online: boolean;
+    healthLabel: string;
+    punchesToday: number;
+    userCount: number;
+    lastSyncAt?: string | null;
+    lastSyncLabel: string;
+    networkQuality: string;
+    firmwareVersion: string;
+    syncHealthStatus: string;
+  }>;
+  departmentHeatmap: Array<{
+    department: string;
+    attendancePercent: number;
+    present: number;
+    total: number;
+    health: string;
+  }>;
+  departmentRanking: Array<{
+    rank: number;
+    department: string;
+    attendancePercent: number;
+    present: number;
+    total: number;
+    health: string;
+  }>;
+  weeklyPattern: Array<{ day: string; attendancePercent: number; health: string }>;
+  trends: {
+    series: Array<Record<string, unknown>>;
+    direction: {
+      attendance: string;
+      late: string;
+      leave: string;
+      overtime: string;
+    };
+  };
+  monthlyAnalytics: {
+    current: {
+      attendancePercent: number;
+      latePercent: number;
+      leavePercent: number;
+      overtimePercent: number;
+    };
+    previous: {
+      attendancePercent: number;
+      latePercent: number;
+      leavePercent: number;
+      overtimePercent: number;
+    };
+    deltas: {
+      attendance: number;
+      late: number;
+      leave: number;
+      overtime: number;
+    };
+  };
+  insights: Array<{ id: string; severity: string; title: string; body: string }>;
+  alerts: Array<{ id: string; severity: string; title: string; action: string }>;
+  recentPunches: Array<{
+    id: string;
+    staffName: string;
+    employeeCode?: string;
+    department?: string;
+    deviceName: string;
+    location?: string;
+    punchTimestamp: string;
+    direction: string;
+  }>;
+  pendingCorrections: number;
+  deviceOnline: number;
+};
+
+export type StaffAttendanceTimeline = {
+  staff: { id: string; fullName: string; employeeCode?: string; department?: { name?: string } };
+  date: string;
+  timeline: Array<{
+    id: string;
+    time: string;
+    label: string;
+    deviceName?: string;
+    location?: string;
+  }>;
+  summary: {
+    status: string;
+    firstInAt?: string | null;
+    lastOutAt?: string | null;
+    workedMinutes: number;
+    lateMinutes: number;
+    overtimeMinutes: number;
+    exceptionFlags: unknown;
+  } | null;
+  score: {
+    score: number;
+    breakdown: Record<string, number>;
+    disciplineStars: number;
+  };
+  calendar: Array<{ date: string; status: string; lateMinutes: number }>;
 };
 
 export type AttendanceMapping = {
@@ -271,6 +395,22 @@ export type AttendanceReportPayload = {
 
 export async function fetchStaffAttendanceDashboard(): Promise<AttendanceDashboard> {
   const { data } = await api.get('/v1/staff/attendance/dashboard');
+  return data;
+}
+
+export async function fetchAttendanceCommandCenter(): Promise<AttendanceCommandCenter> {
+  const { data } = await api.get('/v1/staff/attendance/analytics/command-center');
+  return data;
+}
+
+export async function fetchStaffAttendanceTimeline(
+  staffProfileId: string,
+  date?: string,
+): Promise<StaffAttendanceTimeline> {
+  const { data } = await api.get(
+    `/v1/staff/attendance/analytics/staff/${staffProfileId}/timeline`,
+    { params: date ? { date } : undefined },
+  );
   return data;
 }
 
