@@ -15,65 +15,6 @@ export type SeedArtsFyugpCatalogContext = {
   createdById?: string;
 };
 
-const POOL_DEFS = [
-  {
-    semesterNo: 1,
-    categoryType: 'MDC' as const,
-    prefix: 'MDC',
-    from: 110,
-    to: 119,
-  },
-  {
-    semesterNo: 1,
-    categoryType: 'AEC' as const,
-    prefix: 'AEC',
-    from: 120,
-    to: 129,
-  },
-  {
-    semesterNo: 1,
-    categoryType: 'SEC' as const,
-    prefix: 'SEC',
-    from: 130,
-    to: 139,
-  },
-  {
-    semesterNo: 1,
-    categoryType: 'VAC' as const,
-    prefix: 'VAC',
-    from: 140,
-    to: 140,
-  },
-  {
-    semesterNo: 3,
-    categoryType: 'MDC' as const,
-    prefix: 'MDC',
-    from: 210,
-    to: 219,
-  },
-  {
-    semesterNo: 3,
-    categoryType: 'AEC' as const,
-    prefix: 'AEC',
-    from: 220,
-    to: 229,
-  },
-  {
-    semesterNo: 3,
-    categoryType: 'SEC' as const,
-    prefix: 'SEC',
-    from: 230,
-    to: 239,
-  },
-  {
-    semesterNo: 3,
-    categoryType: 'VTC' as const,
-    prefix: 'VTC',
-    from: 240,
-    to: 249,
-  },
-] as const;
-
 export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const {
     prisma,
@@ -186,119 +127,8 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     );
   }
 
-  const ugVersions = await prisma.programVersion.findMany({
-    where: { tenantId, deletedAt: null, program: { level: 'UG' } },
-    select: { id: true },
-  });
-
-  for (const poolDef of POOL_DEFS) {
-    const poolName = `Arts ${poolDef.categoryType} Semester ${poolDef.semesterNo} Pool`;
-    const courseCodes: string[] = [];
-    for (let num = poolDef.from; num <= poolDef.to; num += 1) {
-      courseCodes.push(`${poolDef.prefix}-${num}`);
-    }
-
-    const pool = await prisma.categoryPool.upsert({
-      where: {
-        tenantId_institutionId_poolName: {
-          tenantId,
-          institutionId,
-          poolName,
-        },
-      },
-      create: {
-        tenantId,
-        institutionId,
-        poolName,
-        semesterNo: poolDef.semesterNo,
-        categoryType: poolDef.categoryType,
-        active: true,
-        createdById,
-      },
-      update: {
-        active: true,
-        semesterNo: poolDef.semesterNo,
-        categoryType: poolDef.categoryType,
-      },
-    });
-
-    let order = 0;
-    for (const code of courseCodes) {
-      if (seedExclusions.excludedCourseCodes.has(code)) {
-        console.log(`Arts seed skip (removed pool course): ${code}`);
-        continue;
-      }
-      const courseId = courseByCode.get(code);
-      if (!courseId) continue;
-
-      await prisma.categoryPoolCourse.upsert({
-        where: { poolId_courseId: { poolId: pool.id, courseId } },
-        create: {
-          poolId: pool.id,
-          courseId,
-          displayOrder: order++,
-          active: true,
-        },
-        update: { active: true, displayOrder: order - 1 },
-      });
-
-      await prisma.courseOffering.upsert({
-        where: {
-          categoryPoolId_courseId: { categoryPoolId: pool.id, courseId },
-        },
-        create: {
-          tenantId,
-          categoryPoolId: pool.id,
-          mappingSource: 'SHARED_POOL',
-          courseId,
-          semesterSequence: poolDef.semesterNo,
-          category: poolDef.categoryType,
-          displayOrder: order - 1,
-          programVersionId: null,
-        },
-        update: {
-          semesterSequence: poolDef.semesterNo,
-          category: poolDef.categoryType,
-        },
-      });
-    }
-
-    for (const version of ugVersions) {
-      await prisma.programmePoolAssignment.upsert({
-        where: {
-          programVersionId_semesterNo_poolId: {
-            programVersionId: version.id,
-            semesterNo: poolDef.semesterNo,
-            poolId: pool.id,
-          },
-        },
-        create: {
-          tenantId,
-          programVersionId: version.id,
-          semesterNo: poolDef.semesterNo,
-          poolId: pool.id,
-          active: true,
-        },
-        update: { active: true },
-      });
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const {
-    PoolSectionProvisioningService,
-  } = require('../src/modules/academic-engine/services/pool-section-provisioning.service');
-  const poolProvisioner = new PoolSectionProvisioningService(prisma as never);
-  await poolProvisioner.provisionPoolOfferings(tenantId, {
-    semesterNo: 1,
-    categories: ['MDC', 'AEC', 'SEC', 'VAC'],
-    shiftCode: 'DAY',
-  });
-  await poolProvisioner.provisionPoolOfferings(tenantId, {
-    semesterNo: 3,
-    categories: ['MDC', 'AEC', 'SEC', 'VTC'],
-    shiftCode: 'DAY',
-  });
+  // Shared category pools (MDC/AEC/SEC/VAC/VTC) are managed via seedCategoryPools
+  // and the Programs UI — not bulk-populated from the Arts catalog seed.
 
   console.log(
     `Arts FYUGP ODD catalog seeded: ${courses.length} courses, ${programVersions.size} BA programmes`,
@@ -363,9 +193,10 @@ async function upsertArtsCourse(
   }
 
   if (existing) {
+    // Never overwrite titles on seed replay — college catalog names are authoritative.
     const course = await prisma.course.update({
       where: { id: existing.id },
-      data: { ...data, title },
+      data: { ...data, title: existing.title },
     });
     return course.id;
   }

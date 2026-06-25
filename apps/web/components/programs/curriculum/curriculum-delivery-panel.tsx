@@ -152,8 +152,8 @@ export function CurriculumDeliveryPanel({
           </CardDescription>
         </div>
 
-        <div className="sticky top-0 z-20 -mx-1 space-y-2">
-          <GlassCard className="space-y-2 border border-border/60 bg-background/95 p-3 backdrop-blur">
+        <div className="sticky top-0 z-30 -mx-1 space-y-2">
+          <GlassCard className="relative isolate space-y-2 border border-border/60 bg-background/95 p-3 backdrop-blur">
             <CurriculumFilterToolbar
               filters={filters}
               searchInput={searchInput}

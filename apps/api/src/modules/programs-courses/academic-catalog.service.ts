@@ -1097,7 +1097,7 @@ export class AcademicCatalogService {
     );
 
     try {
-      return await this.prisma.course.update({
+      const updated = await this.prisma.course.update({
         where: { id },
         data: {
           ...(dto.code !== undefined ? { code } : {}),
@@ -1143,6 +1143,12 @@ export class AcademicCatalogService {
         },
         include: courseInclude,
       });
+      if (titleChanged) {
+        await mergeCatalogSeedExclusions(this.prisma, tenantId, {
+          catalogCustomizedCourseCodes: [nextCode],
+        });
+      }
+      return updated;
     } catch (e) {
       this.mapCoursePrismaUniqueError(e);
     }

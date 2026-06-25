@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 export type CatalogSeedExclusions = {
   excludedCourseCodes: Set<string>;
   excludedCurriculumKeys: Set<string>;
+  catalogCustomizedCourseCodes: Set<string>;
 };
 
 export function readCatalogSeedExclusions(
@@ -18,13 +19,26 @@ export function readCatalogSeedExclusions(
       ? (nepProfile!.excludedCurriculumKeys as string[])
       : [],
   );
-  return { excludedCourseCodes, excludedCurriculumKeys };
+  const catalogCustomizedCourseCodes = new Set<string>(
+    Array.isArray(nepProfile?.catalogCustomizedCourseCodes)
+      ? (nepProfile!.catalogCustomizedCourseCodes as string[])
+      : [],
+  );
+  return {
+    excludedCourseCodes,
+    excludedCurriculumKeys,
+    catalogCustomizedCourseCodes,
+  };
 }
 
 export async function mergeCatalogSeedExclusions(
   prisma: PrismaClient,
   tenantId: string,
-  input: { courseCodes?: string[]; curriculumKeys?: string[] },
+  input: {
+    courseCodes?: string[];
+    curriculumKeys?: string[];
+    catalogCustomizedCourseCodes?: string[];
+  },
 ) {
   const existing = await prisma.tenantAcademicSettings.findUnique({
     where: { tenantId },
@@ -41,11 +55,17 @@ export async function mergeCatalogSeedExclusions(
       current.excludedCurriculumKeys.add(key);
     }
   }
+  if (input.catalogCustomizedCourseCodes?.length) {
+    for (const code of input.catalogCustomizedCourseCodes) {
+      current.catalogCustomizedCourseCodes.add(code);
+    }
+  }
 
   const nepProfile = {
     ...profile,
     excludedCourseCodes: [...current.excludedCourseCodes],
     excludedCurriculumKeys: [...current.excludedCurriculumKeys],
+    catalogCustomizedCourseCodes: [...current.catalogCustomizedCourseCodes],
   };
 
   await prisma.tenantAcademicSettings.upsert({
