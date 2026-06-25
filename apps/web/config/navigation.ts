@@ -1594,6 +1594,56 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['imports:manage'],
           },
           {
+            label: 'Official Documents',
+            href: '/admin/administration/official-documents',
+            permissions: ['official-documents:read', 'official-documents:manage'],
+          },
+          {
+            label: 'Create Document',
+            href: '/admin/administration/official-documents/create',
+            permissions: ['official-documents:manage'],
+          },
+          {
+            label: 'Notices',
+            href: '/admin/administration/official-documents/notices',
+            permissions: ['official-documents:read', 'official-documents:manage'],
+          },
+          {
+            label: 'Circulars',
+            href: '/admin/administration/official-documents/circulars',
+            permissions: ['official-documents:read', 'official-documents:manage'],
+          },
+          {
+            label: 'Office Orders',
+            href: '/admin/administration/official-documents/office-orders',
+            permissions: ['official-documents:read', 'official-documents:manage'],
+          },
+          {
+            label: 'Document Archive',
+            href: '/admin/administration/official-documents/archive',
+            permissions: ['official-documents:read', 'official-documents:archive'],
+          },
+          {
+            label: 'Search Documents',
+            href: '/admin/administration/official-documents/search',
+            permissions: ['official-documents:read', 'official-documents:manage'],
+          },
+          {
+            label: 'Document Templates',
+            href: '/admin/administration/official-documents/templates',
+            permissions: ['official-documents:settings', 'official-documents:read'],
+          },
+          {
+            label: 'Digital Signatures',
+            href: '/admin/administration/official-documents/signatures',
+            permissions: ['official-documents:settings'],
+          },
+          {
+            label: 'Document Settings',
+            href: '/admin/administration/official-documents/settings',
+            permissions: ['official-documents:settings'],
+          },
+          {
             label: 'Backup & DR Center',
             href: '/admin/administration/backups',
             permissions: ['backup:read', 'backup:manage'],

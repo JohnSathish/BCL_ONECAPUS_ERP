@@ -10290,3 +10290,223 @@ model VisitorPass {
   @@map("visitor_passes")
   @@schema("access")
 }
+
+// ─── Official Documents (institutional notices, circulars, office orders) ───
+
+model OfficialDocumentSettings {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  defaultPrefix         String   @default("DBC") @map("default_prefix")
+  referencePattern      String   @default("{PREFIX}/{TYPE}/{YEAR}/{SEQ:4}") @map("reference_pattern")
+  verifyBaseUrl         String?  @map("verify_base_url")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("official_document_settings")
+  @@schema("core")
+}
+
+model OfficialLetterhead {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  code            String
+  name            String
+  collegeName     String   @map("college_name")
+  addressLine     String   @map("address_line")
+  contactLine     String?  @map("contact_line")
+  logoPath        String?  @map("logo_path")
+  footerHtml      String?  @map("footer_html")
+  isDefault       Boolean  @default(false) @map("is_default")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  issuers         OfficialDocumentIssuer[]
+  documents       OfficialDocument[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("official_letterheads")
+  @@schema("core")
+}
+
+model OfficialDocumentIssuer {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  roleCode        String   @map("role_code")
+  name            String
+  designation     String
+  signaturePath   String?  @map("signature_path")
+  sealPath        String?  @map("seal_path")
+  letterheadId    String?  @map("letterhead_id") @db.Uuid
+  refPrefix       String?  @map("ref_prefix")
+  sortOrder       Int      @default(0) @map("sort_order")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  letterhead      OfficialLetterhead? @relation(fields: [letterheadId], references: [id], onDelete: SetNull)
+  documents       OfficialDocument[]
+
+  @@unique([tenantId, roleCode])
+  @@index([tenantId, active])
+  @@map("official_document_issuers")
+  @@schema("core")
+}
+
+model OfficialDocumentTemplate {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentType    String   @map("document_type")
+  name            String
+  title           String?
+  subject         String?
+  salutation      String?
+  bodyHtml        String   @map("body_html")
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, documentType, active])
+  @@map("official_document_templates")
+  @@schema("core")
+}
+
+model OfficialDocument {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  documentType      String    @map("document_type")
+  status            String    @default("DRAFT")
+  priority          String    @default("NORMAL")
+  referenceNo       String?   @map("reference_no")
+  verifyToken       String    @unique @map("verify_token")
+  title             String
+  subject           String?
+  salutation        String?
+  bodyHtml          String    @map("body_html")
+  audience          Json      @default("{}")
+  printSettings     Json      @default("{}") @map("print_settings")
+  issuerId          String?   @map("issuer_id") @db.Uuid
+  letterheadId      String?   @map("letterhead_id") @db.Uuid
+  effectiveDate     DateTime? @map("effective_date")
+  expiryDate        DateTime? @map("expiry_date")
+  scheduledAt       DateTime? @map("scheduled_at")
+  publishedAt       DateTime? @map("published_at")
+  printedAt         DateTime? @map("printed_at")
+  archivedAt        DateTime? @map("archived_at")
+  pdfPath           String?   @map("pdf_path")
+  renderedHtml      String?   @map("rendered_html")
+  printCount        Int       @default(0) @map("print_count")
+  downloadCount     Int       @default(0) @map("download_count")
+  currentVersion    Int       @default(1) @map("current_version")
+  rejectionNote     String?   @map("rejection_note")
+  createdById       String?   @map("created_by_id") @db.Uuid
+  modifiedById      String?   @map("modified_by_id") @db.Uuid
+  approvedById      String?   @map("approved_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  issuer            OfficialDocumentIssuer? @relation(fields: [issuerId], references: [id], onDelete: SetNull)
+  letterhead        OfficialLetterhead? @relation(fields: [letterheadId], references: [id], onDelete: SetNull)
+  versions          OfficialDocumentVersion[]
+  approvals         OfficialDocumentApproval[]
+  attachments       OfficialDocumentAttachment[]
+  auditLogs         OfficialDocumentAuditLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, documentType])
+  @@index([tenantId, referenceNo])
+  @@index([tenantId, publishedAt])
+  @@index([tenantId, createdAt])
+  @@map("official_documents")
+  @@schema("core")
+}
+
+model OfficialDocumentVersion {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentId      String   @map("document_id") @db.Uuid
+  versionNo       Int      @map("version_no")
+  title           String
+  subject         String?
+  salutation      String?
+  bodyHtml        String   @map("body_html")
+  audience        Json     @default("{}")
+  snapshot        Json     @default("{}")
+  createdById     String?  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  document        OfficialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNo])
+  @@index([tenantId, documentId])
+  @@map("official_document_versions")
+  @@schema("core")
+}
+
+model OfficialDocumentApproval {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentId      String   @map("document_id") @db.Uuid
+  step            String
+  status          String
+  actorId         String?  @map("actor_id") @db.Uuid
+  note            String?
+  actedAt         DateTime @default(now()) @map("acted_at")
+
+  document        OfficialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("official_document_approvals")
+  @@schema("core")
+}
+
+model OfficialDocumentAttachment {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentId      String   @map("document_id") @db.Uuid
+  fileName        String   @map("file_name")
+  storageKey      String   @map("storage_key")
+  mimeType        String?  @map("mime_type")
+  fileSize        Int?     @map("file_size")
+  uploadedById    String?  @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  document        OfficialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("official_document_attachments")
+  @@schema("core")
+}
+
+model OfficialDocumentAuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentId      String   @map("document_id") @db.Uuid
+  action          String
+  actorId         String?  @map("actor_id") @db.Uuid
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  document        OfficialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId, createdAt])
+  @@map("official_document_audit_logs")
+  @@schema("core")
+}
+
+model OfficialDocumentSequence {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  documentType    String   @map("document_type")
+  year            Int
+  lastSequence    Int      @default(0) @map("last_sequence")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, documentType, year])
+  @@map("official_document_sequences")
+  @@schema("core")
+}

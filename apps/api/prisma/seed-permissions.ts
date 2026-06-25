@@ -1136,4 +1136,41 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     action: 'restore',
     description: 'Restore from backup (super-admin)',
   },
+  {
+    slug: 'official-documents:read',
+    resource: 'official-documents',
+    action: 'read',
+    description: 'View official documents, archive, and dashboard',
+  },
+  {
+    slug: 'official-documents:manage',
+    resource: 'official-documents',
+    action: 'manage',
+    description: 'Create and edit official document drafts',
+  },
+  {
+    slug: 'official-documents:approve',
+    resource: 'official-documents',
+    action: 'approve',
+    description: 'Approve or reject official documents (Principal)',
+  },
+  {
+    slug: 'official-documents:publish',
+    resource: 'official-documents',
+    action: 'publish',
+    description: 'Publish approved official documents',
+  },
+  {
+    slug: 'official-documents:archive',
+    resource: 'official-documents',
+    action: 'archive',
+    description: 'Archive official documents',
+  },
+  {
+    slug: 'official-documents:settings',
+    resource: 'official-documents',
+    action: 'settings',
+    description:
+      'Manage letterheads, issuers, templates, and reference formats',
+  },
 ];

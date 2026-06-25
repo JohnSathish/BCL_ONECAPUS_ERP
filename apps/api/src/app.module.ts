@@ -75,6 +75,7 @@ import { CampusAccessModule } from './modules/campus-access/campus-access.module
 import { BackupEngineModule } from './modules/backup-engine/backup-engine.module';
 import { PrincipalDeskModule } from './modules/principal-desk/principal-desk.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { OfficialDocumentsModule } from './modules/official-documents/official-documents.module';
 
 @Module({
   imports: [
@@ -149,6 +150,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
     PrincipalDeskModule,
     MarketingModule,
     BackupEngineModule,
+    OfficialDocumentsModule,
   ],
   controllers: [HealthController],
   providers: [

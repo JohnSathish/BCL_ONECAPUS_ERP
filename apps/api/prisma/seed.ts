@@ -275,6 +275,12 @@ async function main() {
     'backup:read',
     'backup:manage',
     'backup:download',
+    'official-documents:read',
+    'official-documents:manage',
+    'official-documents:approve',
+    'official-documents:publish',
+    'official-documents:archive',
+    'official-documents:settings',
   ]);
   await upsertRole('academic-admin', 'Academic Admin', [
     'academic:read',
@@ -592,6 +598,12 @@ async function main() {
     'governance:read',
     'staff-attendance:leave-admin',
     'library:read',
+    'official-documents:read',
+    'official-documents:manage',
+    'official-documents:approve',
+    'official-documents:publish',
+    'official-documents:archive',
+    'official-documents:settings',
   ]);
   await upsertRole('vice-principal', 'Vice Principal', [
     'students:read',
@@ -612,6 +624,11 @@ async function main() {
     'governance:read',
     'staff-attendance:leave-admin',
     'library:read',
+    'official-documents:read',
+    'official-documents:manage',
+    'official-documents:approve',
+    'official-documents:publish',
+    'official-documents:archive',
   ]);
   await upsertRole('erp-administrator', 'ERP Administrator', [
     'users:read',
@@ -636,6 +653,9 @@ async function main() {
     'staff:read',
     'fees:read',
     'naac-iqac:read',
+    'official-documents:read',
+    'official-documents:manage',
+    'official-documents:settings',
   ]);
 
   const adminRole = await prisma.role.findFirstOrThrow({
