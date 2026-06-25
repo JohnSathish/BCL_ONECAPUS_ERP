@@ -36,6 +36,8 @@ import {
   commitStudentImport,
   downloadStudentImportErrorReport,
   downloadStudentImportTemplate,
+  downloadSem3AdmissionTemplate,
+  fetchSem3ImportProgrammes,
   fetchStudentImportBatches,
   fetchStudentImportPreview,
   validateStudentImport,
@@ -84,6 +86,9 @@ export function StudentBulkImportPanel({ canImport }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [templateGuideOpen, setTemplateGuideOpen] = useState(false);
+  const [sem3DialogOpen, setSem3DialogOpen] = useState(false);
+  const [sem3Programme, setSem3Programme] = useState('');
+  const [sem3Downloading, setSem3Downloading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
@@ -101,6 +106,12 @@ export function StudentBulkImportPanel({ canImport }: Props) {
     queryKey: ['student-import-batches', 'studio'],
     queryFn: () => fetchStudentImportBatches(1, 5),
     enabled: canImport,
+  });
+
+  const sem3ProgrammesQ = useQuery({
+    queryKey: ['sem3-import-programmes'],
+    queryFn: fetchSem3ImportProgrammes,
+    enabled: canImport && sem3DialogOpen,
   });
 
   const reset = useCallback(() => {
@@ -173,6 +184,27 @@ export function StudentBulkImportPanel({ canImport }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const downloadSem3Template = async (programme?: string) => {
+    setSem3Downloading(true);
+    try {
+      const blob = await downloadSem3AdmissionTemplate({
+        programme: programme || undefined,
+        semesterSequence: 3,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = programme
+        ? `Sem3_${programme.replace(/[^A-Z0-9-]+/gi, '_')}_Import_Template.xlsx`
+        : 'Sem3_Admission_Import_Template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+      setSem3DialogOpen(false);
+    } finally {
+      setSem3Downloading(false);
+    }
+  };
+
   const validCount = preview?.summary.valid ?? 0;
   const invalidCount = preview?.summary.invalid ?? 0;
   const canCommit = validCount > 0 && preview?.status === 'VALIDATED';
@@ -228,6 +260,18 @@ export function StudentBulkImportPanel({ canImport }: Props) {
               onClick={() => void downloadTemplate('prefilled')}
             >
               Prefilled Template
+            </BulkActionButton>
+            <BulkActionButton
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={<Download className="h-4 w-4" />}
+              onClick={() => {
+                setSem3DialogOpen(true);
+                setSem3Programme('');
+              }}
+            >
+              Sem 3 Template
             </BulkActionButton>
             <BulkActionButton
               type="button"
@@ -500,6 +544,18 @@ export function StudentBulkImportPanel({ canImport }: Props) {
           <ImportHistoryWorkspace batches={recentImports} loading={historyQ.isLoading} />
         </aside>
       </div>
+
+      {sem3DialogOpen ? (
+        <Sem3TemplateDialog
+          programmes={sem3ProgrammesQ.data ?? []}
+          loading={sem3ProgrammesQ.isLoading}
+          downloading={sem3Downloading}
+          selectedProgramme={sem3Programme}
+          onSelectProgramme={setSem3Programme}
+          onClose={() => setSem3DialogOpen(false)}
+          onDownload={() => void downloadSem3Template(sem3Programme || undefined)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -912,6 +968,60 @@ function HealthMetric({
   );
 }
 
+function Sem3TemplateDialog({
+  programmes,
+  loading,
+  downloading,
+  selectedProgramme,
+  onSelectProgramme,
+  onClose,
+  onDownload,
+}: {
+  programmes: { code: string; name: string }[];
+  loading: boolean;
+  downloading: boolean;
+  selectedProgramme: string;
+  onSelectProgramme: (value: string) => void;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <section className="w-full max-w-md rounded-3xl border border-border/60 bg-card p-5 shadow-2xl">
+        <h2 className="text-lg font-semibold">Download Semester 3 Template</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Choose the curriculum programme. The Excel will contain Semester 3 paper names only — no
+          course codes. Major Paper 1 and 2 are assigned automatically from Major Department.
+        </p>
+        <label className="mt-4 block text-sm font-medium">
+          Programme
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedProgramme}
+            onChange={(event) => onSelectProgramme(event.target.value)}
+            disabled={loading}
+          >
+            <option value="">Default (first BA programme)</option>
+            {programmes.map((programme) => (
+              <option key={programme.code} value={programme.code}>
+                {programme.code} — {programme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onDownload} disabled={downloading || loading}>
+            {downloading ? 'Generating…' : 'Download template'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5 backdrop-blur">
@@ -922,17 +1032,19 @@ function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: (
       >
         <span className="flex items-center gap-2 text-sm font-semibold">
           <Info className="h-4 w-4 text-primary" />
-          Template Guide — Sem 1 admission Excel
+          Template Guide — student import Excel
         </span>
         <span className="text-xs text-muted-foreground">{open ? 'Hide' : 'Show'}</span>
       </button>
       {open ? (
         <div className="mt-3 space-y-4 text-xs">
           <p className="text-muted-foreground">
-            Download the template for Excel dropdowns on subject columns ({' '}
+            Use <span className="font-medium text-foreground">Sem 3 Template</span> for Semester 3
+            FYUGP imports (2 Major + MDC + AEC + SEC + VTC). The default blank template includes all
+            columns with a Sem 3 sample row. Download dropdowns on{' '}
             <span className="font-medium text-foreground">CODE - Subject Name</span> in{' '}
             <span className="font-medium text-foreground">MAJOR_CODE</span> etc., or subject names
-            in <span className="font-medium text-foreground">Major Subject</span> columns). See the{' '}
+            in <span className="font-medium text-foreground">Major Subject</span> columns. See the{' '}
             <span className="font-medium text-foreground">SUBJECT_MASTER</span> sheet for the full
             curriculum list.
           </p>
@@ -949,14 +1061,23 @@ function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: (
               <p className="mt-1 text-muted-foreground">+ Registration or Application Number</p>
             </div>
             <div>
-              <p className="mb-1 font-semibold">NEP paper columns (Sem 1)</p>
+              <p className="mb-1 font-semibold">NEP paper columns (Sem 3)</p>
               {[
-                'MAJOR_CODE / Major Subject (dropdown)',
-                'MINOR_CODE / Minor Subject (dropdown)',
-                'MDC_CODE / MDC Choice (dropdown)',
-                'AEC_CODE / AEC (dropdown)',
-                'SEC_CODE / SEC (dropdown)',
-                'VAC_CODE / VAC (dropdown)',
+                'Major Department — ERP assigns both major papers',
+                'MDC Paper / AEC Paper / SEC Paper / VTC Paper',
+                'No Minor or VAC columns in Semester 3',
+                'Current Semester = 3',
+                'Select names from dropdowns — never enter course codes',
+              ].map((item) => (
+                <p key={item} className="text-muted-foreground">
+                  ○ {item}
+                </p>
+              ))}
+              <p className="mt-2 mb-1 font-semibold">NEP paper columns (Sem 1)</p>
+              {[
+                'MAJOR_CODE / Major Subject',
+                'MINOR_CODE / Minor Subject',
+                'MDC, AEC, SEC, VAC',
               ].map((item) => (
                 <p key={item} className="text-muted-foreground">
                   ○ {item}

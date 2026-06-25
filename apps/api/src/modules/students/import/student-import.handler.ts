@@ -22,6 +22,17 @@ import {
   SEM1_ADMISSION_TEMPLATE_HEADERS,
   SEM1_ADMISSION_TEMPLATE_HELPERS,
 } from '../migration/sem1-admission-template';
+import {
+  SEM3_ADMISSION_SAMPLE_ROW,
+  SEM3_ADMISSION_TEMPLATE_HEADERS,
+  SEM3_ADMISSION_TEMPLATE_HELPERS,
+  SEM3_HIDDEN_SHEETS,
+  SEM3_STRUCTURE_NOTES,
+} from '../migration/sem3-admission-template';
+import {
+  Sem3ImportCurriculumService,
+  type Sem3ImportCurriculumCatalog,
+} from './sem3-import-curriculum.service';
 
 export type NormalizedStudentImportRow = {
   email: string;
@@ -75,7 +86,7 @@ type ExistingStudentRef = {
   masterProfile: { nationalId: string | null } | null;
 };
 
-type FyugpCategory = 'MAJOR' | 'MINOR' | 'MDC' | 'AEC' | 'SEC' | 'VAC';
+type FyugpCategory = 'MAJOR' | 'MINOR' | 'MDC' | 'AEC' | 'SEC' | 'VAC' | 'VTC';
 
 type FyugpResolvedSelection = {
   category: FyugpCategory;
@@ -94,11 +105,13 @@ type FyugpResolvedSelection = {
 
 type FyugpAcademicMapping = {
   major?: FyugpResolvedSelection;
+  major2?: FyugpResolvedSelection;
   minor?: FyugpResolvedSelection;
   mdc?: FyugpResolvedSelection;
   aec?: FyugpResolvedSelection;
   sec?: FyugpResolvedSelection;
   vac?: FyugpResolvedSelection;
+  vtc?: FyugpResolvedSelection;
   tutorialGroup?: string;
   labBatch?: string;
 };
@@ -199,7 +212,17 @@ const FYUGP_CATEGORY_LABELS: Record<FyugpCategory, string> = {
   AEC: 'AEC',
   SEC: 'SEC',
   VAC: 'VAC',
+  VTC: 'VTC',
 };
+
+const SINGLE_SLOT_REGISTRATION_CATEGORIES = new Set<FyugpCategory>([
+  'MINOR',
+  'MDC',
+  'AEC',
+  'SEC',
+  'VAC',
+  'VTC',
+]);
 
 type FyugpResolutionContext = {
   subjectMasters: SubjectMasterRow[];
@@ -239,17 +262,20 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     { key: 'motherName', header: 'Mother Name', required: false },
     { key: 'rfid', header: 'RFID', required: false },
     { key: 'majorCourseCode', header: 'MAJOR_CODE', required: false },
+    { key: 'majorCourseCode2', header: 'MAJOR_CODE_2', required: false },
     { key: 'minorCourseCode', header: 'MINOR_CODE', required: false },
     { key: 'mdcCourseCode', header: 'MDC_CODE', required: false },
     { key: 'aecCourseCode', header: 'AEC_CODE', required: false },
     { key: 'secCourseCode', header: 'SEC_CODE', required: false },
     { key: 'vacCourseCode', header: 'VAC_CODE', required: false },
+    { key: 'vtcCourseCode', header: 'VTC_CODE', required: false },
     { key: 'majorSubject', header: 'Major Subject', required: false },
     { key: 'minorSubject', header: 'Minor Subject', required: false },
     { key: 'mdcSubject', header: 'MDC Choice', required: false },
     { key: 'aecSubject', header: 'AEC', required: false },
     { key: 'secSubject', header: 'SEC', required: false },
     { key: 'vacSubject', header: 'VAC', required: false },
+    { key: 'vtcSubject', header: 'VTC', required: false },
     { key: 'sectionCode', header: 'Section Code', required: false },
     { key: 'majorSection', header: 'Major Section', required: false },
     { key: 'minorSection', header: 'Minor Section', required: false },
@@ -257,6 +283,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     { key: 'aecSection', header: 'AEC Section', required: false },
     { key: 'secSection', header: 'SEC Section', required: false },
     { key: 'vacSection', header: 'VAC Section', required: false },
+    { key: 'vtcSection', header: 'VTC Section', required: false },
     { key: 'majorSubject2', header: 'Major Subject 2', required: false },
     { key: 'minorSubject2', header: 'Minor Subject 2', required: false },
     { key: 'electiveSubject', header: 'Elective Subject', required: false },
@@ -280,6 +307,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly academicEngine: AcademicEngineService,
     private readonly semesterResolver: StudentSemesterResolverService,
     private readonly abcService: StudentAbcService,
+    private readonly sem3Curriculum: Sem3ImportCurriculumService,
   ) {}
   async parseAndValidate(
     tenantId: string,
@@ -477,6 +505,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const fileEmails = new Set<string>();
     const fileAadhaars = new Set<string>();
     const fileRfids = new Set<string>();
+    const sem3Catalogs = await this.preloadSem3Catalogs(
+      tenantId,
+      programVersions.map((version) => version.id),
+    );
     return rows.map((row) =>
       this.validateRow(row, {
         importMode,
@@ -501,6 +533,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         fileRfids,
         categoryByCode,
         religionByKey,
+        sem3Catalogs,
         fyugp: {
           subjectMasters,
           offerings: courseOfferings,
@@ -554,6 +587,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fileRfids: Set<string>;
       categoryByCode: Map<string, string>;
       religionByKey: Map<string, string>;
+      sem3Catalogs: Map<string, Sem3ImportCurriculumCatalog>;
       fyugp: FyugpResolutionContext;
     },
   ): ImportRowValidationResult {
@@ -799,6 +833,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         );
       }
     }
+    const majorDepartment = this.firstText(raw, [
+      'majorDepartment',
+      'majorDepartmentName',
+    ]);
     const fyugpMapping = this.resolveFyugpMapping(raw, {
       programVersionId,
       semesterSequence: targetSemester,
@@ -806,8 +844,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fyugp: ctx.fyugp,
       errors,
       warnings,
+      sem3Catalogs: ctx.sem3Catalogs,
     });
-    const majorSubjectSlug = fyugpMapping.major?.subjectSlug;
+    const majorSubjectSlug =
+      fyugpMapping.major?.subjectSlug ??
+      (majorDepartment
+        ? this.resolveMajorDepartmentSlug(
+            majorDepartment,
+            ctx.fyugp.subjectMasters,
+          )
+        : undefined);
     const minorSubjectSlug = fyugpMapping.minor?.subjectSlug;
     const turaLine1 = String(raw.turaLine1 ?? raw.addressInTura ?? '').trim();
     const turaCity = String(raw.turaCity ?? '').trim();
@@ -919,12 +965,17 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fyugp: FyugpResolutionContext;
       errors: string[];
       warnings: string[];
+      sem3Catalogs?: Map<string, Sem3ImportCurriculumCatalog>;
     },
   ): FyugpAcademicMapping {
     const mapping: FyugpAcademicMapping = {
       tutorialGroup: this.readText(raw, 'tutorialGroup'),
       labBatch: this.readText(raw, 'labBatch'),
     };
+    const sem3Resolved = this.resolveSem3FriendlySelections(raw, ctx, mapping);
+    if (sem3Resolved) {
+      return sem3Resolved;
+    }
     const defaultSectionCode =
       this.firstText(raw, ['sectionCode']) ??
       mapping.tutorialGroup ??
@@ -951,6 +1002,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         'CODE',
       ],
       [
+        'major2',
+        'MAJOR',
+        this.firstText(raw, ['majorCourseCode2', 'majorCode2']),
+        'CODE',
+      ],
+      [
         'minor',
         'MINOR',
         this.firstText(raw, [
@@ -964,12 +1021,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       ['aec', 'AEC', this.firstText(raw, ['aecCourseCode', 'aecCode']), 'CODE'],
       ['sec', 'SEC', this.firstText(raw, ['secCourseCode', 'secCode']), 'CODE'],
       ['vac', 'VAC', this.firstText(raw, ['vacCourseCode', 'vacCode']), 'CODE'],
+      ['vtc', 'VTC', this.firstText(raw, ['vtcCourseCode', 'vtcCode']), 'CODE'],
       [
         'major',
         'MAJOR',
         this.firstText(raw, ['majorSubject', 'majorSubjectSlug']),
         'LEGACY',
       ],
+      ['major2', 'MAJOR', this.firstText(raw, ['majorSubject2']), 'LEGACY'],
       [
         'minor',
         'MINOR',
@@ -985,6 +1044,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         'LEGACY',
       ],
       ['vac', 'VAC', this.readText(raw, 'vacSubject'), 'LEGACY'],
+      ['vtc', 'VTC', this.readText(raw, 'vtcSubject'), 'LEGACY'],
     ];
 
     for (const [key, category, input, mode] of requests) {
@@ -1013,11 +1073,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const seen = new Map<string, FyugpCategory>();
     for (const selection of [
       mapping.major,
+      mapping.major2,
       mapping.minor,
       mapping.mdc,
       mapping.aec,
       mapping.sec,
       mapping.vac,
+      mapping.vtc,
     ]) {
       if (!selection) continue;
       const duplicateKey =
@@ -1037,6 +1099,299 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return mapping;
   }
 
+  private resolveSem3FriendlySelections(
+    raw: Record<string, unknown>,
+    ctx: {
+      programVersionId?: string;
+      semesterSequence?: number;
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings: string[];
+      sem3Catalogs?: Map<string, Sem3ImportCurriculumCatalog>;
+    },
+    mapping: FyugpAcademicMapping,
+  ): FyugpAcademicMapping | undefined {
+    const majorDepartment = this.firstText(raw, [
+      'majorDepartment',
+      'majorDepartmentName',
+    ]);
+    const mdcPaper = this.firstText(raw, [
+      'mdcPaper',
+      'mdcSubject',
+      'mdcChoice',
+    ]);
+    const aecPaper = this.firstText(raw, ['aecPaper', 'aecSubject', 'aec']);
+    const secPaper = this.firstText(raw, ['secPaper', 'secSubject', 'sec']);
+    const vtcPaper = this.firstText(raw, ['vtcPaper', 'vtcSubject', 'vtc']);
+    const usesSem3Template = Boolean(
+      majorDepartment || mdcPaper || aecPaper || secPaper || vtcPaper,
+    );
+    if (!usesSem3Template) return undefined;
+
+    if (ctx.semesterSequence !== 3) {
+      ctx.errors.push(
+        'Semester 3 paper columns require Current Semester = 3 on this row.',
+      );
+      return mapping;
+    }
+    if (!ctx.programVersionId) {
+      ctx.errors.push(
+        'Programme is required to resolve Semester 3 paper selections.',
+      );
+      return mapping;
+    }
+
+    const catalog = ctx.sem3Catalogs?.get(ctx.programVersionId);
+    if (!catalog) {
+      ctx.errors.push(
+        'Semester 3 curriculum is not configured for the selected programme.',
+      );
+      return mapping;
+    }
+
+    const defaultSectionCode =
+      this.firstText(raw, ['sectionCode']) ??
+      mapping.tutorialGroup ??
+      undefined;
+    const sectionPreferences = this.buildSectionPreferences(
+      raw,
+      defaultSectionCode,
+    );
+    const subjectCtx = {
+      ...ctx,
+      sectionPreferences,
+      defaultSectionCode,
+    };
+
+    if (!majorDepartment) {
+      ctx.errors.push('Major Department is required for Semester 3 import.');
+    } else {
+      const department = this.sem3Curriculum.resolveMajorDepartment(
+        catalog,
+        majorDepartment,
+      );
+      if (!department) {
+        ctx.errors.push(
+          `Unknown Major Department "${majorDepartment}" for programme ${catalog.programCode}. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.major = this.resolveSem3OfferingSelection(
+          department.paper1,
+          'MAJOR',
+          subjectCtx,
+        );
+        mapping.major2 = this.resolveSem3OfferingSelection(
+          department.paper2,
+          'MAJOR',
+          subjectCtx,
+        );
+        if (mapping.major && !mapping.major.subjectSlug) {
+          mapping.major.subjectSlug = this.resolveMajorDepartmentSlug(
+            majorDepartment,
+            ctx.fyugp.subjectMasters,
+          );
+        }
+      }
+    }
+
+    this.resolveSem3CategoryPaper(
+      mapping,
+      'mdc',
+      'MDC',
+      mdcPaper,
+      catalog.mdcPapers,
+      subjectCtx,
+      ctx.errors,
+    );
+    this.resolveSem3CategoryPaper(
+      mapping,
+      'aec',
+      'AEC',
+      aecPaper,
+      catalog.aecPapers,
+      subjectCtx,
+      ctx.errors,
+    );
+    this.resolveSem3CategoryPaper(
+      mapping,
+      'sec',
+      'SEC',
+      secPaper,
+      catalog.secPapers,
+      subjectCtx,
+      ctx.errors,
+    );
+    this.resolveSem3CategoryPaper(
+      mapping,
+      'vtc',
+      'VTC',
+      vtcPaper,
+      catalog.vtcPapers,
+      subjectCtx,
+      ctx.errors,
+    );
+
+    const seen = new Map<string, FyugpCategory>();
+    for (const selection of [
+      mapping.major,
+      mapping.major2,
+      mapping.mdc,
+      mapping.aec,
+      mapping.sec,
+      mapping.vtc,
+    ]) {
+      if (!selection) continue;
+      const duplicateKey =
+        selection.courseId ??
+        selection.subjectSlug ??
+        this.normalizeSubjectKey(selection.resolvedLabel);
+      const previous = seen.get(duplicateKey);
+      if (previous) {
+        ctx.errors.push(
+          `Duplicate subject allocation: ${selection.resolvedLabel} is already selected for ${previous}.`,
+        );
+      } else {
+        seen.set(duplicateKey, selection.category);
+      }
+    }
+
+    return mapping;
+  }
+
+  private resolveSem3CategoryPaper(
+    mapping: FyugpAcademicMapping,
+    key: 'mdc' | 'aec' | 'sec' | 'vtc',
+    category: FyugpCategory,
+    input: string | undefined,
+    options: Sem3ImportCurriculumCatalog['mdcPapers'],
+    subjectCtx: {
+      programVersionId?: string;
+      semesterSequence?: number;
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings?: string[];
+      sectionPreferences?: Partial<Record<FyugpCategory, string>>;
+      defaultSectionCode?: string;
+    },
+    errors: string[],
+  ) {
+    if (!input) {
+      errors.push(`${category} Paper is required for Semester 3 import.`);
+      return;
+    }
+    const resolved = this.sem3Curriculum.resolveCategoryPaper(
+      options,
+      input,
+      category,
+    );
+    if (!resolved) {
+      errors.push(
+        `Unknown ${category} Paper "${input}" for Semester 3. Choose from the template dropdown.`,
+      );
+      return;
+    }
+    mapping[key] = this.resolveSem3OfferingSelection(
+      resolved,
+      category,
+      subjectCtx,
+    );
+  }
+
+  private resolveSem3OfferingSelection(
+    paper: {
+      title: string;
+      code: string;
+      courseId: string;
+      offeringId: string;
+    },
+    category: FyugpCategory,
+    ctx: {
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings?: string[];
+      sectionPreferences?: Partial<Record<FyugpCategory, string>>;
+      defaultSectionCode?: string;
+    },
+  ): FyugpResolvedSelection | undefined {
+    const offering = ctx.fyugp.offerings.find(
+      (candidate) => candidate.id === paper.offeringId,
+    );
+    if (!offering) {
+      ctx.errors.push(
+        `${category} paper "${paper.title}" (${paper.code}) is not available for import.`,
+      );
+      return undefined;
+    }
+    const preferredSection =
+      ctx.sectionPreferences?.[category] ?? ctx.defaultSectionCode;
+    const section = preferredSection
+      ? (offering.sections.find(
+          (entry) =>
+            entry.shiftId === ctx.shiftId &&
+            entry.sectionCode.toUpperCase() === preferredSection.toUpperCase(),
+        ) ??
+        offering.sections.find(
+          (entry) =>
+            entry.sectionCode.toUpperCase() === preferredSection.toUpperCase(),
+        ))
+      : (offering.sections.find((entry) => entry.shiftId === ctx.shiftId) ??
+        offering.sections[0]);
+    const subjectSlug =
+      offering.course.subjectSlug ??
+      this.subjectSlugForOffering(offering, ctx.fyugp.subjectMasters, category);
+    return {
+      category,
+      input: paper.title,
+      resolvedLabel: `${paper.code} - ${paper.title}`,
+      courseCode: paper.code,
+      resolutionMode: 'NAME',
+      subjectSlug,
+      courseId: paper.courseId,
+      courseOfferingId: offering.id,
+      offeringSectionId: section?.id,
+      sectionCode: section?.sectionCode,
+      categoryPoolId: offering.categoryPoolId ?? undefined,
+    };
+  }
+
+  private resolveMajorDepartmentSlug(
+    majorDepartment: string,
+    subjectMasters: SubjectMasterRow[],
+  ) {
+    const normalized = this.normalizeSubjectKey(majorDepartment);
+    const match = subjectMasters.find(
+      (subject) =>
+        this.normalizeSubjectKey(subject.name) === normalized ||
+        subject.slug === slugifySubject(majorDepartment),
+    );
+    return match?.slug ?? slugifySubject(majorDepartment);
+  }
+
+  private async preloadSem3Catalogs(
+    tenantId: string,
+    programVersionIds: string[],
+  ): Promise<Map<string, Sem3ImportCurriculumCatalog>> {
+    const catalogs = new Map<string, Sem3ImportCurriculumCatalog>();
+    const uniqueIds = [...new Set(programVersionIds)];
+    await Promise.all(
+      uniqueIds.map(async (programVersionId) => {
+        try {
+          const catalog = await this.sem3Curriculum.buildCatalog(tenantId, {
+            programVersionId,
+            semesterSequence: 3,
+          });
+          catalogs.set(programVersionId, catalog);
+        } catch {
+          // Programme may not have Sem 3 curriculum yet — validation will surface per row.
+        }
+      }),
+    );
+    return catalogs;
+  }
+
   private buildSectionPreferences(
     raw: Record<string, unknown>,
     defaultSectionCode?: string,
@@ -1049,6 +1404,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       { category: 'AEC', keys: ['aecSection'] },
       { category: 'SEC', keys: ['secSection'] },
       { category: 'VAC', keys: ['vacSection'] },
+      { category: 'VTC', keys: ['vtcSection'] },
     ];
     for (const { category, keys } of categories) {
       const value = this.firstText(raw, keys) ?? defaultSectionCode;
@@ -1172,7 +1528,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       (category === 'MDC' ||
         category === 'AEC' ||
         category === 'SEC' ||
-        category === 'VAC') &&
+        category === 'VAC' ||
+        category === 'VTC') &&
       !scoped.length
     ) {
       ctx.errors.push(
@@ -2092,11 +2449,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (!mapping) return;
     const selections = [
       mapping.major,
+      mapping.major2,
       mapping.minor,
       mapping.mdc,
       mapping.aec,
       mapping.sec,
       mapping.vac,
+      mapping.vtc,
     ].filter((selection): selection is FyugpResolvedSelection =>
       Boolean(selection?.courseOfferingId),
     );
@@ -2158,13 +2517,17 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           data,
         });
       } else {
-        const categoryExisting = await tx.semesterRegistrationLine.findFirst({
-          where: {
-            tenantId,
-            registrationId: registration.id,
-            category: selection.category,
-          },
-        });
+        const categoryExisting = SINGLE_SLOT_REGISTRATION_CATEGORIES.has(
+          selection.category,
+        )
+          ? await tx.semesterRegistrationLine.findFirst({
+              where: {
+                tenantId,
+                registrationId: registration.id,
+                category: selection.category,
+              },
+            })
+          : null;
         if (categoryExisting) {
           await tx.semesterRegistrationLine.update({
             where: { id: categoryExisting.id },
@@ -2351,6 +2714,243 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return Buffer.from(buf);
   }
 
+  async buildSem3AdmissionTemplateWorkbook(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+  }): Promise<Buffer> {
+    const semesterSequence = options.semesterSequence ?? 3;
+    let programme = options.programme;
+    let programVersionId = options.programVersionId;
+    if (!programme && !programVersionId) {
+      const programmes = await this.sem3Curriculum.listPublishedProgrammes(
+        options.tenantId,
+      );
+      const fallback =
+        programmes.find((entry) => entry.code.startsWith('BA-')) ??
+        programmes[0];
+      if (!fallback) {
+        throw new BadRequestException(
+          'No published programme found. Publish a programme curriculum before downloading the Semester 3 template.',
+        );
+      }
+      programme = fallback.code;
+      programVersionId = fallback.programVersionId;
+    }
+    const catalog = await this.sem3Curriculum.buildCatalog(options.tenantId, {
+      programme,
+      programVersionId,
+      semesterSequence,
+    });
+    const majorDepartments =
+      await this.sem3Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        semesterSequence,
+      );
+    const programmes = await this.sem3Curriculum.listPublishedProgrammes(
+      options.tenantId,
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = [...SEM3_ADMISSION_TEMPLATE_HEADERS];
+    const sampleRow = {
+      ...SEM3_ADMISSION_SAMPLE_ROW,
+      Programme: catalog.programCode,
+      'Current Semester': String(semesterSequence),
+      'Major Department':
+        catalog.majorDepartments[0]?.departmentName ??
+        majorDepartments[0]?.departmentName ??
+        'Economics',
+      'MDC Paper': catalog.mdcPapers[0]?.title ?? '',
+      'AEC Paper': catalog.aecPapers[0]?.title ?? '',
+      'SEC Paper': catalog.secPapers[0]?.title ?? '',
+      'VTC Paper': catalog.vtcPapers[0]?.title ?? '',
+    };
+
+    sheet.addRow(headers);
+    sheet.addRow(
+      headers.map(
+        (h) =>
+          SEM3_ADMISSION_TEMPLATE_HELPERS[h] ??
+          'Optional — stored in student profile when supported',
+      ),
+    );
+    sheet.addRow(
+      headers.map((h) => sampleRow[h as keyof typeof sampleRow] ?? ''),
+    );
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(2).font = { italic: true, color: { argb: 'FF666666' } };
+    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    sheet.columns.forEach((col) => {
+      col.width = 24;
+    });
+
+    const hiddenSheets = [
+      {
+        name: SEM3_HIDDEN_SHEETS.programmes,
+        headers: ['Programme Code', 'Programme Name', 'Program Version Id'],
+        rows: programmes.map((programme) => [
+          programme.code,
+          programme.name,
+          programme.programVersionId,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.majorDepartments,
+        headers: ['Major Department'],
+        rows: majorDepartments.map((department) => [department.departmentName]),
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.majorLookup,
+        headers: [
+          'Major Department',
+          'Paper 1 Code',
+          'Paper 1 Title',
+          'Paper 2 Code',
+          'Paper 2 Title',
+        ],
+        rows: majorDepartments.map((department) => [
+          department.departmentName,
+          department.paper1.code,
+          department.paper1.title,
+          department.paper2.code,
+          department.paper2.title,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.mdcPapers,
+        headers: ['MDC Paper', 'Course Code'],
+        rows: catalog.mdcPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.aecPapers,
+        headers: ['AEC Paper', 'Course Code'],
+        rows: catalog.aecPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.secPapers,
+        headers: ['SEC Paper', 'Course Code'],
+        rows: catalog.secPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM3_HIDDEN_SHEETS.vtcPapers,
+        headers: ['VTC Paper', 'Course Code'],
+        rows: catalog.vtcPapers.map((paper) => [paper.title, paper.code]),
+      },
+    ];
+
+    for (const ref of hiddenSheets) {
+      const refSheet = workbook.addWorksheet(ref.name);
+      refSheet.addRow(ref.headers);
+      for (const row of ref.rows) refSheet.addRow(row);
+      refSheet.getRow(1).font = { bold: true };
+      refSheet.columns.forEach((col) => {
+        col.width = 32;
+      });
+      if (ref.hidden) {
+        refSheet.state = 'veryHidden';
+      }
+    }
+
+    const curriculumInfo = workbook.addWorksheet('Curriculum Info');
+    curriculumInfo.addRow(['Field', 'Value']);
+    curriculumInfo.addRow(['Programme', catalog.programCode]);
+    curriculumInfo.addRow(['Programme Name', catalog.programName]);
+    curriculumInfo.addRow(['Semester', catalog.semesterSequence]);
+    curriculumInfo.addRow(['Program Version Id', catalog.programVersionId]);
+    curriculumInfo.addRow(['Generated At', new Date().toISOString()]);
+    curriculumInfo.getRow(1).font = { bold: true };
+    curriculumInfo.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.addRow(['Column', 'Notes']);
+    for (const header of headers) {
+      instructions.addRow([
+        header,
+        SEM3_ADMISSION_TEMPLATE_HELPERS[header] ??
+          'Imported when mapped; extra columns are preserved for future profile fields.',
+      ]);
+    }
+    instructions.addRow(['', '']);
+    for (const note of SEM3_STRUCTURE_NOTES) {
+      instructions.addRow(['Structure', note]);
+    }
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    this.applySem3Dropdowns(sheet, headers, hiddenSheets, programmes);
+    const buf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buf);
+  }
+
+  private applySem3Dropdowns(
+    sheet: ExcelJS.Worksheet,
+    headers: string[],
+    references: {
+      name: string;
+      rows: (string | number | null)[][];
+    }[],
+    programmes: { code: string }[],
+  ) {
+    const nameDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        Programme: { refName: SEM3_HIDDEN_SHEETS.programmes, column: 'A' },
+        'Major Department': {
+          refName: SEM3_HIDDEN_SHEETS.majorDepartments,
+          column: 'A',
+        },
+        'MDC Paper': { refName: SEM3_HIDDEN_SHEETS.mdcPapers, column: 'A' },
+        'AEC Paper': { refName: SEM3_HIDDEN_SHEETS.aecPapers, column: 'A' },
+        'SEC Paper': { refName: SEM3_HIDDEN_SHEETS.secPapers, column: 'A' },
+        'VTC Paper': { refName: SEM3_HIDDEN_SHEETS.vtcPapers, column: 'A' },
+      };
+    const refByName = new Map(references.map((ref) => [ref.name, ref]));
+
+    for (const [header, config] of Object.entries(nameDropdownMap)) {
+      const columnIndex = headers.indexOf(header) + 1;
+      const ref = refByName.get(config.refName);
+      if (!columnIndex) continue;
+      if (header === 'Programme' && programmes.length) {
+        const values = programmes.map((programme) => programme.code).join(',');
+        for (let row = 3; row <= 1000; row += 1) {
+          sheet.getCell(row, columnIndex).dataValidation = {
+            type: 'list',
+            allowBlank: false,
+            formulae: [`"${values}"`],
+            showErrorMessage: true,
+            errorTitle: 'Invalid programme',
+            error: 'Choose a programme from the dropdown.',
+          };
+        }
+        continue;
+      }
+      if (!ref?.rows.length) continue;
+      const formula = this.excelReferenceFormula(
+        config.refName,
+        ref.rows.length,
+        config.column,
+      );
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, columnIndex).dataValidation = {
+          type: 'list',
+          allowBlank: header === 'Programme' ? false : true,
+          formulae: [formula],
+          showErrorMessage: true,
+          errorTitle: 'Invalid selection',
+          error: `Choose a valid option from ${config.refName}.`,
+        };
+      }
+    }
+  }
+
   private async buildTemplateReferences(): Promise<TemplateReference[]> {
     const [subjects, courseOfferings, departments] = await Promise.all([
       this.prisma.academicSubject.findMany({
@@ -2437,6 +3037,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       { category: 'AEC', name: 'AEC Papers' },
       { category: 'SEC', name: 'SEC Papers' },
       { category: 'VAC', name: 'VAC Papers' },
+      { category: 'VTC', name: 'VTC Papers' },
     ];
     const subjectMasterRows: (string | number | null)[][] = [];
     const categoryReferences: TemplateReference[] = categorySheets.map(
@@ -2481,21 +3082,25 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const codeDropdownMap: Record<string, { refName: string; column: string }> =
       {
         MAJOR_CODE: { refName: 'MAJOR Papers', column: 'C' },
+        MAJOR_CODE_2: { refName: 'MAJOR Papers', column: 'C' },
         MINOR_CODE: { refName: 'MINOR Papers', column: 'C' },
         MDC_CODE: { refName: 'MDC Papers', column: 'C' },
         AEC_CODE: { refName: 'AEC Papers', column: 'C' },
         SEC_CODE: { refName: 'SEC Papers', column: 'C' },
         VAC_CODE: { refName: 'VAC Papers', column: 'C' },
+        VTC_CODE: { refName: 'VTC Papers', column: 'C' },
         Department: { refName: 'Departments', column: 'A' },
       };
     const nameDropdownMap: Record<string, { refName: string; column: string }> =
       {
         'Major Subject': { refName: 'MAJOR Papers', column: 'B' },
+        'Major Subject 2': { refName: 'MAJOR Papers', column: 'B' },
         'Minor Subject': { refName: 'MINOR Papers', column: 'B' },
         'MDC Choice': { refName: 'MDC Papers', column: 'B' },
         AEC: { refName: 'AEC Papers', column: 'B' },
         SEC: { refName: 'SEC Papers', column: 'B' },
         VAC: { refName: 'VAC Papers', column: 'B' },
+        VTC: { refName: 'VTC Papers', column: 'B' },
       };
 
     const applyListValidation = (
@@ -2574,35 +3179,41 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       '',
       'REG2026001',
       '001',
-      'Jane Doe',
-      'jane@example.com',
+      'Priangshuman Marak',
+      'student@example.edu',
       '9876543210',
-      'BCA',
-      '2026-BCA',
-      'SCIENCE',
-      'MORNING',
-      'CS',
+      '123456789012',
+      'BA-ECO',
+      'BATCH-2026',
+      'ARTS',
+      'DAY',
+      '',
       '2026-27',
-      '1',
+      '3',
       'STUDYING',
       'GENERAL',
       'CHRISTIAN',
-      '123456789012',
-      'John Doe',
-      'Jane Doe Sr',
-      'RFID001',
-      'GAR100 - Garo Major',
-      'EDU101 - Education Minor',
-      'MDC101 - Digital Literacy',
-      'AEC101 - Communicative English',
-      'SEC101 - Computer Applications',
-      'VAC101 - Environmental Studies',
-      'Garo Major',
-      'Education Minor',
-      'Digital Literacy',
-      'Communicative English',
-      'Computer Applications',
-      'Environmental Studies',
+      '',
+      'John Marak',
+      'Jane Marak',
+      '',
+      'ECO-200',
+      'ECO-201',
+      '',
+      'MDC-210',
+      'AEC-220',
+      'SEC-230',
+      '',
+      'VTC-240',
+      'ECO-200',
+      '',
+      'MDC-210',
+      'AEC-220',
+      'SEC-230',
+      '',
+      'VTC-240',
+      'A',
+      '',
       '',
       '',
       '',
@@ -2615,7 +3226,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       '',
       'TUT-A',
       'LAB-A',
-      'F',
+      'Male',
       '2006-01-15',
       '123 Main St',
       'Tura',
@@ -2781,6 +3392,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const helpers: Record<string, string> = {
       MAJOR_CODE:
         'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      MAJOR_CODE_2:
+        'Second major/core paper for Sem 3+ (e.g. ECO-201). Sem 1 uses Minor instead.',
       MINOR_CODE:
         'Select CODE - Subject Name from dropdown. Import stores the code only.',
       MDC_CODE:
@@ -2791,6 +3404,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         'Select CODE - Subject Name from dropdown. Import stores the code only.',
       VAC_CODE:
         'Select CODE - Subject Name from dropdown. Import stores the code only.',
+      VTC_CODE:
+        'Vocational Education & Training (Sem 3+). Select from dropdown.',
       'Major Subject':
         'Optional: enter subject name only — select from dropdown or type exact name.',
       'Minor Subject':
@@ -2799,8 +3414,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         'Optional: enter MDC subject name — select from dropdown or type exact name.',
       AEC: 'Optional: enter AEC subject name — select from dropdown or type exact name.',
       SEC: 'Optional: enter SEC subject name — select from dropdown or type exact name.',
-      VAC: 'Optional: enter VAC subject name — select from dropdown or type exact name.',
-      'Major Subject 2': 'Optional second major paper or track',
+      VAC: 'Optional: enter VAC subject name — Sem 1 only; use VTC for Sem 3.',
+      VTC: 'Optional: VTC paper for Sem 3+ (VTC-240 … VTC-249)',
+      'Major Subject 2': 'Second major/core paper (Sem 3: SUB-201 / ECO-201)',
       'Minor Subject 2': 'Optional second minor paper or track',
       'Elective Subject': 'Optional elective paper name',
       'Skill Paper':

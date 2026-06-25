@@ -205,23 +205,61 @@ export class StudentsController {
   @RequirePermissions('students:import')
   async downloadImportTemplate(
     @CurrentUser() user: JwtUser,
-    @Query('mode') mode: 'blank' | 'prefilled' = 'blank',
-    @Query('variant') variant: 'default' | 'sem1-admission' = 'default',
     @Res() res: Response,
+    @Query('mode') mode: 'blank' | 'prefilled' = 'blank',
+    @Query('variant')
+    variant: 'default' | 'sem1-admission' | 'sem3-admission' = 'default',
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
   ) {
     const buffer =
       variant === 'sem1-admission'
         ? await this.studentImport.buildSem1AdmissionTemplate()
-        : await this.studentImport.buildTemplate({ mode, tenantId: user.tid });
+        : variant === 'sem3-admission'
+          ? await this.studentImport.buildSem3AdmissionTemplate({
+              tenantId: user.tid,
+              programme,
+              programVersionId,
+              semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+            })
+          : await this.studentImport.buildTemplate({
+              mode,
+              tenantId: user.tid,
+            });
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${variant === 'sem1-admission' ? 'Sem1_Admission_Import_Template.xlsx' : 'Student_Import_Template.xlsx'}"`,
-    );
+    const filename =
+      variant === 'sem1-admission'
+        ? 'Sem1_Admission_Import_Template.xlsx'
+        : variant === 'sem3-admission'
+          ? 'Sem3_Admission_Import_Template.xlsx'
+          : 'Student_Import_Template.xlsx';
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+  }
+
+  @Get('import/sem3-curriculum/programmes')
+  @RequirePermissions('students:import')
+  listSem3ImportProgrammes(@CurrentUser() user: JwtUser) {
+    return this.studentImport.listSem3ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem3-curriculum')
+  @RequirePermissions('students:import')
+  getSem3ImportCurriculum(
+    @CurrentUser() user: JwtUser,
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+  ) {
+    return this.studentImport.getSem3ImportCurriculum(user.tid, {
+      programme,
+      programVersionId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+    });
   }
 
   @Get('migration/status')

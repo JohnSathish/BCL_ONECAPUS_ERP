@@ -20,6 +20,7 @@ import { StudentBulkUpdateProcessor } from './bulk-update/student-bulk-update.pr
 import { StudentBulkUpdateService } from './bulk-update/student-bulk-update.service';
 import { StudentImportHandler } from './import/student-import.handler';
 import { StudentImportService } from './import/student-import.service';
+import { Sem3ImportCurriculumService } from './import/sem3-import-curriculum.service';
 import { MigrationStatusService } from './migration/migration-status.service';
 import { StudentPhotoBulkController } from './photos/student-photo-bulk.controller';
 import { StudentPhotoBulkProcessor } from './photos/student-photo-bulk.processor';
@@ -82,6 +83,7 @@ import { StudentLeaveService } from './services/student-leave.service';
     StudentAssetsService,
     StudentImportHandler,
     StudentImportService,
+    Sem3ImportCurriculumService,
     StudentBulkUpdateService,
     StudentBulkSectionWriterService,
     StudentBulkUpdateProcessor,

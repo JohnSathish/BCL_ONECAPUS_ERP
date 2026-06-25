@@ -458,6 +458,29 @@ export async function downloadSem1AdmissionTemplate() {
   return data as Blob;
 }
 
+export async function downloadSem3AdmissionTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+}) {
+  const { data } = await api.get('/v1/students/import/template', {
+    params: { variant: 'sem3-admission', ...params },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export type Sem3ImportProgrammeOption = {
+  programVersionId: string;
+  code: string;
+  name: string;
+};
+
+export async function fetchSem3ImportProgrammes() {
+  const { data } = await api.get('/v1/students/import/sem3-curriculum/programmes');
+  return data as Sem3ImportProgrammeOption[];
+}
+
 export type MigrationStepStatus = 'complete' | 'partial' | 'pending';
 
 export type MigrationStepDto = {

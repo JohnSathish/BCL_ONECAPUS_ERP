@@ -23,6 +23,7 @@ import {
   StudentImportHandler,
   type NormalizedStudentImportRow,
 } from './student-import.handler';
+import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
 
 @Injectable()
 export class StudentImportService {
@@ -34,6 +35,8 @@ export class StudentImportService {
     private readonly batches: ImportBatchRepository,
 
     private readonly handler: StudentImportHandler,
+
+    private readonly sem3Curriculum: Sem3ImportCurriculumService,
   ) {}
 
   buildTemplate(options?: { mode?: 'blank' | 'prefilled'; tenantId?: string }) {
@@ -42,6 +45,30 @@ export class StudentImportService {
 
   buildSem1AdmissionTemplate() {
     return this.handler.buildSem1AdmissionTemplateWorkbook();
+  }
+
+  buildSem3AdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+  }) {
+    return this.handler.buildSem3AdmissionTemplateWorkbook(options);
+  }
+
+  listSem3ImportProgrammes(tenantId: string) {
+    return this.sem3Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  getSem3ImportCurriculum(
+    tenantId: string,
+    input: {
+      programme?: string;
+      programVersionId?: string;
+      semesterSequence?: number;
+    },
+  ) {
+    return this.sem3Curriculum.buildCatalog(tenantId, input);
   }
 
   async validateUpload(

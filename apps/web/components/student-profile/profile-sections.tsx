@@ -696,7 +696,34 @@ export function AcademicSection({
   );
 }
 
-const FIRST_SEMESTER_CHANGE_CATEGORIES = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC'] as const;
+function subjectChangeCategoriesForSemester(semesterSequence: number): readonly string[] {
+  if (semesterSequence <= 2) {
+    return ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC'];
+  }
+  if (semesterSequence === 3) {
+    return ['MAJOR', 'MDC', 'AEC', 'SEC', 'VTC'];
+  }
+  if (semesterSequence === 4) {
+    return ['MAJOR', 'VTC'];
+  }
+  if (semesterSequence === 5) {
+    return ['MAJOR', 'MINOR'];
+  }
+  return ['MAJOR'];
+}
+
+function subjectChangeCategoryLabel(category: string) {
+  if (category === 'VTC') return 'VTC (Vocational Training)';
+  if (category === 'VAC') return 'VAC (Value Added Course)';
+  return category;
+}
+
+function subjectChangePanelDescription(semesterSequence: number) {
+  const categories = subjectChangeCategoriesForSemester(semesterSequence)
+    .map(subjectChangeCategoryLabel)
+    .join(', ');
+  return `For Semester ${semesterSequence} corrections: ${categories}, and shift.`;
+}
 
 function normalizeSubjectCategory(value?: string | null) {
   return String(value ?? '')
@@ -752,6 +779,10 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
   });
 
   const semesterSequence = context.data?.semesterSequence ?? profile.semester ?? 1;
+  const changeCategories = useMemo(
+    () => subjectChangeCategoriesForSemester(semesterSequence),
+    [semesterSequence],
+  );
   const registration = context.data?.registration;
   const registrationEditable = registration?.status === 'draft';
 
@@ -817,25 +848,44 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
     setDepartmentId(option?.departmentId ?? null);
   }, [programVersionId, programmeOptions]);
 
-  useEffect(() => {
-    if (!open || !registration?.lines?.length) return;
+  const registrationLineSignature = useMemo(() => {
+    if (!registration?.lines?.length) return '';
+    return (
+      registration.lines as {
+        category?: string | null;
+        offeringSectionId?: string | null;
+      }[]
+    )
+      .map((line) => `${normalizeSubjectCategory(line.category)}:${line.offeringSectionId ?? ''}`)
+      .sort()
+      .join('|');
+  }, [registration?.lines]);
+
+  const registrationSelectionSeed = useMemo(() => {
+    if (!registrationLineSignature || !registration?.lines?.length) return null;
     const next: Record<string, string> = {};
     for (const line of registration.lines as {
       category?: string | null;
       offeringSectionId?: string | null;
     }[]) {
       const category = normalizeSubjectCategory(line.category);
-      if (
-        FIRST_SEMESTER_CHANGE_CATEGORIES.includes(
-          category as (typeof FIRST_SEMESTER_CHANGE_CATEGORIES)[number],
-        ) &&
-        line.offeringSectionId
-      ) {
+      if (changeCategories.includes(category) && line.offeringSectionId) {
         next[category] = line.offeringSectionId;
       }
     }
-    setSelections(next);
-  }, [open, registration?.lines]);
+    return next;
+  }, [changeCategories, registration?.lines, registrationLineSignature]);
+
+  useEffect(() => {
+    if (!open || !registrationSelectionSeed) return;
+    setSelections((current) => {
+      const entries = Object.entries(registrationSelectionSeed);
+      const unchanged =
+        entries.length === Object.keys(current).length &&
+        entries.every(([key, value]) => current[key] === value);
+      return unchanged ? current : registrationSelectionSeed;
+    });
+  }, [open, registrationSelectionSeed]);
 
   const sections = catalogSections(catalog.data);
   const sectionById = useMemo(
@@ -846,23 +896,25 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
     const grouped = new Map<string, CatalogSectionRow[]>();
     for (const section of sections) {
       const category = normalizeSubjectCategory(section.courseOffering.category);
-      if (!FIRST_SEMESTER_CHANGE_CATEGORIES.includes(category as never)) continue;
+      if (!changeCategories.includes(category)) continue;
       if (!grouped.has(category)) grouped.set(category, []);
       grouped.get(category)!.push(section);
     }
     return grouped;
-  }, [sections]);
+  }, [changeCategories, sections]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      if (!registration?.id) throw new Error('No Semester 1 registration found for this student');
+      if (!registration?.id) {
+        throw new Error(`No Semester ${semesterSequence} registration found for this student`);
+      }
       if (!registrationEditable) {
         throw new Error(
           'Only draft registrations can be edited. This registration is already submitted.',
         );
       }
       if (!programVersionId) throw new Error('Select programme first');
-      const selectedLines = FIRST_SEMESTER_CHANGE_CATEGORIES.flatMap((category) => {
+      const selectedLines = changeCategories.flatMap((category) => {
         const section = sectionById.get(selections[category] ?? '');
         return section
           ? [
@@ -883,11 +935,7 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
       )
         .filter(
           (line) =>
-            !FIRST_SEMESTER_CHANGE_CATEGORIES.includes(
-              normalizeSubjectCategory(
-                line.category,
-              ) as (typeof FIRST_SEMESTER_CHANGE_CATEGORIES)[number],
-            ) && line.offeringId,
+            !changeCategories.includes(normalizeSubjectCategory(line.category)) && line.offeringId,
         )
         .map((line) => ({
           category: normalizeSubjectCategory(line.category),
@@ -925,14 +973,14 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
       }
     },
     onSuccess: () => {
-      setMessage('First semester subjects and shift updated. Refreshing profile...');
+      setMessage(`Semester ${semesterSequence} subjects and shift updated. Refreshing profile...`);
       void qc.invalidateQueries({ queryKey: ['students', profile.id, 'profile'] });
       void qc.invalidateQueries({ queryKey: ['students', profile.id, 'semester-registrations'] });
       void qc.invalidateQueries({ queryKey: ['academic-engine', 'profile', profile.id] });
       void qc.invalidateQueries({ queryKey: ['admin-registrations', 'context', profile.id] });
     },
     onError: (error) => {
-      setMessage(apiErrorMessage(error, 'Could not update first semester subjects'));
+      setMessage(apiErrorMessage(error, `Could not update Semester ${semesterSequence} subjects`));
     },
   });
 
@@ -940,9 +988,9 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
     <div className="rounded-md border border-border bg-muted/20 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium">Change First Semester Subjects / Shift</p>
+          <p className="text-sm font-medium">Change Semester {semesterSequence} Subjects / Shift</p>
           <p className="text-xs text-muted-foreground">
-            For first-semester corrections: Major, Minor, MDC, AEC, SEC, VAC, and shift.
+            {subjectChangePanelDescription(semesterSequence)}
           </p>
         </div>
         <Button
@@ -1005,10 +1053,10 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
             </Field>
           </FieldGrid>
           <div className="grid gap-3 md:grid-cols-2">
-            {FIRST_SEMESTER_CHANGE_CATEGORIES.map((category) => {
+            {changeCategories.map((category) => {
               const options = sectionsByCategory.get(category) ?? [];
               return (
-                <Field key={category} label={category}>
+                <Field key={category} label={subjectChangeCategoryLabel(category)}>
                   <select
                     className={inputClass}
                     value={selections[category] ?? ''}
@@ -1020,7 +1068,7 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
                       }))
                     }
                   >
-                    <option value="">Select {category} paper</option>
+                    <option value="">Select {subjectChangeCategoryLabel(category)} paper</option>
                     {options.map((section) => (
                       <option key={section.id} value={section.id}>
                         {sectionOptionLabel(section)}
@@ -1049,8 +1097,8 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
           </div>
           <p className="text-xs text-muted-foreground">
             Change Programme first when a student changes Major department. Subject options below
-            are loaded from the selected programme curriculum, then saved into draft Semester 1
-            registration.
+            are loaded from the selected programme Semester {semesterSequence} curriculum, then
+            saved into the draft registration.
           </p>
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
         </div>

@@ -1,0 +1,1366 @@
+{
+  "exportedAt": "2026-06-25T20:37:07.358Z",
+  "tenantSlug": "demo",
+  "courses": [
+    {
+      "code": "AEC-121",
+      "title": "Alternative English"
+    },
+    {
+      "code": "AEC-170",
+      "title": "Communicative English"
+    },
+    {
+      "code": "AEC-220",
+      "title": "Critical Reading (Science)"
+    },
+    {
+      "code": "AEC-221",
+      "title": "Introduction to Academic Writing (Commerce)"
+    },
+    {
+      "code": "AEC-222",
+      "title": "Introduction to Academic Writing (Arts)"
+    },
+    {
+      "code": "AEC-223",
+      "title": "MIL — Garo (Advanced)"
+    },
+    {
+      "code": "AEC-224",
+      "title": "MIL — Hindi (Advanced)"
+    },
+    {
+      "code": "AEC-225",
+      "title": "MIL — Bengali (Advanced)"
+    },
+    {
+      "code": "AEC-226",
+      "title": "MIL — Assamese (Advanced)"
+    },
+    {
+      "code": "AEC-227",
+      "title": "MIL — Nepali (Advanced)"
+    },
+    {
+      "code": "AEC-228",
+      "title": "MIL — Khasi (Advanced)"
+    },
+    {
+      "code": "AEC-229",
+      "title": "MIL — Kokborok (Advanced)"
+    },
+    {
+      "code": "AEC–123",
+      "title": "MIL- I Garo"
+    },
+    {
+      "code": "AEC–173",
+      "title": "MIL– II Communicative Garo"
+    },
+    {
+      "code": "BCA-M501",
+      "title": "Software Engineering"
+    },
+    {
+      "code": "BCA-M502",
+      "title": "Computer Networks"
+    },
+    {
+      "code": "BOT-100",
+      "title": "Plant Diversity -I: Algae, Bryophytes and Pteridophytes"
+    },
+    {
+      "code": "BOT-150",
+      "title": "Plant Diversity -II: Gymnosperm and Paleobotany, Angiosperm Morphology, Plant Anatomy"
+    },
+    {
+      "code": "BOT-200",
+      "title": "Economic Botany, Ethnobotany and Phytogeography"
+    },
+    {
+      "code": "BOT-201",
+      "title": "Angiosperm Taxonomy"
+    },
+    {
+      "code": "BOT-250",
+      "title": "Mycology and Plant Pathology"
+    },
+    {
+      "code": "BOT-251",
+      "title": "Microbiology"
+    },
+    {
+      "code": "BOT-252",
+      "title": "Reproductive Biology of Angiosperms"
+    },
+    {
+      "code": "BOT-253",
+      "title": "Biodiversity and Conservation Biology"
+    },
+    {
+      "code": "BOT-300",
+      "title": "Plant Physiology"
+    },
+    {
+      "code": "BOT-301",
+      "title": "Plant Biochemistry"
+    },
+    {
+      "code": "BOT-302",
+      "title": "Plant Ecology"
+    },
+    {
+      "code": "BOT-302 M",
+      "title": "Angiosperm Taxonomy, Ecology and Economic Botany (Minor)"
+    },
+    {
+      "code": "BOT-303",
+      "title": "Internship"
+    },
+    {
+      "code": "BOT-350",
+      "title": "Genetics and Plant Breeding"
+    },
+    {
+      "code": "BOT-351",
+      "title": "Molecular Biology"
+    },
+    {
+      "code": "BOT-352",
+      "title": "Plant Stress Biology"
+    },
+    {
+      "code": "BOT-353",
+      "title": "Plant Biotechnology"
+    },
+    {
+      "code": "CHE-100",
+      "title": "Introductory Chemistry I"
+    },
+    {
+      "code": "CHE-150",
+      "title": "Introductory Chemistry II"
+    },
+    {
+      "code": "CHE-200",
+      "title": "Chemistry–III"
+    },
+    {
+      "code": "CHE-201",
+      "title": "Organic Chemistry Laboratory"
+    },
+    {
+      "code": "CHE-250",
+      "title": "Inorganic Chemistry-I"
+    },
+    {
+      "code": "CHE-251",
+      "title": "Organic Chemistry-I"
+    },
+    {
+      "code": "CHE-252",
+      "title": "Physical Chemistry-I"
+    },
+    {
+      "code": "CHE-253",
+      "title": "Inorganic Chemistry Laboratory"
+    },
+    {
+      "code": "CHE-300",
+      "title": "Inorganic Chemistry-IV"
+    },
+    {
+      "code": "CHE-301",
+      "title": "Organic Chemistry-II"
+    },
+    {
+      "code": "CHE-302",
+      "title": "General Chemistry – III"
+    },
+    {
+      "code": "CHE-303",
+      "title": "Internship"
+    },
+    {
+      "code": "CHE-350",
+      "title": "Inorganic Chemistry-II"
+    },
+    {
+      "code": "CHE-351",
+      "title": "Organic Chemistry-III"
+    },
+    {
+      "code": "CHE-352",
+      "title": "Physical Chemistry-II"
+    },
+    {
+      "code": "CHE-353",
+      "title": "Physical Chemistry Laboratory"
+    },
+    {
+      "code": "COM-100",
+      "title": "Accounting for Business"
+    },
+    {
+      "code": "COM-150",
+      "title": "Principles of Management"
+    },
+    {
+      "code": "COM-200",
+      "title": "Business Environment"
+    },
+    {
+      "code": "COM-201",
+      "title": "Corporate Accounting"
+    },
+    {
+      "code": "COM-250",
+      "title": "Business Economics"
+    },
+    {
+      "code": "COM-251",
+      "title": "Cost Accounting"
+    },
+    {
+      "code": "COM-252",
+      "title": "Marketing Management"
+    },
+    {
+      "code": "COM-253",
+      "title": "Financial Management"
+    },
+    {
+      "code": "COM-300",
+      "title": "Business Statistics"
+    },
+    {
+      "code": "COM-301",
+      "title": "Auditing"
+    },
+    {
+      "code": "COM-302",
+      "title": "Human Resouce Management"
+    },
+    {
+      "code": "COM-303",
+      "title": "Internship"
+    },
+    {
+      "code": "COM-350",
+      "title": "Business Law"
+    },
+    {
+      "code": "COM-351",
+      "title": "Financial Market & Institution"
+    },
+    {
+      "code": "COM-352",
+      "title": "Direct Tax"
+    },
+    {
+      "code": "COM-353",
+      "title": "Service Management"
+    },
+    {
+      "code": "ECO-100",
+      "title": "Microeconomics I"
+    },
+    {
+      "code": "ECO-150",
+      "title": "Macroeconomics I"
+    },
+    {
+      "code": "ECO-200",
+      "title": "Economics of Growth and Development"
+    },
+    {
+      "code": "ECO-201",
+      "title": "Mathematical Methods for Economics - I"
+    },
+    {
+      "code": "ECO-250",
+      "title": "Public Economics"
+    },
+    {
+      "code": "ECO-251",
+      "title": "Mathematical Methods for Economics - II"
+    },
+    {
+      "code": "ECO-252",
+      "title": "Environmental Economics"
+    },
+    {
+      "code": "ECO-253",
+      "title": "Macroeconomics II"
+    },
+    {
+      "code": "ECO-300",
+      "title": "Statistical Methods for Economics"
+    },
+    {
+      "code": "ECO-301",
+      "title": "Microeconomics II"
+    },
+    {
+      "code": "ECO-302",
+      "title": "Indian Economy"
+    },
+    {
+      "code": "ECO-304",
+      "title": "Internship"
+    },
+    {
+      "code": "ECO-350",
+      "title": "International Economics"
+    },
+    {
+      "code": "ECO-351",
+      "title": "History of Economic Thought"
+    },
+    {
+      "code": "ECO-352",
+      "title": "Financial Economics"
+    },
+    {
+      "code": "ECO-353",
+      "title": "Economics of Education and Health / Introductory Econometrics"
+    },
+    {
+      "code": "ECO-353 B",
+      "title": "Introductory Econometrics"
+    },
+    {
+      "code": "EDN-100",
+      "title": "Introduction To Education"
+    },
+    {
+      "code": "EDN-150",
+      "title": "Foundation of Education"
+    },
+    {
+      "code": "EDN-200",
+      "title": "Development Of Education In India- I"
+    },
+    {
+      "code": "EDN-250",
+      "title": "Philosophical Foundations of Education"
+    },
+    {
+      "code": "EDN-251",
+      "title": "Sociological Foundations of Education"
+    },
+    {
+      "code": "EDN-252",
+      "title": "Psychological Foundations of Education"
+    },
+    {
+      "code": "EDN-253",
+      "title": "Educational Technology"
+    },
+    {
+      "code": "EDN-300",
+      "title": "Educational Management"
+    },
+    {
+      "code": "EDN-301",
+      "title": "Curriculum Development"
+    },
+    {
+      "code": "EDN-302",
+      "title": "Education for Sustainable Development"
+    },
+    {
+      "code": "EDN-302 M",
+      "title": "Inclusive Education I"
+    },
+    {
+      "code": "EDN-304",
+      "title": "Internship"
+    },
+    {
+      "code": "EDN-350",
+      "title": "Introduction to Educational Research"
+    },
+    {
+      "code": "EDN-351",
+      "title": "Methods and Techniques of Teaching"
+    },
+    {
+      "code": "EDN-352",
+      "title": "Teaching-Learning Process"
+    },
+    {
+      "code": "EDN-353",
+      "title": "Great Educators: Thoughts and Practices"
+    },
+    {
+      "code": "EDU-201",
+      "title": "Development Of Education In India- II"
+    },
+    {
+      "code": "EDU-303",
+      "title": "Education Extension"
+    },
+    {
+      "code": "ENG-100",
+      "title": "Introduction to English Litearature"
+    },
+    {
+      "code": "ENG-150",
+      "title": "British Poetry: Milton To the Present"
+    },
+    {
+      "code": "ENG-200",
+      "title": "British Fiction 19th Century to 20th Century"
+    },
+    {
+      "code": "ENG-201",
+      "title": "British Drama 16th Century to the Present"
+    },
+    {
+      "code": "ENG-250",
+      "title": "British Prose"
+    },
+    {
+      "code": "ENG-251",
+      "title": "European Classical Literature"
+    },
+    {
+      "code": "ENG-252",
+      "title": "Literary Theory and Criticism"
+    },
+    {
+      "code": "ENG-253",
+      "title": "Introduction to General Linguistics and Phonetics"
+    },
+    {
+      "code": "ENG-300",
+      "title": "Indian Classical Literature"
+    },
+    {
+      "code": "ENG-301",
+      "title": "Contemporary Literary Theory and Criticism - 1"
+    },
+    {
+      "code": "ENG-302",
+      "title": "Indian Writing in English"
+    },
+    {
+      "code": "ENG-303",
+      "title": "Functional English"
+    },
+    {
+      "code": "ENG-304",
+      "title": "English Internship"
+    },
+    {
+      "code": "ENG-350",
+      "title": "American Literature - I"
+    },
+    {
+      "code": "ENG-351",
+      "title": "World Literature"
+    },
+    {
+      "code": "ENG-352 B",
+      "title": "Folk Literature"
+    },
+    {
+      "code": "ENG-353 - 1",
+      "title": "Popular Literature"
+    },
+    {
+      "code": "GAR-200",
+      "title": "History of Garo Language"
+    },
+    {
+      "code": "GAR-201",
+      "title": "History of Garo Literature"
+    },
+    {
+      "code": "GAR-250",
+      "title": "Garo Language Study – 1"
+    },
+    {
+      "code": "GAR-300",
+      "title": "Literary Theory and Criticism – II"
+    },
+    {
+      "code": "GAR-301",
+      "title": "Culture in Garo Literature – I"
+    },
+    {
+      "code": "GAR-302",
+      "title": "Garo Fiction – I"
+    },
+    {
+      "code": "GAR-303",
+      "title": "Garo Culture Studies"
+    },
+    {
+      "code": "GAR-304",
+      "title": "Garo Internship"
+    },
+    {
+      "code": "GAR-350",
+      "title": "World Literature in Translation – I"
+    },
+    {
+      "code": "GAR-351",
+      "title": "Garo Poetry – I"
+    },
+    {
+      "code": "GAR-353",
+      "title": "Garo Oral Traditions"
+    },
+    {
+      "code": "GAR–100",
+      "title": "Introduction to Garo Prose and Poetry"
+    },
+    {
+      "code": "GAR–150",
+      "title": "Garo Oral Narratives and Folklore"
+    },
+    {
+      "code": "GAR–251",
+      "title": "Garo Oral Literature"
+    },
+    {
+      "code": "GAR–252",
+      "title": "Literary Theory and Criticism – I"
+    },
+    {
+      "code": "GAR–253",
+      "title": "Garo Drama – I"
+    },
+    {
+      "code": "GAR–352",
+      "title": "Garo Language Study – II"
+    },
+    {
+      "code": "GEO-100",
+      "title": "Introduction to Human Geography"
+    },
+    {
+      "code": "GEO-150",
+      "title": "Introduction to Physical Geography"
+    },
+    {
+      "code": "GEO-200",
+      "title": "Regional Geography of India"
+    },
+    {
+      "code": "GEO-201",
+      "title": "Historical Development of Geography"
+    },
+    {
+      "code": "GEO-250",
+      "title": "Settlement Geography"
+    },
+    {
+      "code": "GEO-251",
+      "title": "Fundamentals of Economic Geography"
+    },
+    {
+      "code": "GEO-252",
+      "title": "Statistical Techniques in Geography"
+    },
+    {
+      "code": "GEO-253",
+      "title": "Thematic Cartography and Survey Techniques I"
+    },
+    {
+      "code": "GEO-300",
+      "title": "Thematic Cartography and Survey Techniques II"
+    },
+    {
+      "code": "GEO-301",
+      "title": "Population Geography"
+    },
+    {
+      "code": "GEO-302",
+      "title": "Introduction to Remote Sensing and GIS"
+    },
+    {
+      "code": "GEO-302 M",
+      "title": "Geography and Environment"
+    },
+    {
+      "code": "GEO-303",
+      "title": "Disaster Management"
+    },
+    {
+      "code": "GEO-304",
+      "title": "Geography Internship"
+    },
+    {
+      "code": "GEO-350",
+      "title": "Geography of Resources"
+    },
+    {
+      "code": "GEO-351",
+      "title": "Regional Geography of South East Asia"
+    },
+    {
+      "code": "GEO-352",
+      "title": "Methods of Data Collection and Field Techniques"
+    },
+    {
+      "code": "GEO-353",
+      "title": "Field Study and Project Report"
+    },
+    {
+      "code": "HIS-100",
+      "title": "History of India (Ancient to 1200 CE)"
+    },
+    {
+      "code": "HIS-150",
+      "title": "HISTORY OF INDIA: MAURYA TO POST GUPTA PERIOD"
+    },
+    {
+      "code": "HIS-200",
+      "title": "Medieval India"
+    },
+    {
+      "code": "HIS-201",
+      "title": "Modern India"
+    },
+    {
+      "code": "HIS-250",
+      "title": "History of Medieval India (13th-18th century C.E.)"
+    },
+    {
+      "code": "HIS-251",
+      "title": "History and Culture of Meghalaya"
+    },
+    {
+      "code": "HIS-252",
+      "title": "Modern North East India (1824-1947 С.E.)"
+    },
+    {
+      "code": "HIS-253",
+      "title": "Modern Europe (mid-15th century to 1815 C.E)"
+    },
+    {
+      "code": "HIS-300",
+      "title": "World History"
+    },
+    {
+      "code": "HIS-301",
+      "title": "Historiography (HIS-301)"
+    },
+    {
+      "code": "HIS-302",
+      "title": "History of North East India"
+    },
+    {
+      "code": "HIS-303",
+      "title": "Archaeology Basics"
+    },
+    {
+      "code": "HIS-304",
+      "title": "History Internship"
+    },
+    {
+      "code": "HIS-350",
+      "title": "History of Indian Nationalism (1858-1950 C.E.)"
+    },
+    {
+      "code": "HIS-351",
+      "title": "Contemporary World (1945-1991 C.E.)"
+    },
+    {
+      "code": "HIS-352",
+      "title": "Historiography"
+    },
+    {
+      "code": "HIS-353",
+      "title": "History of East-Asia (1839-1949 C.E.)"
+    },
+    {
+      "code": "MDC-110",
+      "title": "COMMERCIAL ARITHMETIC & ELEMENTARY STATISTICS"
+    },
+    {
+      "code": "MDC-111",
+      "title": "Culture and Society"
+    },
+    {
+      "code": "MDC-112",
+      "title": "FUNDAMENTALS OF COMPUTER SYSTEMS"
+    },
+    {
+      "code": "MDC-115",
+      "title": "INTRODUCTORY TO LIFE SCIENCES"
+    },
+    {
+      "code": "MDC-116",
+      "title": "INTRODUCTION TO NATIONAL CADET CORPS"
+    },
+    {
+      "code": "MDC-118",
+      "title": "Mathematics in Daily Life"
+    },
+    {
+      "code": "MDC-119",
+      "title": "Philosophy of Culture"
+    },
+    {
+      "code": "MDC-161",
+      "title": "Entrepreneurship"
+    },
+    {
+      "code": "MDC-162",
+      "title": "Environmental Ethics"
+    },
+    {
+      "code": "MDC-163",
+      "title": "Fundamentals of Statistics"
+    },
+    {
+      "code": "MDC-164",
+      "title": "Health & Hygiene Environmental Education and Disater Management"
+    },
+    {
+      "code": "MDC-165",
+      "title": "Introduction to Educational Psychology"
+    },
+    {
+      "code": "MDC-167",
+      "title": "Physical Education and Sports Science"
+    },
+    {
+      "code": "MDC-168",
+      "title": "Physical Geology & Geodynamics"
+    },
+    {
+      "code": "MDC-169",
+      "title": "Understanding Human Rights"
+    },
+    {
+      "code": "MDC-210",
+      "title": "English Proficiency And Soft Skill Development"
+    },
+    {
+      "code": "MDC-211",
+      "title": "Gender Studies"
+    },
+    {
+      "code": "MDC-212",
+      "title": "Financial Literacy (All)"
+    },
+    {
+      "code": "MDC-213",
+      "title": "National Service Scheme"
+    },
+    {
+      "code": "MDC-214",
+      "title": "Physics Around Us"
+    },
+    {
+      "code": "MDC-215",
+      "title": "Development of Education In North-East India"
+    },
+    {
+      "code": "MTH-100",
+      "title": "Fundamental Mathematics-I"
+    },
+    {
+      "code": "MTH-150",
+      "title": "Fundamental Mathematics-II"
+    },
+    {
+      "code": "MTH-200",
+      "title": "Calculus-I & Statics"
+    },
+    {
+      "code": "MTH-201",
+      "title": "Group Theory"
+    },
+    {
+      "code": "MTH-250",
+      "title": "Calculus-II"
+    },
+    {
+      "code": "MTH-251",
+      "title": "Differential Equations"
+    },
+    {
+      "code": "MTH-252",
+      "title": "Dynamics – I"
+    },
+    {
+      "code": "MTH-253",
+      "title": "Matrix Theory and Vector Spaces"
+    },
+    {
+      "code": "MTH-300",
+      "title": "Calculus-III"
+    },
+    {
+      "code": "MTH-301",
+      "title": "Number Theory and Ring Theory"
+    },
+    {
+      "code": "MTH-302",
+      "title": "Numerical Methods and Optimization Techniques"
+    },
+    {
+      "code": "MTH-302 B",
+      "title": "Elementary Algebra (Minor)"
+    },
+    {
+      "code": "MTH-303",
+      "title": "Internship"
+    },
+    {
+      "code": "MTH-350",
+      "title": "Complex Analysis"
+    },
+    {
+      "code": "MTH-351",
+      "title": "Dynamics – II"
+    },
+    {
+      "code": "MTH-352",
+      "title": "Discrete Mathematics"
+    },
+    {
+      "code": "MTH-352 B",
+      "title": "Operations Research"
+    },
+    {
+      "code": "PHI-100",
+      "title": "Understanding Philosophy"
+    },
+    {
+      "code": "PHI-150",
+      "title": "Ethics"
+    },
+    {
+      "code": "PHI-200",
+      "title": "Logic"
+    },
+    {
+      "code": "PHI-201",
+      "title": "Indian Philosophy -I"
+    },
+    {
+      "code": "PHI-250",
+      "title": "Social and Political Philosophy"
+    },
+    {
+      "code": "PHI-251",
+      "title": "History of Modern Western Philosophy"
+    },
+    {
+      "code": "PHI-252",
+      "title": "Indian Philosophy -2"
+    },
+    {
+      "code": "PHI-253",
+      "title": "Greek and Medieval Philosophy"
+    },
+    {
+      "code": "PHI-300",
+      "title": "Epistemology and Metaphysics"
+    },
+    {
+      "code": "PHI-301",
+      "title": "Existentialism"
+    },
+    {
+      "code": "PHI-302",
+      "title": "Philosophy of Value"
+    },
+    {
+      "code": "PHI-303",
+      "title": "Applied Ethics (PHI-303)"
+    },
+    {
+      "code": "PHI-304",
+      "title": "Philosophy Internship"
+    },
+    {
+      "code": "PHI-350",
+      "title": "Philosophy of Religion"
+    },
+    {
+      "code": "PHI-351",
+      "title": "Philosophy of Mind"
+    },
+    {
+      "code": "PHI-352",
+      "title": "Applied Ethics"
+    },
+    {
+      "code": "PHI-353",
+      "title": "Contemporary Indian Philosophy"
+    },
+    {
+      "code": "PHY-100",
+      "title": "Mathematical Physics I, Properties of Matter and Waves"
+    },
+    {
+      "code": "PHY-150",
+      "title": "Electricity & Magnetism, Optics I and Electronics I"
+    },
+    {
+      "code": "PHY-200",
+      "title": "Mathematical Physics II and Experimental Physics III"
+    },
+    {
+      "code": "PHY-201",
+      "title": "Heat & Thermodynamics and Experimental Physics IV"
+    },
+    {
+      "code": "PHY-250",
+      "title": "Optics II and Acoustics"
+    },
+    {
+      "code": "PHY-251",
+      "title": "Classical Mechanics I and Special Theory of Relativity"
+    },
+    {
+      "code": "PHY-252",
+      "title": "Quantum Mechanics I"
+    },
+    {
+      "code": "PHY-253",
+      "title": "Experimental Physics V"
+    },
+    {
+      "code": "PHY-300",
+      "title": "Electromagnetic Theory"
+    },
+    {
+      "code": "PHY-301",
+      "title": "Electronics II and Computational Physics I"
+    },
+    {
+      "code": "PHY-302",
+      "title": "Thermal and Statistical Physics"
+    },
+    {
+      "code": "PHY-302 B",
+      "title": "Modern Physics I"
+    },
+    {
+      "code": "PHY-303",
+      "title": "Internship"
+    },
+    {
+      "code": "PHY-350",
+      "title": "Solid State Physics"
+    },
+    {
+      "code": "PHY-351",
+      "title": "Atomic and Molecular Physics"
+    },
+    {
+      "code": "PHY-352",
+      "title": "Nuclear and Particle Physics"
+    },
+    {
+      "code": "PHY-353",
+      "title": "Experimental Physics VI"
+    },
+    {
+      "code": "POL-100",
+      "title": "Political Theory"
+    },
+    {
+      "code": "POL-150",
+      "title": "Indian Political System"
+    },
+    {
+      "code": "POL-200",
+      "title": "Introduction to International Relations"
+    },
+    {
+      "code": "POL-201",
+      "title": "Public Administration"
+    },
+    {
+      "code": "POL-250",
+      "title": "Classical Traditions in Western Political Thought"
+    },
+    {
+      "code": "POL-251",
+      "title": "Political Systems of Select Countries"
+    },
+    {
+      "code": "POL-252",
+      "title": "Indian Administration"
+    },
+    {
+      "code": "POL-253",
+      "title": "Political Sociology"
+    },
+    {
+      "code": "POL-300",
+      "title": "Socialist Political Thought"
+    },
+    {
+      "code": "POL-301",
+      "title": "State and Democracy in India"
+    },
+    {
+      "code": "POL-302",
+      "title": "Government and Politics in Northeast India"
+    },
+    {
+      "code": "POL-303",
+      "title": "Human Rights"
+    },
+    {
+      "code": "POL-304",
+      "title": "Political Science Internship"
+    },
+    {
+      "code": "POL-350",
+      "title": "Modern Indian Political Thought"
+    },
+    {
+      "code": "POL-351",
+      "title": "Feminist Theory and Practice"
+    },
+    {
+      "code": "POL-352",
+      "title": "Introduction to Public Policy"
+    },
+    {
+      "code": "POL-353",
+      "title": "The United Nations"
+    },
+    {
+      "code": "SEC-131",
+      "title": "Motivation"
+    },
+    {
+      "code": "SEC-132",
+      "title": "PERSONALITY DEVELOPMENT"
+    },
+    {
+      "code": "SEC-133",
+      "title": "Public Speaking"
+    },
+    {
+      "code": "SEC-180",
+      "title": "COMMUNICATION SKILLS"
+    },
+    {
+      "code": "SEC-181",
+      "title": "CONFIDENCE BUILDING"
+    },
+    {
+      "code": "SEC-182",
+      "title": "E- Commerce"
+    },
+    {
+      "code": "SEC-183",
+      "title": "Python Programming"
+    },
+    {
+      "code": "SEC-230",
+      "title": "Introduction to Translation"
+    },
+    {
+      "code": "SEC-232",
+      "title": "Conflict Resolution"
+    },
+    {
+      "code": "SEC-233",
+      "title": "Goods and Service Tax (GST)"
+    },
+    {
+      "code": "SEC-234",
+      "title": "Analytical Thinking"
+    },
+    {
+      "code": "SOC-100",
+      "title": "Introduction to Sociology"
+    },
+    {
+      "code": "SOC-150",
+      "title": "PRINCIPLE OF SOCIOLOGY"
+    },
+    {
+      "code": "SOC-200",
+      "title": "Society in India"
+    },
+    {
+      "code": "SOC-201",
+      "title": "Social Change"
+    },
+    {
+      "code": "SOC-250",
+      "title": "CLASSICAL SOCIOLOGICAL THINKERS"
+    },
+    {
+      "code": "SOC-251",
+      "title": "SOCIOLOGY OF FAMILY AND KINSHIP"
+    },
+    {
+      "code": "SOC-252",
+      "title": "RURAL SOCIOLOGY"
+    },
+    {
+      "code": "SOC-253",
+      "title": "URBAN SOCIOLOGY"
+    },
+    {
+      "code": "SOC-300",
+      "title": "ECONOMIC SOCIOLOGY"
+    },
+    {
+      "code": "SOC-301",
+      "title": "POLITICAL SOCIOLOGY"
+    },
+    {
+      "code": "SOC-302",
+      "title": "SOCIOLOGY OF EVIRONMENT"
+    },
+    {
+      "code": "SOC-303",
+      "title": "Social Work Basics"
+    },
+    {
+      "code": "SOC-304",
+      "title": "Sociology Internship"
+    },
+    {
+      "code": "SOC-350",
+      "title": "SOCIOLOGY OF RELIGION"
+    },
+    {
+      "code": "SOC-351",
+      "title": "SOCIOLOGY OF GENDER"
+    },
+    {
+      "code": "SOC-352",
+      "title": "MODERN SOCIOLOGICAL THEORIES"
+    },
+    {
+      "code": "SOC-353",
+      "title": "RESEARCH METHOLOGY"
+    },
+    {
+      "code": "VAC-140",
+      "title": "Environmental Studies"
+    },
+    {
+      "code": "VAC-190",
+      "title": "Health and Wellness"
+    },
+    {
+      "code": "VAC-191",
+      "title": "Life Skills Education"
+    },
+    {
+      "code": "VAC-192",
+      "title": "Understanding India"
+    },
+    {
+      "code": "VTC: 240.3",
+      "title": "Bee-Keeping -I"
+    },
+    {
+      "code": "VTC: 241.2",
+      "title": "Mushroom Cultivation- I"
+    },
+    {
+      "code": "VTC: 242.2",
+      "title": "Electrical-I"
+    },
+    {
+      "code": "VTC: 243.1",
+      "title": "Web Designing -I"
+    },
+    {
+      "code": "VTC: 243.2",
+      "title": "Desktop Publishing -I"
+    },
+    {
+      "code": "VTC: 243.3",
+      "title": "Computerized Accounting"
+    },
+    {
+      "code": "VTC: 244.2",
+      "title": "Event Management-I"
+    },
+    {
+      "code": "VTC: 245.3",
+      "title": "Guitar-I"
+    },
+    {
+      "code": "VTC: 245.4",
+      "title": "Vocals-I"
+    },
+    {
+      "code": "VTC: 246.1",
+      "title": "Baking and Confectionary-I"
+    },
+    {
+      "code": "VTC: 248.1",
+      "title": "Photography"
+    },
+    {
+      "code": "VTC: 260.3",
+      "title": "Bee-Keeping - II"
+    },
+    {
+      "code": "VTC: 261.2",
+      "title": "Mushroom Cultivation- II"
+    },
+    {
+      "code": "VTC: 262.2",
+      "title": "Electrical-II"
+    },
+    {
+      "code": "VTC: 263.1",
+      "title": "Web Designing -II"
+    },
+    {
+      "code": "VTC: 263.2",
+      "title": "Desktop Publishing -II"
+    },
+    {
+      "code": "VTC: 264.2",
+      "title": "Event Management-II"
+    },
+    {
+      "code": "VTC: 265.3",
+      "title": "Guitar-II"
+    },
+    {
+      "code": "VTC: 265.4",
+      "title": "Vocals-II"
+    },
+    {
+      "code": "VTC: 266.1",
+      "title": "Baking and Confectionary-II"
+    },
+    {
+      "code": "VTC: 360.3",
+      "title": "Bee-Keeping -III"
+    },
+    {
+      "code": "VTC: 361.2",
+      "title": "Mushroom Cultivation--III"
+    },
+    {
+      "code": "VTC: 362.2",
+      "title": "Electrical-III"
+    },
+    {
+      "code": "VTC: 363.1",
+      "title": "Web Designing -III"
+    },
+    {
+      "code": "VTC: 363.2",
+      "title": "Desktop Publishing -III"
+    },
+    {
+      "code": "VTC: 363.3",
+      "title": "Computerized Accounting-III"
+    },
+    {
+      "code": "VTC: 364.2",
+      "title": "Event Management--III"
+    },
+    {
+      "code": "VTC: 365.3",
+      "title": "Guitar-III"
+    },
+    {
+      "code": "VTC: 365.4",
+      "title": "Vocals-III"
+    },
+    {
+      "code": "VTC: 366.1",
+      "title": "Baking and Confectionary-III"
+    },
+    {
+      "code": "VTC:263.3",
+      "title": "Computerized Accounting-II"
+    },
+    {
+      "code": "VTC:269.1",
+      "title": "Photography-II"
+    },
+    {
+      "code": "VTC:369.1",
+      "title": "Photography-III"
+    },
+    {
+      "code": "ZOO-100",
+      "title": "Taxonomy and Animal Diversity"
+    },
+    {
+      "code": "ZOO-150",
+      "title": "Functional and Comparative Anatomy"
+    },
+    {
+      "code": "ZOO-200",
+      "title": "Introductory Cell Biology and Genetics"
+    },
+    {
+      "code": "ZOO-201",
+      "title": "Introductory Biochemistry and Immunology"
+    },
+    {
+      "code": "ZOO-250",
+      "title": "Evolutionary Biology, Adaptation and Animal Behaviour"
+    },
+    {
+      "code": "ZOO-251",
+      "title": "Aquatic Wildlife and Conservation Biology"
+    },
+    {
+      "code": "ZOO-252",
+      "title": "Ecology and Environmental Biology"
+    },
+    {
+      "code": "ZOO-253",
+      "title": "Parasitology Entomology and Economic Zoology"
+    },
+    {
+      "code": "ZOO-300",
+      "title": "Animal Physiology"
+    },
+    {
+      "code": "ZOO-301",
+      "title": "Biochemistry and Immunology"
+    },
+    {
+      "code": "ZOO-302",
+      "title": "Introductory Developmental Biology and Endocrinology"
+    },
+    {
+      "code": "ZOO-302 B",
+      "title": "Economic and Applied Zoology"
+    },
+    {
+      "code": "ZOO-303",
+      "title": "Internship"
+    },
+    {
+      "code": "ZOO-350",
+      "title": "Biological Techniques Bioinformatics and Biostatistics"
+    },
+    {
+      "code": "ZOO-351",
+      "title": "Cell Biology and Genetics"
+    },
+    {
+      "code": "ZOO-352",
+      "title": "Developmental Biology and Reproductive Biology"
+    },
+    {
+      "code": "ZOO-353",
+      "title": "Molecular Biology and Genetic Engineering"
+    }
+  ]
+}
