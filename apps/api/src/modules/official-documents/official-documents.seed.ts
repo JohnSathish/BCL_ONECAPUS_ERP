@@ -140,8 +140,13 @@ export class OfficialDocumentsSeedService {
   async seedTenant(tenantId: string) {
     const tenant = await this.prisma.tenant.findFirst({
       where: { id: tenantId },
+      include: { branding: true },
     });
-    const collegeName = tenant?.name ?? 'Don Bosco College';
+    const collegeName =
+      tenant?.branding?.displayName ?? tenant?.name ?? 'Don Bosco College';
+    const addressLine =
+      tenant?.branding?.address?.trim() || 'Tura, Meghalaya – 794002';
+    const logoPath = tenant?.branding?.logoUrl ?? null;
 
     await this.db().officialDocumentSettings.upsert({
       where: { tenantId },
@@ -164,11 +169,17 @@ export class OfficialDocumentsSeedService {
           code: 'DEFAULT',
           name: 'Default DBC Letterhead',
           collegeName,
-          addressLine: 'Tura, Meghalaya – 794002',
+          addressLine,
           contactLine:
             'Mobile: 9678402086 | Email: viceprincipal@donboscocollege.ac.in | Website: www.donboscocollege.ac.in',
+          logoPath,
           isDefault: true,
         },
+      });
+    } else if (!letterhead.logoPath && logoPath) {
+      letterhead = await this.db().officialLetterhead.update({
+        where: { id: letterhead.id },
+        data: { logoPath, collegeName, addressLine },
       });
     }
 

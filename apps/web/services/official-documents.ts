@@ -222,6 +222,22 @@ export async function updateOfficialDocumentIssuer(
   return data;
 }
 
+export async function uploadOfficialDocumentIssuerAsset(
+  issuerId: string,
+  kind: 'signature' | 'seal',
+  file: File,
+) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('kind', kind);
+  const { data } = await api.post(
+    `/v1/admin/official-documents/settings/issuers/${issuerId}/upload`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data as OfficialDocumentIssuer;
+}
+
 export async function fetchOfficialDocumentSettings() {
   const { data } = await api.get('/v1/admin/official-documents/settings/config');
   return data;

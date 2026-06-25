@@ -45,19 +45,29 @@ export class OfficialDocumentPdfService {
     if (defaultLh) return defaultLh;
     const tenant = await this.prisma.tenant.findFirst({
       where: { id: doc.tenantId },
+      include: { branding: true },
     });
+    const brandingLogo = tenant?.branding?.logoUrl ?? null;
     return {
-      collegeName: tenant?.name ?? 'Don Bosco College',
-      addressLine: 'Tura, Meghalaya – 794002',
+      collegeName:
+        tenant?.branding?.displayName ?? tenant?.name ?? 'Don Bosco College',
+      addressLine:
+        tenant?.branding?.address?.trim() || 'Tura, Meghalaya – 794002',
       contactLine:
         'Mobile: 9678402086 | Email: viceprincipal@donboscocollege.ac.in | Website: www.donboscocollege.ac.in',
-      logoPath: null,
+      logoPath: brandingLogo,
     };
   }
 
   async buildHtml(doc: Record<string, any>, referenceNo: string) {
     const settings = await this.referenceNumbers.getSettings(doc.tenantId);
     const letterhead = await this.resolveLetterhead(doc);
+    const branding = await this.prisma.tenantBranding.findFirst({
+      where: { tenantId: doc.tenantId },
+    });
+    const logoSrc = resolvePdfImageSrc(
+      letterhead.logoPath ?? branding?.logoUrl ?? null,
+    );
     const issuer = doc.issuer ?? {
       name: 'Authorized Signatory',
       designation: 'Office',
@@ -85,7 +95,7 @@ export class OfficialDocumentPdfService {
       collegeName: letterhead.collegeName,
       addressLine: letterhead.addressLine,
       contactLine: letterhead.contactLine,
-      logoSrc: resolvePdfImageSrc(letterhead.logoPath),
+      logoSrc,
       referenceNo,
       dateLabel: formatOfficialDate(doc.publishedAt ?? new Date()),
       documentType: doc.documentType,

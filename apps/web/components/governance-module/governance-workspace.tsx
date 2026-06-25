@@ -889,6 +889,17 @@ export function GovernanceWorkspace({ page = 'dashboard' }: { page?: GovernanceP
 
       {page === 'notices' && (
         <>
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            <strong>Committee notices only.</strong> For institution-wide official letters with DBC
+            letterhead, VP→Principal approval, and auto reference numbers, use{' '}
+            <a
+              href="/admin/administration/official-documents"
+              className="font-medium underline underline-offset-2"
+            >
+              Administration → Official Documents
+            </a>
+            .
+          </div>
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Draft notice</CardTitle>

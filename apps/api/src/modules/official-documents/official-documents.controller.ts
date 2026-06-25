@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -8,8 +9,12 @@ import {
   Query,
   Req,
   StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import type { Request } from 'express';
 import {
   CurrentUser,
@@ -33,6 +38,7 @@ import {
   UpdateTemplateDto,
   UpsertOfficialDocumentSettingsDto,
 } from './dto/official-documents.dto';
+import { OfficialDocumentAssetsService } from './services/official-document-assets.service';
 import { OfficialDocumentApprovalService } from './services/official-document-approval.service';
 import { OfficialDocumentDashboardService } from './services/official-document-dashboard.service';
 import { OfficialDocumentSettingsService } from './services/official-document-settings.service';
@@ -46,6 +52,7 @@ import { OfficialDocumentsSeedService } from './official-documents.seed';
 export class OfficialDocumentsController {
   constructor(
     private readonly documents: OfficialDocumentService,
+    private readonly assets: OfficialDocumentAssetsService,
     private readonly approval: OfficialDocumentApprovalService,
     private readonly dashboard: OfficialDocumentDashboardService,
     private readonly settings: OfficialDocumentSettingsService,
@@ -138,6 +145,38 @@ export class OfficialDocumentsController {
     @Body() dto: UpdateIssuerDto,
   ) {
     return this.settings.updateIssuer(user.tid, id, dto);
+  }
+
+  @Post('settings/issuers/:issuerId/upload')
+  @RequirePermissions('official-documents:settings')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  async uploadIssuerAsset(
+    @CurrentUser() user: JwtUser,
+    @Param('issuerId') issuerId: string,
+    @Body() body: { kind?: 'signature' | 'seal'; roleCode?: string },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    const issuers = await this.settings.listIssuers(user.tid);
+    const issuer = issuers.find((i: { id: string }) => i.id === issuerId);
+    if (!issuer) throw new BadRequestException('Issuer not found');
+    const roleCode = body.roleCode ?? issuer.roleCode;
+    const kind = body.kind === 'seal' ? 'seal' : 'signature';
+    const path = await this.assets.saveIssuerAsset(
+      user.tid,
+      roleCode,
+      file,
+      kind,
+    );
+    return this.settings.updateIssuer(user.tid, issuerId, {
+      ...(kind === 'seal' ? { sealPath: path } : { signaturePath: path }),
+    });
   }
 
   @Get('settings/templates')
