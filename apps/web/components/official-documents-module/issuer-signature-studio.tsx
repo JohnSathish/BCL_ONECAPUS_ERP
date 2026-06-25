@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Save, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { OfficialDocumentsShell } from '@/components/official-documents-module/official-documents-shell';
 import {
   fetchOfficialDocumentIssuers,
   updateOfficialDocumentIssuer,
@@ -54,58 +55,62 @@ export function IssuerSignatureStudio() {
 
   if (issuers.isLoading) {
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading issuers…
-      </p>
+      <OfficialDocumentsShell>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading issuers…
+        </p>
+      </OfficialDocumentsShell>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Digital Signatures & Seals</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload signature and seal images for each issuer. They are applied automatically when
-          generating official letter PDFs.
-        </p>
-      </div>
+    <OfficialDocumentsShell title="Digital Signatures">
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-xl font-semibold">Digital Signatures & Seals</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload signature and seal images for each issuer. They are applied automatically when
+            generating official letter PDFs.
+          </p>
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {(issuers.data ?? []).map((issuer) => {
-          const draft = drafts[issuer.id] ?? {
-            signaturePath: issuer.signaturePath ?? '',
-            sealPath: issuer.sealPath ?? '',
-          };
-          return (
-            <IssuerAssetCard
-              key={issuer.id}
-              issuer={issuer}
-              draft={draft}
-              uploading={uploading}
-              onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [issuer.id]: next }))}
-              onUpload={(kind, file) => void handleUpload(issuer.id, kind, file)}
-              onSave={() =>
-                updateMut.mutate({
-                  id: issuer.id,
-                  payload: {
-                    signaturePath: draft.signaturePath || undefined,
-                    sealPath: draft.sealPath || undefined,
-                  },
-                })
-              }
-              savePending={updateMut.isPending}
-            />
-          );
-        })}
-      </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(issuers.data ?? []).map((issuer) => {
+            const draft = drafts[issuer.id] ?? {
+              signaturePath: issuer.signaturePath ?? '',
+              sealPath: issuer.sealPath ?? '',
+            };
+            return (
+              <IssuerAssetCard
+                key={issuer.id}
+                issuer={issuer}
+                draft={draft}
+                uploading={uploading}
+                onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [issuer.id]: next }))}
+                onUpload={(kind, file) => void handleUpload(issuer.id, kind, file)}
+                onSave={() =>
+                  updateMut.mutate({
+                    id: issuer.id,
+                    payload: {
+                      signaturePath: draft.signaturePath || undefined,
+                      sealPath: draft.sealPath || undefined,
+                    },
+                  })
+                }
+                savePending={updateMut.isPending}
+              />
+            );
+          })}
+        </div>
 
-      {updateMut.isError ? (
-        <p className="text-sm text-destructive">
-          {apiErrorMessage(updateMut.error, 'Save failed')}
-        </p>
-      ) : null}
-    </div>
+        {updateMut.isError ? (
+          <p className="text-sm text-destructive">
+            {apiErrorMessage(updateMut.error, 'Save failed')}
+          </p>
+        ) : null}
+      </div>
+    </OfficialDocumentsShell>
   );
 }
 

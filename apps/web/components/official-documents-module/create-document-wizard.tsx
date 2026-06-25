@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
+import { OfficialDocumentsShell } from '@/components/official-documents-module/official-documents-shell';
 import { Button } from '@/components/ui/button';
 import {
   AUDIENCE_OPTIONS,
@@ -101,228 +102,235 @@ export function CreateDocumentWizard() {
           : Boolean(title.trim() && bodyHtml.trim());
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Create Official Document</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Step-by-step wizard. Reference number and date are assigned automatically on approval.
-        </p>
-      </div>
+    <OfficialDocumentsShell title="Create Document">
+      <div className="mx-auto max-w-4xl space-y-5">
+        <div>
+          <h1 className="text-2xl font-semibold">Create Official Document</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Step-by-step wizard. Reference number and date are assigned automatically on approval.
+          </p>
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        {STEPS.map((label, index) => (
-          <span
-            key={label}
-            className={cn(
-              'rounded-full px-3 py-1 text-xs font-semibold',
-              index === step
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground',
-            )}
-          >
-            {index + 1}. {label}
-          </span>
-        ))}
-      </div>
+        <div className="flex flex-wrap gap-2">
+          {STEPS.map((label, index) => (
+            <span
+              key={label}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold',
+                index === step
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {index + 1}. {label}
+            </span>
+          ))}
+        </div>
 
-      <div className="rounded-2xl border border-border/60 bg-card/85 p-5">
-        {step === 0 ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setDocumentType(opt.value)}
-                className={cn(
-                  'rounded-xl border px-4 py-3 text-left text-sm transition',
-                  documentType === opt.value
-                    ? 'border-primary bg-primary/5 font-semibold'
-                    : 'border-border hover:bg-muted/40',
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {step === 1 ? (
-          <div className="space-y-3">
-            {issuers.isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading issuers…</p>
-            ) : (
-              (issuers.data ?? []).map((issuer) => (
+        <div className="rounded-2xl border border-border/60 bg-card/85 p-5">
+          {step === 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {DOCUMENT_TYPE_OPTIONS.map((opt) => (
                 <button
-                  key={issuer.id}
+                  key={opt.value}
                   type="button"
-                  onClick={() => setIssuerId(issuer.id)}
+                  onClick={() => setDocumentType(opt.value)}
                   className={cn(
-                    'flex w-full flex-col rounded-xl border px-4 py-3 text-left',
-                    issuerId === issuer.id ? 'border-primary bg-primary/5' : 'border-border',
+                    'rounded-xl border px-4 py-3 text-left text-sm transition',
+                    documentType === opt.value
+                      ? 'border-primary bg-primary/5 font-semibold'
+                      : 'border-border hover:bg-muted/40',
                   )}
                 >
-                  <span className="font-semibold">{issuer.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {issuer.designation}
-                    {issuer.refPrefix ? ` · Ref prefix ${issuer.refPrefix}` : ''}
-                  </span>
+                  {opt.label}
                 </button>
-              ))
-            )}
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {AUDIENCE_OPTIONS.map((opt) => (
-              <label key={opt.key} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={Boolean(audience[opt.key])}
-                  onChange={(e) =>
-                    setAudience((prev) => ({ ...prev, [opt.key]: e.target.checked }))
-                  }
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div className="space-y-4">
-            {templates.data?.length ? (
-              <label className="block text-xs font-medium">
-                Apply template
-                <select
-                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                  value={templateId}
-                  onChange={(e) => applyTemplate(e.target.value)}
-                >
-                  <option value="">— Select template —</option>
-                  {templates.data.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      {tpl.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="block text-xs font-medium">
-                Title *
-                <input
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </label>
-              <label className="block text-xs font-medium">
-                Subject
-                <input
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                />
-              </label>
-              <label className="block text-xs font-medium md:col-span-2">
-                Salutation
-                <input
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                  value={salutation}
-                  onChange={(e) => setSalutation(e.target.value)}
-                />
-              </label>
-              <label className="block text-xs font-medium">
-                Priority
-                <select
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                >
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-xs font-medium">
-                Effective Date
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                  value={effectiveDate}
-                  onChange={(e) => setEffectiveDate(e.target.value)}
-                />
-              </label>
+              ))}
             </div>
+          ) : null}
 
-            <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium">Content</span>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Smart variables:
-                </span>
-                {SMART_VARIABLES.map((v) => (
+          {step === 1 ? (
+            <div className="space-y-3">
+              {issuers.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading issuers…</p>
+              ) : (
+                (issuers.data ?? []).map((issuer) => (
                   <button
-                    key={v}
+                    key={issuer.id}
                     type="button"
-                    className="rounded bg-muted px-2 py-0.5 text-[10px] font-mono"
-                    onClick={() => setBodyHtml((prev) => `${prev}${v}`)}
+                    onClick={() => setIssuerId(issuer.id)}
+                    className={cn(
+                      'flex w-full flex-col rounded-xl border px-4 py-3 text-left',
+                      issuerId === issuer.id ? 'border-primary bg-primary/5' : 'border-border',
+                    )}
                   >
-                    {v}
+                    <span className="font-semibold">{issuer.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {issuer.designation}
+                      {issuer.refPrefix ? ` · Ref prefix ${issuer.refPrefix}` : ''}
+                    </span>
                   </button>
-                ))}
-              </div>
-              <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
+                ))
+              )}
             </div>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
 
-      <div className="flex justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={step === 0}
-          onClick={() => setStep((s) => s - 1)}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        {step < STEPS.length - 1 ? (
-          <Button type="button" size="sm" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
-            Next
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        ) : (
+          {step === 2 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {AUDIENCE_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(audience[opt.key])}
+                    onChange={(e) =>
+                      setAudience((prev) => ({ ...prev, [opt.key]: e.target.checked }))
+                    }
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          {step === 3 ? (
+            <div className="space-y-4">
+              {templates.data?.length ? (
+                <label className="block text-xs font-medium">
+                  Apply template
+                  <select
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                    value={templateId}
+                    onChange={(e) => applyTemplate(e.target.value)}
+                  >
+                    <option value="">— Select template —</option>
+                    {templates.data.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-xs font-medium">
+                  Title *
+                  <input
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </label>
+                <label className="block text-xs font-medium">
+                  Subject
+                  <input
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                  />
+                </label>
+                <label className="block text-xs font-medium md:col-span-2">
+                  Salutation
+                  <input
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={salutation}
+                    onChange={(e) => setSalutation(e.target.value)}
+                  />
+                </label>
+                <label className="block text-xs font-medium">
+                  Priority
+                  <select
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                  >
+                    {PRIORITIES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs font-medium">
+                  Effective Date
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={effectiveDate}
+                    onChange={(e) => setEffectiveDate(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium">Content</span>
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Smart variables:
+                  </span>
+                  {SMART_VARIABLES.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className="rounded bg-muted px-2 py-0.5 text-[10px] font-mono"
+                      onClick={() => setBodyHtml((prev) => `${prev}${v}`)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex justify-between">
           <Button
             type="button"
+            variant="outline"
             size="sm"
-            disabled={!canNext || createMut.isPending}
-            onClick={() => createMut.mutate(payload)}
+            disabled={step === 0}
+            onClick={() => setStep((s) => s - 1)}
           >
-            {createMut.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              'Save Draft'
-            )}
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
           </Button>
-        )}
-      </div>
+          {step < STEPS.length - 1 ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canNext}
+              onClick={() => setStep((s) => s + 1)}
+            >
+              Next
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canNext || createMut.isPending}
+              onClick={() => createMut.mutate(payload)}
+            >
+              {createMut.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save Draft'
+              )}
+            </Button>
+          )}
+        </div>
 
-      {createMut.isError ? (
-        <p className="text-sm text-destructive">
-          {apiErrorMessage(createMut.error, 'Failed to create document')}
-        </p>
-      ) : null}
-    </div>
+        {createMut.isError ? (
+          <p className="text-sm text-destructive">
+            {apiErrorMessage(createMut.error, 'Failed to create document')}
+          </p>
+        ) : null}
+      </div>
+    </OfficialDocumentsShell>
   );
 }
