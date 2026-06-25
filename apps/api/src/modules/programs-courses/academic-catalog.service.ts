@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import {
+  buildCurriculumOfferingKey,
+  mergeCatalogSeedExclusions,
+} from '../../common/services/catalog-seed-exclusions.util';
 import { OfferingSectionStreamsService } from '../../common/services/offering-section-streams.service';
 import { ShiftScopeService } from '../../common/services/shift-scope.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -1363,11 +1367,45 @@ export class AcademicCatalogService {
     });
   }
 
-  softDeleteCourse(tenantId: string, id: string) {
-    return this.prisma.course.updateMany({
+  async softDeleteCourse(tenantId: string, id: string) {
+    const course = await this.prisma.course.findFirst({
       where: { id, tenantId, deletedAt: null },
-      data: { deletedAt: new Date() },
+      include: {
+        offerings: {
+          where: { deletedAt: null },
+          include: { course: { select: { code: true } } },
+        },
+      },
     });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    const curriculumKeys = course.offerings.map((offering) =>
+      buildCurriculumOfferingKey(offering),
+    );
+
+    await mergeCatalogSeedExclusions(this.prisma, tenantId, {
+      courseCodes: [course.code],
+      curriculumKeys,
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.categoryPoolCourse.updateMany({
+        where: { courseId: id, active: true },
+        data: { active: false },
+      }),
+      this.prisma.courseOffering.updateMany({
+        where: { courseId: id, tenantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      }),
+      this.prisma.course.updateMany({
+        where: { id, tenantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      }),
+    ]);
+
+    return { ok: true, code: course.code, excludedFromSeed: true };
   }
 
   /** Permanent delete — excluded from demo seed recreation. */
@@ -1679,9 +1717,7 @@ export class AcademicCatalogService {
     course: { code: string };
     semesterSequence: number | null;
   }) {
-    const scope =
-      offering.programVersionId ?? `pool:${offering.categoryPoolId ?? 'none'}`;
-    return `${scope}:${offering.course.code}:${offering.semesterSequence ?? 0}`;
+    return buildCurriculumOfferingKey(offering);
   }
 
   private curriculumSectionKey(
@@ -1727,24 +1763,8 @@ export class AcademicCatalogService {
 
   private async addExcludedCurriculumKeys(tenantId: string, keys: string[]) {
     if (keys.length === 0) return;
-    const existing = await this.prisma.tenantAcademicSettings.findUnique({
-      where: { tenantId },
-    });
-    const profile =
-      (existing?.nepProfile as Record<string, unknown> | null) ?? {};
-    const current = Array.isArray(profile.excludedCurriculumKeys)
-      ? (profile.excludedCurriculumKeys as string[])
-      : [];
-    const merged = [...new Set([...current, ...keys])];
-    await this.prisma.tenantAcademicSettings.upsert({
-      where: { tenantId },
-      create: {
-        tenantId,
-        nepProfile: { ...profile, excludedCurriculumKeys: merged },
-      },
-      update: {
-        nepProfile: { ...profile, excludedCurriculumKeys: merged },
-      },
+    await mergeCatalogSeedExclusions(this.prisma, tenantId, {
+      curriculumKeys: keys,
     });
   }
 

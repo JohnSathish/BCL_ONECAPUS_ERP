@@ -2653,8 +2653,21 @@ async function main() {
           .excludedCurriculumKeys as string[])
       : [],
   );
+  const excludedCourseCodes = new Set<string>(
+    Array.isArray(
+      (academicSettings?.nepProfile as Record<string, unknown> | null)
+        ?.excludedCourseCodes,
+    )
+      ? ((academicSettings?.nepProfile as Record<string, unknown>)
+          .excludedCourseCodes as string[])
+      : [],
+  );
 
   for (const c of nepCourses) {
+    if (excludedCourseCodes.has(c.code)) {
+      console.log(`Seed skip (removed course): ${c.code}`);
+      continue;
+    }
     const offeringKey = `${programVersion.id}:${c.code}:${c.sem}`;
     if (excludedCurriculum.has(offeringKey)) {
       console.log(`Seed skip (removed mapping): ${c.code} semester ${c.sem}`);

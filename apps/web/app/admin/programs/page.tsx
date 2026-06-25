@@ -1643,7 +1643,13 @@ export default function AdminProgramsPage() {
                     canManage={canManage}
                     onEdit={openCourseEdit}
                     onRemove={(c) => {
-                      if (confirm(`Remove course ${c.code}?`)) deleteCourseMut.mutate(c.id);
+                      if (
+                        confirm(
+                          `Remove course ${c.code}? It will stay removed after database seed or migration replays.`,
+                        )
+                      ) {
+                        deleteCourseMut.mutate(c.id);
+                      }
                     }}
                     isRemovePending={deleteCourseMut.isPending}
                   />
@@ -1677,8 +1683,13 @@ export default function AdminProgramsPage() {
                               size="sm"
                               disabled={deleteCourseMut.isPending}
                               onClick={() => {
-                                if (confirm(`Remove course ${c.code}?`))
+                                if (
+                                  confirm(
+                                    `Remove course ${c.code}? It will stay removed after database seed or migration replays.`,
+                                  )
+                                ) {
                                   deleteCourseMut.mutate(c.id);
+                                }
                               }}
                             >
                               Remove

@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { readCatalogSeedExclusions } from '../src/common/services/catalog-seed-exclusions.util';
 import {
   ARTS_FYUGP_DEPARTMENTS,
   buildArtsFyugpOddCourses,
@@ -87,6 +88,13 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     throw new Error('Day shift required for Arts FYUGP catalog seed');
   }
 
+  const academicSettings = await prisma.tenantAcademicSettings.findUnique({
+    where: { tenantId },
+  });
+  const seedExclusions = readCatalogSeedExclusions(
+    academicSettings?.nepProfile as Record<string, unknown> | null,
+  );
+
   const departments = await prisma.department.findMany({
     where: { tenantId, deletedAt: null },
     select: { id: true, code: true },
@@ -148,6 +156,10 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const courses = buildArtsFyugpOddCourses();
 
   for (const courseDef of courses) {
+    if (seedExclusions.excludedCourseCodes.has(courseDef.code)) {
+      console.log(`Arts seed skip (removed course): ${courseDef.code}`);
+      continue;
+    }
     const courseId = await upsertArtsCourse(
       prisma,
       tenantId,
@@ -212,6 +224,10 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
 
     let order = 0;
     for (const code of courseCodes) {
+      if (seedExclusions.excludedCourseCodes.has(code)) {
+        console.log(`Arts seed skip (removed pool course): ${code}`);
+        continue;
+      }
       const courseId = courseByCode.get(code);
       if (!courseId) continue;
 
@@ -241,7 +257,6 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
           programVersionId: null,
         },
         update: {
-          deletedAt: null,
           semesterSequence: poolDef.semesterNo,
           category: poolDef.categoryType,
         },
