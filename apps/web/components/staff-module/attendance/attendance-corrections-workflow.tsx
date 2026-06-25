@@ -13,14 +13,17 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { StaffPicker } from '@/components/staff-module/staff-picker';
 import {
   approveAttendanceCorrectionHr,
   approveAttendanceCorrectionHod,
   fetchAttendanceCorrections,
+  fetchStaffAttendanceTimeline,
   rejectAttendanceCorrection,
   requestAttendanceCorrection,
   type AttendanceCorrection,
 } from '@/services/staff-attendance';
+import type { StaffListItem } from '@/types/staff';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -66,6 +69,7 @@ export function AttendanceCorrectionsWorkflow() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [staffProfileId, setStaffProfileId] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState<StaffListItem | null>(null);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
   const [correctionType, setCorrectionType] = useState('MISSED_OUT');
   const [requestedInAt, setRequestedInAt] = useState('');
@@ -96,6 +100,8 @@ export function AttendanceCorrectionsWorkflow() {
       }),
     onSuccess: () => {
       setShowForm(false);
+      setStaffProfileId('');
+      setSelectedStaff(null);
       setReason('');
       setRequestedInAt('');
       setRequestedOutAt('');
@@ -127,6 +133,12 @@ export function AttendanceCorrectionsWorkflow() {
     () => (corrections.data ?? []).filter((row) => !['APPROVED', 'REJECTED'].includes(row.status)),
     [corrections.data],
   );
+
+  const attendancePreview = useQuery({
+    queryKey: ['staff-attendance', 'timeline-preview', staffProfileId, attendanceDate],
+    queryFn: () => fetchStaffAttendanceTimeline(staffProfileId, attendanceDate),
+    enabled: Boolean(staffProfileId && attendanceDate),
+  });
 
   return (
     <div className="space-y-5">
@@ -169,16 +181,15 @@ export function AttendanceCorrectionsWorkflow() {
               requestMut.mutate();
             }}
           >
-            <label className="block text-xs font-medium">
-              Staff Profile ID
-              <input
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                value={staffProfileId}
-                onChange={(event) => setStaffProfileId(event.target.value)}
-                placeholder="UUID from staff profile"
-                required
-              />
-            </label>
+            <StaffPicker
+              label="Staff Member"
+              value={staffProfileId}
+              onChange={(id, staff) => {
+                setStaffProfileId(id);
+                setSelectedStaff(staff);
+              }}
+              required
+            />
             <label className="block text-xs font-medium">
               Attendance Date
               <input
@@ -231,8 +242,45 @@ export function AttendanceCorrectionsWorkflow() {
                 onChange={(event) => setRequestedOutAt(event.target.value)}
               />
             </label>
+            {staffProfileId && attendanceDate ? (
+              <div className="md:col-span-2 rounded-2xl border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Current record — {selectedStaff?.fullName ?? 'Selected staff'} ·{' '}
+                  {formatDate(attendanceDate)}
+                </p>
+                {attendancePreview.isLoading ? (
+                  <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading attendance…
+                  </p>
+                ) : attendancePreview.data?.summary ? (
+                  <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                    <div>
+                      <span className="text-muted-foreground">Status</span>
+                      <p className="font-medium">{attendancePreview.data.summary.status}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">First IN</span>
+                      <p className="font-medium">
+                        {formatDateTime(attendancePreview.data.summary.firstInAt)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Last OUT</span>
+                      <p className="font-medium">
+                        {formatDateTime(attendancePreview.data.summary.lastOutAt)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No attendance record for this date yet.
+                  </p>
+                )}
+              </div>
+            ) : null}
             <div className="md:col-span-2">
-              <Button type="submit" size="sm" disabled={requestMut.isPending}>
+              <Button type="submit" size="sm" disabled={requestMut.isPending || !staffProfileId}>
                 {requestMut.isPending ? 'Submitting...' : 'Submit Correction Request'}
               </Button>
               {requestMut.isError ? (
