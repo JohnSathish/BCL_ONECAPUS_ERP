@@ -1322,17 +1322,34 @@ export class StaffAttendanceService {
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: {
-        staff: { select: { id: true, fullName: true, employeeCode: true } },
+        staff: {
+          select: {
+            id: true,
+            fullName: true,
+            employeeCode: true,
+            department: { select: { name: true } },
+          },
+        },
       },
     });
   }
 
   async requestCorrection(user: JwtUser, dto: CorrectionDto) {
+    const attendanceDate = this.startOfDay(new Date(dto.attendanceDate));
+    const originalRecord = await this.db().staffAttendanceDailyRecord.findFirst(
+      {
+        where: {
+          tenantId: user.tid,
+          staffProfileId: dto.staffProfileId,
+          attendanceDate,
+        },
+      },
+    );
     const correction = await this.db().staffAttendanceCorrection.create({
       data: {
         tenantId: user.tid,
         staffProfileId: dto.staffProfileId,
-        attendanceDate: new Date(dto.attendanceDate),
+        attendanceDate,
         correctionType: dto.correctionType,
         requestedInAt: dto.requestedInAt
           ? new Date(dto.requestedInAt)
@@ -1342,6 +1359,24 @@ export class StaffAttendanceService {
           : undefined,
         reason: dto.reason,
         requestedById: user.sub,
+        status: 'PENDING',
+        auditPayload: this.toAuditJson({
+          workflow: [
+            this.workflowStep(
+              'REQUEST',
+              user.sub,
+              dto.reason ?? 'Correction requested',
+            ),
+          ],
+          originalRecord: originalRecord
+            ? {
+                firstInAt: originalRecord.firstInAt,
+                lastOutAt: originalRecord.lastOutAt,
+                status: originalRecord.status,
+                workedMinutes: originalRecord.workedMinutes,
+              }
+            : null,
+        }),
       },
     });
     await this.audit(
@@ -1357,36 +1392,201 @@ export class StaffAttendanceService {
     return correction;
   }
 
-  async approveCorrection(user: JwtUser, id: string) {
-    const correction = await this.db().staffAttendanceCorrection.findFirst({
-      where: { id, tenantId: user.tid },
+  async hodApproveCorrection(user: JwtUser, id: string) {
+    const correction = await this.ensureCorrection(user.tid, id);
+    if (correction.status !== 'PENDING') {
+      throw new BadRequestException(
+        'Only pending correction requests can be approved by HOD.',
+      );
+    }
+    const auditPayload = this.appendWorkflowStep(
+      correction.auditPayload,
+      this.workflowStep('HOD_APPROVE', user.sub, 'Approved by HOD'),
+    );
+    const updated = await this.db().staffAttendanceCorrection.update({
+      where: { id },
+      data: {
+        status: 'HOD_APPROVED',
+        auditPayload,
+      },
     });
-    if (!correction) throw new NotFoundException('Correction not found');
+    await this.audit(
+      user,
+      'CORRECTION_HOD_APPROVE',
+      'CORRECTION',
+      id,
+      updated,
+      'HOD_APPROVED',
+      undefined,
+      correction.staffProfileId,
+    );
+    return updated;
+  }
+
+  async approveCorrection(user: JwtUser, id: string) {
+    return this.hrApproveCorrection(user, id);
+  }
+
+  async hrApproveCorrection(user: JwtUser, id: string) {
+    const correction = await this.ensureCorrection(user.tid, id);
+    if (!['PENDING', 'HOD_APPROVED'].includes(String(correction.status))) {
+      throw new BadRequestException(
+        'Correction is not awaiting HR verification.',
+      );
+    }
+    await this.applyCorrection(user.tid, correction);
+    const auditPayload = this.appendWorkflowStep(
+      correction.auditPayload,
+      this.workflowStep(
+        'HR_VERIFY',
+        user.sub,
+        'Verified by HR and attendance updated',
+      ),
+    );
     const updated = await this.db().staffAttendanceCorrection.update({
       where: { id },
       data: {
         status: 'APPROVED',
         approvedById: user.sub,
         approvedAt: new Date(),
+        auditPayload: {
+          ...(auditPayload as Record<string, unknown>),
+          appliedAt: new Date().toISOString(),
+        },
       },
     });
-    await this.engine.recomputeRange(
-      user.tid,
-      correction.attendanceDate,
-      correction.attendanceDate,
-      correction.staffProfileId,
-    );
     await this.audit(
       user,
-      'CORRECTION_APPROVE',
+      'CORRECTION_HR_APPROVE',
       'CORRECTION',
       id,
-      correction,
-      'SUCCESS',
+      updated,
+      'APPROVED',
       undefined,
       correction.staffProfileId,
     );
     return updated;
+  }
+
+  async rejectCorrection(user: JwtUser, id: string, reason: string) {
+    const correction = await this.ensureCorrection(user.tid, id);
+    if (['APPROVED', 'REJECTED'].includes(String(correction.status))) {
+      throw new BadRequestException('Correction request is already finalized.');
+    }
+    const auditPayload = this.appendWorkflowStep(
+      correction.auditPayload,
+      this.workflowStep('REJECT', user.sub, reason),
+    );
+    const updated = await this.db().staffAttendanceCorrection.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        auditPayload,
+      },
+    });
+    await this.audit(
+      user,
+      'CORRECTION_REJECT',
+      'CORRECTION',
+      id,
+      { reason, correction: updated },
+      'REJECTED',
+      undefined,
+      correction.staffProfileId,
+    );
+    return updated;
+  }
+
+  private async ensureCorrection(tenantId: string, id: string) {
+    const correction = await this.db().staffAttendanceCorrection.findFirst({
+      where: { id, tenantId },
+    });
+    if (!correction) throw new NotFoundException('Correction not found');
+    return correction;
+  }
+
+  private async applyCorrection(
+    tenantId: string,
+    correction: Record<string, unknown>,
+  ) {
+    const mapping = await this.db().staffBiometricMapping.findFirst({
+      where: {
+        tenantId,
+        staffProfileId: String(correction.staffProfileId),
+        active: true,
+      },
+      select: { deviceUserId: true, biometricId: true, deviceId: true },
+    });
+    const deviceUserId = String(mapping?.deviceUserId ?? 'CORRECTION');
+    const punches: RawPunchInput[] = [];
+    if (correction.requestedInAt) {
+      punches.push({
+        deviceUserId,
+        biometricId: mapping?.biometricId
+          ? String(mapping.biometricId)
+          : undefined,
+        punchTimestamp: new Date(String(correction.requestedInAt)),
+        punchDirection: 'IN',
+        rawPayload: {
+          source: 'MANUAL_CORRECTION',
+          correctionId: correction.id,
+        },
+      });
+    }
+    if (correction.requestedOutAt) {
+      punches.push({
+        deviceUserId,
+        biometricId: mapping?.biometricId
+          ? String(mapping.biometricId)
+          : undefined,
+        punchTimestamp: new Date(String(correction.requestedOutAt)),
+        punchDirection: 'OUT',
+        rawPayload: {
+          source: 'MANUAL_CORRECTION',
+          correctionId: correction.id,
+        },
+      });
+    }
+    if (punches.length) {
+      await this.storeRawPunches(
+        tenantId,
+        mapping?.deviceId ? String(mapping.deviceId) : undefined,
+        undefined,
+        punches,
+      );
+    }
+    await this.engine.recomputeRange(
+      tenantId,
+      new Date(String(correction.attendanceDate)),
+      new Date(String(correction.attendanceDate)),
+      String(correction.staffProfileId),
+    );
+  }
+
+  private workflowStep(stage: string, userId: string, note?: string) {
+    return {
+      stage,
+      userId,
+      note,
+      at: new Date().toISOString(),
+    };
+  }
+
+  private appendWorkflowStep(
+    auditPayload: unknown,
+    step: Record<string, unknown>,
+  ) {
+    const payload =
+      auditPayload &&
+      typeof auditPayload === 'object' &&
+      !Array.isArray(auditPayload)
+        ? (auditPayload as Record<string, unknown>)
+        : {};
+    const workflow = Array.isArray(payload.workflow) ? payload.workflow : [];
+    return {
+      ...payload,
+      workflow: [...workflow, step],
+    };
   }
 
   async auditLogs(tenantId: string) {
@@ -1466,16 +1666,23 @@ export class StaffAttendanceService {
         return (row.earlyMinutes ?? 0) > 0 || this.hasFlag(row, 'EARLY_OUT');
       if (type === 'ot' || type === 'overtime')
         return (row.overtimeMinutes ?? 0) > 0 || this.hasFlag(row, 'OVERTIME');
-      if (type === 'missing-punch')
+      if (type === 'missing-punch' || type === 'biometric-exception')
         return (
           this.hasFlag(row, 'MISSING_OUT') || this.hasFlag(row, 'NO_PUNCH')
         );
+      if (type === 'leave-vs-attendance')
+        return row.status === 'ON_LEAVE' || row.status === 'ABSENT';
+      if (type === 'holiday-attendance') return row.status === 'HOLIDAY';
+      if (type === 'shift-compliance')
+        return this.hasFlag(row, 'LATE') || this.hasFlag(row, 'EARLY_OUT');
       if (type === 'department-wise') return true;
       if (type === 'shift-wise') return true;
-      if (type === 'staff-card')
+      if (type === 'staff-card' || type === 'staff-summary')
         return (
           !query.staffProfileId || row.staffProfileId === query.staffProfileId
         );
+      if (type === 'muster-roll' || type === 'weekly' || type === 'yearly')
+        return true;
       return true;
     });
     return this.reportPayload(
@@ -1534,7 +1741,11 @@ export class StaffAttendanceService {
 
   private reportTitle(type: string) {
     const titles: Record<string, string> = {
-      daily: 'Daily Attendance Report',
+      daily: 'Daily Attendance Register',
+      monthly: 'Monthly Attendance Register',
+      'muster-roll': 'Muster Roll',
+      weekly: 'Weekly Attendance Report',
+      yearly: 'Yearly Attendance Report',
       late: 'Late Arrival Report',
       early: 'Early Exit Report',
       'early-exit': 'Early Exit Report',
@@ -1542,8 +1753,17 @@ export class StaffAttendanceService {
       overtime: 'Overtime Report',
       'missing-punch': 'Missing Punch Report',
       'shift-wise': 'Shift-wise Attendance Report',
-      'department-wise': 'Department-wise Attendance Report',
-      'staff-card': 'Staff Attendance Card',
+      'department-wise': 'Department Attendance Report',
+      'staff-card': 'Staff Attendance Summary',
+      'staff-summary': 'Staff Attendance Summary',
+      'leave-vs-attendance': 'Leave vs Attendance Report',
+      'payroll-summary': 'Payroll Attendance Summary',
+      'shift-compliance': 'Shift Compliance Report',
+      'holiday-attendance': 'Holiday Attendance Report',
+      'biometric-exception': 'Biometric Exception Report',
+      'device-health': 'Device Health Report',
+      'raw-punches': 'Raw Punch Report',
+      'sync-failures': 'Sync Failure Report',
     };
     return titles[type] ?? 'Attendance Report';
   }

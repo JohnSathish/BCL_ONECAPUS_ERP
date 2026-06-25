@@ -25,6 +25,7 @@ import {
   AttendanceCommandCenter,
   AttendanceLiveFeed,
 } from '@/components/staff-module/attendance/attendance-command-center';
+import { AttendanceCorrectionsWorkflow } from '@/components/staff-module/attendance/attendance-corrections-workflow';
 import { Button } from '@/components/ui/button';
 import {
   autoMapBiometricStaff,
@@ -40,6 +41,7 @@ import {
   fetchDeviceUsers,
   fetchBiometricMappings,
   fetchAttendanceCommandCenter,
+  downloadAttendanceReportExport,
   fetchDailyAttendance,
   fetchLiveAttendance,
   fetchMonthlyAttendance,
@@ -3195,17 +3197,7 @@ function SettingsList({
 }
 
 function CorrectionsConsole() {
-  const corrections = useQuery({
-    queryKey: ['staff-attendance', 'corrections'],
-    queryFn: fetchAttendanceCorrections,
-  });
-  return (
-    <GenericRows
-      title="Attendance Correction Workflow"
-      rows={corrections.data ?? []}
-      loading={corrections.isLoading}
-    />
-  );
+  return <AttendanceCorrectionsWorkflow />;
 }
 
 function ReportsAndFoundations({ kind }: { kind: PageKind }) {
@@ -3214,6 +3206,7 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
   );
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const qc = useQueryClient();
   const report = useQuery({
     queryKey: ['staff-attendance', 'report', reportType, from, to],
@@ -3230,6 +3223,16 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
       ? reportData.staff
       : [];
   const summary = reportData.summary ?? reportData.totals ?? {};
+
+  async function handleExport(format: 'csv' | 'xlsx') {
+    setExporting(format);
+    try {
+      await downloadAttendanceReportExport(reportType, format, { from, to });
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3244,17 +3247,25 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
             onChange={(event) => setReportType(event.target.value)}
           >
             {[
-              ['daily', 'Daily Attendance'],
-              ['monthly', 'Monthly Attendance'],
-              ['late', 'Late Report'],
-              ['early-exit', 'Early Exit'],
-              ['overtime', 'OT Report'],
-              ['missing-punch', 'Missing Punch'],
-              ['shift-wise', 'Shift-wise'],
-              ['department-wise', 'Department-wise'],
-              ['raw-punches', 'Raw Punches'],
-              ['device-health', 'Device Health'],
-              ['sync-failures', 'Sync Failures'],
+              ['daily', 'Daily Attendance Register'],
+              ['muster-roll', 'Muster Roll'],
+              ['monthly', 'Monthly Register'],
+              ['weekly', 'Weekly Attendance'],
+              ['yearly', 'Yearly Attendance'],
+              ['late', 'Late Arrival Report'],
+              ['early-exit', 'Early Exit Report'],
+              ['overtime', 'Overtime Report'],
+              ['missing-punch', 'Missing Punch Report'],
+              ['biometric-exception', 'Biometric Exception Report'],
+              ['shift-wise', 'Shift Compliance Report'],
+              ['department-wise', 'Department Attendance Report'],
+              ['staff-summary', 'Staff Attendance Summary'],
+              ['leave-vs-attendance', 'Leave vs Attendance Report'],
+              ['payroll-summary', 'Payroll Attendance Summary'],
+              ['holiday-attendance', 'Holiday Attendance Report'],
+              ['raw-punches', 'Raw Punch Report'],
+              ['device-health', 'Device Health Report'],
+              ['sync-failures', 'Sync Failure Report'],
             ].map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -3280,6 +3291,24 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
             onClick={() => processMut.mutate()}
           >
             Process Pending Punches
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={exporting === 'csv'}
+            onClick={() => void handleExport('csv')}
+          >
+            {exporting === 'csv' ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={exporting === 'xlsx'}
+            onClick={() => void handleExport('xlsx')}
+          >
+            {exporting === 'xlsx' ? 'Exporting...' : 'Export Excel'}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => window.print()}>
             PDF / Print

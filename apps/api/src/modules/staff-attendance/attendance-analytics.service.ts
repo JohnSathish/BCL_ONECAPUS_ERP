@@ -84,7 +84,7 @@ export class AttendanceAnalyticsService {
         take: 20000,
       }),
       this.db().staffAttendanceCorrection.count({
-        where: { tenantId, status: 'PENDING' },
+        where: { tenantId, status: { in: ['PENDING', 'HOD_APPROVED'] } },
       }),
       this.db().staffAttendanceRawPunch.findMany({
         where: {

@@ -587,6 +587,8 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
       'staff:read',
       'staff:assign-subjects',
       'staff-attendance:view',
+      'staff-attendance:edit',
+      'staff-attendance:corrections:hod',
       'certificates:read',
       'certificates:approve',
       'question-bank:read',

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
@@ -12,9 +13,11 @@ import {
   AttendanceQueryDto,
   AttendanceRuleDto,
   CorrectionDto,
+  CorrectionRejectDto,
 } from './dto/staff-attendance.dto';
-import { StaffAttendanceService } from './staff-attendance.service';
 import { AttendanceAnalyticsService } from './attendance-analytics.service';
+import { AttendanceExportService } from './attendance-export.service';
+import { StaffAttendanceService } from './staff-attendance.service';
 
 @ApiBearerAuth()
 @ApiTags('staff-attendance')
@@ -23,6 +26,7 @@ export class StaffAttendanceController {
   constructor(
     private readonly service: StaffAttendanceService,
     private readonly analytics: AttendanceAnalyticsService,
+    private readonly exportService: AttendanceExportService,
   ) {}
 
   @Get('dashboard')
@@ -110,6 +114,36 @@ export class StaffAttendanceController {
     return this.service.approveCorrection(user, id);
   }
 
+  @Post('corrections/:id/hod-approve')
+  @RequireAnyPermission(
+    'staff-attendance:corrections:hod',
+    'staff-attendance:edit',
+    'staff-attendance:corrections:approve',
+  )
+  hodApproveCorrection(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.service.hodApproveCorrection(user, id);
+  }
+
+  @Post('corrections/:id/hr-approve')
+  @RequirePermissions('staff-attendance:corrections:approve')
+  hrApproveCorrection(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.service.hrApproveCorrection(user, id);
+  }
+
+  @Post('corrections/:id/reject')
+  @RequireAnyPermission(
+    'staff-attendance:corrections:hod',
+    'staff-attendance:corrections:approve',
+    'staff-attendance:edit',
+  )
+  rejectCorrection(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CorrectionRejectDto,
+  ) {
+    return this.service.rejectCorrection(user, id, dto.reason);
+  }
+
   @Get('reports/:type')
   @RequireAnyPermission('staff-attendance:reports', 'staff-attendance:view')
   report(
@@ -118,6 +152,55 @@ export class StaffAttendanceController {
     @Query() query: AttendanceQueryDto,
   ) {
     return this.service.report(user.tid, type, query);
+  }
+
+  @Get('reports/:type/export.csv')
+  @RequireAnyPermission('staff-attendance:reports', 'staff-attendance:view')
+  async exportReportCsv(
+    @CurrentUser() user: JwtUser,
+    @Param('type') type: string,
+    @Query() query: AttendanceQueryDto,
+    @Res() res: Response,
+  ) {
+    const report = await this.service.report(user.tid, type, query);
+    const rows = this.extractReportRows(report);
+    const csv = this.exportService.buildCsv(
+      String((report as { title?: string }).title ?? 'Attendance Report'),
+      rows,
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${type}-attendance.csv"`,
+    );
+    res.send(csv);
+  }
+
+  @Get('reports/:type/export.xlsx')
+  @RequireAnyPermission('staff-attendance:reports', 'staff-attendance:view')
+  async exportReportExcel(
+    @CurrentUser() user: JwtUser,
+    @Param('type') type: string,
+    @Query() query: AttendanceQueryDto,
+    @Res() res: Response,
+  ) {
+    const report = await this.service.report(user.tid, type, query);
+    const rows = this.extractReportRows(report);
+    const summary = (report as { summary?: Record<string, unknown> }).summary;
+    const buffer = await this.exportService.buildExcel(
+      String((report as { title?: string }).title ?? 'Attendance Report'),
+      rows,
+      summary,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${type}-attendance.xlsx"`,
+    );
+    res.send(buffer);
   }
 
   @Post('process-pending')
@@ -143,5 +226,16 @@ export class StaffAttendanceController {
     @Param('staffProfileId') staffProfileId: string,
   ) {
     return this.service.profileSummary(user.tid, staffProfileId);
+  }
+
+  private extractReportRows(report: unknown) {
+    if (!report || typeof report !== 'object') return [];
+    const payload = report as {
+      rows?: Record<string, unknown>[];
+      staff?: Record<string, unknown>[];
+    };
+    if (Array.isArray(payload.rows)) return payload.rows;
+    if (Array.isArray(payload.staff)) return payload.staff;
+    return [];
   }
 }

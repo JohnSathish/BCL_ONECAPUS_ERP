@@ -330,6 +330,11 @@ export class CorrectionDto {
   reason?: string;
 }
 
+export class CorrectionRejectDto {
+  @IsString()
+  reason!: string;
+}
+
 export class AttendanceMasterSettingsDto {
   @IsOptional()
   @IsInt()

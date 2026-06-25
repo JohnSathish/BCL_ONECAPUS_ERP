@@ -228,6 +228,38 @@ export type StaffAttendanceTimeline = {
   calendar: Array<{ date: string; status: string; lateMinutes: number }>;
 };
 
+export type AttendanceCorrection = {
+  id: string;
+  staffProfileId: string;
+  attendanceDate: string;
+  correctionType: string;
+  requestedInAt?: string | null;
+  requestedOutAt?: string | null;
+  reason?: string | null;
+  status: string;
+  requestedById?: string | null;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  auditPayload?: unknown;
+  createdAt: string;
+  updatedAt: string;
+  staff?: {
+    id: string;
+    fullName: string;
+    employeeCode: string;
+    department?: { name: string } | null;
+  };
+};
+
+export type CorrectionRequestPayload = {
+  staffProfileId: string;
+  attendanceDate: string;
+  correctionType: string;
+  requestedInAt?: string;
+  requestedOutAt?: string;
+  reason?: string;
+};
+
 export type AttendanceMapping = {
   id: string;
   staffProfileId: string;
@@ -548,9 +580,51 @@ export async function fetchAttendanceRules() {
   return data;
 }
 
-export async function fetchAttendanceCorrections() {
+export async function fetchAttendanceCorrections(): Promise<AttendanceCorrection[]> {
   const { data } = await api.get('/v1/staff/attendance/corrections');
   return data;
+}
+
+export async function requestAttendanceCorrection(payload: CorrectionRequestPayload) {
+  const { data } = await api.post('/v1/staff/attendance/corrections', payload);
+  return data;
+}
+
+export async function approveAttendanceCorrectionHod(id: string) {
+  const { data } = await api.post(`/v1/staff/attendance/corrections/${id}/hod-approve`);
+  return data;
+}
+
+export async function approveAttendanceCorrectionHr(id: string) {
+  const { data } = await api.post(`/v1/staff/attendance/corrections/${id}/hr-approve`);
+  return data;
+}
+
+export async function rejectAttendanceCorrection(id: string, reason: string) {
+  const { data } = await api.post(`/v1/staff/attendance/corrections/${id}/reject`, { reason });
+  return data;
+}
+
+export async function downloadAttendanceReportExport(
+  type: string,
+  format: 'csv' | 'xlsx',
+  params?: Record<string, string | undefined>,
+) {
+  const response = await api.get(`/v1/staff/attendance/reports/${type}/export.${format}`, {
+    params,
+    responseType: 'blob',
+  });
+  const mime =
+    format === 'csv'
+      ? 'text/csv;charset=utf-8'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const blob = new Blob([response.data], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${type}-attendance.${format}`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchAttendanceAuditLogs() {

@@ -517,6 +517,12 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Approve staff attendance corrections',
   },
   {
+    slug: 'staff-attendance:corrections:hod',
+    resource: 'staff-attendance',
+    action: 'corrections:hod',
+    description: 'HOD approval for staff attendance corrections',
+  },
+  {
     slug: 'staff-attendance:settings:view',
     resource: 'staff-attendance',
     action: 'settings:view',
