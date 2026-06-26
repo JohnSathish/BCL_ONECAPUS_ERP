@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { createWorkbookWithSheets } from '../../../common/import/excel.util';
 import type {
   ImportModuleHandler,
@@ -88,9 +93,11 @@ export class RegistrationImportHandler implements ImportModuleHandler<Normalized
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => AcademicEngineService))
     private readonly engine: AcademicEngineService,
     private readonly adminRegistration: AdminRegistrationService,
     private readonly curriculum: CurriculumResolutionService,
+    @Inject(forwardRef(() => AcademicLifecycleService))
     private readonly lifecycle: AcademicLifecycleService,
   ) {}
 

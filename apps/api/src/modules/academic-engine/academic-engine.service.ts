@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
@@ -65,6 +67,7 @@ export class AcademicEngineService {
     private readonly approval: ApprovalService,
     private readonly credits: CreditLedgerService,
     private readonly analytics: AnalyticsService,
+    @Inject(forwardRef(() => AcademicLifecycleService))
     private readonly lifecycle: AcademicLifecycleService,
     private readonly deliveryFees: CourseDeliveryFeeService,
     private readonly registrationWorkflow: RegistrationWorkflowService,

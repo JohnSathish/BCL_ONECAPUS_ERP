@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
@@ -46,9 +48,13 @@ export class PromotionRegistrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly batchMapping: BatchSemesterMappingService,
+    @Inject(forwardRef(() => AdminRegistrationService))
     private readonly adminRegistration: AdminRegistrationService,
+    @Inject(forwardRef(() => SubjectRegistrationEngineService))
     private readonly registrationEngine: SubjectRegistrationEngineService,
+    @Inject(forwardRef(() => AcademicEngineService))
     private readonly engine: AcademicEngineService,
+    @Inject(forwardRef(() => AllocationService))
     private readonly allocation: AllocationService,
   ) {}
 
