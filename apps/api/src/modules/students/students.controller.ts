@@ -210,58 +210,76 @@ export class StudentsController {
     @Query('variant')
     variant:
       | 'default'
+      | 'full-admission'
       | 'sem1-admission'
       | 'sem3-admission'
-      | 'sem5-admission' = 'default',
+      | 'sem5-admission' = 'full-admission',
     @Query('programme') programme?: string,
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
   ) {
     const buffer =
-      variant === 'sem1-admission'
-        ? await this.studentImport.buildSem1AdmissionTemplate({
+      variant === 'full-admission'
+        ? await this.studentImport.buildFullAdmissionTemplate({
             tenantId: user.tid,
             programme,
             programVersionId,
-            semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
             academicYearId,
           })
-        : variant === 'sem3-admission'
-          ? await this.studentImport.buildSem3AdmissionTemplate({
+        : variant === 'sem1-admission'
+          ? await this.studentImport.buildSem1AdmissionTemplate({
               tenantId: user.tid,
               programme,
               programVersionId,
-              semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+              semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+              academicYearId,
             })
-          : variant === 'sem5-admission'
-            ? await this.studentImport.buildSem5AdmissionTemplate({
+          : variant === 'sem3-admission'
+            ? await this.studentImport.buildSem3AdmissionTemplate({
                 tenantId: user.tid,
                 programme,
                 programVersionId,
                 semesterSequence: semesterSequence
                   ? Number(semesterSequence)
-                  : 5,
-                academicYearId,
+                  : 3,
               })
-            : await this.studentImport.buildTemplate({
-                mode,
-                tenantId: user.tid,
-              });
+            : variant === 'sem5-admission'
+              ? await this.studentImport.buildSem5AdmissionTemplate({
+                  tenantId: user.tid,
+                  programme,
+                  programVersionId,
+                  semesterSequence: semesterSequence
+                    ? Number(semesterSequence)
+                    : 5,
+                  academicYearId,
+                })
+              : await this.studentImport.buildTemplate({
+                  mode,
+                  tenantId: user.tid,
+                });
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     const filename =
-      variant === 'sem1-admission'
-        ? 'Sem1_Admission_Import_Template.xlsx'
-        : variant === 'sem3-admission'
-          ? 'Sem3_Admission_Import_Template.xlsx'
-          : variant === 'sem5-admission'
-            ? 'Sem5_Admission_Import_Template.xlsx'
-            : 'Student_Import_Template.xlsx';
+      variant === 'full-admission'
+        ? 'Full_Admission_Import_Template.xlsx'
+        : variant === 'sem1-admission'
+          ? 'Sem1_Admission_Import_Template.xlsx'
+          : variant === 'sem3-admission'
+            ? 'Sem3_Admission_Import_Template.xlsx'
+            : variant === 'sem5-admission'
+              ? 'Sem5_Admission_Import_Template.xlsx'
+              : 'Student_Import_Template.xlsx';
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+  }
+
+  @Get('import/field-registry')
+  @RequirePermissions('students:import')
+  getImportFieldRegistry() {
+    return this.studentImport.getImportFieldRegistry();
   }
 
   @Get('import/sem1-curriculum/programmes')

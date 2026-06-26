@@ -36,6 +36,7 @@ import {
   commitStudentImport,
   downloadStudentImportErrorReport,
   downloadStudentImportTemplate,
+  downloadFullAdmissionImportTemplate,
   downloadSem1AdmissionTemplate,
   downloadSem3AdmissionTemplate,
   downloadSem5AdmissionTemplate,
@@ -317,7 +318,17 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     validateMut.mutate(file);
   };
 
-  const downloadTemplate = async (mode: 'blank' | 'prefilled' = 'blank') => {
+  const downloadTemplate = async () => {
+    const blob = await downloadFullAdmissionImportTemplate();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Full_Admission_Import_Template.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadLegacyTemplate = async (mode: 'blank' | 'prefilled' = 'blank') => {
     const blob = await downloadStudentImportTemplate(mode);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -432,7 +443,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
             </h1>
             <p className="text-sm text-muted-foreground">
               {focusCopy?.description ??
-                'Import student master records, validate datasets, preview issues, and safely commit admissions data.'}
+                'Download the Full Admission template to populate 90%+ of each student profile in one upload, then validate and commit.'}
             </p>
           </div>
           <BulkActionToolbar>
@@ -444,16 +455,25 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
                   icon={<Download className="h-4 w-4" />}
                   onClick={() => void downloadTemplate()}
                 >
-                  Blank Template
+                  Full Admission Template
                 </BulkActionButton>
                 <BulkActionButton
                   type="button"
                   variant="outline"
                   size="sm"
                   icon={<Download className="h-4 w-4" />}
-                  onClick={() => void downloadTemplate('prefilled')}
+                  onClick={() => void downloadLegacyTemplate()}
                 >
-                  Prefilled Template
+                  Legacy Template
+                </BulkActionButton>
+                <BulkActionButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={() => void downloadLegacyTemplate('prefilled')}
+                >
+                  Legacy Prefilled
                 </BulkActionButton>
               </>
             ) : null}

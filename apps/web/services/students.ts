@@ -416,10 +416,41 @@ export type PaginatedStudentImportBatches = {
 
 export async function downloadStudentImportTemplate(mode: 'blank' | 'prefilled' = 'blank') {
   const { data } = await api.get('/v1/students/import/template', {
-    params: { mode },
+    params: { mode, variant: 'default' },
     responseType: 'blob',
   });
   return data as Blob;
+}
+
+export async function downloadFullAdmissionImportTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/template', {
+    params: { variant: 'full-admission', ...params },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export type StudentImportFieldRegistry = {
+  sections: Record<string, string>;
+  fields: {
+    key: string;
+    header: string;
+    section: string;
+    required: boolean;
+    visible: boolean;
+    readOnly: boolean;
+    defaultValue?: string;
+    helper?: string;
+  }[];
+};
+
+export async function fetchStudentImportFieldRegistry() {
+  const { data } = await api.get('/v1/students/import/field-registry');
+  return data as StudentImportFieldRegistry;
 }
 
 export async function downloadSem1AdmissionTemplate(params?: {

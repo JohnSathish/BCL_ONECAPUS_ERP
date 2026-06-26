@@ -61,6 +61,19 @@ export class StudentImportService {
     return this.handler.buildSem1LegacyFullAdmissionTemplateWorkbook();
   }
 
+  buildFullAdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    academicYearId?: string;
+  }) {
+    return this.handler.buildFullAdmissionTemplateWorkbook(options);
+  }
+
+  getImportFieldRegistry() {
+    return this.handler.getImportFieldRegistry();
+  }
+
   buildSem3AdmissionTemplate(options: {
     tenantId: string;
     programme?: string;

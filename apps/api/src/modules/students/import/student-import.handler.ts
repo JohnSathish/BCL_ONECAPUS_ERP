@@ -55,15 +55,29 @@ import {
   Sem5ImportCurriculumService,
   type Sem5ImportCurriculumCatalog,
 } from './sem5-import-curriculum.service';
+import {
+  FULL_ADMISSION_IMPORT_HEADERS,
+  FULL_ADMISSION_IMPORT_HELPERS,
+  FULL_ADMISSION_STRUCTURE_NOTES,
+  FULL_ADMISSION_HIDDEN_SHEETS,
+  IMPORT_SECTION_LABELS,
+  STUDENT_IMPORT_FIELD_REGISTRY,
+} from './student-import-field-registry';
+import { StudentImportProfileWriterService } from './student-import-profile-writer.service';
 
 export type NormalizedStudentImportRow = {
   email: string;
   enrollmentNumber: string;
   applicationNumber?: string;
   admissionNumber?: string;
+  formNumber?: string;
+  universityRollNumber?: string;
+  universityRegistrationNumber?: string;
+  libraryCardNumber?: string;
   rollNumber?: string;
   fullName: string;
   mobileNumber?: string;
+  whatsappNumber?: string;
   programVersionId: string;
   admissionBatchId: string;
   streamId: string;
@@ -72,15 +86,46 @@ export type NormalizedStudentImportRow = {
   sessionId?: string;
   currentSemester?: number;
   studentStatus?: string;
+  admissionStatus?: string;
+  admissionDate?: string;
   gender?: string;
   dateOfBirth?: string;
   categoryLookupId?: string;
   religionLookupId?: string;
+  bloodGroupLookupId?: string;
+  tribeLookupId?: string;
+  denominationLookupId?: string;
+  nationalityLookupId?: string;
   nationalId?: string;
+  photoFileName?: string;
   fatherName?: string;
+  fatherMobile?: string;
+  fatherOccupation?: string;
   motherName?: string;
+  motherMobile?: string;
+  motherOccupation?: string;
+  guardianName?: string;
+  guardianMobile?: string;
   rfidNumber?: string;
   abcId?: string;
+  residenceType?: string;
+  hostelBlock?: string;
+  hostelRoom?: string;
+  transportNote?: string;
+  scholarshipCategory?: string;
+  boardExam?: {
+    boardName?: string;
+    schoolName?: string;
+    examYear?: number;
+    totalMarks?: number;
+    percentage?: number;
+    division?: string;
+    registrationType?: string;
+  };
+  cuetDetail?: {
+    cuetRollNumber?: string;
+    cuetScore?: number;
+  };
   majorSubjectSlug?: string;
   minorSubjectSlug?: string;
   academicMapping?: FyugpAcademicMapping;
@@ -88,14 +133,18 @@ export type NormalizedStudentImportRow = {
   semesterOverride?: boolean;
   turaAddress?: {
     line1?: string;
+    line2?: string;
     city?: string;
     state?: string;
+    district?: string;
     pinCode?: string;
   };
   homeAddress?: {
     line1?: string;
+    line2?: string;
     city?: string;
     state?: string;
+    district?: string;
     pinCode?: string;
   };
 };
@@ -104,8 +153,16 @@ type ExistingStudentRef = {
   enrollmentNumber: string;
   rollNumber: string | null;
   rfidNumber: string | null;
+  admissionNumber: string | null;
+  applicationNumber: string | null;
+  universityRollNumber: string | null;
+  universityRegistrationNumber: string | null;
   user: { email: string };
-  masterProfile: { nationalId: string | null } | null;
+  masterProfile: {
+    nationalId: string | null;
+    mobileNumber: string | null;
+  } | null;
+  abcAccount: { abcId: string | null } | null;
 };
 
 type FyugpCategory =
@@ -345,6 +402,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
     private readonly sem5Curriculum: Sem5ImportCurriculumService,
+    private readonly profileWriter: StudentImportProfileWriterService,
   ) {}
   async parseAndValidate(
     tenantId: string,
@@ -418,14 +476,30 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           enrollmentNumber: true,
           rollNumber: true,
           rfidNumber: true,
+          admissionNumber: true,
+          applicationNumber: true,
+          universityRollNumber: true,
+          universityRegistrationNumber: true,
           user: { select: { email: true } },
-          masterProfile: { select: { nationalId: true } },
+          masterProfile: {
+            select: { nationalId: true, mobileNumber: true },
+          },
+          abcAccount: { select: { abcId: true } },
         },
       }),
       this.prisma.masterLookup.findMany({
         where: {
           tenantId,
-          lookupType: { in: ['CATEGORY', 'RELIGION'] },
+          lookupType: {
+            in: [
+              'CATEGORY',
+              'RELIGION',
+              'BLOOD_GROUP',
+              'TRIBE',
+              'DENOMINATION',
+              'NATIONALITY',
+            ],
+          },
           isActive: true,
         },
         select: { id: true, code: true, label: true, lookupType: true },
@@ -507,6 +581,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const rollToStudentId = new Map<string, string>();
     const aadhaarToStudentId = new Map<string, string>();
     const rfidToStudentId = new Map<string, string>();
+    const admissionToStudentId = new Map<string, string>();
+    const applicationToStudentId = new Map<string, string>();
+    const universityRollToStudentId = new Map<string, string>();
+    const universityRegToStudentId = new Map<string, string>();
+    const abcToStudentId = new Map<string, string>();
+    const mobileToStudentId = new Map<string, string>();
     for (const student of existingStudents) {
       regToStudent.set(student.enrollmentNumber.trim().toUpperCase(), student);
       emailToStudentId.set(student.user.email.trim().toLowerCase(), student.id);
@@ -522,9 +602,41 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           student.id,
         );
       }
+      if (student.admissionNumber) {
+        admissionToStudentId.set(
+          student.admissionNumber.trim().toUpperCase(),
+          student.id,
+        );
+      }
+      if (student.applicationNumber) {
+        applicationToStudentId.set(
+          student.applicationNumber.trim().toUpperCase(),
+          student.id,
+        );
+      }
+      if (student.universityRollNumber) {
+        universityRollToStudentId.set(
+          student.universityRollNumber.trim().toUpperCase(),
+          student.id,
+        );
+      }
+      if (student.universityRegistrationNumber) {
+        universityRegToStudentId.set(
+          student.universityRegistrationNumber.trim().toUpperCase(),
+          student.id,
+        );
+      }
       const nationalId = student.masterProfile?.nationalId?.trim();
       if (nationalId) {
         aadhaarToStudentId.set(nationalId.toUpperCase(), student.id);
+      }
+      const mobile = student.masterProfile?.mobileNumber?.trim();
+      if (mobile) {
+        mobileToStudentId.set(mobile, student.id);
+      }
+      const abcId = student.abcAccount?.abcId?.trim();
+      if (abcId) {
+        abcToStudentId.set(abcId.toUpperCase(), student.id);
       }
     }
     const categoryByCode = new Map(
@@ -533,15 +645,44 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         .map((l) => [l.code.trim().toUpperCase(), l.id]),
     );
     const religionByKey = new Map<string, string>();
-    for (const lookup of lookups.filter((l) => l.lookupType === 'RELIGION')) {
-      religionByKey.set(lookup.code.trim().toUpperCase(), lookup.id);
-      religionByKey.set(lookup.label.trim().toLowerCase(), lookup.id);
+    const bloodGroupByKey = new Map<string, string>();
+    const tribeByKey = new Map<string, string>();
+    const denominationByKey = new Map<string, string>();
+    const nationalityByKey = new Map<string, string>();
+    for (const lookup of lookups) {
+      const type = lookup.lookupType;
+      const keys = [
+        lookup.code.trim().toUpperCase(),
+        lookup.label.trim().toLowerCase(),
+      ];
+      const target =
+        type === 'CATEGORY'
+          ? categoryByCode
+          : type === 'RELIGION'
+            ? religionByKey
+            : type === 'BLOOD_GROUP'
+              ? bloodGroupByKey
+              : type === 'TRIBE'
+                ? tribeByKey
+                : type === 'DENOMINATION'
+                  ? denominationByKey
+                  : type === 'NATIONALITY'
+                    ? nationalityByKey
+                    : null;
+      if (!target) continue;
+      for (const key of keys) target.set(key, lookup.id);
     }
     const fileRegs = new Set<string>();
     const fileRolls = new Set<string>();
     const fileEmails = new Set<string>();
     const fileAadhaars = new Set<string>();
     const fileRfids = new Set<string>();
+    const fileAdmissions = new Set<string>();
+    const fileApplications = new Set<string>();
+    const fileUniversityRolls = new Set<string>();
+    const fileUniversityRegs = new Set<string>();
+    const fileAbcs = new Set<string>();
+    const fileMobiles = new Set<string>();
     const sem1Catalogs = await this.preloadSem1Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
@@ -571,13 +712,29 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         rollToStudentId,
         aadhaarToStudentId,
         rfidToStudentId,
+        admissionToStudentId,
+        applicationToStudentId,
+        universityRollToStudentId,
+        universityRegToStudentId,
+        abcToStudentId,
+        mobileToStudentId,
         fileRegs,
         fileRolls,
         fileEmails,
         fileAadhaars,
         fileRfids,
+        fileAdmissions,
+        fileApplications,
+        fileUniversityRolls,
+        fileUniversityRegs,
+        fileAbcs,
+        fileMobiles,
         categoryByCode,
         religionByKey,
+        bloodGroupByKey,
+        tribeByKey,
+        denominationByKey,
+        nationalityByKey,
         sem1Catalogs,
         sem3Catalogs,
         sem5Catalogs,
@@ -627,13 +784,29 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       rollToStudentId: Map<string, string>;
       aadhaarToStudentId: Map<string, string>;
       rfidToStudentId: Map<string, string>;
+      admissionToStudentId: Map<string, string>;
+      applicationToStudentId: Map<string, string>;
+      universityRollToStudentId: Map<string, string>;
+      universityRegToStudentId: Map<string, string>;
+      abcToStudentId: Map<string, string>;
+      mobileToStudentId: Map<string, string>;
       fileRegs: Set<string>;
       fileRolls: Set<string>;
       fileEmails: Set<string>;
       fileAadhaars: Set<string>;
       fileRfids: Set<string>;
+      fileAdmissions: Set<string>;
+      fileApplications: Set<string>;
+      fileUniversityRolls: Set<string>;
+      fileUniversityRegs: Set<string>;
+      fileAbcs: Set<string>;
+      fileMobiles: Set<string>;
       categoryByCode: Map<string, string>;
       religionByKey: Map<string, string>;
+      bloodGroupByKey: Map<string, string>;
+      tribeByKey: Map<string, string>;
+      denominationByKey: Map<string, string>;
+      nationalityByKey: Map<string, string>;
       sem1Catalogs: Map<string, Sem1ImportCurriculumCatalog>;
       sem3Catalogs: Map<string, Sem3ImportCurriculumCatalog>;
       sem5Catalogs: Map<string, Sem5ImportCurriculumCatalog>;
@@ -642,7 +815,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   ): ImportRowValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
-    const raw = row.raw;
+    const raw = row.raw as Record<string, unknown>;
+    this.normalizeFullImportRowAliases(raw);
     const enrollmentNumber = String(
       raw.registrationNumber ??
         raw.enrollmentNumber ??
@@ -652,6 +826,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     ).trim();
     const applicationNumber = String(raw.applicationNumber ?? '').trim();
     const admissionNumber = String(raw.admissionNumber ?? '').trim();
+    const formNumber = String(raw.formNumber ?? '').trim() || undefined;
+    const universityRollNumber =
+      String(raw.universityRollNumber ?? '').trim() || undefined;
+    const universityRegistrationNumber =
+      String(raw.universityRegistrationNumber ?? '').trim() || undefined;
     const rollNumber = String(raw.rollNumber ?? '').trim();
     const fullName = String(raw.fullName ?? '').trim();
     const email = String(raw.email ?? '')
@@ -768,6 +947,64 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         ctx.fileRfids.add(rfidKey);
       }
     }
+    this.assertUniqueInFileAndDb(
+      admissionNumber,
+      ctx.fileAdmissions,
+      ctx.admissionToStudentId,
+      ownerId,
+      'Duplicate admission number',
+      errors,
+    );
+    this.assertUniqueInFileAndDb(
+      applicationNumber,
+      ctx.fileApplications,
+      ctx.applicationToStudentId,
+      ownerId,
+      'Duplicate application number',
+      errors,
+    );
+    this.assertUniqueInFileAndDb(
+      universityRollNumber,
+      ctx.fileUniversityRolls,
+      ctx.universityRollToStudentId,
+      ownerId,
+      'Duplicate university roll number',
+      errors,
+    );
+    this.assertUniqueInFileAndDb(
+      universityRegistrationNumber,
+      ctx.fileUniversityRegs,
+      ctx.universityRegToStudentId,
+      ownerId,
+      'Duplicate university registration number',
+      errors,
+    );
+    if (abcId) {
+      const abcKey = abcId.toUpperCase();
+      this.assertUniqueInFileAndDb(
+        abcKey,
+        ctx.fileAbcs,
+        ctx.abcToStudentId,
+        ownerId,
+        'Duplicate ABC ID',
+        errors,
+      );
+    }
+    const mobileRaw = String(raw.mobile ?? raw.mobileNumber ?? '').trim();
+    if (mobileRaw) {
+      this.assertUniqueInFileAndDb(
+        mobileRaw,
+        ctx.fileMobiles,
+        ctx.mobileToStudentId,
+        ownerId,
+        'Duplicate mobile number',
+        errors,
+      );
+    }
+    if (ctx.importMode === 'CREATE') {
+      if (!fatherName) errors.push("Father's name is required");
+      if (!motherName) errors.push("Mother's name is required");
+    }
     const programVersionId =
       ctx.pvByCode.get(programmeCode) ??
       ctx.pvByCode.get(this.normalizeProgrammeCode(programmeCode));
@@ -872,6 +1109,82 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         errors.push(`Unknown religion: ${religionRaw}`);
       }
     }
+    const bloodGroupLookupId = this.resolveLookupId(
+      raw.bloodGroup,
+      ctx.bloodGroupByKey,
+      'blood group',
+      errors,
+    );
+    const tribeLookupId = this.resolveLookupId(
+      raw.tribe,
+      ctx.tribeByKey,
+      'tribe',
+      errors,
+    );
+    const denominationLookupId = this.resolveLookupId(
+      raw.denomination,
+      ctx.denominationByKey,
+      'denomination',
+      errors,
+    );
+    const nationalityLookupId = this.resolveLookupId(
+      raw.nationality,
+      ctx.nationalityByKey,
+      'nationality',
+      errors,
+    );
+    const genderRaw = String(raw.gender ?? '').trim();
+    let gender: string | undefined;
+    if (genderRaw) {
+      const normalizedGender = this.normalizeGender(genderRaw);
+      if (!normalizedGender) {
+        errors.push(`Invalid gender: ${genderRaw}`);
+      } else {
+        gender = normalizedGender;
+      }
+    }
+    const dobRaw = String(raw.dateOfBirth ?? '').trim();
+    let dateOfBirth: string | undefined;
+    if (dobRaw) {
+      const parsedDob = this.parseImportDate(dobRaw);
+      if (!parsedDob) {
+        errors.push(`Invalid date of birth: ${dobRaw}`);
+      } else {
+        dateOfBirth = parsedDob;
+      }
+    }
+    const admissionDateRaw = String(raw.admissionDate ?? '').trim();
+    let admissionDate: string | undefined;
+    if (admissionDateRaw) {
+      const parsedAdmissionDate = this.parseImportDate(admissionDateRaw);
+      if (!parsedAdmissionDate) {
+        errors.push(`Invalid admission date: ${admissionDateRaw}`);
+      } else {
+        admissionDate = parsedAdmissionDate;
+      }
+    }
+    const admissionStatus =
+      String(raw.admissionStatus ?? '')
+        .trim()
+        .toUpperCase() || undefined;
+    const libraryCardNumber =
+      String(raw.libraryCardNumber ?? '').trim() || undefined;
+    const whatsappNumber = String(raw.whatsappNumber ?? '').trim() || undefined;
+    const photoFileName = String(raw.photoFileName ?? '').trim() || undefined;
+    const fatherMobile = String(raw.fatherMobile ?? '').trim() || undefined;
+    const fatherOccupation =
+      String(raw.fatherOccupation ?? '').trim() || undefined;
+    const motherMobile = String(raw.motherMobile ?? '').trim() || undefined;
+    const motherOccupation =
+      String(raw.motherOccupation ?? '').trim() || undefined;
+    const guardianName = String(raw.guardianName ?? '').trim() || undefined;
+    const guardianMobile = String(raw.guardianMobile ?? '').trim() || undefined;
+    const scholarshipCategory =
+      String(raw.scholarshipCategory ?? '').trim() || undefined;
+    const transportNote = String(raw.transport ?? '').trim() || undefined;
+    const residenceType = this.parseResidenceType(String(raw.hostel ?? ''));
+    const boardExam = this.parseBoardExamFields(raw);
+    const cuetDetail = this.parseCuetFields(raw);
     const targetSemester = currentSemester ?? batch?.currentSemester;
     if (batch && targetSemester) {
       const activeMode = this.activeSemesterMode(batch, ctx.semesters);
@@ -906,28 +1219,65 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           )
         : undefined);
     const minorSubjectSlug = fyugpMapping.minor?.subjectSlug;
-    const turaLine1 = String(raw.turaLine1 ?? raw.addressInTura ?? '').trim();
-    const turaCity = String(raw.turaCity ?? '').trim();
-    const turaState = String(raw.turaState ?? raw.state ?? '').trim();
-    const turaPinCode = String(raw.turaPinCode ?? '').trim();
-    const homeLine1 = String(raw.homeLine1 ?? raw.homeAddress ?? '').trim();
+    if (targetSemester === 1 && !majorDepartment && !fyugpMapping.major) {
+      errors.push('Major Department is required for Semester 1 imports');
+    }
+    if (targetSemester === 3 && !majorDepartment && !fyugpMapping.major) {
+      errors.push('Major Department is required for Semester 3 imports');
+    }
+    if (targetSemester === 5 && !majorDepartment && !fyugpMapping.major) {
+      errors.push('Major Department is required for Semester 5 imports');
+    }
+    const turaLine1 = String(
+      raw.presentLine1 ?? raw.turaLine1 ?? raw.addressInTura ?? '',
+    ).trim();
+    const turaLine2 = String(raw.presentPoliceStation ?? '').trim();
+    const turaCity = String(raw.presentVillage ?? raw.turaCity ?? '').trim();
+    const turaDistrict = String(raw.presentDistrict ?? '').trim();
+    const turaState = String(
+      raw.presentState ?? raw.turaState ?? raw.state ?? '',
+    ).trim();
+    const turaPinCode = String(
+      raw.presentPinCode ?? raw.turaPinCode ?? '',
+    ).trim();
+    const homeLine1 = String(
+      raw.permanentLine1 ?? raw.homeLine1 ?? raw.homeAddress ?? '',
+    ).trim();
+    const homeLine2 = String(raw.permanentVillage ?? '').trim();
     const homeCity = String(raw.homeCity ?? '').trim();
-    const homeState = String(raw.homeState ?? '').trim();
-    const homePinCode = String(raw.homePinCode ?? '').trim();
+    const homeDistrict = String(raw.permanentDistrict ?? '').trim();
+    const homeState = String(raw.permanentState ?? raw.homeState ?? '').trim();
+    const homePinCode = String(
+      raw.permanentPinCode ?? raw.homePinCode ?? '',
+    ).trim();
     const turaAddress =
-      turaLine1 || turaCity || turaState || turaPinCode
+      turaLine1 ||
+      turaLine2 ||
+      turaCity ||
+      turaDistrict ||
+      turaState ||
+      turaPinCode
         ? {
             line1: turaLine1 || undefined,
+            line2: turaLine2 || undefined,
             city: turaCity || undefined,
+            district: turaDistrict || undefined,
             state: turaState || undefined,
             pinCode: turaPinCode || undefined,
           }
         : undefined;
     const homeAddress =
-      homeLine1 || homeCity || homeState || homePinCode
+      homeLine1 ||
+      homeLine2 ||
+      homeCity ||
+      homeDistrict ||
+      homeState ||
+      homePinCode
         ? {
             line1: homeLine1 || undefined,
-            city: homeCity || undefined,
+            line2: homeLine2 || undefined,
+            city: homeCity || homeLine2 || undefined,
+            district: homeDistrict || undefined,
             state: homeState || undefined,
             pinCode: homePinCode || undefined,
           }
@@ -943,10 +1293,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             enrollmentNumber,
             applicationNumber: applicationNumber || undefined,
             admissionNumber: admissionNumber || undefined,
+            formNumber,
+            universityRollNumber,
+            universityRegistrationNumber,
+            libraryCardNumber,
             rollNumber: rollNumber || undefined,
             fullName,
-            mobileNumber:
-              String(raw.mobile ?? raw.mobileNumber ?? '').trim() || undefined,
+            mobileNumber: mobileRaw || undefined,
+            whatsappNumber,
             programVersionId,
             admissionBatchId,
             streamId,
@@ -955,15 +1309,33 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             sessionId,
             currentSemester,
             studentStatus,
-            gender: String(raw.gender ?? '').trim() || undefined,
-            dateOfBirth: String(raw.dateOfBirth ?? '').trim() || undefined,
+            admissionStatus,
+            admissionDate,
+            gender,
+            dateOfBirth,
             categoryLookupId,
             religionLookupId,
+            bloodGroupLookupId,
+            tribeLookupId,
+            denominationLookupId,
+            nationalityLookupId,
             nationalId: aadhaar || undefined,
+            photoFileName,
             fatherName,
+            fatherMobile,
+            fatherOccupation,
             motherName,
+            motherMobile,
+            motherOccupation,
+            guardianName,
+            guardianMobile,
             rfidNumber,
             abcId,
+            residenceType: residenceType ?? undefined,
+            transportNote,
+            scholarshipCategory,
+            boardExam,
+            cuetDetail,
             majorSubjectSlug,
             minorSubjectSlug,
             academicMapping: fyugpMapping,
@@ -2760,13 +3132,19 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           enrollmentNumber: n.enrollmentNumber,
           applicationNumber: n.applicationNumber,
           admissionNumber: n.admissionNumber,
+          formNumber: n.formNumber,
+          universityRollNumber: n.universityRollNumber,
+          universityRegistrationNumber: n.universityRegistrationNumber,
+          libraryCardNumber: n.libraryCardNumber,
           rollNumber: n.rollNumber,
           rfidNumber: n.rfidNumber,
           programVersionId: n.programVersionId,
           primaryShiftId: n.shiftId,
           campusId: shift?.campusId,
           departmentId: n.departmentId,
-          admissionDate: new Date(),
+          admissionDate: n.admissionDate
+            ? new Date(n.admissionDate)
+            : new Date(),
           importSource: 'IMPORT',
           importBatchId: batchId,
           createdById: userId,
@@ -2781,14 +3159,37 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           gender: n.gender,
           dateOfBirth: n.dateOfBirth ? new Date(n.dateOfBirth) : null,
           mobileNumber: n.mobileNumber,
+          whatsappNumber: n.whatsappNumber,
           nationalId: n.nationalId,
           categoryLookupId: n.categoryLookupId,
           religionLookupId: n.religionLookupId,
+          bloodGroupLookupId: n.bloodGroupLookupId,
+          tribeLookupId: n.tribeLookupId,
+          denominationLookupId: n.denominationLookupId,
+          nationalityLookupId: n.nationalityLookupId,
+          admissionStatus: n.admissionStatus ?? 'ACTIVE',
           studentStatus: n.studentStatus ?? 'STUDYING',
+          photoPath: n.photoFileName,
         },
       });
-      await this.upsertGuardians(tx, tenantId, student.id, n);
-      await this.upsertAddresses(tx, tenantId, student.id, n);
+      await this.profileWriter.upsertExtendedGuardians(
+        tx,
+        tenantId,
+        student.id,
+        n,
+      );
+      await this.profileWriter.upsertExtendedAddresses(
+        tx,
+        tenantId,
+        student.id,
+        n,
+      );
+      await this.profileWriter.persistExtendedProfile(
+        tx,
+        tenantId,
+        student.id,
+        n,
+      );
       await this.createAcademicOnboardingRegistration(
         tx,
         tenantId,
@@ -2858,6 +3259,17 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (n.applicationNumber)
         studentUpdates.applicationNumber = n.applicationNumber;
       if (n.admissionNumber) studentUpdates.admissionNumber = n.admissionNumber;
+      if (n.formNumber) studentUpdates.formNumber = n.formNumber;
+      if (n.universityRollNumber) {
+        studentUpdates.universityRollNumber = n.universityRollNumber;
+      }
+      if (n.universityRegistrationNumber) {
+        studentUpdates.universityRegistrationNumber =
+          n.universityRegistrationNumber;
+      }
+      if (n.libraryCardNumber) {
+        studentUpdates.libraryCardNumber = n.libraryCardNumber;
+      }
       if (n.rollNumber) studentUpdates.rollNumber = n.rollNumber;
       if (n.rfidNumber) studentUpdates.rfidNumber = n.rfidNumber;
       if (n.programVersionId)
@@ -2875,12 +3287,25 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (n.gender) profileUpdates.gender = n.gender;
       if (n.dateOfBirth) profileUpdates.dateOfBirth = new Date(n.dateOfBirth);
       if (n.mobileNumber) profileUpdates.mobileNumber = n.mobileNumber;
+      if (n.whatsappNumber) profileUpdates.whatsappNumber = n.whatsappNumber;
       if (n.nationalId) profileUpdates.nationalId = n.nationalId;
       if (n.categoryLookupId)
         profileUpdates.categoryLookupId = n.categoryLookupId;
       if (n.religionLookupId)
         profileUpdates.religionLookupId = n.religionLookupId;
+      if (n.bloodGroupLookupId) {
+        profileUpdates.bloodGroupLookupId = n.bloodGroupLookupId;
+      }
+      if (n.tribeLookupId) profileUpdates.tribeLookupId = n.tribeLookupId;
+      if (n.denominationLookupId) {
+        profileUpdates.denominationLookupId = n.denominationLookupId;
+      }
+      if (n.nationalityLookupId) {
+        profileUpdates.nationalityLookupId = n.nationalityLookupId;
+      }
+      if (n.admissionStatus) profileUpdates.admissionStatus = n.admissionStatus;
       if (n.studentStatus) profileUpdates.studentStatus = n.studentStatus;
+      if (n.photoFileName) profileUpdates.photoPath = n.photoFileName;
       if (Object.keys(profileUpdates).length > 0) {
         await tx.studentProfile.upsert({
           where: { studentId },
@@ -2908,8 +3333,24 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           profileUpdates,
         );
       }
-      await this.upsertGuardians(tx, tenantId, studentId, n);
-      await this.upsertAddresses(tx, tenantId, studentId, n);
+      await this.profileWriter.upsertExtendedGuardians(
+        tx,
+        tenantId,
+        studentId,
+        n,
+      );
+      await this.profileWriter.upsertExtendedAddresses(
+        tx,
+        tenantId,
+        studentId,
+        n,
+      );
+      await this.profileWriter.persistExtendedProfile(
+        tx,
+        tenantId,
+        studentId,
+        n,
+      );
       if (n.streamId || n.admissionBatchId) {
         await tx.studentAcademicProfile.upsert({
           where: { studentId },
@@ -2970,6 +3411,146 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
     return studentId;
   }
+
+  private normalizeFullImportRowAliases(raw: Record<string, unknown>) {
+    const semester = Number.parseInt(String(raw.currentSemester ?? ''), 10);
+    if (semester === 3) {
+      if (!raw.majorDepartment && raw.majorDepartmentSem3) {
+        raw.majorDepartment = raw.majorDepartmentSem3;
+      }
+      if (!raw.mdcSubject && raw.mdcPaperSem3)
+        raw.mdcSubject = raw.mdcPaperSem3;
+      if (!raw.aecSubject && raw.aecPaperSem3)
+        raw.aecSubject = raw.aecPaperSem3;
+      if (!raw.secSubject && raw.secPaperSem3)
+        raw.secSubject = raw.secPaperSem3;
+      if (!raw.vtcSubject && raw.vtcPaper) raw.vtcSubject = raw.vtcPaper;
+    }
+    if (semester === 5) {
+      if (!raw.majorDepartment && raw.majorDepartmentSem5) {
+        raw.majorDepartment = raw.majorDepartmentSem5;
+      }
+      if (!raw.minorDepartment && raw.minorDepartmentSem5) {
+        raw.minorDepartment = raw.minorDepartmentSem5;
+      }
+    }
+    if (semester === 1 && !raw.mdcSubject && raw.mdcDepartment) {
+      raw.mdcSubject = raw.mdcDepartment;
+    }
+  }
+
+  private assertUniqueInFileAndDb(
+    value: string | undefined,
+    fileSet: Set<string>,
+    dbMap: Map<string, string>,
+    ownerId: string | undefined,
+    message: string,
+    errors: string[],
+  ) {
+    if (!value) return;
+    const key = value.trim();
+    const normalizedKey = /^\d+$/.test(key) ? key : key.toUpperCase();
+    const dbOwner = dbMap.get(normalizedKey) ?? dbMap.get(key);
+    if (fileSet.has(normalizedKey)) {
+      errors.push(message);
+      return;
+    }
+    if (dbOwner && dbOwner !== ownerId) {
+      errors.push(message);
+      return;
+    }
+    fileSet.add(normalizedKey);
+  }
+
+  private resolveLookupId(
+    rawValue: unknown,
+    map: Map<string, string>,
+    label: string,
+    errors: string[],
+  ) {
+    const text = String(rawValue ?? '').trim();
+    if (!text) return undefined;
+    const id =
+      map.get(text.toUpperCase()) ??
+      map.get(text.toLowerCase()) ??
+      map.get(text);
+    if (!id) errors.push(`Unknown ${label}: ${text}`);
+    return id;
+  }
+
+  private normalizeGender(value: string) {
+    const upper = value.trim().toUpperCase();
+    if (['MALE', 'M', 'BOY'].includes(upper)) return 'MALE';
+    if (['FEMALE', 'F', 'GIRL'].includes(upper)) return 'FEMALE';
+    if (['OTHER', 'O'].includes(upper)) return 'OTHER';
+    return null;
+  }
+
+  private parseImportDate(value: string) {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const dmy = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  private parseResidenceType(hostelRaw: string) {
+    const upper = hostelRaw.trim().toUpperCase();
+    if (!upper) return null;
+    if (['YES', 'Y', 'HOSTELLER', 'HOSTEL'].includes(upper)) return 'HOSTELLER';
+    if (['NO', 'N', 'DAY_SCHOLAR', 'DAY SCHOLAR', 'DAY'].includes(upper)) {
+      return 'DAY_SCHOLAR';
+    }
+    return null;
+  }
+
+  private parseBoardExamFields(raw: Record<string, unknown>) {
+    const boardName = String(raw.boardName ?? raw.board ?? '').trim();
+    const schoolName = String(raw.lastInstitution ?? '').trim();
+    const examYearRaw = String(raw.boardYear ?? '').trim();
+    const totalMarksRaw = String(raw.boardTotalMarks ?? '').trim();
+    const percentageRaw = String(raw.boardPercentage ?? '').trim();
+    const division = String(raw.boardDivision ?? '').trim();
+    const registrationType = String(raw.boardRegistrationType ?? '').trim();
+    if (
+      !boardName &&
+      !schoolName &&
+      !examYearRaw &&
+      !totalMarksRaw &&
+      !percentageRaw
+    ) {
+      return undefined;
+    }
+    return {
+      boardName: boardName || undefined,
+      schoolName: schoolName || undefined,
+      examYear: examYearRaw ? Number.parseInt(examYearRaw, 10) : undefined,
+      totalMarks: totalMarksRaw
+        ? Number.parseInt(totalMarksRaw, 10)
+        : undefined,
+      percentage: percentageRaw ? Number.parseFloat(percentageRaw) : undefined,
+      division: division || undefined,
+      registrationType: registrationType || undefined,
+    };
+  }
+
+  private parseCuetFields(raw: Record<string, unknown>) {
+    const cuetRollNumber = String(raw.cuetRollNumber ?? '').trim();
+    const cuetScoreRaw = String(raw.cuetScore ?? '').trim();
+    if (!cuetRollNumber && !cuetScoreRaw) return undefined;
+    return {
+      cuetRollNumber: cuetRollNumber || undefined,
+      cuetScore: cuetScoreRaw ? Number.parseFloat(cuetScoreRaw) : undefined,
+    };
+  }
+
   private async upsertGuardians(
     tx: Prisma.TransactionClient,
     tenantId: string,
@@ -3277,6 +3858,722 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     this.applyDropdowns(students, headers, references);
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
+  }
+
+  async buildFullAdmissionTemplateWorkbook(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    academicYearId?: string;
+  }): Promise<Buffer> {
+    let programme = options.programme;
+    let programVersionId = options.programVersionId;
+    const programmes = await this.sem1Curriculum.listPublishedProgrammes(
+      options.tenantId,
+    );
+    if (!programme && !programVersionId) {
+      const fallback =
+        programmes.find((entry) => entry.code.startsWith('BA-')) ??
+        programmes[0];
+      if (!fallback) {
+        throw new BadRequestException(
+          'No published programme found. Publish a programme curriculum before downloading the full admission template.',
+        );
+      }
+      programme = fallback.code;
+      programVersionId = fallback.programVersionId;
+    }
+
+    const [
+      sem1Catalog,
+      sem3Catalog,
+      sem5Catalog,
+      sem1MajorDepartments,
+      sem3MajorDepartments,
+      sem5MajorDepartments,
+      batches,
+      streams,
+      shifts,
+      departments,
+      academicYears,
+      lookups,
+    ] = await Promise.all([
+      this.sem1Curriculum.buildCatalog(options.tenantId, {
+        programme,
+        programVersionId,
+        semesterSequence: 1,
+        academicYearId: options.academicYearId,
+      }),
+      this.sem3Curriculum.buildCatalog(options.tenantId, {
+        programme,
+        programVersionId,
+        semesterSequence: 3,
+      }),
+      this.sem5Curriculum.buildCatalog(options.tenantId, {
+        programme,
+        programVersionId,
+        semesterSequence: 5,
+        academicYearId: options.academicYearId,
+      }),
+      this.sem1Curriculum.buildTenantMajorDepartments(options.tenantId, 1),
+      this.sem3Curriculum.buildTenantMajorDepartments(options.tenantId, 3),
+      this.sem5Curriculum.buildTenantMajorDepartments(options.tenantId, 5),
+      this.prisma.admissionBatch.findMany({
+        where: { tenantId: options.tenantId, deletedAt: null },
+        select: { batchCode: true },
+        orderBy: { batchCode: 'asc' },
+      }),
+      this.prisma.academicStream.findMany({
+        where: { tenantId: options.tenantId, deletedAt: null },
+        select: { code: true },
+        orderBy: { code: 'asc' },
+      }),
+      this.prisma.shift.findMany({
+        where: {
+          tenantId: options.tenantId,
+          deletedAt: null,
+          status: 'ACTIVE',
+        },
+        select: { code: true },
+        orderBy: { code: 'asc' },
+      }),
+      this.prisma.department.findMany({
+        where: { tenantId: options.tenantId, deletedAt: null },
+        select: { code: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.academicYear.findMany({
+        where: { tenantId: options.tenantId, deletedAt: null },
+        select: { name: true },
+        orderBy: { name: 'desc' },
+      }),
+      this.prisma.masterLookup.findMany({
+        where: {
+          tenantId: options.tenantId,
+          lookupType: {
+            in: [
+              'CATEGORY',
+              'RELIGION',
+              'BLOOD_GROUP',
+              'TRIBE',
+              'DENOMINATION',
+              'NATIONALITY',
+            ],
+          },
+          isActive: true,
+        },
+        select: { code: true, label: true, lookupType: true },
+        orderBy: [{ lookupType: 'asc' }, { label: 'asc' }],
+      }),
+    ]);
+
+    const sampleMajor =
+      sem1Catalog.majorDepartments[0]?.departmentName ??
+      sem1MajorDepartments[0]?.departmentName ??
+      'Economics';
+    const sampleMajorKey = this.sem1Curriculum.normalizeLabel(sampleMajor);
+    const sampleMinor =
+      sem1Catalog.minorByMajor[sampleMajorKey]?.[0] ?? 'History';
+    const sampleBatch = batches[0]?.batchCode ?? 'BATCH-2026';
+    const sampleStream = streams[0]?.code ?? 'ARTS';
+    const sampleShift = shifts[0]?.code ?? 'DAY';
+    const sampleSession =
+      academicYears[0]?.name ?? sem1Catalog.curriculumLabel ?? '2026-27';
+
+    const sampleByHeader: Record<string, string> = {
+      'Academic Year': sampleSession,
+      'Admission Date': '2026-06-01',
+      'Admission Status': 'ACTIVE',
+      'Admission Number': 'ADM-2026-0001',
+      'Application Number': 'APP-2026-0001',
+      'Form Number': 'FORM-001',
+      'Registration Number': 'REG2026001',
+      'Roll Number': '',
+      'University Roll Number': '',
+      'University Registration Number': '',
+      'ABC ID': '',
+      Shift: sampleShift,
+      Programme: sem1Catalog.programCode,
+      Department: departments[0]?.code ?? '',
+      'Admission Batch': sampleBatch,
+      Stream: sampleStream,
+      Semester: '1',
+      'Full Name': 'Priangshuman Marak',
+      Gender: 'Male',
+      'Date of Birth': '2006-01-15',
+      'Blood Group':
+        lookups.find((l) => l.lookupType === 'BLOOD_GROUP')?.label ?? '',
+      Category:
+        lookups.find((l) => l.lookupType === 'CATEGORY')?.code ?? 'GENERAL',
+      'Tribe / Race':
+        lookups.find((l) => l.lookupType === 'TRIBE')?.label ?? '',
+      Religion: lookups.find((l) => l.lookupType === 'RELIGION')?.label ?? '',
+      Denomination:
+        lookups.find((l) => l.lookupType === 'DENOMINATION')?.label ?? '',
+      Nationality:
+        lookups.find((l) => l.lookupType === 'NATIONALITY')?.label ?? 'Indian',
+      'Aadhaar Number': '',
+      'Email Address': 'student@example.edu',
+      'Student Mobile Number': '9876500000',
+      'WhatsApp Number': '',
+      'Photo File Name': '',
+      "Father's Name": 'John Marak',
+      "Father's Mobile": '9876500001',
+      "Father's Occupation": 'Farmer',
+      "Mother's Name": 'Jane Marak',
+      "Mother's Mobile": '9876500002',
+      "Mother's Occupation": 'Homemaker',
+      'Guardian Name': '',
+      'Guardian Mobile': '',
+      'Present Address': '123 Main Street',
+      'Present Village / Town': 'Tura',
+      'Present Police Station': '',
+      'Present District': 'West Garo Hills',
+      'Present State': 'Meghalaya',
+      'Present PIN Code': '794001',
+      'Permanent Address': '',
+      'Permanent Village / Town': '',
+      'Permanent District': '',
+      'Permanent State': '',
+      'Permanent PIN Code': '',
+      'Institution Last Attended': 'Don Bosco Higher Secondary School',
+      'Board / University': 'MBOSE',
+      'Registration / Private': 'REGULAR',
+      'Year of Passing': '2025',
+      'Total Marks': '450',
+      Percentage: '90',
+      Division: 'First',
+      'CUET Marks': '',
+      'CUET Roll Number': '',
+      'Major Department': sampleMajor,
+      'Minor Department': sampleMinor,
+      MDC: sem1Catalog.mdcDepartments[0]?.title ?? '',
+      AEC: sem1Catalog.aecPapers[0]?.title ?? '',
+      SEC: sem1Catalog.secPapers[0]?.title ?? '',
+      VAC: 'Auto-assigned',
+      'Major Department (Sem 3)': '',
+      'Second Major Department': '',
+      'MDC (Sem 3)': '',
+      'AEC (Sem 3)': '',
+      'SEC (Sem 3)': '',
+      VTC: '',
+      'Major Department (Sem 5)': '',
+      'Minor Department (Sem 5)': '',
+      'Internship Subject': '',
+      'RFID Number': '',
+      'Library Card Number': '',
+      Hostel: 'NO',
+      Transport: 'NO',
+      'Scholarship Category': '',
+      'Student Status': 'STUDYING',
+      'Section Code': 'A',
+    };
+
+    const headers = [...FULL_ADMISSION_IMPORT_HEADERS];
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    sheet.addRow(headers);
+    sheet.addRow(
+      headers.map(
+        (h) =>
+          FULL_ADMISSION_IMPORT_HELPERS[h] ??
+          'Optional — stored in student profile when supported',
+      ),
+    );
+    sheet.addRow(headers.map((h) => sampleByHeader[h] ?? ''));
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(2).font = { italic: true, color: { argb: 'FF666666' } };
+    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    sheet.columns.forEach((col) => {
+      col.width = 24;
+    });
+
+    const lookupRows = (type: string) =>
+      lookups
+        .filter((l) => l.lookupType === type)
+        .map((l) => [l.label, l.code]);
+
+    const sem1MinorsByMajorRows = sem1Catalog.majorDepartments.map((major) => {
+      const minors =
+        sem1Catalog.minorByMajor[
+          this.sem1Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
+    const sem5MinorsByMajorRows = sem5Catalog.majorDepartments.map((major) => {
+      const minors =
+        sem5Catalog.minorByMajor[
+          this.sem5Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
+
+    const hiddenSheets: {
+      name: string;
+      headers: string[];
+      rows: (string | number | null)[][];
+      hidden?: boolean;
+    }[] = [
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.programmes,
+        headers: ['Programme Code', 'Programme Name', 'Program Version Id'],
+        rows: programmes.map((p) => [p.code, p.name, p.programVersionId]),
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.shifts,
+        headers: ['Shift'],
+        rows: shifts.map((s) => [s.code]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.batches,
+        headers: ['Admission Batch'],
+        rows: batches.map((b) => [b.batchCode]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.streams,
+        headers: ['Stream'],
+        rows: streams.map((s) => [s.code]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.academicYears,
+        headers: ['Academic Year'],
+        rows: academicYears.map((y) => [y.name]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.departments,
+        headers: ['Department Code', 'Department Name'],
+        rows: departments.map((d) => [d.code, d.name]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.categories,
+        headers: ['Category', 'Code'],
+        rows: lookupRows('CATEGORY'),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.religions,
+        headers: ['Religion'],
+        rows: lookupRows('RELIGION').map(([label]) => [label]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.bloodGroups,
+        headers: ['Blood Group'],
+        rows: lookupRows('BLOOD_GROUP').map(([label]) => [label]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.tribes,
+        headers: ['Tribe / Race'],
+        rows: lookupRows('TRIBE').map(([label]) => [label]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.denominations,
+        headers: ['Denomination'],
+        rows: lookupRows('DENOMINATION').map(([label]) => [label]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.nationalities,
+        headers: ['Nationality'],
+        rows: lookupRows('NATIONALITY').map(([label]) => [label]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1MajorDepartments,
+        headers: ['Major Department'],
+        rows: sem1MajorDepartments.map((d) => [d.departmentName]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1Mdc,
+        headers: ['MDC'],
+        rows: sem1Catalog.mdcDepartments.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1Aec,
+        headers: ['AEC'],
+        rows: sem1Catalog.aecPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1Sec,
+        headers: ['SEC'],
+        rows: sem1Catalog.secPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
+        headers: [
+          'Major',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: sem1MinorsByMajorRows,
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem3MajorDepartments,
+        headers: ['Major Department (Sem 3)'],
+        rows: sem3MajorDepartments.map((d) => [d.departmentName]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem3Mdc,
+        headers: ['MDC (Sem 3)'],
+        rows: sem3Catalog.mdcPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem3Aec,
+        headers: ['AEC (Sem 3)'],
+        rows: sem3Catalog.aecPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem3Sec,
+        headers: ['SEC (Sem 3)'],
+        rows: sem3Catalog.secPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem3Vtc,
+        headers: ['VTC'],
+        rows: sem3Catalog.vtcPapers.map((p) => [p.title]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5MajorDepartments,
+        headers: ['Major Department (Sem 5)'],
+        rows: sem5MajorDepartments.map((d) => [d.departmentName]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
+        headers: ['Internship Subject'],
+        rows: sem5Catalog.internshipAreas.map((area) => [area]),
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
+        headers: [
+          'Major',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: sem5MinorsByMajorRows,
+        hidden: true,
+      },
+    ];
+
+    for (const ref of hiddenSheets) {
+      const refSheet = workbook.addWorksheet(ref.name);
+      refSheet.addRow(ref.headers);
+      for (const row of ref.rows) refSheet.addRow(row);
+      refSheet.getRow(1).font = { bold: true };
+      refSheet.columns.forEach((col) => {
+        col.width = 32;
+      });
+      if (ref.hidden) refSheet.state = 'veryHidden';
+    }
+
+    const sem1MinorsSheet = workbook.getWorksheet(
+      FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
+    );
+    if (sem1MinorsSheet) {
+      sem1Catalog.majorDepartments.forEach((major, index) => {
+        const rowNumber = index + 2;
+        const minors =
+          sem1Catalog.minorByMajor[
+            this.sem1Curriculum.normalizeLabel(major.departmentName)
+          ] ?? [];
+        if (!minors.length) return;
+        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
+        workbook.definedNames.add(
+          rangeName,
+          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
+        );
+      });
+    }
+
+    const sem5MinorsSheet = workbook.getWorksheet(
+      FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
+    );
+    if (sem5MinorsSheet) {
+      sem5Catalog.majorDepartments.forEach((major, index) => {
+        const rowNumber = index + 2;
+        const minors =
+          sem5Catalog.minorByMajor[
+            this.sem5Curriculum.normalizeLabel(major.departmentName)
+          ] ?? [];
+        if (!minors.length) return;
+        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const rangeName = `FA5_${this.excelMajorMinorsRangeName(major.departmentName)}`;
+        workbook.definedNames.add(
+          rangeName,
+          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
+        );
+      });
+    }
+
+    const curriculumInfo = workbook.addWorksheet('Curriculum Info');
+    curriculumInfo.addRow(['Field', 'Value']);
+    curriculumInfo.addRow(['Programme', sem1Catalog.programCode]);
+    curriculumInfo.addRow(['Programme Name', sem1Catalog.programName]);
+    curriculumInfo.addRow(['Curriculum', sem1Catalog.curriculumLabel]);
+    curriculumInfo.addRow(['Program Version Id', sem1Catalog.programVersionId]);
+    curriculumInfo.addRow([
+      'Sem 1 Auto VAC',
+      `${sem1Catalog.vacPaper.code} — ${sem1Catalog.vacPaper.title}`,
+    ]);
+    curriculumInfo.addRow(['Generated At', new Date().toISOString()]);
+    curriculumInfo.getRow(1).font = { bold: true };
+    curriculumInfo.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.addRow(['Section', 'Column', 'Notes']);
+    let currentSection = '';
+    for (const field of STUDENT_IMPORT_FIELD_REGISTRY.filter(
+      (f) => f.visible && f.key !== 'vacNote',
+    )) {
+      const sectionLabel = IMPORT_SECTION_LABELS[field.section];
+      instructions.addRow([
+        sectionLabel !== currentSection ? sectionLabel : '',
+        `${field.header}${field.required ? ' (required)' : ''}`,
+        field.helper ??
+          FULL_ADMISSION_IMPORT_HELPERS[field.header] ??
+          'Imported when mapped',
+      ]);
+      currentSection = sectionLabel;
+    }
+    instructions.addRow(['', '', '']);
+    for (const note of FULL_ADMISSION_STRUCTURE_NOTES) {
+      instructions.addRow(['Overview', '', note]);
+    }
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    this.applyFullAdmissionDropdowns(
+      sheet,
+      headers,
+      hiddenSheets,
+      programmes,
+      sem1Catalog,
+      sem5Catalog,
+    );
+
+    const buf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buf);
+  }
+
+  private applyFullAdmissionDropdowns(
+    sheet: ExcelJS.Worksheet,
+    headers: string[],
+    references: { name: string; rows: (string | number | null)[][] }[],
+    programmes: { code: string }[],
+    sem1Catalog: Sem1ImportCurriculumCatalog,
+    sem5Catalog: Sem5ImportCurriculumCatalog,
+  ) {
+    const refByName = new Map(references.map((ref) => [ref.name, ref]));
+    const listDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        Programme: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.programmes,
+          column: 'A',
+        },
+        Shift: { refName: FULL_ADMISSION_HIDDEN_SHEETS.shifts, column: 'A' },
+        'Admission Batch': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.batches,
+          column: 'A',
+        },
+        Stream: { refName: FULL_ADMISSION_HIDDEN_SHEETS.streams, column: 'A' },
+        'Academic Year': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.academicYears,
+          column: 'A',
+        },
+        Department: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.departments,
+          column: 'A',
+        },
+        Category: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.categories,
+          column: 'A',
+        },
+        Religion: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.religions,
+          column: 'A',
+        },
+        'Blood Group': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.bloodGroups,
+          column: 'A',
+        },
+        'Tribe / Race': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.tribes,
+          column: 'A',
+        },
+        Denomination: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.denominations,
+          column: 'A',
+        },
+        Nationality: {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.nationalities,
+          column: 'A',
+        },
+        'Major Department': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1MajorDepartments,
+          column: 'A',
+        },
+        MDC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Mdc, column: 'A' },
+        AEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Aec, column: 'A' },
+        SEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Sec, column: 'A' },
+        'Major Department (Sem 3)': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3MajorDepartments,
+          column: 'A',
+        },
+        'MDC (Sem 3)': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Mdc,
+          column: 'A',
+        },
+        'AEC (Sem 3)': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Aec,
+          column: 'A',
+        },
+        'SEC (Sem 3)': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Sec,
+          column: 'A',
+        },
+        VTC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Vtc, column: 'A' },
+        'Major Department (Sem 5)': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5MajorDepartments,
+          column: 'A',
+        },
+        'Internship Subject': {
+          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
+          column: 'A',
+        },
+      };
+
+    const majorColIndex = headers.indexOf('Major Department') + 1;
+    const minorColIndex = headers.indexOf('Minor Department') + 1;
+    const sem5MajorColIndex = headers.indexOf('Major Department (Sem 5)') + 1;
+    const sem5MinorColIndex = headers.indexOf('Minor Department (Sem 5)') + 1;
+    const majorColLetter = majorColIndex
+      ? String.fromCharCode(64 + majorColIndex)
+      : 'AZ';
+    const sem5MajorColLetter = sem5MajorColIndex
+      ? String.fromCharCode(64 + sem5MajorColIndex)
+      : 'AZ';
+
+    for (const [header, config] of Object.entries(listDropdownMap)) {
+      const columnIndex = headers.indexOf(header) + 1;
+      const ref = refByName.get(config.refName);
+      if (!columnIndex) continue;
+      if (header === 'Programme' && programmes.length) {
+        const values = programmes.map((p) => p.code).join(',');
+        for (let row = 3; row <= 1000; row += 1) {
+          sheet.getCell(row, columnIndex).dataValidation = {
+            type: 'list',
+            allowBlank: false,
+            formulae: [`"${values}"`],
+            showErrorMessage: true,
+            errorTitle: 'Invalid programme',
+            error: 'Choose a programme from the dropdown.',
+          };
+        }
+        continue;
+      }
+      if (!ref?.rows.length) continue;
+      const formula = this.excelReferenceFormula(
+        config.refName,
+        ref.rows.length,
+        config.column,
+      );
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, columnIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [formula],
+          showErrorMessage: true,
+          errorTitle: 'Invalid selection',
+          error: `Choose a valid option from ${config.refName}.`,
+        };
+      }
+    }
+
+    const genderCol = headers.indexOf('Gender') + 1;
+    if (genderCol) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, genderCol).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['"Male,Female,Other"'],
+          showErrorMessage: true,
+          errorTitle: 'Invalid gender',
+          error: 'Choose Male, Female, or Other.',
+        };
+      }
+    }
+
+    const semesterCol = headers.indexOf('Semester') + 1;
+    if (semesterCol) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, semesterCol).dataValidation = {
+          type: 'list',
+          allowBlank: false,
+          formulae: ['"1,3,5"'],
+          showErrorMessage: true,
+          errorTitle: 'Invalid semester',
+          error: 'Choose 1, 3, or 5.',
+        };
+      }
+    }
+
+    const admissionStatusCol = headers.indexOf('Admission Status') + 1;
+    if (admissionStatusCol) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, admissionStatusCol).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['"ACTIVE,PROVISIONAL,CANCELLED"'],
+          showErrorMessage: true,
+          errorTitle: 'Invalid admission status',
+          error: 'Choose ACTIVE, PROVISIONAL, or CANCELLED.',
+        };
+      }
+    }
+
+    if (minorColIndex && majorColIndex && sem1Catalog.majorDepartments.length) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, minorColIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected major department.',
+        };
+      }
+    }
+
+    if (
+      sem5MinorColIndex &&
+      sem5MajorColIndex &&
+      sem5Catalog.majorDepartments.length
+    ) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, sem5MinorColIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            `INDIRECT("FA5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected Sem 5 major department.',
+        };
+      }
+    }
   }
 
   async buildSem1AdmissionTemplateWorkbook(options: {
@@ -4646,6 +5943,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       helpers[header] ?? 'Enter institutional data in the displayed format.'
     );
   }
+
+  getImportFieldRegistry() {
+    return {
+      sections: IMPORT_SECTION_LABELS,
+      fields: STUDENT_IMPORT_FIELD_REGISTRY,
+    };
+  }
+
   async buildErrorReportWorkbook(
     rows: ImportRowValidationResult[],
   ): Promise<Buffer> {

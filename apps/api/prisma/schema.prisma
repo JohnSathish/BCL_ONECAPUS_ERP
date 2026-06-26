@@ -1935,6 +1935,10 @@ model Student {
   rollNumber             String?   @map("roll_number")
   applicationNumber      String?   @map("application_number")
   admissionNumber        String?   @map("admission_number")
+  formNumber             String?   @map("form_number")
+  universityRollNumber   String?   @map("university_roll_number")
+  universityRegistrationNumber String? @map("university_registration_number")
+  libraryCardNumber      String?   @map("library_card_number")
   rfidNumber             String?   @map("rfid_number")
   importSource           String?   @map("import_source")
   admissionSource        String?   @map("admission_source")
@@ -2008,6 +2012,7 @@ model StudentProfile {
   gender               String?
   dateOfBirth          DateTime? @map("date_of_birth") @db.Date
   mobileNumber         String?   @map("mobile_number")
+  whatsappNumber       String?   @map("whatsapp_number")
   nationalId           String?   @map("national_id")
   maritalStatus        String?   @map("marital_status")
   studentStatus        String    @default("STUDYING") @map("student_status")
