@@ -23,6 +23,8 @@ import {
   IndividualPromotionDto,
   ProvisionFyugpDto,
   PromotionPreviewQueryDto,
+  PromotionMappingPreviewQueryDto,
+  PromotionValidateQueryDto,
   UpdateAcademicSessionDto,
   UpdateAdmissionBatchDto,
   UpsertInstitutionAcademicConfigDto,
@@ -267,6 +269,24 @@ export class AcademicLifecycleController {
     @Query() query: PromotionPreviewQueryDto,
   ) {
     return this.service.previewPromotion(user.tid, query);
+  }
+
+  @Get('promotion-runs/mapping-preview')
+  @RequirePermissions('academic-lifecycle:read')
+  previewPromotionMappings(
+    @CurrentUser() user: JwtUser,
+    @Query() query: PromotionMappingPreviewQueryDto,
+  ) {
+    return this.service.previewPromotionMappings(user.tid, query);
+  }
+
+  @Get('promotion-runs/validate')
+  @RequirePermissions('academic-lifecycle:read')
+  validatePromotion(
+    @CurrentUser() user: JwtUser,
+    @Query() query: PromotionValidateQueryDto,
+  ) {
+    return this.service.validatePromotion(user.tid, query);
   }
 
   @Post('promotion-runs')

@@ -1706,6 +1706,7 @@ model ProgramVersion {
   poolCourseExclusions       ProgrammePoolCourseExclusion[]
   staffSubjectAssignments    StaffSubjectAssignment[]
   subjectTeachingAssignments SubjectTeachingAssignment[]
+  promotionMappings          ProgramPromotionMapping[]
 
   @@unique([programId, version])
   @@index([tenantId])
@@ -1907,6 +1908,8 @@ model CourseOffering {
   vtcTracksSem3              StudentVtcTrack[]           @relation("VtcTrackSem3")
   vtcTracksSem4              StudentVtcTrack[]           @relation("VtcTrackSem4")
   vtcTracksSem6              StudentVtcTrack[]           @relation("VtcTrackSem6")
+  promotionMappingsFrom      ProgramPromotionMapping[]   @relation("PromotionFromOffering")
+  promotionMappingsTo        ProgramPromotionMapping[]   @relation("PromotionToOffering")
 
   @@unique([categoryPoolId, courseId])
   @@index([tenantId])
@@ -4977,15 +4980,18 @@ model SemesterRegistration {
   semesterSequence Int       @map("semester_sequence")
   status           String    @default("draft")
   submittedAt      DateTime? @map("submitted_at")
+  archivedAt       DateTime? @map("archived_at")
+  promotionRunId   String?   @map("promotion_run_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  student   Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  semester  Semester                   @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  shift     Shift?                     @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  lines     SemesterRegistrationLine[]
-  approvals RegistrationApproval[]
-  auditLogs RegistrationAuditLog[]
+  student      Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  semester     Semester                   @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  shift        Shift?                     @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  promotionRun SemesterPromotionRun?      @relation(fields: [promotionRunId], references: [id], onDelete: SetNull)
+  lines        SemesterRegistrationLine[]
+  approvals    RegistrationApproval[]
+  auditLogs    RegistrationAuditLog[]
 
   @@unique([studentId, semesterId])
   @@index([tenantId])
@@ -5283,14 +5289,39 @@ model SemesterPromotionRun {
   fromSemester   Semester?                   @relation("PromotionFromSemester", fields: [fromSemesterId], references: [id], onDelete: SetNull)
   appliedBy      User?                       @relation("PromotionRunAppliedBy", fields: [appliedById], references: [id], onDelete: SetNull)
   admissionBatch AdmissionBatch?             @relation(fields: [admissionBatchId], references: [id], onDelete: SetNull)
-  entries        SemesterPromotionEntry[]
-  progressRows   StudentSemesterProgress[]
-  auditLogs      SemesterPromotionAuditLog[]
+  entries              SemesterPromotionEntry[]
+  progressRows         StudentSemesterProgress[]
+  auditLogs            SemesterPromotionAuditLog[]
+  archivedRegistrations SemesterRegistration[]
 
   @@index([tenantId])
   @@index([institutionId])
   @@index([cycleRolloverGroupId])
   @@map("semester_promotion_runs")
+  @@schema("academic")
+}
+
+model ProgramPromotionMapping {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  programVersionId String   @map("program_version_id") @db.Uuid
+  fromSequence     Int      @map("from_sequence")
+  toSequence       Int      @map("to_sequence")
+  fromOfferingId   String   @map("from_offering_id") @db.Uuid
+  toOfferingId     String   @map("to_offering_id") @db.Uuid
+  category         String?
+  majorPaperIndex  Int?     @map("major_paper_index")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  programVersion ProgramVersion @relation(fields: [programVersionId], references: [id], onDelete: Cascade)
+  fromOffering   CourseOffering @relation("PromotionFromOffering", fields: [fromOfferingId], references: [id], onDelete: Cascade)
+  toOffering     CourseOffering @relation("PromotionToOffering", fields: [toOfferingId], references: [id], onDelete: Cascade)
+
+  @@unique([programVersionId, fromOfferingId, toSequence])
+  @@index([tenantId])
+  @@index([programVersionId, fromSequence, toSequence])
+  @@map("program_promotion_mappings")
   @@schema("academic")
 }
 

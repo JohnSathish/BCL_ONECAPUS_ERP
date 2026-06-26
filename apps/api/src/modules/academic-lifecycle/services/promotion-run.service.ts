@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { InstitutionAcademicConfigService } from './institution-academic-config.service';
 import { PromotionEligibilityService } from './promotion-eligibility.service';
+import { PromotionRegistrationService } from './promotion-registration.service';
 import { ProgrammeCompletionService } from './programme-completion.service';
 import { FeeCycleEngineService } from '../../fees/services/fee-cycle-engine.service';
 import { isFeeCycleTriggerSemester } from '../../fees/constants/fee-cycle.constants';
@@ -23,6 +24,7 @@ export class PromotionRunService {
     private readonly prisma: PrismaService,
     private readonly configService: InstitutionAcademicConfigService,
     private readonly eligibility: PromotionEligibilityService,
+    private readonly promotionRegistration: PromotionRegistrationService,
     private readonly completion: ProgrammeCompletionService,
     private readonly feeCycleEngine: FeeCycleEngineService,
   ) {}
@@ -281,8 +283,25 @@ export class PromotionRunService {
 
     await this.audit(tenantId, runId, actorId, 'RUN_APPLIED', {});
 
-    for (const entry of run.entries) {
+    const appliedRun = await this.getRun(tenantId, runId);
+    for (const entry of appliedRun.entries) {
       if (entry.status !== 'PROMOTED' && entry.status !== 'COMPLETED') continue;
+
+      const isTerminalCompletion =
+        entry.status === 'COMPLETED' &&
+        entry.toSequence >= config.terminalSemesterNumber;
+
+      if (!isTerminalCompletion) {
+        await this.promotionRegistration.applyForStudent(tenantId, {
+          studentId: entry.studentId,
+          institutionId: run.institutionId,
+          fromSequence: entry.fromSequence,
+          toSequence: entry.toSequence,
+          promotionRunId: runId,
+          actorId,
+        });
+      }
+
       if (!isFeeCycleTriggerSemester(entry.toSequence)) continue;
       void this.feeCycleEngine.onStudentSemesterEntry(
         tenantId,
@@ -292,7 +311,7 @@ export class PromotionRunService {
       );
     }
 
-    return this.getRun(tenantId, runId);
+    return appliedRun;
   }
 
   async rollbackRun(tenantId: string, runId: string, actorId?: string) {
@@ -341,6 +360,17 @@ export class PromotionRunService {
     });
 
     await this.audit(tenantId, runId, actorId, 'RUN_ROLLED_BACK', {});
+
+    for (const entry of run.entries) {
+      if (entry.status !== 'PROMOTED' && entry.status !== 'COMPLETED') continue;
+      await this.promotionRegistration.rollbackForStudent(tenantId, {
+        studentId: entry.studentId,
+        institutionId: run.institutionId,
+        fromSequence: entry.fromSequence,
+        toSequence: entry.toSequence,
+        promotionRunId: runId,
+      });
+    }
 
     return this.getRun(tenantId, runId);
   }

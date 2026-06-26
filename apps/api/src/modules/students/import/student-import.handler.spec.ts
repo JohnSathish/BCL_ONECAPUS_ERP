@@ -23,9 +23,11 @@ describe('StudentImportHandler', () => {
 
   const handler = new StudentImportHandler(
     prisma as never,
-
     {} as never,
-
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
     {} as never,
   );
 

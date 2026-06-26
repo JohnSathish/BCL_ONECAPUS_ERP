@@ -208,14 +208,25 @@ export class StudentsController {
     @Res() res: Response,
     @Query('mode') mode: 'blank' | 'prefilled' = 'blank',
     @Query('variant')
-    variant: 'default' | 'sem1-admission' | 'sem3-admission' = 'default',
+    variant:
+      | 'default'
+      | 'sem1-admission'
+      | 'sem3-admission'
+      | 'sem5-admission' = 'default',
     @Query('programme') programme?: string,
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
     const buffer =
       variant === 'sem1-admission'
-        ? await this.studentImport.buildSem1AdmissionTemplate()
+        ? await this.studentImport.buildSem1AdmissionTemplate({
+            tenantId: user.tid,
+            programme,
+            programVersionId,
+            semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+            academicYearId,
+          })
         : variant === 'sem3-admission'
           ? await this.studentImport.buildSem3AdmissionTemplate({
               tenantId: user.tid,
@@ -223,10 +234,20 @@ export class StudentsController {
               programVersionId,
               semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
             })
-          : await this.studentImport.buildTemplate({
-              mode,
-              tenantId: user.tid,
-            });
+          : variant === 'sem5-admission'
+            ? await this.studentImport.buildSem5AdmissionTemplate({
+                tenantId: user.tid,
+                programme,
+                programVersionId,
+                semesterSequence: semesterSequence
+                  ? Number(semesterSequence)
+                  : 5,
+                academicYearId,
+              })
+            : await this.studentImport.buildTemplate({
+                mode,
+                tenantId: user.tid,
+              });
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -236,9 +257,51 @@ export class StudentsController {
         ? 'Sem1_Admission_Import_Template.xlsx'
         : variant === 'sem3-admission'
           ? 'Sem3_Admission_Import_Template.xlsx'
-          : 'Student_Import_Template.xlsx';
+          : variant === 'sem5-admission'
+            ? 'Sem5_Admission_Import_Template.xlsx'
+            : 'Student_Import_Template.xlsx';
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+  }
+
+  @Get('import/sem1-curriculum/programmes')
+  @RequirePermissions('students:import')
+  listSem1ImportProgrammes(@CurrentUser() user: JwtUser) {
+    return this.studentImport.listSem1ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem1-curriculum/eligible-minors')
+  @RequirePermissions('students:import')
+  getSem1EligibleMinors(
+    @CurrentUser() user: JwtUser,
+    @Query('programVersionId') programVersionId: string,
+    @Query('majorDepartment') majorDepartment: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+  ) {
+    return this.studentImport.getSem1EligibleMinors(user.tid, {
+      programVersionId,
+      majorDepartment,
+      academicYearId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+    });
+  }
+
+  @Get('import/sem1-curriculum')
+  @RequirePermissions('students:import')
+  getSem1ImportCurriculum(
+    @CurrentUser() user: JwtUser,
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.studentImport.getSem1ImportCurriculum(user.tid, {
+      programme,
+      programVersionId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+      academicYearId,
+    });
   }
 
   @Get('import/sem3-curriculum/programmes')
@@ -259,6 +322,46 @@ export class StudentsController {
       programme,
       programVersionId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+    });
+  }
+
+  @Get('import/sem5-curriculum/programmes')
+  @RequirePermissions('students:import')
+  listSem5ImportProgrammes(@CurrentUser() user: JwtUser) {
+    return this.studentImport.listSem5ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem5-curriculum/eligible-minors')
+  @RequirePermissions('students:import')
+  getSem5EligibleMinors(
+    @CurrentUser() user: JwtUser,
+    @Query('programVersionId') programVersionId: string,
+    @Query('majorDepartment') majorDepartment: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+  ) {
+    return this.studentImport.getSem5EligibleMinors(user.tid, {
+      programVersionId,
+      majorDepartment,
+      academicYearId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
+    });
+  }
+
+  @Get('import/sem5-curriculum')
+  @RequirePermissions('students:import')
+  getSem5ImportCurriculum(
+    @CurrentUser() user: JwtUser,
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.studentImport.getSem5ImportCurriculum(user.tid, {
+      programme,
+      programVersionId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
+      academicYearId,
     });
   }
 

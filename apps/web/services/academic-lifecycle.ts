@@ -169,8 +169,38 @@ export async function previewPromotion(params: {
   campusId?: string;
   shiftId?: string;
   admissionBatchId?: string;
+  programVersionId?: string;
 }) {
   const { data } = await api.get('/v1/academic-lifecycle/promotion-runs/preview', { params });
+  return data;
+}
+
+export async function previewPromotionMappings(params: {
+  institutionId: string;
+  fromSequence: number;
+  toSequence: number;
+  campusId?: string;
+  shiftId?: string;
+  admissionBatchId?: string;
+  programVersionId?: string;
+  studentIds?: string[];
+}) {
+  const { data } = await api.get('/v1/academic-lifecycle/promotion-runs/mapping-preview', {
+    params,
+  });
+  return data;
+}
+
+export async function validatePromotion(params: {
+  institutionId: string;
+  fromSequence: number;
+  toSequence: number;
+  campusId?: string;
+  shiftId?: string;
+  admissionBatchId?: string;
+  programVersionId?: string;
+}) {
+  const { data } = await api.get('/v1/academic-lifecycle/promotion-runs/validate', { params });
   return data;
 }
 

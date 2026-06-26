@@ -7,6 +7,7 @@ import { CycleActivationService } from './services/cycle-activation.service';
 import { CycleRolloverService } from './services/cycle-rollover.service';
 import { InstitutionAcademicConfigService } from './services/institution-academic-config.service';
 import { PromotionRunService } from './services/promotion-run.service';
+import { PromotionRegistrationService } from './services/promotion-registration.service';
 import { SemesterLifecycleService } from './services/semester-lifecycle.service';
 import type {
   ActivateCycleDto,
@@ -18,6 +19,8 @@ import type {
   IndividualPromotionDto,
   ProvisionFyugpDto,
   PromotionPreviewQueryDto,
+  PromotionMappingPreviewQueryDto,
+  PromotionValidateQueryDto,
   UpdateAcademicSessionDto,
   UpdateAdmissionBatchDto,
   UpsertInstitutionAcademicConfigDto,
@@ -32,6 +35,7 @@ export class AcademicLifecycleService {
     private readonly lifecycle: SemesterLifecycleService,
     private readonly activeSemester: ActiveSemesterService,
     private readonly promotion: PromotionRunService,
+    private readonly promotionRegistration: PromotionRegistrationService,
     private readonly sessions: AcademicSessionService,
     private readonly batches: AdmissionBatchService,
     private readonly mappings: BatchSemesterMappingService,
@@ -227,6 +231,32 @@ export class AcademicLifecycleService {
 
   previewPromotion(tenantId: string, query: PromotionPreviewQueryDto) {
     return this.promotion.preview(tenantId, query);
+  }
+
+  previewPromotionMappings(
+    tenantId: string,
+    query: PromotionMappingPreviewQueryDto,
+  ) {
+    return this.promotionRegistration.previewMappings(tenantId, query);
+  }
+
+  async validatePromotion(tenantId: string, query: PromotionValidateQueryDto) {
+    const students = await this.promotionRegistration.previewMappings(
+      tenantId,
+      query,
+    );
+    const blocked = students.filter((s) => !s.valid);
+    return {
+      fromSequence: query.fromSequence,
+      toSequence: query.toSequence,
+      counts: {
+        total: students.length,
+        valid: students.length - blocked.length,
+        blocked: blocked.length,
+      },
+      students,
+      valid: blocked.length === 0,
+    };
   }
 
   createPromotionRun(

@@ -228,9 +228,25 @@ export const ADMIN_NAV: NavGroup[] = [
           },
           { label: 'Add Student', href: '/admin/students/new', permissions: ['students:manage'] },
           {
-            label: 'Academic Records',
+            label: 'Subject Registration',
             href: '/admin/students/subject-registration',
             permissions: ['students:manage-academic', 'students:manage'],
+            activePattern: '^/admin/students/subject-registration(?!/semester-)',
+          },
+          {
+            label: 'Semester 1 Import',
+            href: '/admin/students/subject-registration/semester-1-import',
+            permissions: ['students:import', 'students:manage'],
+          },
+          {
+            label: 'Semester 3 Import',
+            href: '/admin/students/subject-registration/semester-3-import',
+            permissions: ['students:import', 'students:manage'],
+          },
+          {
+            label: 'Semester 5 Import',
+            href: '/admin/students/subject-registration/semester-5-import',
+            permissions: ['students:import', 'students:manage'],
           },
           {
             label: 'Attendance',

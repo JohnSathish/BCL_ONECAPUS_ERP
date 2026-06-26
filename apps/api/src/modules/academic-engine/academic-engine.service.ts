@@ -585,6 +585,7 @@ export class AcademicEngineService {
     tenantId: string,
     studentId: string,
     dto: CreateRegistrationDto,
+    opts?: { bypassRegistrationWindow?: boolean; promotionBypass?: boolean },
   ) {
     const student = await this.assertStudent(tenantId, studentId);
 
@@ -604,7 +605,7 @@ export class AcademicEngineService {
       studentId,
       'REGISTRATION',
     );
-    if (feeCheck.blocked) {
+    if (!opts?.promotionBypass && feeCheck.blocked) {
       throw new BadRequestException(
         `Fee dues outstanding (₹${feeCheck.outstandingAmount}). ${feeCheck.reasons.join('; ')}`,
       );
@@ -640,17 +641,18 @@ export class AcademicEngineService {
       );
     }
     if (
-      calendarSem.semesterNumber !== dto.semesterSequence ||
-      !calendarSem.isActive ||
-      calendarSem.status !== 'ACTIVE' ||
-      !calendarSem.registrationOpen
+      !opts?.bypassRegistrationWindow &&
+      (calendarSem.semesterNumber !== dto.semesterSequence ||
+        !calendarSem.isActive ||
+        calendarSem.status !== 'ACTIVE' ||
+        !calendarSem.registrationOpen)
     ) {
       throw new BadRequestException(
         'Registration is not open for this programme semester',
       );
     }
 
-    if (institutionId) {
+    if (institutionId && !opts?.bypassRegistrationWindow) {
       const operational = await this.lifecycle.resolveOperationalSemester(
         tenantId,
         institutionId,

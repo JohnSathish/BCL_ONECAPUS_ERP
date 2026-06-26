@@ -119,3 +119,44 @@ export type AdmissionBatchRow = {
   entrySession: { id: string; name: string };
   _count?: { studentProfiles: number };
 };
+
+export type PromotionMappingLine = {
+  category: string;
+  majorPaperIndex?: number | null;
+  departmentName?: string | null;
+  from?: { code: string; title: string; offeringId: string } | null;
+  to: { code: string; title: string; offeringId: string };
+  resolved: boolean;
+  message?: string;
+};
+
+export type PromotionMappingPreviewStudent = {
+  studentId: string;
+  enrollmentNumber?: string | null;
+  studentName?: string | null;
+  lines: PromotionMappingLine[];
+  valid: boolean;
+  messages: string[];
+};
+
+export type PromotionPreviewResponse = {
+  fromSequence: number;
+  toSequence: number;
+  counts: {
+    eligible: number;
+    detained: number;
+    failed: number;
+    total: number;
+  };
+  eligible: unknown[];
+  detained: unknown[];
+  failed: unknown[];
+};
+
+export type PromotionValidateResponse = {
+  fromSequence: number;
+  toSequence: number;
+  valid: boolean;
+  counts: { total: number; valid: number; blocked: number };
+  students: PromotionMappingPreviewStudent[];
+};

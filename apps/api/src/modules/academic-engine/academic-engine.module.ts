@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ImportModule } from '../../common/import/import.module';
 import { AcademicLifecycleModule } from '../academic-lifecycle/academic-lifecycle.module';
 import { ShiftsModule } from '../shifts/shifts.module';
@@ -33,7 +33,7 @@ import { FeesModule } from '../fees/fees.module';
 
 @Module({
   imports: [
-    AcademicLifecycleModule,
+    forwardRef(() => AcademicLifecycleModule),
     ShiftsModule,
     ImportModule,
     LmsModule,
@@ -82,6 +82,7 @@ import { FeesModule } from '../fees/fees.module';
     StudentVtcTrackService,
     OfferingsService,
     CourseEligibilityService,
+    AllocationService,
   ],
 })
 export class AcademicEngineModule {}

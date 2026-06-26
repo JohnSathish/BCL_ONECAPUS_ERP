@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { AdmissionsModule } from '../admissions/admissions.module';
+import { AcademicEngineModule } from '../academic-engine/academic-engine.module';
 import { FeesModule } from '../fees/fees.module';
 import { AcademicLifecycleController } from './academic-lifecycle.controller';
 import { AcademicLifecycleService } from './academic-lifecycle.service';
@@ -13,10 +14,15 @@ import { InstitutionAcademicConfigService } from './services/institution-academi
 import { ProgrammeCompletionService } from './services/programme-completion.service';
 import { PromotionEligibilityService } from './services/promotion-eligibility.service';
 import { PromotionRunService } from './services/promotion-run.service';
+import { PromotionRegistrationService } from './services/promotion-registration.service';
 import { SemesterLifecycleService } from './services/semester-lifecycle.service';
 
 @Module({
-  imports: [forwardRef(() => AdmissionsModule), FeesModule],
+  imports: [
+    forwardRef(() => AdmissionsModule),
+    forwardRef(() => AcademicEngineModule),
+    FeesModule,
+  ],
   controllers: [AcademicLifecycleController],
   providers: [
     AcademicLifecycleService,
@@ -30,8 +36,9 @@ import { SemesterLifecycleService } from './services/semester-lifecycle.service'
     CycleRolloverService,
     PromotionEligibilityService,
     PromotionRunService,
+    PromotionRegistrationService,
     ProgrammeCompletionService,
   ],
-  exports: [AcademicLifecycleService],
+  exports: [AcademicLifecycleService, PromotionRegistrationService],
 })
 export class AcademicLifecycleModule {}

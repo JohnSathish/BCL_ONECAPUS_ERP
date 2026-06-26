@@ -17,6 +17,7 @@ import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
 import { seedDbcCommittees } from './seeds/seed-dbc-committees';
 import { seedNaacIqac } from './seeds/seed-naac-iqac';
 import { SEED_PERMISSIONS as PERMISSIONS } from './seed-permissions';
+import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
 
 const prisma = new PrismaClient();
 
@@ -2842,6 +2843,16 @@ async function main() {
     shifts,
     createdById: adminUser.id,
   });
+
+  await syncProgramPromotionMappings(prisma, tenant.id, programVersion.id, [
+    { fromSequence: 1, toSequence: 2 },
+    { fromSequence: 2, toSequence: 3 },
+    { fromSequence: 3, toSequence: 4 },
+    { fromSequence: 4, toSequence: 5 },
+    { fromSequence: 5, toSequence: 6 },
+    { fromSequence: 6, toSequence: 7 },
+    { fromSequence: 7, toSequence: 8 },
+  ]);
 
   await seedArtsOddTimetable({
     prisma,

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { BatchProgressionTable } from '@/components/academic-lifecycle/batch-progression-table';
 import { CycleRolloverWizard } from '@/components/academic-lifecycle/cycle-rollover-wizard';
+import { PromotionWizard } from '@/components/academic-lifecycle/promotion-wizard';
 import { LifecycleActionsPanel } from '@/components/academic-lifecycle/lifecycle-actions-panel';
 import { LifecycleDashboardCards } from '@/components/academic-lifecycle/lifecycle-dashboard-cards';
 import { PromotionLogsTable } from '@/components/academic-lifecycle/promotion-logs-table';
@@ -293,6 +294,15 @@ export default function AdminAcademicLifecyclePage() {
             <SemesterLifecycleTable rows={dashboard.data?.semesterLifecycle ?? []} />
 
             <BatchProgressionTable rows={dashboard.data?.batchProgression ?? []} />
+
+            <PromotionWizard
+              institutionId={institutionId}
+              campusId={campusId || undefined}
+              shiftId={shiftId || undefined}
+              defaultFromSequence={dashboard.data?.batchProgression?.[0]?.currentSemester ?? 1}
+              canManage={Boolean(canManage)}
+              onApplied={invalidate}
+            />
 
             <CycleRolloverWizard
               preview={rolloverPreview.data}

@@ -36,8 +36,16 @@ import {
   commitStudentImport,
   downloadStudentImportErrorReport,
   downloadStudentImportTemplate,
+  downloadSem1AdmissionTemplate,
   downloadSem3AdmissionTemplate,
+  downloadSem5AdmissionTemplate,
+  fetchSem1EligibleMinors,
+  fetchSem1ImportCurriculum,
+  fetchSem1ImportProgrammes,
   fetchSem3ImportProgrammes,
+  fetchSem5EligibleMinors,
+  fetchSem5ImportCurriculum,
+  fetchSem5ImportProgrammes,
   fetchStudentImportBatches,
   fetchStudentImportPreview,
   validateStudentImport,
@@ -45,7 +53,10 @@ import {
   type StudentImportMode,
   type StudentImportPreview,
   type StudentImportPreviewRow,
+  type Sem1ImportProgrammeOption,
+  type Sem5ImportProgrammeOption,
 } from '@/services/students';
+import { fetchAcademicYears } from '@/services/organization';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -64,6 +75,31 @@ type AdvancedSettings = {
 
 type Props = {
   canImport: boolean;
+  focusSemester?: 1 | 3 | 5;
+};
+
+const FOCUS_SEMESTER_COPY: Record<
+  1 | 3 | 5,
+  { title: string; description: string; templateLabel: string }
+> = {
+  1: {
+    title: 'Semester 1 Subject Import',
+    description:
+      'Import newly admitted Semester 1 students. Select departments and paper names only — VAC Environment Studies is registered automatically.',
+    templateLabel: 'Sem 1 Template',
+  },
+  3: {
+    title: 'Semester 3 Subject Import',
+    description:
+      'Import Semester 3 subject selections using Major Department and paper names — no course codes required.',
+    templateLabel: 'Sem 3 Template',
+  },
+  5: {
+    title: 'Semester 5 Subject Import',
+    description:
+      'Import Semester 5 Major, Minor, and Internship selections using friendly department names only.',
+    templateLabel: 'Sem 5 Template',
+  },
 };
 
 const PREVIEW_PAGE_SIZE = 50;
@@ -74,7 +110,7 @@ const IMPORT_STEPS = [
   { key: 'commit', label: 'Commit Import' },
 ];
 
-export function StudentBulkImportPanel({ canImport }: Props) {
+export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>('upload');
   const [uploadPct, setUploadPct] = useState(0);
@@ -86,9 +122,19 @@ export function StudentBulkImportPanel({ canImport }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [templateGuideOpen, setTemplateGuideOpen] = useState(false);
+  const [sem1DialogOpen, setSem1DialogOpen] = useState(false);
+  const [sem1Programme, setSem1Programme] = useState('');
+  const [sem1AcademicYearId, setSem1AcademicYearId] = useState('');
+  const [sem1PreviewMajor, setSem1PreviewMajor] = useState('');
+  const [sem1Downloading, setSem1Downloading] = useState(false);
   const [sem3DialogOpen, setSem3DialogOpen] = useState(false);
   const [sem3Programme, setSem3Programme] = useState('');
   const [sem3Downloading, setSem3Downloading] = useState(false);
+  const [sem5DialogOpen, setSem5DialogOpen] = useState(false);
+  const [sem5Programme, setSem5Programme] = useState('');
+  const [sem5AcademicYearId, setSem5AcademicYearId] = useState('');
+  const [sem5PreviewMajor, setSem5PreviewMajor] = useState('');
+  const [sem5Downloading, setSem5Downloading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
@@ -108,10 +154,110 @@ export function StudentBulkImportPanel({ canImport }: Props) {
     enabled: canImport,
   });
 
+  const sem1ProgrammesQ = useQuery({
+    queryKey: ['sem1-import-programmes'],
+    queryFn: fetchSem1ImportProgrammes,
+    enabled: canImport && sem1DialogOpen,
+  });
+
   const sem3ProgrammesQ = useQuery({
     queryKey: ['sem3-import-programmes'],
     queryFn: fetchSem3ImportProgrammes,
     enabled: canImport && sem3DialogOpen,
+  });
+
+  const sem5ProgrammesQ = useQuery({
+    queryKey: ['sem5-import-programmes'],
+    queryFn: fetchSem5ImportProgrammes,
+    enabled: canImport && sem5DialogOpen,
+  });
+
+  const academicYearsQ = useQuery({
+    queryKey: ['academic-years', 'sem-import', focusSemester ?? 'all'],
+    queryFn: fetchAcademicYears,
+    enabled: canImport && (sem1DialogOpen || sem5DialogOpen),
+  });
+
+  const selectedSem1Programme = useMemo(() => {
+    const programmes = sem1ProgrammesQ.data ?? [];
+    if (!sem1Programme) return programmes[0];
+    return programmes.find((programme) => programme.code === sem1Programme) ?? programmes[0];
+  }, [sem1Programme, sem1ProgrammesQ.data]);
+
+  const sem1CurriculumQ = useQuery({
+    queryKey: [
+      'sem1-import-curriculum',
+      selectedSem1Programme?.programVersionId,
+      sem1AcademicYearId,
+    ],
+    queryFn: () =>
+      fetchSem1ImportCurriculum({
+        programVersionId: selectedSem1Programme?.programVersionId,
+        academicYearId: sem1AcademicYearId || undefined,
+        semesterSequence: 1,
+      }),
+    enabled: canImport && sem1DialogOpen && Boolean(selectedSem1Programme?.programVersionId),
+  });
+
+  const sem1EligibleMinorsQ = useQuery({
+    queryKey: [
+      'sem1-eligible-minors',
+      selectedSem1Programme?.programVersionId,
+      sem1PreviewMajor,
+      sem1AcademicYearId,
+    ],
+    queryFn: () =>
+      fetchSem1EligibleMinors({
+        programVersionId: selectedSem1Programme!.programVersionId,
+        majorDepartment: sem1PreviewMajor,
+        academicYearId: sem1AcademicYearId || undefined,
+        semesterSequence: 1,
+      }),
+    enabled:
+      canImport &&
+      sem1DialogOpen &&
+      Boolean(selectedSem1Programme?.programVersionId && sem1PreviewMajor),
+  });
+
+  const selectedSem5Programme = useMemo(() => {
+    const programmes = sem5ProgrammesQ.data ?? [];
+    if (!sem5Programme) return programmes[0];
+    return programmes.find((programme) => programme.code === sem5Programme) ?? programmes[0];
+  }, [sem5Programme, sem5ProgrammesQ.data]);
+
+  const sem5CurriculumQ = useQuery({
+    queryKey: [
+      'sem5-import-curriculum',
+      selectedSem5Programme?.programVersionId,
+      sem5AcademicYearId,
+    ],
+    queryFn: () =>
+      fetchSem5ImportCurriculum({
+        programVersionId: selectedSem5Programme?.programVersionId,
+        academicYearId: sem5AcademicYearId || undefined,
+        semesterSequence: 5,
+      }),
+    enabled: canImport && sem5DialogOpen && Boolean(selectedSem5Programme?.programVersionId),
+  });
+
+  const sem5EligibleMinorsQ = useQuery({
+    queryKey: [
+      'sem5-eligible-minors',
+      selectedSem5Programme?.programVersionId,
+      sem5PreviewMajor,
+      sem5AcademicYearId,
+    ],
+    queryFn: () =>
+      fetchSem5EligibleMinors({
+        programVersionId: selectedSem5Programme!.programVersionId,
+        majorDepartment: sem5PreviewMajor,
+        academicYearId: sem5AcademicYearId || undefined,
+        semesterSequence: 5,
+      }),
+    enabled:
+      canImport &&
+      sem5DialogOpen &&
+      Boolean(selectedSem5Programme?.programVersionId && sem5PreviewMajor),
   });
 
   const reset = useCallback(() => {
@@ -184,6 +330,28 @@ export function StudentBulkImportPanel({ canImport }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const downloadSem1Template = async () => {
+    if (!selectedSem1Programme) return;
+    setSem1Downloading(true);
+    try {
+      const blob = await downloadSem1AdmissionTemplate({
+        programme: selectedSem1Programme.code,
+        programVersionId: selectedSem1Programme.programVersionId,
+        semesterSequence: 1,
+        academicYearId: sem1AcademicYearId || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Sem1_${selectedSem1Programme.code.replace(/[^A-Z0-9-]+/gi, '_')}_Import_Template.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSem1DialogOpen(false);
+    } finally {
+      setSem1Downloading(false);
+    }
+  };
+
   const downloadSem3Template = async (programme?: string) => {
     setSem3Downloading(true);
     try {
@@ -205,6 +373,28 @@ export function StudentBulkImportPanel({ canImport }: Props) {
     }
   };
 
+  const downloadSem5Template = async () => {
+    if (!selectedSem5Programme) return;
+    setSem5Downloading(true);
+    try {
+      const blob = await downloadSem5AdmissionTemplate({
+        programme: selectedSem5Programme.code,
+        programVersionId: selectedSem5Programme.programVersionId,
+        semesterSequence: 5,
+        academicYearId: sem5AcademicYearId || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Sem5_${selectedSem5Programme.code.replace(/[^A-Z0-9-]+/gi, '_')}_Import_Template.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSem5DialogOpen(false);
+    } finally {
+      setSem5Downloading(false);
+    }
+  };
+
   const validCount = preview?.summary.valid ?? 0;
   const invalidCount = preview?.summary.invalid ?? 0;
   const canCommit = validCount > 0 && preview?.status === 'VALIDATED';
@@ -214,6 +404,8 @@ export function StudentBulkImportPanel({ canImport }: Props) {
   const recentImports = useMemo(() => historyQ.data?.data ?? [], [historyQ.data?.data]);
   const dashboard = useMemo(() => buildDashboardStats(recentImports), [recentImports]);
   const issueSummary = useMemo(() => buildIssueSummary(preview), [preview]);
+
+  const focusCopy = focusSemester ? FOCUS_SEMESTER_COPY[focusSemester] : null;
 
   if (!canImport) {
     return (
@@ -236,43 +428,81 @@ export function StudentBulkImportPanel({ canImport }: Props) {
               Enterprise student data command center
             </span>
             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              Student Import Studio
+              {focusCopy?.title ?? 'Student Import Studio'}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Import student master records, validate datasets, preview issues, and safely commit
-              admissions data.
+              {focusCopy?.description ??
+                'Import student master records, validate datasets, preview issues, and safely commit admissions data.'}
             </p>
           </div>
           <BulkActionToolbar>
-            <BulkActionButton
-              type="button"
-              size="sm"
-              icon={<Download className="h-4 w-4" />}
-              onClick={() => void downloadTemplate()}
-            >
-              Blank Template
-            </BulkActionButton>
-            <BulkActionButton
-              type="button"
-              variant="outline"
-              size="sm"
-              icon={<Download className="h-4 w-4" />}
-              onClick={() => void downloadTemplate('prefilled')}
-            >
-              Prefilled Template
-            </BulkActionButton>
-            <BulkActionButton
-              type="button"
-              variant="outline"
-              size="sm"
-              icon={<Download className="h-4 w-4" />}
-              onClick={() => {
-                setSem3DialogOpen(true);
-                setSem3Programme('');
-              }}
-            >
-              Sem 3 Template
-            </BulkActionButton>
+            {!focusSemester ? (
+              <>
+                <BulkActionButton
+                  type="button"
+                  size="sm"
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={() => void downloadTemplate()}
+                >
+                  Blank Template
+                </BulkActionButton>
+                <BulkActionButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={() => void downloadTemplate('prefilled')}
+                >
+                  Prefilled Template
+                </BulkActionButton>
+              </>
+            ) : null}
+            {!focusSemester || focusSemester === 1 ? (
+              <BulkActionButton
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  setSem1DialogOpen(true);
+                  setSem1Programme('');
+                  setSem1AcademicYearId('');
+                  setSem1PreviewMajor('');
+                }}
+              >
+                {focusSemester === 1 ? 'Generate Sem 1 Template' : 'Sem 1 Template'}
+              </BulkActionButton>
+            ) : null}
+            {!focusSemester || focusSemester === 3 ? (
+              <BulkActionButton
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  setSem3DialogOpen(true);
+                  setSem3Programme('');
+                }}
+              >
+                {focusSemester === 3 ? 'Generate Sem 3 Template' : 'Sem 3 Template'}
+              </BulkActionButton>
+            ) : null}
+            {!focusSemester || focusSemester === 5 ? (
+              <BulkActionButton
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  setSem5DialogOpen(true);
+                  setSem5Programme('');
+                  setSem5AcademicYearId('');
+                  setSem5PreviewMajor('');
+                }}
+              >
+                {focusSemester === 5 ? 'Generate Sem 5 Template' : 'Sem 5 Template'}
+              </BulkActionButton>
+            ) : null}
             <BulkActionButton
               type="button"
               variant="outline"
@@ -282,16 +512,18 @@ export function StudentBulkImportPanel({ canImport }: Props) {
             >
               View Guide
             </BulkActionButton>
-            <Link
-              href="/admin/students/sem-1-migration"
-              className={cn(
-                buttonVariants({ variant: 'outline', size: 'sm' }),
-                'gap-2 rounded-xl font-semibold shadow-sm',
-              )}
-            >
-              <Sparkles className="h-4 w-4" />
-              Sem 1 Migration Guide
-            </Link>
+            {!focusSemester ? (
+              <Link
+                href="/admin/students/sem-1-migration"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'gap-2 rounded-xl font-semibold shadow-sm',
+                )}
+              >
+                <Sparkles className="h-4 w-4" />
+                Sem 1 Migration Guide
+              </Link>
+            ) : null}
             <Link
               href="/admin/students/import/history"
               className={cn(
@@ -545,6 +777,30 @@ export function StudentBulkImportPanel({ canImport }: Props) {
         </aside>
       </div>
 
+      {sem1DialogOpen ? (
+        <Sem1TemplateDialog
+          programmes={sem1ProgrammesQ.data ?? []}
+          academicYears={academicYearsQ.data ?? []}
+          curriculum={sem1CurriculumQ.data}
+          eligibleMinors={sem1EligibleMinorsQ.data}
+          loading={
+            sem1ProgrammesQ.isLoading || academicYearsQ.isLoading || sem1CurriculumQ.isLoading
+          }
+          downloading={sem1Downloading}
+          selectedProgramme={sem1Programme}
+          selectedAcademicYearId={sem1AcademicYearId}
+          previewMajor={sem1PreviewMajor}
+          onSelectProgramme={(value) => {
+            setSem1Programme(value);
+            setSem1PreviewMajor('');
+          }}
+          onSelectAcademicYear={setSem1AcademicYearId}
+          onSelectPreviewMajor={setSem1PreviewMajor}
+          onClose={() => setSem1DialogOpen(false)}
+          onDownload={() => void downloadSem1Template()}
+        />
+      ) : null}
+
       {sem3DialogOpen ? (
         <Sem3TemplateDialog
           programmes={sem3ProgrammesQ.data ?? []}
@@ -554,6 +810,30 @@ export function StudentBulkImportPanel({ canImport }: Props) {
           onSelectProgramme={setSem3Programme}
           onClose={() => setSem3DialogOpen(false)}
           onDownload={() => void downloadSem3Template(sem3Programme || undefined)}
+        />
+      ) : null}
+
+      {sem5DialogOpen ? (
+        <Sem5TemplateDialog
+          programmes={sem5ProgrammesQ.data ?? []}
+          academicYears={academicYearsQ.data ?? []}
+          curriculum={sem5CurriculumQ.data}
+          eligibleMinors={sem5EligibleMinorsQ.data}
+          loading={
+            sem5ProgrammesQ.isLoading || academicYearsQ.isLoading || sem5CurriculumQ.isLoading
+          }
+          downloading={sem5Downloading}
+          selectedProgramme={sem5Programme}
+          selectedAcademicYearId={sem5AcademicYearId}
+          previewMajor={sem5PreviewMajor}
+          onSelectProgramme={(value) => {
+            setSem5Programme(value);
+            setSem5PreviewMajor('');
+          }}
+          onSelectAcademicYear={setSem5AcademicYearId}
+          onSelectPreviewMajor={setSem5PreviewMajor}
+          onClose={() => setSem5DialogOpen(false)}
+          onDownload={() => void downloadSem5Template()}
         />
       ) : null}
     </div>
@@ -968,6 +1248,293 @@ function HealthMetric({
   );
 }
 
+function Sem1TemplateDialog({
+  programmes,
+  academicYears,
+  curriculum,
+  eligibleMinors,
+  loading,
+  downloading,
+  selectedProgramme,
+  selectedAcademicYearId,
+  previewMajor,
+  onSelectProgramme,
+  onSelectAcademicYear,
+  onSelectPreviewMajor,
+  onClose,
+  onDownload,
+}: {
+  programmes: Sem1ImportProgrammeOption[];
+  academicYears: { id: string; name: string }[];
+  curriculum?: {
+    curriculumLabel: string;
+    majorDepartments: { departmentName: string }[];
+    vacPaper: { code: string; title: string };
+  };
+  eligibleMinors?: {
+    majorDepartment: string;
+    majorPaper: { code: string; title: string };
+    vacPaper: { code: string; title: string };
+    eligibleMinors: string[];
+  };
+  loading: boolean;
+  downloading: boolean;
+  selectedProgramme: string;
+  selectedAcademicYearId: string;
+  previewMajor: string;
+  onSelectProgramme: (value: string) => void;
+  onSelectAcademicYear: (value: string) => void;
+  onSelectPreviewMajor: (value: string) => void;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  const activeProgramme =
+    programmes.find((programme) => programme.code === selectedProgramme) ?? programmes[0];
+  const majorOptions = curriculum?.majorDepartments ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <section className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-border/60 bg-card p-5 shadow-2xl">
+        <h2 className="text-lg font-semibold">Download Semester 1 Template</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Select academic year and programme. VAC Environment Studies is registered automatically —
+          no course codes in the Excel file.
+        </p>
+
+        <label className="mt-4 block text-sm font-medium">
+          Academic Year
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedAcademicYearId}
+            onChange={(event) => onSelectAcademicYear(event.target.value)}
+            disabled={loading}
+          >
+            <option value="">Any / default rules</option>
+            {academicYears.map((year) => (
+              <option key={year.id} value={year.id}>
+                {year.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-4 block text-sm font-medium">
+          Programme
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedProgramme || activeProgramme?.code || ''}
+            onChange={(event) => onSelectProgramme(event.target.value)}
+            disabled={loading}
+          >
+            {programmes.map((programme) => (
+              <option key={programme.code} value={programme.code}>
+                {programme.code} — {programme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="mt-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+          <p>
+            <span className="text-muted-foreground">Semester:</span> 1
+          </p>
+          <p>
+            <span className="text-muted-foreground">Curriculum:</span>{' '}
+            {activeProgramme?.curriculumLabel ?? curriculum?.curriculumLabel ?? 'FYUGP'}
+          </p>
+          <p>
+            <span className="text-muted-foreground">Auto VAC:</span>{' '}
+            {curriculum?.vacPaper.title ?? eligibleMinors?.vacPaper.title ?? 'Environment Studies'}
+          </p>
+        </div>
+
+        <label className="mt-4 block text-sm font-medium">
+          Preview Major Department
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={previewMajor}
+            onChange={(event) => onSelectPreviewMajor(event.target.value)}
+            disabled={loading || !majorOptions.length}
+          >
+            <option value="">Select to preview resolved papers</option>
+            {majorOptions.map((major) => (
+              <option key={major.departmentName} value={major.departmentName}>
+                {major.departmentName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {eligibleMinors && previewMajor ? (
+          <div className="mt-4 space-y-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-sm">
+            <p className="font-medium text-primary">{eligibleMinors.majorDepartment}</p>
+            <p className="text-xs text-muted-foreground">
+              Major paper: {eligibleMinors.majorPaper.code}
+            </p>
+            <p className="text-xs">
+              Allowed minors: {eligibleMinors.eligibleMinors.join(', ') || 'None configured'}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onDownload} disabled={downloading || loading}>
+            {downloading ? 'Generating…' : 'Generate Import Template'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Sem5TemplateDialog({
+  programmes,
+  academicYears,
+  curriculum,
+  eligibleMinors,
+  loading,
+  downloading,
+  selectedProgramme,
+  selectedAcademicYearId,
+  previewMajor,
+  onSelectProgramme,
+  onSelectAcademicYear,
+  onSelectPreviewMajor,
+  onClose,
+  onDownload,
+}: {
+  programmes: Sem5ImportProgrammeOption[];
+  academicYears: { id: string; name: string }[];
+  curriculum?: {
+    curriculumLabel: string;
+    majorDepartments: { departmentName: string }[];
+  };
+  eligibleMinors?: {
+    majorDepartment: string;
+    majorPapers: { code: string; title: string }[];
+    internship: { code: string; title: string };
+    eligibleMinors: string[];
+  };
+  loading: boolean;
+  downloading: boolean;
+  selectedProgramme: string;
+  selectedAcademicYearId: string;
+  previewMajor: string;
+  onSelectProgramme: (value: string) => void;
+  onSelectAcademicYear: (value: string) => void;
+  onSelectPreviewMajor: (value: string) => void;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  const activeProgramme =
+    programmes.find((programme) => programme.code === selectedProgramme) ?? programmes[0];
+  const majorOptions = curriculum?.majorDepartments ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <section className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-border/60 bg-card p-5 shadow-2xl">
+        <h2 className="text-lg font-semibold">Download Semester 5 Template</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Select academic year, programme, and curriculum. The Excel template uses Major Department,
+          Minor Department, and Internship Area only — no course codes.
+        </p>
+
+        <label className="mt-4 block text-sm font-medium">
+          Academic Year
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedAcademicYearId}
+            onChange={(event) => onSelectAcademicYear(event.target.value)}
+            disabled={loading}
+          >
+            <option value="">Any / default rules</option>
+            {academicYears.map((year) => (
+              <option key={year.id} value={year.id}>
+                {year.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-4 block text-sm font-medium">
+          Programme
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedProgramme || activeProgramme?.code || ''}
+            onChange={(event) => onSelectProgramme(event.target.value)}
+            disabled={loading}
+          >
+            {programmes.map((programme) => (
+              <option key={programme.code} value={programme.code}>
+                {programme.code} — {programme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="mt-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+          <p>
+            <span className="text-muted-foreground">Semester:</span> 5
+          </p>
+          <p>
+            <span className="text-muted-foreground">Curriculum:</span>{' '}
+            {activeProgramme?.curriculumLabel ?? curriculum?.curriculumLabel ?? 'FYUGP'}
+          </p>
+        </div>
+
+        <label className="mt-4 block text-sm font-medium">
+          Preview Major Department
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={previewMajor}
+            onChange={(event) => onSelectPreviewMajor(event.target.value)}
+            disabled={loading || !majorOptions.length}
+          >
+            <option value="">Select to preview resolved papers</option>
+            {majorOptions.map((major) => (
+              <option key={major.departmentName} value={major.departmentName}>
+                {major.departmentName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {eligibleMinors && previewMajor ? (
+          <div className="mt-4 space-y-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-sm">
+            <p className="font-medium text-primary">{eligibleMinors.majorDepartment}</p>
+            <p className="text-xs text-muted-foreground">
+              Major papers: {eligibleMinors.majorPapers.map((paper) => paper.code).join(', ')}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Internship: {eligibleMinors.internship.code}
+            </p>
+            <p className="text-xs">
+              Allowed minors: {eligibleMinors.eligibleMinors.join(', ') || 'None configured'}
+            </p>
+          </div>
+        ) : null}
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          Use CREATE mode for new admissions or MERGE mode to register Sem 5 subjects for existing
+          students.
+        </p>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onDownload} disabled={downloading || loading}>
+            {downloading ? 'Generating…' : 'Generate Import Template'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function Sem3TemplateDialog({
   programmes,
   loading,
@@ -1254,22 +1821,7 @@ function PreviewTable({ rows, loading }: { rows: StudentImportPreviewRow[]; load
               <td className="px-3 py-2 font-mono text-xs">{row.displayCode ?? '—'}</td>
               <td className="px-3 py-2">{row.displayTitle ?? '—'}</td>
               <td className="px-3 py-2">
-                <div className="grid min-w-[360px] grid-cols-2 gap-1 text-[11px]">
-                  {(['major', 'minor', 'mdc', 'aec', 'sec', 'vac'] as const).map((key) => (
-                    <span
-                      key={key}
-                      className={cn(
-                        'rounded-full px-2 py-1',
-                        row.academicMapping?.[key]?.resolvedLabel
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground',
-                      )}
-                      title={row.academicMapping?.[key]?.input}
-                    >
-                      {key.toUpperCase()} → {formatAcademicMapping(row.academicMapping?.[key])}
-                    </span>
-                  ))}
-                </div>
+                <Sem5AcademicMappingPreview mapping={row.academicMapping} />
               </td>
               <td className="px-3 py-2">
                 {row.status === 'VALID' ? (
@@ -1294,6 +1846,107 @@ function PreviewTable({ rows, loading }: { rows: StudentImportPreviewRow[]; load
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function Sem5AcademicMappingPreview({
+  mapping,
+}: {
+  mapping?: StudentImportPreviewRow['academicMapping'];
+}) {
+  const isSem5 = Boolean(mapping?.major3 || mapping?.internship);
+  const isSem1 = Boolean(
+    !isSem5 && mapping?.vac && mapping?.mdc && mapping?.aec && mapping?.sec && !mapping?.vtc,
+  );
+
+  if (isSem1) {
+    const line = (label: string, code?: string, input?: string) => (
+      <p>
+        <span className="font-medium">{input ?? label}</span>
+        {code ? ` → ${code}` : null}
+      </p>
+    );
+    return (
+      <div className="min-w-[360px] space-y-1 text-[11px]">
+        {line(
+          'Major',
+          mapping?.major?.courseCode,
+          mapping?.major?.input ?? mapping?.major?.resolvedLabel?.split(' - ').pop(),
+        )}
+        {line(
+          'Minor',
+          mapping?.minor?.courseCode,
+          mapping?.minor?.input ?? mapping?.minor?.resolvedLabel?.split(' - ').pop(),
+        )}
+        {line(
+          'MDC',
+          mapping?.mdc?.courseCode,
+          mapping?.mdc?.input ?? mapping?.mdc?.resolvedLabel?.split(' - ').pop(),
+        )}
+        {line(
+          'AEC',
+          mapping?.aec?.courseCode,
+          mapping?.aec?.input ?? mapping?.aec?.resolvedLabel?.split(' - ').pop(),
+        )}
+        {line(
+          'SEC',
+          mapping?.sec?.courseCode,
+          mapping?.sec?.input ?? mapping?.sec?.resolvedLabel?.split(' - ').pop(),
+        )}
+        {line('Environment Studies', mapping?.vac?.courseCode, 'VAC (auto)')}
+      </div>
+    );
+  }
+
+  if (isSem5) {
+    const majorLabel =
+      mapping?.major?.input ?? mapping?.major?.resolvedLabel?.split(' - ').pop() ?? 'Major';
+    const minorLabel =
+      mapping?.minor?.input ?? mapping?.minor?.resolvedLabel?.split(' - ').pop() ?? 'Minor';
+    const majorCodes = [mapping?.major, mapping?.major2, mapping?.major3]
+      .filter(Boolean)
+      .map((entry) => entry?.courseCode)
+      .filter(Boolean)
+      .join(', ');
+    return (
+      <div className="min-w-[360px] space-y-1 text-[11px]">
+        <p>
+          <span className="font-medium">{majorLabel}</span>
+          {majorCodes ? ` → ${majorCodes}` : null}
+        </p>
+        <p>
+          <span className="font-medium">{minorLabel}</span>
+          {mapping?.minor?.courseCode ? ` → ${mapping.minor.courseCode}` : null}
+        </p>
+        <p>
+          <span className="font-medium">
+            {mapping?.internshipArea?.resolvedLabel ??
+              mapping?.internshipArea?.input ??
+              'Internship'}
+          </span>
+          {mapping?.internship?.courseCode ? ` → ${mapping.internship.courseCode}` : null}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid min-w-[360px] grid-cols-2 gap-1 text-[11px]">
+      {(['major', 'minor', 'mdc', 'aec', 'sec', 'vac', 'vtc'] as const).map((key) => (
+        <span
+          key={key}
+          className={cn(
+            'rounded-full px-2 py-1',
+            mapping?.[key]?.resolvedLabel
+              ? 'bg-primary/10 text-primary'
+              : 'bg-muted text-muted-foreground',
+          )}
+          title={mapping?.[key]?.input}
+        >
+          {key.toUpperCase()} → {formatAcademicMapping(mapping?.[key])}
+        </span>
+      ))}
     </div>
   );
 }

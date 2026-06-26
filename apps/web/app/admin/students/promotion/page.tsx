@@ -14,6 +14,7 @@ import {
   fetchPromotionLogs,
   previewPromotion,
 } from '@/services/academic-lifecycle';
+import type { PromotionPreviewResponse } from '@/types/academic-lifecycle';
 import { fetchInstitutions } from '@/services/organization';
 import { cn } from '@/utils/cn';
 
@@ -86,9 +87,7 @@ function StudentPromotionPageContent() {
 
   if (!session) return null;
 
-  const preview = promotionPreview.data as
-    | { eligibleCount?: number; detainCount?: number; batches?: unknown[] }
-    | undefined;
+  const preview = promotionPreview.data as PromotionPreviewResponse | undefined;
 
   return (
     <DashboardShell role="admin" title="Promotion">
@@ -151,17 +150,17 @@ function StudentPromotionPageContent() {
             <CardContent className="grid gap-3 text-sm md:grid-cols-3">
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
                 <p className="text-muted-foreground">Eligible to promote</p>
-                <p className="text-lg font-semibold">{preview.eligibleCount ?? '—'}</p>
+                <p className="text-lg font-semibold">{preview.counts?.eligible ?? '—'}</p>
               </div>
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-                <p className="text-muted-foreground">To detain</p>
-                <p className="text-lg font-semibold">{preview.detainCount ?? '—'}</p>
-              </div>
-              <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-                <p className="text-muted-foreground">Batches affected</p>
+                <p className="text-muted-foreground">Blocked</p>
                 <p className="text-lg font-semibold">
-                  {Array.isArray(preview.batches) ? preview.batches.length : '—'}
+                  {(preview.counts?.detained ?? 0) + (preview.counts?.failed ?? 0) || '—'}
                 </p>
+              </div>
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                <p className="text-muted-foreground">Total candidates</p>
+                <p className="text-lg font-semibold">{preview.counts?.total ?? '—'}</p>
               </div>
               <Link href="/admin/academic-lifecycle" className="md:col-span-3">
                 <Button type="button" size="sm" variant="outline">

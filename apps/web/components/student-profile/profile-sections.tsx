@@ -707,7 +707,7 @@ function subjectChangeCategoriesForSemester(semesterSequence: number): readonly 
     return ['MAJOR', 'VTC'];
   }
   if (semesterSequence === 5) {
-    return ['MAJOR', 'MINOR'];
+    return ['MAJOR', 'MINOR', 'INTERNSHIP'];
   }
   return ['MAJOR'];
 }

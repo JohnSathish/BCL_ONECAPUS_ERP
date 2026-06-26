@@ -377,55 +377,27 @@ export type StudentImportPreviewRow = {
   errors: string[];
   warnings?: string[];
   academicMapping?: {
-    major?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
-    minor?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
-    mdc?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
-    aec?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
-    sec?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
-    vac?: {
-      resolvedLabel?: string;
-      input?: string;
-      category?: string;
-      courseCode?: string;
-      resolutionMode?: string;
-      sectionCode?: string;
-    };
+    major?: AcademicMappingField;
+    major2?: AcademicMappingField;
+    major3?: AcademicMappingField;
+    minor?: AcademicMappingField;
+    internship?: AcademicMappingField;
+    internshipArea?: { input?: string; slug?: string; resolvedLabel?: string };
+    mdc?: AcademicMappingField;
+    aec?: AcademicMappingField;
+    sec?: AcademicMappingField;
+    vac?: AcademicMappingField;
+    vtc?: AcademicMappingField;
   };
+};
+
+type AcademicMappingField = {
+  resolvedLabel?: string;
+  input?: string;
+  category?: string;
+  courseCode?: string;
+  resolutionMode?: string;
+  sectionCode?: string;
 };
 
 export type StudentImportPreview = {
@@ -450,12 +422,72 @@ export async function downloadStudentImportTemplate(mode: 'blank' | 'prefilled' 
   return data as Blob;
 }
 
-export async function downloadSem1AdmissionTemplate() {
+export async function downloadSem1AdmissionTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+}) {
   const { data } = await api.get('/v1/students/import/template', {
-    params: { variant: 'sem1-admission' },
+    params: { variant: 'sem1-admission', ...params },
     responseType: 'blob',
   });
   return data as Blob;
+}
+
+export type Sem1ImportProgrammeOption = {
+  programVersionId: string;
+  code: string;
+  name: string;
+  curriculumLabel: string;
+};
+
+export type Sem1ImportCurriculum = {
+  programVersionId: string;
+  programCode: string;
+  programName: string;
+  curriculumLabel: string;
+  semesterSequence: number;
+  majorDepartments: { departmentName: string; paper: { code: string; title: string } }[];
+  mdcDepartments: { code: string; title: string }[];
+  aecPapers: { code: string; title: string }[];
+  secPapers: { code: string; title: string }[];
+  vacPaper: { code: string; title: string };
+  minorByMajor: Record<string, string[]>;
+};
+
+export type Sem1EligibleMinorsPreview = {
+  majorDepartment: string;
+  majorPaper: { code: string; title: string };
+  vacPaper: { code: string; title: string };
+  eligibleMinors: string[];
+};
+
+export async function fetchSem1ImportProgrammes() {
+  const { data } = await api.get('/v1/students/import/sem1-curriculum/programmes');
+  return data as Sem1ImportProgrammeOption[];
+}
+
+export async function fetchSem1ImportCurriculum(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/sem1-curriculum', { params });
+  return data as Sem1ImportCurriculum;
+}
+
+export async function fetchSem1EligibleMinors(params: {
+  programVersionId: string;
+  majorDepartment: string;
+  academicYearId?: string;
+  semesterSequence?: number;
+}) {
+  const { data } = await api.get('/v1/students/import/sem1-curriculum/eligible-minors', {
+    params,
+  });
+  return data as Sem1EligibleMinorsPreview;
 }
 
 export async function downloadSem3AdmissionTemplate(params?: {
@@ -479,6 +511,77 @@ export type Sem3ImportProgrammeOption = {
 export async function fetchSem3ImportProgrammes() {
   const { data } = await api.get('/v1/students/import/sem3-curriculum/programmes');
   return data as Sem3ImportProgrammeOption[];
+}
+
+export async function downloadSem5AdmissionTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/template', {
+    params: { variant: 'sem5-admission', ...params },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export type Sem5ImportProgrammeOption = {
+  programVersionId: string;
+  code: string;
+  name: string;
+  curriculumLabel: string;
+};
+
+export type Sem5ImportCurriculum = {
+  programVersionId: string;
+  programCode: string;
+  programName: string;
+  curriculumLabel: string;
+  semesterSequence: number;
+  majorDepartments: {
+    departmentName: string;
+    paper1: { code: string; title: string };
+    paper2: { code: string; title: string };
+    paper3: { code: string; title: string };
+    internship: { code: string; title: string };
+  }[];
+  internshipAreas: string[];
+  minorByMajor: Record<string, string[]>;
+};
+
+export type Sem5EligibleMinorsPreview = {
+  majorDepartment: string;
+  majorPapers: { code: string; title: string }[];
+  internship: { code: string; title: string };
+  eligibleMinors: string[];
+};
+
+export async function fetchSem5ImportProgrammes() {
+  const { data } = await api.get('/v1/students/import/sem5-curriculum/programmes');
+  return data as Sem5ImportProgrammeOption[];
+}
+
+export async function fetchSem5ImportCurriculum(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/sem5-curriculum', { params });
+  return data as Sem5ImportCurriculum;
+}
+
+export async function fetchSem5EligibleMinors(params: {
+  programVersionId: string;
+  majorDepartment: string;
+  academicYearId?: string;
+  semesterSequence?: number;
+}) {
+  const { data } = await api.get('/v1/students/import/sem5-curriculum/eligible-minors', {
+    params,
+  });
+  return data as Sem5EligibleMinorsPreview;
 }
 
 export type MigrationStepStatus = 'complete' | 'partial' | 'pending';

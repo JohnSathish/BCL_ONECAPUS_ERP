@@ -31,6 +31,11 @@ import {
 import { StudentMajorMinorTrackService } from './student-major-minor-track.service';
 import { StudentVtcTrackService } from './student-vtc-track.service';
 import { CourseEligibilityService } from './course-eligibility.service';
+import {
+  buildPriorLineContextMap,
+  priorLineSlotKey,
+  resolveSuccessorOfferingId,
+} from '../domain/promotion-line-resolver';
 
 export type {
   RegistrationWorkflowSettings,
@@ -657,25 +662,34 @@ export class AdminRegistrationService {
         tenantId,
         studentId: reg.studentId,
         semesterSequence: reg.semesterSequence - 1,
-        status: 'completed',
+        status: { in: ['completed', 'archived'] },
       },
-      include: { lines: { where: { status: 'confirmed' } } },
+      include: {
+        lines: {
+          where: { status: 'confirmed' },
+          include: {
+            offering: {
+              include: {
+                course: { include: { department: true } },
+              },
+            },
+          },
+        },
+      },
     });
-    const priorByCategoryAndPaper = new Map<string, string>();
-    const priorMajorLines = (priorReg?.lines ?? []).filter(
-      (l) => l.category === 'MAJOR',
+    const priorLineContext = await buildPriorLineContextMap(
+      this.prisma,
+      (priorReg?.lines ?? []).map((line) => ({
+        category: line.category,
+        offeringId: line.offeringId,
+        offering: line.offering
+          ? {
+              majorPaperIndex: line.offering.majorPaperIndex,
+              course: line.offering.course,
+            }
+          : null,
+      })),
     );
-    for (let i = 0; i < priorMajorLines.length; i++) {
-      priorByCategoryAndPaper.set(
-        `MAJOR-${i + 1}`,
-        priorMajorLines[i]!.offeringId,
-      );
-    }
-    for (const line of priorReg?.lines ?? []) {
-      if (line.category !== 'MAJOR') {
-        priorByCategoryAndPaper.set(line.category, line.offeringId);
-      }
-    }
 
     const majorChoice = student.programChoices.find(
       (c) => c.choiceType === 'MAJOR',
@@ -749,6 +763,36 @@ export class AdminRegistrationService {
       })[0];
     };
 
+    const narrowPoolByPriorContinuity = async (
+      pool: typeof eligibleSections,
+      category: string,
+      continuityRule: string | undefined,
+      slotKey: string,
+      majorPaperIndex?: number,
+      subjectSlug?: string | null,
+    ) => {
+      const priorLine = priorLineContext.get(slotKey);
+      const shouldMap =
+        priorLine &&
+        (continuityRule === 'LOCK' ||
+          continuityRule === 'TRACK_CONTINUE' ||
+          (!continuityRule && priorLine.category === category));
+      if (!shouldMap || continuityRule === 'TRACK_CONTINUE') {
+        return pool;
+      }
+
+      const successorId = await resolveSuccessorOfferingId(this.prisma, {
+        tenantId,
+        programVersionId,
+        toSequence: reg.semesterSequence,
+        priorLine,
+        subjectSlug,
+      });
+      if (!successorId) return pool;
+      const narrowed = pool.filter((s) => s.courseOfferingId === successorId);
+      return narrowed.length > 0 ? narrowed : pool;
+    };
+
     for (const [category, count] of Object.entries(categoryCounts)) {
       if (skipCategories.has(category)) continue;
       const mandatory = mandatoryFlagForCategory(category, rule.lines);
@@ -807,14 +851,14 @@ export class AdminRegistrationService {
           let slotPool = uniqueSections;
 
           if (continuityRules[category] === 'LOCK') {
-            const priorOfferingId = priorByCategoryAndPaper.get(
+            slotPool = await narrowPoolByPriorContinuity(
+              slotPool,
+              category,
+              continuityRules[category],
               `MAJOR-${paperIndex + 1}`,
+              paperIndex + 1,
+              majorChoice?.subjectSlug,
             );
-            if (priorOfferingId) {
-              slotPool = slotPool.filter(
-                (s) => s.courseOfferingId === priorOfferingId,
-              );
-            }
           }
 
           const offeringRows = slotPool.map((s) => ({
@@ -882,15 +926,25 @@ export class AdminRegistrationService {
           );
         }
 
-        if (continuityRules[category] === 'LOCK') {
-          const priorOfferingId =
-            priorByCategoryAndPaper.get(
-              majorPaperIndex != null ? `MAJOR-${majorPaperIndex}` : category,
-            ) ?? priorByCategoryAndPaper.get(category);
-          if (priorOfferingId) {
-            pool = pool.filter((s) => s.courseOfferingId === priorOfferingId);
-          }
-        }
+        const slotKey =
+          majorPaperIndex != null
+            ? `MAJOR-${majorPaperIndex}`
+            : priorLineSlotKey(category, majorPaperIndex);
+        const subjectSlugForSlot =
+          category === 'MAJOR'
+            ? majorChoice?.subjectSlug
+            : category === 'MINOR'
+              ? minorChoice?.subjectSlug
+              : null;
+
+        pool = await narrowPoolByPriorContinuity(
+          pool,
+          category,
+          continuityRules[category],
+          slotKey,
+          majorPaperIndex,
+          subjectSlugForSlot,
+        );
 
         if (category === 'MAJOR' && majorChoice) {
           const majorPool = pool.filter((s) =>

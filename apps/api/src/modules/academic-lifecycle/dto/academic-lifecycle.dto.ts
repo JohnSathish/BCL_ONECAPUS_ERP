@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -104,6 +105,15 @@ export class PromotionPreviewQueryDto {
   @IsUUID()
   admissionBatchId?: string;
 }
+
+export class PromotionMappingPreviewQueryDto extends PromotionPreviewQueryDto {
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+}
+
+export class PromotionValidateQueryDto extends PromotionPreviewQueryDto {}
 
 export class CreatePromotionRunDto {
   @IsUUID()

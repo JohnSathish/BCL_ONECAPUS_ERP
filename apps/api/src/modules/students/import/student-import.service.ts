@@ -23,7 +23,9 @@ import {
   StudentImportHandler,
   type NormalizedStudentImportRow,
 } from './student-import.handler';
+import { Sem1ImportCurriculumService } from './sem1-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
+import { Sem5ImportCurriculumService } from './sem5-import-curriculum.service';
 
 @Injectable()
 export class StudentImportService {
@@ -36,15 +38,27 @@ export class StudentImportService {
 
     private readonly handler: StudentImportHandler,
 
+    private readonly sem1Curriculum: Sem1ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
+    private readonly sem5Curriculum: Sem5ImportCurriculumService,
   ) {}
 
   buildTemplate(options?: { mode?: 'blank' | 'prefilled'; tenantId?: string }) {
     return this.handler.buildTemplateWorkbook(options);
   }
 
-  buildSem1AdmissionTemplate() {
-    return this.handler.buildSem1AdmissionTemplateWorkbook();
+  buildSem1AdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+    academicYearId?: string;
+  }) {
+    return this.handler.buildSem1AdmissionTemplateWorkbook(options);
+  }
+
+  buildSem1LegacyFullAdmissionTemplate() {
+    return this.handler.buildSem1LegacyFullAdmissionTemplateWorkbook();
   }
 
   buildSem3AdmissionTemplate(options: {
@@ -56,8 +70,26 @@ export class StudentImportService {
     return this.handler.buildSem3AdmissionTemplateWorkbook(options);
   }
 
+  buildSem5AdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+    academicYearId?: string;
+  }) {
+    return this.handler.buildSem5AdmissionTemplateWorkbook(options);
+  }
+
   listSem3ImportProgrammes(tenantId: string) {
     return this.sem3Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  listSem1ImportProgrammes(tenantId: string) {
+    return this.sem1Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  listSem5ImportProgrammes(tenantId: string) {
+    return this.sem5Curriculum.listPublishedProgrammes(tenantId);
   }
 
   getSem3ImportCurriculum(
@@ -69,6 +101,54 @@ export class StudentImportService {
     },
   ) {
     return this.sem3Curriculum.buildCatalog(tenantId, input);
+  }
+
+  getSem1ImportCurriculum(
+    tenantId: string,
+    input: {
+      programme?: string;
+      programVersionId?: string;
+      semesterSequence?: number;
+      academicYearId?: string;
+    },
+  ) {
+    return this.sem1Curriculum.buildCatalog(tenantId, input);
+  }
+
+  getSem1EligibleMinors(
+    tenantId: string,
+    input: {
+      programVersionId: string;
+      majorDepartment: string;
+      academicYearId?: string;
+      semesterSequence?: number;
+    },
+  ) {
+    return this.sem1Curriculum.listEligibleMinorsForMajor(tenantId, input);
+  }
+
+  getSem5ImportCurriculum(
+    tenantId: string,
+    input: {
+      programme?: string;
+      programVersionId?: string;
+      semesterSequence?: number;
+      academicYearId?: string;
+    },
+  ) {
+    return this.sem5Curriculum.buildCatalog(tenantId, input);
+  }
+
+  getSem5EligibleMinors(
+    tenantId: string,
+    input: {
+      programVersionId: string;
+      majorDepartment: string;
+      academicYearId?: string;
+      semesterSequence?: number;
+    },
+  ) {
+    return this.sem5Curriculum.listEligibleMinorsForMajor(tenantId, input);
   }
 
   async validateUpload(

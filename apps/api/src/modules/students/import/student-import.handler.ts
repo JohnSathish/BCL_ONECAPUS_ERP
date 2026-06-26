@@ -23,6 +23,13 @@ import {
   SEM1_ADMISSION_TEMPLATE_HELPERS,
 } from '../migration/sem1-admission-template';
 import {
+  SEM1_SUBJECT_IMPORT_HEADERS,
+  SEM1_SUBJECT_IMPORT_HELPERS,
+  SEM1_SUBJECT_IMPORT_SAMPLE_ROW,
+  SEM1_HIDDEN_SHEETS,
+  SEM1_STRUCTURE_NOTES,
+} from '../migration/sem1-subject-import-template';
+import {
   SEM3_ADMISSION_SAMPLE_ROW,
   SEM3_ADMISSION_TEMPLATE_HEADERS,
   SEM3_ADMISSION_TEMPLATE_HELPERS,
@@ -30,9 +37,24 @@ import {
   SEM3_STRUCTURE_NOTES,
 } from '../migration/sem3-admission-template';
 import {
+  SEM5_ADMISSION_SAMPLE_ROW,
+  SEM5_ADMISSION_TEMPLATE_HEADERS,
+  SEM5_ADMISSION_TEMPLATE_HELPERS,
+  SEM5_HIDDEN_SHEETS,
+  SEM5_STRUCTURE_NOTES,
+} from '../migration/sem5-admission-template';
+import {
+  Sem1ImportCurriculumService,
+  type Sem1ImportCurriculumCatalog,
+} from './sem1-import-curriculum.service';
+import {
   Sem3ImportCurriculumService,
   type Sem3ImportCurriculumCatalog,
 } from './sem3-import-curriculum.service';
+import {
+  Sem5ImportCurriculumService,
+  type Sem5ImportCurriculumCatalog,
+} from './sem5-import-curriculum.service';
 
 export type NormalizedStudentImportRow = {
   email: string;
@@ -86,7 +108,15 @@ type ExistingStudentRef = {
   masterProfile: { nationalId: string | null } | null;
 };
 
-type FyugpCategory = 'MAJOR' | 'MINOR' | 'MDC' | 'AEC' | 'SEC' | 'VAC' | 'VTC';
+type FyugpCategory =
+  | 'MAJOR'
+  | 'MINOR'
+  | 'MDC'
+  | 'AEC'
+  | 'SEC'
+  | 'VAC'
+  | 'VTC'
+  | 'INTERNSHIP';
 
 type FyugpResolvedSelection = {
   category: FyugpCategory;
@@ -106,7 +136,10 @@ type FyugpResolvedSelection = {
 type FyugpAcademicMapping = {
   major?: FyugpResolvedSelection;
   major2?: FyugpResolvedSelection;
+  major3?: FyugpResolvedSelection;
   minor?: FyugpResolvedSelection;
+  internship?: FyugpResolvedSelection;
+  internshipArea?: { input: string; slug: string; resolvedLabel?: string };
   mdc?: FyugpResolvedSelection;
   aec?: FyugpResolvedSelection;
   sec?: FyugpResolvedSelection;
@@ -213,6 +246,7 @@ const FYUGP_CATEGORY_LABELS: Record<FyugpCategory, string> = {
   SEC: 'SEC',
   VAC: 'VAC',
   VTC: 'VTC',
+  INTERNSHIP: 'Internship',
 };
 
 const SINGLE_SLOT_REGISTRATION_CATEGORIES = new Set<FyugpCategory>([
@@ -222,6 +256,7 @@ const SINGLE_SLOT_REGISTRATION_CATEGORIES = new Set<FyugpCategory>([
   'SEC',
   'VAC',
   'VTC',
+  'INTERNSHIP',
 ]);
 
 type FyugpResolutionContext = {
@@ -307,7 +342,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly academicEngine: AcademicEngineService,
     private readonly semesterResolver: StudentSemesterResolverService,
     private readonly abcService: StudentAbcService,
+    private readonly sem1Curriculum: Sem1ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
+    private readonly sem5Curriculum: Sem5ImportCurriculumService,
   ) {}
   async parseAndValidate(
     tenantId: string,
@@ -505,7 +542,15 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const fileEmails = new Set<string>();
     const fileAadhaars = new Set<string>();
     const fileRfids = new Set<string>();
+    const sem1Catalogs = await this.preloadSem1Catalogs(
+      tenantId,
+      programVersions.map((version) => version.id),
+    );
     const sem3Catalogs = await this.preloadSem3Catalogs(
+      tenantId,
+      programVersions.map((version) => version.id),
+    );
+    const sem5Catalogs = await this.preloadSem5Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
     );
@@ -533,7 +578,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         fileRfids,
         categoryByCode,
         religionByKey,
+        sem1Catalogs,
         sem3Catalogs,
+        sem5Catalogs,
         fyugp: {
           subjectMasters,
           offerings: courseOfferings,
@@ -587,7 +634,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fileRfids: Set<string>;
       categoryByCode: Map<string, string>;
       religionByKey: Map<string, string>;
+      sem1Catalogs: Map<string, Sem1ImportCurriculumCatalog>;
       sem3Catalogs: Map<string, Sem3ImportCurriculumCatalog>;
+      sem5Catalogs: Map<string, Sem5ImportCurriculumCatalog>;
       fyugp: FyugpResolutionContext;
     },
   ): ImportRowValidationResult {
@@ -844,7 +893,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fyugp: ctx.fyugp,
       errors,
       warnings,
+      sem1Catalogs: ctx.sem1Catalogs,
       sem3Catalogs: ctx.sem3Catalogs,
+      sem5Catalogs: ctx.sem5Catalogs,
     });
     const majorSubjectSlug =
       fyugpMapping.major?.subjectSlug ??
@@ -965,13 +1016,23 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       fyugp: FyugpResolutionContext;
       errors: string[];
       warnings: string[];
+      sem1Catalogs?: Map<string, Sem1ImportCurriculumCatalog>;
       sem3Catalogs?: Map<string, Sem3ImportCurriculumCatalog>;
+      sem5Catalogs?: Map<string, Sem5ImportCurriculumCatalog>;
     },
   ): FyugpAcademicMapping {
     const mapping: FyugpAcademicMapping = {
       tutorialGroup: this.readText(raw, 'tutorialGroup'),
       labBatch: this.readText(raw, 'labBatch'),
     };
+    const sem1Resolved = this.resolveSem1FriendlySelections(raw, ctx, mapping);
+    if (sem1Resolved) {
+      return sem1Resolved;
+    }
+    const sem5Resolved = this.resolveSem5FriendlySelections(raw, ctx, mapping);
+    if (sem5Resolved) {
+      return sem5Resolved;
+    }
     const sem3Resolved = this.resolveSem3FriendlySelections(raw, ctx, mapping);
     if (sem3Resolved) {
       return sem3Resolved;
@@ -1097,6 +1158,467 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     return mapping;
+  }
+
+  private resolveSem1FriendlySelections(
+    raw: Record<string, unknown>,
+    ctx: {
+      programVersionId?: string;
+      semesterSequence?: number;
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings: string[];
+      sem1Catalogs?: Map<string, Sem1ImportCurriculumCatalog>;
+    },
+    mapping: FyugpAcademicMapping,
+  ): FyugpAcademicMapping | undefined {
+    const majorDepartment = this.firstText(raw, [
+      'majorDepartment',
+      'majorDepartmentName',
+    ]);
+    const minorDepartment = this.firstText(raw, [
+      'minorDepartment',
+      'minorDepartmentName',
+    ]);
+    const mdcDepartment = this.firstText(raw, [
+      'mdcDepartment',
+      'mdcPaper',
+      'mdcSubject',
+      'mdcChoice',
+    ]);
+    const aecPaper = this.firstText(raw, ['aecPaper', 'aecSubject', 'aec']);
+    const secPaper = this.firstText(raw, [
+      'secPaper',
+      'secSubject',
+      'sec',
+      'skillPaper',
+      'skillEnhancementCourse',
+    ]);
+    const vtcPaper = this.firstText(raw, ['vtcPaper', 'vtcSubject', 'vtc']);
+    const internshipArea = this.firstText(raw, [
+      'internshipArea',
+      'internship',
+    ]);
+
+    const usesSem1Template = Boolean(
+      ctx.semesterSequence === 1 &&
+      (majorDepartment ||
+        minorDepartment ||
+        mdcDepartment ||
+        aecPaper ||
+        secPaper),
+    );
+    if (!usesSem1Template) return undefined;
+
+    if (vtcPaper || internshipArea) {
+      ctx.errors.push(
+        'Semester 1 import cannot include VTC or Internship columns.',
+      );
+      return mapping;
+    }
+
+    if (ctx.semesterSequence !== 1) {
+      ctx.errors.push(
+        'Semester 1 paper columns require Current Semester = 1 on this row.',
+      );
+      return mapping;
+    }
+    if (!ctx.programVersionId) {
+      ctx.errors.push(
+        'Programme is required to resolve Semester 1 paper selections.',
+      );
+      return mapping;
+    }
+
+    const catalog = ctx.sem1Catalogs?.get(ctx.programVersionId);
+    if (!catalog) {
+      ctx.errors.push(
+        'Semester 1 curriculum is not configured for the selected programme.',
+      );
+      return mapping;
+    }
+
+    const defaultSectionCode =
+      this.firstText(raw, ['sectionCode']) ??
+      mapping.tutorialGroup ??
+      undefined;
+    const sectionPreferences = this.buildSectionPreferences(
+      raw,
+      defaultSectionCode,
+    );
+    const subjectCtx = {
+      ...ctx,
+      sectionPreferences,
+      defaultSectionCode,
+    };
+
+    if (!majorDepartment) {
+      ctx.errors.push('Major Department is required for Semester 1 import.');
+    } else {
+      const department = this.sem1Curriculum.resolveMajorDepartment(
+        catalog,
+        majorDepartment,
+      );
+      if (!department) {
+        ctx.errors.push(
+          `Unknown Major Department "${majorDepartment}" for programme ${catalog.programCode}. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.major = this.resolveSem3OfferingSelection(
+          department.paper,
+          'MAJOR',
+          subjectCtx,
+        );
+        if (mapping.major && !mapping.major.subjectSlug) {
+          mapping.major.subjectSlug = department.subjectSlug;
+        }
+
+        if (!minorDepartment) {
+          ctx.errors.push(
+            'Minor Department is required for Semester 1 import.',
+          );
+        } else {
+          const minorOption = this.sem1Curriculum.resolveMinorDepartment(
+            catalog,
+            department.departmentName,
+            minorDepartment,
+          );
+          if (!minorOption) {
+            ctx.errors.push(
+              `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
+            );
+          } else {
+            mapping.minor = this.resolveSem3OfferingSelection(
+              minorOption.paper,
+              'MINOR',
+              subjectCtx,
+            );
+            if (mapping.minor && !mapping.minor.subjectSlug) {
+              mapping.minor.subjectSlug = minorOption.subjectSlug;
+            }
+          }
+        }
+      }
+    }
+
+    if (!mdcDepartment) {
+      ctx.errors.push('MDC Department is required for Semester 1 import.');
+    } else {
+      const resolved = this.sem1Curriculum.resolveCategoryPaper(
+        catalog.mdcDepartments,
+        mdcDepartment,
+        'MDC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown MDC Department "${mdcDepartment}" for Semester 1. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.mdc = this.resolveSem3OfferingSelection(
+          resolved,
+          'MDC',
+          subjectCtx,
+        );
+      }
+    }
+
+    if (!aecPaper) {
+      ctx.errors.push('AEC Paper is required for Semester 1 import.');
+    } else {
+      const resolved = this.sem1Curriculum.resolveCategoryPaper(
+        catalog.aecPapers,
+        aecPaper,
+        'AEC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown AEC Paper "${aecPaper}" for Semester 1. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.aec = this.resolveSem3OfferingSelection(
+          resolved,
+          'AEC',
+          subjectCtx,
+        );
+      }
+    }
+
+    if (!secPaper) {
+      ctx.errors.push(
+        'Skill Enhancement Course is required for Semester 1 import.',
+      );
+    } else {
+      const resolved = this.sem1Curriculum.resolveCategoryPaper(
+        catalog.secPapers,
+        secPaper,
+        'SEC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown Skill Enhancement Course "${secPaper}" for Semester 1. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.sec = this.resolveSem3OfferingSelection(
+          resolved,
+          'SEC',
+          subjectCtx,
+        );
+      }
+    }
+
+    mapping.vac = this.resolveSem3OfferingSelection(
+      catalog.vacPaper,
+      'VAC',
+      subjectCtx,
+    );
+
+    const seen = new Map<string, FyugpCategory>();
+    for (const selection of [
+      mapping.major,
+      mapping.minor,
+      mapping.mdc,
+      mapping.aec,
+      mapping.sec,
+      mapping.vac,
+    ]) {
+      if (!selection) continue;
+      const duplicateKey =
+        selection.courseId ??
+        selection.subjectSlug ??
+        this.normalizeSubjectKey(selection.resolvedLabel);
+      const previous = seen.get(duplicateKey);
+      if (previous) {
+        ctx.errors.push(
+          `Duplicate subject allocation: ${selection.resolvedLabel} is already selected for ${previous}.`,
+        );
+      } else {
+        seen.set(duplicateKey, selection.category);
+      }
+    }
+
+    return mapping;
+  }
+
+  private resolveSem5FriendlySelections(
+    raw: Record<string, unknown>,
+    ctx: {
+      programVersionId?: string;
+      semesterSequence?: number;
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings: string[];
+      sem5Catalogs?: Map<string, Sem5ImportCurriculumCatalog>;
+    },
+    mapping: FyugpAcademicMapping,
+  ): FyugpAcademicMapping | undefined {
+    const majorDepartment = this.firstText(raw, [
+      'majorDepartment',
+      'majorDepartmentName',
+    ]);
+    const minorDepartment = this.firstText(raw, [
+      'minorDepartment',
+      'minorDepartmentName',
+    ]);
+    const internshipArea = this.firstText(raw, [
+      'internshipArea',
+      'internship',
+    ]);
+    const mdcPaper = this.firstText(raw, [
+      'mdcPaper',
+      'mdcSubject',
+      'mdcChoice',
+    ]);
+    const aecPaper = this.firstText(raw, ['aecPaper', 'aecSubject', 'aec']);
+    const secPaper = this.firstText(raw, ['secPaper', 'secSubject', 'sec']);
+    const vtcPaper = this.firstText(raw, ['vtcPaper', 'vtcSubject', 'vtc']);
+
+    const usesSem5Template = Boolean(
+      ctx.semesterSequence === 5 &&
+      (majorDepartment || minorDepartment || internshipArea),
+    );
+    if (!usesSem5Template) return undefined;
+
+    if (mdcPaper || aecPaper || secPaper || vtcPaper) {
+      ctx.errors.push(
+        'Semester 5 import cannot include MDC, AEC, SEC, or VTC columns.',
+      );
+      return mapping;
+    }
+
+    if (ctx.semesterSequence !== 5) {
+      ctx.errors.push(
+        'Semester 5 paper columns require Current Semester = 5 on this row.',
+      );
+      return mapping;
+    }
+    if (!ctx.programVersionId) {
+      ctx.errors.push(
+        'Programme is required to resolve Semester 5 paper selections.',
+      );
+      return mapping;
+    }
+
+    const catalog = ctx.sem5Catalogs?.get(ctx.programVersionId);
+    if (!catalog) {
+      ctx.errors.push(
+        'Semester 5 curriculum is not configured for the selected programme.',
+      );
+      return mapping;
+    }
+
+    const defaultSectionCode =
+      this.firstText(raw, ['sectionCode']) ??
+      mapping.tutorialGroup ??
+      undefined;
+    const sectionPreferences = this.buildSectionPreferences(
+      raw,
+      defaultSectionCode,
+    );
+    const subjectCtx = {
+      ...ctx,
+      sectionPreferences,
+      defaultSectionCode,
+    };
+
+    if (!majorDepartment) {
+      ctx.errors.push('Major Department is required for Semester 5 import.');
+    } else {
+      const department = this.sem5Curriculum.resolveMajorDepartment(
+        catalog,
+        majorDepartment,
+      );
+      if (!department) {
+        ctx.errors.push(
+          `Unknown Major Department "${majorDepartment}" for programme ${catalog.programCode}. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.major = this.resolveSem5OfferingSelection(
+          department.paper1,
+          'MAJOR',
+          subjectCtx,
+        );
+        mapping.major2 = this.resolveSem5OfferingSelection(
+          department.paper2,
+          'MAJOR',
+          subjectCtx,
+        );
+        mapping.major3 = this.resolveSem5OfferingSelection(
+          department.paper3,
+          'MAJOR',
+          subjectCtx,
+        );
+        if (mapping.major && !mapping.major.subjectSlug) {
+          mapping.major.subjectSlug = department.subjectSlug;
+        }
+
+        if (!minorDepartment) {
+          ctx.errors.push(
+            'Minor Department is required for Semester 5 import.',
+          );
+        } else {
+          const allowedMinor = this.sem5Curriculum.resolveMinorDepartment(
+            catalog,
+            department.departmentName,
+            minorDepartment,
+          );
+          if (!allowedMinor) {
+            ctx.errors.push(
+              `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
+            );
+          } else {
+            const minorOption =
+              this.sem5Curriculum.resolveMinorDepartmentOption(
+                catalog,
+                minorDepartment,
+              );
+            if (!minorOption) {
+              ctx.errors.push(
+                `Minor Department "${minorDepartment}" is not configured in Semester 5 curriculum.`,
+              );
+            } else {
+              mapping.minor = this.resolveSem5OfferingSelection(
+                minorOption.paper,
+                'MINOR',
+                subjectCtx,
+              );
+              if (mapping.minor && !mapping.minor.subjectSlug) {
+                mapping.minor.subjectSlug = minorOption.subjectSlug;
+              }
+            }
+          }
+        }
+
+        if (!internshipArea) {
+          ctx.errors.push('Internship Area is required for Semester 5 import.');
+        } else {
+          const resolvedArea =
+            this.sem5Curriculum.resolveInternshipArea(internshipArea);
+          if (!resolvedArea) {
+            ctx.errors.push(
+              `Unknown Internship Area "${internshipArea}". Choose from the template dropdown.`,
+            );
+          } else {
+            mapping.internshipArea = {
+              input: internshipArea,
+              slug: slugifySubject(resolvedArea),
+              resolvedLabel: resolvedArea,
+            };
+            mapping.internship = this.resolveSem5OfferingSelection(
+              department.internship,
+              'INTERNSHIP',
+              subjectCtx,
+            );
+          }
+        }
+      }
+    }
+
+    const seen = new Map<string, FyugpCategory>();
+    for (const selection of [
+      mapping.major,
+      mapping.major2,
+      mapping.major3,
+      mapping.minor,
+      mapping.internship,
+    ]) {
+      if (!selection) continue;
+      const duplicateKey =
+        selection.courseId ??
+        selection.subjectSlug ??
+        this.normalizeSubjectKey(selection.resolvedLabel);
+      const previous = seen.get(duplicateKey);
+      if (previous) {
+        ctx.errors.push(
+          `Duplicate subject allocation: ${selection.resolvedLabel} is already selected for ${previous}.`,
+        );
+      } else {
+        seen.set(duplicateKey, selection.category);
+      }
+    }
+
+    return mapping;
+  }
+
+  private resolveSem5OfferingSelection(
+    paper: {
+      title: string;
+      code: string;
+      courseId: string;
+      offeringId: string;
+    },
+    category: FyugpCategory,
+    ctx: {
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings?: string[];
+      sectionPreferences?: Partial<Record<FyugpCategory, string>>;
+      defaultSectionCode?: string;
+    },
+  ): FyugpResolvedSelection | undefined {
+    return this.resolveSem3OfferingSelection(paper, category, ctx);
   }
 
   private resolveSem3FriendlySelections(
@@ -1368,6 +1890,50 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         subject.slug === slugifySubject(majorDepartment),
     );
     return match?.slug ?? slugifySubject(majorDepartment);
+  }
+
+  private async preloadSem1Catalogs(
+    tenantId: string,
+    programVersionIds: string[],
+  ): Promise<Map<string, Sem1ImportCurriculumCatalog>> {
+    const catalogs = new Map<string, Sem1ImportCurriculumCatalog>();
+    const uniqueIds = [...new Set(programVersionIds)];
+    await Promise.all(
+      uniqueIds.map(async (programVersionId) => {
+        try {
+          const catalog = await this.sem1Curriculum.buildCatalog(tenantId, {
+            programVersionId,
+            semesterSequence: 1,
+          });
+          catalogs.set(programVersionId, catalog);
+        } catch {
+          // Programme may not have Sem 1 curriculum yet — validation will surface per row.
+        }
+      }),
+    );
+    return catalogs;
+  }
+
+  private async preloadSem5Catalogs(
+    tenantId: string,
+    programVersionIds: string[],
+  ): Promise<Map<string, Sem5ImportCurriculumCatalog>> {
+    const catalogs = new Map<string, Sem5ImportCurriculumCatalog>();
+    const uniqueIds = [...new Set(programVersionIds)];
+    await Promise.all(
+      uniqueIds.map(async (programVersionId) => {
+        try {
+          const catalog = await this.sem5Curriculum.buildCatalog(tenantId, {
+            programVersionId,
+            semesterSequence: 5,
+          });
+          catalogs.set(programVersionId, catalog);
+        } catch {
+          // Programme may not have Sem 5 curriculum yet — validation will surface per row.
+        }
+      }),
+    );
+    return catalogs;
   }
 
   private async preloadSem3Catalogs(
@@ -2252,6 +2818,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       majorSubjectSlug: n.majorSubjectSlug,
       minorSubjectSlug: n.minorSubjectSlug,
     });
+    await this.persistInternshipAreaChoice(tenantId, studentId, n);
     if (n.abcId) {
       await this.abcService.upsertForStudent(tenantId, studentId, n.abcId);
     }
@@ -2389,6 +2956,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         majorSubjectSlug: n.majorSubjectSlug,
         minorSubjectSlug: n.minorSubjectSlug,
       });
+      await this.persistInternshipAreaChoice(tenantId, studentId, n);
       await this.createAcademicOnboardingRegistration(
         tx,
         tenantId,
@@ -2450,7 +3018,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const selections = [
       mapping.major,
       mapping.major2,
+      mapping.major3,
       mapping.minor,
+      mapping.internship,
       mapping.mdc,
       mapping.aec,
       mapping.sec,
@@ -2537,6 +3107,39 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           await tx.semesterRegistrationLine.create({ data });
         }
       }
+    }
+  }
+
+  private async persistInternshipAreaChoice(
+    tenantId: string,
+    studentId: string,
+    n: NormalizedStudentImportRow,
+  ) {
+    const internshipArea = n.academicMapping?.internshipArea;
+    if (!internshipArea?.slug) return;
+    const existing = await this.prisma.studentProgramChoice.findFirst({
+      where: {
+        tenantId,
+        studentId,
+        choiceType: 'INTERNSHIP_AREA',
+        deletedAt: null,
+      },
+    });
+    if (existing) {
+      await this.prisma.studentProgramChoice.update({
+        where: { id: existing.id },
+        data: { subjectSlug: internshipArea.slug },
+      });
+    } else {
+      await this.prisma.studentProgramChoice.create({
+        data: {
+          tenantId,
+          studentId,
+          choiceType: 'INTERNSHIP_AREA',
+          subjectSlug: internshipArea.slug,
+          status: 'active',
+        },
+      });
     }
   }
 
@@ -2676,7 +3279,313 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return Buffer.from(buf);
   }
 
-  async buildSem1AdmissionTemplateWorkbook(): Promise<Buffer> {
+  async buildSem1AdmissionTemplateWorkbook(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+    academicYearId?: string;
+  }): Promise<Buffer> {
+    const semesterSequence = options.semesterSequence ?? 1;
+    let programme = options.programme;
+    let programVersionId = options.programVersionId;
+    if (!programme && !programVersionId) {
+      const programmes = await this.sem1Curriculum.listPublishedProgrammes(
+        options.tenantId,
+      );
+      const fallback =
+        programmes.find((entry) => entry.code.startsWith('BA-')) ??
+        programmes[0];
+      if (!fallback) {
+        throw new BadRequestException(
+          'No published programme found. Publish a programme curriculum before downloading the Semester 1 template.',
+        );
+      }
+      programme = fallback.code;
+      programVersionId = fallback.programVersionId;
+    }
+    const catalog = await this.sem1Curriculum.buildCatalog(options.tenantId, {
+      programme,
+      programVersionId,
+      semesterSequence,
+      academicYearId: options.academicYearId,
+    });
+    const majorDepartments =
+      await this.sem1Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        semesterSequence,
+      );
+    const programmes = await this.sem1Curriculum.listPublishedProgrammes(
+      options.tenantId,
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = [...SEM1_SUBJECT_IMPORT_HEADERS];
+    const sampleMajor =
+      catalog.majorDepartments[0]?.departmentName ??
+      majorDepartments[0]?.departmentName ??
+      'Economics';
+    const sampleMajorKey = this.sem1Curriculum.normalizeLabel(sampleMajor);
+    const sampleMinor = catalog.minorByMajor[sampleMajorKey]?.[0] ?? 'History';
+    const sampleRow = {
+      ...SEM1_SUBJECT_IMPORT_SAMPLE_ROW,
+      Programme: catalog.programCode,
+      'Current Semester': String(semesterSequence),
+      'Major Department': sampleMajor,
+      'Minor Department': sampleMinor,
+      'MDC Department': catalog.mdcDepartments[0]?.title ?? '',
+      'AEC Paper': catalog.aecPapers[0]?.title ?? '',
+      'Skill Enhancement Course': catalog.secPapers[0]?.title ?? '',
+    };
+
+    sheet.addRow(headers);
+    sheet.addRow(
+      headers.map(
+        (h) =>
+          SEM1_SUBJECT_IMPORT_HELPERS[h] ??
+          'Optional — stored in student profile when supported',
+      ),
+    );
+    sheet.addRow(
+      headers.map((h) => sampleRow[h as keyof typeof sampleRow] ?? ''),
+    );
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(2).font = { italic: true, color: { argb: 'FF666666' } };
+    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    sheet.columns.forEach((col) => {
+      col.width = 24;
+    });
+
+    const minorsByMajorRows = catalog.majorDepartments.map((major) => {
+      const minors =
+        catalog.minorByMajor[
+          this.sem1Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
+
+    const hiddenSheets = [
+      {
+        name: SEM1_HIDDEN_SHEETS.programmes,
+        headers: [
+          'Programme Code',
+          'Programme Name',
+          'Program Version Id',
+          'Curriculum',
+        ],
+        rows: programmes.map((programme) => [
+          programme.code,
+          programme.name,
+          programme.programVersionId,
+          programme.curriculumLabel,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.majorDepartments,
+        headers: ['Major Department'],
+        rows: majorDepartments.map((department) => [department.departmentName]),
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.majorLookup,
+        headers: ['Major Department', 'Major Code', 'Major Title'],
+        rows: catalog.majorDepartments.map((department) => [
+          department.departmentName,
+          department.paper.code,
+          department.paper.title,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.mdcDepartments,
+        headers: ['MDC Department', 'Course Code'],
+        rows: catalog.mdcDepartments.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.aecPapers,
+        headers: ['AEC Paper', 'Course Code'],
+        rows: catalog.aecPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.secPapers,
+        headers: ['Skill Enhancement Course', 'Course Code'],
+        rows: catalog.secPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM1_HIDDEN_SHEETS.minorsByMajor,
+        headers: [
+          'Major Department',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: minorsByMajorRows,
+        hidden: true,
+      },
+    ];
+
+    for (const ref of hiddenSheets) {
+      const refSheet = workbook.addWorksheet(ref.name);
+      refSheet.addRow(ref.headers);
+      for (const row of ref.rows) refSheet.addRow(row);
+      refSheet.getRow(1).font = { bold: true };
+      refSheet.columns.forEach((col) => {
+        col.width = 32;
+      });
+      if (ref.hidden) {
+        refSheet.state = 'veryHidden';
+      }
+    }
+
+    const minorsSheet = workbook.getWorksheet(SEM1_HIDDEN_SHEETS.minorsByMajor);
+    if (minorsSheet) {
+      catalog.majorDepartments.forEach((major, index) => {
+        const rowNumber = index + 2;
+        const minors =
+          catalog.minorByMajor[
+            this.sem1Curriculum.normalizeLabel(major.departmentName)
+          ] ?? [];
+        if (!minors.length) return;
+        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
+        workbook.definedNames.add(
+          rangeName,
+          `'${SEM1_HIDDEN_SHEETS.minorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
+        );
+      });
+    }
+
+    const curriculumInfo = workbook.addWorksheet('Curriculum Info');
+    curriculumInfo.addRow(['Field', 'Value']);
+    curriculumInfo.addRow(['Programme', catalog.programCode]);
+    curriculumInfo.addRow(['Programme Name', catalog.programName]);
+    curriculumInfo.addRow(['Curriculum', catalog.curriculumLabel]);
+    curriculumInfo.addRow(['Semester', catalog.semesterSequence]);
+    curriculumInfo.addRow(['Program Version Id', catalog.programVersionId]);
+    curriculumInfo.addRow([
+      'Auto VAC',
+      `${catalog.vacPaper.code} — ${catalog.vacPaper.title}`,
+    ]);
+    curriculumInfo.addRow(['Generated At', new Date().toISOString()]);
+    curriculumInfo.getRow(1).font = { bold: true };
+    curriculumInfo.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.addRow(['Column', 'Notes']);
+    for (const header of headers) {
+      instructions.addRow([
+        header,
+        SEM1_SUBJECT_IMPORT_HELPERS[header] ??
+          'Imported when mapped; extra columns are preserved for future profile fields.',
+      ]);
+    }
+    instructions.addRow(['', '']);
+    for (const note of SEM1_STRUCTURE_NOTES) {
+      instructions.addRow(['Structure', note]);
+    }
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    this.applySem1Dropdowns(sheet, headers, hiddenSheets, programmes, catalog);
+    const buf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buf);
+  }
+
+  private applySem1Dropdowns(
+    sheet: ExcelJS.Worksheet,
+    headers: string[],
+    references: {
+      name: string;
+      rows: (string | number | null)[][];
+    }[],
+    programmes: { code: string }[],
+    catalog: Sem1ImportCurriculumCatalog,
+  ) {
+    const nameDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        Programme: { refName: SEM1_HIDDEN_SHEETS.programmes, column: 'A' },
+        'Major Department': {
+          refName: SEM1_HIDDEN_SHEETS.majorDepartments,
+          column: 'A',
+        },
+        'MDC Department': {
+          refName: SEM1_HIDDEN_SHEETS.mdcDepartments,
+          column: 'A',
+        },
+        'AEC Paper': { refName: SEM1_HIDDEN_SHEETS.aecPapers, column: 'A' },
+        'Skill Enhancement Course': {
+          refName: SEM1_HIDDEN_SHEETS.secPapers,
+          column: 'A',
+        },
+      };
+    const refByName = new Map(references.map((ref) => [ref.name, ref]));
+    const majorColIndex = headers.indexOf('Major Department') + 1;
+    const minorColIndex = headers.indexOf('Minor Department') + 1;
+    const majorColLetter = majorColIndex
+      ? String.fromCharCode(64 + majorColIndex)
+      : 'L';
+
+    for (const [header, config] of Object.entries(nameDropdownMap)) {
+      const columnIndex = headers.indexOf(header) + 1;
+      const ref = refByName.get(config.refName);
+      if (!columnIndex) continue;
+      if (header === 'Programme' && programmes.length) {
+        const values = programmes.map((programme) => programme.code).join(',');
+        for (let row = 3; row <= 1000; row += 1) {
+          sheet.getCell(row, columnIndex).dataValidation = {
+            type: 'list',
+            allowBlank: false,
+            formulae: [`"${values}"`],
+            showErrorMessage: true,
+            errorTitle: 'Invalid programme',
+            error: 'Choose a programme from the dropdown.',
+          };
+        }
+        continue;
+      }
+      if (!ref?.rows.length) continue;
+      const formula = this.excelReferenceFormula(
+        config.refName,
+        ref.rows.length,
+        config.column,
+      );
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, columnIndex).dataValidation = {
+          type: 'list',
+          allowBlank: header === 'Programme' ? false : true,
+          formulae: [formula],
+          showErrorMessage: true,
+          errorTitle: 'Invalid selection',
+          error: `Choose a valid option from ${config.refName}.`,
+        };
+      }
+    }
+
+    if (minorColIndex && majorColIndex && catalog.majorDepartments.length) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, minorColIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected major department.',
+        };
+      }
+    }
+  }
+
+  async buildSem1LegacyFullAdmissionTemplateWorkbook(): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Admission');
     const headers = [...SEM1_ADMISSION_TEMPLATE_HEADERS];
@@ -2889,6 +3798,315 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     this.applySem3Dropdowns(sheet, headers, hiddenSheets, programmes);
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
+  }
+
+  async buildSem5AdmissionTemplateWorkbook(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+    academicYearId?: string;
+  }): Promise<Buffer> {
+    const semesterSequence = options.semesterSequence ?? 5;
+    let programme = options.programme;
+    let programVersionId = options.programVersionId;
+    if (!programme && !programVersionId) {
+      const programmes = await this.sem5Curriculum.listPublishedProgrammes(
+        options.tenantId,
+      );
+      const fallback =
+        programmes.find((entry) => entry.code.startsWith('BA-')) ??
+        programmes[0];
+      if (!fallback) {
+        throw new BadRequestException(
+          'No published programme found. Publish a programme curriculum before downloading the Semester 5 template.',
+        );
+      }
+      programme = fallback.code;
+      programVersionId = fallback.programVersionId;
+    }
+    const catalog = await this.sem5Curriculum.buildCatalog(options.tenantId, {
+      programme,
+      programVersionId,
+      semesterSequence,
+      academicYearId: options.academicYearId,
+    });
+    const majorDepartments =
+      await this.sem5Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        semesterSequence,
+      );
+    const programmes = await this.sem5Curriculum.listPublishedProgrammes(
+      options.tenantId,
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = [...SEM5_ADMISSION_TEMPLATE_HEADERS];
+    const sampleMajor =
+      catalog.majorDepartments[0]?.departmentName ??
+      majorDepartments[0]?.departmentName ??
+      'Economics';
+    const sampleMajorKey = this.sem5Curriculum.normalizeLabel(sampleMajor);
+    const sampleMinor = catalog.minorByMajor[sampleMajorKey]?.[0] ?? 'History';
+    const sampleRow = {
+      ...SEM5_ADMISSION_SAMPLE_ROW,
+      Programme: catalog.programCode,
+      'Current Semester': String(semesterSequence),
+      'Major Department': sampleMajor,
+      'Minor Department': sampleMinor,
+      'Internship Area': catalog.internshipAreas[0] ?? 'Bank Internship',
+    };
+
+    sheet.addRow(headers);
+    sheet.addRow(
+      headers.map(
+        (h) =>
+          SEM5_ADMISSION_TEMPLATE_HELPERS[h] ??
+          'Optional — stored in student profile when supported',
+      ),
+    );
+    sheet.addRow(
+      headers.map((h) => sampleRow[h as keyof typeof sampleRow] ?? ''),
+    );
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(2).font = { italic: true, color: { argb: 'FF666666' } };
+    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    sheet.columns.forEach((col) => {
+      col.width = 24;
+    });
+
+    const minorsByMajorRows = catalog.majorDepartments.map((major) => {
+      const minors =
+        catalog.minorByMajor[
+          this.sem5Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
+
+    const hiddenSheets = [
+      {
+        name: SEM5_HIDDEN_SHEETS.programmes,
+        headers: [
+          'Programme Code',
+          'Programme Name',
+          'Program Version Id',
+          'Curriculum',
+        ],
+        rows: programmes.map((programme) => [
+          programme.code,
+          programme.name,
+          programme.programVersionId,
+          programme.curriculumLabel,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM5_HIDDEN_SHEETS.majorDepartments,
+        headers: ['Major Department'],
+        rows: majorDepartments.map((department) => [department.departmentName]),
+      },
+      {
+        name: SEM5_HIDDEN_SHEETS.majorLookup,
+        headers: [
+          'Major Department',
+          'Paper 1 Code',
+          'Paper 1 Title',
+          'Paper 2 Code',
+          'Paper 2 Title',
+          'Paper 3 Code',
+          'Paper 3 Title',
+          'Internship Code',
+          'Internship Title',
+        ],
+        rows: catalog.majorDepartments.map((department) => [
+          department.departmentName,
+          department.paper1.code,
+          department.paper1.title,
+          department.paper2.code,
+          department.paper2.title,
+          department.paper3.code,
+          department.paper3.title,
+          department.internship.code,
+          department.internship.title,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM5_HIDDEN_SHEETS.internshipAreas,
+        headers: ['Internship Area'],
+        rows: catalog.internshipAreas.map((area) => [area]),
+      },
+      {
+        name: SEM5_HIDDEN_SHEETS.minorsByMajor,
+        headers: [
+          'Major Department',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: minorsByMajorRows,
+        hidden: true,
+      },
+    ];
+
+    for (const ref of hiddenSheets) {
+      const refSheet = workbook.addWorksheet(ref.name);
+      refSheet.addRow(ref.headers);
+      for (const row of ref.rows) refSheet.addRow(row);
+      refSheet.getRow(1).font = { bold: true };
+      refSheet.columns.forEach((col) => {
+        col.width = 32;
+      });
+      if (ref.hidden) {
+        refSheet.state = 'veryHidden';
+      }
+    }
+
+    const minorsSheet = workbook.getWorksheet(SEM5_HIDDEN_SHEETS.minorsByMajor);
+    if (minorsSheet) {
+      catalog.majorDepartments.forEach((major, index) => {
+        const rowNumber = index + 2;
+        const minors =
+          catalog.minorByMajor[
+            this.sem5Curriculum.normalizeLabel(major.departmentName)
+          ] ?? [];
+        if (!minors.length) return;
+        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
+        workbook.definedNames.add(
+          rangeName,
+          `'${SEM5_HIDDEN_SHEETS.minorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
+        );
+      });
+    }
+
+    const curriculumInfo = workbook.addWorksheet('Curriculum Info');
+    curriculumInfo.addRow(['Field', 'Value']);
+    curriculumInfo.addRow(['Programme', catalog.programCode]);
+    curriculumInfo.addRow(['Programme Name', catalog.programName]);
+    curriculumInfo.addRow(['Curriculum', catalog.curriculumLabel]);
+    curriculumInfo.addRow(['Semester', catalog.semesterSequence]);
+    curriculumInfo.addRow(['Program Version Id', catalog.programVersionId]);
+    curriculumInfo.addRow(['Generated At', new Date().toISOString()]);
+    curriculumInfo.getRow(1).font = { bold: true };
+    curriculumInfo.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.addRow(['Column', 'Notes']);
+    for (const header of headers) {
+      instructions.addRow([
+        header,
+        SEM5_ADMISSION_TEMPLATE_HELPERS[header] ??
+          'Imported when mapped; extra columns are preserved for future profile fields.',
+      ]);
+    }
+    instructions.addRow(['', '']);
+    for (const note of SEM5_STRUCTURE_NOTES) {
+      instructions.addRow(['Structure', note]);
+    }
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    this.applySem5Dropdowns(sheet, headers, hiddenSheets, programmes, catalog);
+    const buf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buf);
+  }
+
+  private excelMajorMinorsRangeName(majorDepartment: string) {
+    const sanitized = majorDepartment
+      .trim()
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return `${sanitized || 'Major'}_Minors`;
+  }
+
+  private applySem5Dropdowns(
+    sheet: ExcelJS.Worksheet,
+    headers: string[],
+    references: {
+      name: string;
+      rows: (string | number | null)[][];
+    }[],
+    programmes: { code: string }[],
+    catalog: Sem5ImportCurriculumCatalog,
+  ) {
+    const nameDropdownMap: Record<string, { refName: string; column: string }> =
+      {
+        Programme: { refName: SEM5_HIDDEN_SHEETS.programmes, column: 'A' },
+        'Major Department': {
+          refName: SEM5_HIDDEN_SHEETS.majorDepartments,
+          column: 'A',
+        },
+        'Internship Area': {
+          refName: SEM5_HIDDEN_SHEETS.internshipAreas,
+          column: 'A',
+        },
+      };
+    const refByName = new Map(references.map((ref) => [ref.name, ref]));
+    const majorColIndex = headers.indexOf('Major Department') + 1;
+    const minorColIndex = headers.indexOf('Minor Department') + 1;
+    const majorColLetter = majorColIndex
+      ? String.fromCharCode(64 + majorColIndex)
+      : 'L';
+
+    for (const [header, config] of Object.entries(nameDropdownMap)) {
+      const columnIndex = headers.indexOf(header) + 1;
+      const ref = refByName.get(config.refName);
+      if (!columnIndex) continue;
+      if (header === 'Programme' && programmes.length) {
+        const values = programmes.map((programme) => programme.code).join(',');
+        for (let row = 3; row <= 1000; row += 1) {
+          sheet.getCell(row, columnIndex).dataValidation = {
+            type: 'list',
+            allowBlank: false,
+            formulae: [`"${values}"`],
+            showErrorMessage: true,
+            errorTitle: 'Invalid programme',
+            error: 'Choose a programme from the dropdown.',
+          };
+        }
+        continue;
+      }
+      if (!ref?.rows.length) continue;
+      const formula = this.excelReferenceFormula(
+        config.refName,
+        ref.rows.length,
+        config.column,
+      );
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, columnIndex).dataValidation = {
+          type: 'list',
+          allowBlank: header === 'Programme' ? false : true,
+          formulae: [formula],
+          showErrorMessage: true,
+          errorTitle: 'Invalid selection',
+          error: `Choose a valid option from ${config.refName}.`,
+        };
+      }
+    }
+
+    if (minorColIndex && majorColIndex && catalog.majorDepartments.length) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, minorColIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected major department.',
+        };
+      }
+    }
   }
 
   private applySem3Dropdowns(
