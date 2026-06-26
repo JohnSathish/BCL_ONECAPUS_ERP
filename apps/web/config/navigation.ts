@@ -1528,6 +1528,26 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:read', 'reports:read'],
           },
           {
+            label: 'Student Master',
+            href: '/admin/reports/students/master',
+            permissions: ['students:read', 'reports:read'],
+          },
+          {
+            label: 'Subject Registration',
+            href: '/admin/reports/students/subject-registration',
+            permissions: ['students:read', 'reports:read'],
+          },
+          {
+            label: 'Subject Papers',
+            href: '/admin/reports/students/subject-papers',
+            permissions: ['students:read', 'reports:read'],
+          },
+          {
+            label: 'Report Builder',
+            href: '/admin/reports/students/builder',
+            permissions: ['students:read', 'reports:read'],
+          },
+          {
             label: 'Attendance Reports',
             href: '/admin/academics/attendance',
             permissions: [...P.studentAttendance],

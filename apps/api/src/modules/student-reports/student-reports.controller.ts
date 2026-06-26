@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
@@ -7,9 +17,17 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
 import {
+  BuiltinReportQueryDto,
+  CreateSavedReportDto,
+  ExecuteCustomReportDto,
+  TabularReportExportDto,
+  UpdateSavedReportDto,
+} from './dto/custom-report.dto';
+import {
   StudentReportExportDto,
   StudentReportFiltersDto,
 } from './dto/student-reports.dto';
+import { CustomReportService } from './services/custom-report.service';
 import { StudentReportsExportService } from './services/student-reports-export.service';
 import { StudentReportsService } from './services/student-reports.service';
 
@@ -21,7 +39,181 @@ export class StudentReportsController {
   constructor(
     private readonly reports: StudentReportsService,
     private readonly exportService: StudentReportsExportService,
+    private readonly customReports: CustomReportService,
   ) {}
+
+  @Get('field-registry')
+  fieldRegistry(@Query('module') module?: string) {
+    return this.customReports.listFieldRegistry(module ?? 'STUDENTS');
+  }
+
+  @Get('builtin-templates')
+  builtinTemplates() {
+    return this.customReports.listBuiltinTemplates();
+  }
+
+  @Get('saved')
+  listSaved(@CurrentUser() user: JwtUser, @Query('module') module?: string) {
+    return this.customReports.listSavedReports(user.tid, user.sub, module);
+  }
+
+  @Post('saved')
+  createSaved(@CurrentUser() user: JwtUser, @Body() dto: CreateSavedReportDto) {
+    return this.customReports.createSavedReport(user.tid, user.sub, dto);
+  }
+
+  @Patch('saved/:id')
+  updateSaved(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateSavedReportDto,
+  ) {
+    return this.customReports.updateSavedReport(user.tid, user.sub, id, dto);
+  }
+
+  @Delete('saved/:id')
+  deleteSaved(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.customReports.deleteSavedReport(user.tid, id);
+  }
+
+  @Post('saved/:id/favorite')
+  toggleFavorite(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.customReports.toggleFavorite(user.tid, user.sub, id);
+  }
+
+  @Get('master/preview')
+  masterPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: BuiltinReportQueryDto,
+  ) {
+    const { columns, limit, ...filters } = query;
+    return this.customReports.previewBuiltin(
+      user.tid,
+      'student-master',
+      filters,
+      user,
+      columns,
+    );
+  }
+
+  @Get('master/export')
+  async masterExportGet(
+    @CurrentUser() user: JwtUser,
+    @Query() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'student-master', dto, user),
+    );
+  }
+
+  @Post('master/export')
+  async masterExport(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'student-master', dto, user),
+    );
+  }
+
+  @Get('subject-summary/preview')
+  subjectSummaryPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.customReports.previewBuiltin(
+      user.tid,
+      'subject-summary',
+      filters,
+      user,
+    );
+  }
+
+  @Get('subject-summary/export')
+  async subjectSummaryExportGet(
+    @CurrentUser() user: JwtUser,
+    @Query() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'subject-summary', dto, user),
+    );
+  }
+
+  @Post('subject-summary/export')
+  async subjectSummaryExport(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'subject-summary', dto, user),
+    );
+  }
+
+  @Get('subject-papers/preview')
+  subjectPapersPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.customReports.previewBuiltin(
+      user.tid,
+      'subject-papers',
+      filters,
+      user,
+    );
+  }
+
+  @Get('subject-papers/export')
+  async subjectPapersExportGet(
+    @CurrentUser() user: JwtUser,
+    @Query() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'subject-papers', dto, user),
+    );
+  }
+
+  @Post('subject-papers/export')
+  async subjectPapersExport(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: TabularReportExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportBuiltin(user.tid, 'subject-papers', dto, user),
+    );
+  }
+
+  @Post('custom/preview')
+  customPreview(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ExecuteCustomReportDto,
+  ) {
+    const { format: _format, name: _name, ...rest } = dto;
+    return this.customReports.executeCustom(user.tid, rest, user);
+  }
+
+  @Post('custom/export')
+  async customExport(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ExecuteCustomReportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportCustom(user.tid, dto, user),
+    );
+  }
 
   @Get('dashboard')
   dashboard(
@@ -166,6 +358,23 @@ export class StudentReportsController {
     @Res() res: Response,
   ) {
     const result = await this.exportService.export(user.tid, dto, user);
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+    res.send(result.buffer);
+  }
+
+  private async sendExport(
+    res: Response,
+    promise: Promise<{
+      buffer: Buffer;
+      contentType: string;
+      filename: string;
+    }>,
+  ) {
+    const result = await promise;
     res.setHeader('Content-Type', result.contentType);
     res.setHeader(
       'Content-Disposition',

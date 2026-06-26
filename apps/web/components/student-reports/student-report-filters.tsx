@@ -12,6 +12,9 @@ export type StudentReportFilterState = {
   departmentId: string;
   admissionStatus: string;
   studentStatus: string;
+  gender: string;
+  feeStatus: string;
+  residenceType: string;
 };
 
 export const emptyReportFilters: StudentReportFilterState = {
@@ -23,6 +26,9 @@ export const emptyReportFilters: StudentReportFilterState = {
   departmentId: '',
   admissionStatus: '',
   studentStatus: '',
+  gender: '',
+  feeStatus: '',
+  residenceType: '',
 };
 
 export function toApiFilters(state: StudentReportFilterState): StudentReportFilters {
@@ -35,6 +41,9 @@ export function toApiFilters(state: StudentReportFilterState): StudentReportFilt
     departmentId: opt(state.departmentId),
     admissionStatus: opt(state.admissionStatus),
     studentStatus: opt(state.studentStatus),
+    gender: opt(state.gender),
+    feeStatus: opt(state.feeStatus),
+    residenceType: opt(state.residenceType),
     semester: state.semester ? Number(state.semester) : undefined,
   };
 }
@@ -47,6 +56,7 @@ type Props = {
   batchOptions: { id: string; label: string }[];
   streamOptions: { id: string; label: string }[];
   departmentOptions?: { id: string; label: string }[];
+  extended?: boolean;
 };
 
 export function StudentReportFiltersBar({
@@ -57,6 +67,7 @@ export function StudentReportFiltersBar({
   batchOptions,
   streamOptions,
   departmentOptions = [],
+  extended = false,
 }: Props) {
   return (
     <div className="flex flex-wrap gap-2 rounded-xl border border-border/60 bg-card/80 p-3 print:hidden">
@@ -155,6 +166,40 @@ export function StudentReportFiltersBar({
         <option value="PASSED_OUT">Passed Out</option>
         <option value="DROPOUT">Dropout</option>
       </select>
+      {extended ? (
+        <>
+          <select
+            className={`${erpSelectClass} max-w-[120px]`}
+            value={filters.gender}
+            onChange={(e) => onChange({ gender: e.target.value })}
+          >
+            <option value="">All gender</option>
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <select
+            className={`${erpSelectClass} max-w-[130px]`}
+            value={filters.feeStatus}
+            onChange={(e) => onChange({ feeStatus: e.target.value })}
+          >
+            <option value="">All fee status</option>
+            <option value="CLEAR">Clear</option>
+            <option value="DUE">Due</option>
+            <option value="OVERDUE">Overdue</option>
+            <option value="PARTIAL">Partial</option>
+          </select>
+          <select
+            className={`${erpSelectClass} max-w-[140px]`}
+            value={filters.residenceType}
+            onChange={(e) => onChange({ residenceType: e.target.value })}
+          >
+            <option value="">All residence</option>
+            <option value="HOSTELLER">Hosteller</option>
+            <option value="DAY_SCHOLAR">Day Scholar</option>
+          </select>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -64,8 +64,35 @@ export class StudentReportsQueryService {
       profileFilter.admissionStatus = filters.admissionStatus;
     if (filters.studentStatus)
       profileFilter.studentStatus = filters.studentStatus;
+    if (filters.gender) profileFilter.gender = filters.gender;
+    if (filters.categoryLookupId)
+      profileFilter.categoryLookupId = filters.categoryLookupId;
+    if (filters.religionLookupId)
+      profileFilter.religionLookupId = filters.religionLookupId;
+    if (filters.bloodGroupLookupId)
+      profileFilter.bloodGroupLookupId = filters.bloodGroupLookupId;
     if (Object.keys(profileFilter).length) {
       where = { ...where, masterProfile: profileFilter };
+    }
+
+    if (filters.state || filters.district) {
+      where = {
+        ...where,
+        addresses: {
+          some: {
+            ...(filters.state
+              ? { state: { equals: filters.state, mode: 'insensitive' } }
+              : {}),
+            ...(filters.district
+              ? { district: { equals: filters.district, mode: 'insensitive' } }
+              : {}),
+          },
+        },
+      };
+    }
+
+    if (filters.studentIds?.length) {
+      where = { ...where, id: { in: filters.studentIds } };
     }
 
     if (user) {

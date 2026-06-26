@@ -54,6 +54,51 @@ export class StudentReportFiltersDto {
   @IsOptional()
   @IsString()
   studentStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryLookupId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  religionLookupId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  bloodGroupLookupId?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @IsOptional()
+  @IsString()
+  feeStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  residenceType?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortDirection?: 'asc' | 'desc';
+
+  /** Internal: restrict to explicit student ids after operational filters */
+  @IsOptional()
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
 }
 
 export class StudentReportExportDto extends StudentReportFiltersDto {

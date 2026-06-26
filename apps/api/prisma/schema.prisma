@@ -355,6 +355,7 @@ model User {
   applicantApplication           AdmissionApplication?       @relation("ApplicantUser")
   admissionDocumentsVerified     AdmissionApplicationDocument[] @relation("AdmissionDocVerifiedBy")
   admissionAuditLogs             AdmissionAuditLog[]         @relation("AdmissionAuditActor")
+  savedReportFavorites           SavedReportFavorite[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, username])
@@ -10540,4 +10541,47 @@ model OfficialDocumentSequence {
   @@unique([tenantId, documentType, year])
   @@map("official_document_sequences")
   @@schema("core")
+}
+
+model SavedReport {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  createdById      String?   @map("created_by_id") @db.Uuid
+  name             String
+  module           String    @default("STUDENTS")
+  reportKind       String    @default("CUSTOM") @map("report_kind")
+  builtinKey       String?   @map("builtin_key")
+  isSystemTemplate Boolean   @default(false) @map("is_system_template")
+  filters          Json      @default("{}")
+  columns          Json      @default("[]")
+  sortBy           String?   @map("sort_by")
+  sortDirection    String?   @map("sort_direction")
+  groupBy          String?   @map("group_by")
+  layout           Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  favorites SavedReportFavorite[]
+
+  @@index([tenantId, module, deletedAt])
+  @@index([tenantId, builtinKey])
+  @@map("saved_reports")
+  @@schema("platform")
+}
+
+model SavedReportFavorite {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  savedReportId String   @map("saved_report_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  savedReport SavedReport @relation(fields: [savedReportId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, savedReportId])
+  @@index([tenantId, userId])
+  @@map("saved_report_favorites")
+  @@schema("platform")
 }

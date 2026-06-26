@@ -1959,10 +1959,13 @@ function formatAcademicMapping(
     | undefined,
 ) {
   if (!mapping?.resolvedLabel) return '—';
-  const paper = mapping.courseCode
-    ? `${mapping.courseCode} → ${mapping.resolvedLabel}`
-    : mapping.resolvedLabel;
-  return mapping.sectionCode ? `${paper} [${mapping.sectionCode}]` : paper;
+  if ('courseCode' in mapping && mapping.courseCode) {
+    const paper = `${mapping.courseCode} → ${mapping.resolvedLabel}`;
+    return 'sectionCode' in mapping && mapping.sectionCode
+      ? `${paper} [${mapping.sectionCode}]`
+      : paper;
+  }
+  return mapping.resolvedLabel;
 }
 
 function DiagnosticList({ messages, tone }: { messages: string[]; tone: 'error' | 'warning' }) {

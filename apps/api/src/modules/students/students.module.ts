@@ -104,6 +104,7 @@ import { StudentLeaveService } from './services/student-leave.service';
     StudentAbcService,
     StudentPortalService,
     StudentLeaveService,
+    StudentDirectoryEnrichmentService,
   ],
 })
 export class StudentsModule {}
