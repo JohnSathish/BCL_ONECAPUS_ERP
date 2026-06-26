@@ -87,4 +87,16 @@ export async function createWorkbookWithSheets(
   return Buffer.from(buf);
 }
 
+/** 1-based column index → Excel column letter (1 → A, 27 → AA). */
+export function excelColumnLetter(columnIndex: number): string {
+  let letter = '';
+  let index = columnIndex;
+  while (index > 0) {
+    const remainder = (index - 1) % 26;
+    letter = String.fromCharCode(65 + remainder) + letter;
+    index = Math.floor((index - 1) / 26);
+  }
+  return letter;
+}
+
 export { DATA_SHEET_NAME, INSTRUCTIONS_SHEET_NAME };

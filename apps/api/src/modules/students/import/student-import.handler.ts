@@ -2,7 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
-import { createWorkbookWithSheets } from '../../../common/import/excel.util';
+import {
+  createWorkbookWithSheets,
+  excelColumnLetter,
+} from '../../../common/import/excel.util';
 import type {
   ImportModuleHandler,
   ImportModuleHandlerContext,
@@ -4280,7 +4283,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             this.sem1Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
-        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const endCol = excelColumnLetter(1 + minors.length);
         const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
         workbook.definedNames.add(
           rangeName,
@@ -4300,7 +4303,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             this.sem5Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
-        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const endCol = excelColumnLetter(1 + minors.length);
         const rangeName = `FA5_${this.excelMajorMinorsRangeName(major.departmentName)}`;
         workbook.definedNames.add(
           rangeName,
@@ -4455,11 +4458,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const sem5MajorColIndex = headers.indexOf('Major Department (Sem 5)') + 1;
     const sem5MinorColIndex = headers.indexOf('Minor Department (Sem 5)') + 1;
     const majorColLetter = majorColIndex
-      ? String.fromCharCode(64 + majorColIndex)
-      : 'AZ';
+      ? excelColumnLetter(majorColIndex)
+      : 'BG';
     const sem5MajorColLetter = sem5MajorColIndex
-      ? String.fromCharCode(64 + sem5MajorColIndex)
-      : 'AZ';
+      ? excelColumnLetter(sem5MajorColIndex)
+      : 'BR';
 
     for (const [header, config] of Object.entries(listDropdownMap)) {
       const columnIndex = headers.indexOf(header) + 1;
@@ -4545,7 +4548,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           type: 'list',
           allowBlank: true,
           formulae: [
-            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
           ],
           showErrorMessage: true,
           errorTitle: 'Invalid minor',
@@ -4565,7 +4568,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           type: 'list',
           allowBlank: true,
           formulae: [
-            `INDIRECT("FA5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
+            `=INDIRECT("FA5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
           ],
           showErrorMessage: true,
           errorTitle: 'Invalid minor',
@@ -4746,7 +4749,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             this.sem1Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
-        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const endCol = excelColumnLetter(1 + minors.length);
         const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
         workbook.definedNames.add(
           rangeName,
@@ -4826,7 +4829,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const majorColIndex = headers.indexOf('Major Department') + 1;
     const minorColIndex = headers.indexOf('Minor Department') + 1;
     const majorColLetter = majorColIndex
-      ? String.fromCharCode(64 + majorColIndex)
+      ? excelColumnLetter(majorColIndex)
       : 'L';
 
     for (const [header, config] of Object.entries(nameDropdownMap)) {
@@ -4871,7 +4874,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           type: 'list',
           allowBlank: true,
           formulae: [
-            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
           ],
           showErrorMessage: true,
           errorTitle: 'Invalid minor',
@@ -5271,7 +5274,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             this.sem5Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
-        const endCol = String.fromCharCode(66 + minors.length - 1);
+        const endCol = excelColumnLetter(1 + minors.length);
         const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
         workbook.definedNames.add(
           rangeName,
@@ -5350,7 +5353,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const majorColIndex = headers.indexOf('Major Department') + 1;
     const minorColIndex = headers.indexOf('Minor Department') + 1;
     const majorColLetter = majorColIndex
-      ? String.fromCharCode(64 + majorColIndex)
+      ? excelColumnLetter(majorColIndex)
       : 'L';
 
     for (const [header, config] of Object.entries(nameDropdownMap)) {
@@ -5395,7 +5398,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           type: 'list',
           allowBlank: true,
           formulae: [
-            `INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
+            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
           ],
           showErrorMessage: true,
           errorTitle: 'Invalid minor',
@@ -5667,8 +5670,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     rowCount: number,
     column = 'A',
   ) {
+    if (rowCount <= 0) return '" "';
     const safeName = sheetName.replace(/'/g, "''");
-    return `'${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
+    return `='${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
   }
 
   private templateCourseCode(code: string) {
