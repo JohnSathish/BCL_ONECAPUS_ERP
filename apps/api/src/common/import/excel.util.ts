@@ -99,4 +99,57 @@ export function excelColumnLetter(columnIndex: number): string {
   return letter;
 }
 
+export const IMPORT_TEMPLATE_DATA_FIRST_ROW = 3;
+export const IMPORT_TEMPLATE_DATA_LAST_ROW = 500;
+
+type WorksheetWithValidations = ExcelJS.Worksheet & {
+  dataValidations: {
+    add: (
+      address: string,
+      validation: {
+        type: 'list';
+        allowBlank?: boolean;
+        formulae: string[];
+        showErrorMessage?: boolean;
+      },
+    ) => void;
+  };
+};
+
+/** Excel list validation for a whole column range (one rule — avoids corrupt per-cell XML). */
+export function applyWorksheetListValidation(
+  sheet: ExcelJS.Worksheet,
+  columnIndex: number,
+  formula: string,
+  options?: {
+    allowBlank?: boolean;
+    firstRow?: number;
+    lastRow?: number;
+  },
+) {
+  if (!columnIndex || !formula) return;
+  const firstRow = options?.firstRow ?? IMPORT_TEMPLATE_DATA_FIRST_ROW;
+  const lastRow = options?.lastRow ?? IMPORT_TEMPLATE_DATA_LAST_ROW;
+  const col = excelColumnLetter(columnIndex);
+  (sheet as WorksheetWithValidations).dataValidations.add(
+    `${col}${firstRow}:${col}${lastRow}`,
+    {
+      type: 'list',
+      allowBlank: options?.allowBlank ?? true,
+      formulae: [formula],
+      showErrorMessage: true,
+    },
+  );
+}
+
+export function excelSheetListFormula(
+  sheetName: string,
+  rowCount: number,
+  column = 'A',
+) {
+  if (rowCount <= 0) return '" "';
+  const safeName = sheetName.replace(/'/g, "''");
+  return `='${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
+}
+
 export { DATA_SHEET_NAME, INSTRUCTIONS_SHEET_NAME };

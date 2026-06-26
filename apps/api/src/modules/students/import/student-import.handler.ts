@@ -5,6 +5,8 @@ import ExcelJS from 'exceljs';
 import {
   createWorkbookWithSheets,
   excelColumnLetter,
+  excelSheetListFormula,
+  applyWorksheetListValidation,
 } from '../../../common/import/excel.util';
 import type {
   ImportModuleHandler,
@@ -4096,20 +4098,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         .filter((l) => l.lookupType === type)
         .map((l) => [l.label, l.code]);
 
-    const sem1MinorsByMajorRows = sem1Catalog.majorDepartments.map((major) => {
-      const minors =
-        sem1Catalog.minorByMajor[
-          this.sem1Curriculum.normalizeLabel(major.departmentName)
-        ] ?? [];
-      return [major.departmentName, ...minors];
-    });
-    const sem5MinorsByMajorRows = sem5Catalog.majorDepartments.map((major) => {
-      const minors =
-        sem5Catalog.minorByMajor[
-          this.sem5Curriculum.normalizeLabel(major.departmentName)
-        ] ?? [];
-      return [major.departmentName, ...minors];
-    });
+    const allSem1Minors = [
+      ...new Set(
+        Object.values(sem1Catalog.minorByMajor).flatMap((minors) => minors),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+    const allSem5Minors = [
+      ...new Set(
+        Object.values(sem5Catalog.minorByMajor).flatMap((minors) => minors),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
 
     const hiddenSheets: {
       name: string;
@@ -4199,16 +4197,27 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         rows: sem1Catalog.secPapers.map((p) => [p.title]),
       },
       {
-        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
-        headers: [
-          'Major',
-          'Minor 1',
-          'Minor 2',
-          'Minor 3',
-          'Minor 4',
-          'Minor 5',
-        ],
-        rows: sem1MinorsByMajorRows,
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1AllMinors,
+        headers: ['Minor Department'],
+        rows: allSem1Minors.map((minor) => [minor]),
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.gender,
+        headers: ['Gender'],
+        rows: [['Male'], ['Female'], ['Other']],
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.semester,
+        headers: ['Semester'],
+        rows: [['1'], ['3'], ['5']],
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.admissionStatus,
+        headers: ['Admission Status'],
+        rows: [['ACTIVE'], ['PROVISIONAL'], ['CANCELLED']],
         hidden: true,
       },
       {
@@ -4247,16 +4256,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         rows: sem5Catalog.internshipAreas.map((area) => [area]),
       },
       {
-        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
-        headers: [
-          'Major',
-          'Minor 1',
-          'Minor 2',
-          'Minor 3',
-          'Minor 4',
-          'Minor 5',
-        ],
-        rows: sem5MinorsByMajorRows,
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5AllMinors,
+        headers: ['Minor Department (Sem 5)'],
+        rows: allSem5Minors.map((minor) => [minor]),
         hidden: true,
       },
     ];
@@ -4270,46 +4272,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         col.width = 32;
       });
       if (ref.hidden) refSheet.state = 'veryHidden';
-    }
-
-    const sem1MinorsSheet = workbook.getWorksheet(
-      FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
-    );
-    if (sem1MinorsSheet) {
-      sem1Catalog.majorDepartments.forEach((major, index) => {
-        const rowNumber = index + 2;
-        const minors =
-          sem1Catalog.minorByMajor[
-            this.sem1Curriculum.normalizeLabel(major.departmentName)
-          ] ?? [];
-        if (!minors.length) return;
-        const endCol = excelColumnLetter(1 + minors.length);
-        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
-        workbook.definedNames.add(
-          rangeName,
-          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
-        );
-      });
-    }
-
-    const sem5MinorsSheet = workbook.getWorksheet(
-      FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
-    );
-    if (sem5MinorsSheet) {
-      sem5Catalog.majorDepartments.forEach((major, index) => {
-        const rowNumber = index + 2;
-        const minors =
-          sem5Catalog.minorByMajor[
-            this.sem5Curriculum.normalizeLabel(major.departmentName)
-          ] ?? [];
-        if (!minors.length) return;
-        const endCol = excelColumnLetter(1 + minors.length);
-        const rangeName = `FA5_${this.excelMajorMinorsRangeName(major.departmentName)}`;
-        workbook.definedNames.add(
-          rangeName,
-          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
-        );
-      });
     }
 
     const curriculumInfo = workbook.addWorksheet('Curriculum Info');
@@ -4353,14 +4315,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 36;
     });
 
-    this.applyFullAdmissionDropdowns(
-      sheet,
-      headers,
-      hiddenSheets,
-      programmes,
-      sem1Catalog,
-      sem5Catalog,
-    );
+    this.applyFullAdmissionDropdowns(sheet, headers, hiddenSheets);
 
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
@@ -4370,212 +4325,120 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     sheet: ExcelJS.Worksheet,
     headers: string[],
     references: { name: string; rows: (string | number | null)[][] }[],
-    programmes: { code: string }[],
-    sem1Catalog: Sem1ImportCurriculumCatalog,
-    sem5Catalog: Sem5ImportCurriculumCatalog,
   ) {
     const refByName = new Map(references.map((ref) => [ref.name, ref]));
-    const listDropdownMap: Record<string, { refName: string; column: string }> =
-      {
-        Programme: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.programmes,
-          column: 'A',
-        },
-        Shift: { refName: FULL_ADMISSION_HIDDEN_SHEETS.shifts, column: 'A' },
-        'Admission Batch': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.batches,
-          column: 'A',
-        },
-        Stream: { refName: FULL_ADMISSION_HIDDEN_SHEETS.streams, column: 'A' },
-        'Academic Year': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.academicYears,
-          column: 'A',
-        },
-        Department: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.departments,
-          column: 'A',
-        },
-        Category: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.categories,
-          column: 'A',
-        },
-        Religion: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.religions,
-          column: 'A',
-        },
-        'Blood Group': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.bloodGroups,
-          column: 'A',
-        },
-        'Tribe / Race': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.tribes,
-          column: 'A',
-        },
-        Denomination: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.denominations,
-          column: 'A',
-        },
-        Nationality: {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.nationalities,
-          column: 'A',
-        },
-        'Major Department': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1MajorDepartments,
-          column: 'A',
-        },
-        MDC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Mdc, column: 'A' },
-        AEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Aec, column: 'A' },
-        SEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Sec, column: 'A' },
-        'Major Department (Sem 3)': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3MajorDepartments,
-          column: 'A',
-        },
-        'MDC (Sem 3)': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Mdc,
-          column: 'A',
-        },
-        'AEC (Sem 3)': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Aec,
-          column: 'A',
-        },
-        'SEC (Sem 3)': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Sec,
-          column: 'A',
-        },
-        VTC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Vtc, column: 'A' },
-        'Major Department (Sem 5)': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5MajorDepartments,
-          column: 'A',
-        },
-        'Internship Subject': {
-          refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
-          column: 'A',
-        },
-      };
-
-    const majorColIndex = headers.indexOf('Major Department') + 1;
-    const minorColIndex = headers.indexOf('Minor Department') + 1;
-    const sem5MajorColIndex = headers.indexOf('Major Department (Sem 5)') + 1;
-    const sem5MinorColIndex = headers.indexOf('Minor Department (Sem 5)') + 1;
-    const majorColLetter = majorColIndex
-      ? excelColumnLetter(majorColIndex)
-      : 'BG';
-    const sem5MajorColLetter = sem5MajorColIndex
-      ? excelColumnLetter(sem5MajorColIndex)
-      : 'BR';
+    const requiredHeaders = new Set(['Programme', 'Semester']);
+    const listDropdownMap: Record<
+      string,
+      { refName: string; column?: string }
+    > = {
+      Programme: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.programmes,
+        column: 'A',
+      },
+      Shift: { refName: FULL_ADMISSION_HIDDEN_SHEETS.shifts, column: 'A' },
+      'Admission Batch': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.batches,
+        column: 'A',
+      },
+      Stream: { refName: FULL_ADMISSION_HIDDEN_SHEETS.streams, column: 'A' },
+      'Academic Year': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.academicYears,
+        column: 'A',
+      },
+      Department: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.departments,
+        column: 'A',
+      },
+      Category: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.categories,
+        column: 'A',
+      },
+      Religion: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.religions,
+        column: 'A',
+      },
+      'Blood Group': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.bloodGroups,
+        column: 'A',
+      },
+      'Tribe / Race': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.tribes,
+        column: 'A',
+      },
+      Denomination: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.denominations,
+        column: 'A',
+      },
+      Nationality: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.nationalities,
+        column: 'A',
+      },
+      Gender: { refName: FULL_ADMISSION_HIDDEN_SHEETS.gender, column: 'A' },
+      Semester: {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.semester,
+        column: 'A',
+      },
+      'Admission Status': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.admissionStatus,
+        column: 'A',
+      },
+      'Major Department': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1MajorDepartments,
+        column: 'A',
+      },
+      'Minor Department': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1AllMinors,
+        column: 'A',
+      },
+      MDC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Mdc, column: 'A' },
+      AEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Aec, column: 'A' },
+      SEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Sec, column: 'A' },
+      'Major Department (Sem 3)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3MajorDepartments,
+        column: 'A',
+      },
+      'MDC (Sem 3)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Mdc,
+        column: 'A',
+      },
+      'AEC (Sem 3)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Aec,
+        column: 'A',
+      },
+      'SEC (Sem 3)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Sec,
+        column: 'A',
+      },
+      VTC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem3Vtc, column: 'A' },
+      'Major Department (Sem 5)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5MajorDepartments,
+        column: 'A',
+      },
+      'Minor Department (Sem 5)': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5AllMinors,
+        column: 'A',
+      },
+      'Internship Subject': {
+        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
+        column: 'A',
+      },
+    };
 
     for (const [header, config] of Object.entries(listDropdownMap)) {
       const columnIndex = headers.indexOf(header) + 1;
       const ref = refByName.get(config.refName);
-      if (!columnIndex) continue;
-      if (header === 'Programme' && programmes.length) {
-        const values = programmes.map((p) => p.code).join(',');
-        for (let row = 3; row <= 1000; row += 1) {
-          sheet.getCell(row, columnIndex).dataValidation = {
-            type: 'list',
-            allowBlank: false,
-            formulae: [`"${values}"`],
-            showErrorMessage: true,
-            errorTitle: 'Invalid programme',
-            error: 'Choose a programme from the dropdown.',
-          };
-        }
-        continue;
-      }
-      if (!ref?.rows.length) continue;
-      const formula = this.excelReferenceFormula(
-        config.refName,
-        ref.rows.length,
-        config.column,
+      if (!columnIndex || !ref?.rows.length) continue;
+      applyWorksheetListValidation(
+        sheet,
+        columnIndex,
+        excelSheetListFormula(
+          config.refName,
+          ref.rows.length,
+          config.column ?? 'A',
+        ),
+        { allowBlank: !requiredHeaders.has(header) },
       );
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, columnIndex).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [formula],
-          showErrorMessage: true,
-          errorTitle: 'Invalid selection',
-          error: `Choose a valid option from ${config.refName}.`,
-        };
-      }
-    }
-
-    const genderCol = headers.indexOf('Gender') + 1;
-    if (genderCol) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, genderCol).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: ['"Male,Female,Other"'],
-          showErrorMessage: true,
-          errorTitle: 'Invalid gender',
-          error: 'Choose Male, Female, or Other.',
-        };
-      }
-    }
-
-    const semesterCol = headers.indexOf('Semester') + 1;
-    if (semesterCol) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, semesterCol).dataValidation = {
-          type: 'list',
-          allowBlank: false,
-          formulae: ['"1,3,5"'],
-          showErrorMessage: true,
-          errorTitle: 'Invalid semester',
-          error: 'Choose 1, 3, or 5.',
-        };
-      }
-    }
-
-    const admissionStatusCol = headers.indexOf('Admission Status') + 1;
-    if (admissionStatusCol) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, admissionStatusCol).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: ['"ACTIVE,PROVISIONAL,CANCELLED"'],
-          showErrorMessage: true,
-          errorTitle: 'Invalid admission status',
-          error: 'Choose ACTIVE, PROVISIONAL, or CANCELLED.',
-        };
-      }
-    }
-
-    if (minorColIndex && majorColIndex && sem1Catalog.majorDepartments.length) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, minorColIndex).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [
-            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
-          ],
-          showErrorMessage: true,
-          errorTitle: 'Invalid minor',
-          error:
-            'Choose a minor department allowed for the selected major department.',
-        };
-      }
-    }
-
-    if (
-      sem5MinorColIndex &&
-      sem5MajorColIndex &&
-      sem5Catalog.majorDepartments.length
-    ) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, sem5MinorColIndex).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [
-            `=INDIRECT("FA5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
-          ],
-          showErrorMessage: true,
-          errorTitle: 'Invalid minor',
-          error:
-            'Choose a minor department allowed for the selected Sem 5 major department.',
-        };
-      }
     }
   }
 
@@ -5670,9 +5533,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     rowCount: number,
     column = 'A',
   ) {
-    if (rowCount <= 0) return '" "';
-    const safeName = sheetName.replace(/'/g, "''");
-    return `='${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
+    return excelSheetListFormula(sheetName, rowCount, column);
   }
 
   private templateCourseCode(code: string) {

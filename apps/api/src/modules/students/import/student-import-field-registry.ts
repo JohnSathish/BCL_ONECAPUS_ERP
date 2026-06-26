@@ -752,15 +752,18 @@ export const FULL_ADMISSION_HIDDEN_SHEETS = {
   sem1Mdc: 'FA Sem1 MDC',
   sem1Aec: 'FA Sem1 AEC',
   sem1Sec: 'FA Sem1 SEC',
-  sem1MinorsByMajor: 'FA Sem1 Minors',
+  sem1AllMinors: 'FA Sem1 Minor Depts',
   sem3MajorDepartments: 'FA Sem3 Majors',
   sem3Mdc: 'FA Sem3 MDC',
   sem3Aec: 'FA Sem3 AEC',
   sem3Sec: 'FA Sem3 SEC',
   sem3Vtc: 'FA Sem3 VTC',
   sem5MajorDepartments: 'FA Sem5 Majors',
-  sem5MinorsByMajor: 'FA Sem5 Minors',
+  sem5AllMinors: 'FA Sem5 Minor Depts',
   sem5Internship: 'FA Sem5 Internship',
+  gender: 'FA Gender',
+  semester: 'FA Semester',
+  admissionStatus: 'FA Admission Status',
 } as const;
 
 export const FULL_ADMISSION_STRUCTURE_NOTES = [
@@ -770,6 +773,7 @@ export const FULL_ADMISSION_STRUCTURE_NOTES = [
   'Sem 3: Major Department auto-assigns two major papers; no Minor column.',
   'Sem 5: Major Department auto-assigns three major papers + Minor + Internship.',
   'Use department and paper titles from dropdowns — never enter raw course codes.',
+  'Minor Department lists all NEP minors — the import validates the major/minor pairing.',
   "Father's Name and Mother's Name are mandatory for new admissions.",
   'Photo File Name is optional — use the Photo Bulk Upload tool if not embedding photos.',
 ];
