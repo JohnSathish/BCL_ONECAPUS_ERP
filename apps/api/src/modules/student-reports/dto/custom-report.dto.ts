@@ -84,6 +84,44 @@ export class ExecuteCustomReportDto extends TabularReportExportDto {
   name?: string;
 }
 
+export class RunSavedReportDto extends StudentReportFiltersDto {
+  @IsOptional()
+  @IsIn(['xlsx', 'csv'])
+  format?: 'xlsx' | 'csv';
+}
+
+export class CreateScheduledReportDto {
+  @IsString()
+  @MaxLength(120)
+  name!: string;
+
+  @IsUUID()
+  savedReportId!: string;
+
+  @IsIn(['DAILY', 'WEEKLY', 'MONTHLY'])
+  scheduleType!: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+  @IsOptional()
+  @Type(() => Number)
+  scheduleDay?: number;
+
+  @IsOptional()
+  @IsString()
+  scheduleTime?: string;
+
+  @IsOptional()
+  @IsIn(['xlsx', 'csv'])
+  format?: 'xlsx' | 'csv';
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  recipientEmails?: string[];
+
+  @IsOptional()
+  filterOverrides?: Record<string, unknown>;
+}
+
 export class BuiltinReportQueryDto extends StudentReportFiltersDto {
   @IsOptional()
   @IsArray()

@@ -216,6 +216,71 @@ export async function toggleSavedReportFavorite(id: string): Promise<{ favorited
   return data;
 }
 
+export async function deleteSavedReport(id: string): Promise<{ ok: boolean }> {
+  const { data } = await api.delete(`/v1/student-reports/saved/${id}`);
+  return data;
+}
+
+export async function previewSavedReport(
+  id: string,
+  filters?: StudentReportFilters,
+): Promise<TabularReportPreview> {
+  const { data } = await api.get(`/v1/student-reports/saved/${id}/preview`, {
+    params: cleanParams(filters),
+  });
+  return data;
+}
+
+export async function exportSavedReport(
+  id: string,
+  format: 'xlsx' | 'csv',
+  filters?: StudentReportFilters,
+): Promise<void> {
+  const response = await api.get(`/v1/student-reports/saved/${id}/export`, {
+    params: { ...cleanParams(filters), format },
+    responseType: 'blob',
+  });
+  downloadBlob(response.data, `saved-report-${id}.${format === 'xlsx' ? 'xlsx' : 'csv'}`);
+}
+
+export type ScheduledReport = {
+  id: string;
+  name: string;
+  module: string;
+  scheduleType: string;
+  scheduleDay: number | null;
+  scheduleTime: string | null;
+  format: string;
+  recipientEmails: string[] | null;
+  isActive: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  savedReport: { id: string; name: string; builtinKey: string | null } | null;
+};
+
+export async function fetchScheduledReports(module = 'STUDENTS'): Promise<ScheduledReport[]> {
+  const { data } = await api.get('/v1/student-reports/scheduled', { params: { module } });
+  return data;
+}
+
+export async function createScheduledReport(payload: {
+  name: string;
+  savedReportId: string;
+  scheduleType: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  scheduleDay?: number;
+  scheduleTime?: string;
+  format?: 'xlsx' | 'csv';
+  recipientEmails?: string[];
+}): Promise<ScheduledReport> {
+  const { data } = await api.post('/v1/student-reports/scheduled', payload);
+  return data;
+}
+
+export async function deleteScheduledReport(id: string): Promise<{ ok: boolean }> {
+  const { data } = await api.delete(`/v1/student-reports/scheduled/${id}`);
+  return data;
+}
+
 export async function previewBuiltinReport(
   key: BuiltinReportKey,
   filters?: StudentReportFilters,

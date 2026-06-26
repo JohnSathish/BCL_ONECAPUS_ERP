@@ -19,7 +19,9 @@ import { RequireAnyPermission } from '../../common/decorators/require-permission
 import {
   BuiltinReportQueryDto,
   CreateSavedReportDto,
+  CreateScheduledReportDto,
   ExecuteCustomReportDto,
+  RunSavedReportDto,
   TabularReportExportDto,
   UpdateSavedReportDto,
 } from './dto/custom-report.dto';
@@ -79,6 +81,62 @@ export class StudentReportsController {
   @Post('saved/:id/favorite')
   toggleFavorite(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.customReports.toggleFavorite(user.tid, user.sub, id);
+  }
+
+  @Get('saved/:id/preview')
+  savedPreview(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() overrides: RunSavedReportDto,
+  ) {
+    return this.customReports.executeSavedReport(user.tid, id, overrides, user);
+  }
+
+  @Get('saved/:id/export')
+  async savedExportGet(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() dto: RunSavedReportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportSavedReport(user.tid, id, dto, user),
+    );
+  }
+
+  @Post('saved/:id/export')
+  async savedExport(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: RunSavedReportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.customReports.exportSavedReport(user.tid, id, dto, user),
+    );
+  }
+
+  @Get('scheduled')
+  listScheduled(
+    @CurrentUser() user: JwtUser,
+    @Query('module') module?: string,
+  ) {
+    return this.customReports.listScheduledReports(user.tid, module);
+  }
+
+  @Post('scheduled')
+  createScheduled(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateScheduledReportDto,
+  ) {
+    return this.customReports.createScheduledReport(user.tid, user.sub, dto);
+  }
+
+  @Delete('scheduled/:id')
+  deleteScheduled(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.customReports.deleteScheduledReport(user.tid, id);
   }
 
   @Get('master/preview')

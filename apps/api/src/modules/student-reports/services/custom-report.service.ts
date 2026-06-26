@@ -17,6 +17,7 @@ import {
 } from '../domain/student-report-field-registry';
 import type {
   CreateSavedReportDto,
+  CreateScheduledReportDto,
   ExecuteCustomReportDto,
   TabularReportExportDto,
   UpdateSavedReportDto,
@@ -225,6 +226,107 @@ export class CustomReportService {
     return { ...exportResult, meta: result };
   }
 
+  async executeSavedReport(
+    tenantId: string,
+    id: string,
+    overrides: StudentReportFiltersDto,
+    user?: JwtUser,
+  ) {
+    const row = await this.requireSavedReport(tenantId, id);
+    return this.runSavedRow(tenantId, row, overrides, user);
+  }
+
+  async exportSavedReport(
+    tenantId: string,
+    id: string,
+    overrides: StudentReportFiltersDto & { format?: 'xlsx' | 'csv' },
+    user?: JwtUser,
+  ) {
+    const row = await this.requireSavedReport(tenantId, id);
+    const result = await this.runSavedRow(tenantId, row, overrides, user);
+    const { columns, name, builtinKey } = this.parseSavedConfig(row);
+    const format = overrides.format ?? 'xlsx';
+
+    let columnDefs: { key: string; label: string }[];
+    if (builtinKey && builtinKey !== 'student-master') {
+      columnDefs = result.columns as { key: string; label: string }[];
+    } else {
+      columnDefs = resolveFieldLabels(
+        columns.length
+          ? columns
+          : (result.columns as { key: string }[]).map((c) => c.key),
+      );
+    }
+
+    const exportResult = await this.tabularExport.toBuffer(
+      {
+        sheetName: name,
+        columns: columnDefs,
+        rows: result.rows as Record<string, unknown>[],
+      },
+      format,
+    );
+    return { ...exportResult, meta: result };
+  }
+
+  async listScheduledReports(tenantId: string, module = 'STUDENTS') {
+    return this.prisma.scheduledReport.findMany({
+      where: { tenantId, module, deletedAt: null },
+      include: {
+        savedReport: {
+          select: { id: true, name: true, builtinKey: true, reportKind: true },
+        },
+      },
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+    });
+  }
+
+  async createScheduledReport(
+    tenantId: string,
+    userId: string,
+    dto: CreateScheduledReportDto,
+  ) {
+    const saved = await this.requireSavedReport(tenantId, dto.savedReportId);
+    const nextRunAt = this.computeNextRun(
+      dto.scheduleType,
+      dto.scheduleDay,
+      dto.scheduleTime,
+    );
+    return this.prisma.scheduledReport.create({
+      data: {
+        tenantId,
+        createdById: userId,
+        savedReportId: saved.id,
+        name: dto.name,
+        module: saved.module,
+        scheduleType: dto.scheduleType,
+        scheduleDay: dto.scheduleDay,
+        scheduleTime: dto.scheduleTime,
+        format: dto.format ?? 'xlsx',
+        recipientEmails: (dto.recipientEmails ?? []) as Prisma.InputJsonValue,
+        filterOverrides: (dto.filterOverrides ?? {}) as Prisma.InputJsonValue,
+        nextRunAt,
+      },
+      include: {
+        savedReport: {
+          select: { id: true, name: true, builtinKey: true },
+        },
+      },
+    });
+  }
+
+  async deleteScheduledReport(tenantId: string, id: string) {
+    const row = await this.prisma.scheduledReport.findFirst({
+      where: { id, tenantId, deletedAt: null },
+    });
+    if (!row) throw new NotFoundException('Scheduled report not found');
+    await this.prisma.scheduledReport.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    return { ok: true };
+  }
+
   private async runBuiltin(
     tenantId: string,
     key: BuiltinReportKey,
@@ -256,6 +358,93 @@ export class CustomReportService {
       return this.subjectReports.subjectPapers(tenantId, resolvedFilters, user);
     }
     throw new BadRequestException(`Unknown built-in report: ${key}`);
+  }
+
+  private async runSavedRow(
+    tenantId: string,
+    row: {
+      name: string;
+      reportKind: string;
+      builtinKey: string | null;
+      filters: unknown;
+      columns: unknown;
+      sortBy: string | null;
+      sortDirection: string | null;
+    },
+    overrides: StudentReportFiltersDto,
+    user?: JwtUser,
+  ) {
+    const { filters, columns, builtinKey } = this.parseSavedConfig(row);
+    const merged: StudentReportFiltersDto = {
+      ...filters,
+      ...overrides,
+      ...(row.sortBy ? { sortBy: row.sortBy } : {}),
+      ...(row.sortDirection
+        ? { sortDirection: row.sortDirection as 'asc' | 'desc' }
+        : {}),
+    };
+
+    if (row.reportKind === 'BUILTIN' && builtinKey) {
+      return this.runBuiltin(
+        tenantId,
+        builtinKey as BuiltinReportKey,
+        merged,
+        user,
+        columns.length ? columns : undefined,
+      );
+    }
+
+    if (!columns.length) {
+      throw new BadRequestException('Saved report has no columns configured');
+    }
+
+    return this.masterAssembler.assemble(tenantId, merged, user, columns);
+  }
+
+  private parseSavedConfig(row: {
+    name: string;
+    builtinKey: string | null;
+    filters: unknown;
+    columns: unknown;
+  }) {
+    const filters = (row.filters ?? {}) as StudentReportFiltersDto;
+    const columns = Array.isArray(row.columns) ? (row.columns as string[]) : [];
+    return {
+      filters,
+      columns,
+      name: row.name,
+      builtinKey: row.builtinKey,
+    };
+  }
+
+  private computeNextRun(
+    scheduleType: string,
+    scheduleDay?: number,
+    scheduleTime?: string,
+  ) {
+    const now = new Date();
+    const next = new Date(now);
+    const [hours, minutes] = (scheduleTime ?? '08:00')
+      .split(':')
+      .map((v) => Number.parseInt(v, 10));
+
+    next.setHours(hours || 8, minutes || 0, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+
+    if (scheduleType === 'WEEKLY') {
+      const target = scheduleDay ?? 1;
+      while (next.getDay() !== target) {
+        next.setDate(next.getDate() + 1);
+      }
+    }
+
+    if (scheduleType === 'MONTHLY') {
+      const day = Math.min(scheduleDay ?? 1, 28);
+      next.setDate(day);
+      if (next <= now) next.setMonth(next.getMonth() + 1);
+    }
+
+    return next;
   }
 
   private async applyOperationalFilters(

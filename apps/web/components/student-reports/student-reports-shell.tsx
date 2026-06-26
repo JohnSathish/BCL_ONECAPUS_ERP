@@ -18,8 +18,8 @@ const NAV_ITEMS = [
   { label: 'Subject Registration', href: '/admin/reports/students/subject-registration' },
   { label: 'Subject Papers', href: '/admin/reports/students/subject-papers' },
   { label: 'Report Builder', href: '/admin/reports/students/builder' },
-  { label: 'Saved Reports', href: '/admin/reports/students/saved', soon: true },
-  { label: 'Scheduled', href: '/admin/reports/students/scheduled', soon: true },
+  { label: 'Saved Reports', href: '/admin/reports/students/saved' },
+  { label: 'Scheduled', href: '/admin/reports/students/scheduled' },
   { label: 'Export Center', href: '/admin/reports/students/export' },
 ];
 

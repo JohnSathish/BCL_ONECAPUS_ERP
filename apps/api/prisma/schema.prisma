@@ -10562,7 +10562,8 @@ model SavedReport {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
 
-  favorites SavedReportFavorite[]
+  favorites        SavedReportFavorite[]
+  scheduledReports ScheduledReport[]
 
   @@index([tenantId, module, deletedAt])
   @@index([tenantId, builtinKey])
@@ -10583,5 +10584,33 @@ model SavedReportFavorite {
   @@unique([userId, savedReportId])
   @@index([tenantId, userId])
   @@map("saved_report_favorites")
+  @@schema("platform")
+}
+
+model ScheduledReport {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  createdById     String?   @map("created_by_id") @db.Uuid
+  savedReportId   String?   @map("saved_report_id") @db.Uuid
+  name            String
+  module          String    @default("STUDENTS")
+  scheduleType    String    @map("schedule_type")
+  scheduleDay     Int?      @map("schedule_day")
+  scheduleTime    String?   @map("schedule_time")
+  format          String    @default("xlsx")
+  recipientEmails Json?     @map("recipient_emails")
+  filterOverrides Json?     @map("filter_overrides")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastRunAt       DateTime? @map("last_run_at")
+  nextRunAt       DateTime? @map("next_run_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  savedReport SavedReport? @relation(fields: [savedReportId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, module, isActive])
+  @@index([tenantId, nextRunAt])
+  @@map("scheduled_reports")
   @@schema("platform")
 }
