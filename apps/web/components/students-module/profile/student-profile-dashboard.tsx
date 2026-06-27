@@ -270,13 +270,19 @@ function ProfileSummarySidebar({
           <p className="mb-1 text-[10px] font-medium text-muted-foreground">
             Sem {profile.semester} subjects ({enrollments.length})
           </p>
-          <ul className="max-h-32 space-y-0.5 overflow-y-auto text-[10px]">
-            {enrollments.slice(0, 8).map((e) => (
-              <li key={`${e.registrationId}-${e.courseCode}`} className="truncate">
-                <span className="font-mono text-muted-foreground">{e.courseCode}</span>{' '}
-                {e.courseTitle}
-              </li>
-            ))}
+          <ul className="max-h-40 space-y-0.5 overflow-y-auto text-[10px]">
+            {[...enrollments]
+              .sort((a, b) => {
+                const rank = (c?: string | null) => (c === 'MAJOR' || c === 'MINOR' ? 0 : 1);
+                return rank(a.category) - rank(b.category);
+              })
+              .slice(0, 10)
+              .map((e) => (
+                <li key={`${e.registrationId}-${e.courseCode}`} className="truncate">
+                  <span className="font-mono text-muted-foreground">{e.courseCode}</span>{' '}
+                  {e.courseTitle}
+                </li>
+              ))}
           </ul>
         </div>
       ) : null}

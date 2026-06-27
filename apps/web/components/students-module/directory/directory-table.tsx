@@ -206,10 +206,12 @@ function DataRow({
           <PhotoCell row={row} />
         </td>
         <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <p className="font-mono text-[11px] font-medium">{row.enrollmentNumber}</p>
+          <p className="font-mono text-[11px] font-medium">{row.rollNumber ?? '—'}</p>
         </td>
         <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <p className="font-mono text-[11px] font-medium">{row.rollNumber ?? '—'}</p>
+          <p className="font-mono text-[11px] font-medium">
+            {row.universityRollNumber?.trim() || row.admissionNumber?.trim() || '—'}
+          </p>
         </td>
         <td className="max-w-[160px] px-1.5 py-1 align-middle">
           <button
@@ -343,10 +345,10 @@ export function DirectoryTable({
           Photo
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Reg No
+          Roll No
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Roll No
+          NEHU Roll No
         </th>
         <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Student Name

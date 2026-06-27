@@ -10,6 +10,7 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DirectoryAdvancedFiltersDrawer } from '@/components/students-module/directory/directory-advanced-filters-drawer';
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
@@ -29,9 +30,12 @@ import {
   deleteStudentPhotosBulk,
   downloadStudentPhotoBulkReport,
   downloadStudentPhotoIdentifierList,
+  fetchStudentPhotoBulkJob,
   fetchStudentPhotoBulkJobs,
+  getPhotoBulkApplyProgress,
   previewStudentPhotoBulkUpload,
   reprocessStudentPhotosBulk,
+  type PhotoBulkApplyProgress,
   type PhotoBulkBatch,
   type PhotoIdentifierStrategy,
 } from '@/services/student-photo-bulk';
@@ -112,6 +116,7 @@ export function StudentPhotoBulkPage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [preview, setPreview] = useState<PhotoBulkBatch | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
+  const [applyProgress, setApplyProgress] = useState<PhotoBulkApplyProgress | null>(null);
   const [message, setMessage] = useState('');
 
   const institutions = useQuery({
@@ -170,6 +175,8 @@ export function StudentPhotoBulkPage() {
     queryKey: ['student-photo-bulk', 'jobs'],
     queryFn: fetchStudentPhotoBulkJobs,
     enabled: Boolean(session) && perms.canManagePhotos,
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((job) => job.status === 'PROCESSING') ? 2000 : false,
   });
 
   const programOptions = useMemo(() => {
@@ -228,17 +235,29 @@ export function StudentPhotoBulkPage() {
   const applyMut = useMutation({
     mutationFn: () => {
       if (!preview) throw new Error('Generate preview first');
-      return applyStudentPhotoBulkUpload(preview.id, conflictStrategy);
+      setApplyProgress(null);
+      return applyStudentPhotoBulkUpload(preview.id, conflictStrategy, (batch) => {
+        setApplyProgress(getPhotoBulkApplyProgress(batch));
+      });
     },
     onSuccess: (result) => {
+      setApplyProgress(null);
       setMessage(
         result.message ??
           `Assigned ${result.assigned ?? 0} photos. Skipped ${result.skipped ?? 0}.`,
       );
+      if (preview?.id) {
+        void fetchStudentPhotoBulkJob(preview.id)
+          .then(setPreview)
+          .catch(() => undefined);
+      }
       void qc.invalidateQueries({ queryKey: ['student-photo-bulk', 'jobs'] });
       void qc.invalidateQueries({ queryKey: ['students'] });
     },
-    onError: (err) => setMessage(apiErrorMessage(err, 'Photo assignment failed')),
+    onError: (err) => {
+      setApplyProgress(null);
+      setMessage(apiErrorMessage(err, 'Photo assignment failed'));
+    },
   });
 
   const deleteMut = useMutation({
@@ -361,6 +380,13 @@ export function StudentPhotoBulkPage() {
               <p className="mt-3 text-xs text-primary">
                 {files.length} file{files.length === 1 ? '' : 's'} detected
               </p>
+              {files.length > 150 && !files.some((f) => f.name.toLowerCase().endsWith('.zip')) ? (
+                <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  For {files.length} photos, zip them into one <strong>.zip</strong> file first
+                  (e.g. BA25-002.jpg, BA25-003.jpg inside the zip). Uploading hundreds of individual
+                  files can fail in the browser — a single ZIP is much more reliable.
+                </p>
+              ) : null}
               {previewMut.isPending ? (
                 <p className="mt-1 text-xs text-muted-foreground">Uploading {uploadPct}%</p>
               ) : null}
@@ -448,11 +474,29 @@ export function StudentPhotoBulkPage() {
                 className="min-h-[88px] w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                 value={csvMap}
                 onChange={(e) => setCsvMap(e.target.value)}
-                placeholder={'StudentIdentifier,PhotoFile\nBA26-001,photo1.jpg'}
+                placeholder={'Leave empty when filenames match roll numbers (e.g. BA25-002.JPG)'}
               />
             </Field>
 
             {message ? <p className="rounded-lg bg-muted px-3 py-2 text-xs">{message}</p> : null}
+
+            {applyMut.isPending && applyProgress ? (
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-medium">{applyProgress.label}</span>
+                  {!applyProgress.indeterminate ? (
+                    <span className="text-muted-foreground">{applyProgress.percent}%</span>
+                  ) : null}
+                </div>
+                <Progress
+                  value={applyProgress.indeterminate ? 8 : applyProgress.percent}
+                  className={cn('h-2.5', applyProgress.indeterminate && '[&>div]:animate-pulse')}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Assigned {applyProgress.processed} of {applyProgress.total} matched photos
+                </p>
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -492,25 +536,11 @@ export function StudentPhotoBulkPage() {
           <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
             <h2 className="text-sm font-semibold">Job progress</h2>
             {(jobs.data ?? []).slice(0, 8).map((job) => (
-              <div key={job.id} className="rounded-lg border border-border px-3 py-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{job.status}</span>
-                  <span className="text-muted-foreground">
-                    {new Date(job.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-1 text-muted-foreground">
-                  Matched {job.matchedCount} · Assigned {job.assignedCount} · Errors{' '}
-                  {job.errorCount}
-                </div>
-                <button
-                  type="button"
-                  className="mt-1 text-primary underline"
-                  onClick={() => downloadStudentPhotoBulkReport(job.id)}
-                >
-                  Download report
-                </button>
-              </div>
+              <PhotoBulkJobCard
+                key={job.id}
+                job={job}
+                onDownloadReport={downloadStudentPhotoBulkReport}
+              />
             ))}
             {(jobs.data ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">No photo batches yet.</p>
@@ -527,6 +557,12 @@ export function StudentPhotoBulkPage() {
                   Matched {preview.matchedCount} · Unmatched {preview.unmatchedCount} · Duplicates{' '}
                   {preview.duplicateCount} · Missing {preview.missingCount}
                 </p>
+                {preview.unmatchedCount > 0 ? (
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                    Unmatched files have no student with that roll number in the database (e.g.{' '}
+                    BA25-1021 when only ~385 students exist). Only matched rows are assigned.
+                  </p>
+                ) : null}
               </div>
               <Button
                 type="button"
@@ -609,6 +645,72 @@ export function StudentPhotoBulkPage() {
         religionOptions={religionOptions}
       />
     </DashboardShell>
+  );
+}
+
+function PhotoBulkJobCard({
+  job,
+  onDownloadReport,
+}: {
+  job: PhotoBulkBatch;
+  onDownloadReport: (batchId: string) => void;
+}) {
+  const progress = getPhotoBulkApplyProgress(job);
+  const showBar =
+    job.matchedCount > 0 &&
+    (job.status === 'PROCESSING' ||
+      job.status === 'COMPLETED' ||
+      job.status === 'COMPLETED_WITH_ERRORS');
+
+  const statusClass =
+    job.status === 'COMPLETED'
+      ? 'text-emerald-700'
+      : job.status === 'COMPLETED_WITH_ERRORS'
+        ? 'text-amber-700'
+        : job.status === 'PROCESSING'
+          ? 'text-primary'
+          : job.status === 'FAILED'
+            ? 'text-destructive'
+            : 'text-muted-foreground';
+
+  return (
+    <div className="rounded-lg border border-border px-3 py-2 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className={cn('font-medium capitalize', statusClass)}>{progress.label}</span>
+        <span className="text-muted-foreground">{new Date(job.createdAt).toLocaleString()}</span>
+      </div>
+
+      {showBar ? (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
+            <span>
+              {progress.processed} of {progress.total} matched photos
+            </span>
+            {!progress.indeterminate ? <span>{progress.percent}%</span> : null}
+          </div>
+          <Progress
+            value={progress.indeterminate ? 8 : progress.percent}
+            className={cn('h-2.5', progress.indeterminate && '[&>div]:animate-pulse')}
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-2 text-muted-foreground">
+        Matched {job.matchedCount} · Assigned {job.assignedCount} · Skipped {job.skippedCount} ·
+        Errors {job.errorCount}
+      </div>
+      {(job.status === 'COMPLETED' ||
+        job.status === 'COMPLETED_WITH_ERRORS' ||
+        job.status === 'FAILED') && (
+        <button
+          type="button"
+          className="mt-1 text-primary underline"
+          onClick={() => onDownloadReport(job.id)}
+        >
+          Download report
+        </button>
+      )}
+    </div>
   );
 }
 

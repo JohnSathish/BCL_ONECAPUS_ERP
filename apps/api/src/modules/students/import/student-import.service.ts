@@ -17,6 +17,8 @@ import {
 
 import { PrismaService } from '../../../database/prisma.service';
 
+import { QueueService } from '../../../shared/queue/queue.service';
+
 import type { StudentImportMode } from '../dto/students.dto';
 
 import {
@@ -26,6 +28,9 @@ import {
 import { Sem1ImportCurriculumService } from './sem1-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './sem5-import-curriculum.service';
+
+/** Large student imports run in the background to avoid HTTP timeouts. */
+const STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD = 50;
 
 @Injectable()
 export class StudentImportService {
@@ -41,6 +46,8 @@ export class StudentImportService {
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
     private readonly sem5Curriculum: Sem5ImportCurriculumService,
+
+    private readonly queue: QueueService,
   ) {}
 
   buildTemplate(options?: { mode?: 'blank' | 'prefilled'; tenantId?: string }) {
@@ -209,6 +216,16 @@ export class StudentImportService {
 
     if (!batch) throw new NotFoundException('Import batch not found');
 
+    if (batch.status === 'COMMITTING') {
+      return {
+        batchId,
+        status: 'COMMITTING',
+        async: true,
+        message:
+          'Import already in progress. Waiting for background processing to finish.',
+      };
+    }
+
     if (batch.status !== 'VALIDATED') {
       throw new ConflictException(
         `Batch is not ready for commit (status: ${batch.status})`,
@@ -229,50 +246,98 @@ export class StudentImportService {
       throw new ConflictException('No valid rows to import');
     }
 
+    if (validDbRows.length > STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD) {
+      await this.batches.updateBatch(batchId, tenantId, {
+        status: 'COMMITTING',
+        strictMode: mode === 'STRICT',
+      });
+      await this.queue.enqueueStudentImportCommit({
+        tenantId,
+        userId,
+        batchId,
+        mode,
+        importMode,
+      });
+      return {
+        batchId,
+        status: 'COMMITTING',
+        async: true,
+        message:
+          'Import queued for background processing. This may take several minutes for large files.',
+      };
+    }
+
+    return this.commitSync(
+      tenantId,
+      userId,
+      batchId,
+      mode,
+      importMode,
+      validDbRows,
+    );
+  }
+
+  async runCommitJob(
+    tenantId: string,
+    userId: string,
+    batchId: string,
+    mode: ImportCommitMode,
+    importMode: StudentImportMode = 'CREATE',
+  ) {
+    const validDbRows = await this.batches.getRowsByBatch(batchId, {
+      status: 'VALID',
+    });
+    return this.commitSync(
+      tenantId,
+      userId,
+      batchId,
+      mode,
+      importMode,
+      validDbRows,
+    );
+  }
+
+  private async commitSync(
+    tenantId: string,
+    userId: string,
+    batchId: string,
+    mode: ImportCommitMode,
+    importMode: StudentImportMode,
+    validDbRows: Awaited<ReturnType<ImportBatchRepository['getRowsByBatch']>>,
+  ) {
     await this.batches.updateBatch(batchId, tenantId, {
       status: 'COMMITTING',
-
       strictMode: mode === 'STRICT',
     });
 
     const toImport = validDbRows.map((r) => ({
       rowNumber: r.rowNumber,
-
       normalized: r.normalized as NormalizedStudentImportRow,
     }));
 
     try {
       const created = await this.handler.commitRows(
         { tenantId, userId, batchId, options: { importMode } },
-
         toImport,
       );
 
       await this.batches.markRowsImported(
         batchId,
-
         created.map((c) => ({ rowNumber: c.rowNumber, courseId: c.entityId })),
       );
 
       await this.batches.updateBatch(batchId, tenantId, {
         status: 'COMMITTED',
-
         successfulRows: created.length,
-
         failedRows: 0,
-
         completedAt: new Date(),
       });
 
       return {
         batchId,
-
         status: 'COMMITTED',
-
         async: false,
-
         successfulRows: created.length,
-
         failedRows: 0,
       };
     } catch (e) {
@@ -280,9 +345,7 @@ export class StudentImportService {
 
       await this.batches.updateBatch(batchId, tenantId, {
         status: 'FAILED',
-
         errorMessage: message,
-
         completedAt: new Date(),
       });
 

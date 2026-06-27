@@ -9,6 +9,17 @@ export function getApiBaseUrl(): string {
   return 'http://localhost:3001/api';
 }
 
+/**
+ * Direct Nest API URL for browser multipart uploads.
+ * Next.js dev proxy can truncate streaming multipart bodies; bypass it for file uploads.
+ */
+export function getDirectApiBaseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_API_DIRECT_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'development') return 'http://127.0.0.1:3001/api';
+  return getApiBaseUrl();
+}
+
 /** Socket.IO runs on the Nest host, not the Next.js dev server. */
 export function getRealtimeOrigin(): string {
   const wsFromEnv = process.env.NEXT_PUBLIC_WS_ORIGIN?.trim();

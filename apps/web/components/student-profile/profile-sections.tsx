@@ -251,17 +251,24 @@ export function AcademicIdentitySection({
   profile: StudentProfile;
   canEdit: boolean;
 }) {
+  const nehuRegistration =
+    profile.universityRegistrationNumber ??
+    (profile.enrollmentNumber && profile.enrollmentNumber !== profile.rollNumber
+      ? profile.enrollmentNumber
+      : '');
+  const nehuRoll = profile.universityRollNumber ?? profile.admissionNumber ?? '';
+
   const [form, setForm] = useState({
     abcId: profile.abcId ?? '',
-    enrollmentNumber: profile.enrollmentNumber,
-    admissionNumber: profile.admissionNumber ?? '',
+    universityRegistrationNumber: nehuRegistration,
+    universityRollNumber: nehuRoll,
     rollNumber: profile.rollNumber ?? '',
   });
   const savePayload = useMemo(
     () => ({
       abcId: form.abcId,
-      enrollmentNumber: form.enrollmentNumber,
-      admissionNumber: form.admissionNumber || undefined,
+      universityRegistrationNumber: form.universityRegistrationNumber.trim() || undefined,
+      universityRollNumber: form.universityRollNumber.trim() || undefined,
       rollNumber: form.rollNumber || undefined,
     }),
     [form],
@@ -289,16 +296,18 @@ export function AcademicIdentitySection({
           <input
             className={inputClass}
             disabled={!canEdit}
-            value={form.enrollmentNumber}
-            onChange={(e) => setForm((f) => ({ ...f, enrollmentNumber: e.target.value }))}
+            value={form.universityRegistrationNumber}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, universityRegistrationNumber: e.target.value }))
+            }
           />
         </Field>
         <Field label="NEHU Roll No.">
           <input
             className={inputClass}
             disabled={!canEdit}
-            value={form.admissionNumber}
-            onChange={(e) => setForm((f) => ({ ...f, admissionNumber: e.target.value }))}
+            value={form.universityRollNumber}
+            onChange={(e) => setForm((f) => ({ ...f, universityRollNumber: e.target.value }))}
           />
         </Field>
         <Field label="College Roll No.">

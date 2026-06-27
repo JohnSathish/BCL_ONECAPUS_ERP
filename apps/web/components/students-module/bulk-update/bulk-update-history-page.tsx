@@ -3,14 +3,18 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
+import { Progress } from '@/components/ui/progress';
 import {
+  applyBulkUpdate,
   fetchBulkUpdateBatch,
   fetchBulkUpdateBatches,
   formatFieldValue,
+  getBulkUpdateApplyProgress,
   rollbackBulkUpdate,
 } from '@/services/student-bulk-update';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -34,7 +38,32 @@ export function BulkUpdateHistoryPage() {
     queryKey: ['bulk-update', 'batch', focusBatchId],
     queryFn: () => fetchBulkUpdateBatch(focusBatchId!),
     enabled: Boolean(session) && Boolean(focusBatchId) && perms.canBulkUpdate,
+    refetchInterval: (query) => (query.state.data?.status === 'PROCESSING' ? 2000 : false),
   });
+
+  const applyMut = useMutation({
+    mutationFn: (batchId: string) =>
+      applyBulkUpdate(batchId, false, () => {
+        void qc.invalidateQueries({ queryKey: ['bulk-update', 'batch', batchId] });
+        void qc.invalidateQueries({ queryKey: ['bulk-update', 'batches'] });
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['bulk-update', 'batches'] });
+      if (focusBatchId) {
+        void qc.invalidateQueries({ queryKey: ['bulk-update', 'batch', focusBatchId] });
+      }
+      void qc.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+
+  const applyProgress =
+    detail.data && (detail.data.status === 'PROCESSING' || applyMut.isPending)
+      ? getBulkUpdateApplyProgress(detail.data)
+      : null;
+
+  const canResumeApply =
+    detail.data?.status === 'PREVIEWED' ||
+    (detail.data?.status === 'PROCESSING' && !detail.data.appliedAt);
 
   const rollbackMut = useMutation({
     mutationFn: (batchId: string) => rollbackBulkUpdate(batchId),
@@ -110,16 +139,28 @@ export function BulkUpdateHistoryPage() {
         <div className="rounded-xl border border-border">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-sm font-semibold">Batch detail</span>
-            {focusBatchId && detail.data?.status === 'APPLIED' && perms.canBulkUpdateRollback ? (
-              <button
-                type="button"
-                className="text-xs text-destructive underline disabled:opacity-50"
-                disabled={rollbackMut.isPending}
-                onClick={() => rollbackMut.mutate(focusBatchId)}
-              >
-                {rollbackMut.isPending ? 'Rolling back…' : 'Rollback'}
-              </button>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {focusBatchId && canResumeApply && perms.canBulkUpdate ? (
+                <button
+                  type="button"
+                  className={cn(buttonVariants({ size: 'sm' }), 'h-7 text-xs')}
+                  disabled={applyMut.isPending}
+                  onClick={() => applyMut.mutate(focusBatchId)}
+                >
+                  {applyMut.isPending ? 'Applying…' : 'Apply batch'}
+                </button>
+              ) : null}
+              {focusBatchId && detail.data?.status === 'APPLIED' && perms.canBulkUpdateRollback ? (
+                <button
+                  type="button"
+                  className="text-xs text-destructive underline disabled:opacity-50"
+                  disabled={rollbackMut.isPending}
+                  onClick={() => rollbackMut.mutate(focusBatchId)}
+                >
+                  {rollbackMut.isPending ? 'Rolling back…' : 'Rollback'}
+                </button>
+              ) : null}
+            </div>
           </div>
           {!focusBatchId ? (
             <p className="px-3 py-4 text-xs text-muted-foreground">
@@ -139,6 +180,28 @@ export function BulkUpdateHistoryPage() {
                 <p>
                   Applied {detail.data.appliedCount} · Errors {detail.data.errorCount}
                 </p>
+                {applyMut.isError ? (
+                  <p className="text-destructive">
+                    {apiErrorMessage(applyMut.error, 'Apply failed')}
+                  </p>
+                ) : null}
+                {applyProgress && (detail.data.status === 'PROCESSING' || applyMut.isPending) ? (
+                  <div className="space-y-1 pt-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        {applyProgress.indeterminate ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : null}
+                        {applyProgress.label}
+                      </span>
+                      {!applyProgress.indeterminate ? <span>{applyProgress.percent}%</span> : null}
+                    </div>
+                    <Progress
+                      value={applyProgress.indeterminate ? 8 : applyProgress.percent}
+                      className={cn('h-2', applyProgress.indeterminate && '[&>div]:animate-pulse')}
+                    />
+                  </div>
+                ) : null}
                 {rollbackMut.isError ? (
                   <p className="text-destructive">
                     {apiErrorMessage(rollbackMut.error, 'Rollback failed')}

@@ -310,6 +310,8 @@ export class StudentProfileSectionsService {
           applicationNumber: student.applicationNumber,
           admissionNumber: student.admissionNumber,
           enrollmentNumber: student.enrollmentNumber,
+          universityRollNumber: student.universityRollNumber,
+          universityRegistrationNumber: student.universityRegistrationNumber,
           rollNumber: student.rollNumber,
           fullName: student.masterProfile?.fullName,
           email: student.masterProfile?.email ?? student.user.email,
@@ -529,6 +531,15 @@ export class StudentProfileSectionsService {
             : {}),
           ...(dto.enrollmentNumber !== undefined
             ? { enrollmentNumber: dto.enrollmentNumber }
+            : {}),
+          ...(dto.universityRollNumber !== undefined
+            ? { universityRollNumber: dto.universityRollNumber.trim() || null }
+            : {}),
+          ...(dto.universityRegistrationNumber !== undefined
+            ? {
+                universityRegistrationNumber:
+                  dto.universityRegistrationNumber.trim() || null,
+              }
             : {}),
           ...(dto.rollNumber !== undefined
             ? { rollNumber: dto.rollNumber }

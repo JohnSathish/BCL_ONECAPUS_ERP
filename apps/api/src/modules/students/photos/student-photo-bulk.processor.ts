@@ -16,6 +16,7 @@ export class StudentPhotoBulkProcessor extends WorkerHost {
       conflictStrategy?: string;
     }>,
   ): Promise<unknown> {
+    if (process.env.PROCESS_BACKGROUND_JOBS === 'worker') return undefined;
     if (job.name !== 'student-photo-bulk-apply') return null;
     const { tenantId, batchId, userId, conflictStrategy } = job.data;
     await this.photoBulk.applyBatchInternal(

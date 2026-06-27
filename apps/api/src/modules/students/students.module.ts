@@ -20,6 +20,7 @@ import { StudentBulkUpdateProcessor } from './bulk-update/student-bulk-update.pr
 import { StudentBulkUpdateService } from './bulk-update/student-bulk-update.service';
 import { StudentImportHandler } from './import/student-import.handler';
 import { StudentImportProfileWriterService } from './import/student-import-profile-writer.service';
+import { StudentImportProcessor } from './import/student-import.processor';
 import { StudentImportService } from './import/student-import.service';
 import { Sem1ImportCurriculumService } from './import/sem1-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './import/sem3-import-curriculum.service';
@@ -87,6 +88,7 @@ import { StudentLeaveService } from './services/student-leave.service';
     StudentImportHandler,
     StudentImportProfileWriterService,
     StudentImportService,
+    StudentImportProcessor,
     Sem3ImportCurriculumService,
     Sem1ImportCurriculumService,
     Sem5ImportCurriculumService,

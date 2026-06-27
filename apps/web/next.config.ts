@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: ['geist'],
+  // Next.js 15.5+ buffers proxied request bodies (default 10MB). Photo ZIP uploads exceed that.
+  experimental: {
+    proxyClientMaxBodySize: '512mb',
+    middlewareClientMaxBodySize: '512mb',
+  },
   eslint: {
     // ESLint runs in CI (web-lint job); Docker build stays resilient.
     ignoreDuringBuilds: true,
@@ -63,13 +68,15 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const devApiConnect =
+      process.env.NODE_ENV === 'development' ? ' http://127.0.0.1:3001 http://localhost:3001' : '';
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.razorpay.com wss: ws:",
+      `connect-src 'self' https://api.razorpay.com wss: ws:${devApiConnect}`,
       "frame-src 'self' https://api.razorpay.com",
       "object-src 'none'",
       "base-uri 'self'",

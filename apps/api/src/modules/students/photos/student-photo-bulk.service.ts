@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -11,7 +12,6 @@ import sharp from 'sharp';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { JwtUser } from '../../../common/decorators/current-user.decorator';
-import { QueueService } from '../../../shared/queue/queue.service';
 import { StudentsService } from '../students.service';
 import { toStudentListQuery } from '../dto/students.dto';
 import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
@@ -25,6 +25,8 @@ import type {
 const MAX_FILES = 5000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MIN_IMAGE_BYTES = 20 * 1024;
+/** Total bytes across all files in one preview request (individual files mode). */
+const MAX_TOTAL_UPLOAD_BYTES = 512 * 1024 * 1024;
 const ASYNC_THRESHOLD = 200;
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const IMAGE_MIMES = new Set([
@@ -53,12 +55,12 @@ type StudentMatch = {
 
 @Injectable()
 export class StudentPhotoBulkService {
+  private readonly logger = new Logger(StudentPhotoBulkService.name);
   private readonly uploadRoot = resolveTenantUploadRoot();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly students: StudentsService,
-    private readonly queue: QueueService,
   ) {}
 
   async preview(
@@ -76,6 +78,15 @@ export class StudentPhotoBulkService {
       throw new BadRequestException('Upload photos or a ZIP file');
     if (photoFiles.length > MAX_FILES) {
       throw new BadRequestException(`Maximum ${MAX_FILES} files per batch`);
+    }
+    const totalBytes = photoFiles.reduce(
+      (sum, file) => sum + file.buffer.length,
+      0,
+    );
+    if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
+      throw new BadRequestException(
+        `Total upload size ${Math.round(totalBytes / (1024 * 1024))} MB exceeds ${Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))} MB. Zip the photos into one file and upload the ZIP instead.`,
+      );
     }
 
     const normalization = this.defaultNormalization(normalizationInput);
@@ -212,26 +223,65 @@ export class StudentPhotoBulkService {
 
   async apply(user: JwtUser, dto: PhotoBulkApplyDto) {
     const batch = await this.assertBatch(user.tid, dto.batchId);
-    if (!['PREVIEWED', 'FAILED'].includes(batch.status)) {
+    const stuckProcessing =
+      batch.status === 'PROCESSING' &&
+      !batch.appliedAt &&
+      batch.assignedCount === 0 &&
+      Date.now() - new Date(batch.updatedAt).getTime() > 30_000;
+
+    const started = await (this.prisma as any).studentPhotoBulkBatch.updateMany(
+      {
+        where: {
+          id: dto.batchId,
+          tenantId: user.tid,
+          OR: [
+            { status: { in: ['PREVIEWED', 'FAILED'] } },
+            ...(stuckProcessing
+              ? [{ status: 'PROCESSING', appliedAt: null, assignedCount: 0 }]
+              : []),
+          ],
+        },
+        data: {
+          status: 'PROCESSING',
+          assignedCount: 0,
+          skippedCount: 0,
+        },
+      },
+    );
+
+    if (started.count === 0) {
+      if (batch.status === 'PROCESSING') {
+        throw new BadRequestException(
+          'Photo assignment is already in progress',
+        );
+      }
       throw new BadRequestException(
         `Batch status is ${batch.status}, cannot apply`,
       );
     }
+
     if (batch.matchedCount > ASYNC_THRESHOLD) {
-      await this.queue.enqueueStudentPhotoBulkApply({
-        tenantId: user.tid,
-        batchId: dto.batchId,
-        userId: user.sub,
-        conflictStrategy: dto.conflictStrategy,
-      });
-      await (this.prisma as any).studentPhotoBulkBatch.update({
-        where: { id: dto.batchId },
-        data: { status: 'PROCESSING' },
+      // Run in-process — the shared BullMQ "exports" queue has many processors and
+      // the wrong worker often completes photo jobs without doing any work.
+      void this.applyBatchInternal(
+        user.tid,
+        dto.batchId,
+        user.sub,
+        dto.conflictStrategy,
+      ).catch(async (err) => {
+        this.logger.error(
+          `Photo bulk apply failed for batch ${dto.batchId}`,
+          err instanceof Error ? err.stack : String(err),
+        );
+        await (this.prisma as any).studentPhotoBulkBatch.update({
+          where: { id: dto.batchId },
+          data: { status: 'FAILED' },
+        });
       });
       return {
         batchId: dto.batchId,
         async: true,
-        message: 'Photo assignment queued',
+        message: 'Photo assignment started',
       };
     }
     return this.applyBatchInternal(
@@ -248,6 +298,32 @@ export class StudentPhotoBulkService {
     actorId: string,
     conflictOverride?: string,
   ) {
+    try {
+      return await this.runApplyBatch(
+        tenantId,
+        batchId,
+        actorId,
+        conflictOverride,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Photo bulk apply crashed for batch ${batchId}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+      await (this.prisma as any).studentPhotoBulkBatch.update({
+        where: { id: batchId },
+        data: { status: 'FAILED' },
+      });
+      throw err;
+    }
+  }
+
+  private async runApplyBatch(
+    tenantId: string,
+    batchId: string,
+    actorId: string,
+    conflictOverride?: string,
+  ) {
     const batch = await this.assertBatch(tenantId, batchId);
     const conflict = conflictOverride ?? batch.conflictStrategy;
     const changes = await (this.prisma as any).studentPhotoBulkChange.findMany({
@@ -259,8 +335,22 @@ export class StudentPhotoBulkService {
     let assigned = 0;
     let skipped = 0;
     let errors = 0;
+    const total = changes.length;
+    const flushEvery = 5;
 
-    for (const change of changes) {
+    const flushProgress = async () => {
+      await (this.prisma as any).studentPhotoBulkBatch.update({
+        where: { id: batchId },
+        data: {
+          assignedCount: assigned,
+          skippedCount: skipped,
+          errorCount: batch.errorCount + errors,
+        },
+      });
+    };
+
+    for (let index = 0; index < changes.length; index += 1) {
+      const change = changes[index];
       try {
         const currentPhoto =
           change.student?.masterProfile?.photoPath ?? change.oldPhotoPath;
@@ -270,41 +360,40 @@ export class StudentPhotoBulkService {
             where: { id: change.id },
             data: { status: 'SKIPPED', errorMessage: 'Existing photo kept' },
           });
-          continue;
+        } else {
+          const publicPath = await this.persistAssignedPhoto(
+            tenantId,
+            change.studentId,
+            change.stagedPath,
+            conflict === 'KEEP_BOTH',
+          );
+          await this.prisma.studentProfile.upsert({
+            where: { studentId: change.studentId },
+            create: {
+              tenantId,
+              studentId: change.studentId,
+              fullName: change.student?.masterProfile?.fullName ?? 'Student',
+              photoPath: publicPath,
+            },
+            update: { photoPath: publicPath },
+          });
+          await this.prisma.studentProfileAuditLog.create({
+            data: {
+              tenantId,
+              studentId: change.studentId,
+              sectionKey: 'bulk_photo',
+              fieldKey: 'photoPath',
+              oldValue: currentPhoto ?? null,
+              newValue: publicPath,
+              actorId,
+            },
+          });
+          await (this.prisma as any).studentPhotoBulkChange.update({
+            where: { id: change.id },
+            data: { status: 'ASSIGNED', newPhotoPath: publicPath },
+          });
+          assigned += 1;
         }
-
-        const publicPath = await this.persistAssignedPhoto(
-          tenantId,
-          change.studentId,
-          change.stagedPath,
-          conflict === 'KEEP_BOTH',
-        );
-        await this.prisma.studentProfile.upsert({
-          where: { studentId: change.studentId },
-          create: {
-            tenantId,
-            studentId: change.studentId,
-            fullName: change.student?.masterProfile?.fullName ?? 'Student',
-            photoPath: publicPath,
-          },
-          update: { photoPath: publicPath },
-        });
-        await this.prisma.studentProfileAuditLog.create({
-          data: {
-            tenantId,
-            studentId: change.studentId,
-            sectionKey: 'bulk_photo',
-            fieldKey: 'photoPath',
-            oldValue: currentPhoto ?? null,
-            newValue: publicPath,
-            actorId,
-          },
-        });
-        await (this.prisma as any).studentPhotoBulkChange.update({
-          where: { id: change.id },
-          data: { status: 'ASSIGNED', newPhotoPath: publicPath },
-        });
-        assigned += 1;
       } catch (err) {
         errors += 1;
         await (this.prisma as any).studentPhotoBulkChange.update({
@@ -314,6 +403,10 @@ export class StudentPhotoBulkService {
             errorMessage: err instanceof Error ? err.message : 'Assign failed',
           },
         });
+      }
+
+      if ((index + 1) % flushEvery === 0 || index === total - 1) {
+        await flushProgress();
       }
     }
 

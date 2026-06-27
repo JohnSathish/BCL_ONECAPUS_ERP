@@ -86,13 +86,11 @@ export function DirectoryMobileList({ rows, selectedIds, onToggleRow, onOpenProf
                   </button>
                 </DirectoryStudentHoverCard>
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  {row.enrollmentNumber}
+                  Roll {row.rollNumber ?? '—'}
+                  {row.universityRollNumber?.trim() || row.admissionNumber?.trim()
+                    ? ` · NEHU ${row.universityRollNumber?.trim() || row.admissionNumber?.trim()}`
+                    : ''}
                 </p>
-                {row.rollNumber ? (
-                  <p className="font-mono text-[11px] text-muted-foreground">
-                    Roll {row.rollNumber}
-                  </p>
-                ) : null}
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <DirectoryStatusPill label={statusLabel} />
                   <DirectorySemesterChip semester={row.semester} />

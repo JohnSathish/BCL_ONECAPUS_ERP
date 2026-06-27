@@ -37,6 +37,7 @@ import {
 import { DirectoryAdvancedFiltersDrawer } from '@/components/students-module/directory/directory-advanced-filters-drawer';
 import { BulkActionButton, BulkActionToolbar, BulkEmptyState } from '@/components/erp/bulk-actions';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { Progress } from '@/components/ui/progress';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
@@ -52,7 +53,9 @@ import { fetchShifts } from '@/services/shifts';
 import {
   applyBulkUpdate,
   fetchBulkUpdateFields,
+  getBulkUpdateApplyProgress,
   previewBulkUpdate,
+  type BulkUpdateApplyProgress,
 } from '@/services/student-bulk-update';
 import { fetchMasterLookups, fetchStudents } from '@/services/students';
 import type { StudentDirectoryRow } from '@/types/students';
@@ -97,6 +100,7 @@ export function BulkUpdatePage() {
   );
   const [previewError, setPreviewError] = useState('');
   const [forceApply, setForceApply] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<BulkUpdateApplyProgress | null>(null);
 
   const institutions = useQuery({
     queryKey: ['org', 'institutions'],
@@ -207,15 +211,22 @@ export function BulkUpdatePage() {
   const applyMut = useMutation({
     mutationFn: () => {
       if (!wizard.batchId) throw new Error('Missing preview batch');
-      return applyBulkUpdate(wizard.batchId, forceApply);
+      setApplyProgress(null);
+      return applyBulkUpdate(wizard.batchId, forceApply, (batch) => {
+        setApplyProgress(getBulkUpdateApplyProgress(batch));
+      });
     },
     onSuccess: (data) => {
+      setApplyProgress(null);
       wizard.setApplyResult(data);
       void qc.invalidateQueries({ queryKey: ['students'] });
       void qc.invalidateQueries({ queryKey: ['bulk-update', 'batches'] });
       wizard.next();
     },
-    onError: (err) => setPreviewError(apiErrorMessage(err, 'Apply failed')),
+    onError: (err) => {
+      setApplyProgress(null);
+      setPreviewError(apiErrorMessage(err, 'Apply failed'));
+    },
   });
 
   if (!session) return null;
@@ -482,6 +493,7 @@ export function BulkUpdatePage() {
               preview={preview}
               previewLoading={previewMut.isPending}
               applying={applyMut.isPending}
+              applyProgress={applyProgress}
               batchId={wizard.batchId}
             />
             <LiveStudentPreview
@@ -706,6 +718,7 @@ function OperationConsole({
   preview,
   previewLoading,
   applying,
+  applyProgress,
   batchId,
 }: {
   step: string;
@@ -714,6 +727,7 @@ function OperationConsole({
   preview: Awaited<ReturnType<typeof previewBulkUpdate>> | null;
   previewLoading: boolean;
   applying: boolean;
+  applyProgress: BulkUpdateApplyProgress | null;
   batchId: string | null;
 }) {
   const validationScore = preview
@@ -739,11 +753,26 @@ function OperationConsole({
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {previewLoading
               ? 'Validating changes...'
-              : 'Applying updates and recording audit trail...'}
+              : (applyProgress?.label ?? 'Applying updates and recording audit trail...')}
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-background">
-            <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
-          </div>
+          {applyProgress && applying ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>
+                  {applyProgress.processed} of {applyProgress.total} students
+                </span>
+                {!applyProgress.indeterminate ? <span>{applyProgress.percent}%</span> : null}
+              </div>
+              <Progress
+                value={applyProgress.indeterminate ? 8 : applyProgress.percent}
+                className={cn('h-2.5', applyProgress.indeterminate && '[&>div]:animate-pulse')}
+              />
+            </div>
+          ) : (
+            <div className="h-1.5 overflow-hidden rounded-full bg-background">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+            </div>
+          )}
         </div>
       ) : null}
     </section>

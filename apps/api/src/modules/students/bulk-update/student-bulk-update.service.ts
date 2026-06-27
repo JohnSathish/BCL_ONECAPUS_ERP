@@ -1,12 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { JwtUser } from '../../../common/decorators/current-user.decorator';
-import { QueueService } from '../../../shared/queue/queue.service';
+import { parseFlexibleDate } from '../../../common/utils/parse-flexible-date';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
 import { StudentsService } from '../students.service';
 import { StudentProfileSectionsService } from '../services/student-profile-sections.service';
@@ -20,18 +21,18 @@ import { StudentBulkSectionWriterService } from './student-bulk-section-writer.s
 import { toStudentListQuery } from '../dto/students.dto';
 
 const MAX_STUDENTS = 5000;
-const CHUNK_SIZE = 50;
 const ASYNC_THRESHOLD = 200;
 
 @Injectable()
 export class StudentBulkUpdateService {
+  private readonly logger = new Logger(StudentBulkUpdateService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly students: StudentsService,
     private readonly sections: StudentProfileSectionsService,
     private readonly sectionWriter: StudentBulkSectionWriterService,
     private readonly academicEngine: AcademicEngineService,
-    private readonly queue: QueueService,
   ) {}
 
   getFields() {
@@ -258,33 +259,73 @@ export class StudentBulkUpdateService {
       where: { id: batchId, tenantId: user.tid },
     });
     if (!batch) throw new NotFoundException('Batch not found');
-    if (batch.status !== 'PREVIEWED') {
+
+    const stuckProcessing =
+      batch.status === 'PROCESSING' &&
+      !batch.appliedAt &&
+      Date.now() - new Date(batch.updatedAt).getTime() > 10_000;
+
+    const started = await this.prisma.studentBulkUpdateBatch.updateMany({
+      where: {
+        id: batchId,
+        tenantId: user.tid,
+        OR: [
+          { status: 'PREVIEWED' },
+          ...(stuckProcessing
+            ? [{ status: 'PROCESSING', appliedAt: null }]
+            : []),
+        ],
+      },
+      data: {
+        status: 'PROCESSING',
+        ...(stuckProcessing ? {} : { appliedCount: 0, errorCount: 0 }),
+        ipAddress: ipAddress ?? batch.ipAddress,
+      },
+    });
+
+    if (started.count === 0) {
+      if (batch.status === 'PROCESSING') {
+        throw new BadRequestException('Bulk update is already in progress');
+      }
       throw new BadRequestException(
         `Batch status is ${batch.status}, cannot apply`,
       );
     }
+
     if (batch.invalidCount > 0 && !forceApply) {
+      await this.prisma.studentBulkUpdateBatch.update({
+        where: { id: batchId },
+        data: { status: 'PREVIEWED' },
+      });
       throw new BadRequestException(
         `${batch.invalidCount} students have validation errors — use forceApply to override`,
       );
     }
 
     if (batch.studentCount > ASYNC_THRESHOLD) {
-      await this.queue.enqueueStudentBulkUpdateApply({
-        tenantId: user.tid,
+      void this.applyBatchInternal(
+        user.tid,
         batchId,
-        userId: user.sub,
-        ipAddress,
+        user.sub,
         forceApply,
-      });
-      await this.prisma.studentBulkUpdateBatch.update({
-        where: { id: batchId },
-        data: { status: 'PROCESSING' },
+      ).catch(async (err) => {
+        this.logger.error(
+          `Bulk update failed for batch ${batchId}`,
+          err instanceof Error ? err.stack : String(err),
+        );
+        await this.prisma.studentBulkUpdateBatch.update({
+          where: { id: batchId },
+          data: {
+            status: 'FAILED',
+            errorMessage: err instanceof Error ? err.message : 'Apply failed',
+          },
+        });
       });
       return {
         batchId,
         async: true,
-        message: 'Bulk update queued for processing',
+        total: batch.validCount || batch.studentCount,
+        message: 'Bulk update started',
       };
     }
 
@@ -292,6 +333,30 @@ export class StudentBulkUpdateService {
   }
 
   async applyBatchInternal(
+    tenantId: string,
+    batchId: string,
+    actorId: string,
+    forceApply = false,
+  ) {
+    try {
+      return await this.runApplyBatch(tenantId, batchId, actorId, forceApply);
+    } catch (err) {
+      this.logger.error(
+        `Bulk update apply crashed for batch ${batchId}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+      await this.prisma.studentBulkUpdateBatch.update({
+        where: { id: batchId },
+        data: {
+          status: 'FAILED',
+          errorMessage: err instanceof Error ? err.message : 'Apply failed',
+        },
+      });
+      throw err;
+    }
+  }
+
+  private async runApplyBatch(
     tenantId: string,
     batchId: string,
     actorId: string,
@@ -318,119 +383,126 @@ export class StudentBulkUpdateService {
       byStudent.set(c.studentId, list);
     }
 
-    let applied = 0;
-    let errors = 0;
+    let applied = batch.appliedCount;
+    let errors = batch.errorCount;
     const studentIds = [...byStudent.keys()];
+    const flushEvery = 5;
 
-    for (let i = 0; i < studentIds.length; i += CHUNK_SIZE) {
-      const chunk = studentIds.slice(i, i + CHUNK_SIZE);
-      await this.prisma.$transaction(async (tx) => {
-        for (const studentId of chunk) {
-          try {
-            const student = await this.sections.loadStudentForBulk(
-              tenantId,
-              studentId,
-            );
-            const rowValues = this.resolveValuesForStudent(
-              { updateMode, values, csvRows: csvRows ?? undefined, fieldKeys },
-              student.enrollmentNumber,
-              student.rollNumber,
-            );
+    const flushProgress = async () => {
+      await this.prisma.studentBulkUpdateBatch.update({
+        where: { id: batchId },
+        data: { appliedCount: applied, errorCount: errors },
+      });
+    };
 
-            if (!forceApply) {
-              const validationErrors = await this.validateStudentChanges(
-                tenantId,
-                student,
-                fieldKeys,
-                rowValues,
-                false,
-              );
-              if (validationErrors.length) {
-                errors += 1;
-                await tx.studentBulkUpdateChange.updateMany({
-                  where: { batchId, studentId, status: 'PREVIEW' },
-                  data: {
-                    status: 'ERROR',
-                    errorMessage: validationErrors.join('; '),
-                  },
-                });
-                continue;
-              }
-            }
+    this.logger.log(
+      `Applying bulk update batch ${batchId} for ${studentIds.length} students`,
+    );
 
-            const current: Record<string, unknown> = {};
-            for (const fk of fieldKeys) {
-              current[fk] = await this.sectionWriter.readFieldValue(
-                student,
-                fk,
-              );
-            }
+    for (let index = 0; index < studentIds.length; index += 1) {
+      const studentId = studentIds[index]!;
+      try {
+        const student = await this.sections.loadStudentForBulk(
+          tenantId,
+          studentId,
+        );
+        const rowValues = this.resolveValuesForStudent(
+          { updateMode, values, csvRows: csvRows ?? undefined, fieldKeys },
+          student.enrollmentNumber,
+          student.rollNumber,
+        );
 
-            const nepFields = fieldKeys.filter((k) =>
-              ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'].includes(k),
-            );
-            const profileFields = fieldKeys.filter(
-              (k) => !nepFields.includes(k),
-            );
-
-            if (profileFields.length) {
-              const patches = this.sectionWriter.buildSectionPatches(
-                profileFields,
-                rowValues,
-                updateMode,
-                current,
-              );
-              await this.sectionWriter.applySectionPatches(
-                tenantId,
-                studentId,
-                patches,
-                actorId,
-              );
-            }
-
-            for (const nepKey of nepFields) {
-              const offeringId = rowValues[nepKey];
-              if (offeringId) {
-                await this.applyNepCategory(
-                  tenantId,
-                  studentId,
-                  nepKey,
-                  String(offeringId),
-                );
-              }
-            }
-
-            const auditChanges = profileFields.map((fk) => ({
-              fieldKey: fk,
-              sectionKey: BULK_UPDATE_FIELD_MAP.get(fk)?.sectionKey ?? 'basic',
-              oldValue: current[fk],
-              newValue: rowValues[fk],
-            }));
-
-            await this.sectionWriter.writeAuditLogs(
-              tx,
-              tenantId,
-              studentId,
-              actorId,
-              auditChanges,
-            );
-
-            await tx.studentBulkUpdateChange.updateMany({
-              where: { batchId, studentId, status: 'PREVIEW' },
-              data: { status: 'APPLIED' },
-            });
-
-            applied += 1;
-          } catch (err) {
+        if (!forceApply) {
+          const validationErrors = await this.validateStudentChanges(
+            tenantId,
+            student,
+            fieldKeys,
+            rowValues,
+            false,
+          );
+          if (validationErrors.length) {
             errors += 1;
-            const msg = err instanceof Error ? err.message : 'Apply failed';
-            await tx.studentBulkUpdateChange.updateMany({
+            await this.prisma.studentBulkUpdateChange.updateMany({
               where: { batchId, studentId, status: 'PREVIEW' },
-              data: { status: 'ERROR', errorMessage: msg },
+              data: {
+                status: 'ERROR',
+                errorMessage: validationErrors.join('; '),
+              },
             });
+            continue;
           }
         }
-      });
+
+        const current: Record<string, unknown> = {};
+        for (const fk of fieldKeys) {
+          current[fk] = await this.sectionWriter.readFieldValue(student, fk);
+        }
+
+        const nepFields = fieldKeys.filter((k) =>
+          ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'].includes(k),
+        );
+        const profileFields = fieldKeys.filter((k) => !nepFields.includes(k));
+
+        if (profileFields.length) {
+          const patches = this.sectionWriter.buildSectionPatches(
+            profileFields,
+            rowValues,
+            updateMode,
+            current,
+          );
+          await this.sectionWriter.applySectionPatches(
+            tenantId,
+            studentId,
+            patches,
+            actorId,
+          );
+        }
+
+        for (const nepKey of nepFields) {
+          const offeringId = rowValues[nepKey];
+          if (offeringId) {
+            await this.applyNepCategory(
+              tenantId,
+              studentId,
+              nepKey,
+              String(offeringId),
+            );
+          }
+        }
+
+        const auditChanges = profileFields.map((fk) => ({
+          fieldKey: fk,
+          sectionKey: BULK_UPDATE_FIELD_MAP.get(fk)?.sectionKey ?? 'basic',
+          oldValue: current[fk],
+          newValue: rowValues[fk],
+        }));
+
+        await this.sectionWriter.writeAuditLogs(
+          this.prisma,
+          tenantId,
+          studentId,
+          actorId,
+          auditChanges,
+        );
+
+        await this.prisma.studentBulkUpdateChange.updateMany({
+          where: { batchId, studentId, status: 'PREVIEW' },
+          data: { status: 'APPLIED' },
+        });
+
+        applied += 1;
+      } catch (err) {
+        errors += 1;
+        const msg = err instanceof Error ? err.message : 'Apply failed';
+        await this.prisma.studentBulkUpdateChange.updateMany({
+          where: { batchId, studentId, status: 'PREVIEW' },
+          data: { status: 'ERROR', errorMessage: msg },
+        });
+      }
+
+      if ((index + 1) % flushEvery === 0 || index === studentIds.length - 1) {
+        await flushProgress();
+      }
     }
 
     await this.prisma.studentBulkUpdateBatch.update({
@@ -580,7 +652,14 @@ export class StudentBulkUpdateService {
         ) ?? {};
       const out: Record<string, unknown> = {};
       for (const key of dto.fieldKeys) {
-        if (row[key] !== undefined) out[key] = row[key];
+        if (row[key] === undefined) continue;
+        if (key === 'dateOfBirth') {
+          const parsed = parseFlexibleDate(row[key]);
+          if (parsed) out[key] = parsed;
+          else if (String(row[key] ?? '').trim()) out[key] = row[key];
+          continue;
+        }
+        out[key] = row[key];
       }
       return out;
     }

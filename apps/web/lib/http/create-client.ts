@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { waitForAuthBootstrap } from '@/lib/auth/wait-for-auth-bootstrap';
 
 type CreateClientOptions = {
+  baseURL?: string;
   onUnauthorized?: (
     error: AxiosError,
     retry: (config: InternalAxiosRequestConfig) => ReturnType<AxiosInstance['request']>,
@@ -47,7 +48,7 @@ function assertJsonApiResponse(res: AxiosResponse) {
 
 export function createHttpClient(options: CreateClientOptions = {}): AxiosInstance {
   const client = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: options.baseURL ?? API_BASE_URL,
     timeout: API_REQUEST_TIMEOUT_MS,
     withCredentials: true,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

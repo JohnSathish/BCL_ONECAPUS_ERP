@@ -673,11 +673,13 @@ export async function commitStudentImport(
       mode,
       importMode,
     },
-    { timeout: 120_000 },
+    { timeout: 600_000 },
   );
   return data as {
     batchId: string;
     status: string;
+    async?: boolean;
+    message?: string;
     successfulRows: number;
     failedRows?: number;
   };

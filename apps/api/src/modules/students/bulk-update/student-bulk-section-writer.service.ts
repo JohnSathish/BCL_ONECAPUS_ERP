@@ -42,6 +42,10 @@ export class StudentBulkSectionWriterService {
         return student.masterProfile?.bloodGroupLookupId ?? null;
       case 'rollNumber':
         return student.rollNumber ?? null;
+      case 'universityRollNumber':
+        return student.universityRollNumber ?? null;
+      case 'universityRegistrationNumber':
+        return student.universityRegistrationNumber ?? null;
       case 'enrollmentNumber':
         return student.enrollmentNumber ?? null;
       case 'abcId':

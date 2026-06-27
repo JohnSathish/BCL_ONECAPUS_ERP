@@ -32,6 +32,7 @@ export type StudentDirectoryRow = {
   admissionNumber?: string | null;
   enrollmentNumber: string;
   rollNumber?: string | null;
+  universityRollNumber?: string | null;
   rfidNumber?: string | null;
   fullName: string;
   displayFullName?: string;
@@ -122,6 +123,8 @@ export type StudentAttendanceSummary = {
 export type StudentProfile = StudentDirectoryRow & {
   applicationNumber?: string | null;
   admissionNumber?: string | null;
+  universityRollNumber?: string | null;
+  universityRegistrationNumber?: string | null;
   rfidNumber?: string | null;
   importSource?: string | null;
   admissionSource?: string | null;

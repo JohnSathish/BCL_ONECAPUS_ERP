@@ -128,15 +128,117 @@ export async function previewBulkUpdate(payload: {
   return data;
 }
 
+export type BulkUpdateApplyProgress = {
+  percent: number;
+  processed: number;
+  total: number;
+  label: string;
+  indeterminate: boolean;
+};
+
+const BULK_UPDATE_DONE = new Set(['APPLIED', 'FAILED']);
+
+export function getBulkUpdateApplyProgress(batch: BulkUpdateBatchSummary): BulkUpdateApplyProgress {
+  const total = batch.validCount || batch.studentCount || 0;
+  const processed = batch.appliedCount + batch.errorCount;
+
+  if (batch.status === 'APPLIED') {
+    return {
+      percent: 100,
+      processed: total,
+      total,
+      label: 'Bulk update complete',
+      indeterminate: false,
+    };
+  }
+
+  if (batch.status === 'FAILED') {
+    return {
+      percent: total > 0 ? Math.round((processed / total) * 100) : 0,
+      processed,
+      total,
+      label: 'Bulk update failed',
+      indeterminate: false,
+    };
+  }
+
+  if (batch.status === 'PROCESSING') {
+    const percent = total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
+    return {
+      percent,
+      processed,
+      total,
+      label:
+        processed > 0
+          ? `Updating students — ${processed} of ${total} (${percent}%)`
+          : 'Starting bulk update…',
+      indeterminate: processed === 0,
+    };
+  }
+
+  return {
+    percent: 0,
+    processed,
+    total,
+    label: batch.status.replace(/_/g, ' ').toLowerCase(),
+    indeterminate: false,
+  };
+}
+
+async function pollUntilBulkUpdateApplied(
+  batchId: string,
+  onProgress?: (batch: BulkUpdateBatchSummary) => void,
+): Promise<BulkUpdateBatchSummary> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const batch = await fetchBulkUpdateBatch(batchId);
+    onProgress?.(batch);
+    if (BULK_UPDATE_DONE.has(batch.status)) return batch;
+  }
+  throw new Error('Bulk update is still processing. Check batch history in a few minutes.');
+}
+
 export async function applyBulkUpdate(
   batchId: string,
   forceApply = false,
+  onProgress?: (batch: BulkUpdateBatchSummary) => void,
 ): Promise<BulkUpdateApplyResult> {
   const { data } = await api.post('/v1/students/bulk-update/apply', {
     batchId,
     forceApply,
   });
-  return data;
+  const result = data as BulkUpdateApplyResult;
+  if (!result.async) return result;
+
+  onProgress?.(
+    await fetchBulkUpdateBatch(batchId).catch(
+      () =>
+        ({
+          id: batchId,
+          status: 'PROCESSING',
+          studentCount: result.total ?? 0,
+          validCount: result.total ?? 0,
+          invalidCount: 0,
+          appliedCount: 0,
+          errorCount: 0,
+          appliedAt: null,
+          rolledBackAt: null,
+          createdAt: new Date().toISOString(),
+          updateMode: 'REPLACE',
+          fieldKeys: [],
+        }) satisfies BulkUpdateBatchSummary,
+    ),
+  );
+
+  const batch = await pollUntilBulkUpdateApplied(batchId, onProgress);
+  return {
+    batchId,
+    async: false,
+    applied: batch.appliedCount,
+    errors: batch.errorCount,
+    total: batch.validCount || batch.studentCount,
+    message: `Updated ${batch.appliedCount} students. ${batch.errorCount} errors.`,
+  };
 }
 
 export async function rollbackBulkUpdate(batchId: string) {

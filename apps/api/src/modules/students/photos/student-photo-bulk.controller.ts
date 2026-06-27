@@ -31,7 +31,7 @@ import {
 } from './dto/student-photo-bulk.dto';
 import { StudentPhotoBulkService } from './student-photo-bulk.service';
 
-const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
 
 function clientIp(req: Request) {
   const forwarded = req.headers['x-forwarded-for'];

@@ -6,6 +6,33 @@ const API_ORIGIN =
   process.env.NEXT_PRIVATE_API_ORIGIN ??
   'http://127.0.0.1:3001';
 
+/** Nest takes longer to boot than Next.js on `npm run dev`; retry brief connection failures. */
+const PROXY_STARTUP_MAX_ATTEMPTS = 15;
+const PROXY_STARTUP_INITIAL_DELAY_MS = 400;
+const PROXY_STARTUP_MAX_DELAY_MS = 2_000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchUpstreamWithStartupRetry(url: URL, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < PROXY_STARTUP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt === PROXY_STARTUP_MAX_ATTEMPTS - 1) break;
+      const delay = Math.min(
+        PROXY_STARTUP_INITIAL_DELAY_MS * 1.4 ** attempt,
+        PROXY_STARTUP_MAX_DELAY_MS,
+      );
+      await sleep(delay);
+    }
+  }
+  throw lastError;
+}
+
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'content-length',
@@ -58,10 +85,15 @@ async function proxyApiRequest(request: NextRequest, context: RouteContext) {
     headers.set('accept', headers.get('accept') ?? 'application/json');
     headers.set('x-request-id', traceId);
 
-    const upstream = await fetch(upstreamUrl, {
+    const body = ['GET', 'HEAD'].includes(request.method)
+      ? undefined
+      : Buffer.from(await request.arrayBuffer());
+    if (body) headers.set('content-length', String(body.length));
+
+    const upstream = await fetchUpstreamWithStartupRetry(upstreamUrl, {
       method: request.method,
       headers,
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer(),
+      body,
       redirect: 'manual',
       cache: 'no-store',
     });

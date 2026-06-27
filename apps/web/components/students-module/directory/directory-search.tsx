@@ -84,7 +84,7 @@ export function DirectorySearch({ value, onChange, onSearch, loading, className 
               setRecent(loadRecent());
             }}
             onBlur={() => window.setTimeout(() => setFocused(false), 150)}
-            placeholder="Name, Reg No, Roll No, Mobile, Aadhaar, RFID, Email, Application No…"
+            placeholder="Name, Roll No, NEHU Roll No, Mobile, Aadhaar, RFID, Email…"
             className={cn(
               'h-10 w-full rounded-lg border border-border/60 bg-background/80 pl-9 pr-16 text-sm',
               'placeholder:text-muted-foreground/70 focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20',

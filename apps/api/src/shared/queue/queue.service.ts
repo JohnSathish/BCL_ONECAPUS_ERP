@@ -49,6 +49,18 @@ export class QueueService {
     });
   }
 
+  enqueueStudentImportCommit(payload: {
+    tenantId: string;
+    userId: string;
+    batchId: string;
+    mode: string;
+    importMode?: string;
+  }) {
+    return this.exports.add('student-import-commit', payload, {
+      attempts: 2,
+    });
+  }
+
   enqueueStudentBulkUpdateApply(payload: {
     tenantId: string;
     batchId: string;

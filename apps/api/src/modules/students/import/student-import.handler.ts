@@ -15,6 +15,7 @@ import type {
   ImportValidateOptions,
   ParsedImportRow,
 } from '../../../common/import/import.types';
+import { parseFlexibleDate } from '../../../common/utils/parse-flexible-date';
 import { PrismaService } from '../../../database/prisma.service';
 import { isAcademicDepartment } from '../../organization/department-rules';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
@@ -1104,7 +1105,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (categoryCode && !categoryLookupId) {
       errors.push(`Unknown category code: ${categoryCode}`);
     }
-    const religionRaw = String(raw.religion ?? '').trim();
+    const religionRaw = this.normalizeImportReligion(
+      String(raw.religion ?? '').trim(),
+    );
     let religionLookupId: string | undefined;
     if (religionRaw) {
       religionLookupId =
@@ -1115,7 +1118,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       }
     }
     const bloodGroupLookupId = this.resolveLookupId(
-      raw.bloodGroup,
+      this.normalizeImportBloodGroup(String(raw.bloodGroup ?? '').trim()),
       ctx.bloodGroupByKey,
       'blood group',
       errors,
@@ -1127,7 +1130,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       errors,
     );
     const denominationLookupId = this.resolveLookupId(
-      raw.denomination,
+      this.normalizeImportDenomination(String(raw.denomination ?? '').trim()),
       ctx.denominationByKey,
       'denomination',
       errors,
@@ -3491,19 +3494,46 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return null;
   }
 
+  private normalizeImportReligion(value: string) {
+    if (!value) return '';
+    const upper = value.trim().toUpperCase();
+    const aliases: Record<string, string> = {
+      CHRISTISN: 'Christian',
+      HINDUISM: 'Hindu',
+      BUDDHISM: 'Buddhist',
+    };
+    return aliases[upper] ?? value.trim();
+  }
+
+  private normalizeImportDenomination(value: string) {
+    if (!value) return '';
+    const upper = value.trim().toUpperCase();
+    if (upper === 'OTHERS') return 'Other';
+    return value.trim();
+  }
+
+  private normalizeImportBloodGroup(value: string) {
+    if (!value) return '';
+    const text = value.trim().replace(/\u2212/g, '-');
+    const upper = text.toUpperCase();
+    if (['NOT CHECKED', 'NA', 'N/A', 'UNKNOWN', 'NIL'].includes(upper)) {
+      return '';
+    }
+    if (upper === '0+' || upper === '0 POS' || upper === '0POS') return 'O+';
+    if (/^O\+VE$/i.test(text)) return 'O+';
+    if (/^A\+VE$/i.test(text)) return 'A+';
+    if (/^B\+VE$/i.test(text)) return 'B+';
+    if (/^AB\+VE$/i.test(text)) return 'AB+';
+    if (/^(A|B|O|AB)$/i.test(text)) return `${upper}+`;
+    if (/^(A|B|O|AB)[+-]$/i.test(text)) {
+      const group = text.slice(0, -1).toUpperCase();
+      return text.endsWith('-') ? `${group}\u2212` : `${group}+`;
+    }
+    return text.trim();
+  }
+
   private parseImportDate(value: string) {
-    const trimmed = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-    const dmy = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-    if (dmy) {
-      const [, d, m, y] = dmy;
-      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    }
-    const parsed = new Date(trimmed);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(0, 10);
-    }
-    return null;
+    return parseFlexibleDate(value);
   }
 
   private parseResidenceType(hostelRaw: string) {

@@ -27,6 +27,8 @@ export class UpdateBasicSectionDto {
   @IsOptional() @IsString() admissionNumber?: string;
   @IsOptional() @IsString() enrollmentNumber?: string;
   @IsOptional() @IsString() rollNumber?: string;
+  @IsOptional() @IsString() universityRollNumber?: string;
+  @IsOptional() @IsString() universityRegistrationNumber?: string;
   @IsOptional() @IsString() fullName?: string;
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() mobileNumber?: string;

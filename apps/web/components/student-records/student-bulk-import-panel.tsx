@@ -295,15 +295,53 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     },
   });
 
+  const pollUntilCommitted = useCallback(
+    async (batchId: string) => {
+      const maxAttempts = 300;
+      for (let i = 0; i < maxAttempts; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const batches = await fetchStudentImportBatches(1, 50);
+        const batch = batches.data.find((item) => item.id === batchId);
+        if (!batch) continue;
+        if (batch.status === 'COMMITTED') {
+          setCommitResult({
+            batchId,
+            status: 'COMMITTED',
+            successfulRows: batch.successfulRows,
+            failedRows: batch.failedRows,
+          });
+          setStep('done');
+          setNotice('');
+          void qc.invalidateQueries({ queryKey: ['students'] });
+          void qc.invalidateQueries({ queryKey: ['student-import-batches'] });
+          return;
+        }
+        if (batch.status === 'FAILED') {
+          throw new Error(batch.errorMessage ?? 'Import failed in background');
+        }
+      }
+      throw new Error('Import is still processing. Check Import History in a few minutes.');
+    },
+    [qc],
+  );
+
   const commitMut = useMutation({
     mutationFn: () => {
       if (!preview?.batchId) throw new Error('No validated import batch');
       return commitStudentImport(preview.batchId, commitMode, importMode);
     },
     onMutate: () => setStep('committing'),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      if (result.async) {
+        setNotice(
+          result.message ?? 'Import queued for background processing. Please keep this page open.',
+        );
+        await pollUntilCommitted(result.batchId);
+        return;
+      }
       setCommitResult(result);
       setStep('done');
+      setNotice('');
       void qc.invalidateQueries({ queryKey: ['students'] });
       void qc.invalidateQueries({ queryKey: ['student-import-batches'] });
     },
@@ -667,6 +705,19 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
                   </BulkActionButton>
                 ) : null}
               </div>
+
+              {step === 'committing' ? (
+                <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium">Importing {preview.summary.valid} students…</p>
+                    <p className="text-muted-foreground">
+                      Large imports run in the background and may take several minutes. Please keep
+                      this page open until completion.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="grid gap-2 sm:grid-cols-4">
                 <SummaryCard label="Rows" value={preview.summary.total} />

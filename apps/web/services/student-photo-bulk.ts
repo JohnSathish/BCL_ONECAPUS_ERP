@@ -1,5 +1,16 @@
+import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
+import { pingActivity } from '@/lib/auth/session-activity';
+import { createHttpClient } from '@/lib/http/create-client';
+import { getDirectApiBaseUrl } from '@/lib/http/env';
 import { api } from '@/services/api';
 import { downloadBlob } from '@/utils/download-blob';
+
+/** Bypass Next.js dev proxy — multipart uploads are truncated when proxied. */
+const uploadApi = createHttpClient({
+  baseURL: getDirectApiBaseUrl(),
+  onSuccess: pingActivity,
+  onUnauthorized: (error, retry) => tokenRefreshManager.handle401(error, retry),
+});
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 
 export type PhotoIdentifierStrategy =
@@ -106,8 +117,10 @@ export async function previewStudentPhotoBulkUpload(
   if (payload.scopeFilter) form.append('scopeFilter', JSON.stringify(payload.scopeFilter));
   if (payload.csvMap) form.append('csvMap', payload.csvMap);
 
-  const { data } = await api.post('/v1/students/photos/bulk/preview', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const { data } = await uploadApi.post('/v1/students/photos/bulk/preview', form, {
+    timeout: 600_000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
     onUploadProgress: (e) => {
       if (onUploadProgress && e.total) onUploadProgress(Math.round((e.loaded / e.total) * 100));
     },
@@ -115,9 +128,93 @@ export async function previewStudentPhotoBulkUpload(
   return data as PhotoBulkBatch;
 }
 
-export async function applyStudentPhotoBulkUpload(batchId: string, conflictStrategy?: string) {
+const PHOTO_BATCH_DONE = new Set(['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED']);
+
+export type PhotoBulkApplyProgress = {
+  percent: number;
+  processed: number;
+  total: number;
+  label: string;
+  indeterminate: boolean;
+};
+
+export function getPhotoBulkApplyProgress(job: PhotoBulkBatch): PhotoBulkApplyProgress {
+  const total = job.matchedCount || 0;
+  const processed = job.assignedCount + job.skippedCount;
+
+  if (job.status === 'COMPLETED' || job.status === 'COMPLETED_WITH_ERRORS') {
+    return {
+      percent: 100,
+      processed: total,
+      total,
+      label: job.status === 'COMPLETED_WITH_ERRORS' ? 'Completed with errors' : 'Completed',
+      indeterminate: false,
+    };
+  }
+
+  if (job.status === 'FAILED') {
+    return {
+      percent: total ? Math.round((processed / total) * 100) : 0,
+      processed,
+      total,
+      label: 'Failed',
+      indeterminate: false,
+    };
+  }
+
+  if (job.status === 'PROCESSING') {
+    const percent = total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
+    return {
+      percent,
+      processed,
+      total,
+      label:
+        processed > 0
+          ? `Assigning photos — ${processed} of ${total} (${percent}%)`
+          : 'Starting assignment… (this may take a few minutes for large batches)',
+      indeterminate: processed === 0,
+    };
+  }
+
+  if (job.status === 'PREVIEWED') {
+    return {
+      percent: 0,
+      processed: 0,
+      total,
+      label: 'Ready to apply',
+      indeterminate: false,
+    };
+  }
+
+  return {
+    percent: 0,
+    processed,
+    total,
+    label: job.status.replace(/_/g, ' ').toLowerCase(),
+    indeterminate: false,
+  };
+}
+
+async function pollUntilPhotoBatchApplied(
+  batchId: string,
+  onProgress?: (batch: PhotoBulkBatch) => void,
+): Promise<PhotoBulkBatch> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const batch = await fetchStudentPhotoBulkJob(batchId);
+    onProgress?.(batch);
+    if (PHOTO_BATCH_DONE.has(batch.status)) return batch;
+  }
+  throw new Error('Photo assignment is still processing. Check the jobs list in a few minutes.');
+}
+
+export async function applyStudentPhotoBulkUpload(
+  batchId: string,
+  conflictStrategy?: string,
+  onProgress?: (batch: PhotoBulkBatch) => void,
+) {
   const { data } = await api.post('/v1/students/photos/bulk/apply', { batchId, conflictStrategy });
-  return data as {
+  const result = data as {
     batchId: string;
     async?: boolean;
     message?: string;
@@ -125,6 +222,32 @@ export async function applyStudentPhotoBulkUpload(batchId: string, conflictStrat
     skipped?: number;
     errors?: number;
     total?: number;
+  };
+  if (!result.async) return result;
+
+  onProgress?.(
+    await fetchStudentPhotoBulkJob(batchId).catch(
+      () =>
+        ({
+          id: batchId,
+          status: 'PROCESSING',
+          matchedCount: result.total ?? 0,
+          assignedCount: 0,
+          skippedCount: 0,
+          errorCount: 0,
+        }) as PhotoBulkBatch,
+    ),
+  );
+
+  const batch = await pollUntilPhotoBatchApplied(batchId, onProgress);
+  return {
+    batchId,
+    async: false,
+    assigned: batch.assignedCount,
+    skipped: batch.skippedCount,
+    errors: batch.errorCount,
+    total: batch.matchedCount,
+    message: `Assigned ${batch.assignedCount} photos. Skipped ${batch.skippedCount}. Unmatched files were not applied.`,
   };
 }
 

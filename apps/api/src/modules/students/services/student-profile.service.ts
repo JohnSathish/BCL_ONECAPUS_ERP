@@ -113,30 +113,28 @@ export class StudentProfileService {
     });
 
     const sectionEnrollments = registrations.flatMap((reg) =>
-      reg.lines
-        .filter((l) => l.offeringSectionId)
-        .map((l) => ({
-          registrationId: reg.id,
-          semesterSequence: reg.semesterSequence,
-          semesterId: reg.semesterId,
-          registrationStatus: reg.status,
-          sectionCode: l.offeringSection?.sectionCode,
-          courseCode: l.offering.course.code,
-          courseTitle: l.offering.course.title,
-          category: l.category,
-          status: l.status,
-          credits: Number(l.credits ?? l.offering.course.credits ?? 0),
-          assignedById: l.assignedById,
-          assignmentSource: l.assignmentSource,
-          registrationSource: l.registrationSource,
-          generatedBy: l.generatedBy,
-          generatedAt: l.createdAt,
-          curriculumMappingId: l.offeringId,
-          mappingSource: l.offering.mappingSource,
-          curriculumVersion: l.offering.programVersion?.version ?? null,
-          facultyName: l.offeringSection?.staffProfile?.fullName ?? null,
-          facultyId: l.offeringSection?.staffProfile?.id ?? null,
-        })),
+      reg.lines.map((l) => ({
+        registrationId: reg.id,
+        semesterSequence: reg.semesterSequence,
+        semesterId: reg.semesterId,
+        registrationStatus: reg.status,
+        sectionCode: l.offeringSection?.sectionCode ?? null,
+        courseCode: l.offering.course.code,
+        courseTitle: l.offering.course.title,
+        category: l.category,
+        status: l.status,
+        credits: Number(l.credits ?? l.offering.course.credits ?? 0),
+        assignedById: l.assignedById,
+        assignmentSource: l.assignmentSource,
+        registrationSource: l.registrationSource,
+        generatedBy: l.generatedBy,
+        generatedAt: l.createdAt,
+        curriculumMappingId: l.offeringId,
+        mappingSource: l.offering.mappingSource,
+        curriculumVersion: l.offering.programVersion?.version ?? null,
+        facultyName: l.offeringSection?.staffProfile?.fullName ?? null,
+        facultyId: l.offeringSection?.staffProfile?.id ?? null,
+      })),
     );
 
     const completion = await this.sections.getCompletion(tenantId, studentId);
@@ -179,6 +177,8 @@ export class StudentProfileService {
       ),
       applicationNumber: student.applicationNumber,
       admissionNumber: student.admissionNumber,
+      universityRollNumber: student.universityRollNumber,
+      universityRegistrationNumber: student.universityRegistrationNumber,
       rfidNumber: student.rfidNumber,
       abcId: student.abcAccount?.abcId ?? null,
       importSource: student.importSource,
@@ -276,6 +276,7 @@ export class StudentProfileService {
       enrollmentNumber: string;
       applicationNumber?: string | null;
       admissionNumber?: string | null;
+      universityRollNumber?: string | null;
       rollNumber: string | null;
       rfidNumber?: string | null;
       admissionDate: Date | null;
@@ -329,6 +330,7 @@ export class StudentProfileService {
       enrollmentNumber: student.enrollmentNumber,
       applicationNumber: student.applicationNumber ?? null,
       admissionNumber: student.admissionNumber ?? null,
+      universityRollNumber: student.universityRollNumber ?? null,
       rollNumber: student.rollNumber,
       rfidNumber: student.rfidNumber ?? null,
       abcId: student.abcAccount?.abcId ?? null,

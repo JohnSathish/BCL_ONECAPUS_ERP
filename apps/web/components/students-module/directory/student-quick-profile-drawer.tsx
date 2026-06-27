@@ -80,7 +80,12 @@ export function StudentQuickProfileDrawer({ row, open, onOpenChange }: Props) {
       <div className="flex flex-col items-center gap-3 pb-4">
         <DirectoryStudentAvatar row={row} size="lg" />
         <div className="text-center">
-          <p className="font-mono text-xs text-muted-foreground">{row.enrollmentNumber}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            {row.rollNumber ?? '—'}
+            {row.universityRollNumber?.trim() || row.admissionNumber?.trim()
+              ? ` · NEHU ${row.universityRollNumber?.trim() || row.admissionNumber?.trim()}`
+              : ''}
+          </p>
           <div className="mt-2 flex flex-wrap justify-center gap-1.5">
             <DirectoryStatusPill label={row.studentStatus ?? row.academicStatus} />
             <DirectoryRegistrationBadge status={row.registrationStatus} />
@@ -124,8 +129,11 @@ export function StudentQuickProfileDrawer({ row, open, onOpenChange }: Props) {
         </p>
       ) : (
         <div className="mt-2">
-          <ProfileRow label="Reg No" value={row.enrollmentNumber} />
           <ProfileRow label="Roll No" value={row.rollNumber} />
+          <ProfileRow
+            label="NEHU Roll No"
+            value={row.universityRollNumber?.trim() || row.admissionNumber?.trim()}
+          />
           <ProfileRow label="Programme" value={row.programme} />
           <ProfileRow
             label="Major"

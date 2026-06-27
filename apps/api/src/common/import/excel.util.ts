@@ -5,6 +5,35 @@ import type { ParsedImportRow } from './import.types';
 const DATA_SHEET_NAME = 'Courses';
 const INSTRUCTIONS_SHEET_NAME = 'Instructions';
 
+/** Normalize ExcelJS cell values (hyperlinks, formulas, rich text) to plain scalars. */
+export function normalizeExcelCellValue(value: unknown): unknown {
+  if (value == null) return '';
+  if (typeof value !== 'object') return value;
+  if (value instanceof Date) return value;
+
+  const cell = value as {
+    result?: unknown;
+    text?: unknown;
+    richText?: { text?: string }[];
+    formula?: unknown;
+  };
+
+  if (cell.result != null && cell.result !== value) {
+    return normalizeExcelCellValue(cell.result);
+  }
+  if (cell.text != null && cell.text !== '') {
+    return String(cell.text);
+  }
+  if (Array.isArray(cell.richText)) {
+    return cell.richText.map((part) => part.text ?? '').join('');
+  }
+  if (cell.formula != null) {
+    return cell.result != null ? normalizeExcelCellValue(cell.result) : '';
+  }
+
+  return value;
+}
+
 export async function parseExcelDataSheet(
   buffer: Buffer,
   options?: { sheetName?: string; dataStartRow?: number } | string,
@@ -25,13 +54,9 @@ export async function parseExcelDataSheet(
   let headers: string[] = [];
 
   sheet.eachRow((row, rowNumber) => {
-    const values = (row.values as unknown[]).slice(1).map((v) => {
-      if (v == null) return '';
-      if (typeof v === 'object' && 'result' in (v as object)) {
-        return (v as { result: unknown }).result;
-      }
-      return v;
-    });
+    const values = (row.values as unknown[])
+      .slice(1)
+      .map((v) => normalizeExcelCellValue(v));
 
     if (rowNumber === 1) {
       headers = values.map((v) => String(v ?? '').trim());
