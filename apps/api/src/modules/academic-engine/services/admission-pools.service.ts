@@ -674,15 +674,27 @@ export class AdmissionPoolsService {
     );
 
     const slugSet = new Set(paths.map((p) => p.slug));
+    const departmentIds = new Set(
+      paths
+        .map((p) => p.department?.id)
+        .filter((id): id is string => Boolean(id)),
+    );
 
     return allOfferings.filter((o) => {
-      const slug =
-        o.course?.subjectSlug?.trim() ||
-        this.eligibility.normalizeSlug(
-          o.course?.department?.name ?? o.course?.title ?? '',
-        );
-
-      return slugSet.has(slug);
+      if (!o.course) return false;
+      const candidates = this.eligibility.resolveCourseSubjectSlugCandidates({
+        subjectSlug: o.course.subjectSlug,
+        title: o.course.title ?? undefined,
+        department: o.course.department
+          ? {
+              name: o.course.department.name,
+              code: o.course.department.code ?? undefined,
+            }
+          : undefined,
+      });
+      if (candidates.some((slug) => slugSet.has(slug))) return true;
+      const courseDeptId = o.course?.department?.id;
+      return Boolean(courseDeptId && departmentIds.has(courseDeptId));
     });
   }
 

@@ -50,6 +50,60 @@ export class MajorMinorEligibilityService {
     return [...slugs];
   }
 
+  /** Subject paths are programme-level; union slugs from every configured semester. */
+  private addOfferingSlugs(
+    slugs: Set<string>,
+    offering: {
+      course: {
+        subjectSlug?: string | null;
+        title?: string;
+        department?: { name?: string; code?: string } | null;
+      };
+    },
+  ) {
+    for (const slug of this.resolveCourseSubjectSlugCandidates(
+      offering.course,
+    )) {
+      slugs.add(slug);
+    }
+  }
+
+  private async collectProgrammeCategorySlugs(
+    tenantId: string,
+    programVersionId: string,
+    category: string,
+  ): Promise<Set<string>> {
+    const semesters = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        programVersionId,
+        deletedAt: null,
+        category: { equals: category, mode: 'insensitive' },
+      },
+      distinct: ['semesterSequence'],
+      select: { semesterSequence: true },
+      orderBy: { semesterSequence: 'asc' },
+    });
+
+    const slugs = new Set<string>();
+    for (const { semesterSequence } of semesters) {
+      if (semesterSequence == null) continue;
+      const resolved = await this.curriculum.resolveProgrammeCurriculum(
+        tenantId,
+        programVersionId,
+        semesterSequence,
+        { category },
+      );
+      for (const offering of resolved.directOfferings) {
+        this.addOfferingSlugs(slugs, offering);
+      }
+      for (const pooled of resolved.inheritedPoolOfferings) {
+        this.addOfferingSlugs(slugs, pooled.offering);
+      }
+    }
+    return slugs;
+  }
+
   async listMajorMinorRules(tenantId: string, institutionId?: string) {
     return this.prisma.majorMinorRule.findMany({
       where: {
@@ -88,28 +142,12 @@ export class MajorMinorEligibilityService {
     const institutionId = version.program?.department?.institutionId;
     if (!institutionId) return [];
 
-    const resolved = await this.curriculum.resolveProgrammeCurriculum(
+    void semesterSequence;
+    const majorSlugs = await this.collectProgrammeCategorySlugs(
       tenantId,
       programVersionId,
-      semesterSequence,
-      { category: 'MAJOR' },
+      'MAJOR',
     );
-
-    const majorSlugs = new Set<string>();
-    for (const offering of resolved.directOfferings) {
-      for (const slug of this.resolveCourseSubjectSlugCandidates(
-        offering.course,
-      )) {
-        majorSlugs.add(slug);
-      }
-    }
-    for (const pooled of resolved.inheritedPoolOfferings) {
-      for (const slug of this.resolveCourseSubjectSlugCandidates(
-        pooled.offering.course,
-      )) {
-        majorSlugs.add(slug);
-      }
-    }
 
     if (majorSlugs.size === 0) return [];
 
@@ -189,28 +227,12 @@ export class MajorMinorEligibilityService {
     );
     if (allowedSlugs.size === 0) return [];
 
-    const resolved = await this.curriculum.resolveProgrammeCurriculum(
+    void semesterSequence;
+    const programmeMinorSlugs = await this.collectProgrammeCategorySlugs(
       tenantId,
       programVersionId,
-      semesterSequence,
-      { category: 'MINOR' },
+      'MINOR',
     );
-
-    const programmeMinorSlugs = new Set<string>();
-    for (const offering of resolved.directOfferings) {
-      for (const slug of this.resolveCourseSubjectSlugCandidates(
-        offering.course,
-      )) {
-        programmeMinorSlugs.add(slug);
-      }
-    }
-    for (const pooled of resolved.inheritedPoolOfferings) {
-      for (const slug of this.resolveCourseSubjectSlugCandidates(
-        pooled.offering.course,
-      )) {
-        programmeMinorSlugs.add(slug);
-      }
-    }
 
     const eligibleSlugs = [...allowedSlugs].filter((slug) =>
       programmeMinorSlugs.has(slug),

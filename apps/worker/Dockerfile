@@ -20,7 +20,11 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+
 COPY --from=deps /app/package.json ./package.json
+
+COPY --from=deps /app/package-lock.json ./package-lock.json
 
 COPY apps/worker ./apps/worker
 
@@ -30,7 +34,7 @@ WORKDIR /app/apps/api
 
 ENV DATABASE_URL=postgresql://nep:nep_dev_password@postgres:5432/nep_erp
 
-RUN rm -f prisma.config.ts && npx --yes prisma@6.19.0 generate --schema=./prisma/schema.prisma
+RUN rm -f prisma.config.ts && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 
 WORKDIR /app/apps/worker
 

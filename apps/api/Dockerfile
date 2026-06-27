@@ -15,7 +15,7 @@ WORKDIR /app/apps/api
 ENV DATABASE_URL=postgresql://nep:nep_dev_password@postgres:5432/nep_erp
 # Nest compile of this monorepo exceeds Node's default heap in Docker builders.
 ENV NODE_OPTIONS=--max-old-space-size=4096
-RUN rm -f prisma.config.ts && npx --yes prisma@6.19.0 generate --schema=./prisma/schema.prisma
+RUN rm -f prisma.config.ts && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 RUN npm run build:docker
 
 FROM node:22-alpine AS runner

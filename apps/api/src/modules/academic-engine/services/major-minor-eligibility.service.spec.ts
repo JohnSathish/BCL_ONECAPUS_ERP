@@ -64,6 +64,7 @@ describe('MajorMinorEligibilityService', () => {
 
   const prisma = {
     programVersion: { findFirst: jest.fn() },
+    courseOffering: { findMany: jest.fn() },
     academicSubject: { findMany: jest.fn(), findFirst: jest.fn() },
     majorMinorRule: { findMany: jest.fn(), findFirst: jest.fn() },
   };
@@ -83,6 +84,11 @@ describe('MajorMinorEligibilityService', () => {
       id: programVersionId,
       program: { department: { institutionId } },
     });
+    prisma.courseOffering.findMany.mockResolvedValue([
+      { semesterSequence: 1 },
+      { semesterSequence: 2 },
+      { semesterSequence: 3 },
+    ]);
   });
 
   function mockCurriculumOfferings(majorSlugs: string[], minorSlugs: string[]) {
@@ -132,28 +138,58 @@ describe('MajorMinorEligibilityService', () => {
   }
 
   it('lists Accounting for Business major when course department slug differs from subject path', async () => {
+    prisma.courseOffering.findMany.mockResolvedValue([
+      { semesterSequence: 1 },
+      { semesterSequence: 3 },
+    ]);
     mockCurriculumOfferings(
       ['commerce'],
       ['economics', 'mathematics', 'geography'],
     );
-    curriculum.resolveProgrammeCurriculum.mockResolvedValueOnce({
-      directOfferings: [
-        {
-          course: {
-            subjectSlug: null,
-            title: 'Accounting for Business',
-            department: { name: 'Commerce' },
-          },
-        },
-      ],
-      inheritedPoolOfferings: [],
-    });
+    curriculum.resolveProgrammeCurriculum.mockImplementation(
+      async (
+        _t: string,
+        _pv: string,
+        sem: number,
+        opts?: { category?: string },
+      ) => {
+        if (opts?.category !== 'MAJOR') {
+          return { directOfferings: [], inheritedPoolOfferings: [] };
+        }
+        if (sem === 1) {
+          return {
+            directOfferings: [
+              {
+                course: {
+                  subjectSlug: 'accounting-for-business',
+                  title: 'Accounting for Business',
+                  department: { name: 'Commerce' },
+                },
+              },
+            ],
+            inheritedPoolOfferings: [],
+          };
+        }
+        return {
+          directOfferings: [
+            {
+              course: {
+                subjectSlug: null,
+                title: 'Corporate Accounting',
+                department: { name: 'Commerce' },
+              },
+            },
+          ],
+          inheritedPoolOfferings: [],
+        };
+      },
+    );
     mockAcademicSubjects(['accounting-for-business']);
 
     const majors = await service.listEligibleMajors(
       tenantId,
       programVersionId,
-      1,
+      3,
     );
     expect(majors).toHaveLength(1);
     expect(majors[0]?.slug).toBe('accounting-for-business');
