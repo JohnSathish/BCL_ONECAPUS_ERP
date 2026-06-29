@@ -1,12 +1,10 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { StaffBulkUpdateService } from './staff-bulk-update.service';
 
-@Processor('exports')
-export class StaffBulkUpdateProcessor extends WorkerHost {
-  constructor(private readonly bulkUpdate: StaffBulkUpdateService) {
-    super();
-  }
+@Injectable()
+export class StaffBulkUpdateProcessor {
+  constructor(private readonly bulkUpdate: StaffBulkUpdateService) {}
 
   async process(
     job: Job<{

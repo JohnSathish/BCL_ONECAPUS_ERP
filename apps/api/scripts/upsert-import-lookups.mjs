@@ -9,12 +9,35 @@ const prisma = new PrismaClient();
 const LOOKUPS = [
   {
     lookupType: 'DENOMINATION',
+    code: 'BAPTIST',
+    label: 'Baptist',
+    sortOrder: 1,
+  },
+  {
+    lookupType: 'DENOMINATION',
     code: 'CATHOLIC',
     label: 'Catholic',
     sortOrder: 2,
   },
+  {
+    lookupType: 'DENOMINATION',
+    code: 'CHRISTIAN',
+    label: 'Christian',
+    sortOrder: 3,
+  },
   { lookupType: 'DENOMINATION', code: 'OTHER', label: 'Other', sortOrder: 4 },
   { lookupType: 'DENOMINATION', code: 'HINDU', label: 'Hindu', sortOrder: 5 },
+  { lookupType: 'TRIBE', code: 'GARO', label: 'Garo', sortOrder: 1 },
+  { lookupType: 'TRIBE', code: 'JAINTIA', label: 'Jaintia', sortOrder: 2 },
+  { lookupType: 'TRIBE', code: 'KHASI', label: 'Khasi', sortOrder: 3 },
+  { lookupType: 'TRIBE', code: 'BENGALI', label: 'Bengali', sortOrder: 4 },
+  { lookupType: 'TRIBE', code: 'HAJONG', label: 'Hajong', sortOrder: 5 },
+  { lookupType: 'TRIBE', code: 'NEPALI', label: 'Nepali', sortOrder: 6 },
+  { lookupType: 'TRIBE', code: 'BIHARI', label: 'Bihari', sortOrder: 7 },
+  { lookupType: 'TRIBE', code: 'ODIYA', label: 'Odiya', sortOrder: 8 },
+  { lookupType: 'TRIBE', code: 'KOCH', label: 'Koch', sortOrder: 10 },
+  { lookupType: 'TRIBE', code: 'TANGKHUL', label: 'Tangkhul', sortOrder: 11 },
+  { lookupType: 'TRIBE', code: 'OTHER', label: 'Others', sortOrder: 9 },
   { lookupType: 'RELIGION', code: 'BUDDHIST', label: 'Buddhist', sortOrder: 5 },
 ];
 

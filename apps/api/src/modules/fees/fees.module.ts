@@ -83,6 +83,7 @@ import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
     MonthlyFeeEngineService,
     StudentFeeAccountService,
     StudentFeeSummaryService,
+    FeeReceiptPdfProcessor,
   ],
 })
 export class FeesModule {}

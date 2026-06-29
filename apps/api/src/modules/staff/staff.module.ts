@@ -82,6 +82,7 @@ import { StaffPortalService } from './services/staff-portal.service';
     StaffImportHandler,
     StaffImportService,
     StaffPortalService,
+    StaffBulkUpdateProcessor,
   ],
 })
 export class StaffModule {}

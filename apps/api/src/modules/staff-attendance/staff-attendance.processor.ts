@@ -1,20 +1,18 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { StaffAttendanceEngineService } from './staff-attendance-engine.service';
 import { StaffAttendanceService } from './staff-attendance.service';
 import { DeviceHealthService } from './device-health.service';
 import { AttendanceProcessingOrchestratorService } from './attendance-processing-orchestrator.service';
 
-@Processor('exports')
-export class StaffAttendanceProcessor extends WorkerHost {
+@Injectable()
+export class StaffAttendanceProcessor {
   constructor(
     private readonly service: StaffAttendanceService,
     private readonly engine: StaffAttendanceEngineService,
     private readonly health: DeviceHealthService,
     private readonly processing: AttendanceProcessingOrchestratorService,
-  ) {
-    super();
-  }
+  ) {}
 
   async process(job: Job<Record<string, unknown>>): Promise<unknown> {
     if (job.name === 'staff-biometric-sync-device') {

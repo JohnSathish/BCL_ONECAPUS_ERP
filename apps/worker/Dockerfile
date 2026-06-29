@@ -2,7 +2,7 @@ FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json ./
 
 COPY apps/worker/package.json apps/worker/
 
@@ -10,7 +10,11 @@ COPY apps/api/package.json apps/api/
 
 COPY apps/api/prisma apps/api/prisma/
 
-RUN npm ci -w worker -w api --ignore-scripts
+RUN for attempt in 1 2 3 4 5; do \
+      npm ci -w worker -w api --ignore-scripts && break; \
+      echo "npm ci failed (attempt ${attempt}/5), retrying in ${attempt}0s…"; \
+      sleep $((attempt * 10)); \
+    done
 
 
 

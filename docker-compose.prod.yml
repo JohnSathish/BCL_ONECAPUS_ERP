@@ -45,8 +45,10 @@ services:
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET: ${R2_BUCKET:-}
-      # "worker" = HTTP-only API; background jobs run in the worker container.
-      PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-worker}
+      # API container runs Nest export processors (student import, bulk update, etc.).
+      # The worker container uses PROCESS_BACKGROUND_JOBS=worker for backups + fee PDFs.
+      PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-api}
+      FEE_RECEIPT_PDF_ON_WORKER: ${FEE_RECEIPT_PDF_ON_WORKER:-true}
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage

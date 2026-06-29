@@ -217,24 +217,35 @@ export class StudentImportService {
     if (!batch) throw new NotFoundException('Import batch not found');
 
     if (batch.status === 'COMMITTING') {
-      return {
-        batchId,
-        status: 'COMMITTING',
-        async: true,
-        message:
-          'Import already in progress. Waiting for background processing to finish.',
-      };
+      if (batch.successfulRows > 0) {
+        return {
+          batchId,
+          status: 'COMMITTING',
+          async: true,
+          message:
+            'Import already in progress. Waiting for background processing to finish.',
+        };
+      }
+
+      // A prior background job may have been consumed by the wrong worker and
+      // marked complete without importing — allow the user to retry commit.
+      await this.batches.updateBatch(batchId, tenantId, {
+        status: 'VALIDATED',
+      });
     }
 
-    if (batch.status !== 'VALIDATED') {
+    const latestBatch = await this.batches.getBatch(batchId, tenantId);
+    if (!latestBatch) throw new NotFoundException('Import batch not found');
+
+    if (latestBatch.status !== 'VALIDATED') {
       throw new ConflictException(
-        `Batch is not ready for commit (status: ${batch.status})`,
+        `Batch is not ready for commit (status: ${latestBatch.status})`,
       );
     }
 
-    if (mode === 'STRICT' && batch.invalidRows > 0) {
+    if (mode === 'STRICT' && latestBatch.invalidRows > 0) {
       throw new ConflictException(
-        `Strict import rejected: ${batch.invalidRows} invalid row(s).`,
+        `Strict import rejected: ${latestBatch.invalidRows} invalid row(s).`,
       );
     }
 
@@ -316,9 +327,25 @@ export class StudentImportService {
     }));
 
     try {
+      let lastProgressUpdate = 0;
       const created = await this.handler.commitRows(
         { tenantId, userId, batchId, options: { importMode } },
         toImport,
+        {
+          onProgress: async (processed, total) => {
+            if (
+              processed === 1 ||
+              processed === total ||
+              processed - lastProgressUpdate >= 2
+            ) {
+              lastProgressUpdate = processed;
+              await this.batches.updateBatch(batchId, tenantId, {
+                successfulRows: processed,
+                validRows: total,
+              });
+            }
+          },
+        },
       );
 
       await this.batches.markRowsImported(
@@ -351,6 +378,21 @@ export class StudentImportService {
 
       throw e;
     }
+  }
+
+  async getBatch(tenantId: string, batchId: string) {
+    const batch = await this.batches.getBatch(batchId, tenantId);
+    if (!batch) throw new NotFoundException('Import batch not found');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: batch.uploadedByUserId },
+      select: { email: true },
+    });
+
+    return {
+      ...batch,
+      uploadedByEmail: user?.email ?? null,
+    };
   }
 
   async listBatches(tenantId: string, query: PaginationQueryDto) {

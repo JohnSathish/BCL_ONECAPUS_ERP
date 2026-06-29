@@ -32,6 +32,7 @@ import {
 } from '@/components/erp/bulk-actions';
 import { CompactCard, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   commitStudentImport,
   downloadStudentImportErrorReport,
@@ -47,10 +48,13 @@ import {
   fetchSem5EligibleMinors,
   fetchSem5ImportCurriculum,
   fetchSem5ImportProgrammes,
+  fetchStudentImportBatch,
   fetchStudentImportBatches,
   fetchStudentImportPreview,
+  getStudentImportCommitProgress,
   validateStudentImport,
   type StudentImportBatch,
+  type StudentImportCommitProgress,
   type StudentImportMode,
   type StudentImportPreview,
   type StudentImportPreviewRow,
@@ -120,6 +124,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const [importMode, setImportMode] = useState<StudentImportMode>('CREATE');
   const [commitMode, setCommitMode] = useState<CommitMode>('VALID_ONLY');
   const [commitResult, setCommitResult] = useState<{ successfulRows?: number } | null>(null);
+  const [commitProgress, setCommitProgress] = useState<StudentImportCommitProgress | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [templateGuideOpen, setTemplateGuideOpen] = useState(false);
@@ -269,6 +274,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     setImportMode('CREATE');
     setCommitMode('VALID_ONLY');
     setCommitResult(null);
+    setCommitProgress(null);
     setSelectedFile(null);
     setNotice('');
   }, []);
@@ -300,9 +306,8 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
       const maxAttempts = 300;
       for (let i = 0; i < maxAttempts; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const batches = await fetchStudentImportBatches(1, 50);
-        const batch = batches.data.find((item) => item.id === batchId);
-        if (!batch) continue;
+        const batch = await fetchStudentImportBatch(batchId);
+        setCommitProgress(getStudentImportCommitProgress(batch));
         if (batch.status === 'COMMITTED') {
           setCommitResult({
             batchId,
@@ -330,7 +335,17 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
       if (!preview?.batchId) throw new Error('No validated import batch');
       return commitStudentImport(preview.batchId, commitMode, importMode);
     },
-    onMutate: () => setStep('committing'),
+    onMutate: () => {
+      setStep('committing');
+      const total = preview?.summary.valid ?? 0;
+      setCommitProgress({
+        percent: 0,
+        processed: 0,
+        total,
+        label: `Starting import of ${total} students…`,
+        indeterminate: true,
+      });
+    },
     onSuccess: async (result) => {
       if (result.async) {
         setNotice(
@@ -339,6 +354,13 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
         await pollUntilCommitted(result.batchId);
         return;
       }
+      setCommitProgress({
+        percent: 100,
+        processed: result.successfulRows,
+        total: result.successfulRows,
+        label: 'Import complete',
+        indeterminate: false,
+      });
       setCommitResult(result);
       setStep('done');
       setNotice('');
@@ -347,6 +369,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     },
     onError: () => {
       setStep('preview');
+      setCommitProgress(null);
     },
   });
 
@@ -707,15 +730,26 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
               </div>
 
               {step === 'committing' ? (
-                <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
-                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div>
-                    <p className="font-medium">Importing {preview.summary.valid} students…</p>
-                    <p className="text-muted-foreground">
-                      Large imports run in the background and may take several minutes. Please keep
-                      this page open until completion.
-                    </p>
+                <div
+                  className="space-y-3 rounded-2xl border-2 border-rose-400/80 bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 px-4 py-3.5 text-sm shadow-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 animate-pulse text-rose-600" />
+                    <div>
+                      <p className="font-semibold text-rose-950">
+                        {commitProgress?.label ?? `Importing ${preview.summary.valid} students…`}
+                      </p>
+                      <p className="mt-1 font-medium text-rose-900/90">
+                        Large imports run in the background and may take several minutes. Please
+                        keep this page open until completion.
+                      </p>
+                    </div>
                   </div>
+                  {commitProgress ? (
+                    <ImportCommitProgressBar progress={commitProgress} variant="prominent" />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -824,6 +858,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
             canCommit={canCommit}
             validating={validateMut.isPending}
             committing={commitMut.isPending || step === 'committing'}
+            commitProgress={step === 'committing' ? commitProgress : null}
             validCount={validCount}
             onBack={reset}
             onSaveDraft={() => setNotice('Draft saved locally for this import session.')}
@@ -1207,12 +1242,57 @@ function CommitModePanel({
   );
 }
 
+function ImportCommitProgressBar({
+  progress,
+  variant = 'default',
+}: {
+  progress: StudentImportCommitProgress;
+  variant?: 'default' | 'prominent';
+}) {
+  return (
+    <div
+      className={cn(
+        'space-y-1.5 rounded-xl border px-3 py-2',
+        variant === 'prominent' ? 'border-rose-300/70 bg-white/70' : 'border-border bg-muted/40',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className={cn('font-medium', variant === 'prominent' && 'text-rose-950')}>
+          {progress.label}
+        </span>
+        {!progress.indeterminate ? (
+          <span className={cn(variant === 'prominent' ? 'text-rose-800' : 'text-muted-foreground')}>
+            {progress.percent}%
+          </span>
+        ) : null}
+      </div>
+      <Progress
+        value={progress.indeterminate ? 8 : progress.percent}
+        className={cn(
+          'h-2.5',
+          progress.indeterminate && '[&>div]:animate-pulse',
+          variant === 'prominent' && '[&>div]:bg-rose-600',
+        )}
+      />
+      <p
+        className={cn(
+          'text-[11px]',
+          variant === 'prominent' ? 'font-medium text-rose-900/80' : 'text-muted-foreground',
+        )}
+      >
+        Imported {progress.processed} of {progress.total} students
+      </p>
+    </div>
+  );
+}
+
 function SmartFooterActions({
   step,
   canValidate,
   canCommit,
   validating,
   committing,
+  commitProgress,
   validCount,
   onBack,
   onSaveDraft,
@@ -1224,47 +1304,58 @@ function SmartFooterActions({
   canCommit: boolean;
   validating: boolean;
   committing: boolean;
+  commitProgress: StudentImportCommitProgress | null;
   validCount: number;
   onBack: () => void;
   onSaveDraft: () => void;
   onValidate: () => void;
   onCommit: () => void;
 }) {
+  const importButtonLabel =
+    committing && commitProgress && !commitProgress.indeterminate
+      ? `${commitProgress.processed}/${commitProgress.total} imported`
+      : committing
+        ? 'Importing...'
+        : `Commit Import (${validCount})`;
+
   return (
-    <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/70 bg-card/90 p-3 shadow-2xl shadow-black/10 backdrop-blur">
-      <Button type="button" variant="ghost" size="sm" onClick={onBack}>
-        ← Back
-      </Button>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onSaveDraft}>
-          Save Draft
+    <div className="sticky bottom-3 z-10 space-y-3 rounded-3xl border border-border/70 bg-card/90 p-3 shadow-2xl shadow-black/10 backdrop-blur">
+      {committing && commitProgress ? <ImportCommitProgressBar progress={commitProgress} /> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button type="button" variant="ghost" size="sm" onClick={onBack}>
+          ← Back
         </Button>
-        {step === 'upload' ? (
-          <BulkActionButton
-            type="button"
-            elevated
-            disabled={!canValidate}
-            loading={validating}
-            loadingText="Validating..."
-            icon={<Wand2 className="h-4 w-4" />}
-            onClick={onValidate}
-          >
-            Validate Dataset
-          </BulkActionButton>
-        ) : null}
-        {step === 'preview' || step === 'committing' ? (
-          <BulkActionButton
-            type="button"
-            elevated
-            disabled={!canCommit}
-            loading={committing}
-            loadingText="Importing..."
-            icon={<ShieldCheck className="h-4 w-4" />}
-            onClick={onCommit}
-          >
-            Commit Import ({validCount})
-          </BulkActionButton>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={onSaveDraft}>
+            Save Draft
+          </Button>
+          {step === 'upload' ? (
+            <BulkActionButton
+              type="button"
+              elevated
+              disabled={!canValidate}
+              loading={validating}
+              loadingText="Validating..."
+              icon={<Wand2 className="h-4 w-4" />}
+              onClick={onValidate}
+            >
+              Validate Dataset
+            </BulkActionButton>
+          ) : null}
+          {step === 'preview' || step === 'committing' ? (
+            <BulkActionButton
+              type="button"
+              elevated
+              disabled={!canCommit || committing}
+              loading={committing}
+              loadingText={importButtonLabel}
+              icon={<ShieldCheck className="h-4 w-4" />}
+              onClick={onCommit}
+            >
+              {importButtonLabel}
+            </BulkActionButton>
+          ) : null}
+        </div>
       </div>
     </div>
   );

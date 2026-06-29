@@ -8,7 +8,13 @@ const connection = new IORedis(process.env.REDIS_URL ?? 'redis://127.0.0.1:6379'
   maxRetriesPerRequest: null,
 });
 
-/** Default `api` so local dev Nest processors handle export jobs (student import, photo bulk, etc.). */
+/**
+ * - `api` (default in dev): Nest API ExportsQueueProcessor handles export jobs.
+ * - `worker` (production worker container): backups + fee-receipt-pdf only.
+ *
+ * Nest API export jobs (student import, bulk update, …) must always run in the
+ * API container. The worker re-queues them via moveToWait when picked up by mistake.
+ */
 const processJobs = process.env.PROCESS_BACKGROUND_JOBS ?? 'api';
 
 function isNestApiExportJob(name: string) {
@@ -32,12 +38,12 @@ function isNestApiExportJob(name: string) {
   ].includes(name);
 }
 
-async function yieldToNestApi(job: Job) {
-  await job.moveToDelayed(Date.now() + 2000, job.token);
-  throw new DelayedError('Handled by Nest API exports processor');
+async function deferToApiWorker(job: Job) {
+  await job.moveToWait(job.token);
+  throw new DelayedError('Deferred to Nest API exports worker');
 }
 
-/** Only subscribe when this process owns fee-receipt jobs; Nest API handles the rest. */
+/** Worker-owned exports jobs only; Nest API jobs are never completed here. */
 const exportsWorker =
   processJobs === 'worker'
     ? new Worker(
@@ -52,10 +58,11 @@ const exportsWorker =
             return generateFeeReceiptPdf(tenantId, receiptId);
           }
           if (isNestApiExportJob(job.name)) {
-            await yieldToNestApi(job);
+            console.log('[worker] deferring exports job to API', job.name, job.id);
+            await deferToApiWorker(job);
           }
-          console.warn('[worker] unknown exports job', job.id, job.name);
-          await yieldToNestApi(job);
+          console.error('[worker] unknown exports job — deferring to API', job.id, job.name);
+          await deferToApiWorker(job);
         },
         { connection },
       )

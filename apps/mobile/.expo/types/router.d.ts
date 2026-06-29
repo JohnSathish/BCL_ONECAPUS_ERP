@@ -12,62 +12,20 @@ declare module 'expo-router' {
         | { pathname: `/`; params?: Router.UnknownInputParams }
         | { pathname: `/../../web/.next/types/app/layout`; params?: Router.UnknownInputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/layout`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/login/layout`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/../../web/.next/types/app/login/page`; params?: Router.UnknownInputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/administration/support-data/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/api/[...path]/route`;
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-generation-page`;
+            pathname: `/../../web/.next/types/app/student/page`;
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-history-page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/components/administration-module/roll-number-reports-page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-history/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | { pathname: `/../../web/.next/types/validator`; params?: Router.UnknownInputParams }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-reports/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | { pathname: `/../../web/.next/types/app/admin/page`; params?: Router.UnknownInputParams }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/admit-cards/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/internal-assessments/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/timetable/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/consolidation/page`;
+            pathname: `/../../web/.next/types/app/student/governance/meetings/page`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }
@@ -93,62 +51,20 @@ declare module 'expo-router' {
         | { pathname: `/`; params?: Router.UnknownOutputParams }
         | { pathname: `/../../web/.next/types/app/layout`; params?: Router.UnknownOutputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/layout`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/login/layout`;
             params?: Router.UnknownOutputParams;
           }
         | { pathname: `/../../web/.next/types/app/login/page`; params?: Router.UnknownOutputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/administration/support-data/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/api/[...path]/route`;
             params?: Router.UnknownOutputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-generation-page`;
+            pathname: `/../../web/.next/types/app/student/page`;
             params?: Router.UnknownOutputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-history-page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/components/administration-module/roll-number-reports-page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-history/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | { pathname: `/../../web/.next/types/validator`; params?: Router.UnknownOutputParams }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-reports/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | { pathname: `/../../web/.next/types/app/admin/page`; params?: Router.UnknownOutputParams }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/admit-cards/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/internal-assessments/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/timetable/page`;
-            params?: Router.UnknownOutputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/consolidation/page`;
+            pathname: `/../../web/.next/types/app/student/governance/meetings/page`;
             params?: Router.UnknownOutputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownOutputParams }
@@ -173,23 +89,11 @@ declare module 'expo-router' {
         | Router.ExternalPathString
         | `/${`?${string}` | `#${string}` | ''}`
         | `/../../web/.next/types/app/layout${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/layout${`?${string}` | `#${string}` | ''}`
         | `/../../web/.next/types/app/login/layout${`?${string}` | `#${string}` | ''}`
         | `/../../web/.next/types/app/login/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/administration/support-data/page${`?${string}` | `#${string}` | ''}`
         | `/../../web/.next/types/app/api/[...path]/route${`?${string}` | `#${string}` | ''}`
-        | `/../../web/components/administration-module/roll-number-generation-page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/components/administration-module/roll-number-history-page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/components/administration-module/roll-number-reports-page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/app/admin/administration/roll-number-history/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/validator${`?${string}` | `#${string}` | ''}`
-        | `/../../web/app/admin/administration/roll-number-reports/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/academics/examinations/admit-cards/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/academics/examinations/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/academics/examinations/internal-assessments/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/academics/examinations/timetable/page${`?${string}` | `#${string}` | ''}`
-        | `/../../web/.next/types/app/admin/academics/examinations/consolidation/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/.next/types/app/student/page${`?${string}` | `#${string}` | ''}`
+        | `/../../web/.next/types/app/student/governance/meetings/page${`?${string}` | `#${string}` | ''}`
         | `/_sitemap${`?${string}` | `#${string}` | ''}`
         | `${'/(auth)'}/login${`?${string}` | `#${string}` | ''}`
         | `/login${`?${string}` | `#${string}` | ''}`
@@ -210,62 +114,20 @@ declare module 'expo-router' {
         | { pathname: `/`; params?: Router.UnknownInputParams }
         | { pathname: `/../../web/.next/types/app/layout`; params?: Router.UnknownInputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/layout`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/login/layout`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/../../web/.next/types/app/login/page`; params?: Router.UnknownInputParams }
         | {
-            pathname: `/../../web/.next/types/app/admin/administration/support-data/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
             pathname: `/../../web/.next/types/app/api/[...path]/route`;
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-generation-page`;
+            pathname: `/../../web/.next/types/app/student/page`;
             params?: Router.UnknownInputParams;
           }
         | {
-            pathname: `/../../web/components/administration-module/roll-number-history-page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/components/administration-module/roll-number-reports-page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-history/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | { pathname: `/../../web/.next/types/validator`; params?: Router.UnknownInputParams }
-        | {
-            pathname: `/../../web/app/admin/administration/roll-number-reports/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | { pathname: `/../../web/.next/types/app/admin/page`; params?: Router.UnknownInputParams }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/admit-cards/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/internal-assessments/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/timetable/page`;
-            params?: Router.UnknownInputParams;
-          }
-        | {
-            pathname: `/../../web/.next/types/app/admin/academics/examinations/consolidation/page`;
+            pathname: `/../../web/.next/types/app/student/governance/meetings/page`;
             params?: Router.UnknownInputParams;
           }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }

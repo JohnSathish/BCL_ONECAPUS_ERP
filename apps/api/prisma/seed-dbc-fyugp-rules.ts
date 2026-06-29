@@ -53,7 +53,7 @@ const DEPT_CODE_BY_NAME: Record<string, string> = {
   Mathematics: 'MTH',
   Zoology: 'ZOO',
   Physics: 'PHY',
-  'Accounting For Business': 'AFB',
+  'Accounting For Business': 'COM',
 };
 
 export async function seedDbcFyugpRules(

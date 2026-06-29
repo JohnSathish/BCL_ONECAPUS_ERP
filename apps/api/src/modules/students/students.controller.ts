@@ -455,6 +455,12 @@ export class StudentsController {
     return this.studentImport.listBatches(user.tid, query);
   }
 
+  @Get('import/batches/:id')
+  @RequirePermissions('students:import')
+  getImportBatch(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.studentImport.getBatch(user.tid, id);
+  }
+
   @Get('import/batches/:id/preview')
   @RequirePermissions('students:import')
   previewImportBatch(

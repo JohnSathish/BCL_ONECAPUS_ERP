@@ -489,7 +489,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           universityRegistrationNumber: true,
           user: { select: { email: true } },
           masterProfile: {
-            select: { nationalId: true, mobileNumber: true },
+            select: { nationalId: true, mobileNumber: true, email: true },
           },
           abcAccount: { select: { abcId: true } },
         },
@@ -597,6 +597,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     for (const student of existingStudents) {
       regToStudent.set(student.enrollmentNumber.trim().toUpperCase(), student);
       emailToStudentId.set(student.user.email.trim().toLowerCase(), student.id);
+      const profileEmail = student.masterProfile?.email?.trim().toLowerCase();
+      if (profileEmail) {
+        emailToStudentId.set(profileEmail, student.id);
+      }
       if (student.rollNumber) {
         rollToStudentId.set(
           student.rollNumber.trim().toUpperCase(),
@@ -914,7 +918,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (ctx.fileRolls.has(rollKey)) {
         errors.push('Duplicate roll number');
       } else if (dbOwner && dbOwner !== ownerId) {
-        errors.push('Duplicate roll number');
+        if (ctx.importMode === 'MERGE') {
+          existingStudentId = existingStudentId ?? dbOwner;
+        } else {
+          errors.push('Duplicate roll number');
+        }
       } else {
         ctx.fileRolls.add(rollKey);
       }
@@ -925,7 +933,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (fileDup) {
         errors.push('Duplicate email');
       } else if (dbOwner && dbOwner !== ownerId) {
-        errors.push('Duplicate email');
+        if (ctx.importMode === 'MERGE') {
+          existingStudentId = existingStudentId ?? dbOwner;
+        } else {
+          errors.push(
+            'Email already linked to an existing student (use Merge import mode to update)',
+          );
+        }
       } else {
         ctx.fileEmails.add(email);
       }
@@ -1368,15 +1382,20 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   async commitRows(
     ctx: ImportModuleHandlerContext,
     rows: { rowNumber: number; normalized: NormalizedStudentImportRow }[],
+    options?: {
+      onProgress?: (processed: number, total: number) => void | Promise<void>;
+    },
   ) {
     const created: { rowNumber: number; entityId: string }[] = [];
-    for (const row of rows) {
+    const total = rows.length;
+    for (const [index, row] of rows.entries()) {
       const n = row.normalized;
       try {
         const studentId = n.existingStudentId
           ? await this.mergeStudentRecord(ctx, n.existingStudentId, n)
           : await this.createStudentRecord(ctx, n);
         created.push({ rowNumber: row.rowNumber, entityId: studentId });
+        await options?.onProgress?.(index + 1, total);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unknown import error';
@@ -3085,11 +3104,57 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     });
   }
 
+  private async findExistingStudentIdForImport(
+    tenantId: string,
+    n: NormalizedStudentImportRow,
+  ): Promise<string | undefined> {
+    if (n.existingStudentId) return n.existingStudentId;
+
+    const user = await this.prisma.user.findUnique({
+      where: { tenantId_email: { tenantId, email: n.email } },
+      select: {
+        student: { select: { id: true, deletedAt: true } },
+      },
+    });
+    if (user?.student) {
+      if (user.student.deletedAt) {
+        await this.prisma.student.update({
+          where: { id: user.student.id },
+          data: { deletedAt: null },
+        });
+      }
+      return user.student.id;
+    }
+
+    const rollNumber = n.rollNumber?.trim();
+    if (rollNumber) {
+      const byRoll = await this.prisma.student.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          rollNumber: { equals: rollNumber, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      if (byRoll) return byRoll.id;
+    }
+
+    return undefined;
+  }
+
   private async createStudentRecord(
     ctx: ImportModuleHandlerContext,
     n: NormalizedStudentImportRow,
   ) {
     const { tenantId, userId, batchId } = ctx;
+    const existingStudentId = await this.findExistingStudentIdForImport(
+      tenantId,
+      n,
+    );
+    if (existingStudentId) {
+      return this.mergeStudentRecord(ctx, existingStudentId, n);
+    }
+
     const existingUser = await this.prisma.user.findUnique({
       where: { tenantId_email: { tenantId, email: n.email } },
     });
@@ -3510,6 +3575,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (!value) return '';
     const upper = value.trim().toUpperCase();
     if (upper === 'OTHERS') return 'Other';
+    if (upper === 'HINDUISM') return 'Hindu';
     return value.trim();
   }
 

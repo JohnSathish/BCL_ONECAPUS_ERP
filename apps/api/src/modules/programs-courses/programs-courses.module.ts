@@ -26,6 +26,10 @@ import { CurriculumOfferingListService } from './curriculum-offering-list.servic
     CourseImportService,
     CourseImportProcessor,
   ],
-  exports: [ProgramsCoursesService, CourseDeliveryFeeService],
+  exports: [
+    ProgramsCoursesService,
+    CourseDeliveryFeeService,
+    CourseImportProcessor,
+  ],
 })
 export class ProgramsCoursesModule {}

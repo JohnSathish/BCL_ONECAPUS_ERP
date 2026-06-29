@@ -43,6 +43,7 @@ import { UsersModule } from './modules/users/users.module';
 import { DashboardAnalyticsModule } from './modules/dashboard-analytics/dashboard-analytics.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { QueueModule } from './shared/queue/queue.module';
+import { BackgroundExportsModule } from './shared/queue/background-exports.module';
 import { CacheModule } from './shared/cache/cache.module';
 import { StorageModule } from './shared/storage/storage.module';
 import { AdministrationModule } from './modules/administration/administration.module';
@@ -97,6 +98,7 @@ import { OfficialDocumentsModule } from './modules/official-documents/official-d
     PrismaModule,
     PermissionsModule,
     QueueModule,
+    BackgroundExportsModule,
     CacheModule,
     StorageModule,
     CurriculumCoreModule,

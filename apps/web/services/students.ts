@@ -685,6 +685,68 @@ export async function commitStudentImport(
   };
 }
 
+export type StudentImportCommitProgress = {
+  percent: number;
+  processed: number;
+  total: number;
+  label: string;
+  indeterminate: boolean;
+};
+
+export function getStudentImportCommitProgress(
+  batch: StudentImportBatch,
+): StudentImportCommitProgress {
+  const total = batch.validRows || batch.totalRows;
+  const processed = batch.successfulRows ?? 0;
+
+  if (batch.status === 'COMMITTED') {
+    return {
+      percent: 100,
+      processed: processed || total,
+      total,
+      label: 'Import complete',
+      indeterminate: false,
+    };
+  }
+
+  if (batch.status === 'FAILED') {
+    return {
+      percent: total > 0 ? Math.round((processed / total) * 100) : 0,
+      processed,
+      total,
+      label: 'Import failed',
+      indeterminate: false,
+    };
+  }
+
+  if (batch.status === 'COMMITTING') {
+    const percent = total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
+    return {
+      percent,
+      processed,
+      total,
+      label:
+        processed > 0
+          ? `Importing students — ${processed} of ${total} (${percent}%)`
+          : `Starting import of ${total} students…`,
+      indeterminate: processed === 0,
+    };
+  }
+
+  return {
+    percent: 0,
+    processed,
+    total,
+    label: batch.status.replace(/_/g, ' ').toLowerCase(),
+    indeterminate: false,
+  };
+}
+
+export async function fetchStudentImportBatch(batchId: string): Promise<StudentImportBatch> {
+  const { data } = await api.get(`/v1/students/import/batches/${batchId}`);
+  return data as StudentImportBatch;
+}
+
 export async function fetchStudentImportBatches(
   page = 1,
   limit = 20,

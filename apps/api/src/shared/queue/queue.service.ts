@@ -58,6 +58,8 @@ export class QueueService {
   }) {
     return this.exports.add('student-import-commit', payload, {
       attempts: 2,
+      // Process before routine staff biometric / attendance jobs (lower = sooner).
+      priority: 1,
     });
   }
 

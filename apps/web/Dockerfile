@@ -2,9 +2,13 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV HUSKY=0
-COPY package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
-RUN npm ci -w web --include=dev --ignore-scripts
+RUN for attempt in 1 2 3 4 5; do \
+      npm ci -w web --include=dev --ignore-scripts && break; \
+      echo "npm ci failed (attempt ${attempt}/5), retrying in ${attempt}0s…"; \
+      sleep $((attempt * 10)); \
+    done
 # Lockfile may be Windows-generated; install Linux musl native bindings for Alpine.
 RUN npm install @tailwindcss/oxide-linux-x64-musl@4.3.0 --workspace=web --no-save \
   && npm rebuild @tailwindcss/oxide lightningcss --workspace=web

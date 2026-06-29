@@ -1,8 +1,12 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
-RUN npm ci -w api --ignore-scripts
+RUN for attempt in 1 2 3 4 5; do \
+      npm ci -w api --ignore-scripts && break; \
+      echo "npm ci failed (attempt ${attempt}/5), retrying in ${attempt}0s…"; \
+      sleep $((attempt * 10)); \
+    done
 
 FROM node:22-alpine AS builder
 WORKDIR /app

@@ -1,16 +1,12 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { FeeReceiptDocumentService } from '../services/fee-receipt-document.service';
 
-@Processor('exports')
 @Injectable()
-export class FeeReceiptPdfProcessor extends WorkerHost {
+export class FeeReceiptPdfProcessor {
   private readonly logger = new Logger(FeeReceiptPdfProcessor.name);
 
-  constructor(private readonly receiptDocs: FeeReceiptDocumentService) {
-    super();
-  }
+  constructor(private readonly receiptDocs: FeeReceiptDocumentService) {}
 
   async process(job: Job): Promise<unknown> {
     if (process.env.PROCESS_BACKGROUND_JOBS === 'worker') return undefined;

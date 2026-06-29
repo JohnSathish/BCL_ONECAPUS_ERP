@@ -37,7 +37,9 @@ echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
 echo "Rebuilding web + api + worker…"
-"${COMPOSE[@]}" build --no-cache web api worker
+# Use Docker layer cache when possible; npm ci retries are in each Dockerfile .npmrc.
+# For a full clean rebuild: COMPOSE build --no-cache web api worker
+"${COMPOSE[@]}" build web api worker
 
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis

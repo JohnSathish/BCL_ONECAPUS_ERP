@@ -1,14 +1,12 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { StudentImportService } from './student-import.service';
 import type { StudentImportMode } from '../dto/students.dto';
 import type { ImportCommitMode } from '../../../common/import/import.types';
 
-@Processor('exports')
-export class StudentImportProcessor extends WorkerHost {
-  constructor(private readonly studentImport: StudentImportService) {
-    super();
-  }
+@Injectable()
+export class StudentImportProcessor {
+  constructor(private readonly studentImport: StudentImportService) {}
 
   async process(
     job: Job<{

@@ -17,6 +17,7 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:ci": "turbo lint:ci",
+    "check:exports-queue": "node scripts/ci/check-exports-queue-worker.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
     "typecheck": "turbo typecheck",

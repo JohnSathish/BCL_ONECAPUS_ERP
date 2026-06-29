@@ -40,7 +40,7 @@ echo
 
 echo "--- .env checks (redacted) ---"
 if [[ -f .env ]]; then
-  grep -E '^(PROCESS_BACKGROUND_JOBS|API_HOST|HOST|DATABASE_URL|REDIS_URL)=' .env \
+  grep -E '^(PROCESS_BACKGROUND_JOBS|FEE_RECEIPT_PDF_ON_WORKER|API_HOST|HOST|DATABASE_URL|REDIS_URL)=' .env \
     | sed -E 's/(PASSWORD|SECRET)=[^ ]+/\1=***REDACTED***/g' \
     || true
 else
@@ -49,4 +49,5 @@ fi
 echo
 
 echo "=== If API is crash-looping: docker compose logs api --tail 100 ==="
-echo "=== If PROCESS_BACKGROUND_JOBS=api, set PROCESS_BACKGROUND_JOBS=worker in .env ==="
+echo "=== API container must use PROCESS_BACKGROUND_JOBS=api (student import / bulk jobs) ==="
+echo "=== Worker container uses PROCESS_BACKGROUND_JOBS=worker (backups + fee PDFs) ==="

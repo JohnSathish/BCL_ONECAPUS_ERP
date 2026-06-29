@@ -1170,8 +1170,8 @@ async function main() {
     { name: 'Zoology', code: 'ZOO', departmentType: 'SCIENCE' },
     { name: 'Physics', code: 'PHY', departmentType: 'SCIENCE' },
     {
-      name: 'Accounting For Business',
-      code: 'AFB',
+      name: 'Commerce',
+      code: 'COM',
       departmentType: 'COMMERCE',
     },
     {
@@ -2967,6 +2967,20 @@ async function main() {
       code: 'HINDU',
       label: 'Hindu',
       sortOrder: 5,
+    },
+    { lookupType: 'TRIBE', code: 'GARO', label: 'Garo', sortOrder: 1 },
+    { lookupType: 'TRIBE', code: 'JAINTIA', label: 'Jaintia', sortOrder: 2 },
+    { lookupType: 'TRIBE', code: 'KHASI', label: 'Khasi', sortOrder: 3 },
+    { lookupType: 'TRIBE', code: 'BENGALI', label: 'Bengali', sortOrder: 4 },
+    { lookupType: 'TRIBE', code: 'HAJONG', label: 'Hajong', sortOrder: 5 },
+    { lookupType: 'TRIBE', code: 'NEPALI', label: 'Nepali', sortOrder: 6 },
+    { lookupType: 'TRIBE', code: 'BIHARI', label: 'Bihari', sortOrder: 7 },
+    { lookupType: 'TRIBE', code: 'ODIYA', label: 'Odiya', sortOrder: 8 },
+    {
+      lookupType: 'TRIBE',
+      code: 'OTHER',
+      label: 'Others',
+      sortOrder: 9,
     },
     { lookupType: 'NATIONALITY', code: 'IN', label: 'Indian', sortOrder: 1 },
     {

@@ -75,6 +75,7 @@ export function canAccessAdminPortal(
   roles: string[],
   permissions: string[] = [],
 ) {
+  if (isStudentOnlyUser(roles)) return false;
   return registryCanAccessAdmin(roles, permissions);
 }
 
@@ -84,6 +85,14 @@ export function canAccessStaffPortal(roles: string[]) {
 
 export function canAccessStudentPortal(roles: string[]) {
   return roles.some((role) => STUDENT_PORTAL_ROLES.has(role));
+}
+
+export function isStudentOnlyUser(roles: string[]) {
+  return (
+    canAccessStudentPortal(roles) &&
+    !canAccessStaffPortal(roles) &&
+    !roles.some((r) => ADMIN_PORTAL_ROLES.has(r) || r.startsWith('shift-'))
+  );
 }
 
 export function resolveHomePath(roles: string[], permissions: string[] = []) {
@@ -99,6 +108,9 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
     !canAccessAdminPortal(roles, permissions)
   ) {
     return '/library-desk';
+  }
+  if (isStudentOnlyUser(roles)) {
+    return '/student';
   }
   if (canAccessAdminPortal(roles, permissions)) {
     return resolveDefaultAdminHome(permissions, roles);

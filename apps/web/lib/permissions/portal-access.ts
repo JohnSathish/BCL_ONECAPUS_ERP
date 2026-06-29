@@ -66,6 +66,7 @@ export function canAccessPlatformPortal(roles: string[], permissions: string[] =
 }
 
 export function canAccessAdminPortal(roles: string[], permissions: string[] = []) {
+  if (isStudentOnlyUser(roles)) return false;
   return registryCanAccessAdmin(roles, permissions);
 }
 
@@ -101,6 +102,9 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
   }
   if (canAccessApplicantPortal(roles, permissions) && !canAccessAdminPortal(roles, permissions)) {
     return '/admissions-portal/dashboard';
+  }
+  if (isStudentOnlyUser(roles)) {
+    return '/student';
   }
   if (canAccessAdminPortal(roles, permissions)) {
     return resolveDefaultAdminHome(permissions, roles);

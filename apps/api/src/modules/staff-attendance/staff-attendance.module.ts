@@ -48,6 +48,7 @@ import { StaffAttendanceService } from './staff-attendance.service';
     StaffAttendanceEngineService,
     AttendancePolicyEngineService,
     AttendanceSettingsService,
+    StaffAttendanceProcessor,
   ],
 })
 export class StaffAttendanceModule {}
