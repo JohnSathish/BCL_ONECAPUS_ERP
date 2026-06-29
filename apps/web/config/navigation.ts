@@ -576,7 +576,8 @@ export const ADMIN_NAV: NavGroup[] = [
         href: '/admin/programs',
         module: 'academics',
         permissions: [...P.academics],
-        activePattern: '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts)(?:/.*)?$',
+        activePattern:
+          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections)(?:/.*)?$',
         children: [
           { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
           {
@@ -588,6 +589,11 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Course Master',
             href: '/admin/programs',
             permissions: [...P.academics],
+          },
+          {
+            label: 'Subject Sections',
+            href: '/admin/academics/subject-sections',
+            permissions: ['academic-engine:read', 'academic-engine:manage'],
           },
           {
             label: 'Subject Mapping',

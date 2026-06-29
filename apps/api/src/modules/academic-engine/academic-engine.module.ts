@@ -5,6 +5,7 @@ import { ShiftsModule } from '../shifts/shifts.module';
 import { CourseDeliveryFeeService } from '../../common/services/course-delivery-fee.service';
 import { AcademicEngineController } from './academic-engine.controller';
 import { FyugpController } from './fyugp.controller';
+import { SubjectSectionManagementController } from './subject-section-management.controller';
 import { AcademicEngineService } from './academic-engine.service';
 import { RegistrationImportController } from './import/registration-import.controller';
 import { RegistrationImportHandler } from './import/registration-import.handler';
@@ -22,6 +23,7 @@ import { AdmissionPoolsService } from './services/admission-pools.service';
 import { MajorMinorEligibilityService } from './services/major-minor-eligibility.service';
 import { SubjectRegistrationEngineService } from './services/subject-registration-engine.service';
 import { PoolSectionProvisioningService } from './services/pool-section-provisioning.service';
+import { SubjectSectionManagementService } from './services/subject-section-management.service';
 import { SemesterRulesService } from './services/semester-rules.service';
 import { HonoursTrackService } from './services/honours-track.service';
 import { CurriculumCompletionService } from './services/curriculum-completion.service';
@@ -43,6 +45,7 @@ import { FeesModule } from '../fees/fees.module';
     AcademicEngineController,
     RegistrationImportController,
     FyugpController,
+    SubjectSectionManagementController,
   ],
   providers: [
     AcademicEngineService,
@@ -62,6 +65,7 @@ import { FeesModule } from '../fees/fees.module';
     MajorMinorEligibilityService,
     SubjectRegistrationEngineService,
     PoolSectionProvisioningService,
+    SubjectSectionManagementService,
     SemesterRulesService,
     HonoursTrackService,
     CurriculumCompletionService,
