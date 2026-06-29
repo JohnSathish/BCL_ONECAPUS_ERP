@@ -6,7 +6,9 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
@@ -52,6 +54,38 @@ export class SubjectSectionManagementController {
     @Param('sectionId') sectionId: string,
   ) {
     return this.sections.listSectionStudents(user.tid, sectionId);
+  }
+
+  @Get('offerings/:offeringId/allocation-export')
+  @RequirePermissions('academic-engine:read')
+  async exportOfferingAllocations(
+    @CurrentUser() user: JwtUser,
+    @Param('offeringId') offeringId: string,
+    @Res() res: Response,
+  ) {
+    const { filename, csv } = await this.sections.exportOfferingAllocationsCsv(
+      user.tid,
+      offeringId,
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  }
+
+  @Get('sections/:sectionId/students/export')
+  @RequirePermissions('academic-engine:read')
+  async exportSectionStudents(
+    @CurrentUser() user: JwtUser,
+    @Param('sectionId') sectionId: string,
+    @Res() res: Response,
+  ) {
+    const { filename, csv } = await this.sections.exportSectionStudentsCsv(
+      user.tid,
+      sectionId,
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
   }
 
   @Post('bulk-provision')

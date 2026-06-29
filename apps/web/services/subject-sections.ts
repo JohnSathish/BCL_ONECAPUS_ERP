@@ -171,3 +171,32 @@ export async function fetchSectionStudents(sectionId: string) {
     }>;
   };
 }
+
+function downloadCsvBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadOfferingAllocationExport(offeringId: string) {
+  const response = await api.get(
+    `/v1/academic-engine/subject-sections/offerings/${offeringId}/allocation-export`,
+    { responseType: 'blob' },
+  );
+  const disposition = String(response.headers['content-disposition'] ?? '');
+  const match = disposition.match(/filename="([^"]+)"/);
+  downloadCsvBlob(response.data as Blob, match?.[1] ?? 'section_allocation.csv');
+}
+
+export async function downloadSectionStudentsExport(sectionId: string) {
+  const response = await api.get(
+    `/v1/academic-engine/subject-sections/sections/${sectionId}/students/export`,
+    { responseType: 'blob' },
+  );
+  const disposition = String(response.headers['content-disposition'] ?? '');
+  const match = disposition.match(/filename="([^"]+)"/);
+  downloadCsvBlob(response.data as Blob, match?.[1] ?? 'section_students.csv');
+}

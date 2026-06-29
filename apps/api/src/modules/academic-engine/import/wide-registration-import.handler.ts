@@ -104,9 +104,35 @@ function readRegistrationNumber(raw: Record<string, unknown>): string {
 }
 
 function readSectionCode(raw: Record<string, unknown>): string | undefined {
-  const val = raw.sectionCode ?? raw.sectioncode;
-  const code = String(val ?? '').trim();
-  return code || undefined;
+  for (const alias of [
+    'sectionCode',
+    'sectioncode',
+    'grp',
+    'tutorialGroup',
+    'tutorialgroup',
+  ]) {
+    for (const [rawKey, val] of Object.entries(raw)) {
+      if (normalizeWideHeaderKey(String(rawKey)) === alias) {
+        const code = String(val ?? '').trim();
+        if (code) return code;
+      }
+    }
+  }
+  return undefined;
+}
+
+function readCategorySectionCode(
+  raw: Record<string, unknown>,
+  category: string,
+): string | undefined {
+  const norm = category.toLowerCase();
+  for (const [key, val] of Object.entries(raw)) {
+    if (normalizeWideHeaderKey(String(key)) === `${norm}section`) {
+      const code = String(val ?? '').trim();
+      if (code) return code;
+    }
+  }
+  return readSectionCode(raw);
 }
 
 function cellText(value: unknown): string {
@@ -154,7 +180,6 @@ export function unpivotWideRows(
     const raw = row.raw;
     const registrationNumber = readRegistrationNumber(raw);
     const semesterSequence = resolveSemesterSequenceFromWideRow(raw);
-    const sectionCode = readSectionCode(raw);
     const categoryKeys = Object.keys(raw).filter(isWideCategoryColumnKey);
 
     for (const columnKey of categoryKeys) {
@@ -168,7 +193,7 @@ export function unpivotWideRows(
           category: entry.category,
           courseCode: entry.courseCode,
           majorPaperIndex: entry.majorPaperIndex,
-          sectionCode,
+          sectionCode: readCategorySectionCode(raw, entry.category),
         });
       }
     }
@@ -208,6 +233,7 @@ export async function buildWideTemplateWorkbook(): Promise<Buffer> {
       headers: [
         'Registration Number',
         'Semester',
+        'Grp',
         'Major',
         'Minor',
         'MDC',
@@ -220,6 +246,7 @@ export async function buildWideTemplateWorkbook(): Promise<Buffer> {
         [
           'REG2026001',
           1,
+          'A',
           'BCA-M101',
           'MAT-M101',
           'MDC101',
@@ -231,6 +258,7 @@ export async function buildWideTemplateWorkbook(): Promise<Buffer> {
         [
           'REG2024001',
           5,
+          'B',
           'BCA-M501|BCA-M502',
           '',
           'MDC501',
@@ -256,6 +284,10 @@ export async function buildWideTemplateWorkbook(): Promise<Buffer> {
           'Student registration / enrollment number',
         ],
         ['Semester (required)', 'Programme semester sequence for this row'],
+        [
+          'Grp / Section Code',
+          'Section A, B, or Core for all papers on this row (or use AEC Section, MDC Section, etc.)',
+        ],
         ['Major', 'Major course code(s)'],
         ['Major-1 / Major-2', 'Optional split major paper columns'],
         ['Minor', 'Minor course code'],

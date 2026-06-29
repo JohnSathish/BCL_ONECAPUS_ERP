@@ -375,6 +375,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     { key: 'vacSubject', header: 'VAC', required: false },
     { key: 'vtcSubject', header: 'VTC', required: false },
     { key: 'sectionCode', header: 'Section Code', required: false },
+    { key: 'grp', header: 'Grp', required: false },
     { key: 'majorSection', header: 'Major Section', required: false },
     { key: 'minorSection', header: 'Minor Section', required: false },
     { key: 'mdcSection', header: 'MDC Section', required: false },
@@ -1418,7 +1419,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       return sem3Resolved;
     }
     const defaultSectionCode =
-      this.firstText(raw, ['sectionCode']) ??
+      this.firstText(raw, ['sectionCode', 'grp', 'tutorialGroup']) ??
       mapping.tutorialGroup ??
       undefined;
     const sectionPreferences = this.buildSectionPreferences(
@@ -1620,7 +1621,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const defaultSectionCode =
-      this.firstText(raw, ['sectionCode']) ??
+      this.firstText(raw, ['sectionCode', 'grp', 'tutorialGroup']) ??
       mapping.tutorialGroup ??
       undefined;
     const sectionPreferences = this.buildSectionPreferences(
@@ -1849,7 +1850,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const defaultSectionCode =
-      this.firstText(raw, ['sectionCode']) ??
+      this.firstText(raw, ['sectionCode', 'grp', 'tutorialGroup']) ??
       mapping.tutorialGroup ??
       undefined;
     const sectionPreferences = this.buildSectionPreferences(
@@ -2053,7 +2054,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const defaultSectionCode =
-      this.firstText(raw, ['sectionCode']) ??
+      this.firstText(raw, ['sectionCode', 'grp', 'tutorialGroup']) ??
       mapping.tutorialGroup ??
       undefined;
     const sectionPreferences = this.buildSectionPreferences(

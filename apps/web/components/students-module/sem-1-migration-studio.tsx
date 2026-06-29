@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
+import { SectionAllocationGuide } from '@/components/academic-engine/section-allocation-guide';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { downloadSem1AdmissionTemplate } from '@/services/students';
 import { cn } from '@/utils/cn';
@@ -38,6 +39,16 @@ const WORKFLOW_STEPS = [
       'Upload your admission Excel directly. Columns like Major Subject, MDC Choice, AEC, SEC, VAC map automatically. Use Section Code or Tutorial Group for A / B / Core.',
     href: '/admin/students/import',
     action: 'Student Import Studio',
+  },
+  {
+    id: 'subject-sections',
+    icon: Layers,
+    title: 'Split large classes into A / B (Path 2)',
+    description:
+      'When compulsory papers exceed room capacity, create Section A & B here or use Auto divide after students are registered.',
+    href: '/admin/academics/subject-sections',
+    action: 'Subject Sections',
+    optional: true,
   },
   {
     id: 'registration',
@@ -89,6 +100,12 @@ const COLUMN_MAP = [
   { admission: 'SEC', erp: 'SEC', note: 'Skill Enhancement paper' },
   { admission: 'VAC', erp: 'VAC', note: 'Value Added Course' },
   { admission: 'Section Code', erp: 'Section Code', note: 'A, B, or Core for all papers' },
+  {
+    admission: 'Grp',
+    erp: 'Section Code',
+    note: 'Same as Section Code (college spreadsheet alias)',
+  },
+  { admission: 'AEC Section', erp: 'AEC Section', note: 'Section A/B for AEC only' },
   { admission: 'Address in Tura', erp: 'Tura Address Line 1', note: 'Campus / local address' },
   { admission: 'Home Address', erp: 'Home Address Line 1', note: 'Permanent address' },
   {
@@ -155,6 +172,8 @@ export function Sem1MigrationStudio() {
           </div>
         </div>
       </section>
+
+      <SectionAllocationGuide compact />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <CompactCard>

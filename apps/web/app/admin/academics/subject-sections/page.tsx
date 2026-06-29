@@ -14,12 +14,14 @@ import {
   autoDivideSubjectSections,
   bulkProvisionSubjectSections,
   createSubjectSection,
+  downloadOfferingAllocationExport,
   fetchSubjectSectionDashboard,
   fetchSubjectsWithSections,
   importSectionAllocations,
   type SectionAllocationStrategy,
   type SubjectWithSections,
 } from '@/services/subject-sections';
+import { SectionAllocationGuide } from '@/components/academic-engine/section-allocation-guide';
 
 const CATEGORIES = ['AEC', 'SEC', 'MDC', 'VAC', 'VTC', 'MAJOR', 'MINOR'];
 
@@ -156,6 +158,8 @@ export default function SubjectSectionsPage() {
             Could not load subject sections. Refresh the page after the API reloads.
           </p>
         ) : null}
+
+        <SectionAllocationGuide />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
@@ -317,6 +321,18 @@ export default function SubjectSectionsPage() {
                       >
                         Import
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-[11px]"
+                        onClick={() =>
+                          void downloadOfferingAllocationExport(r.id).catch(() =>
+                            setMessage('Could not export allocation template.'),
+                          )
+                        }
+                      >
+                        Export CSV
+                      </Button>
                     </div>
                   ),
                 },
@@ -350,17 +366,34 @@ export default function SubjectSectionsPage() {
             </div>
             <textarea
               className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-              placeholder={'Roll Number, Section\nBA26-001, A\nBA26-002, B\nBA26-003, A'}
+              placeholder={
+                'Roll Number, Section\nBA26-001, A\nBA26-002, B\nBA26-003, A\n\nTip: Export CSV first, fill the New Section column, then paste Roll + Section here.'
+              }
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
             />
-            <Button
-              size="sm"
-              disabled={!selectedOffering || importMut.isPending || !importText.trim()}
-              onClick={() => importMut.mutate()}
-            >
-              {importMut.isPending ? 'Importing…' : 'Import section allocation'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={!selectedOffering || importMut.isPending || !importText.trim()}
+                onClick={() => importMut.mutate()}
+              >
+                {importMut.isPending ? 'Importing…' : 'Import section allocation'}
+              </Button>
+              {selectedOffering ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void downloadOfferingAllocationExport(selectedOffering.id).catch(() =>
+                      setMessage('Could not export allocation template.'),
+                    )
+                  }
+                >
+                  Download CSV template
+                </Button>
+              ) : null}
+            </div>
           </CompactCardBody>
         </CompactCard>
       </div>

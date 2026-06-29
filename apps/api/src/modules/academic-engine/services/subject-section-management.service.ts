@@ -214,6 +214,100 @@ export class SubjectSectionManagementService {
     };
   }
 
+  async exportOfferingAllocationsCsv(
+    tenantId: string,
+    offeringId: string,
+  ): Promise<{ filename: string; csv: string }> {
+    const offering = await this.prisma.courseOffering.findFirst({
+      where: { id: offeringId, tenantId, deletedAt: null },
+      include: { course: { select: { code: true, title: true } } },
+    });
+    if (!offering) throw new NotFoundException('Offering not found');
+
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId,
+        offeringId,
+        status: { in: ['pending', 'confirmed', 'waitlisted'] },
+      },
+      include: {
+        offeringSection: { select: { sectionCode: true } },
+        registration: {
+          include: {
+            student: {
+              select: {
+                rollNumber: true,
+                masterProfile: { select: { fullName: true } },
+                department: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ registration: { student: { rollNumber: 'asc' } } }],
+    });
+
+    const header = [
+      'Roll Number',
+      'Full Name',
+      'Department',
+      'Current Section',
+      'New Section',
+    ];
+    const rows = lines.map((line) => [
+      line.registration.student.rollNumber ?? '',
+      line.registration.student.masterProfile?.fullName ?? '',
+      line.registration.student.department?.name ?? '',
+      line.offeringSection?.sectionCode ?? '',
+      '',
+    ]);
+
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((c) => this.csvCell(c)).join(','))
+      .join('\n');
+
+    const safeCode = offering.course.code.replace(/[^\w.-]+/g, '_');
+    return {
+      filename: `${safeCode}_section_allocation.csv`,
+      csv,
+    };
+  }
+
+  async exportSectionStudentsCsv(
+    tenantId: string,
+    sectionId: string,
+  ): Promise<{ filename: string; csv: string }> {
+    const payload = await this.listSectionStudents(tenantId, sectionId);
+    const header = [
+      'Roll Number',
+      'Full Name',
+      'Department',
+      'Status',
+      'Section',
+    ];
+    const rows = payload.students.map((row) => [
+      row.student.rollNumber ?? '',
+      row.student.fullName,
+      row.student.department?.name ?? '',
+      row.status,
+      payload.section.sectionCode,
+    ]);
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((c) => this.csvCell(c)).join(','))
+      .join('\n');
+    const safeCode = payload.section.course.code.replace(/[^\w.-]+/g, '_');
+    return {
+      filename: `${safeCode}_${payload.section.sectionCode}_students.csv`,
+      csv,
+    };
+  }
+
+  private csvCell(value: string) {
+    const text = String(value ?? '');
+    if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+    return text;
+  }
+
   async bulkProvisionSections(
     tenantId: string,
     dto: BulkProvisionSubjectSectionsDto,
