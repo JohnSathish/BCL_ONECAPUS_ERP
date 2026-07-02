@@ -16,7 +16,7 @@ import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 export type CreatePaymentRequestDto = {
   studentId: string;
   demandIds: string[];
-  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
+  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL' | 'DESK_CHECKOUT';
   sendLinkVia?: Array<'SMS' | 'EMAIL' | 'WHATSAPP'>;
 };
 
@@ -149,6 +149,7 @@ export class FeePaymentRequestService {
 
     let providerOrderId: string | null = null;
     let paymentLinkUrl: string | null = null;
+    let paymentLinkProviderId: string | null = null;
     let qrImageUrl: string | null = null;
     let mode: 'LIVE' | 'MOCK' = 'MOCK';
 
@@ -169,6 +170,11 @@ export class FeePaymentRequestService {
           });
           paymentLinkUrl = link.short_url;
           providerOrderId = link.id;
+          paymentLinkProviderId = link.id;
+          await this.db().paymentTransaction.update({
+            where: { id: payment.id },
+            data: { providerOrderId: link.id },
+          });
         } else {
           const order = await createRazorpayOrder(creds, {
             amountPaise: Math.round(amount * 100),
@@ -180,24 +186,27 @@ export class FeePaymentRequestService {
             where: { id: payment.id },
             data: { providerOrderId: order.id },
           });
-          try {
-            const qr = await createRazorpayUpiQr(creds, {
-              amountPaise: Math.round(amount * 100),
-              description,
-              referenceId: requestNo,
-              closeByUnix,
-              notes,
-            });
-            qrImageUrl = qr.image_url;
-          } catch {
-            const link = await createRazorpayPaymentLink(creds, {
-              amountPaise: Math.round(amount * 100),
-              description,
-              referenceId: requestNo,
-              expireByUnix: closeByUnix,
-              notes,
-            });
-            paymentLinkUrl = link.short_url;
+          if (dto.channel !== 'DESK_CHECKOUT') {
+            try {
+              const qr = await createRazorpayUpiQr(creds, {
+                amountPaise: Math.round(amount * 100),
+                description,
+                referenceId: requestNo,
+                closeByUnix,
+                notes,
+              });
+              qrImageUrl = qr.image_url;
+            } catch {
+              const link = await createRazorpayPaymentLink(creds, {
+                amountPaise: Math.round(amount * 100),
+                description,
+                referenceId: requestNo,
+                expireByUnix: closeByUnix,
+                notes,
+              });
+              paymentLinkUrl = link.short_url;
+              paymentLinkProviderId = link.id;
+            }
           }
         }
         mode = 'LIVE';
@@ -230,7 +239,11 @@ export class FeePaymentRequestService {
         upiReference: requestNo,
         generatedById: user.sub,
         expiresAt,
-        metadata: { mode, studentName },
+        metadata: {
+          mode,
+          studentName,
+          ...(paymentLinkProviderId ? { paymentLinkProviderId } : {}),
+        },
       },
     });
 

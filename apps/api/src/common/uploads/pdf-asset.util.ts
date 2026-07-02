@@ -82,3 +82,34 @@ export function resolvePdfImageSrc(assetUrl?: string | null): string | null {
 
   return null;
 }
+
+/**
+ * Like resolvePdfImageSrc, but fetches remote http(s) assets and embeds them as data URIs
+ * so Puppeteer page.setContent() does not depend on network during PDF render.
+ */
+export async function resolvePdfImageSrcAsync(
+  assetUrl?: string | null,
+): Promise<string | null> {
+  const resolved = resolvePdfImageSrc(assetUrl);
+  if (!resolved) return null;
+  if (resolved.startsWith('data:')) return resolved;
+  if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
+    return resolved;
+  }
+
+  try {
+    const response = await fetch(resolved, {
+      signal: AbortSignal.timeout(12_000),
+      headers: { Accept: 'image/*,*/*' },
+    });
+    if (!response.ok) return null;
+    const contentType =
+      response.headers.get('content-type')?.split(';')[0]?.trim() ??
+      'image/png';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) return null;
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}

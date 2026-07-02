@@ -25,6 +25,11 @@ export type RazorpayPaymentLink = {
   short_url: string;
   amount: number;
   status: string;
+  payments?: Array<{ payment_id?: string; id?: string; status?: string }>;
+};
+
+export type RazorpayOrderPayments = {
+  items: Array<{ id: string; status: string; order_id?: string }>;
 };
 
 export type RazorpayQrCode = {
@@ -72,6 +77,56 @@ export async function createRazorpayPaymentLink(
     throw new Error(
       body.error?.description ?? `Razorpay payment link failed (${res.status})`,
     );
+  return body;
+}
+
+export async function fetchRazorpayPaymentLink(
+  creds: RazorpayCredentials,
+  linkId: string,
+): Promise<RazorpayPaymentLink> {
+  const auth = Buffer.from(`${creds.keyId}:${creds.keySecret}`).toString(
+    'base64',
+  );
+  const res = await fetch(
+    `https://api.razorpay.com/v1/payment_links/${linkId}`,
+    {
+      headers: { Authorization: `Basic ${auth}` },
+    },
+  );
+  const body = (await res.json()) as RazorpayPaymentLink & {
+    error?: { description?: string };
+  };
+  if (!res.ok) {
+    throw new Error(
+      body.error?.description ??
+        `Razorpay payment link fetch failed (${res.status})`,
+    );
+  }
+  return body;
+}
+
+export async function fetchRazorpayOrderPayments(
+  creds: RazorpayCredentials,
+  orderId: string,
+): Promise<RazorpayOrderPayments> {
+  const auth = Buffer.from(`${creds.keyId}:${creds.keySecret}`).toString(
+    'base64',
+  );
+  const res = await fetch(
+    `https://api.razorpay.com/v1/orders/${orderId}/payments`,
+    {
+      headers: { Authorization: `Basic ${auth}` },
+    },
+  );
+  const body = (await res.json()) as RazorpayOrderPayments & {
+    error?: { description?: string };
+  };
+  if (!res.ok) {
+    throw new Error(
+      body.error?.description ??
+        `Razorpay order payments fetch failed (${res.status})`,
+    );
+  }
   return body;
 }
 

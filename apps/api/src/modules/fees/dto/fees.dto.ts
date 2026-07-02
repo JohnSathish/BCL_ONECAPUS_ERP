@@ -401,8 +401,8 @@ export class CreatePaymentRequestDto {
   demandIds!: string[];
 
   @IsOptional()
-  @IsIn(['OFFICE_QR', 'PAYMENT_LINK', 'STUDENT_PORTAL'])
-  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
+  @IsIn(['OFFICE_QR', 'PAYMENT_LINK', 'STUDENT_PORTAL', 'DESK_CHECKOUT'])
+  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL' | 'DESK_CHECKOUT';
 }
 
 export class VerifyFeePaymentDto {

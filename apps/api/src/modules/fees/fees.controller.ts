@@ -878,8 +878,18 @@ export class FeesController {
 
   @Get('payment-requests/:id')
   @RequireAnyPermission('fees:read', 'fees:manage', 'student:portal:self')
-  getPaymentRequest(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+  async getPaymentRequest(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    await this.gateways.syncPaymentRequest(user, id).catch(() => undefined);
     return this.paymentRequests.getOne(user.tid, id);
+  }
+
+  @Post('payment-requests/:id/sync')
+  @RequireAnyPermission('fees:read', 'fees:manage')
+  syncPaymentRequest(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.gateways.syncPaymentRequest(user, id);
   }
 
   @Post('payment-requests')

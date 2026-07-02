@@ -454,7 +454,7 @@ export async function simulateFeePayment(paymentId: string) {
 
 export async function createMyPaymentRequest(payload: {
   demandIds: string[];
-  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
+  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL' | 'DESK_CHECKOUT';
 }) {
   const { data } = await api.post('/v1/fees/me/payment-requests', payload);
   return data as {
@@ -487,7 +487,7 @@ export async function fetchMyExternalPayments(status?: string) {
 export async function createPaymentRequest(payload: {
   studentId: string;
   demandIds: string[];
-  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
+  channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL' | 'DESK_CHECKOUT';
 }) {
   const { data } = await api.post('/v1/fees/payment-requests', payload);
   return data as {
@@ -504,6 +504,15 @@ export async function fetchPaymentRequests(params?: { studentId?: string; status
 
 export async function fetchPaymentRequest(id: string) {
   const { data } = await api.get<FeePaymentRequest>(`/v1/fees/payment-requests/${id}`);
+  return data;
+}
+
+export async function syncPaymentRequest(id: string) {
+  const { data } = await api.post<{
+    synced: boolean;
+    providerStatus?: string;
+    request?: FeePaymentRequest;
+  }>(`/v1/fees/payment-requests/${id}/sync`);
   return data;
 }
 

@@ -1,8 +1,6 @@
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { pathToFileURL } from 'url';
+import { resolvePdfImageSrcAsync } from '../../../common/uploads/pdf-asset.util';
 
-export const FEE_RECEIPT_TEMPLATE_VERSION = 'v5';
+export const FEE_RECEIPT_TEMPLATE_VERSION = 'v6';
 
 export type ReceiptTemplateFormat = 'full' | 'half' | 'thermal';
 
@@ -76,24 +74,50 @@ export function inr(amount: number) {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function resolveAssetSrc(assetUrl?: string | null): string | null {
-  if (!assetUrl) return null;
-  if (
-    assetUrl.startsWith('http://') ||
-    assetUrl.startsWith('https://') ||
-    assetUrl.startsWith('data:')
-  )
-    return assetUrl;
-  if (assetUrl.startsWith('/uploads/') || assetUrl.startsWith('/branding/')) {
-    const candidates = [
-      join(process.cwd(), assetUrl.replace(/^\//, '')),
-      join(process.cwd(), '..', 'web', 'public', assetUrl.replace(/^\//, '')),
-    ];
-    for (const absolute of candidates) {
-      if (existsSync(absolute)) return pathToFileURL(absolute).href;
+export function formatBillingPeriodLabel(period?: string | null): string {
+  if (!period?.trim()) return '—';
+  const trimmed = period.trim();
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(trimmed);
+  if (monthMatch) {
+    const monthIndex = Number(monthMatch[2]) - 1;
+    if (monthIndex >= 0 && monthIndex <= 11) {
+      return new Date(Number(monthMatch[1]), monthIndex, 1).toLocaleDateString(
+        'en-IN',
+        { month: 'long', year: 'numeric' },
+      );
     }
   }
-  return null;
+  if (/^CYCLE-/i.test(trimmed)) {
+    return trimmed.replace(/^CYCLE-/i, 'Admission Cycle ');
+  }
+  return trimmed;
+}
+
+function billingPeriodSortKey(period: string): string {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(period.trim());
+  return monthMatch ? period.trim() : `z-${period}`;
+}
+
+function collectFormattedBillingPeriods(
+  allocations: Array<{ demand?: Record<string, unknown> }>,
+): string[] {
+  const rawPeriods = allocations
+    .map((allocation) => {
+      const demand = allocation.demand;
+      const metadata = demand?.metadata as
+        | { feeCycleName?: string }
+        | undefined;
+      return String(
+        demand?.billingPeriod ?? metadata?.feeCycleName ?? '',
+      ).trim();
+    })
+    .filter(Boolean);
+  const unique = [...new Set(rawPeriods)].sort((a, b) =>
+    billingPeriodSortKey(a).localeCompare(billingPeriodSortKey(b)),
+  );
+  return unique
+    .map((period) => formatBillingPeriodLabel(period))
+    .filter((label) => label !== '—');
 }
 
 const ONES = [
@@ -212,6 +236,10 @@ function mapDemandAllocation(
     (demand.metadata as Record<string, unknown> | undefined) ?? {};
   const demandType = String(demand.demandType ?? 'GENERAL');
   const lines = (demand.lines as Array<{ name: string }> | undefined) ?? [];
+  const billingPeriod = String(demand.billingPeriod ?? '').trim();
+  const periodLabel = formatBillingPeriodLabel(
+    billingPeriod || String(metadata.feeCycleName ?? ''),
+  );
 
   let component = 'Fee';
   if (demandType === 'MONTHLY_TUITION') component = 'Monthly Fee';
@@ -221,45 +249,45 @@ function mapDemandAllocation(
     component = 'Monthly Fee';
 
   const feeHead =
-    String(metadata.feeCycleName ?? '') ||
-    String(demand.billingPeriod ?? '') ||
-    String(demand.demandNo ?? 'Fee');
+    periodLabel !== '—'
+      ? periodLabel
+      : String(metadata.feeCycleName ?? '') ||
+        billingPeriod ||
+        String(demand.demandNo ?? 'Fee');
 
-  const description =
-    lines.length > 0
-      ? lines.map((l) => l.name).join(' · ')
-      : demandType === 'MONTHLY_TUITION'
-        ? `Monthly tuition · ${feeHead}`
-        : String(metadata.covers ?? metadata.description ?? component);
+  const lineNames =
+    lines.length > 0 ? lines.map((l) => l.name).join(' · ') : '';
+  let description = lineNames;
+  if (demandType === 'MONTHLY_TUITION' && periodLabel !== '—') {
+    description = lineNames
+      ? `${lineNames} · ${periodLabel}`
+      : `Monthly tuition · ${periodLabel}`;
+  } else if (!description) {
+    description = String(metadata.covers ?? metadata.description ?? component);
+  }
 
   return { component, feeHead, description, amount };
 }
 
 export function resolveFeeCycleLabel(receipt: Record<string, unknown>) {
-  const payment = receipt.payment as
-    | { allocations?: Array<{ demand?: Record<string, unknown> }> }
-    | undefined;
-  const allocations = payment?.allocations ?? [];
-  if (allocations.length === 1) {
-    const demand = allocations[0].demand;
-    const metadata = demand?.metadata as { feeCycleName?: string } | undefined;
-    const receiptDemand = receipt.demand as
-      | { metadata?: { feeCycleName?: string }; billingPeriod?: string }
-      | undefined;
-    return (
-      metadata?.feeCycleName ??
-      demand?.billingPeriod ??
-      receiptDemand?.metadata?.feeCycleName ??
-      '—'
-    );
+  const allocations =
+    (
+      receipt.payment as
+        | { allocations?: Array<{ demand?: Record<string, unknown> }> }
+        | undefined
+    )?.allocations ?? [];
+  if (allocations.length) {
+    const periods = collectFormattedBillingPeriods(allocations);
+    if (periods.length) return periods.join(', ');
   }
-  if (allocations.length > 1) return 'Multiple fee heads';
+
   const receiptDemand = receipt.demand as
     | { metadata?: { feeCycleName?: string }; billingPeriod?: string }
     | undefined;
-  return (
-    receiptDemand?.metadata?.feeCycleName ?? receiptDemand?.billingPeriod ?? '—'
+  const fallback = formatBillingPeriodLabel(
+    receiptDemand?.billingPeriod ?? receiptDemand?.metadata?.feeCycleName ?? '',
   );
+  return fallback !== '—' ? fallback : '—';
 }
 
 export function buildFeeReceiptStorageKey(
@@ -333,10 +361,9 @@ function formatReceiptDateCompact(date: Date) {
   return `${day} ${month} ${date.getFullYear()}`;
 }
 
-function linePeriod(line: FeeReceiptLine, feeCycle: string) {
-  if (/^\d{4}-\d{2}$/.test(line.feeHead)) return line.feeHead;
-  if (/monthly/i.test(line.component) && feeCycle !== '—') return feeCycle;
-  return line.feeHead || '—';
+function linePeriod(line: FeeReceiptLine) {
+  if (line.feeHead && line.feeHead !== '—') return line.feeHead;
+  return '—';
 }
 
 export function buildFeeReceiptHtml(
@@ -368,7 +395,7 @@ function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       <tr>
         <td class="c">${index + 1}</td>
         <td>${escapeHtml(line.component)}</td>
-        <td>${escapeHtml(linePeriod(line, data.feeCycle))}</td>
+        <td>${escapeHtml(linePeriod(line))}</td>
         <td>${escapeHtml(line.description)}</td>
         <td class="amt">${inr(line.amount)}</td>
       </tr>`,
@@ -599,7 +626,7 @@ function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
           <div class="kv"><span class="k">Enrollment</span><span class="v">${escapeHtml(data.enrollmentNumber)}</span></div>
           <div class="kv"><span class="k">Programme</span><span class="v">${escapeHtml(data.programme)}</span></div>
           <div class="kv"><span class="k">Semester</span><span class="v">${escapeHtml(data.semester)}</span></div>
-          <div class="kv"><span class="k">Fee Cycle</span><span class="v">${escapeHtml(data.feeCycle)}</span></div>
+          <div class="kv"><span class="k">Fee Period</span><span class="v">${escapeHtml(data.feeCycle)}</span></div>
         </div>
       </div>
       <div class="panel">
@@ -1027,7 +1054,7 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
             <p class="field"><strong>Application No.:</strong> <span>${escapeHtml(data.applicationNo)}</span></p>
             <p class="field"><strong>Programme:</strong> <span>${escapeHtml(data.programme)}</span></p>
             <p class="field"><strong>Semester:</strong> <span>${escapeHtml(data.semester)}</span></p>
-            <p class="field"><strong>Fee Cycle:</strong> <span>${escapeHtml(data.feeCycle)}</span></p>
+            <p class="field"><strong>Fee Period:</strong> <span>${escapeHtml(data.feeCycle)}</span></p>
           </div>
         </div>
         <div class="panel">
@@ -1135,7 +1162,7 @@ export async function resolveFeeReceiptBranding(
     badges.find((b) => /naac/i.test(b)) ?? (isDbc ? 'NAAC Accredited' : null);
 
   const logoUrl = (branding?.logoUrl as string | null) ?? null;
-  const logoSrc = resolveAssetSrc(logoUrl);
+  const logoSrc = await resolvePdfImageSrcAsync(logoUrl);
 
   return {
     collegeName: displayName.toUpperCase(),

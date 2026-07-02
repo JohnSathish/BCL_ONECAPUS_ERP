@@ -16,6 +16,21 @@ import {
   type ReceiptTemplateFormat,
 } from '../templates/fee-receipt.template';
 
+function resolveReceiptVerifyBaseUrl(): string {
+  const candidates = [
+    process.env.WEB_ORIGIN,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.OFFICIAL_DOCUMENT_VERIFY_URL,
+  ];
+  for (const candidate of candidates) {
+    if (candidate?.trim()) return candidate.trim().replace(/\/$/, '');
+  }
+  if (process.env.NEXT_PUBLIC_LOGIN_HOST?.trim()) {
+    return `https://${process.env.NEXT_PUBLIC_LOGIN_HOST.trim()}`;
+  }
+  return 'https://erp.donboscocollege.ac.in';
+}
+
 @Injectable()
 export class FeeReceiptDocumentService {
   constructor(
@@ -202,7 +217,7 @@ export class FeeReceiptDocumentService {
       : null;
 
     const branding = await resolveFeeReceiptBranding(this.db(), tenantId);
-    const verifyUrl = `${process.env.WEB_ORIGIN ?? 'http://demo.localhost:3000'}/verify/receipt/${receipt.receiptNo}`;
+    const verifyUrl = `${resolveReceiptVerifyBaseUrl()}/verify/receipt/${receipt.receiptNo}`;
     const payment = receipt.payment;
     const paymentMeta = (payment?.metadata ?? {}) as Record<string, unknown>;
     const transactionRef =

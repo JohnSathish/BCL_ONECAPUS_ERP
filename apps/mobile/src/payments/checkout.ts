@@ -1,6 +1,12 @@
+import Constants from 'expo-constants';
 import { Alert, Platform } from 'react-native';
 import type { PaymentCheckout } from '@/types/fees';
 import { pollPaymentStatus, simulateFeePayment, verifyFeePayment } from '@/services/fees';
+
+/** Expo Go has no native Razorpay module — fee Pay now needs an EAS dev/production APK. */
+export function isExpoGoClient() {
+  return Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
+}
 
 export type CheckoutResult = {
   success: boolean;
@@ -79,15 +85,18 @@ export async function completeFeeCheckout(checkout: PaymentCheckout): Promise<Ch
   }
 
   if (checkout.mode === 'LIVE') {
-    const needsDevBuild = Platform.OS !== 'web' && !isNativeRazorpayAvailable();
+    const inExpoGo = isExpoGoClient();
+    const needsDevBuild = Platform.OS !== 'web' && (inExpoGo || !isNativeRazorpayAvailable());
     return new Promise((resolve) => {
       Alert.alert(
         'Complete payment',
-        needsDevBuild
-          ? 'Native Razorpay requires an EAS development build (not Expo Go). Install the dev build, or pay via the college web portal and tap "Check status".'
-          : Platform.OS === 'web'
-            ? 'Razorpay checkout on web is not wired yet. Use the student web portal or a native dev build.'
-            : 'Could not open Razorpay. Pay via the college web portal, then tap "Check status".',
+        inExpoGo
+          ? 'Razorpay cannot run in Expo Go. Install the EAS development APK on your phone (npm run build:dev:android), or pay via the college web portal and tap "Check status".'
+          : needsDevBuild
+            ? 'Native Razorpay requires an EAS development build (not Expo Go). Install the dev build, or pay via the college web portal and tap "Check status".'
+            : Platform.OS === 'web'
+              ? 'Razorpay checkout on web is not wired yet. Use the student web portal or a native dev build.'
+              : 'Could not open Razorpay. Pay via the college web portal, then tap "Check status".',
         [
           {
             text: 'Cancel',

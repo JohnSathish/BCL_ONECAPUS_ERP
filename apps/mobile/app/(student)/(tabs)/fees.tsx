@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { completeFeeCheckout } from '@/payments/checkout';
+import { completeFeeCheckout, isExpoGoClient } from '@/payments/checkout';
 import {
   downloadAndShareReceiptPdf,
   fetchMyFeeAccount,
@@ -43,6 +43,7 @@ export default function StudentFeesScreen() {
 
   const payables = account?.payableItems ?? [];
   const allowAdvance = account?.studentPortal?.allowAdvanceMonthlyPayment ?? false;
+  const expoGoPaymentNote = isExpoGoClient();
 
   const payableByDemandId = useMemo(() => {
     const map = new Map<string, PayableFeeItem>();
@@ -224,6 +225,15 @@ export default function StudentFeesScreen() {
             />
             <SummaryCard label="Paid" value={formatInr(account.summary.totalPaid)} />
           </View>
+          {expoGoPaymentNote ? (
+            <View style={styles.expoGoBanner}>
+              <Text style={styles.expoGoBannerTitle}>Expo Go — payments limited</Text>
+              <Text style={styles.expoGoBannerText}>
+                Pay now (Razorpay) needs the EAS dev APK installed on your phone. You can still view
+                fees here, or pay on the college web portal.
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.summaryRow}>
             <SummaryCard label="Admission" value={account.admissionFeeStatus?.status ?? '—'} />
             <SummaryCard
@@ -636,6 +646,16 @@ const styles = StyleSheet.create({
   summaryWarn: { borderColor: '#fcd34d', backgroundColor: '#fffbeb' },
   summaryLabel: { fontSize: 11, color: '#6b7280', textTransform: 'uppercase' },
   summaryValue: { fontSize: 18, fontWeight: '700', marginTop: 4 },
+  expoGoBanner: {
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+  },
+  expoGoBannerTitle: { fontSize: 13, fontWeight: '700', color: '#92400e' },
+  expoGoBannerText: { fontSize: 12, lineHeight: 17, color: '#78350f' },
   section: {
     borderWidth: 1,
     borderColor: '#dbeafe',

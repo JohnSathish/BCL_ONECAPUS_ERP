@@ -4,6 +4,9 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import type { GatewayPaymentDto } from '../dto/fees.dto';
 import {
   createRazorpayOrder,
+  fetchRazorpayOrderPayments,
+  fetchRazorpayPaymentLink,
+  isRazorpayConfigured,
   verifyRazorpayPaymentSignature,
 } from '../../../common/payments/razorpay.util';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
@@ -198,6 +201,8 @@ export class GatewayPaymentService {
         payload.payload as { payment?: { entity?: Record<string, unknown> } }
       )?.payment?.entity;
       const orderId = entity?.order_id as string | undefined;
+      const paymentId = entity?.id as string | undefined;
+      const notes = (entity?.notes ?? {}) as Record<string, string>;
       if (orderId) {
         const payment = await this.db().paymentTransaction.findFirst({
           where: { tenantId, providerOrderId: orderId },
@@ -206,9 +211,70 @@ export class GatewayPaymentService {
           await this.completePayment(
             tenantId,
             payment,
-            String(entity?.id ?? ''),
+            String(paymentId ?? ''),
           );
         }
+      } else if (notes.paymentId) {
+        const payment = await this.db().paymentTransaction.findFirst({
+          where: { tenantId, id: notes.paymentId },
+        });
+        if (payment && payment.status !== 'SUCCESS') {
+          await this.completePayment(
+            tenantId,
+            payment,
+            String(paymentId ?? ''),
+          );
+        }
+      }
+    }
+
+    if (provider === 'RAZORPAY' && payload.event === 'payment_link.paid') {
+      const linkEntity = (
+        payload.payload as {
+          payment_link?: { entity?: Record<string, unknown> };
+        }
+      )?.payment_link?.entity;
+      const payEntity = (
+        payload.payload as { payment?: { entity?: Record<string, unknown> } }
+      )?.payment?.entity;
+      const linkId = linkEntity?.id as string | undefined;
+      const providerPaymentId = payEntity?.id as string | undefined;
+      if (linkId) {
+        await this.completePaymentRequestByProviderRef(
+          tenantId,
+          linkId,
+          providerPaymentId,
+        );
+      }
+    }
+
+    if (provider === 'RAZORPAY' && payload.event === 'payment.failed') {
+      const entity = (
+        payload.payload as { payment?: { entity?: Record<string, unknown> } }
+      )?.payment?.entity;
+      const orderId = entity?.order_id as string | undefined;
+      const notes = (entity?.notes ?? {}) as Record<string, string>;
+      const payment = orderId
+        ? await this.db().paymentTransaction.findFirst({
+            where: { tenantId, providerOrderId: orderId },
+          })
+        : notes.paymentId
+          ? await this.db().paymentTransaction.findFirst({
+              where: { tenantId, id: notes.paymentId },
+            })
+          : null;
+      if (payment && payment.status === 'INITIATED') {
+        await this.db().paymentTransaction.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED' },
+        });
+        await this.db().feePaymentRequest.updateMany({
+          where: { tenantId, paymentId: payment.id, status: 'PENDING' },
+          data: {
+            status: 'CANCELLED',
+            metadata: { failureReason: 'Payment failed at gateway' },
+          },
+        });
       }
     }
     return { received: true };
@@ -246,13 +312,232 @@ export class GatewayPaymentService {
           where: { paymentId: payment.id },
         })
       : null;
+    if (request?.status === 'PENDING') {
+      await this.syncPaymentRequest(user, request.id);
+    }
+    const refreshedPayment = await this.db().paymentTransaction.findFirst({
+      where: { tenantId: user.tid, provider, providerOrderId: orderId },
+    });
+    const refreshedRequest = refreshedPayment
+      ? await this.db().feePaymentRequest.findFirst({
+          where: { paymentId: refreshedPayment.id },
+        })
+      : null;
     return {
       provider,
       orderId,
-      payment,
-      paymentRequest: request,
-      status: payment?.status ?? 'NOT_FOUND',
+      payment: refreshedPayment,
+      paymentRequest: refreshedRequest,
+      status: refreshedPayment?.status ?? 'NOT_FOUND',
     };
+  }
+
+  /** Poll Razorpay for payment-link / order status and reconcile ERP records. */
+  async syncPaymentRequest(user: JwtUser, requestId: string) {
+    const request = await this.db().feePaymentRequest.findFirst({
+      where: { id: requestId, tenantId: user.tid },
+    });
+    if (!request) throw new BadRequestException('Payment request not found.');
+    if (request.status !== 'PENDING') {
+      return { synced: false, request, providerStatus: request.status };
+    }
+
+    const payment = request.paymentId
+      ? await this.db().paymentTransaction.findFirst({
+          where: { id: request.paymentId, tenantId: user.tid },
+        })
+      : null;
+    if (!payment) {
+      return { synced: false, request, providerStatus: 'NOT_FOUND' };
+    }
+    if (payment.status === 'SUCCESS') {
+      await this.db().feePaymentRequest.updateMany({
+        where: { id: request.id, status: 'PENDING' },
+        data: { status: 'PAID', paidAt: payment.paidAt ?? new Date() },
+      });
+      const updated = await this.db().feePaymentRequest.findFirst({
+        where: { id: request.id },
+      });
+      return { synced: true, request: updated, providerStatus: 'paid' };
+    }
+
+    const creds = {
+      keyId: process.env.RAZORPAY_KEY_ID ?? '',
+      keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+    };
+    if (!isRazorpayConfigured(creds)) {
+      return { synced: false, request, providerStatus: 'NOT_CONFIGURED' };
+    }
+
+    const providerRef = String(
+      request.providerOrderId ?? payment.providerOrderId ?? '',
+    ).trim();
+    if (!providerRef) {
+      return { synced: false, request, providerStatus: 'NO_PROVIDER_REF' };
+    }
+
+    try {
+      if (
+        providerRef.startsWith('plink_') ||
+        request.channel === 'PAYMENT_LINK'
+      ) {
+        const link = await fetchRazorpayPaymentLink(creds, providerRef);
+        if (link.status === 'paid') {
+          const providerPaymentId =
+            link.payments?.find((p) => p.status === 'captured')?.payment_id ??
+            link.payments?.[0]?.payment_id ??
+            link.payments?.[0]?.id ??
+            `plink-${link.id}`;
+          await this.completePayment(
+            user.tid,
+            payment,
+            providerPaymentId,
+            request.generatedById ?? user.sub,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'paid' };
+        }
+        if (link.status === 'expired' || link.status === 'cancelled') {
+          await this.markPaymentRequestClosed(
+            user.tid,
+            request,
+            payment,
+            link.status,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return {
+            synced: true,
+            request: updated,
+            providerStatus: link.status,
+          };
+        }
+        return { synced: false, request, providerStatus: link.status };
+      }
+
+      if (providerRef.startsWith('order_')) {
+        const orderPayments = await fetchRazorpayOrderPayments(
+          creds,
+          providerRef,
+        );
+        const captured = orderPayments.items?.find(
+          (p) => p.status === 'captured',
+        );
+        if (captured) {
+          await this.completePayment(
+            user.tid,
+            payment,
+            captured.id,
+            request.generatedById ?? user.sub,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'paid' };
+        }
+        const failed = orderPayments.items?.find((p) => p.status === 'failed');
+        if (failed) {
+          await this.markPaymentRequestClosed(
+            user.tid,
+            request,
+            payment,
+            'failed',
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'failed' };
+        }
+
+        const linkId = (
+          request.metadata as { paymentLinkProviderId?: string } | null
+        )?.paymentLinkProviderId;
+        if (linkId?.startsWith('plink_')) {
+          const link = await fetchRazorpayPaymentLink(creds, linkId);
+          if (link.status === 'paid') {
+            const providerPaymentId =
+              link.payments?.find((p) => p.status === 'captured')?.payment_id ??
+              link.payments?.[0]?.payment_id ??
+              link.payments?.[0]?.id ??
+              `plink-${link.id}`;
+            await this.completePayment(
+              user.tid,
+              payment,
+              providerPaymentId,
+              request.generatedById ?? user.sub,
+            );
+            const updated = await this.db().feePaymentRequest.findFirst({
+              where: { id: request.id },
+            });
+            return { synced: true, request: updated, providerStatus: 'paid' };
+          }
+          if (link.status === 'expired' || link.status === 'cancelled') {
+            await this.markPaymentRequestClosed(
+              user.tid,
+              request,
+              payment,
+              link.status,
+            );
+            const updated = await this.db().feePaymentRequest.findFirst({
+              where: { id: request.id },
+            });
+            return {
+              synced: true,
+              request: updated,
+              providerStatus: link.status,
+            };
+          }
+        }
+      }
+    } catch {
+      return { synced: false, request, providerStatus: 'SYNC_ERROR' };
+    }
+
+    return { synced: false, request, providerStatus: 'pending' };
+  }
+
+  private async completePaymentRequestByProviderRef(
+    tenantId: string,
+    providerRef: string,
+    providerPaymentId?: string,
+  ) {
+    const request = await this.db().feePaymentRequest.findFirst({
+      where: { tenantId, providerOrderId: providerRef, status: 'PENDING' },
+    });
+    if (!request?.paymentId) return;
+    const payment = await this.db().paymentTransaction.findFirst({
+      where: { id: request.paymentId, tenantId },
+    });
+    if (!payment || payment.status === 'SUCCESS') return;
+    await this.completePayment(
+      tenantId,
+      payment,
+      providerPaymentId ?? `WH-${Date.now()}`,
+      request.generatedById,
+    );
+  }
+
+  private async markPaymentRequestClosed(
+    tenantId: string,
+    request: Record<string, unknown>,
+    payment: Record<string, unknown>,
+    reason: string,
+  ) {
+    const requestStatus = reason === 'failed' ? 'CANCELLED' : 'EXPIRED';
+    await this.db().feePaymentRequest.update({
+      where: { id: request.id },
+      data: {
+        status: requestStatus,
+        metadata: { ...(request.metadata as object), closeReason: reason },
+      },
+    });
+    await this.db().paymentTransaction.update({
+      where: { id: payment.id },
+      data: { status: reason === 'failed' ? 'FAILED' : 'EXPIRED' },
+    });
   }
 
   private async completePayment(

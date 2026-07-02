@@ -80,7 +80,8 @@ function DynamicMethodFields({
   if (method.usesPaymentRequest) {
     return (
       <p className="text-sm text-muted-foreground">
-        Use <strong>Generate payment QR / link</strong> below to collect via the online gateway.
+        Use <strong>Open Razorpay checkout</strong> below — UPI, card, or net banking. Receipt is
+        issued automatically when payment succeeds.
       </p>
     );
   }

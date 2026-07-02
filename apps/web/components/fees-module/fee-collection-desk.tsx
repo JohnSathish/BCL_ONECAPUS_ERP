@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  CreditCard,
   Download,
   FileText,
   Link2,
@@ -44,9 +45,10 @@ import {
   sendDueReminders,
   sendReceiptNotification,
   simulateFeePayment,
+  verifyFeePayment,
 } from '@/services/fee-cycle';
-import { fetchFeeDashboard, fetchFeeReport } from '@/services/fees';
-import { collectFee } from '@/services/fees';
+import { openRazorpayCheckout } from '@/lib/razorpay-checkout';
+import { collectFee, fetchFeeDashboard, fetchFeeReport } from '@/services/fees';
 import { fetchStudents } from '@/services/students';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAuth } from '@/hooks/use-auth';
@@ -222,15 +224,22 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
     if (row.status === 'PAID') {
       setActiveRequest(row);
       setLastReceiptId(row.receiptId ?? null);
-      setMessage(`Payment successful — receipt issued.`);
+      setActiveCheckout(null);
+      setSelectedPayables(new Set());
+      setMessage(`Payment successful — receipt issued (${row.requestNo}).`);
       void accountQ.refetch();
       void dashboardQ.refetch();
       void paymentRequestsQ.refetch();
-    } else if (row.status === 'EXPIRED' || row.status === 'CANCELLED') {
+    } else if (row.status === 'EXPIRED') {
       setActiveRequest(row);
       setActiveCheckout(null);
+      setMessage(`Payment request ${row.requestNo} expired. Generate a new link or QR.`);
+    } else if (row.status === 'CANCELLED') {
+      setActiveRequest(row);
+      setActiveCheckout(null);
+      setMessage(`Payment failed or was cancelled for ${row.requestNo}.`);
     }
-  }, [activeRequestQ.data?.status, activeRequestQ.data?.id]);
+  }, [activeRequestQ.data?.status, activeRequestQ.data?.id, activeRequestQ.data?.requestNo]);
 
   useEffect(() => {
     setSelectedPayables(new Set());
@@ -309,6 +318,75 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
       void paymentRequestsQ.refetch();
     },
     onError: (e) => setMessage(apiErrorMessage(e, 'Failed to generate payment request')),
+  });
+
+  const deskCheckoutMut = useMutation({
+    mutationFn: async () => {
+      const demandIds = [
+        ...new Set(payables.filter((p) => selectedPayables.has(p.id)).map((p) => p.demandId)),
+      ];
+      const res = await createPaymentRequest({
+        studentId,
+        demandIds,
+        channel: 'DESK_CHECKOUT',
+      });
+      setActiveRequest(res.request);
+      setActiveCheckout({
+        mode: res.checkout.mode,
+        paymentId: res.payment.id,
+        expiresAt: res.checkout.expiresAt,
+        requestNo: res.checkout.requestNo,
+      });
+
+      if (res.checkout.mode === 'MOCK' && res.payment.id) {
+        const mock = await simulateFeePayment(res.payment.id);
+        return {
+          requestNo: res.checkout.requestNo,
+          receiptNo: mock.receipt?.receiptNo,
+          receiptId: mock.receipt?.id,
+        };
+      }
+
+      if (!res.checkout.keyId || !res.checkout.orderId) {
+        throw new Error('Online payment is not configured. Add Razorpay keys on the API server.');
+      }
+
+      let receiptNo: string | undefined;
+      let receiptId: string | undefined;
+      await openRazorpayCheckout({
+        keyId: res.checkout.keyId,
+        orderId: res.checkout.orderId,
+        amount: res.checkout.amount,
+        description: `Fee ${res.checkout.requestNo}`,
+        onSuccess: async (response) => {
+          const verified = await verifyFeePayment(response);
+          receiptNo = verified.receipt?.receiptNo;
+          receiptId = verified.receipt?.id;
+        },
+      });
+
+      return { requestNo: res.checkout.requestNo, receiptNo, receiptId };
+    },
+    onSuccess: (result) => {
+      setActiveCheckout(null);
+      setActiveRequest(null);
+      setSelectedPayables(new Set());
+      if (result.receiptId) setLastReceiptId(result.receiptId);
+      setMessage(
+        result.receiptNo
+          ? `Payment successful — receipt ${result.receiptNo}.`
+          : `Payment successful — ${result.requestNo}.`,
+      );
+      void accountQ.refetch();
+      void dashboardQ.refetch();
+      void paymentRequestsQ.refetch();
+    },
+    onError: (e) =>
+      setMessage(
+        e instanceof Error && e.message && !('response' in e)
+          ? e.message
+          : apiErrorMessage(e, 'Razorpay checkout failed'),
+      ),
   });
 
   const deskCollectMut = useMutation({
@@ -674,6 +752,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   const defaulterRows =
     (defaultersQ.data as { rows?: unknown[] })?.rows ?? dashboardQ.data?.defaulters ?? [];
   const collectionModes = settingsQ.data?.collectionModes;
+  const gatewayEnabled = collectionModes?.gateway ?? settingsQ.data?.onlinePaymentEnabled !== false;
   const upiQrEnabled = collectionModes?.upi_qr ?? settingsQ.data?.officeQrEnabled !== false;
   const deskPaymentMethods = enabledDeskPaymentMethods(collectionModes);
   const selectedDeskMethod = deskPaymentMethods.find((m) => m.id === paymentMethodId);
@@ -1261,57 +1340,91 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   </p>
                 ) : null}
 
-                {(upiQrEnabled && paymentMethodId === 'gateway') ||
-                (upiQrEnabled && !paymentMethodId) ? (
-                  <div className="space-y-2 border-t pt-3">
-                    <Label className="block">Online gateway — UPI QR / payment link</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          name="payChannel"
-                          checked={payChannel === 'OFFICE_QR'}
-                          onChange={() => setPayChannel('OFFICE_QR')}
-                        />
-                        Dynamic UPI QR
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          name="payChannel"
-                          checked={payChannel === 'PAYMENT_LINK'}
-                          onChange={() => setPayChannel('PAYMENT_LINK')}
-                        />
-                        Payment link
-                      </label>
-                    </div>
-                  </div>
-                ) : null}
+                {paymentMethodId === 'gateway' ? (
+                  <div className="space-y-3 border-t pt-3">
+                    <Button
+                      className="w-full"
+                      disabled={!selectedTotal || !payables.length || deskCheckoutMut.isPending}
+                      onClick={() => deskCheckoutMut.mutate()}
+                    >
+                      {deskCheckoutMut.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Opening Razorpay…
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Open Razorpay checkout
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Opens Razorpay in this window — UPI, debit/credit card, or net banking.
+                      Receipt is issued automatically when payment succeeds.
+                    </p>
 
-                {(upiQrEnabled && paymentMethodId === 'gateway') ||
-                (upiQrEnabled && !paymentMethodId) ? (
-                  <Button
-                    className="w-full"
-                    disabled={!selectedTotal || qrRequestMut.isPending || !payables.length}
-                    onClick={() => qrRequestMut.mutate()}
-                  >
-                    {qrRequestMut.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating…
-                      </>
-                    ) : payChannel === 'OFFICE_QR' ? (
-                      <>
-                        <QrCode className="mr-2 h-4 w-4" />
-                        Generate payment QR
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="mr-2 h-4 w-4" />
-                        Generate payment link
-                      </>
-                    )}
-                  </Button>
+                    {upiQrEnabled ? (
+                      <details className="rounded-lg border bg-muted/20 p-3">
+                        <summary className="cursor-pointer text-sm font-medium">
+                          Send QR or payment link to student
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm">
+                              <input
+                                type="radio"
+                                name="payChannel"
+                                checked={payChannel === 'OFFICE_QR'}
+                                onChange={() => setPayChannel('OFFICE_QR')}
+                              />
+                              Dynamic UPI QR
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm">
+                              <input
+                                type="radio"
+                                name="payChannel"
+                                checked={payChannel === 'PAYMENT_LINK'}
+                                onChange={() => setPayChannel('PAYMENT_LINK')}
+                              />
+                              Payment link
+                            </label>
+                          </div>
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            disabled={!selectedTotal || qrRequestMut.isPending || !payables.length}
+                            onClick={() => qrRequestMut.mutate()}
+                          >
+                            {qrRequestMut.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating…
+                              </>
+                            ) : payChannel === 'OFFICE_QR' ? (
+                              <>
+                                <QrCode className="mr-2 h-4 w-4" />
+                                Generate payment QR
+                              </>
+                            ) : (
+                              <>
+                                <Link2 className="mr-2 h-4 w-4" />
+                                Generate payment link
+                              </>
+                            )}
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Share the link via WhatsApp, SMS, or email. This screen auto-updates
+                            when Razorpay confirms payment (every ~3 seconds).
+                          </p>
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                ) : gatewayEnabled && !paymentMethodId ? (
+                  <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    Select <strong>Online Payment Gateway</strong> above to open Razorpay checkout.
+                  </p>
                 ) : null}
 
                 {activeCheckout && activeRequest?.status === 'PENDING' ? (
@@ -2161,7 +2274,8 @@ function PaymentRequestPanel({
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Waiting for payment confirmation…
+        Checking Razorpay every few seconds — updates automatically after the student pays via
+        WhatsApp, SMS, or email link.
       </div>
 
       <div className="flex flex-wrap gap-2">
