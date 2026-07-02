@@ -29,6 +29,8 @@ type Props = {
   isLoading?: boolean;
   departments: Department[];
   programVersions: ProgramVersionOption[];
+  allowAllProgrammes?: boolean;
+  scopeLabel?: string | null;
 };
 
 export function CourseCatalogToolbar({
@@ -43,11 +45,18 @@ export function CourseCatalogToolbar({
   isLoading,
   departments,
   programVersions,
+  allowAllProgrammes = true,
+  scopeLabel,
 }: Props) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
     <div className="space-y-3 border-b border-border/60 pb-4">
+      {scopeLabel ? (
+        <p className="rounded-xl border border-teal-500/25 bg-teal-500/5 px-3 py-2 text-xs text-muted-foreground">
+          {scopeLabel}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">Course catalog</p>
@@ -108,6 +117,7 @@ export function CourseCatalogToolbar({
           departments={departments}
           programVersions={programVersions}
           layout="inline"
+          allowAllProgrammes={allowAllProgrammes}
         />
         {hasActiveFilters ? (
           <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
@@ -124,6 +134,7 @@ export function CourseCatalogToolbar({
         onClear={onClearFilters}
         departments={departments}
         programVersions={programVersions}
+        allowAllProgrammes={allowAllProgrammes}
       />
     </div>
   );

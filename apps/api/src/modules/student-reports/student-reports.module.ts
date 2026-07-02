@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ShiftsModule } from '../shifts/shifts.module';
 import { StudentsModule } from '../students/students.module';
 import { StudentReportsController } from './student-reports.controller';
 import { CustomReportService } from './services/custom-report.service';
@@ -10,7 +11,7 @@ import { StudentSubjectReportService } from './services/student-subject-report.s
 import { StudentTabularExportService } from './services/student-tabular-export.service';
 
 @Module({
-  imports: [StudentsModule],
+  imports: [StudentsModule, ShiftsModule],
   controllers: [StudentReportsController],
   providers: [
     StudentReportsQueryService,

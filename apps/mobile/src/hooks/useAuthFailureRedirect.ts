@@ -7,7 +7,7 @@ export function useAuthFailureRedirect() {
 
   useEffect(() => {
     setAuthFailureHandler(() => {
-      router.replace('/(auth)/login');
+      router.replace('/(auth)/splash');
     });
     return () => setAuthFailureHandler(() => {});
   }, [router]);

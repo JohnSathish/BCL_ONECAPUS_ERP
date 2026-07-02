@@ -26,6 +26,10 @@ export class ExamQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
 }
 
 export class ExamSessionDto {

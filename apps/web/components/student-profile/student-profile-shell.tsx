@@ -83,17 +83,15 @@ export function SectionCard({
 }) {
   return (
     <div className="glass-card overflow-hidden rounded-xl border border-border/50 bg-card/80">
-      <div className="border-b border-border/50 px-3 py-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {description ? (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
-        ) : null}
+      <div className="border-b border-border/50 px-4 py-3 sm:px-5">
+        <h2 className="text-sm font-semibold sm:text-base">{title}</h2>
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
       </div>
-      <div className="space-y-2.5 p-3">{children}</div>
+      <div className="space-y-3 p-4 sm:p-5">{children}</div>
       {footer ? (
         <div
           className={cn(
-            'border-t border-border/50 px-3 py-2 text-[11px] text-muted-foreground',
+            'border-t border-border/50 px-4 py-2.5 text-xs text-muted-foreground sm:px-5',
             footerClassName,
           )}
         >
@@ -105,7 +103,7 @@ export function SectionCard({
 }
 
 export function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">{children}</div>;
 }
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -118,4 +116,4 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export const inputClass =
-  'h-8 w-full rounded-lg border border-border/60 bg-background px-2.5 text-xs';
+  'h-9 w-full rounded-lg border border-border/60 bg-background px-3 text-sm';

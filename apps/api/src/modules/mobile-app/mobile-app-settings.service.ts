@@ -85,9 +85,39 @@ export class MobileAppSettingsService {
   async getBootstrapPayload(tenantId: string, appType: MobileAppType) {
     const key = this.cacheKey(tenantId, appType);
     return this.cache.wrap(key, CACHE_TTL, async () => {
-      const [settings, branding] = await Promise.all([
+      const [
+        settings,
+        branding,
+        studentCount,
+        facultyCount,
+        departmentCount,
+        academicYear,
+        openIntake,
+      ] = await Promise.all([
         this.getSettings(tenantId),
         this.prisma.tenantBranding.findUnique({ where: { tenantId } }),
+        this.prisma.student.count({ where: { tenantId, deletedAt: null } }),
+        this.prisma.staffProfile.count({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        }),
+        this.prisma.department.count({ where: { tenantId, deletedAt: null } }),
+        this.prisma.academicYear.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            OR: [{ status: 'ACTIVE' }, { isPrimarySession: true }],
+          },
+          orderBy: { startDate: 'desc' },
+          select: { name: true },
+        }),
+        this.prisma.admissionIntake.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: { in: ['open', 'OPEN', 'active', 'ACTIVE'] },
+          },
+          select: { name: true },
+        }),
       ]);
       const overrides = (settings.brandingOverrides ?? {}) as Record<
         string,
@@ -117,6 +147,21 @@ export class MobileAppSettingsService {
           primaryColor:
             overrides.primaryColor ?? branding?.primaryColor ?? null,
           displayName: branding?.displayName ?? null,
+        },
+        portalHighlights: {
+          stats: {
+            students: studentCount,
+            faculty: facultyCount,
+            departments: departmentCount,
+            academicYear: academicYear?.name ?? null,
+          },
+          updates: [
+            ...(openIntake ? [`Admissions open — ${openIntake.name}`] : []),
+            ...(academicYear?.name
+              ? [`Academic session ${academicYear.name} active`]
+              : []),
+            'NEP 2020 curriculum enabled',
+          ],
         },
       };
     });

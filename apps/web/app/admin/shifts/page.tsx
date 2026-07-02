@@ -58,7 +58,7 @@ export default function AdminShiftsPage() {
 
   const shifts = useQuery({
     queryKey: ['shifts', campusId],
-    queryFn: () => fetchShifts({ campusId }),
+    queryFn: () => fetchShifts({ campusId, includeInactive: true }),
     enabled: Boolean(session) && Boolean(campusId),
   });
 

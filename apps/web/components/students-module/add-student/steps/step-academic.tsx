@@ -38,6 +38,7 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
   const majors = useEligibleMajors({
     programVersionId: draft.programVersionId,
     semesterSequence,
+    shiftId: draft.primaryShiftId || undefined,
     enabled: Boolean(draft.programVersionId),
   });
   const pools = useAdmissionPools({
@@ -55,6 +56,7 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
     programVersionId: draft.programVersionId,
     majorSubjectSlug: draft.majorSubjectSlug,
     semesterSequence,
+    shiftId: draft.primaryShiftId || undefined,
     enabled: Boolean(draft.programVersionId && draft.majorSubjectSlug && needsMinor),
   });
 
@@ -144,6 +146,35 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
     <div className="space-y-3 overflow-visible">
       <ErpFormSection title="Programme & batch" description="Academic placement">
         <ErpFormGrid cols={3}>
+          <GlassField label="Shift" error={errors.primaryShiftId}>
+            <select
+              className={glassSelectClass}
+              value={draft.primaryShiftId}
+              onChange={(e) => {
+                const primaryShiftId = e.target.value;
+                setDraft((d) => ({
+                  ...d,
+                  primaryShiftId,
+                  programVersionId: '',
+                  departmentId: '',
+                  majorSubjectId: '',
+                  minorSubjectId: '',
+                  majorSubjectSlug: '',
+                  minorSubjectSlug: '',
+                  majorCourseOfferingId: '',
+                  minorCourseOfferingId: '',
+                  subjectSelections: {},
+                }));
+              }}
+            >
+              <option value="">Select shift</option>
+              {lookups.shiftOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </GlassField>
           <GlassField
             label="Programme"
             error={errors.programVersionId}
@@ -152,6 +183,7 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
             <select
               className={glassSelectClass}
               value={draft.programVersionId}
+              disabled={!draft.primaryShiftId}
               onChange={(e) => {
                 const programVersionId = e.target.value;
                 const linkedDepartmentId = resolveDepartmentIdForProgramVersion(
@@ -204,21 +236,6 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
             >
               <option value="">Select stream</option>
               {lookups.streamOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </GlassField>
-          <GlassField label="Shift" error={errors.primaryShiftId}>
-            <select
-              className={glassSelectClass}
-              value={draft.primaryShiftId}
-              disabled={!draft.programVersionId}
-              onChange={(e) => setDraft((d) => ({ ...d, primaryShiftId: e.target.value }))}
-            >
-              <option value="">Select shift</option>
-              {lookups.shiftOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>

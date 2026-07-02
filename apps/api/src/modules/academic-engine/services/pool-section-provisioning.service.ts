@@ -18,6 +18,7 @@ export type ProvisionPoolSectionsOptions = {
   semesterNo?: number;
   categories?: string[];
   shiftCode?: string;
+  shiftId?: string;
   institutionId?: string;
   poolId?: string;
 };
@@ -137,7 +138,9 @@ export class PoolSectionProvisioningService {
       filters.categories ?? [...SHARED_POOL_CAPACITY_CATEGORIES]
     ).map((c) => c.trim().toUpperCase());
     const shiftCode = (filters.shiftCode ?? 'DAY').trim().toUpperCase();
-    const shiftId = await this.resolveDefaultShiftId(tenantId, shiftCode);
+    const shiftId =
+      filters.shiftId ??
+      (await this.resolveDefaultShiftId(tenantId, shiftCode));
 
     const poolWhere: Prisma.CategoryPoolWhereInput = {
       tenantId,
@@ -148,6 +151,7 @@ export class PoolSectionProvisioningService {
         ? { institutionId: filters.institutionId }
         : {}),
       ...(filters.poolId ? { id: filters.poolId } : {}),
+      ...(filters.shiftId || filters.shiftCode ? { shiftId } : {}),
     };
 
     const pools = await this.prisma.categoryPool.findMany({

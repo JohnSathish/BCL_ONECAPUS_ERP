@@ -92,15 +92,28 @@ export class CurriculumResolutionService {
     tenantId: string,
     programVersionId: string,
     semesterSequence: number,
+    shiftId?: string,
   ): Promise<string[]> {
+    const baseWhere = {
+      tenantId,
+      programVersionId,
+      semesterNo: semesterSequence,
+      active: true,
+      pool: { active: true },
+    };
+
+    if (shiftId) {
+      const shiftRows = await this.prisma.programmePoolAssignment.findMany({
+        where: { ...baseWhere, shiftId },
+        select: { poolId: true },
+      });
+      if (shiftRows.length) {
+        return shiftRows.map((row) => row.poolId);
+      }
+    }
+
     const rows = await this.prisma.programmePoolAssignment.findMany({
-      where: {
-        tenantId,
-        programVersionId,
-        semesterNo: semesterSequence,
-        active: true,
-        pool: { active: true },
-      },
+      where: { ...baseWhere, shiftId: null },
       select: { poolId: true },
     });
     return rows.map((row) => row.poolId);
@@ -134,12 +147,13 @@ export class CurriculumResolutionService {
     tenantId: string,
     programVersionId: string,
     semesterSequence: number,
-    filters?: { category?: string },
+    filters?: { category?: string; shiftId?: string },
   ): Promise<ResolvedCurriculum> {
     const poolIds = await this.getAssignedPoolIds(
       tenantId,
       programVersionId,
       semesterSequence,
+      filters?.shiftId,
     );
     const exclusions = await this.getExcludedCourseIdsByPool(
       tenantId,
@@ -173,6 +187,9 @@ export class CurriculumResolutionService {
               id: { in: poolIds },
               active: true,
               semesterNo: semesterSequence,
+              ...(filters?.shiftId
+                ? { OR: [{ shiftId: filters.shiftId }, { shiftId: null }] }
+                : {}),
               ...(normalizedCategory
                 ? { categoryType: normalizedCategory }
                 : {}),

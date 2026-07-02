@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -39,6 +39,8 @@ import { BulkActionButton, BulkActionToolbar, BulkEmptyState } from '@/component
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Progress } from '@/components/ui/progress';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useBindWorkspaceShift } from '@/hooks/use-bind-workspace-shift';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
 import { fetchAcademicStreams } from '@/services/academic-engine';
@@ -91,8 +93,14 @@ function filtersToParams(filters: ReturnType<typeof useBulkUpdateWizard>['filter
 export function BulkUpdatePage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
+  const shiftScope = useShiftScope();
   const qc = useQueryClient();
   const wizard = useBulkUpdateWizard();
+  const bindWorkspaceShift = useCallback(
+    (shiftId: string) => wizard.patchFilters({ shiftId }),
+    [wizard.patchFilters],
+  );
+  useBindWorkspaceShift(wizard.filters.shiftId, bindWorkspaceShift);
   const [listPage, setListPage] = useState(1);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewBulkUpdate>> | null>(
@@ -401,6 +409,8 @@ export function BulkUpdatePage() {
                     id: r.id,
                     label: r.label,
                   }))}
+                  hideShiftFilter={shiftScope.hideShiftSelectors}
+                  lockShiftId={shiftScope.activeShiftId}
                 />
               ) : null}
 

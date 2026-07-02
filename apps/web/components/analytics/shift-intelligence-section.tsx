@@ -9,10 +9,11 @@ import { ChartWidgetCard } from '@/components/analytics/chart-widget-card';
 import { WidgetSkeleton } from '@/components/analytics/widget-skeleton';
 import { useInView } from '@/hooks/use-in-view';
 import { fetchShiftIntelligence } from '@/services/dashboard-analytics';
-import { useDashboardFilters, useDashboardFiltersStore } from '@/store/dashboard-filters-store';
+import { useEffectiveDashboardFilters } from '@/hooks/use-effective-dashboard-filters';
+import { useDashboardFiltersStore } from '@/store/dashboard-filters-store';
 
 export function ShiftIntelligenceSection() {
-  const filters = useDashboardFilters();
+  const filters = useEffectiveDashboardFilters();
   const autoRefresh = useDashboardFiltersStore((s) => s.autoRefresh);
   const { ref, inView } = useInView('200px');
 

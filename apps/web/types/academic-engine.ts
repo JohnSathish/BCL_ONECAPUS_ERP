@@ -122,6 +122,7 @@ export type AcademicShift = {
   id: string;
   code: string;
   name: string;
+  status?: string;
   startTime?: string;
   endTime?: string;
   campusId?: string;

@@ -32,6 +32,51 @@ export type ShiftCapacityRow = {
   configured: boolean;
 };
 
+export type ShiftTransferPreview = {
+  studentId: string;
+  currentShift: { id: string; code: string; name: string };
+  targetShift: { id: string; code: string; name: string };
+  currentRollNumber: string | null;
+  previewRollNumber: string;
+  admissionYear: number;
+  prefix: string;
+};
+
+export type ShiftTransferResult = {
+  transferId: string;
+  studentId: string;
+  oldRollNumber: string | null;
+  newRollNumber: string | null;
+  oldShift: { id: string; code: string; name: string };
+  newShift: { id: string; code: string; name: string };
+};
+
+type TransferStudentContext = {
+  student: {
+    id: string;
+    rollNumber: string | null;
+    primaryShiftId: string | null;
+    campusId: string | null;
+    primaryShift: { id: string; code: string; name: string } | null;
+  };
+  profile: {
+    streamId: string;
+    stream: { id: string; code: string; name: string };
+    admissionBatchId: string;
+    admissionBatch: {
+      admissionYear: number;
+      entrySession: { institutionId: string } | null;
+    };
+  };
+  institutionId: string;
+  admissionYear: number;
+  prefix: string;
+  yearSuffix: string;
+  rollSettings: { sequenceLength: number; separator: string };
+};
+
+const ALLOCATE_MAX_RETRIES = 20;
+
 @Injectable()
 export class RollShiftRangeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -376,6 +421,337 @@ export class RollShiftRangeService {
     });
   }
 
+  private async lockShiftConfig(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    institutionId: string,
+    shiftId: string,
+    admissionYear: number,
+  ) {
+    const rows = await tx.$queryRaw<
+      Array<{
+        id: string;
+        sequence_start: number;
+        sequence_end: number;
+        next_sequence: number;
+      }>
+    >`
+      SELECT id, sequence_start, sequence_end, next_sequence
+      FROM platform.roll_shift_range_configs
+      WHERE tenant_id = ${tenantId}::uuid
+        AND institution_id = ${institutionId}::uuid
+        AND shift_id = ${shiftId}::uuid
+        AND admission_year = ${admissionYear}
+        AND is_active = true
+      FOR UPDATE
+    `;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      sequenceStart: row.sequence_start,
+      sequenceEnd: row.sequence_end,
+      nextSequence: row.next_sequence,
+    };
+  }
+
+  private async isRollNumberTaken(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    rollNumber: string,
+    excludeStudentId?: string,
+  ) {
+    const trimmed = rollNumber.trim();
+    const [student, reserved] = await Promise.all([
+      tx.student.findFirst({
+        where: {
+          tenantId,
+          rollNumber: trimmed,
+          deletedAt: null,
+          ...(excludeStudentId ? { NOT: { id: excludeStudentId } } : {}),
+        },
+        select: { id: true },
+      }),
+      tx.rollNumberVacancy.findFirst({
+        where: { tenantId, rollNumber: trimmed, status: 'RESERVED' },
+        select: { id: true },
+      }),
+    ]);
+    return Boolean(student || reserved);
+  }
+
+  private formatShiftLabel(shift?: { code: string; name: string } | null) {
+    if (!shift) return null;
+    return `${shift.code} — ${shift.name}`;
+  }
+
+  private async resolveTransferStudentContext(
+    tenantId: string,
+    studentId: string,
+    toShiftId: string,
+  ): Promise<TransferStudentContext> {
+    const [student, toShift] = await Promise.all([
+      this.prisma.student.findFirst({
+        where: { id: studentId, tenantId, deletedAt: null },
+        include: {
+          primaryShift: { select: { id: true, code: true, name: true } },
+          academicProfile: {
+            include: {
+              stream: true,
+              admissionBatch: { include: { entrySession: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.shift.findFirst({
+        where: { id: toShiftId, tenantId, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, code: true, name: true },
+      }),
+    ]);
+
+    if (!student) throw new NotFoundException('Student not found');
+    if (!student.primaryShiftId) {
+      throw new BadRequestException('Student has no primary shift assigned');
+    }
+    if (!toShift) throw new NotFoundException('Target shift not found');
+    if (student.primaryShiftId === toShiftId) {
+      throw new BadRequestException('Student is already on this shift');
+    }
+
+    const profile = student.academicProfile;
+    if (!profile?.streamId || !profile.admissionBatchId || !profile.stream) {
+      throw new BadRequestException(
+        'Student academic profile is incomplete (stream/batch required for roll transfer)',
+      );
+    }
+
+    const institutionId =
+      profile.admissionBatch?.entrySession?.institutionId ??
+      (student.campusId
+        ? (
+            await this.prisma.campus.findFirst({
+              where: { id: student.campusId, tenantId },
+              select: { institutionId: true },
+            })
+          )?.institutionId
+        : null);
+
+    if (!institutionId) {
+      throw new BadRequestException(
+        'Cannot resolve institution for roll transfer',
+      );
+    }
+
+    const admissionYear = profile.admissionBatch!.admissionYear;
+    const shiftRangesActive = await this.hasActiveShiftRanges(
+      tenantId,
+      institutionId,
+      admissionYear,
+    );
+    if (!shiftRangesActive) {
+      throw new BadRequestException(
+        'Shift roll number ranges are not configured for this admission year. Configure ranges in Administration → Roll Number → Shift Ranges before transferring.',
+      );
+    }
+
+    const settings = await this.prisma.rollNumberSettings.findUnique({
+      where: { tenantId },
+    });
+    const rollSettings = {
+      sequenceLength: settings?.sequenceLength ?? 3,
+      separator: settings?.separator ?? '-',
+    };
+
+    const prefixConfig = await this.prisma.rollPrefixConfig.findFirst({
+      where: { tenantId, streamId: profile.streamId, isActive: true },
+    });
+    if (!prefixConfig?.prefix) {
+      throw new BadRequestException(
+        'Roll prefix not configured for student stream',
+      );
+    }
+
+    const targetConfig = await this.findShiftConfig(
+      this.prisma,
+      tenantId,
+      institutionId,
+      toShiftId,
+      admissionYear,
+    );
+    if (!targetConfig) {
+      throw new BadRequestException(
+        'Target shift has no roll number range configured for this admission year',
+      );
+    }
+
+    return {
+      student: {
+        id: student.id,
+        rollNumber: student.rollNumber,
+        primaryShiftId: student.primaryShiftId,
+        campusId: student.campusId,
+        primaryShift: student.primaryShift,
+      },
+      profile: {
+        streamId: profile.streamId,
+        stream: profile.stream,
+        admissionBatchId: profile.admissionBatchId,
+        admissionBatch: profile.admissionBatch!,
+      },
+      institutionId,
+      admissionYear,
+      prefix: prefixConfig.prefix,
+      yearSuffix: String(admissionYear).slice(-2),
+      rollSettings,
+    };
+  }
+
+  async previewShiftTransfer(
+    tenantId: string,
+    input: { studentId: string; toShiftId: string },
+  ): Promise<ShiftTransferPreview> {
+    const ctx = await this.resolveTransferStudentContext(
+      tenantId,
+      input.studentId,
+      input.toShiftId,
+    );
+
+    const toShift = await this.prisma.shift.findFirst({
+      where: { id: input.toShiftId, tenantId },
+      select: { id: true, code: true, name: true },
+    });
+    if (!toShift) throw new NotFoundException('Target shift not found');
+
+    const config = await this.findShiftConfig(
+      this.prisma,
+      tenantId,
+      ctx.institutionId,
+      input.toShiftId,
+      ctx.admissionYear,
+    );
+    if (!config) {
+      throw new BadRequestException(
+        'Target shift has no roll number range configured',
+      );
+    }
+    if (config.nextSequence > config.sequenceEnd) {
+      throw new BadRequestException(
+        `Target shift roll number range exhausted (${config.sequenceStart}–${config.sequenceEnd})`,
+      );
+    }
+
+    const previewRollNumber = this.formatRollNumber(
+      ctx.prefix,
+      ctx.yearSuffix,
+      config.nextSequence,
+      ctx.rollSettings,
+    );
+
+    return {
+      studentId: input.studentId,
+      currentShift: ctx.student.primaryShift!,
+      targetShift: toShift,
+      currentRollNumber: ctx.student.rollNumber,
+      previewRollNumber,
+      admissionYear: ctx.admissionYear,
+      prefix: ctx.prefix,
+    };
+  }
+
+  async previewShiftTransferBulk(
+    tenantId: string,
+    input: { studentIds: string[]; toShiftId: string },
+  ) {
+    const previews: ShiftTransferPreview[] = [];
+    const errors: Array<{ studentId: string; error: string }> = [];
+
+    for (const studentId of input.studentIds) {
+      try {
+        previews.push(
+          await this.previewShiftTransfer(tenantId, {
+            studentId,
+            toShiftId: input.toShiftId,
+          }),
+        );
+      } catch (err) {
+        errors.push({
+          studentId,
+          error: err instanceof Error ? err.message : 'Preview failed',
+        });
+      }
+    }
+
+    return { previews, errors };
+  }
+
+  async executeShiftTransfer(
+    tenantId: string,
+    input: {
+      studentId: string;
+      toShiftId: string;
+      reason?: string;
+      actorId?: string;
+    },
+  ): Promise<ShiftTransferResult> {
+    const ctx = await this.resolveTransferStudentContext(
+      tenantId,
+      input.studentId,
+      input.toShiftId,
+    );
+
+    const toShift = await this.prisma.shift.findFirst({
+      where: { id: input.toShiftId, tenantId },
+      select: { id: true, code: true, name: true },
+    });
+    if (!toShift) throw new NotFoundException('Target shift not found');
+
+    const transfer = await this.prisma.studentShiftTransfer.create({
+      data: {
+        tenantId,
+        studentId: input.studentId,
+        fromShiftId: ctx.student.primaryShiftId!,
+        toShiftId: input.toShiftId,
+        reason: input.reason ?? 'Shift transfer',
+        status: 'approved',
+        approvedById: input.actorId,
+        approvedAt: new Date(),
+      },
+    });
+
+    await this.prisma.studentAcademicProfile.updateMany({
+      where: { studentId: input.studentId },
+      data: { preferredShiftId: input.toShiftId },
+    });
+
+    const rollChange = await this.processShiftTransferRollChange(tenantId, {
+      studentId: input.studentId,
+      fromShiftId: ctx.student.primaryShiftId!,
+      toShiftId: input.toShiftId,
+      transferId: transfer.id,
+      reason: input.reason ?? 'Shift transfer',
+      actorId: input.actorId,
+    });
+
+    if (
+      rollChange.oldRollNumber &&
+      rollChange.newRollNumber &&
+      rollChange.oldRollNumber === rollChange.newRollNumber
+    ) {
+      throw new BadRequestException(
+        'Roll number was not reassigned. Verify shift ranges are configured for the destination shift.',
+      );
+    }
+
+    return {
+      transferId: transfer.id,
+      studentId: input.studentId,
+      oldRollNumber: rollChange.oldRollNumber,
+      newRollNumber: rollChange.newRollNumber,
+      oldShift: ctx.student.primaryShift!,
+      newShift: toShift,
+    };
+  }
+
   async allocateInShiftRange(
     tx: Prisma.TransactionClient,
     tenantId: string,
@@ -387,57 +763,59 @@ export class RollShiftRangeService {
       yearSuffix: string;
       streamCode: string;
       settings: { sequenceLength: number; separator: string };
+      excludeStudentId?: string;
     },
   ): Promise<RollNumberPreview | null> {
-    const config = await this.findShiftConfig(
-      tx,
-      tenantId,
-      input.institutionId,
-      input.shiftId,
-      input.admissionYear,
-    );
-    if (!config) return null;
-
-    if (config.nextSequence > config.sequenceEnd) {
-      throw new BadRequestException(
-        `Shift roll number range exhausted (${config.sequenceStart}–${config.sequenceEnd})`,
+    for (let attempt = 0; attempt < ALLOCATE_MAX_RETRIES; attempt++) {
+      const config = await this.lockShiftConfig(
+        tx,
+        tenantId,
+        input.institutionId,
+        input.shiftId,
+        input.admissionYear,
       );
-    }
+      if (!config) return null;
 
-    const sequence = config.nextSequence;
-    await tx.rollShiftRangeConfig.update({
-      where: { id: config.id },
-      data: { nextSequence: sequence + 1 },
-    });
+      if (config.nextSequence > config.sequenceEnd) {
+        throw new BadRequestException(
+          `Shift roll number range exhausted (${config.sequenceStart}–${config.sequenceEnd})`,
+        );
+      }
 
-    const rollNumber = this.formatRollNumber(
-      input.prefix,
-      input.yearSuffix,
-      sequence,
-      input.settings,
-    );
+      const sequence = config.nextSequence;
+      await tx.rollShiftRangeConfig.update({
+        where: { id: config.id },
+        data: { nextSequence: sequence + 1 },
+      });
 
-    const reserved = await tx.rollNumberVacancy.findFirst({
-      where: {
+      const rollNumber = this.formatRollNumber(
+        input.prefix,
+        input.yearSuffix,
+        sequence,
+        input.settings,
+      );
+
+      const taken = await this.isRollNumberTaken(
+        tx,
         tenantId,
         rollNumber,
-        status: 'RESERVED',
-      },
-    });
-    if (reserved) {
-      throw new ConflictException(
-        `Roll number ${rollNumber} is reserved and cannot be auto-assigned`,
+        input.excludeStudentId,
       );
+      if (taken) continue;
+
+      return {
+        rollNumber,
+        prefix: input.prefix,
+        yearSuffix: input.yearSuffix,
+        sequence,
+        admissionYear: input.admissionYear,
+        streamCode: input.streamCode,
+      };
     }
 
-    return {
-      rollNumber,
-      prefix: input.prefix,
-      yearSuffix: input.yearSuffix,
-      sequence,
-      admissionYear: input.admissionYear,
-      streamCode: input.streamCode,
-    };
+    throw new ConflictException(
+      'Could not allocate a unique roll number in the target shift range',
+    );
   }
 
   async vacateRollNumber(
@@ -594,10 +972,9 @@ export class RollShiftRangeService {
       admissionYear,
     );
     if (!shiftRangesActive) {
-      return {
-        oldRollNumber: student.rollNumber,
-        newRollNumber: student.rollNumber,
-      };
+      throw new BadRequestException(
+        'Shift roll number ranges are not configured for this admission year',
+      );
     }
 
     const settings = await this.prisma.rollNumberSettings.findUnique({
@@ -658,6 +1035,7 @@ export class RollShiftRangeService {
         yearSuffix,
         streamCode: profile.stream!.code,
         settings: rollSettings,
+        excludeStudentId: input.studentId,
       });
 
       if (!allocated) {
@@ -673,6 +1051,11 @@ export class RollShiftRangeService {
           primaryShiftId: input.toShiftId,
           lastModifiedById: input.actorId,
         },
+      });
+
+      await tx.studentAcademicProfile.updateMany({
+        where: { studentId: input.studentId },
+        data: { preferredShiftId: input.toShiftId },
       });
 
       await tx.studentShiftTransfer.update({
@@ -735,73 +1118,18 @@ export class RollShiftRangeService {
 
     for (const studentId of input.studentIds) {
       try {
-        const student = await this.prisma.student.findFirst({
-          where: { id: studentId, tenantId, deletedAt: null },
-        });
-        if (!student?.primaryShiftId) {
-          throw new BadRequestException('Student has no primary shift');
-        }
-        if (student.primaryShiftId === input.toShiftId) {
-          throw new BadRequestException('Student already on target shift');
-        }
-
-        const transfer = await this.prisma.studentShiftTransfer.create({
-          data: {
-            tenantId,
-            studentId,
-            fromShiftId: student.primaryShiftId,
-            toShiftId: input.toShiftId,
-            reason: input.reason,
-            status: 'approved',
-            approvedById: input.actorId,
-            approvedAt: new Date(),
-          },
-        });
-
-        await this.prisma.studentAcademicProfile.updateMany({
-          where: { studentId },
-          data: { preferredShiftId: input.toShiftId },
-        });
-
-        const rollChange = await this.processShiftTransferRollChange(tenantId, {
+        const result = await this.executeShiftTransfer(tenantId, {
           studentId,
-          fromShiftId: student.primaryShiftId,
           toShiftId: input.toShiftId,
-          transferId: transfer.id,
           reason: input.reason,
           actorId: input.actorId,
         });
 
-        const profile = await this.prisma.studentAcademicProfile.findFirst({
-          where: { studentId },
-          include: {
-            admissionBatch: { include: { entrySession: true } },
-          },
-        });
-        const institutionId =
-          profile?.admissionBatch?.entrySession?.institutionId;
-        const admissionYear = profile?.admissionBatch?.admissionYear;
-        const shiftRangesActive =
-          institutionId && admissionYear
-            ? await this.hasActiveShiftRanges(
-                tenantId,
-                institutionId,
-                admissionYear,
-              )
-            : false;
-
-        if (!shiftRangesActive) {
-          await this.prisma.student.update({
-            where: { id: studentId },
-            data: { primaryShiftId: input.toShiftId },
-          });
-        }
-
         results.push({
           studentId,
           status: 'success',
-          oldRollNumber: rollChange.oldRollNumber,
-          newRollNumber: rollChange.newRollNumber,
+          oldRollNumber: result.oldRollNumber,
+          newRollNumber: result.newRollNumber,
         });
       } catch (err) {
         results.push({

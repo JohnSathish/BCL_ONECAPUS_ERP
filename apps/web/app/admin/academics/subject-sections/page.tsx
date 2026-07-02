@@ -9,6 +9,7 @@ import { DataTable } from '@/components/erp/data-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { fetchShifts } from '@/services/academic-engine';
 import {
   autoDivideSubjectSections,
@@ -27,6 +28,7 @@ const CATEGORIES = ['AEC', 'SEC', 'MDC', 'VAC', 'VTC', 'MAJOR', 'MINOR'];
 
 export default function SubjectSectionsPage() {
   const session = useRequireAuth();
+  const shiftScope = useShiftScope();
   const qc = useQueryClient();
   const [semesterNo, setSemesterNo] = useState('1');
   const [category, setCategory] = useState('AEC');
@@ -65,7 +67,11 @@ export default function SubjectSectionsPage() {
     enabled: Boolean(session),
   });
 
-  const dayShiftId = shifts.data?.find((s) => s.code === 'DAY')?.id ?? shifts.data?.[0]?.id ?? '';
+  const workspaceShiftId =
+    shiftScope.activeShiftId ??
+    shifts.data?.find((s) => s.code === 'MORNING')?.id ??
+    shifts.data?.[0]?.id ??
+    '';
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['subject-sections'] });
@@ -93,7 +99,7 @@ export default function SubjectSectionsPage() {
     mutationFn: (payload: { offeringId: string; sectionCode: string }) =>
       createSubjectSection({
         offeringId: payload.offeringId,
-        shiftId: dayShiftId,
+        shiftId: workspaceShiftId,
         sectionCode: payload.sectionCode,
         capacity: Number(capacity) || 120,
       }),
@@ -107,7 +113,7 @@ export default function SubjectSectionsPage() {
     mutationFn: (offeringId: string) =>
       autoDivideSubjectSections({
         offeringId,
-        shiftId: dayShiftId || undefined,
+        shiftId: workspaceShiftId || undefined,
         strategy,
       }),
     onSuccess: (result) => {
@@ -132,7 +138,7 @@ export default function SubjectSectionsPage() {
         .filter((r) => r.rollNumber && r.sectionCode);
       return importSectionAllocations({
         offeringId: selectedOffering.id,
-        shiftId: dayShiftId || undefined,
+        shiftId: workspaceShiftId || undefined,
         rows,
       });
     },

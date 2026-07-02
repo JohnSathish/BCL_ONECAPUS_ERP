@@ -364,7 +364,8 @@ export const ADMIN_NAV: NavGroup[] = [
           {
             label: 'Reports',
             href: '/admin/staff/reports',
-            permissions: ['staff:read', 'reports:read'],
+            permissions: ['staff:read'],
+            requireAllPermissions: ['staff:read', 'reports:read'],
           },
           { label: 'Roles', href: '/admin/staff/roles', permissions: ['staff:manage'] },
           {
@@ -741,6 +742,14 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'lms',
         permissions: ['lms:lesson-plans:manage', 'lms:read'],
         activePattern: '^/admin/academics/lms/lesson-plans(?:/.*)?$',
+      },
+      {
+        label: 'Faculty',
+        icon: Users,
+        href: '/admin/academics/shift-faculty',
+        module: 'shifts',
+        permissions: ['shift:read'],
+        activePattern: '^/admin/academics/shift-faculty(?:/.*)?$',
       },
       {
         label: 'Student Attendance',

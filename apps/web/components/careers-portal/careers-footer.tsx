@@ -125,7 +125,7 @@ export function CareersFooter() {
               Institution
             </p>
             <ul className="mt-4 space-y-2 text-sm text-slate-400">
-              <li>{info?.institutional?.naacGrade ?? 'NAAC B Grade'}</li>
+              <li>{info?.institutional?.naacGrade ?? "NAAC Re-accredited with Grade 'B'"}</li>
               <li>{info?.institutional?.departments ?? 17} Academic Departments</li>
               <li>{info?.institutional?.yearsOfExcellence ?? 39}+ Years of Excellence</li>
               <li>Don Bosco Mission · Salesian Education</li>

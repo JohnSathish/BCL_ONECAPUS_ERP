@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EAS_BUILD_PROFILE": "development"
+      },
       "android": {
         "buildType": "apk"
       },
@@ -21,10 +24,16 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal"
+      }
+    }
   }
 }

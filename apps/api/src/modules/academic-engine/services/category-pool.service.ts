@@ -371,6 +371,44 @@ export class CategoryPoolService {
     });
   }
 
+  private async upsertProgrammePoolAssignment(
+    db: Prisma.TransactionClient | PrismaService,
+    data: {
+      tenantId: string;
+      programVersionId: string;
+      semesterNo: number;
+      poolId: string;
+      shiftId?: string | null;
+      active: boolean;
+    },
+  ) {
+    const existing = await db.programmePoolAssignment.findFirst({
+      where: {
+        tenantId: data.tenantId,
+        programVersionId: data.programVersionId,
+        semesterNo: data.semesterNo,
+        poolId: data.poolId,
+        shiftId: data.shiftId ?? null,
+      },
+    });
+    if (existing) {
+      return db.programmePoolAssignment.update({
+        where: { id: existing.id },
+        data: { active: data.active },
+      });
+    }
+    return db.programmePoolAssignment.create({
+      data: {
+        tenantId: data.tenantId,
+        programVersionId: data.programVersionId,
+        semesterNo: data.semesterNo,
+        poolId: data.poolId,
+        shiftId: data.shiftId ?? null,
+        active: data.active,
+      },
+    });
+  }
+
   async upsertProgramAssignments(
     tenantId: string,
     programVersionId: string,
@@ -383,11 +421,13 @@ export class CategoryPoolService {
         programVersionId,
       );
 
+    const poolShiftById = new Map<string, string | null>();
     for (const item of assignments) {
       const pool = await this.prisma.categoryPool.findFirst({
         where: { id: item.poolId, tenantId, active: true },
       });
       if (!pool) throw new NotFoundException(`Pool ${item.poolId} not found`);
+      poolShiftById.set(item.poolId, pool.shiftId ?? null);
       if (institutionId && pool.institutionId !== institutionId) {
         throw new BadRequestException(
           `Pool "${pool.poolName}" belongs to a different institution`,
@@ -400,27 +440,18 @@ export class CategoryPoolService {
       }
     }
 
-    await this.prisma.$transaction(
-      assignments.map((item) =>
-        this.prisma.programmePoolAssignment.upsert({
-          where: {
-            programVersionId_semesterNo_poolId: {
-              programVersionId,
-              semesterNo: item.semesterNo,
-              poolId: item.poolId,
-            },
-          },
-          create: {
-            tenantId,
-            programVersionId,
-            semesterNo: item.semesterNo,
-            poolId: item.poolId,
-            active: item.active,
-          },
-          update: { active: item.active },
-        }),
-      ),
-    );
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of assignments) {
+        await this.upsertProgrammePoolAssignment(tx, {
+          tenantId,
+          programVersionId,
+          semesterNo: item.semesterNo,
+          poolId: item.poolId,
+          shiftId: poolShiftById.get(item.poolId) ?? null,
+          active: item.active,
+        });
+      }
+    });
 
     return this.getProgramAssignments(tenantId, programVersionId);
   }
@@ -538,13 +569,13 @@ export class CategoryPoolService {
         continue;
       }
 
-      const existing = await this.prisma.programmePoolAssignment.findUnique({
+      const existing = await this.prisma.programmePoolAssignment.findFirst({
         where: {
-          programVersionId_semesterNo_poolId: {
-            programVersionId: target.id,
-            semesterNo: pool.semesterNo,
-            poolId,
-          },
+          tenantId,
+          programVersionId: target.id,
+          semesterNo: pool.semesterNo,
+          poolId,
+          shiftId: pool.shiftId ?? null,
         },
       });
 
@@ -566,27 +597,18 @@ export class CategoryPoolService {
     const pool = await this.getPool(tenantId, poolId);
     const toAssign = preview.items.filter((item) => item.assigned);
 
-    await this.prisma.$transaction(
-      toAssign.map((item) =>
-        this.prisma.programmePoolAssignment.upsert({
-          where: {
-            programVersionId_semesterNo_poolId: {
-              programVersionId: item.programVersionId,
-              semesterNo: pool.semesterNo,
-              poolId,
-            },
-          },
-          create: {
-            tenantId,
-            programVersionId: item.programVersionId,
-            semesterNo: pool.semesterNo,
-            poolId,
-            active: true,
-          },
-          update: { active: true },
-        }),
-      ),
-    );
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of toAssign) {
+        await this.upsertProgrammePoolAssignment(tx, {
+          tenantId,
+          programVersionId: item.programVersionId,
+          semesterNo: pool.semesterNo,
+          poolId,
+          shiftId: pool.shiftId ?? null,
+          active: true,
+        });
+      }
+    });
 
     return {
       assigned: toAssign.length,

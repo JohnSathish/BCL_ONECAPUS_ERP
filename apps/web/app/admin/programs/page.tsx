@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label';
 import { useFormDraft } from '@/hooks/use-form-draft';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useCourseMasterScope } from '@/hooks/use-course-master-scope';
 import { canManageAcademic } from '@/lib/can-manage-academic';
 import {
   fetchAcademicYears,
@@ -246,24 +247,6 @@ export default function AdminProgramsPage() {
     toQueryParams: courseCatalogQueryParams,
   } = useCourseCatalogFilters();
 
-  const courseCatalogQuery = useInfiniteQuery({
-    queryKey: ['catalog', 'courses', debouncedCourseSearch, courseCatalogFilters],
-    queryFn: ({ pageParam }) =>
-      fetchCourses(courseCatalogQueryParams(debouncedCourseSearch, pageParam)),
-    initialPageParam: 1,
-    getNextPageParam: (last) =>
-      last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
-    enabled: Boolean(session) && tab === 'courses',
-    placeholderData: (prev) => prev,
-  });
-
-  const catalogCourses = useMemo(
-    () => courseCatalogQuery.data?.pages.flatMap((p) => p.data) ?? [],
-    [courseCatalogQuery.data],
-  );
-
-  const catalogTotal = courseCatalogQuery.data?.pages[0]?.meta.total;
-
   const coursePicker = useQuery({
     queryKey: ['catalog', 'courses', 'picker', coursePickerSearch],
     queryFn: async () => {
@@ -346,6 +329,39 @@ export default function AdminProgramsPage() {
       (a, b) => a.program.code.localeCompare(b.program.code) || b.version - a.version,
     );
   }, [programs.data]);
+
+  const courseMasterScope = useCourseMasterScope(programVersions);
+  const catalogProgramVersions = courseMasterScope.scopedProgramVersions;
+  const catalogDepartments = useMemo(
+    () => courseMasterScope.filterDepartments(departments.data ?? []),
+    [courseMasterScope, departments.data],
+  );
+
+  const courseCatalogQuery = useInfiniteQuery({
+    queryKey: [
+      'catalog',
+      'courses',
+      debouncedCourseSearch,
+      courseCatalogFilters,
+      courseMasterScope.shiftId,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchCourses(
+        courseCatalogQueryParams(debouncedCourseSearch, pageParam, courseMasterScope.shiftId),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    enabled: Boolean(session) && tab === 'courses',
+    placeholderData: (prev) => prev,
+  });
+
+  const catalogCourses = useMemo(
+    () => courseCatalogQuery.data?.pages.flatMap((p) => p.data) ?? [],
+    [courseCatalogQuery.data],
+  );
+
+  const catalogTotal = courseCatalogQuery.data?.pages[0]?.meta.total;
 
   const allProgramVersionOptions = useMemo(() => {
     const list: { id: string; label: string }[] = [];
@@ -1435,10 +1451,18 @@ export default function AdminProgramsPage() {
           <>
             <StudioToolbar
               title="Course Master Data Studio"
-              description="Advanced course catalog grid with category intelligence, impact visibility, saved columns, and bulk operations."
-              actions={['Column Selector', 'Saved Columns', 'Pinned Columns', 'Bulk Edit']}
+              description={
+                courseMasterScope.isShiftFiltered
+                  ? 'Read-only shift-scoped catalog view. Switch to Institution workspace to edit the global course master.'
+                  : 'Advanced course catalog grid with category intelligence, impact visibility, saved columns, and bulk operations.'
+              }
+              actions={
+                courseMasterScope.canEditCourseMaster
+                  ? ['Column Selector', 'Saved Columns', 'Pinned Columns', 'Bulk Edit']
+                  : undefined
+              }
             />
-            {canManage ? (
+            {courseMasterScope.canEditCourseMaster ? (
               <div className="mb-4 mt-4 flex flex-wrap gap-2 rounded-3xl border border-border/60 bg-card/80 p-3 shadow-lg shadow-black/5">
                 <Button
                   type="button"
@@ -1468,149 +1492,167 @@ export default function AdminProgramsPage() {
             ) : null}
             <CourseImportDialog open={courseImportOpen} onOpenChange={setCourseImportOpen} />
             <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-              <Card className="overflow-hidden rounded-3xl border-border/60 bg-card/85 shadow-xl shadow-black/5">
-                <CardHeader>
-                  <CardTitle>
-                    {editingCourse ? `Edit course — ${editingCourse.code}` : 'Add course'}
-                  </CardTitle>
-                  <CardDescription>
-                    {editingCourse
-                      ? 'Update code, title, credits, type, or department'
-                      : 'Academic identity: delivery type (theory/practical), credits, hours, department. NEP role (Major/Minor/MDC…) is set on Curriculum mapping.'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {editingCourse ? (
-                    <PageTabs
-                      tabs={[
-                        { id: 'details', label: 'Details' },
-                        { id: 'eligibility', label: 'Eligibility & Restrictions' },
-                      ]}
-                      active={courseEditTab}
-                      onChange={setCourseEditTab}
-                    />
-                  ) : null}
-                  {editingCourse && courseEditTab === 'eligibility' ? (
-                    <CourseEligibilityPanel course={editingCourse} canManage={Boolean(canManage)} />
-                  ) : (
-                    <form
-                      className="space-y-4"
-                      onSubmit={courseForm.handleSubmit((v) =>
-                        editingCourse ? updateCourseMut.mutate(v) : createCourseMut.mutate(v),
-                      )}
-                    >
-                      {courseSubmitError ? (
-                        <p className="text-sm text-destructive" role="alert">
-                          {courseSubmitError}
-                        </p>
-                      ) : null}
-                      <Field
-                        label="Code"
-                        id="course-code"
-                        error={courseFieldErrors.code?.message}
-                        hint={courseCodeDupHint}
-                      >
-                        <Input
-                          id="course-code"
-                          placeholder="CS101"
-                          className={cn(courseFieldErrors.code && 'border-destructive')}
-                          {...courseForm.register('code')}
-                          disabled={!canManage}
-                        />
-                      </Field>
-                      <Field
-                        label="Title"
-                        id="course-title"
-                        error={courseFieldErrors.title?.message}
-                        hint={courseTitleDupHint}
-                      >
-                        <Input
-                          id="course-title"
-                          placeholder="Programming Fundamentals"
-                          className={cn(courseFieldErrors.title && 'border-destructive')}
-                          {...courseForm.register('title')}
-                          disabled={!canManage}
-                        />
-                      </Field>
-                      <CourseAcademicFields
-                        canManage={Boolean(canManage)}
-                        register={
-                          courseForm.register as unknown as UseFormRegister<CourseAcademicFieldsValues>
-                        }
-                        watch={
-                          courseForm.watch as unknown as UseFormWatch<CourseAcademicFieldsValues>
-                        }
-                        setValue={
-                          courseForm.setValue as unknown as UseFormSetValue<CourseAcademicFieldsValues>
-                        }
-                        errors={courseFieldErrors as FieldErrors<CourseAcademicFieldsValues>}
+              {courseMasterScope.canEditCourseMaster ? (
+                <Card className="overflow-hidden rounded-3xl border-border/60 bg-card/85 shadow-xl shadow-black/5">
+                  <CardHeader>
+                    <CardTitle>
+                      {editingCourse ? `Edit course — ${editingCourse.code}` : 'Add course'}
+                    </CardTitle>
+                    <CardDescription>
+                      {editingCourse
+                        ? 'Update code, title, credits, type, or department'
+                        : 'Academic identity: delivery type (theory/practical), credits, hours, department. NEP role (Major/Minor/MDC…) is set on Curriculum mapping.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {editingCourse ? (
+                      <PageTabs
+                        tabs={[
+                          { id: 'details', label: 'Details' },
+                          { id: 'eligibility', label: 'Eligibility & Restrictions' },
+                        ]}
+                        active={courseEditTab}
+                        onChange={setCourseEditTab}
                       />
-                      <Field
-                        label="CBCS catalog type"
-                        error={courseFieldErrors.courseType?.message}
+                    ) : null}
+                    {editingCourse && courseEditTab === 'eligibility' ? (
+                      <CourseEligibilityPanel
+                        course={editingCourse}
+                        canManage={Boolean(canManage)}
+                      />
+                    ) : (
+                      <form
+                        className="space-y-4"
+                        onSubmit={courseForm.handleSubmit((v) =>
+                          editingCourse ? updateCourseMut.mutate(v) : createCourseMut.mutate(v),
+                        )}
                       >
-                        <select
-                          className={cn(
-                            selectClass,
-                            courseFieldErrors.courseType && 'border-destructive',
-                          )}
-                          {...courseForm.register('courseType')}
-                          disabled={!canManage}
+                        {courseSubmitError ? (
+                          <p className="text-sm text-destructive" role="alert">
+                            {courseSubmitError}
+                          </p>
+                        ) : null}
+                        <Field
+                          label="Code"
+                          id="course-code"
+                          error={courseFieldErrors.code?.message}
+                          hint={courseCodeDupHint}
                         >
-                          {COURSE_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Department" error={courseFieldErrors.departmentId?.message}>
-                        <select
-                          className={cn(
-                            selectClass,
-                            courseFieldErrors.departmentId && 'border-destructive',
-                          )}
-                          {...courseForm.register('departmentId')}
-                          disabled={!canManage}
+                          <Input
+                            id="course-code"
+                            placeholder="CS101"
+                            className={cn(courseFieldErrors.code && 'border-destructive')}
+                            {...courseForm.register('code')}
+                            disabled={!canManage}
+                          />
+                        </Field>
+                        <Field
+                          label="Title"
+                          id="course-title"
+                          error={courseFieldErrors.title?.message}
+                          hint={courseTitleDupHint}
                         >
-                          <option value="">None</option>
-                          {(departments.data ?? []).map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {d.code ? `${d.code} — ${d.name}` : d.name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Description" id="course-desc">
-                        <Input
-                          id="course-desc"
-                          {...courseForm.register('description')}
-                          disabled={!canManage}
+                          <Input
+                            id="course-title"
+                            placeholder="Programming Fundamentals"
+                            className={cn(courseFieldErrors.title && 'border-destructive')}
+                            {...courseForm.register('title')}
+                            disabled={!canManage}
+                          />
+                        </Field>
+                        <CourseAcademicFields
+                          canManage={Boolean(canManage)}
+                          register={
+                            courseForm.register as unknown as UseFormRegister<CourseAcademicFieldsValues>
+                          }
+                          watch={
+                            courseForm.watch as unknown as UseFormWatch<CourseAcademicFieldsValues>
+                          }
+                          setValue={
+                            courseForm.setValue as unknown as UseFormSetValue<CourseAcademicFieldsValues>
+                          }
+                          errors={courseFieldErrors as FieldErrors<CourseAcademicFieldsValues>}
                         />
-                      </Field>
-                      {editingCourse ? (
-                        <div className="flex gap-2">
-                          <Button type="submit" disabled={!canManage || updateCourseMut.isPending}>
-                            {updateCourseMut.isPending ? 'Saving…' : 'Save changes'}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={updateCourseMut.isPending}
-                            onClick={cancelCourseEdit}
+                        <Field
+                          label="CBCS catalog type"
+                          error={courseFieldErrors.courseType?.message}
+                        >
+                          <select
+                            className={cn(
+                              selectClass,
+                              courseFieldErrors.courseType && 'border-destructive',
+                            )}
+                            {...courseForm.register('courseType')}
+                            disabled={!canManage}
                           >
-                            Cancel
+                            {COURSE_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Department" error={courseFieldErrors.departmentId?.message}>
+                          <select
+                            className={cn(
+                              selectClass,
+                              courseFieldErrors.departmentId && 'border-destructive',
+                            )}
+                            {...courseForm.register('departmentId')}
+                            disabled={!canManage}
+                          >
+                            <option value="">None</option>
+                            {(departments.data ?? []).map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.code ? `${d.code} — ${d.name}` : d.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Description" id="course-desc">
+                          <Input
+                            id="course-desc"
+                            {...courseForm.register('description')}
+                            disabled={!canManage}
+                          />
+                        </Field>
+                        {editingCourse ? (
+                          <div className="flex gap-2">
+                            <Button
+                              type="submit"
+                              disabled={!canManage || updateCourseMut.isPending}
+                            >
+                              {updateCourseMut.isPending ? 'Saving…' : 'Save changes'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={updateCourseMut.isPending}
+                              onClick={cancelCourseEdit}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button type="submit" disabled={!canManage || createCourseMut.isPending}>
+                            {createCourseMut.isPending ? 'Saving…' : 'Create course'}
                           </Button>
-                        </div>
-                      ) : (
-                        <Button type="submit" disabled={!canManage || createCourseMut.isPending}>
-                          {createCourseMut.isPending ? 'Saving…' : 'Create course'}
-                        </Button>
-                      )}
-                    </form>
-                  )}
-                </CardContent>
-              </Card>
+                        )}
+                      </form>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="overflow-hidden rounded-3xl border-border/60 bg-card/85 shadow-xl shadow-black/5">
+                  <CardHeader>
+                    <CardTitle>Read-only catalog</CardTitle>
+                    <CardDescription>
+                      Course Master is maintained at institution level. Browse papers enabled for
+                      your shift; use Curriculum Manager to map them into Morning/Day delivery.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              )}
 
               <Card className="overflow-hidden rounded-3xl border-border/60 bg-card/85 shadow-xl shadow-black/5">
                 <CardHeader className="space-y-0 pb-0">
@@ -1627,9 +1669,11 @@ export default function AdminProgramsPage() {
                     }}
                     hasActiveFilters={hasCourseCatalogFilters || Boolean(courseSearch.trim())}
                     totalCount={catalogTotal}
-                    isLoading={courseCatalogQuery.isLoading}
-                    departments={departments.data ?? []}
-                    programVersions={programVersions}
+                    isLoading={courseCatalogQuery.isLoading || courseMasterScope.shiftScopeLoading}
+                    departments={catalogDepartments}
+                    programVersions={catalogProgramVersions}
+                    allowAllProgrammes={courseMasterScope.allowAllProgrammes}
+                    scopeLabel={courseMasterScope.scopeLabel}
                   />
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -1640,7 +1684,7 @@ export default function AdminProgramsPage() {
                     isFetchingNextPage={courseCatalogQuery.isFetchingNextPage}
                     hasNextPage={courseCatalogQuery.hasNextPage}
                     onLoadMore={() => void courseCatalogQuery.fetchNextPage()}
-                    canManage={canManage}
+                    canManage={courseMasterScope.canEditCourseMaster}
                     onEdit={openCourseEdit}
                     onRemove={(c) => {
                       if (
@@ -2613,7 +2657,7 @@ function StudioToolbar({
 }: {
   title: string;
   description: string;
-  actions: string[];
+  actions?: string[];
 }) {
   return (
     <section className="rounded-[2rem] border border-border/60 bg-card/85 p-4 shadow-xl shadow-black/5">
@@ -2623,7 +2667,7 @@ function StudioToolbar({
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {actions.map((action) => (
+          {(actions ?? []).map((action) => (
             <Button
               key={action}
               type="button"

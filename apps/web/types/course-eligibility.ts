@@ -23,6 +23,13 @@ export type CourseEligibilityRules = {
   excludedMajorSubjectSlugs?: string[];
   class12SubjectExclusions?: Class12SubjectExclusion[];
   priorStudyExclusions?: PriorStudyExclusion[];
+  excludedWhenMajorAndClass12?: Array<{
+    majorSubjectSlug: string;
+    class12SubjectSlug: string;
+    label?: string;
+  }>;
+  excludedMinorSubjectSlugs?: string[];
+  triggersNccEnrollment?: boolean;
 };
 
 export type CourseEligibilityPreviewResult = {

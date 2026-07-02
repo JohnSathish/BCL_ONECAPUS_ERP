@@ -1,6 +1,7 @@
 import {
   ARTS_ODD_PAPER_BASKET,
   buildArtsFyugpOddCourses,
+  buildArtsFyugpSem5MinorCourseDefs,
   buildArtsRoutineSampleRows,
 } from './arts-fyugp-odd-catalog';
 
@@ -36,5 +37,14 @@ describe('arts-fyugp-odd-catalog', () => {
 
   it('builds 17 sample routine rows for Economics major', () => {
     expect(buildArtsRoutineSampleRows()).toHaveLength(17);
+  });
+
+  it('builds cross-department Sem 5 minor mappings per BA programme', () => {
+    const minors = buildArtsFyugpSem5MinorCourseDefs('BA-ECO');
+    expect(minors).toHaveLength(8);
+    expect(
+      minors.some((row) => row.code === 'POL-303' && row.category === 'MINOR'),
+    ).toBe(true);
+    expect(minors.some((row) => row.code === 'ECO-303')).toBe(false);
   });
 });

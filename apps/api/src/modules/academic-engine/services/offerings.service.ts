@@ -72,6 +72,7 @@ export class OfferingsService {
       programVersionId?: string;
       semesterSequence?: number;
       category?: string;
+      shiftId?: string;
     },
   ) {
     if (!filters.programVersionId) {
@@ -88,7 +89,10 @@ export class OfferingsService {
         tenantId,
         filters.programVersionId,
         semesterSequence,
-        filters.category ? { category: filters.category } : undefined,
+        {
+          ...(filters.category ? { category: filters.category } : {}),
+          ...(filters.shiftId ? { shiftId: filters.shiftId } : {}),
+        },
       );
 
       for (const offering of resolved.directOfferings) {

@@ -28,6 +28,8 @@ type Props = {
   sessionOptions: Option[];
   categoryOptions: Option[];
   religionOptions: Option[];
+  hideShiftFilter?: boolean;
+  lockShiftId?: string;
 };
 
 export function BulkUpdateScopeStep({
@@ -46,6 +48,8 @@ export function BulkUpdateScopeStep({
   sessionOptions,
   categoryOptions,
   religionOptions,
+  hideShiftFilter = false,
+  lockShiftId,
 }: Props) {
   const optionMaps: FilterOptionMaps = {
     program: optionsToMap(programOptions),
@@ -171,18 +175,20 @@ export function BulkUpdateScopeStep({
                 </option>
               ))}
             </select>
-            <select
-              className="rounded-2xl border border-border bg-background px-3 py-2 text-xs"
-              value={filters.shiftId}
-              onChange={(e) => onFilterChange({ shiftId: e.target.value })}
-            >
-              <option value="">All shifts</option>
-              {shiftOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            {!hideShiftFilter ? (
+              <select
+                className="rounded-2xl border border-border bg-background px-3 py-2 text-xs"
+                value={filters.shiftId}
+                onChange={(e) => onFilterChange({ shiftId: e.target.value })}
+              >
+                <option value="">All shifts</option>
+                {shiftOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <select
               className="rounded-2xl border border-border bg-background px-3 py-2 text-xs"
               value={filters.semester}
@@ -222,7 +228,7 @@ export function BulkUpdateScopeStep({
                 search: '',
                 programVersionId: '',
                 batchId: '',
-                shiftId: '',
+                shiftId: lockShiftId ?? '',
                 semester: '',
                 streamId: '',
                 departmentId: '',

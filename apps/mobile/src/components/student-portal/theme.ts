@@ -1,0 +1,16 @@
+export const studentTheme = {
+  primary: '#0f3c89',
+  primaryLight: '#1d4ed8',
+  primaryMuted: '#2563eb',
+  accent: '#0d9488',
+  background: '#f3f4f6',
+  surface: '#ffffff',
+  border: '#dbeafe',
+  text: '#0f172a',
+  textMuted: '#64748b',
+  textSubtle: '#94a3b8',
+  warning: '#d97706',
+  success: '#059669',
+  danger: '#dc2626',
+  drawerWidth: 320,
+} as const;

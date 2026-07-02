@@ -1,6 +1,6 @@
 # OneCampus Mobile (Expo)
 
-Student/staff shell for the OneCampus ERP mobile APIs.
+Student mobile app for fees, attendance, and notifications.
 
 ## Quick start (Expo Go / dev server)
 
@@ -10,9 +10,15 @@ npm install
 npm start
 ```
 
-Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_TENANT_SLUG` in `.env`. On a physical device, use your PC LAN IP instead of `localhost`.
+Set `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_TENANT_SLUG`, and `EXPO_PUBLIC_PRIVACY_POLICY_URL` in `.env`. On a physical device, use your PC LAN IP instead of `localhost`.
 
-## Phase 2 screens
+Example privacy URL when web is deployed:
+
+```
+EXPO_PUBLIC_PRIVACY_POLICY_URL=https://your-college-domain.edu/mobile-privacy.html
+```
+
+## v1 screens
 
 | Screen        | Route                      | API                                |
 | ------------- | -------------------------- | ---------------------------------- |
@@ -20,40 +26,63 @@ Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_TENANT_SLUG` in `.env`. On a physical
 | Attendance    | `/(student)/attendance`    | `/v1/student-attendance/portal/me` |
 | Notifications | `/(student)/notifications` | `/v1/communication/notifications`  |
 
-`apiFetch` attaches the access token and refreshes on `401` via `POST /v1/auth/refresh` (mobile body tokens).
+Staff portal login is disabled in v1 (student-only Play release).
+
+## Google Play release (production AAB)
+
+See **`play-store-listing.md`** for store copy, data safety answers, and DBC-specific checklist.
+
+1. Copy `.env.production.example` → `.env` with production API URL, tenant slug, and privacy policy URL.
+2. Host `apps/web/public/mobile-privacy.html` at `https://donboscocollege.ac.in/mobile-privacy.html`.
+3. Log in to EAS: `npx eas login`
+4. Configure project: `npx eas build:configure` (first time only)
+5. Build production Android bundle:
+
+```powershell
+npm run build:prod:android
+```
+
+6. Submit to Play internal track:
+
+```powershell
+npm run submit:android
+```
+
+Production builds **exclude** `expo-dev-client`. Use `npm run build:dev:android` for Razorpay native testing.
 
 ## Native Razorpay (EAS dev build)
 
 `react-native-razorpay` does **not** work in Expo Go. Use a development build:
 
 ```powershell
-cd apps/mobile
-npm install
-npx eas login
-npx eas build --profile development --platform android
+npm run build:dev:android
 ```
 
 After installing the APK on your device:
 
 ```powershell
 npm start
-# press "a" or scan QR — opens in the dev client, not Expo Go
 ```
 
 Fee checkout uses native Razorpay when `mode: LIVE` and keys are configured; otherwise `SAFE_MOCK` simulate or manual status poll.
 
 ## Scripts
 
-| Command                     | Purpose                   |
-| --------------------------- | ------------------------- |
-| `npm start`                 | Metro on port **8082**    |
-| `npm run typecheck`         | TypeScript check          |
-| `npm run build:dev:android` | EAS development APK       |
-| `npm run build:dev:ios`     | EAS development iOS build |
+| Command                         | Purpose                          |
+| ------------------------------- | -------------------------------- |
+| `npm start`                     | Metro on port **8082**           |
+| `npm run typecheck`             | TypeScript check                 |
+| `npm run build:dev:android`     | EAS development APK (dev client) |
+| `npm run build:preview:android` | Internal preview APK             |
+| `npm run build:prod:android`    | Production AAB for Google Play   |
+| `npm run submit:android`        | Submit latest AAB to Play        |
 
 ## Environment
 
 ```
-EXPO_PUBLIC_API_URL=http://192.168.x.x:3001/api
+EXPO_PUBLIC_API_URL=https://erp.donboscocollege.ac.in/api
 EXPO_PUBLIC_TENANT_SLUG=demo
+EXPO_PUBLIC_APP_NAME=DBC Student
+EXPO_PUBLIC_PRIVACY_POLICY_URL=https://donboscocollege.ac.in/mobile-privacy.html
+EXPO_PUBLIC_SUPPORT_EMAIL=principaldbct@gmail.com
 ```

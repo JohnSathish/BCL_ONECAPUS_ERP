@@ -7,13 +7,12 @@ import { Download } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { exportStudentReport, type StudentReportType } from '@/services/student-reports';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -49,10 +48,9 @@ const EXPORT_CATALOG: { type: StudentReportType; label: string; description: str
 ];
 
 export default function ExportCenterPage() {
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const [message, setMessage] = useState('');
   const filterOptions = useStudentReportFilterOptions();
-  const apiFilters = toApiFilters(filters);
 
   const exportMut = useMutation({
     mutationFn: ({ type, format }: { type: StudentReportType; format: 'xlsx' | 'csv' }) =>
@@ -69,7 +67,8 @@ export default function ExportCenterPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           {...filterOptions}
         />
 

@@ -38,6 +38,10 @@ export class AttendanceSessionQueryDto {
   staffProfileId?: string;
 
   @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

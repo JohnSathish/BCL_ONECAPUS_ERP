@@ -25,6 +25,7 @@ import {
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
@@ -145,6 +146,7 @@ function clearAdvancedFilters(filters: DirectoryFilters): DirectoryFilters {
 export function StudentDirectoryPage() {
   const session = useRequireAuth();
   const authReady = useAuthQueryEnabled();
+  const shiftScope = useShiftScope();
   const perms = useStudentPermissions();
   const qc = useQueryClient();
   const [filters, setFilters] = useState<DirectoryFilters>(emptyFilters);
@@ -164,6 +166,14 @@ export function StudentDirectoryPage() {
     setPage(1);
     setSelectedIds(new Set());
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (shiftScope.hideShiftSelectors && shiftScope.activeShiftId) {
+      setFilters((f) =>
+        f.shiftId === shiftScope.activeShiftId ? f : { ...f, shiftId: shiftScope.activeShiftId! },
+      );
+    }
+  }, [shiftScope.activeShiftId, shiftScope.hideShiftSelectors]);
 
   const institutions = useQuery({
     queryKey: ['org', 'institutions'],
@@ -462,6 +472,7 @@ export function StudentDirectoryPage() {
               selectedIds.size > 0 ? () => exportMut.mutate([...selectedIds]) : undefined
             }
             exportPending={exportMut.isPending}
+            hideShiftFilter={shiftScope.hideShiftSelectors}
           />
         </div>
 

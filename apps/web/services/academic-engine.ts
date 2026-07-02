@@ -186,6 +186,7 @@ export async function provisionPoolSections(payload?: {
   semesterNo?: number;
   categories?: string[];
   shiftCode?: string;
+  shiftId?: string;
   institutionId?: string;
   poolId?: string;
 }) {
@@ -313,10 +314,16 @@ export async function fetchCatalog(params: {
 export async function fetchEligibleMajors(params: {
   programVersionId: string;
   semesterSequence?: number;
+  shiftId?: string;
 }): Promise<import('@/types/academic-engine').SubjectPathOption[]> {
   const { data } = await api.get(
     `/v1/academic-engine/programs/${params.programVersionId}/eligible-majors`,
-    { params: { semesterSequence: params.semesterSequence ?? 1 } },
+    {
+      params: {
+        semesterSequence: params.semesterSequence ?? 1,
+        shiftId: params.shiftId,
+      },
+    },
   );
   return data;
 }
@@ -326,6 +333,7 @@ export async function fetchEligibleMinors(params: {
   majorSubjectSlug: string;
   semesterSequence?: number;
   academicYearId?: string;
+  shiftId?: string;
 }): Promise<import('@/types/academic-engine').SubjectPathOption[]> {
   const { data } = await api.get(
     `/v1/academic-engine/programs/${params.programVersionId}/eligible-minors`,
@@ -334,10 +342,214 @@ export async function fetchEligibleMinors(params: {
         majorSubjectSlug: params.majorSubjectSlug,
         semesterSequence: params.semesterSequence ?? 1,
         academicYearId: params.academicYearId,
+        shiftId: params.shiftId,
       },
     },
   );
   return data;
+}
+
+export type ShiftAdmissionContext = {
+  shift: { id: string; code: string; name: string };
+  programVersionId: string | null;
+  semesterSequence: number;
+  allowedProgramIds: string[];
+  allowedProgramVersionIds: string[];
+  allowedDepartmentIds: string[];
+  autoAssignCategories: string[];
+  poolCoursesByCategory: Record<string, { id: string; code: string; title: string }[]>;
+};
+
+export type ShiftProgrammeRow = {
+  programId: string;
+  code: string;
+  name: string;
+  enabled: boolean;
+  publishedVersionIds: string[];
+};
+
+export type ShiftDepartmentRow = {
+  departmentId: string;
+  code: string;
+  name: string;
+  enabled: boolean;
+};
+
+export async function fetchShiftAdmissionContext(params: {
+  shiftId: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  institutionId?: string;
+}): Promise<ShiftAdmissionContext> {
+  const { data } = await api.get(`/v1/academic-engine/shifts/${params.shiftId}/admission-context`, {
+    params: {
+      programVersionId: params.programVersionId,
+      semesterSequence: params.semesterSequence ?? 1,
+      institutionId: params.institutionId,
+    },
+  });
+  return data;
+}
+
+export async function fetchShiftProgrammes(
+  shiftId: string,
+  institutionId?: string,
+): Promise<ShiftProgrammeRow[]> {
+  const { data } = await api.get(`/v1/academic-engine/shifts/${shiftId}/programmes`, {
+    params: institutionId ? { institutionId } : undefined,
+  });
+  return data;
+}
+
+export async function fetchShiftDepartments(
+  shiftId: string,
+  institutionId?: string,
+): Promise<ShiftDepartmentRow[]> {
+  const { data } = await api.get(`/v1/academic-engine/shifts/${shiftId}/departments`, {
+    params: institutionId ? { institutionId } : undefined,
+  });
+  return data;
+}
+
+export type CurriculumConfigurationStatusRow = {
+  shiftId: string;
+  shiftCode: string;
+  shiftName: string;
+  programmeFamily: 'BA' | 'BSC' | 'BCOM';
+  programmeLabel: string;
+  programmeCount: number;
+  semesters: Record<number, 'complete' | 'pending' | 'na'>;
+};
+
+export type CurriculumManagerCourseRow = {
+  courseId: string;
+  code: string;
+  title: string;
+  displayOrder: number;
+  eligibilityRules: import('@/types/course-eligibility').CourseEligibilityRules;
+  eligibilitySummary: string;
+};
+
+export type CurriculumManagerCategoryBlock = {
+  categoryType: string;
+  requiredCount: number;
+  mandatory: boolean;
+  autoAssign: boolean;
+  continuityRule: string | null;
+  pool: {
+    id: string;
+    poolName: string;
+    shiftId: string | null;
+    assigned: boolean;
+  } | null;
+  courses: CurriculumManagerCourseRow[];
+  availablePools: Array<{
+    id: string;
+    poolName: string;
+    courseCount: number;
+    assigned: boolean;
+    shiftId: string | null;
+  }>;
+};
+
+export type CurriculumManagerView = {
+  shift: { id: string; code: string; name: string };
+  programVersion: { id: string; code: string; name: string; version: number };
+  semesterNo: number;
+  curriculumMode: 'shift-pools' | 'direct-offerings';
+  shiftIndependent: boolean;
+  semesterSummary: string;
+  categoryCounts: Record<string, number>;
+  continuityRules: Record<string, string>;
+  categories: CurriculumManagerCategoryBlock[];
+  majorDepartments: Array<{
+    departmentName: string;
+    papers: Array<{ code: string; title: string; offeringId: string }>;
+    internship?: { code: string; title: string; offeringId: string } | null;
+  }>;
+  minorDepartments: Array<{
+    departmentName: string;
+    paper: { code: string; title: string; offeringId: string };
+  }>;
+  minorEnabled: boolean;
+  configurationStatus: 'complete' | 'partial' | 'empty';
+  missingCategories: string[];
+};
+
+export async function fetchCurriculumManagerView(params: {
+  shiftId: string;
+  programVersionId: string;
+  semesterNo: number;
+  institutionId?: string;
+}) {
+  const { data } = await api.get(
+    `/v1/academic-engine/shifts/${params.shiftId}/curriculum-manager`,
+    {
+      params: {
+        programVersionId: params.programVersionId,
+        semesterNo: params.semesterNo,
+        institutionId: params.institutionId,
+      },
+    },
+  );
+  return data as CurriculumManagerView;
+}
+
+export async function assignCurriculumManagerPool(
+  shiftId: string,
+  payload: { programVersionId: string; semesterNo: number; poolId: string },
+) {
+  const { data } = await api.put(
+    `/v1/academic-engine/shifts/${shiftId}/curriculum-manager/pool-assignment`,
+    payload,
+  );
+  return data as CurriculumManagerView;
+}
+
+export async function upsertShiftCurriculumPolicy(
+  shiftId: string,
+  payload: {
+    programVersionId?: string | null;
+    semesterNo: number;
+    categoryType: string;
+    autoAssign: boolean;
+  },
+) {
+  const { data } = await api.put(
+    `/v1/academic-engine/shifts/${shiftId}/curriculum-policies`,
+    payload,
+  );
+  return data;
+}
+
+export async function fetchCurriculumConfigurationStatus(institutionId?: string) {
+  const { data } = await api.get('/v1/academic-engine/shifts/curriculum-configuration-status', {
+    params: institutionId ? { institutionId } : undefined,
+  });
+  return data as {
+    shifts: { id: string; code: string; name: string }[];
+    rows: CurriculumConfigurationStatusRow[];
+  };
+}
+
+export async function upsertShiftProgrammes(
+  shiftId: string,
+  items: { programId: string; enabled: boolean }[],
+) {
+  const { data } = await api.put(`/v1/academic-engine/shifts/${shiftId}/programmes`, {
+    items,
+  });
+  return data as ShiftProgrammeRow[];
+}
+
+export async function upsertShiftDepartments(
+  shiftId: string,
+  items: { departmentId: string; enabled: boolean }[],
+) {
+  const { data } = await api.put(`/v1/academic-engine/shifts/${shiftId}/departments`, {
+    items,
+  });
+  return data as ShiftDepartmentRow[];
 }
 
 export async function fetchMajorMinorRules(institutionId?: string) {

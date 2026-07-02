@@ -59,6 +59,11 @@ export class CourseListQueryDto {
   @IsIn([...NEP_CURRICULUM_CATEGORIES])
   category?: string;
 
+  /** Limit catalog to programmes/departments enabled for this shift. */
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
   /** Reserved for future filters (faculty, shift, syllabus version, archived). */
   @IsOptional()
   @IsString()

@@ -34,6 +34,9 @@ export async function fetchStudentPortalMe() {
     fullName: string;
     displayFullName: string;
     enrollmentNumber: string;
+    rollNumber: string | null;
+    universityRollNumber: string | null;
+    universityRegistrationNumber: string | null;
     photoUrl: string | null;
     rfidNumber: string | null;
     department: string | null;

@@ -4,9 +4,13 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+
 import { Reflector } from '@nestjs/core';
+
 import { SHIFT_SCOPED_KEY } from '../decorators/shift-scoped.decorator';
+
 import type { JwtUser } from '../decorators/current-user.decorator';
+
 import { buildShiftScope, type ShiftScope } from '../utils/shift-scope.util';
 
 declare module 'express-serve-static-core' {
@@ -22,22 +26,32 @@ export class ShiftScopeGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const scoped = this.reflector.getAllAndOverride<boolean>(SHIFT_SCOPED_KEY, [
       context.getHandler(),
+
       context.getClass(),
     ]);
-    if (!scoped) return true;
 
     const request = context.switchToHttp().getRequest<{
       user?: JwtUser;
+
       headers: Record<string, string | string[] | undefined>;
+
       query: Record<string, string | string[] | undefined>;
+
       shiftScope?: ShiftScope;
     }>();
 
     const user = request.user;
-    if (!user) throw new ForbiddenException('Authentication required');
+
+    if (!user) {
+      if (scoped) throw new ForbiddenException('Authentication required');
+
+      return true;
+    }
 
     const headerShift = request.headers['x-shift-id'];
+
     const queryShift = request.query.shiftId;
+
     const requested =
       (typeof queryShift === 'string' ? queryShift : undefined) ??
       (typeof headerShift === 'string' ? headerShift : undefined);
@@ -48,7 +62,19 @@ export class ShiftScopeGuard implements CanActivate {
       throw new ForbiddenException('Shift access denied');
     }
 
-    request.shiftScope = scope;
+    const isShiftOnly =
+      !scope.allShifts &&
+      (scope.shiftIds.length > 0 ||
+        user.roles.some((role) => role.startsWith('shift-')));
+
+    if (requested || isShiftOnly || scoped) {
+      request.shiftScope = scope;
+    }
+
+    if (scoped && isShiftOnly && !scope.activeShiftId) {
+      throw new ForbiddenException('Shift context required');
+    }
+
     return true;
   }
 }

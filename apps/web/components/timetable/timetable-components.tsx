@@ -88,6 +88,7 @@ export function TimetableFilterBar({
   context,
   onDeletePlan,
   deleteBusy,
+  hideShiftFilter = false,
 }: {
   shiftId: string;
   setShiftId: (value: string) => void;
@@ -103,6 +104,7 @@ export function TimetableFilterBar({
   context?: TimetableContext;
   onDeletePlan?: (planId: string) => void;
   deleteBusy?: boolean;
+  hideShiftFilter?: boolean;
 }) {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId);
   const canDeletePlan = Boolean(
@@ -159,21 +161,24 @@ export function TimetableFilterBar({
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          Shift
-          <select
-            className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
-            value={shiftId}
-            onChange={(event) => setShiftId(event.target.value)}
-          >
-            <option value="">All / plan default shifts</option>
-            {(context?.shifts ?? []).map((shift) => (
-              <option key={shift.id} value={shift.id}>
-                {shift.name} · {formatShiftClock(shift.startTime)}–{formatShiftClock(shift.endTime)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!hideShiftFilter ? (
+          <label className="space-y-1 text-xs font-medium text-muted-foreground">
+            Shift
+            <select
+              className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+              value={shiftId}
+              onChange={(event) => setShiftId(event.target.value)}
+            >
+              <option value="">All / plan default shifts</option>
+              {(context?.shifts ?? []).map((shift) => (
+                <option key={shift.id} value={shift.id}>
+                  {shift.name} · {formatShiftClock(shift.startTime)}–
+                  {formatShiftClock(shift.endTime)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="space-y-1 text-xs font-medium text-muted-foreground md:col-span-2">
           Active Plan
           <div className="flex gap-2">
@@ -561,7 +566,14 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold">{primaryTitle}</span>
-        <span className="rounded-full bg-background/70 px-2 py-0.5">{category}</span>
+        <div className="flex items-center gap-1">
+          {entry.shiftName ? (
+            <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-medium">
+              {entry.shiftName}
+            </span>
+          ) : null}
+          <span className="rounded-full bg-background/70 px-2 py-0.5">{category}</span>
+        </div>
       </div>
       <p className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide opacity-80">
         {primaryCode}

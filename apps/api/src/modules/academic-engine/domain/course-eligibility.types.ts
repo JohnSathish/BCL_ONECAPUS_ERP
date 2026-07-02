@@ -30,6 +30,15 @@ export type CourseEligibilityRules = {
   excludedMajorSubjectSlugs?: string[];
   class12SubjectExclusions?: Class12SubjectExclusion[];
   priorStudyExclusions?: PriorStudyExclusion[];
+  /** Block when student major AND Class XII both match (all conditions required). */
+  excludedWhenMajorAndClass12?: Array<{
+    majorSubjectSlug: string;
+    class12SubjectSlug: string;
+    label?: string;
+  }>;
+  excludedMinorSubjectSlugs?: string[];
+  /** When true, selecting this course flags the student for NCC enrollment. */
+  triggersNccEnrollment?: boolean;
 };
 
 export type CompletedStudyRecord = {

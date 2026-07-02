@@ -11,6 +11,21 @@ Centralized academic definition with decentralized per-shift operations.
 
 Shifts live in `core.shifts` (campus-scoped, database-driven — not hardcoded Morning/Day/Evening).
 
+### Workspace model (admin UI)
+
+Morning and Day operate as **persistent admin workspaces**, not per-page filters:
+
+| Workspace   | Code      | Who enters                            | Accent  |
+| ----------- | --------- | ------------------------------------- | ------- |
+| Institution | —         | Super Admin, Principal (consolidated) | Default |
+| Morning     | `MORNING` | Morning shift admin                   | Teal    |
+| Day         | `DAY`     | Day shift admin                       | Amber   |
+
+- Same `/admin/*` routes — workspace context injects `x-shift-id` on API calls
+- Super admin: last workspace remembered; picker at `/admin/workspace` on first login
+- Shift admins: workspace locked to assigned shift; no shift dropdown on student directory
+- Shared modules (Library, HR, Principal desk, global course master) ignore workspace filter
+
 ## RBAC
 
 | Role                            | Access                                    |
@@ -22,6 +37,16 @@ Shifts live in `core.shifts` (campus-scoped, database-driven — not hardcoded M
 | `shift-examination-coordinator` | Exams in shift                            |
 
 JWT claims: `shiftIds`, `primaryShiftId`, `allShifts`.
+
+### Role entry matrix
+
+| Role                  | JWT                       | Workspace         | Switcher | Default landing                   |
+| --------------------- | ------------------------- | ----------------- | -------- | --------------------------------- |
+| Super Admin           | `allShifts: true`         | Any + institution | Yes      | `/admin` (last workspace)         |
+| Morning Admin         | `shiftIds: [morning]`     | `morning` only    | No       | `/admin`                          |
+| Day Admin             | `shiftIds: [day]`         | `day` only        | No       | `/admin`                          |
+| Faculty (one shift)   | N/A                       | N/A               | No       | `/staff/dashboard`                |
+| Faculty (both shifts) | `StaffShiftAssignment` ×2 | N/A               | No       | Merged timetable with shift badge |
 
 ## API
 
@@ -40,6 +65,8 @@ JWT claims: `shiftIds`, `primaryShiftId`, `allShifts`.
 | GET/POST        | `/api/v1/shift-operations/attendance`   | Attendance sessions                                        |
 | GET/POST        | `/api/v1/shift-operations/examinations` | Exam schedules                                             |
 
+All workspace-scoped admin modules honor the `x-shift-id` header (auto-sent by the web client when workspace ≠ institution). Shift-only users receive 403 if the header is tampered.
+
 ## Course delivery model
 
 - **Course** — single master catalog row
@@ -48,20 +75,20 @@ JWT claims: `shiftIds`, `primaryShiftId`, `allShifts`.
 
 ## UI routes
 
-| Route           | Audience                                                          |
-| --------------- | ----------------------------------------------------------------- |
-| `/admin/shifts` | Institution admin — shift CRUD, **shift administrators**, summary |
+| Route              | Audience                                                          |
+| ------------------ | ----------------------------------------------------------------- |
+| `/admin/workspace` | Super admin workspace picker (Institution / Morning / Day)        |
+| `/admin/shifts`    | Institution admin — shift CRUD, **shift administrators**, summary |
+| `/admin/*`         | All admin modules — workspace context auto-scopes delivery data   |
+| `/shift/*`         | **Deprecated** — redirects to `/admin` with workspace context     |
 
 ### Assigning shift admins (college / super admin)
 
 1. Open **Academics → Shift management** (`/admin/shifts`).
 2. Select **Institution** and **Campus**.
-3. In **Shift administrators**, choose the shift (e.g. Morning or Evening).
+3. In **Shift administrators**, choose the shift (e.g. Morning or Day).
 4. Enter the user email. For a new account, keep **Create new user** checked and set a password (min 8 characters).
-5. Click **Assign shift admin**. The user receives the `shift-admin` role and access only to that shift’s portal (`/shift`).
-   | `/shift` | Shift admin dashboard |
-   | `/shift/students` | Shift-filtered student list |
-   | `/shift/timetable` | Shift timetable |
+5. Click **Assign shift admin**. The user receives the `shift-admin` role and lands in `/admin` scoped to that shift workspace.
 
 ## Demo credentials
 

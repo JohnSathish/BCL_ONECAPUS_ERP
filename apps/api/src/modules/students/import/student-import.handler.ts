@@ -50,9 +50,20 @@ import {
   SEM5_STRUCTURE_NOTES,
 } from '../migration/sem5-admission-template';
 import {
+  SEM2_HIDDEN_SHEETS,
+  SEM2_STRUCTURE_NOTES,
+  SEM2_SUBJECT_IMPORT_HEADERS,
+  SEM2_SUBJECT_IMPORT_HELPERS,
+  SEM2_SUBJECT_IMPORT_SAMPLE_ROW,
+} from '../migration/sem2-subject-import-template';
+import {
   Sem1ImportCurriculumService,
   type Sem1ImportCurriculumCatalog,
 } from './sem1-import-curriculum.service';
+import {
+  Sem2ImportCurriculumService,
+  type Sem2ImportCurriculumCatalog,
+} from './sem2-import-curriculum.service';
 import {
   Sem3ImportCurriculumService,
   type Sem3ImportCurriculumCatalog,
@@ -407,6 +418,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly semesterResolver: StudentSemesterResolverService,
     private readonly abcService: StudentAbcService,
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
+    private readonly sem2Curriculum: Sem2ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
     private readonly sem5Curriculum: Sem5ImportCurriculumService,
     private readonly profileWriter: StudentImportProfileWriterService,
@@ -698,9 +710,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       tenantId,
       programVersions.map((version) => version.id),
     );
+    const activeShiftIds = [...new Set(shifts.map((shift) => shift.id))];
+    const sem2Catalogs = await this.preloadSem2Catalogs(
+      tenantId,
+      programVersions.map((version) => version.id),
+      activeShiftIds,
+    );
     const sem3Catalogs = await this.preloadSem3Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
+      activeShiftIds,
     );
     const sem5Catalogs = await this.preloadSem5Catalogs(
       tenantId,
@@ -747,6 +766,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         denominationByKey,
         nationalityByKey,
         sem1Catalogs,
+        sem2Catalogs,
         sem3Catalogs,
         sem5Catalogs,
         fyugp: {
@@ -819,6 +839,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       denominationByKey: Map<string, string>;
       nationalityByKey: Map<string, string>;
       sem1Catalogs: Map<string, Sem1ImportCurriculumCatalog>;
+      sem2Catalogs: Map<string, Sem2ImportCurriculumCatalog>;
       sem3Catalogs: Map<string, Sem3ImportCurriculumCatalog>;
       sem5Catalogs: Map<string, Sem5ImportCurriculumCatalog>;
       fyugp: FyugpResolutionContext;
@@ -1230,6 +1251,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       errors,
       warnings,
       sem1Catalogs: ctx.sem1Catalogs,
+      sem2Catalogs: ctx.sem2Catalogs,
       sem3Catalogs: ctx.sem3Catalogs,
       sem5Catalogs: ctx.sem5Catalogs,
     });
@@ -1244,6 +1266,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const minorSubjectSlug = fyugpMapping.minor?.subjectSlug;
     if (targetSemester === 1 && !majorDepartment && !fyugpMapping.major) {
       errors.push('Major Department is required for Semester 1 imports');
+    }
+    if (targetSemester === 2 && !majorDepartment && !fyugpMapping.major) {
+      errors.push('Major Department is required for Semester 2 imports');
     }
     if (targetSemester === 3 && !majorDepartment && !fyugpMapping.major) {
       errors.push('Major Department is required for Semester 3 imports');
@@ -1417,6 +1442,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       errors: string[];
       warnings: string[];
       sem1Catalogs?: Map<string, Sem1ImportCurriculumCatalog>;
+      sem2Catalogs?: Map<string, Sem2ImportCurriculumCatalog>;
       sem3Catalogs?: Map<string, Sem3ImportCurriculumCatalog>;
       sem5Catalogs?: Map<string, Sem5ImportCurriculumCatalog>;
     },
@@ -1428,6 +1454,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const sem1Resolved = this.resolveSem1FriendlySelections(raw, ctx, mapping);
     if (sem1Resolved) {
       return sem1Resolved;
+    }
+    const sem2Resolved = this.resolveSem2FriendlySelections(raw, ctx, mapping);
+    if (sem2Resolved) {
+      return sem2Resolved;
     }
     const sem5Resolved = this.resolveSem5FriendlySelections(raw, ctx, mapping);
     if (sem5Resolved) {
@@ -1800,6 +1830,269 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return mapping;
   }
 
+  private resolveSem2FriendlySelections(
+    raw: Record<string, unknown>,
+    ctx: {
+      programVersionId?: string;
+      semesterSequence?: number;
+      shiftId?: string;
+      fyugp: FyugpResolutionContext;
+      errors: string[];
+      warnings: string[];
+      sem2Catalogs?: Map<string, Sem2ImportCurriculumCatalog>;
+    },
+    mapping: FyugpAcademicMapping,
+  ): FyugpAcademicMapping | undefined {
+    const majorDepartment = this.firstText(raw, [
+      'majorDepartment',
+      'majorDepartmentName',
+    ]);
+    const minorDepartment = this.firstText(raw, [
+      'minorDepartment',
+      'minorDepartmentName',
+    ]);
+    const mdcPaper = this.firstText(raw, [
+      'mdcPaper',
+      'mdcDepartment',
+      'mdcSubject',
+      'mdcChoice',
+    ]);
+    const aecPaper = this.firstText(raw, ['aecPaper', 'aecSubject', 'aec']);
+    const secPaper = this.firstText(raw, [
+      'secPaper',
+      'secSubject',
+      'sec',
+      'skillPaper',
+      'skillEnhancementCourse',
+    ]);
+    const vacPaper = this.firstText(raw, ['vacPaper', 'vacSubject', 'vac']);
+    const vtcPaper = this.firstText(raw, ['vtcPaper', 'vtcSubject', 'vtc']);
+    const internshipArea = this.firstText(raw, [
+      'internshipArea',
+      'internship',
+    ]);
+
+    const usesSem2Template = Boolean(
+      ctx.semesterSequence === 2 &&
+      (majorDepartment ||
+        minorDepartment ||
+        mdcPaper ||
+        aecPaper ||
+        secPaper ||
+        vacPaper),
+    );
+    if (!usesSem2Template) return undefined;
+
+    if (vtcPaper || internshipArea) {
+      ctx.errors.push(
+        'Semester 2 import cannot include VTC or Internship columns.',
+      );
+      return mapping;
+    }
+
+    if (ctx.semesterSequence !== 2) {
+      ctx.errors.push(
+        'Semester 2 paper columns require Current Semester = 2 on this row.',
+      );
+      return mapping;
+    }
+    if (!ctx.programVersionId) {
+      ctx.errors.push(
+        'Programme is required to resolve Semester 2 paper selections.',
+      );
+      return mapping;
+    }
+    if (!ctx.shiftId) {
+      ctx.errors.push('Shift is required to resolve Semester 2 paper pools.');
+      return mapping;
+    }
+
+    const catalog = ctx.sem2Catalogs?.get(
+      `${ctx.programVersionId}:${ctx.shiftId}`,
+    );
+    if (!catalog) {
+      ctx.errors.push(
+        'Semester 2 curriculum is not configured for the selected programme and shift.',
+      );
+      return mapping;
+    }
+
+    const defaultSectionCode =
+      this.firstText(raw, ['sectionCode', 'grp', 'tutorialGroup']) ??
+      mapping.tutorialGroup ??
+      undefined;
+    const sectionPreferences = this.buildSectionPreferences(
+      raw,
+      defaultSectionCode,
+    );
+    const subjectCtx = {
+      ...ctx,
+      sectionPreferences,
+      defaultSectionCode,
+    };
+
+    if (!majorDepartment) {
+      ctx.errors.push('Major Department is required for Semester 2 import.');
+    } else {
+      const department = this.sem2Curriculum.resolveMajorDepartment(
+        catalog,
+        majorDepartment,
+      );
+      if (!department) {
+        ctx.errors.push(
+          `Unknown Major Department "${majorDepartment}" for programme ${catalog.programCode}. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.major = this.resolveSem3OfferingSelection(
+          department.paper,
+          'MAJOR',
+          subjectCtx,
+        );
+        if (mapping.major && !mapping.major.subjectSlug) {
+          mapping.major.subjectSlug = department.subjectSlug;
+        }
+
+        if (!minorDepartment) {
+          ctx.errors.push(
+            'Minor Department is required for Semester 2 import.',
+          );
+        } else {
+          const minorOption = this.sem2Curriculum.resolveMinorDepartment(
+            catalog,
+            department.departmentName,
+            minorDepartment,
+          );
+          if (!minorOption) {
+            ctx.errors.push(
+              `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
+            );
+          } else {
+            mapping.minor = this.resolveSem3OfferingSelection(
+              minorOption.paper,
+              'MINOR',
+              subjectCtx,
+            );
+            if (mapping.minor && !mapping.minor.subjectSlug) {
+              mapping.minor.subjectSlug = minorOption.subjectSlug;
+            }
+          }
+        }
+      }
+    }
+
+    if (!mdcPaper) {
+      ctx.errors.push('MDC Paper is required for Semester 2 import.');
+    } else {
+      const resolved = this.sem2Curriculum.resolveCategoryPaper(
+        catalog.mdcPapers,
+        mdcPaper,
+        'MDC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown MDC Paper "${mdcPaper}" for Semester 2. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.mdc = this.resolveSem3OfferingSelection(
+          resolved,
+          'MDC',
+          subjectCtx,
+        );
+      }
+    }
+
+    if (!aecPaper) {
+      ctx.errors.push('AEC Paper is required for Semester 2 import.');
+    } else {
+      const resolved = this.sem2Curriculum.resolveCategoryPaper(
+        catalog.aecPapers,
+        aecPaper,
+        'AEC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown AEC Paper "${aecPaper}" for Semester 2. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.aec = this.resolveSem3OfferingSelection(
+          resolved,
+          'AEC',
+          subjectCtx,
+        );
+      }
+    }
+
+    if (!secPaper) {
+      ctx.errors.push(
+        'Skill Enhancement Course is required for Semester 2 import.',
+      );
+    } else {
+      const resolved = this.sem2Curriculum.resolveCategoryPaper(
+        catalog.secPapers,
+        secPaper,
+        'SEC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown Skill Enhancement Course "${secPaper}" for Semester 2. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.sec = this.resolveSem3OfferingSelection(
+          resolved,
+          'SEC',
+          subjectCtx,
+        );
+      }
+    }
+
+    if (!vacPaper) {
+      ctx.errors.push('VAC Paper is required for Semester 2 import.');
+    } else {
+      const resolved = this.sem2Curriculum.resolveCategoryPaper(
+        catalog.vacPapers,
+        vacPaper,
+        'VAC',
+      );
+      if (!resolved) {
+        ctx.errors.push(
+          `Unknown VAC Paper "${vacPaper}" for Semester 2. Choose from the template dropdown.`,
+        );
+      } else {
+        mapping.vac = this.resolveSem3OfferingSelection(
+          resolved,
+          'VAC',
+          subjectCtx,
+        );
+      }
+    }
+
+    const seen = new Map<string, FyugpCategory>();
+    for (const selection of [
+      mapping.major,
+      mapping.minor,
+      mapping.mdc,
+      mapping.aec,
+      mapping.sec,
+      mapping.vac,
+    ]) {
+      if (!selection) continue;
+      const duplicateKey =
+        selection.courseId ??
+        selection.subjectSlug ??
+        this.normalizeSubjectKey(selection.resolvedLabel);
+      const previous = seen.get(duplicateKey);
+      if (previous) {
+        ctx.errors.push(
+          `Duplicate subject allocation: ${selection.resolvedLabel} is already selected for ${previous}.`,
+        );
+      } else {
+        seen.set(duplicateKey, selection.category);
+      }
+    }
+
+    return mapping;
+  }
+
   private resolveSem5FriendlySelections(
     raw: Record<string, unknown>,
     ctx: {
@@ -2063,8 +2356,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       );
       return mapping;
     }
+    if (!ctx.shiftId) {
+      ctx.errors.push(
+        'Shift is required to resolve Semester 3 paper selections.',
+      );
+      return mapping;
+    }
 
-    const catalog = ctx.sem3Catalogs?.get(ctx.programVersionId);
+    const catalog = ctx.sem3Catalogs?.get(
+      `${ctx.programVersionId}:${ctx.shiftId}`,
+    );
     if (!catalog) {
       ctx.errors.push(
         'Semester 3 curriculum is not configured for the selected programme.',
@@ -2126,11 +2427,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       subjectCtx,
       ctx.errors,
     );
+    const autoAecTitle =
+      catalog.aecPapers.length === 1 ? catalog.aecPapers[0]?.title : undefined;
     this.resolveSem3CategoryPaper(
       mapping,
       'aec',
       'AEC',
-      aecPaper,
+      aecPaper || autoAecTitle,
       catalog.aecPapers,
       subjectCtx,
       ctx.errors,
@@ -2336,24 +2639,55 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return catalogs;
   }
 
+  private async preloadSem2Catalogs(
+    tenantId: string,
+    programVersionIds: string[],
+    shiftIds: string[],
+  ): Promise<Map<string, Sem2ImportCurriculumCatalog>> {
+    const catalogs = new Map<string, Sem2ImportCurriculumCatalog>();
+    const uniqueIds = [...new Set(programVersionIds)];
+    const uniqueShifts = [...new Set(shiftIds)];
+    await Promise.all(
+      uniqueIds.flatMap((programVersionId) =>
+        uniqueShifts.map(async (shiftId) => {
+          try {
+            const catalog = await this.sem2Curriculum.buildCatalog(tenantId, {
+              programVersionId,
+              shiftId,
+            });
+            catalogs.set(`${programVersionId}:${shiftId}`, catalog);
+          } catch {
+            // Programme/shift may not have Sem 2 curriculum yet.
+          }
+        }),
+      ),
+    );
+    return catalogs;
+  }
+
   private async preloadSem3Catalogs(
     tenantId: string,
     programVersionIds: string[],
+    shiftIds: string[],
   ): Promise<Map<string, Sem3ImportCurriculumCatalog>> {
     const catalogs = new Map<string, Sem3ImportCurriculumCatalog>();
     const uniqueIds = [...new Set(programVersionIds)];
+    const uniqueShifts = [...new Set(shiftIds)];
     await Promise.all(
-      uniqueIds.map(async (programVersionId) => {
-        try {
-          const catalog = await this.sem3Curriculum.buildCatalog(tenantId, {
-            programVersionId,
-            semesterSequence: 3,
-          });
-          catalogs.set(programVersionId, catalog);
-        } catch {
-          // Programme may not have Sem 3 curriculum yet — validation will surface per row.
-        }
-      }),
+      uniqueIds.flatMap((programVersionId) =>
+        uniqueShifts.map(async (shiftId) => {
+          try {
+            const catalog = await this.sem3Curriculum.buildCatalog(tenantId, {
+              programVersionId,
+              semesterSequence: 3,
+              shiftId,
+            });
+            catalogs.set(`${programVersionId}:${shiftId}`, catalog);
+          } catch {
+            // Programme/shift may not have Sem 3 curriculum yet.
+          }
+        }),
+      ),
     );
     return catalogs;
   }
@@ -4758,6 +5092,210 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return Buffer.from(buf);
   }
 
+  async buildSem2AdmissionTemplateWorkbook(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    shiftId?: string;
+    academicYearId?: string;
+  }): Promise<Buffer> {
+    let programme = options.programme;
+    let programVersionId = options.programVersionId;
+    if (!programme && !programVersionId) {
+      const programmes = await this.sem2Curriculum.listPublishedProgrammes(
+        options.tenantId,
+      );
+      const fallback =
+        programmes.find((entry) => entry.code.startsWith('BA-')) ??
+        programmes[0];
+      if (!fallback) {
+        throw new BadRequestException(
+          'No published programme found. Publish a programme curriculum before downloading the Semester 2 template.',
+        );
+      }
+      programme = fallback.code;
+      programVersionId = fallback.programVersionId;
+    }
+
+    let shiftId = options.shiftId;
+    if (!shiftId) {
+      const dayShift = await this.prisma.shift.findFirst({
+        where: {
+          tenantId: options.tenantId,
+          code: 'DAY',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      shiftId = dayShift?.id;
+    }
+    if (!shiftId) {
+      throw new BadRequestException(
+        'Shift is required to build the Semester 2 import template.',
+      );
+    }
+
+    const catalog = await this.sem2Curriculum.buildCatalog(options.tenantId, {
+      programme,
+      programVersionId,
+      shiftId,
+      academicYearId: options.academicYearId,
+    });
+    const programmes = await this.sem2Curriculum.listPublishedProgrammes(
+      options.tenantId,
+    );
+    const shifts = await this.prisma.shift.findMany({
+      where: { tenantId: options.tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
+    });
+    const selectedShift =
+      shifts.find((shift) => shift.id === shiftId) ?? shifts[0];
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = [...SEM2_SUBJECT_IMPORT_HEADERS];
+    const sampleMajor =
+      catalog.majorDepartments[0]?.departmentName ?? 'Economics';
+    const sampleMajorKey = this.sem2Curriculum.normalizeLabel(sampleMajor);
+    const sampleMinor = catalog.minorByMajor[sampleMajorKey]?.[0] ?? 'History';
+    const sampleRow = {
+      ...SEM2_SUBJECT_IMPORT_SAMPLE_ROW,
+      Programme: catalog.programCode,
+      Shift: selectedShift?.code ?? 'MORNING',
+      'Current Semester': '2',
+      'Major Department': sampleMajor,
+      'Minor Department': sampleMinor,
+      'MDC Paper': catalog.mdcPapers[0]?.title ?? '',
+      'AEC Paper': catalog.aecPapers[0]?.title ?? '',
+      'Skill Enhancement Course': catalog.secPapers[0]?.title ?? '',
+      'VAC Paper': catalog.vacPapers[0]?.title ?? '',
+    };
+
+    sheet.addRow(headers);
+    sheet.addRow(
+      headers.map(
+        (h) =>
+          SEM2_SUBJECT_IMPORT_HELPERS[h] ??
+          'Optional — stored in student profile when supported',
+      ),
+    );
+    sheet.addRow(
+      headers.map((h) => sampleRow[h as keyof typeof sampleRow] ?? ''),
+    );
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(2).font = { italic: true, color: { argb: 'FF666666' } };
+    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    sheet.columns.forEach((col) => {
+      col.width = 24;
+    });
+
+    const hiddenSheets = [
+      {
+        name: SEM2_HIDDEN_SHEETS.programmes,
+        headers: [
+          'Programme Code',
+          'Programme Name',
+          'Program Version Id',
+          'Curriculum',
+        ],
+        rows: programmes.map((entry) => [
+          entry.code,
+          entry.name,
+          entry.programVersionId,
+          entry.curriculumLabel,
+        ]),
+        hidden: true,
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.shifts,
+        headers: ['Shift Code', 'Shift Name', 'Shift Id'],
+        rows: shifts.map((shift) => [shift.code, shift.name, shift.id]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.majorDepartments,
+        headers: ['Major Department'],
+        rows: catalog.majorDepartments.map((department) => [
+          department.departmentName,
+        ]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.mdcPapers,
+        headers: ['MDC Paper', 'Course Code'],
+        rows: catalog.mdcPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.aecPapers,
+        headers: ['AEC Paper', 'Course Code'],
+        rows: catalog.aecPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.secPapers,
+        headers: ['Skill Enhancement Course', 'Course Code'],
+        rows: catalog.secPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.vacPapers,
+        headers: ['VAC Paper', 'Course Code'],
+        rows: catalog.vacPapers.map((paper) => [paper.title, paper.code]),
+      },
+      {
+        name: SEM2_HIDDEN_SHEETS.minorsByMajor,
+        headers: [
+          'Major Department',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: catalog.majorDepartments.map((major) => {
+          const minors =
+            catalog.minorByMajor[
+              this.sem2Curriculum.normalizeLabel(major.departmentName)
+            ] ?? [];
+          return [major.departmentName, ...minors];
+        }),
+        hidden: true,
+      },
+    ];
+
+    for (const ref of hiddenSheets) {
+      const refSheet = workbook.addWorksheet(ref.name);
+      refSheet.addRow(ref.headers);
+      for (const row of ref.rows) refSheet.addRow(row);
+      refSheet.getRow(1).font = { bold: true };
+      refSheet.columns.forEach((col) => {
+        col.width = 32;
+      });
+      if (ref.hidden) {
+        refSheet.state = 'veryHidden';
+      }
+    }
+
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.addRow(['Column', 'Notes']);
+    for (const header of headers) {
+      instructions.addRow([
+        header,
+        SEM2_SUBJECT_IMPORT_HELPERS[header] ??
+          'Imported when mapped; extra columns are preserved for future profile fields.',
+      ]);
+    }
+    instructions.addRow(['', '']);
+    for (const note of SEM2_STRUCTURE_NOTES) {
+      instructions.addRow(['Structure', note]);
+    }
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns.forEach((col) => {
+      col.width = 36;
+    });
+
+    const buf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buf);
+  }
+
   private applySem1Dropdowns(
     sheet: ExcelJS.Worksheet,
     headers: string[],
@@ -4888,6 +5426,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     programme?: string;
     programVersionId?: string;
     semesterSequence?: number;
+    shiftId?: string;
   }): Promise<Buffer> {
     const semesterSequence = options.semesterSequence ?? 3;
     let programme = options.programme;
@@ -4907,11 +5446,34 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       programme = fallback.code;
       programVersionId = fallback.programVersionId;
     }
+
+    let shiftId = options.shiftId;
+    if (!shiftId) {
+      const morningShift = await this.prisma.shift.findFirst({
+        where: {
+          tenantId: options.tenantId,
+          code: 'MORNING',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      shiftId = morningShift?.id;
+    }
+
     const catalog = await this.sem3Curriculum.buildCatalog(options.tenantId, {
       programme,
       programVersionId,
       semesterSequence,
+      shiftId,
     });
+    const shifts = await this.prisma.shift.findMany({
+      where: { tenantId: options.tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
+    });
+    const selectedShift =
+      shifts.find((shift) => shift.id === shiftId) ?? shifts[0];
     const majorDepartments =
       await this.sem3Curriculum.buildTenantMajorDepartments(
         options.tenantId,
@@ -4927,13 +5489,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const sampleRow = {
       ...SEM3_ADMISSION_SAMPLE_ROW,
       Programme: catalog.programCode,
+      Shift: selectedShift?.code ?? 'MORNING',
       'Current Semester': String(semesterSequence),
       'Major Department':
         catalog.majorDepartments[0]?.departmentName ??
         majorDepartments[0]?.departmentName ??
         'Economics',
       'MDC Paper': catalog.mdcPapers[0]?.title ?? '',
-      'AEC Paper': catalog.aecPapers[0]?.title ?? '',
       'SEC Paper': catalog.secPapers[0]?.title ?? '',
       'VTC Paper': catalog.vtcPapers[0]?.title ?? '',
     };
@@ -4996,11 +5558,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         rows: catalog.mdcPapers.map((paper) => [paper.title, paper.code]),
       },
       {
-        name: SEM3_HIDDEN_SHEETS.aecPapers,
-        headers: ['AEC Paper', 'Course Code'],
-        rows: catalog.aecPapers.map((paper) => [paper.title, paper.code]),
-      },
-      {
         name: SEM3_HIDDEN_SHEETS.secPapers,
         headers: ['SEC Paper', 'Course Code'],
         rows: catalog.secPapers.map((paper) => [paper.title, paper.code]),
@@ -5031,6 +5588,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     curriculumInfo.addRow(['Programme Name', catalog.programName]);
     curriculumInfo.addRow(['Semester', catalog.semesterSequence]);
     curriculumInfo.addRow(['Program Version Id', catalog.programVersionId]);
+    curriculumInfo.addRow([
+      'Auto AEC',
+      catalog.aecPapers[0]
+        ? `${catalog.aecPapers[0].code} — ${catalog.aecPapers[0].title}`
+        : 'Not configured',
+    ]);
     curriculumInfo.addRow(['Generated At', new Date().toISOString()]);
     curriculumInfo.getRow(1).font = { bold: true };
     curriculumInfo.columns.forEach((col) => {
@@ -5386,7 +5949,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           column: 'A',
         },
         'MDC Paper': { refName: SEM3_HIDDEN_SHEETS.mdcPapers, column: 'A' },
-        'AEC Paper': { refName: SEM3_HIDDEN_SHEETS.aecPapers, column: 'A' },
         'SEC Paper': { refName: SEM3_HIDDEN_SHEETS.secPapers, column: 'A' },
         'VTC Paper': { refName: SEM3_HIDDEN_SHEETS.vtcPapers, column: 'A' },
       };

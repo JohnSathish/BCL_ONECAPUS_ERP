@@ -1,10 +1,20 @@
 import type { PrismaClient } from '@prisma/client';
 import { readCatalogSeedExclusions } from '../src/common/services/catalog-seed-exclusions.util';
 import {
+  buildArtsFyugpEvenCourses,
+  buildArtsFyugpSem2MinorCourseDefs,
+} from '../src/modules/academic-engine/domain/arts-fyugp-even-catalog';
+import { buildDbcMorningSem3VtcCourses } from '../src/modules/academic-engine/domain/dbc-morning-sem3-catalog';
+import {
   ARTS_FYUGP_DEPARTMENTS,
   buildArtsFyugpOddCourses,
+  buildArtsFyugpSem5MinorCourseDefs,
   type ArtsFyugpCourseDef,
 } from '../src/modules/academic-engine/domain/arts-fyugp-odd-catalog';
+import { FYUGP_SEM2_PROGRAM_DEPARTMENTS } from '../src/modules/academic-engine/domain/fyugp-sem2-departments';
+import { DEFAULT_FYUGP_SEMESTER_RULES } from '../src/modules/academic-engine/domain/fyugp-templates';
+import { upsertSemesterStructureRules } from '../src/modules/academic-engine/services/structure-rules.helper';
+import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
 
 export type SeedArtsFyugpCatalogContext = {
   prisma: PrismaClient;
@@ -14,6 +24,16 @@ export type SeedArtsFyugpCatalogContext = {
   shifts: Record<string, { id: string }>;
   createdById?: string;
 };
+
+const PROMOTION_PAIRS = [
+  { fromSequence: 1, toSequence: 2 },
+  { fromSequence: 2, toSequence: 3 },
+  { fromSequence: 3, toSequence: 4 },
+  { fromSequence: 4, toSequence: 5 },
+  { fromSequence: 5, toSequence: 6 },
+  { fromSequence: 6, toSequence: 7 },
+  { fromSequence: 7, toSequence: 8 },
+] as const;
 
 export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const {
@@ -25,6 +45,7 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     createdById,
   } = ctx;
   const dayShiftId = shifts.DAY?.id;
+  const morningShiftId = shifts.MORNING?.id;
   if (!dayShiftId) {
     throw new Error('Day shift required for Arts FYUGP catalog seed');
   }
@@ -46,7 +67,7 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
 
   const programVersions = new Map<string, { id: string; programId: string }>();
 
-  for (const dept of ARTS_FYUGP_DEPARTMENTS) {
+  for (const dept of FYUGP_SEM2_PROGRAM_DEPARTMENTS) {
     const departmentId = departmentIdByCode.get(dept.code);
     if (!departmentId) {
       console.warn(`Arts seed skip: department ${dept.code} not found`);
@@ -94,9 +115,12 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   }
 
   const courseByCode = new Map<string, string>();
-  const courses = buildArtsFyugpOddCourses();
+  const oddCourses = buildArtsFyugpOddCourses();
+  const evenCourses = buildArtsFyugpEvenCourses();
+  const sem3VtcCourses = buildDbcMorningSem3VtcCourses();
+  const allCourses = [...oddCourses, ...evenCourses, ...sem3VtcCourses];
 
-  for (const courseDef of courses) {
+  for (const courseDef of allCourses) {
     if (seedExclusions.excludedCourseCodes.has(courseDef.code)) {
       console.log(`Arts seed skip (removed course): ${courseDef.code}`);
       continue;
@@ -110,7 +134,11 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     courseByCode.set(courseDef.code, courseId);
   }
 
-  for (const courseDef of courses) {
+  const shiftIdsForSections = [dayShiftId, morningShiftId].filter(
+    Boolean,
+  ) as string[];
+
+  for (const courseDef of oddCourses) {
     if (courseDef.sharedPool) continue;
     const programCode = courseDef.programCode;
     if (!programCode) continue;
@@ -123,16 +151,86 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
       courseByCode.get(courseDef.code)!,
       courseDef,
       semesterBySeq,
-      dayShiftId,
+      shiftIdsForSections,
     );
   }
 
-  // Shared category pools (MDC/AEC/SEC/VAC/VTC) are managed via seedCategoryPools
-  // and the Programs UI — not bulk-populated from the Arts catalog seed.
+  for (const [programCode, version] of programVersions) {
+    const sem2Major = evenCourses.find(
+      (c) => c.programCode === programCode && c.category === 'MAJOR',
+    );
+    if (sem2Major && courseByCode.has(sem2Major.code)) {
+      await upsertDirectOffering(
+        prisma,
+        tenantId,
+        version.id,
+        courseByCode.get(sem2Major.code)!,
+        sem2Major,
+        semesterBySeq,
+        shiftIdsForSections,
+      );
+    }
+
+    for (const minorDef of buildArtsFyugpSem2MinorCourseDefs(programCode)) {
+      const courseId = courseByCode.get(minorDef.code);
+      if (!courseId) continue;
+      await upsertDirectOffering(
+        prisma,
+        tenantId,
+        version.id,
+        courseId,
+        minorDef,
+        semesterBySeq,
+        shiftIdsForSections,
+      );
+    }
+
+    for (const minorDef of buildArtsFyugpSem5MinorCourseDefs(programCode)) {
+      const courseId = courseByCode.get(minorDef.code);
+      if (!courseId) continue;
+      await upsertDirectOffering(
+        prisma,
+        tenantId,
+        version.id,
+        courseId,
+        minorDef,
+        semesterBySeq,
+        shiftIdsForSections,
+      );
+    }
+
+    await upsertSemesterStructureRules(
+      prisma,
+      tenantId,
+      version.id,
+      DEFAULT_FYUGP_SEMESTER_RULES,
+    );
+
+    await prisma.programVersion.updateMany({
+      where: { id: version.id, tenantId },
+      data: { status: 'PUBLISHED', publishedAt: new Date() },
+    });
+  }
+
+  let promotionMappings = 0;
+  for (const version of programVersions.values()) {
+    const result = await syncProgramPromotionMappings(
+      prisma,
+      tenantId,
+      version.id,
+      [...PROMOTION_PAIRS],
+    );
+    promotionMappings += result.created;
+  }
 
   console.log(
-    `Arts FYUGP ODD catalog seeded: ${courses.length} courses, ${programVersions.size} BA programmes`,
+    `Arts FYUGP catalog seeded: ${oddCourses.length} ODD + ${evenCourses.length} EVEN courses, ${programVersions.size} FYUGP programmes (BA/B.Sc./B.Com.), ${promotionMappings} promotion mappings`,
   );
+
+  return {
+    programVersionIds: [...programVersions.values()].map((v) => v.id),
+    programVersions,
+  };
 }
 
 async function upsertArtsCourse(
@@ -193,10 +291,9 @@ async function upsertArtsCourse(
   }
 
   if (existing) {
-    // Never overwrite titles on seed replay — college catalog names are authoritative.
     const course = await prisma.course.update({
       where: { id: existing.id },
-      data: { ...data, title: existing.title },
+      data: { ...data, title },
     });
     return course.id;
   }
@@ -220,7 +317,7 @@ async function upsertDirectOffering(
   courseId: string,
   courseDef: ArtsFyugpCourseDef,
   semesterBySeq: Record<number, { id: string }>,
-  dayShiftId: string,
+  shiftIds: string[],
 ) {
   const existingOff = await prisma.courseOffering.findFirst({
     where: {
@@ -230,6 +327,7 @@ async function upsertDirectOffering(
       semesterSequence: courseDef.semesterSequence,
       deletedAt: null,
       mappingSource: 'DIRECT',
+      category: courseDef.category,
     },
   });
 
@@ -250,30 +348,32 @@ async function upsertDirectOffering(
       },
     }));
 
-  let section = await prisma.offeringSection.findFirst({
-    where: {
-      courseOfferingId: offering.id,
-      shiftId: dayShiftId,
-      sectionCode: 'A',
-    },
-  });
-  if (!section) {
-    section = await prisma.offeringSection.create({
-      data: {
-        tenantId,
+  for (const shiftId of shiftIds) {
+    let section = await prisma.offeringSection.findFirst({
+      where: {
         courseOfferingId: offering.id,
-        shiftId: dayShiftId,
+        shiftId,
         sectionCode: 'A',
-        capacity: 80,
-        waitlistCapacity: 20,
-        status: 'active',
+        deletedAt: null,
       },
     });
+    if (!section) {
+      section = await prisma.offeringSection.create({
+        data: {
+          tenantId,
+          courseOfferingId: offering.id,
+          shiftId,
+          sectionCode: 'A',
+          capacity: 80,
+          waitlistCapacity: 20,
+          status: 'active',
+        },
+      });
+    }
+    await prisma.offeringSeatLedger.upsert({
+      where: { offeringSectionId: section.id },
+      create: { tenantId, offeringSectionId: section.id },
+      update: {},
+    });
   }
-
-  await prisma.offeringSeatLedger.upsert({
-    where: { offeringSectionId: section.id },
-    create: { tenantId, offeringSectionId: section.id },
-    update: {},
-  });
 }

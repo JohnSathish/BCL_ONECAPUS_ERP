@@ -11,6 +11,7 @@ const CHIP_COLORS: Record<string, string> = {
   AEC: 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300',
   SEC: 'border-rose-500/30 bg-rose-500/10 text-rose-800 dark:text-rose-300',
   VAC: 'border-teal-500/30 bg-teal-500/10 text-teal-800 dark:text-teal-300',
+  VTC: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-800 dark:text-indigo-300',
 };
 
 export function AcademicSnapshotWidget({

@@ -19,6 +19,7 @@ export type AuthUserPayload = {
   impersonatedBy?: string;
   impersonationSessionId?: string;
   isImpersonating?: boolean;
+  mustResetPassword?: boolean;
 };
 
 export type AuthSessionResponse = {

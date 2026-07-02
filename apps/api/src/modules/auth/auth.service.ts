@@ -314,9 +314,116 @@ export class AuthService {
     return session;
   }
 
+  private async resolveLoginUser(tenantId: string, loginId: string) {
+    const include = {
+      roles: {
+        where: { deletedAt: null },
+        include: { role: true },
+      },
+    } as const;
+
+    const trimmed = loginId.trim();
+    if (trimmed.includes('@')) {
+      return this.prisma.user.findFirst({
+        where: {
+          tenantId,
+          email: trimmed.toLowerCase(),
+          deletedAt: null,
+          isActive: true,
+        },
+        include,
+      });
+    }
+
+    const key = trimmed.toUpperCase();
+    const student = await this.prisma.student.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { rollNumber: { equals: trimmed, mode: 'insensitive' } },
+          { enrollmentNumber: { equals: trimmed, mode: 'insensitive' } },
+          { universityRollNumber: { equals: trimmed, mode: 'insensitive' } },
+          {
+            universityRegistrationNumber: {
+              equals: trimmed,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+      select: { userId: true },
+    });
+    if (student?.userId) {
+      return this.prisma.user.findFirst({
+        where: {
+          id: student.userId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        include,
+      });
+    }
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { employeeCode: { equals: key, mode: 'insensitive' } },
+          { mobile: trimmed },
+          { email: { equals: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      select: { portalUserId: true },
+    });
+    if (staff?.portalUserId) {
+      const staffUser = await this.prisma.user.findFirst({
+        where: {
+          id: staff.portalUserId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        include,
+      });
+      if (staffUser) return staffUser;
+    }
+
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: {
+        tenantId,
+        mobileNumber: trimmed,
+      },
+      select: { student: { select: { userId: true } } },
+    });
+    if (profile?.student?.userId) {
+      return this.prisma.user.findFirst({
+        where: {
+          id: profile.student.userId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        include,
+      });
+    }
+
+    return this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        email: trimmed.toLowerCase(),
+        deletedAt: null,
+        isActive: true,
+      },
+      include,
+    });
+  }
+
   async login(
     tenantId: string,
-    email: string,
+    loginId: string,
     password: string,
     challengeToken: string,
     challengeAnswer: number,
@@ -333,7 +440,10 @@ export class AuthService {
     rememberMe?: boolean,
   ): Promise<AuthSessionResponse> {
     const ip = meta?.ipAddress ?? 'unknown';
-    const normalizedEmail = email.trim().toLowerCase();
+    const trimmed = loginId.trim();
+    const normalizedEmail = trimmed.includes('@')
+      ? trimmed.toLowerCase()
+      : trimmed;
     await this.loginAttempts.assertNotLocked(tenantId, ip, normalizedEmail);
 
     if (!this.challenge.verify(challengeToken, challengeAnswer)) {
@@ -347,20 +457,7 @@ export class AuthService {
     });
     if (!tenant) throw new UnauthorizedException('Invalid credentials');
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        tenantId: tenant.id,
-        email: normalizedEmail,
-        deletedAt: null,
-        isActive: true,
-      },
-      include: {
-        roles: {
-          where: { deletedAt: null },
-          include: { role: true },
-        },
-      },
-    });
+    const user = await this.resolveLoginUser(tenant.id, trimmed);
     if (!user) {
       await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
       throw new UnauthorizedException('Invalid credentials');
@@ -439,7 +536,13 @@ export class AuthService {
       },
     });
 
-    return session;
+    return {
+      ...session,
+      user: {
+        ...session.user,
+        mustResetPassword: user.mustResetPassword ?? false,
+      },
+    };
   }
 
   async refresh(
@@ -657,7 +760,11 @@ export class AuthService {
     const rules = await this.passwordPolicy.getRules(user.tenantId);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, passwordChangedAt: new Date() },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        mustResetPassword: false,
+      },
     });
     await this.passwordPolicy.recordHistory(
       userId,

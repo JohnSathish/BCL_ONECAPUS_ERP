@@ -369,6 +369,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     prefix: '/admin/academics/teaching-subject-groups',
     permissions: [...MODULE_PERMISSIONS.timetable],
   },
+  {
+    prefix: '/admin/academics/shift-faculty',
+    permissions: ['shift:read'],
+  },
   { prefix: '/admin/academics/lms', permissions: [...MODULE_PERMISSIONS.lms] },
   { prefix: '/admin/academics/question-bank', permissions: [...MODULE_PERMISSIONS.questionBank] },
   { prefix: '/admin/academics/attendance', permissions: [...MODULE_PERMISSIONS.studentAttendance] },

@@ -39,11 +39,13 @@ import {
   downloadStudentImportTemplate,
   downloadFullAdmissionImportTemplate,
   downloadSem1AdmissionTemplate,
+  downloadSem2AdmissionTemplate,
   downloadSem3AdmissionTemplate,
   downloadSem5AdmissionTemplate,
   fetchSem1EligibleMinors,
   fetchSem1ImportCurriculum,
   fetchSem1ImportProgrammes,
+  fetchSem2ImportProgrammes,
   fetchSem3ImportProgrammes,
   fetchSem5EligibleMinors,
   fetchSem5ImportCurriculum,
@@ -62,6 +64,7 @@ import {
   type Sem5ImportProgrammeOption,
 } from '@/services/students';
 import { fetchAcademicYears } from '@/services/organization';
+import { fetchShifts } from '@/services/academic-engine';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -80,11 +83,11 @@ type AdvancedSettings = {
 
 type Props = {
   canImport: boolean;
-  focusSemester?: 1 | 3 | 5;
+  focusSemester?: 1 | 2 | 3 | 5;
 };
 
 const FOCUS_SEMESTER_COPY: Record<
-  1 | 3 | 5,
+  1 | 2 | 3 | 5,
   { title: string; description: string; templateLabel: string }
 > = {
   1: {
@@ -92,6 +95,12 @@ const FOCUS_SEMESTER_COPY: Record<
     description:
       'Import newly admitted Semester 1 students. Select departments and paper names only — VAC Environment Studies is registered automatically.',
     templateLabel: 'Sem 1 Template',
+  },
+  2: {
+    title: 'Semester 2 Subject Import',
+    description:
+      'Import Semester 2 students using department names and shift-specific paper titles. Major/minor departments carry forward; pool papers are chosen by title.',
+    templateLabel: 'Sem 2 Template',
   },
   3: {
     title: 'Semester 3 Subject Import',
@@ -133,8 +142,13 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const [sem1AcademicYearId, setSem1AcademicYearId] = useState('');
   const [sem1PreviewMajor, setSem1PreviewMajor] = useState('');
   const [sem1Downloading, setSem1Downloading] = useState(false);
+  const [sem2DialogOpen, setSem2DialogOpen] = useState(false);
+  const [sem2Programme, setSem2Programme] = useState('');
+  const [sem2ShiftId, setSem2ShiftId] = useState('');
+  const [sem2Downloading, setSem2Downloading] = useState(false);
   const [sem3DialogOpen, setSem3DialogOpen] = useState(false);
   const [sem3Programme, setSem3Programme] = useState('');
+  const [sem3ShiftId, setSem3ShiftId] = useState('');
   const [sem3Downloading, setSem3Downloading] = useState(false);
   const [sem5DialogOpen, setSem5DialogOpen] = useState(false);
   const [sem5Programme, setSem5Programme] = useState('');
@@ -166,9 +180,27 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     enabled: canImport && sem1DialogOpen,
   });
 
+  const sem2ProgrammesQ = useQuery({
+    queryKey: ['sem2-import-programmes'],
+    queryFn: fetchSem2ImportProgrammes,
+    enabled: canImport && sem2DialogOpen,
+  });
+
+  const sem2ShiftsQ = useQuery({
+    queryKey: ['sem2-import-shifts'],
+    queryFn: fetchShifts,
+    enabled: canImport && sem2DialogOpen,
+  });
+
   const sem3ProgrammesQ = useQuery({
     queryKey: ['sem3-import-programmes'],
     queryFn: fetchSem3ImportProgrammes,
+    enabled: canImport && sem3DialogOpen,
+  });
+
+  const sem3ShiftsQ = useQuery({
+    queryKey: ['sem3-import-shifts'],
+    queryFn: fetchShifts,
     enabled: canImport && sem3DialogOpen,
   });
 
@@ -424,12 +456,42 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     }
   };
 
-  const downloadSem3Template = async (programme?: string) => {
+  const downloadSem2Template = async (programme?: string, shiftId?: string) => {
+    setSem2Downloading(true);
+    try {
+      const resolvedShiftId =
+        shiftId ||
+        sem2ShiftsQ.data?.find((shift) => shift.code === 'DAY')?.id ||
+        sem2ShiftsQ.data?.[0]?.id;
+      const blob = await downloadSem2AdmissionTemplate({
+        programme: programme || undefined,
+        shiftId: resolvedShiftId,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = programme
+        ? `Sem2_${programme.replace(/[^A-Z0-9-]+/gi, '_')}_Import_Template.xlsx`
+        : 'Sem2_Admission_Import_Template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+      setSem2DialogOpen(false);
+    } finally {
+      setSem2Downloading(false);
+    }
+  };
+
+  const downloadSem3Template = async (programme?: string, shiftId?: string) => {
     setSem3Downloading(true);
     try {
+      const resolvedShiftId =
+        shiftId ||
+        sem3ShiftsQ.data?.find((shift) => shift.code === 'MORNING')?.id ||
+        sem3ShiftsQ.data?.[0]?.id;
       const blob = await downloadSem3AdmissionTemplate({
         programme: programme || undefined,
         semesterSequence: 3,
+        shiftId: resolvedShiftId,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -552,6 +614,21 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
                 }}
               >
                 {focusSemester === 1 ? 'Generate Sem 1 Template' : 'Sem 1 Template'}
+              </BulkActionButton>
+            ) : null}
+            {!focusSemester || focusSemester === 2 ? (
+              <BulkActionButton
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  setSem2DialogOpen(true);
+                  setSem2Programme('');
+                  setSem2ShiftId('');
+                }}
+              >
+                {focusSemester === 2 ? 'Generate Sem 2 Template' : 'Sem 2 Template'}
               </BulkActionButton>
             ) : null}
             {!focusSemester || focusSemester === 3 ? (
@@ -907,15 +984,36 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
         />
       ) : null}
 
+      {sem2DialogOpen ? (
+        <Sem2TemplateDialog
+          programmes={sem2ProgrammesQ.data ?? []}
+          shifts={sem2ShiftsQ.data ?? []}
+          loading={sem2ProgrammesQ.isLoading || sem2ShiftsQ.isLoading}
+          downloading={sem2Downloading}
+          selectedProgramme={sem2Programme}
+          selectedShiftId={sem2ShiftId}
+          onSelectProgramme={setSem2Programme}
+          onSelectShiftId={setSem2ShiftId}
+          onClose={() => setSem2DialogOpen(false)}
+          onDownload={() =>
+            void downloadSem2Template(sem2Programme || undefined, sem2ShiftId || undefined)
+          }
+        />
+      ) : null}
       {sem3DialogOpen ? (
         <Sem3TemplateDialog
           programmes={sem3ProgrammesQ.data ?? []}
-          loading={sem3ProgrammesQ.isLoading}
+          shifts={sem3ShiftsQ.data ?? []}
+          loading={sem3ProgrammesQ.isLoading || sem3ShiftsQ.isLoading}
           downloading={sem3Downloading}
           selectedProgramme={sem3Programme}
+          selectedShiftId={sem3ShiftId}
           onSelectProgramme={setSem3Programme}
+          onSelectShiftId={setSem3ShiftId}
           onClose={() => setSem3DialogOpen(false)}
-          onDownload={() => void downloadSem3Template(sem3Programme || undefined)}
+          onDownload={() =>
+            void downloadSem3Template(sem3Programme || undefined, sem3ShiftId || undefined)
+          }
         />
       ) : null}
 
@@ -1697,30 +1795,118 @@ function Sem5TemplateDialog({
   );
 }
 
-function Sem3TemplateDialog({
+function Sem2TemplateDialog({
   programmes,
+  shifts,
   loading,
   downloading,
   selectedProgramme,
+  selectedShiftId,
   onSelectProgramme,
+  onSelectShiftId,
   onClose,
   onDownload,
 }: {
   programmes: { code: string; name: string }[];
+  shifts: { id: string; code: string; name: string }[];
   loading: boolean;
   downloading: boolean;
   selectedProgramme: string;
+  selectedShiftId: string;
   onSelectProgramme: (value: string) => void;
+  onSelectShiftId: (value: string) => void;
   onClose: () => void;
   onDownload: () => void;
 }) {
+  const defaultShiftId =
+    selectedShiftId || shifts.find((shift) => shift.code === 'DAY')?.id || shifts[0]?.id || '';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <section className="w-full max-w-md rounded-3xl border border-border/60 bg-card p-5 shadow-2xl">
+        <h2 className="text-lg font-semibold">Download Semester 2 Template</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Choose programme and shift. The Excel lists Semester 2 paper titles for that shift only —
+          major and minor use department names.
+        </p>
+        <label className="mt-4 block text-sm font-medium">
+          Programme
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={selectedProgramme}
+            onChange={(event) => onSelectProgramme(event.target.value)}
+            disabled={loading}
+          >
+            <option value="">Default (first published programme)</option>
+            {programmes.map((programme) => (
+              <option key={programme.code} value={programme.code}>
+                {programme.code} — {programme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="mt-3 block text-sm font-medium">
+          Shift
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={defaultShiftId}
+            onChange={(event) => onSelectShiftId(event.target.value)}
+            disabled={loading}
+          >
+            {shifts.map((shift) => (
+              <option key={shift.id} value={shift.id}>
+                {shift.code} — {shift.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onDownload} disabled={downloading || loading}>
+            {downloading ? 'Generating…' : 'Download template'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Sem3TemplateDialog({
+  programmes,
+  shifts,
+  loading,
+  downloading,
+  selectedProgramme,
+  selectedShiftId,
+  onSelectProgramme,
+  onSelectShiftId,
+  onClose,
+  onDownload,
+}: {
+  programmes: { code: string; name: string }[];
+  shifts: { id: string; code: string; name: string }[];
+  loading: boolean;
+  downloading: boolean;
+  selectedProgramme: string;
+  selectedShiftId: string;
+  onSelectProgramme: (value: string) => void;
+  onSelectShiftId: (value: string) => void;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  const defaultShiftId =
+    selectedShiftId || shifts.find((shift) => shift.code === 'MORNING')?.id || shifts[0]?.id || '';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <section className="w-full max-w-md rounded-3xl border border-border/60 bg-card p-5 shadow-2xl">
         <h2 className="text-lg font-semibold">Download Semester 3 Template</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Choose the curriculum programme. The Excel will contain Semester 3 paper names only — no
-          course codes. Major Paper 1 and 2 are assigned automatically from Major Department.
+          Choose programme and shift. The Excel lists Semester 3 MDC, SEC, and VTC papers for that
+          shift only. Major Paper 1 and 2 are assigned automatically from Major Department. AEC-222
+          is auto-assigned for Morning Shift.
         </p>
         <label className="mt-4 block text-sm font-medium">
           Programme
@@ -1734,6 +1920,21 @@ function Sem3TemplateDialog({
             {programmes.map((programme) => (
               <option key={programme.code} value={programme.code}>
                 {programme.code} — {programme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="mt-3 block text-sm font-medium">
+          Shift
+          <select
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            value={defaultShiftId}
+            onChange={(event) => onSelectShiftId(event.target.value)}
+            disabled={loading}
+          >
+            {shifts.map((shift) => (
+              <option key={shift.id} value={shift.id}>
+                {shift.code} — {shift.name}
               </option>
             ))}
           </select>
@@ -1793,7 +1994,7 @@ function TemplateAssistantPanel({ open, onToggle }: { open: boolean; onToggle: (
               <p className="mb-1 font-semibold">NEP paper columns (Sem 3)</p>
               {[
                 'Major Department — ERP assigns both major papers',
-                'MDC Paper / AEC Paper / SEC Paper / VTC Paper',
+                'MDC Paper / SEC Paper / VTC Paper — AEC auto-assigned',
                 'No Minor or VAC columns in Semester 3',
                 'Current Semester = 3',
                 'Select names from dropdowns — never enter course codes',

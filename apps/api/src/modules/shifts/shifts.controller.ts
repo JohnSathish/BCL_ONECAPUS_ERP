@@ -43,8 +43,14 @@ export class ShiftsController {
     @Query('campusId') campusId?: string,
     @Query('institutionId') institutionId?: string,
     @Query('status') status?: string,
+    @Query('includeInactive') includeInactive?: string,
   ) {
-    return this.shifts.list(user.tid, { campusId, institutionId, status });
+    return this.shifts.list(user.tid, {
+      campusId,
+      institutionId,
+      status,
+      includeInactive: includeInactive === 'true',
+    });
   }
 
   @Get('operations/summary')

@@ -116,7 +116,29 @@ export function normalizeCourseEligibilityRules(
     priorStudyExclusions: normalizePriorStudyExclusions(
       input.priorStudyExclusions as CourseEligibilityRules['priorStudyExclusions'],
     ),
+    excludedWhenMajorAndClass12: normalizeMajorClass12Exclusions(
+      input.excludedWhenMajorAndClass12 as CourseEligibilityRules['excludedWhenMajorAndClass12'],
+    ),
+    excludedMinorSubjectSlugs: uniqueSlugs(
+      input.excludedMinorSubjectSlugs as string[] | undefined,
+    ),
   };
+}
+
+function normalizeMajorClass12Exclusions(
+  rows: CourseEligibilityRules['excludedWhenMajorAndClass12'],
+) {
+  if (!rows?.length) return [];
+  return rows
+    .map((row) => ({
+      majorSubjectSlug: slugifySubject(row.majorSubjectSlug ?? ''),
+      class12SubjectSlug: slugifySubject(row.class12SubjectSlug ?? ''),
+      label: row.label?.trim() || undefined,
+    }))
+    .filter(
+      (row) =>
+        row.majorSubjectSlug.length > 0 && row.class12SubjectSlug.length > 0,
+    );
 }
 
 export function isRulesEmpty(rules: CourseEligibilityRules): boolean {
@@ -130,7 +152,9 @@ export function isRulesEmpty(rules: CourseEligibilityRules): boolean {
     !rules.allowedMajorSubjectSlugs?.length &&
     !rules.excludedMajorSubjectSlugs?.length &&
     !rules.class12SubjectExclusions?.length &&
-    !rules.priorStudyExclusions?.length
+    !rules.priorStudyExclusions?.length &&
+    !rules.excludedWhenMajorAndClass12?.length &&
+    !rules.excludedMinorSubjectSlugs?.length
   );
 }
 
@@ -156,6 +180,10 @@ export function formatEligibilityReason(code: string, detail?: string): string {
       return detail ?? 'Excluded due to Class XII subject background';
     case 'PRIOR_STUDY_EXCLUDED':
       return detail ?? 'Excluded due to prior study';
+    case 'MINOR_EXCLUDED':
+      return detail ?? 'Student minor subject is excluded';
+    case 'MAJOR_CLASS12_EXCLUDED':
+      return detail ?? 'Excluded due to major and Class XII background';
     default:
       return detail ?? 'Not eligible for this course';
   }
@@ -259,6 +287,44 @@ function passesMajor(
   return null;
 }
 
+function passesMinor(
+  rules: CourseEligibilityRules,
+  ctx: StudentEligibilityContext,
+): Pick<CourseEligibilityResult, 'eligible' | 'reasons' | 'codes'> | null {
+  const minor = normalizeSlug(ctx.minorSubjectSlug);
+  if (minor && rules.excludedMinorSubjectSlugs?.includes(minor)) {
+    return fail(
+      'MINOR_EXCLUDED',
+      `Students with ${minor} minor cannot take this course`,
+    );
+  }
+  return null;
+}
+
+function passesMajorAndClass12(
+  rules: CourseEligibilityRules,
+  ctx: StudentEligibilityContext,
+): Pick<CourseEligibilityResult, 'eligible' | 'reasons' | 'codes'> | null {
+  const rows = rules.excludedWhenMajorAndClass12;
+  if (!rows?.length) return null;
+
+  const major = normalizeSlug(ctx.majorSubjectSlug);
+  const class12Slugs = class12SubjectSlugs(ctx.class12Subjects);
+  for (const row of rows) {
+    if (
+      major === row.majorSubjectSlug &&
+      class12Slugs.has(row.class12SubjectSlug)
+    ) {
+      const label = row.label ?? row.majorSubjectSlug;
+      return fail(
+        'MAJOR_CLASS12_EXCLUDED',
+        `Excluded for ${label} major with Class XII ${label}`,
+      );
+    }
+  }
+  return null;
+}
+
 function passesClass12(
   rules: CourseEligibilityRules,
   ctx: StudentEligibilityContext,
@@ -328,6 +394,8 @@ export function evaluateCourseEligibility(
     passesStream(rules, ctx),
     passesProgramme(rules, ctx),
     passesMajor(rules, ctx),
+    passesMinor(rules, ctx),
+    passesMajorAndClass12(rules, ctx),
     passesClass12(rules, ctx),
     passesPriorStudy(rules, ctx),
   ];

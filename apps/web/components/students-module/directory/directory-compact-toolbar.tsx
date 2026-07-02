@@ -124,6 +124,7 @@ type Props = {
   onExport: () => void;
   onExportSelected?: () => void;
   exportPending?: boolean;
+  hideShiftFilter?: boolean;
 };
 
 export function DirectoryCompactToolbar({
@@ -150,6 +151,7 @@ export function DirectoryCompactToolbar({
   onExport,
   onExportSelected,
   exportPending,
+  hideShiftFilter = false,
 }: Props) {
   const advancedFilterCount = countActiveFilters({
     ...filters,
@@ -206,12 +208,14 @@ export function DirectoryCompactToolbar({
             options={SEMESTER_OPTIONS}
             onChange={(v) => onFilterChange({ semester: v })}
           />
-          <FilterPill
-            label="Shift"
-            value={filters.shiftId}
-            options={shiftOptions}
-            onChange={(v) => onFilterChange({ shiftId: v })}
-          />
+          {!hideShiftFilter ? (
+            <FilterPill
+              label="Shift"
+              value={filters.shiftId}
+              options={shiftOptions}
+              onChange={(v) => onFilterChange({ shiftId: v })}
+            />
+          ) : null}
           <FilterPill
             label="Department"
             value={filters.departmentId}

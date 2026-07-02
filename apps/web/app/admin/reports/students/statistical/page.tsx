@@ -1,18 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { BarChartWidget } from '@/components/analytics/charts/bar-chart-widget';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { fetchStudentReportDashboard } from '@/services/student-reports';
@@ -20,8 +19,7 @@ import { fetchStudentReportDashboard } from '@/services/student-reports';
 export default function StatisticalReportsPage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
-  const [filters, setFilters] = useState(emptyReportFilters);
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const filterOptions = useStudentReportFilterOptions();
 
   const dashboard = useQuery({
@@ -42,7 +40,8 @@ export default function StatisticalReportsPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           {...filterOptions}
         />
 

@@ -8,13 +8,12 @@ import { Download, Play, Star, Trash2 } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import {
   deleteSavedReport,
   exportSavedReport,
@@ -22,7 +21,6 @@ import {
   previewSavedReport,
   toggleSavedReportFavorite,
   type SavedReport,
-  type StudentReportFilters,
 } from '@/services/student-reports';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -42,12 +40,11 @@ function reportHref(report: SavedReport) {
 }
 
 export default function SavedReportsPage() {
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const filterOptions = useStudentReportFilterOptions();
   const queryClient = useQueryClient();
-  const apiFilters = toApiFilters(filters) as StudentReportFilters;
 
   const savedQuery = useQuery({
     queryKey: ['saved-reports'],
@@ -99,7 +96,8 @@ export default function SavedReportsPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           extended
           {...filterOptions}
         />

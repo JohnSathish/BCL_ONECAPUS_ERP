@@ -280,6 +280,7 @@ export type FeeFinanceSettings = {
   availablePaymentMethods?: Array<{ key: CollectionModeKey; label: string }>;
   studentPortal?: {
     onlineEnabled: boolean;
+    mobileRazorpayEnabled?: boolean;
     officePaymentEnabled: boolean;
     officeMethods: string[];
     showPayAtOffice: boolean;

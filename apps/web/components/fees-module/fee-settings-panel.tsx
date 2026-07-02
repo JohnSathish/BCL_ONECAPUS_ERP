@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
 const COLLECTION_MODE_ROWS: Array<{ key: CollectionModeKey; hint?: string }> = [
-  { key: 'gateway', hint: 'Razorpay / student portal online pay' },
+  { key: 'gateway', hint: 'Razorpay — student web portal & mobile (when mobile toggle is on)' },
   { key: 'upi_qr', hint: 'Dynamic UPI QR at fee desk' },
   { key: 'sbi_icollect', hint: 'External entry — SBI iCollect' },
   { key: 'bank_transfer', hint: 'External entry — NEFT / RTGS / UPI ref' },
@@ -156,6 +156,19 @@ export function FeeSettingsPanel() {
               onCheckedChange={(v) =>
                 saveMut.mutate({ metadata: { allowAdvanceMonthlyPayment: v } })
               }
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>Razorpay on mobile app</Label>
+              <p className="text-xs text-muted-foreground">
+                Controls Pay now in the BCL OneCampus student app (EAS / Play Store build). Requires
+                Online Gateway enabled and Razorpay keys on the API server.
+              </p>
+            </div>
+            <Switch
+              checked={s.studentPortal?.mobileRazorpayEnabled !== false}
+              onCheckedChange={(v) => saveMut.mutate({ metadata: { mobileRazorpayEnabled: v } })}
             />
           </div>
           <p className="text-xs text-muted-foreground">

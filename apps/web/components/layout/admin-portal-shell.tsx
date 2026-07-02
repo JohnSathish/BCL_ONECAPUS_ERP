@@ -2,6 +2,7 @@
 
 import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
+import { WorkspaceThemeEffect } from '@/components/layout/workspace-theme-effect';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
 
@@ -11,6 +12,7 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full max-w-full overflow-hidden bg-background">
+      <WorkspaceThemeEffect />
       <EnterpriseSidebar role="admin" />
       <div
         className={cn(

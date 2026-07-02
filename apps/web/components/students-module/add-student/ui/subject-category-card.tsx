@@ -89,7 +89,8 @@ export function SubjectCategoryCard({
       {locked && selected ? (
         <div className="text-[11px]">
           <p className="truncate font-medium">
-            {selected.courseOffering.course.code} — {selected.courseOffering.course.title}
+            {selected.courseOffering.course.title}
+            <span className="text-muted-foreground"> ({selected.courseOffering.course.code})</span>
           </p>
           <p className="text-[10px] text-muted-foreground">
             {selected.sectionCode} · {selected.seatLedger?.confirmedCount ?? 0}/{selected.capacity}{' '}
@@ -129,8 +130,11 @@ export function SubjectCategoryCard({
                     >
                       <div className="flex items-start justify-between gap-1">
                         <span className="font-medium">
-                          {row.section.courseOffering.course.code} —{' '}
                           {row.section.courseOffering.course.title}
+                          <span className="text-muted-foreground">
+                            {' '}
+                            ({row.section.courseOffering.course.code})
+                          </span>
                         </span>
                         <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">
                           Unavailable

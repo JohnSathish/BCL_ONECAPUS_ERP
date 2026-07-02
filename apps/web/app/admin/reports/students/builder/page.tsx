@@ -7,13 +7,12 @@ import { Save } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import {
   createSavedReport,
   fetchReportFieldRegistry,
@@ -22,7 +21,7 @@ import {
 import { apiErrorMessage } from '@/utils/api-error';
 
 export default function ReportBuilderPage() {
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const [selected, setSelected] = useState<string[]>([]);
   const [reportName, setReportName] = useState('');
   const [message, setMessage] = useState('');
@@ -54,7 +53,7 @@ export default function ReportBuilderPage() {
       createSavedReport({
         name: reportName.trim(),
         columns: selected,
-        filters: toApiFilters(filters),
+        filters: apiFilters,
       }),
     onSuccess: () => {
       setMessage('Report saved.');
@@ -76,7 +75,8 @@ export default function ReportBuilderPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           extended
           {...filterOptions}
         />

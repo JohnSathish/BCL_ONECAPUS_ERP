@@ -45,7 +45,7 @@ export function CareersInstitutionalStatsBar({
           />
           <CareersAnimatedStat
             label="Accreditation"
-            displayText={inst?.naacGrade ?? 'NAAC B Grade'}
+            displayText={inst?.naacGrade ?? "NAAC Re-accredited with Grade 'B'"}
             icon={Award}
             accent="amber"
             isLoading={isLoading}

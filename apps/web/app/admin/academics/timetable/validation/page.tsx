@@ -1,17 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { fetchTimetablePlans, fetchTimetableValidationCenter } from '@/services/timetable';
 
 export default function TimetableValidationCenterPage() {
+  const { hideShiftSelectors, activeShiftName, activeShiftCode } = useShiftScope();
+  const effectiveShiftId = useEffectiveShiftId(undefined);
   const [planId, setPlanId] = useState('');
+
   const plansQ = useQuery({
-    queryKey: ['timetable', 'plans'],
-    queryFn: () => fetchTimetablePlans(),
+    queryKey: ['timetable', 'plans', 'validation', effectiveShiftId],
+    queryFn: () => fetchTimetablePlans({ shiftId: effectiveShiftId }),
   });
+
+  const plans = plansQ.data ?? [];
+
+  useEffect(() => {
+    if (!planId) return;
+    if (!plans.some((plan) => plan.id === planId)) {
+      setPlanId('');
+    }
+  }, [planId, plans]);
+
   const validationQ = useQuery({
     queryKey: ['timetable', 'validation-center', planId],
     queryFn: () => fetchTimetableValidationCenter(planId),
@@ -21,6 +36,15 @@ export default function TimetableValidationCenterPage() {
   return (
     <DashboardShell role="admin" title="Timetable Validation Center">
       <div className="space-y-5">
+        {hideShiftSelectors ? (
+          <p className="text-sm text-muted-foreground">
+            Showing plans for{' '}
+            <span className="font-medium text-foreground">
+              {activeShiftName ?? activeShiftCode ?? 'workspace shift'}
+            </span>
+            .
+          </p>
+        ) : null}
         <Card>
           <CardHeader>
             <CardTitle>Validation Center</CardTitle>
@@ -32,7 +56,7 @@ export default function TimetableValidationCenterPage() {
               onChange={(event) => setPlanId(event.target.value)}
             >
               <option value="">Select timetable plan</option>
-              {(plansQ.data ?? []).map((plan) => (
+              {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
                   {plan.name} · {plan.status}
                 </option>

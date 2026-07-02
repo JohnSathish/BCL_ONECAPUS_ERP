@@ -1,17 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DistributionReportPanel } from '@/components/student-reports/distribution-report-panel';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { fetchStudentDistributionReport } from '@/services/student-reports';
@@ -19,8 +18,7 @@ import { fetchStudentDistributionReport } from '@/services/student-reports';
 export default function GovernmentReportsPage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
-  const [filters, setFilters] = useState(emptyReportFilters);
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const filterOptions = useStudentReportFilterOptions();
 
   const category = useQuery({
@@ -43,7 +41,8 @@ export default function GovernmentReportsPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           {...filterOptions}
         />
 

@@ -40,7 +40,7 @@ export function useCourseCatalogFilters() {
   const clearFilters = useCallback(() => setFilters(emptyFilters), []);
 
   const toQueryParams = useCallback(
-    (search?: string, page = 1): CourseListParams => ({
+    (search?: string, page = 1, shiftId?: string): CourseListParams => ({
       page,
       limit: 30,
       search: search?.trim() || undefined,
@@ -50,6 +50,7 @@ export function useCourseCatalogFilters() {
       programVersionId: filters.programVersionId || undefined,
       semesterSequence: filters.semesterSequence ? Number(filters.semesterSequence) : undefined,
       category: filters.category || undefined,
+      shiftId: shiftId || undefined,
     }),
     [filters],
   );

@@ -96,8 +96,17 @@ export class ShiftsService {
       campusId?: string;
       institutionId?: string;
       status?: string;
+      /** When true, return all statuses (shift master admin). */
+      includeInactive?: boolean;
     },
   ) {
+    const statusFilter =
+      filters?.includeInactive || filters?.status === 'ALL'
+        ? filters?.status && filters.status !== 'ALL'
+          ? filters.status
+          : undefined
+        : (filters?.status?.toUpperCase() ?? 'ACTIVE');
+
     return this.prisma.shift
       .findMany({
         where: {
@@ -108,7 +117,7 @@ export class ShiftsService {
           ...(filters?.institutionId
             ? { institutionId: filters.institutionId }
             : {}),
-          ...(filters?.status ? { status: filters.status } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
         },
         include: shiftInclude,
         orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],

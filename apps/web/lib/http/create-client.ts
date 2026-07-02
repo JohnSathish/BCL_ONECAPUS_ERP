@@ -11,6 +11,8 @@ import { isRetryableQueryError, normalizeAxiosError, sleep } from '@/lib/http/ap
 import { unwrapApiPayload } from '@/lib/http/api-envelope';
 import { dispatchLicenseWriteBlocked } from '@/components/licensing/license-write-blocked-banner';
 import { useAuthStore } from '@/store/auth-store';
+import { getWorkspaceShiftHeader } from '@/store/workspace-store';
+import { shouldAttachWorkspaceShiftHeader } from '@/lib/shared-modules';
 import { waitForAuthBootstrap } from '@/lib/auth/wait-for-auth-bootstrap';
 
 type CreateClientOptions = {
@@ -68,6 +70,11 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
       }
       if (session?.user.tenantSlug) {
         config.headers['X-Tenant-Slug'] = session.user.tenantSlug;
+      }
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : undefined;
+      const shiftHeader = getWorkspaceShiftHeader();
+      if (shiftHeader && shouldAttachWorkspaceShiftHeader(pathname)) {
+        config.headers['x-shift-id'] = shiftHeader;
       }
     }
     config.headers['X-Request-Id'] = config.headers['X-Request-Id'] ?? requestId();

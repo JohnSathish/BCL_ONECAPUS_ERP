@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { slugifySubject } from '../domain/nep-categories';
 import { CurriculumResolutionService } from './curriculum-resolution.service';
+import { ShiftCurriculumService } from './shift-curriculum.service';
 
 export type SubjectPathRow = {
   id: string;
@@ -17,6 +18,7 @@ export class MajorMinorEligibilityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly curriculum: CurriculumResolutionService,
+    private readonly shiftCurriculum: ShiftCurriculumService,
   ) {}
 
   normalizeSlug(value: string) {
@@ -128,6 +130,7 @@ export class MajorMinorEligibilityService {
     tenantId: string,
     programVersionId: string,
     semesterSequence = 1,
+    opts?: { shiftId?: string },
   ): Promise<SubjectPathRow[]> {
     const version = await this.prisma.programVersion.findFirst({
       where: { id: programVersionId, tenantId, deletedAt: null },
@@ -163,14 +166,18 @@ export class MajorMinorEligibilityService {
       orderBy: { name: 'asc' },
     });
 
-    return subjects.map((s) => ({
-      id: s.id,
-      slug: s.slug,
-      name: s.name,
-      programmeGroup: s.programmeGroup,
-      departmentId: s.departmentId,
-      department: s.department,
-    }));
+    return this.shiftCurriculum.filterSubjectPathsByShift(
+      tenantId,
+      opts?.shiftId,
+      subjects.map((s) => ({
+        id: s.id,
+        slug: s.slug,
+        name: s.name,
+        programmeGroup: s.programmeGroup,
+        departmentId: s.departmentId,
+        department: s.department,
+      })),
+    );
   }
 
   async listEligibleMinors(
@@ -179,6 +186,7 @@ export class MajorMinorEligibilityService {
     majorSubjectSlug: string,
     semesterSequence = 1,
     academicYearId?: string,
+    shiftId?: string,
   ): Promise<SubjectPathRow[]> {
     const majorSlug = this.normalizeSlug(majorSubjectSlug);
     if (!majorSlug) return [];
@@ -212,9 +220,14 @@ export class MajorMinorEligibilityService {
         tenantId,
         majorSubjectId: majorSubject.id,
         isActive: true,
-        OR: [
-          { academicYearId: academicYearId ?? undefined },
-          { academicYearId: null },
+        AND: [
+          {
+            OR: [
+              { academicYearId: academicYearId ?? undefined },
+              { academicYearId: null },
+            ],
+          },
+          ...(shiftId ? [{ OR: [{ shiftId }, { shiftId: null }] }] : []),
         ],
       },
       include: {
@@ -251,14 +264,18 @@ export class MajorMinorEligibilityService {
       orderBy: { name: 'asc' },
     });
 
-    return subjects.map((s) => ({
-      id: s.id,
-      slug: s.slug,
-      name: s.name,
-      programmeGroup: s.programmeGroup,
-      departmentId: s.departmentId,
-      department: s.department,
-    }));
+    return this.shiftCurriculum.filterSubjectPathsByShift(
+      tenantId,
+      shiftId,
+      subjects.map((s) => ({
+        id: s.id,
+        slug: s.slug,
+        name: s.name,
+        programmeGroup: s.programmeGroup,
+        departmentId: s.departmentId,
+        department: s.department,
+      })),
+    );
   }
 
   async validateMajorMinorPair(

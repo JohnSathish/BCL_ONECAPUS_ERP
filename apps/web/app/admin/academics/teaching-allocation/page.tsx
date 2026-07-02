@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileDown, UploadCloud, Wand2 } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -19,6 +19,7 @@ import {
 } from '@/services/timetable';
 import { cn } from '@/utils/cn';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
+import { useWorkspaceBoundShiftState } from '@/hooks/use-workspace-bound-shift-state';
 
 export default function TeachingAllocationPage() {
   useRequireAuth();
@@ -26,20 +27,28 @@ export default function TeachingAllocationPage() {
   const qc = useQueryClient();
   const [semesterMode, setSemesterMode] = useState<'ODD' | 'EVEN'>('ODD');
   const [streamId, setStreamId] = useState('');
-  const [shiftId, setShiftId] = useState('');
+  const { shiftId, setShiftId, effectiveShiftId, hideShiftFilter, workspaceShiftLabel } =
+    useWorkspaceBoundShiftState();
   const [file, setFile] = useState<File | null>(null);
   const contextQ = useQuery({
     queryKey: ['timetable', 'context'],
     queryFn: fetchTimetableContext,
     enabled: authReady,
   });
+
+  useEffect(() => {
+    if (contextQ.data?.currentAcademicMode) {
+      setSemesterMode(contextQ.data.currentAcademicMode);
+    }
+  }, [contextQ.data?.currentAcademicMode]);
+
   const params = useMemo(
     () => ({
       semesterMode,
       streamId: streamId || undefined,
-      shiftId: shiftId || undefined,
+      shiftId: effectiveShiftId,
     }),
-    [semesterMode, streamId, shiftId],
+    [effectiveShiftId, semesterMode, streamId],
   );
   const rowsQ = useQuery({
     queryKey: ['timetable', 'teaching-allocations', params],
@@ -114,18 +123,24 @@ export default function TeachingAllocationPage() {
                 </option>
               ))}
             </select>
-            <select
-              className="h-10 rounded-md border bg-card px-3 text-sm"
-              value={shiftId}
-              onChange={(event) => setShiftId(event.target.value)}
-            >
-              <option value="">All Shifts</option>
-              {(contextQ.data?.shifts ?? []).map((shift) => (
-                <option key={shift.id} value={shift.id}>
-                  {shift.name}
-                </option>
-              ))}
-            </select>
+            {!hideShiftFilter ? (
+              <select
+                className="h-10 rounded-md border bg-card px-3 text-sm"
+                value={shiftId}
+                onChange={(event) => setShiftId(event.target.value)}
+              >
+                <option value="">All Shifts</option>
+                {(contextQ.data?.shifts ?? []).map((shift) => (
+                  <option key={shift.id} value={shift.id}>
+                    {shift.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/30 px-3 text-sm text-muted-foreground">
+                {workspaceShiftLabel ?? 'Workspace shift'}
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 type="button"

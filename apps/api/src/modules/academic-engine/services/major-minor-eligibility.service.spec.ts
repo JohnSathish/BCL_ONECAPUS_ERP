@@ -72,10 +72,20 @@ describe('MajorMinorEligibilityService', () => {
   const curriculum = {
     resolveProgrammeCurriculum: jest.fn(),
   };
+  const shiftCurriculum = {
+    filterSubjectPathsByShift: jest.fn(
+      async (
+        _tenantId: string,
+        _shiftId: string | undefined,
+        paths: unknown[],
+      ) => paths,
+    ),
+  };
 
   const service = new MajorMinorEligibilityService(
     prisma as never,
     curriculum as never,
+    shiftCurriculum as never,
   );
 
   beforeEach(() => {

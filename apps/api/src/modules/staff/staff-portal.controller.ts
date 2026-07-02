@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -93,5 +94,14 @@ export class StaffPortalController {
   @RequireAnyPermission('staff:portal:self')
   getTodayTimetable(@CurrentUser() user: JwtUser) {
     return this.portal.getTodayScheduleForUser(user);
+  }
+
+  @Get('me/sections/:sectionId/roster')
+  @RequireAnyPermission('staff:portal:self')
+  getSectionRoster(
+    @CurrentUser() user: JwtUser,
+    @Param('sectionId') sectionId: string,
+  ) {
+    return this.portal.getSectionRoster(user, sectionId);
   }
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { AcademicLifecycleService } from '../../academic-lifecycle/academic-lifecycle.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
@@ -148,6 +152,8 @@ export class StaffPortalService {
       activeSemesters: [] as number[],
     };
 
+    let primaryAcademicYearId: string | null = null;
+
     if (institutionId) {
       try {
         const dash = await this.lifecycle.getCycleDashboard(
@@ -159,12 +165,13 @@ export class StaffPortalService {
           cycle: dash.currentCycle ?? 'ODD',
           activeSemesters: dash.activeSemesters ?? [],
         };
+        primaryAcademicYearId = dash.primarySession?.id ?? null;
       } catch {
         // lifecycle may be unconfigured
       }
     }
 
-    const assignments = await this.prisma.staffSubjectAssignment.findMany({
+    const allAssignments = await this.prisma.staffSubjectAssignment.findMany({
       where: { tenantId: user.tid, staffProfileId: staff.id },
       include: {
         course: { select: { id: true, code: true, title: true } },
@@ -178,6 +185,12 @@ export class StaffPortalService {
       },
       orderBy: [{ semesterNo: 'asc' }, { createdAt: 'desc' }],
     });
+
+    const assignments = this.filterActiveTeachingAssignments(
+      allAssignments,
+      academicContext.activeSemesters,
+      primaryAcademicYearId,
+    );
 
     const sectionIds = assignments
       .map((a) => a.offeringSectionId)
@@ -691,7 +704,31 @@ export class StaffPortalService {
 
   async getSubjectAssignments(user: JwtUser) {
     const staff = await this.resolveStaffProfile(user.tid, user.sub);
-    const assignments = await this.prisma.staffSubjectAssignment.findMany({
+    const institutionId =
+      staff.campus?.institutionId ??
+      (
+        await this.prisma.institution.findFirst({
+          where: { tenantId: user.tid, deletedAt: null },
+          select: { id: true },
+        })
+      )?.id;
+
+    let activeSemesters: number[] = [];
+    let primaryAcademicYearId: string | null = null;
+    if (institutionId) {
+      try {
+        const dash = await this.lifecycle.getCycleDashboard(
+          user.tid,
+          institutionId,
+        );
+        activeSemesters = dash.activeSemesters ?? [];
+        primaryAcademicYearId = dash.primarySession?.id ?? null;
+      } catch {
+        // lifecycle may be unconfigured
+      }
+    }
+
+    const allAssignments = await this.prisma.staffSubjectAssignment.findMany({
       where: { tenantId: user.tid, staffProfileId: staff.id },
       include: {
         course: { select: { id: true, code: true, title: true } },
@@ -707,6 +744,13 @@ export class StaffPortalService {
       },
       orderBy: [{ semesterNo: 'asc' }, { createdAt: 'desc' }],
     });
+
+    const assignments = this.filterActiveTeachingAssignments(
+      allAssignments,
+      activeSemesters,
+      primaryAcademicYearId,
+    );
+
     return assignments.map((a) => ({
       id: a.id,
       courseId: a.courseId,
@@ -793,6 +837,107 @@ export class StaffPortalService {
   async getTodayScheduleForUser(user: JwtUser) {
     const staff = await this.resolveStaffProfile(user.tid, user.sub);
     return this.getTodaySchedule(user.tid, staff.id);
+  }
+
+  async getSectionRoster(user: JwtUser, sectionId: string) {
+    const staff = await this.resolveStaffProfile(user.tid, user.sub);
+
+    const [assignment, teachingRow] = await Promise.all([
+      this.prisma.staffSubjectAssignment.findFirst({
+        where: {
+          tenantId: user.tid,
+          staffProfileId: staff.id,
+          offeringSectionId: sectionId,
+        },
+      }),
+      (this.prisma as any).subjectTeachingAssignment.findFirst({
+        where: {
+          tenantId: user.tid,
+          staffProfileId: staff.id,
+          offeringSectionId: sectionId,
+          deletedAt: null,
+        },
+      }),
+    ]);
+
+    if (!assignment && !teachingRow) {
+      throw new ForbiddenException(
+        'You are not assigned to this class section.',
+      );
+    }
+
+    const section = await this.prisma.offeringSection.findFirst({
+      where: { id: sectionId, tenantId: user.tid, deletedAt: null },
+      include: {
+        courseOffering: {
+          include: { course: { select: { code: true, title: true } } },
+        },
+        shift: { select: { id: true, code: true, name: true } },
+      },
+    });
+    if (!section) throw new NotFoundException('Section not found');
+
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId: user.tid,
+        offeringSectionId: sectionId,
+        status: { in: ['pending', 'confirmed', 'waitlisted'] },
+      },
+      include: {
+        registration: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                rollNumber: true,
+                enrollmentNumber: true,
+                masterProfile: { select: { fullName: true, gender: true } },
+                department: { select: { name: true, code: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ registration: { student: { rollNumber: 'asc' } } }],
+    });
+
+    return {
+      section: {
+        id: section.id,
+        sectionCode: section.sectionCode,
+        semesterNo: section.courseOffering.semesterSequence,
+        shift: section.shift,
+        course: section.courseOffering.course,
+      },
+      students: lines.map((line) => ({
+        id: line.registration.student.id,
+        rollNumber: line.registration.student.rollNumber,
+        enrollmentNumber: line.registration.student.enrollmentNumber,
+        fullName: line.registration.student.masterProfile?.fullName ?? '',
+        gender: line.registration.student.masterProfile?.gender ?? null,
+        department: line.registration.student.department,
+        status: line.status,
+      })),
+    };
+  }
+
+  private filterActiveTeachingAssignments<
+    T extends { semesterNo: number; academicYearId?: string | null },
+  >(
+    assignments: T[],
+    activeSemesters: number[],
+    primaryAcademicYearId?: string | null,
+  ): T[] {
+    let rows = assignments;
+    if (activeSemesters.length > 0) {
+      rows = rows.filter((a) => activeSemesters.includes(a.semesterNo));
+    }
+    if (primaryAcademicYearId) {
+      rows = rows.filter(
+        (a) => !a.academicYearId || a.academicYearId === primaryAcademicYearId,
+      );
+    }
+    return rows;
   }
 
   private async getLeaveKpi(tenantId: string, staffProfileId: string) {

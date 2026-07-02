@@ -8,9 +8,10 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CurrentUser,
@@ -20,6 +21,7 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
+import { extractClientIp } from '../../common/utils/request-host';
 import { AcademicEngineService } from './academic-engine.service';
 import { AdminRegistrationService } from './services/admin-registration.service';
 import {
@@ -53,6 +55,7 @@ import {
 import { FyugpStructureTemplateService } from './services/fyugp-structure-template.service';
 import { CategoryPoolService } from './services/category-pool.service';
 import { CurriculumCompletionService } from './services/curriculum-completion.service';
+import { ShiftCurriculumService } from './services/shift-curriculum.service';
 import {
   CurriculumCompletionExportQueryDto,
   CurriculumCompletionMissingItemsQueryDto,
@@ -85,6 +88,7 @@ export class AcademicEngineController {
     private readonly eligibility: MajorMinorEligibilityService,
     private readonly courseEligibility: CourseEligibilityService,
     private readonly curriculumCompletion: CurriculumCompletionService,
+    private readonly shiftCurriculum: ShiftCurriculumService,
   ) {}
 
   @Get('academic-subjects')
@@ -217,11 +221,13 @@ export class AcademicEngineController {
     @CurrentUser() user: JwtUser,
     @Param('versionId') versionId: string,
     @Query('semesterSequence') semesterSequence?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.eligibility.listEligibleMajors(
       user.tid,
       versionId,
       semesterSequence ? Number(semesterSequence) : 1,
+      { shiftId },
     );
   }
 
@@ -237,6 +243,7 @@ export class AcademicEngineController {
     @Query('majorSubjectSlug') majorSubjectSlug: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.eligibility.listEligibleMinors(
       user.tid,
@@ -244,7 +251,147 @@ export class AcademicEngineController {
       majorSubjectSlug,
       semesterSequence ? Number(semesterSequence) : 1,
       academicYearId,
+      shiftId,
     );
+  }
+
+  @Get('shifts/:shiftId/admission-context')
+  @RequireAnyPermission(
+    'academic-engine:read',
+    'students:read',
+    'students:manage',
+  )
+  getShiftAdmissionContext(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.shiftCurriculum.getShiftAdmissionContext(user.tid, shiftId, {
+      programVersionId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+      institutionId,
+    });
+  }
+
+  @Get('shifts/:shiftId/programmes')
+  @RequirePermissions('academic-engine:read')
+  listShiftProgrammes(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.shiftCurriculum.listProgrammesForShift(
+      user.tid,
+      shiftId,
+      institutionId,
+    );
+  }
+
+  @Put('shifts/:shiftId/programmes')
+  @RequirePermissions('academic-engine:manage')
+  upsertShiftProgrammes(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Body() body: { items: { programId: string; enabled: boolean }[] },
+  ) {
+    return this.shiftCurriculum.upsertProgrammeConfigs(
+      user.tid,
+      shiftId,
+      body.items ?? [],
+    );
+  }
+
+  @Get('shifts/:shiftId/departments')
+  @RequirePermissions('academic-engine:read')
+  listShiftDepartments(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.shiftCurriculum.listDepartmentsForShift(
+      user.tid,
+      shiftId,
+      institutionId,
+    );
+  }
+
+  @Get('shifts/curriculum-configuration-status')
+  @RequirePermissions('academic-engine:read')
+  getCurriculumConfigurationStatus(
+    @CurrentUser() user: JwtUser,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.shiftCurriculum.getCurriculumConfigurationStatus(
+      user.tid,
+      institutionId,
+    );
+  }
+
+  @Get('shifts/:shiftId/curriculum-manager')
+  @RequirePermissions('academic-engine:read')
+  getCurriculumManagerView(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Query('programVersionId') programVersionId: string,
+    @Query('semesterNo') semesterNo: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.shiftCurriculum.getCurriculumManagerView(user.tid, shiftId, {
+      programVersionId,
+      semesterNo: Number(semesterNo),
+      institutionId,
+    });
+  }
+
+  @Put('shifts/:shiftId/curriculum-manager/pool-assignment')
+  @RequirePermissions('academic-engine:manage')
+  assignCurriculumManagerPool(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Body()
+    body: {
+      programVersionId: string;
+      semesterNo: number;
+      poolId: string;
+    },
+  ) {
+    return this.shiftCurriculum.assignShiftSemesterPool(
+      user.tid,
+      shiftId,
+      body,
+    );
+  }
+
+  @Put('shifts/:shiftId/departments')
+  @RequirePermissions('academic-engine:manage')
+  upsertShiftDepartments(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Body() body: { items: { departmentId: string; enabled: boolean }[] },
+  ) {
+    return this.shiftCurriculum.upsertDepartmentConfigs(
+      user.tid,
+      shiftId,
+      body.items ?? [],
+    );
+  }
+
+  @Put('shifts/:shiftId/curriculum-policies')
+  @RequirePermissions('academic-engine:manage')
+  upsertShiftCurriculumPolicy(
+    @CurrentUser() user: JwtUser,
+    @Param('shiftId') shiftId: string,
+    @Body()
+    body: {
+      programVersionId?: string | null;
+      semesterNo: number;
+      categoryType: string;
+      autoAssign: boolean;
+    },
+  ) {
+    return this.shiftCurriculum.upsertCurriculumPolicy(user.tid, shiftId, body);
   }
 
   @Get('fyugp/major-minor-rules')
@@ -821,15 +968,25 @@ export class AcademicEngineController {
 
   @Patch('registrations/:id/lines')
   @RequirePermissions('academic-engine:manage')
-  updateLines(
+  async updateLines(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
     @Body() dto: UpdateRegistrationLinesDto,
+    @Req() req: Request,
   ) {
-    return this.engine.updateRegistrationLines(user.tid, id, dto.lines, {
-      registrationSource: 'ADMIN_ASSIGNED',
-      assignedById: user.sub,
-    });
+    const { registration, auditRecorded } =
+      await this.engine.updateRegistrationLines(user.tid, id, dto.lines, {
+        registrationSource: 'ADMIN_ASSIGNED',
+        assignedById: user.sub,
+        audit: {
+          actorId: user.sub,
+          actorRoles: user.roles,
+          reason: dto.auditReason,
+          ipAddress: extractClientIp(req),
+          userAgent: req.headers['user-agent'],
+        },
+      });
+    return { ...registration, auditRecorded };
   }
 
   @Post('registrations/:id/validate')

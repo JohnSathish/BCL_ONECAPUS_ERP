@@ -74,14 +74,12 @@ export const DESK_PAYMENT_METHODS: DeskPaymentMethodDef[] = [
         key: 'sbiTransactionId',
         label: 'SBI Transaction ID',
         type: 'text',
-        required: true,
         placeholder: 'e.g. ICL202600178',
       },
       {
         key: 'bankReferenceNumber',
         label: 'Bank Reference Number',
         type: 'text',
-        required: true,
         placeholder: 'Bank reference',
       },
       { key: 'paymentDate', label: 'Payment Date', type: 'date', required: true },
@@ -226,6 +224,12 @@ export function validateDeskPaymentForm(
     if (field.type === 'readonly' || field.type === 'file') continue;
     const value = values[field.key]?.trim();
     if (!value) return `${field.label} is required.`;
+  }
+
+  if (method.id === 'sbi_icollect') {
+    if (!values.sbiTransactionId?.trim() && !values.bankReferenceNumber?.trim()) {
+      return 'Enter either SBI Transaction ID or Bank Reference Number.';
+    }
   }
 
   if (method.id === 'scholarship') {

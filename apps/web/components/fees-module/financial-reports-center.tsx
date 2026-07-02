@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -32,6 +32,8 @@ import {
   type FeeReportId,
 } from '@/components/fees-module/financial-reports.constants';
 import { cn } from '@/utils/cn';
+import { useBindWorkspaceShift, useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 
 type ReportFilters = {
   from: string;
@@ -128,6 +130,7 @@ async function downloadReport(
 }
 
 export function FinancialReportsCenter() {
+  const { hideShiftSelectors } = useShiftScope();
   const [tab, setTab] = useState<'reports' | 'analytics' | 'saved' | 'scheduled'>('reports');
   const [categoryId, setCategoryId] = useState(FEE_REPORT_CATEGORIES[0].id);
   const [activeReportId, setActiveReportId] = useState<FeeReportId>('daily-collection');
@@ -155,6 +158,13 @@ export function FinancialReportsCenter() {
     })),
   );
 
+  const bindWorkspaceShift = useCallback(
+    (shiftId: string) => setFilters((f) => (f.shift === shiftId ? f : { ...f, shift: shiftId })),
+    [],
+  );
+  useBindWorkspaceShift(filters.shift || undefined, bindWorkspaceShift);
+  const effectiveShiftId = useEffectiveShiftId(filters.shift || undefined);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TEMPLATES_KEY);
@@ -175,8 +185,16 @@ export function FinancialReportsCenter() {
     () => ({
       from: filters.from || undefined,
       to: filters.to || undefined,
+      semester: filters.semester || undefined,
+      programVersionId: filters.programme || undefined,
+      departmentId: filters.department || undefined,
+      shiftId: effectiveShiftId,
+      category: filters.category || undefined,
+      feeHead: filters.feeHead || undefined,
+      paymentMode: filters.paymentMode || undefined,
+      status: filters.status || undefined,
     }),
-    [filters.from, filters.to],
+    [effectiveShiftId, filters],
   );
 
   const dashboardQ = useQuery({ queryKey: ['fees', 'dashboard'], queryFn: fetchFeeDashboard });
@@ -422,12 +440,14 @@ export function FinancialReportsCenter() {
                   onChange={(v) => setFilters((f) => ({ ...f, department: v }))}
                   placeholder="All departments"
                 />
-                <FilterField
-                  label="Shift"
-                  value={filters.shift}
-                  onChange={(v) => setFilters((f) => ({ ...f, shift: v }))}
-                  placeholder="All shifts"
-                />
+                {!hideShiftSelectors ? (
+                  <FilterField
+                    label="Shift"
+                    value={filters.shift}
+                    onChange={(v) => setFilters((f) => ({ ...f, shift: v }))}
+                    placeholder="All shifts"
+                  />
+                ) : null}
                 <FilterField
                   label="Student category"
                   value={filters.category}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Download, Printer, Users } from 'lucide-react';
 
@@ -10,21 +10,14 @@ import { Button } from '@/components/ui/button';
 import { BarChartWidget } from '@/components/analytics/charts/bar-chart-widget';
 import { DonutChartWidget } from '@/components/analytics/charts/donut-chart-widget';
 import { DistributionReportPanel } from '@/components/student-reports/distribution-report-panel';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
-import { toShiftOptions } from '@/lib/shift-options';
-import { fetchAcademicStreams } from '@/services/academic-engine';
-import { fetchAdmissionBatches } from '@/services/academic-lifecycle';
-import { fetchDepartments } from '@/services/organization';
-import { fetchInstitutions } from '@/services/organization';
-import { fetchPrograms } from '@/services/programs';
-import { fetchShifts } from '@/services/shifts';
 import { exportStudentReport, fetchStudentReportDashboard } from '@/services/student-reports';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -35,58 +28,15 @@ function toChart(buckets: { label: string; count: number }[]) {
 export function StudentReportsDashboardPage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
+  const filterOptions = useStudentReportFilterOptions();
   const [message, setMessage] = useState('');
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
 
   const dashboard = useQuery({
     queryKey: ['student-reports', 'dashboard', apiFilters],
     queryFn: () => fetchStudentReportDashboard(apiFilters),
     enabled: Boolean(session) && perms.canRead,
   });
-
-  const institutions = useQuery({
-    queryKey: ['org', 'institutions'],
-    queryFn: fetchInstitutions,
-    enabled: Boolean(session),
-  });
-  const institutionId = institutions.data?.[0]?.id ?? '';
-
-  const programs = useQuery({
-    queryKey: ['catalog', 'programs'],
-    queryFn: () => fetchPrograms(1),
-    enabled: Boolean(session),
-  });
-  const shifts = useQuery({
-    queryKey: ['shifts', 'ACTIVE'],
-    queryFn: () => fetchShifts({ status: 'ACTIVE' }),
-    enabled: Boolean(session),
-  });
-  const streams = useQuery({
-    queryKey: ['academic-engine', 'streams'],
-    queryFn: fetchAcademicStreams,
-    enabled: Boolean(session),
-  });
-  const batches = useQuery({
-    queryKey: ['academic-lifecycle', 'batches', institutionId],
-    queryFn: () => fetchAdmissionBatches(institutionId),
-    enabled: Boolean(session) && Boolean(institutionId),
-  });
-  const departments = useQuery({
-    queryKey: ['org', 'departments', institutionId],
-    queryFn: () => fetchDepartments({ institutionId, scope: 'academic', status: 'ACTIVE' }),
-    enabled: Boolean(session) && Boolean(institutionId),
-  });
-
-  const programVersions = useMemo(() => {
-    const rows: { id: string; label: string }[] = [];
-    for (const p of programs.data?.data ?? []) {
-      for (const v of p.versions ?? []) {
-        if (v.status === 'PUBLISHED') rows.push({ id: v.id, label: `${p.code} v${v.version}` });
-      }
-    }
-    return rows;
-  }, [programs.data]);
 
   const exportMut = useMutation({
     mutationFn: (format: 'xlsx' | 'csv') => exportStudentReport('dashboard', format, apiFilters),
@@ -121,12 +71,9 @@ export function StudentReportsDashboardPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
-          programOptions={programVersions}
-          shiftOptions={toShiftOptions(shifts.data ?? [])}
-          batchOptions={(batches.data ?? []).map((b) => ({ id: b.id, label: b.batchCode }))}
-          streamOptions={(streams.data ?? []).map((s) => ({ id: s.id, label: s.name }))}
-          departmentOptions={(departments.data ?? []).map((d) => ({ id: d.id, label: d.name }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
+          {...filterOptions}
         />
 
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}

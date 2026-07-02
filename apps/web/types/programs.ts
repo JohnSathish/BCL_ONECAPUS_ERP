@@ -105,6 +105,8 @@ export type CourseListParams = {
   programVersionId?: string;
   semesterSequence?: number;
   category?: string;
+  /** When set, limits catalog to programmes/departments enabled for the shift. */
+  shiftId?: string;
 };
 
 export type Course = {

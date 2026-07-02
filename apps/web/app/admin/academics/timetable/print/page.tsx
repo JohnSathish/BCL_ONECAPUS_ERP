@@ -7,6 +7,7 @@ import { Printer, X } from 'lucide-react';
 import { TimetablePrintDocument } from '@/components/timetable/timetable-print-document';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
+import { useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { toBrandingDocumentContext } from '@/lib/branding-document';
 import {
@@ -28,6 +29,7 @@ function TimetablePrintPageContent() {
   const classroomId = searchParams.get('classroomId') ?? undefined;
   const sectionCode = searchParams.get('sectionCode') ?? undefined;
   const autoprint = searchParams.get('autoprint') === '1';
+  const effectiveShiftId = useEffectiveShiftId(undefined);
 
   const { branding } = useInstitutionBranding();
   const brandingDoc = toBrandingDocumentContext(branding);
@@ -44,8 +46,8 @@ function TimetablePrintPageContent() {
   });
 
   const plansQ = useQuery({
-    queryKey: ['timetable', 'plans', 'print'],
-    queryFn: () => fetchTimetablePlans(),
+    queryKey: ['timetable', 'plans', 'print', effectiveShiftId],
+    queryFn: () => fetchTimetablePlans({ shiftId: effectiveShiftId }),
     enabled: authReady,
   });
 

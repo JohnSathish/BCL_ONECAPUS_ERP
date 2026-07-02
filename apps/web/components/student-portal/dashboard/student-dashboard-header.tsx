@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 
 import { StudentName } from '@/components/students/student-name';
+import { StaffPortalAvatar } from '@/components/staff-portal/layout/staff-portal-avatar';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import type { StudentDashboardView } from '@/types/student-portal';
 import { getLocalGreeting } from '@/utils/student-portal-utils';
@@ -26,6 +27,18 @@ export function StudentDashboardHeader({ data, loading }: Props) {
   const { profile } = data;
   const greeting = getLocalGreeting();
   const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
+  const rollLabel = profile.rollNumber?.trim() || '—';
+  const collegeReg = profile.enrollmentNumber?.trim() || '—';
+  const nehuRoll = profile.universityRollNumber?.trim() || '—';
+  const nehuReg = profile.universityRegistrationNumber?.trim() || '—';
+  const displayName = profile.displayFullName?.trim() || profile.fullName;
+
+  const identityFields = [
+    { label: 'College Roll', value: rollLabel },
+    { label: 'College Reg', value: collegeReg },
+    { label: 'NEHU Roll', value: nehuRoll },
+    { label: 'NEHU Reg', value: nehuReg },
+  ];
 
   return (
     <motion.div
@@ -45,10 +58,12 @@ export function StudentDashboardHeader({ data, loading }: Props) {
                 className="h-16 w-16 rounded-2xl border border-border/60 object-cover shadow-sm"
               />
             ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-primary/10 text-xl font-bold text-primary shadow-sm">
-                <StudentName name={profile.fullName} className="sr-only" />
-                {profile.enrollmentNumber?.slice(-2) ?? 'ST'}
-              </div>
+              <StaffPortalAvatar
+                photoUrl={null}
+                name={displayName}
+                size="lg"
+                className="rounded-2xl"
+              />
             )}
           </div>
           <div className="min-w-0">
@@ -65,9 +80,19 @@ export function StudentDashboardHeader({ data, loading }: Props) {
               {profile.semesterSequence != null
                 ? `Semester ${profile.semesterSequence}`
                 : 'Semester —'}
-              {' · '}
-              Roll No: {profile.enrollmentNumber || '—'}
             </p>
+            <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {identityFields.map((field) => (
+                <div key={field.label} className="min-w-0">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {field.label}
+                  </dt>
+                  <dd className="truncate font-mono text-xs font-medium text-foreground/90">
+                    {field.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
             {profile.academicYear ? (
               <p className="text-xs text-muted-foreground">Academic Year: {profile.academicYear}</p>
             ) : null}

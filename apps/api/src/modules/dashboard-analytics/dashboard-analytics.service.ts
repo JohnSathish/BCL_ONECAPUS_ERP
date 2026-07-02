@@ -1273,13 +1273,7 @@ export class DashboardAnalyticsService {
       widgetId: 'shift-enrollment',
       chartType: 'bar',
       source: series.length ? 'live' : 'seed',
-      series: series.length
-        ? series
-        : [
-            { label: 'MORNING', value: 0 },
-            { label: 'DAY', value: 0 },
-            { label: 'EVENING', value: 0 },
-          ],
+      series: series.length ? series : [],
     };
   }
 

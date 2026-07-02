@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, User } from 'lucide-react';
+import { useBindWorkspaceShift } from '@/hooks/use-bind-workspace-shift';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { fetchShifts } from '@/services/shifts';
 import { fetchPrograms, fetchProgramVersions } from '@/services/programs';
 import { fetchStudents } from '@/services/students';
@@ -31,6 +33,13 @@ export function DemandScopeForm({
   const [studentResults, setStudentResults] = useState<StudentRow[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
   const [programId, setProgramId] = useState('');
+  const { hideShiftSelectors } = useShiftScope();
+
+  const bindWorkspaceShift = useCallback(
+    (shiftId: string) => setScope((prev) => ({ ...prev, shiftId })),
+    [setScope],
+  );
+  useBindWorkspaceShift(scope.shiftId, bindWorkspaceShift);
 
   const programsQ = useQuery({
     queryKey: ['programs', 'demand-scope'],
@@ -43,7 +52,7 @@ export function DemandScopeForm({
   });
   const shiftsQ = useQuery({
     queryKey: ['shifts', 'demand-scope'],
-    queryFn: () => fetchShifts({ status: 'active' }),
+    queryFn: () => fetchShifts({ status: 'ACTIVE' }),
   });
 
   const programs = programsQ.data?.data ?? [];
@@ -190,23 +199,25 @@ export function DemandScopeForm({
             ))}
           </select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Shift</Label>
-          <select
-            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-            value={scope.shiftId ?? ''}
-            onChange={(e) =>
-              setScope((prev) => ({ ...prev, shiftId: e.target.value || undefined }))
-            }
-          >
-            <option value="">All shifts</option>
-            {shifts.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!hideShiftSelectors ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Shift</Label>
+            <select
+              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              value={scope.shiftId ?? ''}
+              onChange={(e) =>
+                setScope((prev) => ({ ...prev, shiftId: e.target.value || undefined }))
+              }
+            >
+              <option value="">All shifts</option>
+              {shifts.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Semester number</Label>
           <Input

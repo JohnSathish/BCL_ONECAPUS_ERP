@@ -376,7 +376,7 @@ export class AppointmentOrderService {
     const renderedHtml = buildAppointmentOrderHtml({
       collegeName: tenant?.name ?? 'Don Bosco College, Tura',
       collegeAddress: branding?.addressLine ?? 'Tura, Meghalaya',
-      naacInfo: '(Re-accredited with B Grade by NAAC)',
+      naacInfo: "(Re-accredited with Grade 'B' by NAAC)",
       referenceNo,
       dateLabel,
       candidateName: order.candidateName,

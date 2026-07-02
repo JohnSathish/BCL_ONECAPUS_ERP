@@ -57,6 +57,9 @@ export type TimetableEntry = {
   sectionCode?: string | null;
   semesterSequence?: number | null;
   isCombined?: boolean;
+  shiftId?: string | null;
+  shiftCode?: string | null;
+  shiftName?: string | null;
 };
 
 export type TimetableMatrixRow = {

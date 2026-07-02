@@ -57,8 +57,14 @@ export async function fetchShifts(params?: {
   campusId?: string;
   institutionId?: string;
   status?: string;
+  includeInactive?: boolean;
 }): Promise<ShiftRow[]> {
-  const { data } = await api.get('/v1/shifts', { params });
+  const { data } = await api.get('/v1/shifts', {
+    params: {
+      ...params,
+      includeInactive: params?.includeInactive ? 'true' : undefined,
+    },
+  });
   return data;
 }
 

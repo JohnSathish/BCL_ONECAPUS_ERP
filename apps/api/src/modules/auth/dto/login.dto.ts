@@ -6,11 +6,18 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class LoginDto {
+  @ValidateIf((o) => !o.identifier)
   @IsEmail()
-  email!: string;
+  email?: string;
+
+  @ValidateIf((o) => !o.email)
+  @IsString()
+  @MinLength(2)
+  identifier?: string;
 
   @IsString()
   @MinLength(8)

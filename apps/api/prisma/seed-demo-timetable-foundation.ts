@@ -424,6 +424,17 @@ async function seedTeachingAssignments(
   for (const group of groups) {
     for (const paper of group.papers ?? []) {
       if (!paper.offeringSectionId || !group.primaryStaffProfileId) continue;
+
+      const section = await ctx.prisma.offeringSection.findFirst({
+        where: {
+          id: paper.offeringSectionId,
+          tenantId: ctx.tenantId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!section) continue;
+
       const existing = await (
         ctx.prisma as any
       ).subjectTeachingAssignment.findFirst({

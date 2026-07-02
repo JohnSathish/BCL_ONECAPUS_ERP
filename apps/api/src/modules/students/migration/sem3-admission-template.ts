@@ -27,8 +27,6 @@ export const SEM3_ADMISSION_TEMPLATE_HEADERS = [
 
   'MDC Paper',
 
-  'AEC Paper',
-
   'SEC Paper',
 
   'VTC Paper',
@@ -61,7 +59,7 @@ export const SEM3_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
 
   Stream: 'ARTS',
 
-  Shift: 'DAY',
+  Shift: 'MORNING or DAY — determines Semester 3 paper pool',
 
   'Academic Session': '2026-27',
 
@@ -71,8 +69,6 @@ export const SEM3_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
     'Select department — ERP assigns Major Paper 1 & 2 automatically',
 
   'MDC Paper': 'Select paper name — ERP maps to MDC code automatically',
-
-  'AEC Paper': 'Select paper name — ERP maps to AEC code automatically',
 
   'SEC Paper': 'Select paper name — ERP maps to SEC code automatically',
 
@@ -98,7 +94,7 @@ export const SEM3_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 
   Stream: 'ARTS',
 
-  Shift: 'DAY',
+  Shift: 'MORNING',
 
   'Academic Session': '2026-27',
 
@@ -106,13 +102,11 @@ export const SEM3_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 
   'Major Department': 'Economics',
 
-  'MDC Paper': 'Environmental Studies',
+  'MDC Paper': 'Financial Literacy',
 
-  'AEC Paper': 'Communicative English',
+  'SEC Paper': 'Introduction to Translation',
 
-  'SEC Paper': 'Office Automation',
-
-  'VTC Paper': 'Graphic Design',
+  'VTC Paper': 'Bee Keeping – I',
 
   'Section Code': 'A',
 
@@ -126,9 +120,9 @@ export const SEM3_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 };
 
 export const SEM3_STRUCTURE_NOTES = [
-  'Semester 3 FYUGP: 2 Major/Core (auto from Major Department) + MDC + AEC + SEC + VTC = 6 papers, 20 credits.',
+  'Semester 3 FYUGP: 2 Major/Core (auto from Major Department) + MDC + AEC (auto) + SEC + VTC = 6 papers, 20 credits.',
 
-  'There is no Minor or VAC in Semester 3. Do not enter course codes — select names from dropdowns only.',
+  'There is no Minor or VAC in Semester 3. AEC-222 is assigned automatically for Morning Shift — do not enter AEC in the sheet.',
 
   'Major Paper 1 and Major Paper 2 are assigned automatically when you choose Major Department.',
 

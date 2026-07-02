@@ -35,6 +35,7 @@ import { AdminRegistrationService } from '../academic-engine/services/admin-regi
 import { AdmissionPoolsService } from '../academic-engine/services/admission-pools.service';
 import { SubjectRegistrationEngineService } from '../academic-engine/services/subject-registration-engine.service';
 import { MajorMinorEligibilityService } from '../academic-engine/services/major-minor-eligibility.service';
+import { ShiftCurriculumService } from '../academic-engine/services/shift-curriculum.service';
 import { UserProvisioningService } from '../administration/services/user-provisioning.service';
 import { RollNumberService } from './services/roll-number.service';
 import { RollShiftRangeService } from './services/roll-shift-range.service';
@@ -43,6 +44,8 @@ import { LicenseEnforcementService } from '../licensing/services/license-enforce
 import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service';
 import { createWorkbookWithSheets } from '../../common/import/excel.util';
 import { StudentAbcService } from './services/student-abc.service';
+import { AcademicChangeHistoryService } from './academic-change-history/academic-change-history.service';
+import type { AcademicChangeAuditContext } from './academic-change-history/academic-change-history.types';
 
 const directoryInclude = {
   user: { select: { id: true, email: true, isActive: true } },
@@ -140,6 +143,7 @@ export class StudentsService {
     private readonly admissionPools: AdmissionPoolsService,
     private readonly registrationEngine: SubjectRegistrationEngineService,
     private readonly eligibility: MajorMinorEligibilityService,
+    private readonly shiftCurriculum: ShiftCurriculumService,
     private readonly provisioning: UserProvisioningService,
     private readonly organization: OrganizationService,
     private readonly rollNumbers: RollNumberService,
@@ -150,6 +154,7 @@ export class StudentsService {
     private readonly displaySettings: StudentDisplaySettingsService,
     private readonly feeCycleEngine: FeeCycleEngineService,
     private readonly abcService: StudentAbcService,
+    private readonly academicChangeHistory: AcademicChangeHistoryService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -473,60 +478,78 @@ export class StudentsService {
     }
 
     if (query.search) {
+      const searchTerm = query.search.trim();
+      const transferMatches = searchTerm
+        ? await this.prisma.studentShiftTransfer.findMany({
+            where: {
+              tenantId,
+              status: 'approved',
+              oldRollNumber: { contains: searchTerm, mode: 'insensitive' },
+            },
+            select: { studentId: true },
+            distinct: ['studentId'],
+            take: 50,
+          })
+        : [];
+      const matchedStudentIds = transferMatches.map((t) => t.studentId);
+
       where = {
         ...where,
         OR: [
           {
             enrollmentNumber: {
-              contains: query.search,
+              contains: searchTerm,
               mode: 'insensitive',
             },
           },
-          { rollNumber: { contains: query.search, mode: 'insensitive' } },
+          { rollNumber: { contains: searchTerm, mode: 'insensitive' } },
+          ...(matchedStudentIds.length
+            ? [{ id: { in: matchedStudentIds } }]
+            : []),
           {
             user: {
-              email: { contains: query.search, mode: 'insensitive' },
+              email: { contains: searchTerm, mode: 'insensitive' },
             },
           },
           {
             masterProfile: {
-              fullName: { contains: query.search, mode: 'insensitive' },
+              fullName: { contains: searchTerm, mode: 'insensitive' },
             },
           },
           {
             masterProfile: {
-              mobileNumber: { contains: query.search, mode: 'insensitive' },
+              mobileNumber: { contains: searchTerm, mode: 'insensitive' },
             },
           },
           {
             masterProfile: {
-              nationalId: { contains: query.search, mode: 'insensitive' },
+              nationalId: { contains: searchTerm, mode: 'insensitive' },
             },
           },
           {
             applicationNumber: {
-              contains: query.search,
+              contains: searchTerm,
               mode: 'insensitive',
             },
           },
           {
             admissionNumber: {
-              contains: query.search,
+              contains: searchTerm,
               mode: 'insensitive',
             },
           },
           {
-            rfidNumber: { contains: query.search, mode: 'insensitive' },
+            rfidNumber: { contains: searchTerm, mode: 'insensitive' },
           },
           {
             abcAccount: {
-              abcId: { contains: query.search, mode: 'insensitive' },
+              abcId: { contains: searchTerm, mode: 'insensitive' },
             },
           },
           {
             programVersion: {
               program: {
-                name: { contains: query.search, mode: 'insensitive' },
+                name: { contains: searchTerm, mode: 'insensitive' },
               },
             },
           },
@@ -1088,6 +1111,23 @@ export class StudentsService {
     const semesterSequence =
       dtoSemesterSequence ?? admitDto.currentSemester ?? 1;
 
+    let resolvedSelections = subjectSelections ?? {};
+    if (
+      admitDto.primaryShiftId &&
+      admitDto.programVersionId &&
+      registrationAction !== 'NONE'
+    ) {
+      resolvedSelections = await this.shiftCurriculum.enrichSubjectSelections(
+        tenantId,
+        {
+          shiftId: admitDto.primaryShiftId,
+          programVersionId: admitDto.programVersionId,
+          semesterSequence,
+          selections: resolvedSelections,
+        },
+      );
+    }
+
     if (admitDto.majorSubjectSlug && admitDto.minorSubjectSlug) {
       await this.eligibility.assertValidMajorMinorPair(
         tenantId,
@@ -1097,8 +1137,8 @@ export class StudentsService {
     }
 
     if (
-      subjectSelections &&
-      Object.keys(subjectSelections).length > 0 &&
+      resolvedSelections &&
+      Object.keys(resolvedSelections).length > 0 &&
       registrationAction !== 'NONE'
     ) {
       const class12Subjects = this.extractClass12SubjectsFromSections(sections);
@@ -1112,7 +1152,7 @@ export class StudentsService {
           majorSubjectSlug: admitDto.majorSubjectSlug,
           minorSubjectSlug: admitDto.minorSubjectSlug,
           class12Subjects,
-          selections: subjectSelections,
+          selections: resolvedSelections,
         },
       );
       if (!validation.ok) {
@@ -1125,6 +1165,20 @@ export class StudentsService {
 
     const profile = await this.admit(tenantId, admitDto);
     const studentId = profile.id;
+
+    if (
+      resolvedSelections &&
+      Object.keys(resolvedSelections).length > 0 &&
+      (await this.shiftCurriculum.selectionTriggersNccEnrollment(
+        tenantId,
+        resolvedSelections,
+      ))
+    ) {
+      await this.prisma.studentAcademicProfile.updateMany({
+        where: { tenantId, studentId },
+        data: { nccEnrolled: true },
+      });
+    }
 
     await this.prisma.student.update({
       where: { id: studentId },
@@ -1144,7 +1198,7 @@ export class StudentsService {
         registrationAction !== 'NONE' &&
         admitDto.programVersionId &&
         (admitDto.majorSubjectSlug ||
-          (subjectSelections && Object.keys(subjectSelections).length > 0))
+          (resolvedSelections && Object.keys(resolvedSelections).length > 0))
       ) {
         const semesterId = await this.resolveRegistrationSemesterId(
           tenantId,
@@ -1174,7 +1228,7 @@ export class StudentsService {
         await this.syncAdmissionLanguageEligibility(
           tenantId,
           studentId,
-          subjectSelections ?? {},
+          resolvedSelections ?? {},
         );
 
         const lines = await this.registrationEngine.buildAdmitRegistrationLines(
@@ -1185,7 +1239,7 @@ export class StudentsService {
             semesterSequence,
             shiftId: admitDto.primaryShiftId,
             streamId: admitDto.streamId,
-            subjectSelections: subjectSelections ?? {},
+            subjectSelections: resolvedSelections ?? {},
             assignedById: actorId,
           },
         );
@@ -2062,6 +2116,17 @@ export class StudentsService {
       student?.academicProfile?.admissionBatch?.entrySession?.institutionId;
     const admissionYear =
       student?.academicProfile?.admissionBatch?.admissionYear;
+    const [fromShift, toShift] = await Promise.all([
+      this.prisma.shift.findFirst({
+        where: { id: transfer.fromShiftId, tenantId },
+        select: { id: true, code: true, name: true },
+      }),
+      this.prisma.shift.findFirst({
+        where: { id: transfer.toShiftId, tenantId },
+        select: { id: true, code: true, name: true },
+      }),
+    ]);
+
     const shiftRangesActive =
       institutionId && admissionYear
         ? await this.rollShiftRange.hasActiveShiftRanges(
@@ -2071,26 +2136,44 @@ export class StudentsService {
           )
         : false;
 
-    if (shiftRangesActive) {
-      await this.rollShiftRange.processShiftTransferRollChange(tenantId, {
+    if (!shiftRangesActive) {
+      throw new BadRequestException(
+        'Shift roll number ranges are not configured for this admission year',
+      );
+    }
+
+    const rollChange = await this.rollShiftRange.processShiftTransferRollChange(
+      tenantId,
+      {
         studentId: transfer.studentId,
         fromShiftId: transfer.fromShiftId,
         toShiftId: transfer.toShiftId,
         transferId,
         reason: transfer.reason ?? undefined,
         actorId,
-      });
-    } else {
-      await this.prisma.$transaction([
-        this.prisma.student.update({
-          where: { id: transfer.studentId },
-          data: { primaryShiftId: transfer.toShiftId },
-        }),
-        this.prisma.studentAcademicProfile.updateMany({
-          where: { studentId: transfer.studentId },
-          data: { preferredShiftId: transfer.toShiftId },
-        }),
-      ]);
+      },
+    );
+
+    const shiftLabel = (shift: { code: string; name: string }) =>
+      `${shift.code} — ${shift.name}`;
+
+    if (fromShift && toShift) {
+      await this.academicChangeHistory.logShiftTransferChanges(
+        tenantId,
+        transfer.studentId,
+        {
+          shiftLabel: shiftLabel(fromShift),
+          rollNumber: rollChange.oldRollNumber,
+        },
+        {
+          shiftLabel: shiftLabel(toShift),
+          rollNumber: rollChange.newRollNumber,
+        },
+        {
+          actorId,
+          reason: transfer.reason ?? 'Shift transfer',
+        },
+      );
     }
 
     return this.prisma.studentShiftTransfer.findFirst({
@@ -2170,11 +2253,113 @@ export class StudentsService {
       reason?: string;
     },
     actorId?: string,
+    audit?: AcademicChangeAuditContext,
   ) {
-    return this.rollShiftRange.bulkShiftTransferWithRollRegeneration(tenantId, {
+    const results: Array<{
+      studentId: string;
+      status: 'success' | 'failed';
+      oldRollNumber?: string | null;
+      newRollNumber?: string | null;
+      error?: string;
+    }> = [];
+
+    for (const studentId of input.studentIds) {
+      try {
+        const result = await this.executeShiftTransfer(
+          tenantId,
+          {
+            studentId,
+            toShiftId: input.toShiftId,
+            reason: input.reason,
+          },
+          actorId ?? '',
+          audit,
+        );
+        results.push({
+          studentId,
+          status: 'success',
+          oldRollNumber: result.oldRollNumber,
+          newRollNumber: result.newRollNumber,
+        });
+      } catch (err) {
+        results.push({
+          studentId,
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Transfer failed',
+        });
+      }
+    }
+
+    return {
+      total: input.studentIds.length,
+      succeeded: results.filter((r) => r.status === 'success').length,
+      failed: results.filter((r) => r.status === 'failed').length,
+      results,
+    };
+  }
+
+  async previewShiftTransfer(
+    tenantId: string,
+    studentId: string,
+    toShiftId: string,
+  ) {
+    return this.rollShiftRange.previewShiftTransfer(tenantId, {
+      studentId,
+      toShiftId,
+    });
+  }
+
+  async previewShiftTransferBulk(
+    tenantId: string,
+    input: { studentIds: string[]; toShiftId: string },
+  ) {
+    return this.rollShiftRange.previewShiftTransferBulk(tenantId, input);
+  }
+
+  async executeShiftTransfer(
+    tenantId: string,
+    input: {
+      studentId: string;
+      toShiftId: string;
+      reason?: string;
+    },
+    actorId: string,
+    audit?: AcademicChangeAuditContext,
+  ) {
+    const result = await this.rollShiftRange.executeShiftTransfer(tenantId, {
       ...input,
       actorId,
     });
+
+    const actor = await this.academicChangeHistory.resolveActorContext(
+      tenantId,
+      actorId,
+      audit?.actorRoles,
+    );
+
+    const shiftLabel = (shift: { code: string; name: string }) =>
+      `${shift.code} — ${shift.name}`;
+
+    const auditResult =
+      await this.academicChangeHistory.logShiftTransferChanges(
+        tenantId,
+        input.studentId,
+        {
+          shiftLabel: shiftLabel(result.oldShift),
+          rollNumber: result.oldRollNumber,
+        },
+        {
+          shiftLabel: shiftLabel(result.newShift),
+          rollNumber: result.newRollNumber,
+        },
+        {
+          ...audit,
+          ...actor,
+          reason: input.reason ?? audit?.reason ?? 'Shift transfer',
+        },
+      );
+
+    return { ...result, auditRecorded: auditResult.recorded };
   }
 
   async getStudentRollShiftHistory(tenantId: string, studentId: string) {

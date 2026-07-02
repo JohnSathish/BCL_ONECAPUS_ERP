@@ -57,6 +57,7 @@ type Props = {
   streamOptions: { id: string; label: string }[];
   departmentOptions?: { id: string; label: string }[];
   extended?: boolean;
+  hideShiftFilter?: boolean;
 };
 
 export function StudentReportFiltersBar({
@@ -68,6 +69,7 @@ export function StudentReportFiltersBar({
   streamOptions,
   departmentOptions = [],
   extended = false,
+  hideShiftFilter = false,
 }: Props) {
   return (
     <div className="flex flex-wrap gap-2 rounded-xl border border-border/60 bg-card/80 p-3 print:hidden">
@@ -133,18 +135,20 @@ export function StudentReportFiltersBar({
           </option>
         ))}
       </select>
-      <select
-        className={`${erpSelectClass} max-w-[130px]`}
-        value={filters.shiftId}
-        onChange={(e) => onChange({ shiftId: e.target.value })}
-      >
-        <option value="">All shifts</option>
-        {shiftOptions.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      {!hideShiftFilter ? (
+        <select
+          className={`${erpSelectClass} max-w-[130px]`}
+          value={filters.shiftId}
+          onChange={(e) => onChange({ shiftId: e.target.value })}
+        >
+          <option value="">All shifts</option>
+          {shiftOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
       <select
         className={`${erpSelectClass} max-w-[130px]`}
         value={filters.admissionStatus}

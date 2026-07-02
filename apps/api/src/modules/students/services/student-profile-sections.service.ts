@@ -26,6 +26,8 @@ import type {
   UpdateGuardiansSectionDto,
   VerifyDocumentDto,
 } from '../dto/profile-section.dto';
+import { AcademicChangeHistoryService } from '../academic-change-history/academic-change-history.service';
+import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
 
 const extendedProfileInclude = {
   masterProfile: true,
@@ -73,6 +75,7 @@ export class StudentProfileSectionsService {
     private readonly organization: OrganizationService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
     private readonly abcService: StudentAbcService,
+    private readonly academicChangeHistory: AcademicChangeHistoryService,
   ) {}
 
   async getSection(tenantId: string, studentId: string, sectionKey: string) {
@@ -97,19 +100,23 @@ export class StudentProfileSectionsService {
     sectionKey: string,
     dto: Record<string, unknown>,
     actorId?: string,
+    audit?: AcademicChangeAuditContext,
   ) {
     if (!isProfileSectionKey(sectionKey)) {
       throw new BadRequestException(`Unknown profile section: ${sectionKey}`);
     }
     await this.loadStudent(tenantId, studentId);
 
+    let auditRecorded = 0;
+
     switch (sectionKey) {
       case 'basic':
-        await this.updateBasic(
+        auditRecorded = await this.updateBasic(
           tenantId,
           studentId,
           dto as UpdateBasicSectionDto,
           actorId,
+          audit,
         );
         break;
       case 'category_reservation':
@@ -170,7 +177,8 @@ export class StudentProfileSectionsService {
         throw new BadRequestException(`Unsupported section: ${sectionKey}`);
     }
 
-    return this.getSection(tenantId, studentId, sectionKey);
+    const section = await this.getSection(tenantId, studentId, sectionKey);
+    return { ...section, auditRecorded };
   }
 
   /** Exposed for bulk update — includes latest semester registration lines */
@@ -473,7 +481,8 @@ export class StudentProfileSectionsService {
     studentId: string,
     dto: UpdateBasicSectionDto,
     actorId?: string,
-  ) {
+    audit?: AcademicChangeAuditContext,
+  ): Promise<number> {
     if (dto.enrollmentNumber) {
       const taken = await this.prisma.student.findFirst({
         where: {
@@ -519,6 +528,19 @@ export class StudentProfileSectionsService {
       );
     }
 
+    if (dto.primaryShiftId !== undefined) {
+      throw new BadRequestException(
+        'Shift changes must use the shift transfer endpoint so roll numbers are reassigned automatically.',
+      );
+    }
+
+    const auditReason = dto.auditReason?.trim() || audit?.reason;
+    const mayAudit =
+      dto.programVersionId !== undefined || dto.departmentId !== undefined;
+    const beforeLabels = mayAudit
+      ? await this.loadAcademicLabels(tenantId, studentId)
+      : null;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.student.update({
         where: { id: studentId },
@@ -549,9 +571,6 @@ export class StudentProfileSectionsService {
             : {}),
           ...(dto.departmentId !== undefined
             ? { departmentId: dto.departmentId }
-            : {}),
-          ...(dto.primaryShiftId !== undefined
-            ? { primaryShiftId: dto.primaryShiftId }
             : {}),
           ...(dto.rfidNumber !== undefined ? { rfidNumber } : {}),
           lastModifiedById: actorId,
@@ -646,6 +665,55 @@ export class StudentProfileSectionsService {
     if (dto.abcId !== undefined) {
       await this.abcService.upsertForStudent(tenantId, studentId, dto.abcId);
     }
+
+    if (!mayAudit || !beforeLabels) return 0;
+
+    const afterLabels = await this.loadAcademicLabels(tenantId, studentId);
+    const actor = await this.academicChangeHistory.resolveActorContext(
+      tenantId,
+      actorId,
+      audit?.actorRoles,
+    );
+    const result = await this.academicChangeHistory.logBasicAcademicChanges(
+      tenantId,
+      studentId,
+      beforeLabels,
+      afterLabels,
+      {
+        ...audit,
+        ...actor,
+        reason: auditReason ?? audit?.reason,
+      },
+    );
+    return result.recorded;
+  }
+
+  private async loadAcademicLabels(tenantId: string, studentId: string) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId, deletedAt: null },
+      include: {
+        programVersion: { include: { program: true } },
+        department: true,
+        primaryShift: true,
+      },
+    });
+    if (!student) {
+      return {
+        programmeLabel: null as string | null,
+        departmentLabel: null as string | null,
+        shiftLabel: null as string | null,
+      };
+    }
+    const programmeLabel = student.programVersion
+      ? `${student.programVersion.program.code} — ${student.programVersion.program.name}`
+      : null;
+    const departmentLabel = student.department
+      ? (student.department.name ?? student.department.code)
+      : null;
+    const shiftLabel = student.primaryShift
+      ? `${student.primaryShift.code} — ${student.primaryShift.name}`
+      : null;
+    return { programmeLabel, departmentLabel, shiftLabel };
   }
 
   private normalizeOptionalUuid(value?: string | null) {

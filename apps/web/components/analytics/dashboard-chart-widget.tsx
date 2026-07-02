@@ -11,7 +11,8 @@ import { PendingApprovalsWidget } from '@/components/analytics/pending-approvals
 import { WidgetSkeleton } from '@/components/analytics/widget-skeleton';
 import { useInView } from '@/hooks/use-in-view';
 import { fetchDashboardChart } from '@/services/dashboard-analytics';
-import { useDashboardFilters, useDashboardFiltersStore } from '@/store/dashboard-filters-store';
+import { useEffectiveDashboardFilters } from '@/hooks/use-effective-dashboard-filters';
+import { useDashboardFiltersStore } from '@/store/dashboard-filters-store';
 import type { DashboardChartWidgetId } from '@/types/dashboard-analytics';
 import { cn } from '@/utils/cn';
 
@@ -30,7 +31,7 @@ export function DashboardChartWidget({
   lazy = false,
   className,
 }: Props) {
-  const filters = useDashboardFilters();
+  const filters = useEffectiveDashboardFilters();
   const autoRefresh = useDashboardFiltersStore((s) => s.autoRefresh);
   const { ref, inView } = useInView();
   const enabled = !lazy || inView;

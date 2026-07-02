@@ -107,9 +107,9 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
     return '/student';
   }
   if (canAccessAdminPortal(roles, permissions)) {
-    return resolveDefaultAdminHome(permissions, roles);
+    return '/admin';
   }
-  if (roles.some((r) => r.startsWith('shift-'))) return '/shift';
+  if (roles.some((r) => r.startsWith('shift-'))) return '/admin';
   if (canAccessStaffPortal(roles)) return '/staff/dashboard';
   if (canAccessStudentPortal(roles)) return '/student';
   if (roles.includes('parent')) return '/parent';

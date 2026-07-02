@@ -89,6 +89,12 @@ function DynamicMethodFields({
 
   return (
     <div className="space-y-3">
+      {method.id === 'sbi_icollect' ? (
+        <p className="text-xs text-muted-foreground">
+          Provide <strong>either</strong> SBI Transaction ID <strong>or</strong> Bank Reference
+          Number (at least one).
+        </p>
+      ) : null}
       {method.fields.map((field) => {
         const id = `desk-field-${field.key}`;
         if (field.type === 'textarea') {

@@ -34,6 +34,7 @@ type Props = {
   departmentOptions: { id: string; label: string }[];
   sessionOptions: { id: string; label: string }[];
   categoryOptions: { id: string; label: string }[];
+  hideShiftFilter?: boolean;
 };
 
 const FALLBACK_STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
@@ -49,6 +50,7 @@ export function DirectoryFilterBar({
   departmentOptions,
   sessionOptions,
   categoryOptions,
+  hideShiftFilter = false,
 }: Props) {
   const studentStatusData = useSupportDataOptions('student-status');
   const admissionTypeData = useSupportDataOptions('admission-types');
@@ -135,18 +137,20 @@ export function DirectoryFilterBar({
           </option>
         ))}
       </select>
-      <select
-        className={`${erpSelectClass} max-w-[140px]`}
-        value={filters.shiftId}
-        onChange={(e) => onChange({ shiftId: e.target.value })}
-      >
-        <option value="">All shifts</option>
-        {shiftOptions.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      {!hideShiftFilter ? (
+        <select
+          className={`${erpSelectClass} max-w-[140px]`}
+          value={filters.shiftId}
+          onChange={(e) => onChange({ shiftId: e.target.value })}
+        >
+          <option value="">All shifts</option>
+          {shiftOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
       <select
         className={`${erpSelectClass} max-w-[140px]`}
         value={filters.categoryLookupId}

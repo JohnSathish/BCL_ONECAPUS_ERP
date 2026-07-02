@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CreditCard, FileText, LifeBuoy, LogOut, Settings, User } from 'lucide-react';
 
+import { StaffPortalAvatar } from '@/components/staff-portal/layout/staff-portal-avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,10 +20,12 @@ import { useAuthStore } from '@/store/auth-store';
 
 type Props = {
   displayName: string;
+  fullName?: string;
+  photoUrl?: string | null;
   email?: string | null;
 };
 
-export function StudentUserMenu({ displayName, email }: Props) {
+export function StudentUserMenu({ displayName, fullName, photoUrl, email }: Props) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -37,6 +40,8 @@ export function StudentUserMenu({ displayName, email }: Props) {
     router.replace('/login');
   };
 
+  const avatarName = fullName?.trim() || displayName;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -45,14 +50,17 @@ export function StudentUserMenu({ displayName, email }: Props) {
           className="flex shrink-0 items-center gap-2 rounded-xl border border-border/80 bg-card/80 px-2 py-1.5 backdrop-blur transition hover:bg-muted/50"
           aria-label="Student menu"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-xs font-bold text-primary-foreground">
-            {displayName.slice(0, 2).toUpperCase()}
-          </span>
+          <StaffPortalAvatar
+            photoUrl={photoUrl}
+            name={avatarName}
+            size="sm"
+            className="rounded-lg"
+          />
           <span className="hidden max-w-[100px] truncate text-sm font-medium md:inline">
             {displayName}
           </span>
         </button>
-      </DropdownMenuTrigger>
+      </DropdownMenuTrigger>{' '}
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
           <p className="font-medium">{displayName}</p>

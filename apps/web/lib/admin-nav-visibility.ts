@@ -50,6 +50,7 @@ function filterNavItem(item: NavItem, ctx: AdminNavContext): NavItem | null {
   if (item.children?.length) {
     const children = item.children.filter((child) => childVisible(child, ctx));
     if (children.length === 0) return null;
+    if (!itemAllowed) return null;
     return { ...item, children };
   }
 

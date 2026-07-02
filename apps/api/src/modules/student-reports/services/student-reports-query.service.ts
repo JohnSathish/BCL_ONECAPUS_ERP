@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { DataScopeService } from '../../../common/permissions/data-scope.service';
+import { ShiftScopeService } from '../../../common/services/shift-scope.service';
 import { PrismaService } from '../../../database/prisma.service';
 import type { StudentReportFiltersDto } from '../dto/student-reports.dto';
 
@@ -12,6 +13,7 @@ export class StudentReportsQueryService {
   constructor(
     readonly prisma: PrismaService,
     private readonly dataScope: DataScopeService,
+    private readonly shiftScope: ShiftScopeService,
   ) {}
 
   buildWhere(
@@ -27,8 +29,14 @@ export class StudentReportsQueryService {
         ? { programVersionId: filters.programVersionId }
         : {}),
       ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
-      ...(filters.shiftId ? { primaryShiftId: filters.shiftId } : {}),
     };
+
+    if (user) {
+      const scope = this.shiftScope.resolveScope(user, filters.shiftId);
+      where = this.shiftScope.applyPrimaryShiftWhere(where, scope);
+    } else if (filters.shiftId) {
+      where = { ...where, primaryShiftId: filters.shiftId };
+    }
 
     if (filters.semester) {
       where = {

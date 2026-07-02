@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarRange, CheckCircle2, Layers, Plus } from 'lucide-react';
+import { ArrowLeft, CalendarRange, CheckCircle2, Layers, Plus } from 'lucide-react';
 import {
   activateFeeCycle,
   bulkGenerateCycleDemands,
@@ -68,6 +69,14 @@ export function FeeCycleConfigPanel() {
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/admin/fees"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Finance / Fees
+      </Link>
+
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

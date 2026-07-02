@@ -61,30 +61,19 @@ export async function seedArtsShiftIiTimetable(
     return null;
   }
 
-  let shiftIi = await prisma.shift.findFirst({
+  const shiftIi = await prisma.shift.findFirst({
     where: {
       tenantId,
       campusId,
       code: 'SHIFT_II',
       deletedAt: null,
-      status: 'ACTIVE',
     },
   });
-  if (!shiftIi) {
-    shiftIi = await prisma.shift.create({
-      data: {
-        tenantId,
-        institutionId,
-        campusId,
-        name: 'Arts Shift II',
-        code: 'SHIFT_II',
-        startTime: parseTimeToDate('09:45:00'),
-        endTime: parseTimeToDate('15:30:00'),
-        shiftType: 'REGULAR',
-        status: 'ACTIVE',
-        sortOrder: 2,
-      },
-    });
+  if (!shiftIi || shiftIi.status !== 'ACTIVE') {
+    console.warn(
+      'Arts Shift II timetable seed skipped: SHIFT_II is discontinued or missing',
+    );
+    return null;
   }
 
   let plan = await prisma.timetablePlan.findFirst({

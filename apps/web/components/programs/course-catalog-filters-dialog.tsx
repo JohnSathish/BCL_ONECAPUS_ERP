@@ -20,6 +20,7 @@ type Props = {
   onClear: () => void;
   departments: Department[];
   programVersions: ProgramVersionOption[];
+  allowAllProgrammes?: boolean;
 };
 
 export function CourseCatalogFiltersDialog({
@@ -30,6 +31,7 @@ export function CourseCatalogFiltersDialog({
   onClear,
   departments,
   programVersions,
+  allowAllProgrammes = true,
 }: Props) {
   const [draft, setDraft] = useState(filters);
 
@@ -50,6 +52,7 @@ export function CourseCatalogFiltersDialog({
           departments={departments}
           programVersions={programVersions}
           layout="stacked"
+          allowAllProgrammes={allowAllProgrammes}
         />
         <div className="mt-6 flex gap-2">
           <Button

@@ -32,6 +32,8 @@ import { DEFAULT_FAVORITE_HREFS, NAV_SEARCH_ACTIONS, moduleColor } from '@/confi
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-me';
 import { buildStaffNavContext, filterStaffNav } from '@/lib/staff-portal/nav-visibility';
 import { buildAdminNavContext, filterAdminNav } from '@/lib/admin-nav-visibility';
+import { applyWorkspaceNavLabels } from '@/lib/workspace/workspace-nav';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { Input } from '@/components/ui/input';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
@@ -165,12 +167,14 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   }, [pathname, setMobileNavOpen]);
 
   const session = useAuthStore((s) => s.session);
+  const workspaceKind = useWorkspaceStore((s) => s.kind);
   const userPerms = session?.user?.permissions ?? [];
   const isAdminLayout = role === 'admin';
 
   const groups: NavGroup[] = useMemo(() => {
     if (role === 'admin') {
-      return filterAdminNav(ADMIN_NAV, buildAdminNavContext(session ?? undefined));
+      const filtered = filterAdminNav(ADMIN_NAV, buildAdminNavContext(session ?? undefined));
+      return applyWorkspaceNavLabels(filtered, workspaceKind);
     }
     if (role === 'staff') {
       const ctx = staffMe.data
@@ -198,7 +202,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         })),
       },
     ];
-  }, [role, staffMe.data, userPerms, session]);
+  }, [role, staffMe.data, userPerms, session, workspaceKind]);
 
   const navIndex = useMemo(() => buildNavIndex(groups), [groups]);
 

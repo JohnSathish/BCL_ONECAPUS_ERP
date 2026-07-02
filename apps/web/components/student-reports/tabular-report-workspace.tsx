@@ -6,17 +6,15 @@ import { Download, RefreshCw } from 'lucide-react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import {
   exportBuiltinReport,
   previewBuiltinReport,
   type BuiltinReportKey,
-  type StudentReportFilters,
 } from '@/services/student-reports';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -27,10 +25,9 @@ type Props = {
 };
 
 export function TabularReportWorkspace({ reportKey, title, description }: Props) {
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const [message, setMessage] = useState('');
   const filterOptions = useStudentReportFilterOptions();
-  const apiFilters = toApiFilters(filters) as StudentReportFilters;
 
   const previewQuery = useQuery({
     queryKey: ['builtin-report-preview', reportKey, apiFilters],
@@ -53,7 +50,8 @@ export function TabularReportWorkspace({ reportKey, title, description }: Props)
 
       <StudentReportFiltersBar
         filters={filters}
-        onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+        onChange={patchFilters}
+        hideShiftFilter={hideShiftFilter}
         extended
         {...filterOptions}
       />

@@ -1027,8 +1027,46 @@ export class TimetableEngineService {
     filters?: { shiftId?: string; streamId?: string },
   ) {
     const resolvedStaffId = staffProfileId ?? (await this.staffIdForUser(user));
-    if (!resolvedStaffId) return { entries: [] };
+    if (!resolvedStaffId) return { entries: [], rows: [], days: [] };
 
+    if (!filters?.shiftId) {
+      const assignments = await this.prisma.staffShiftAssignment.findMany({
+        where: {
+          tenantId: user.tid,
+          staffProfileId: resolvedStaffId,
+          active: true,
+        },
+        include: {
+          shift: { select: { id: true, code: true, name: true } },
+        },
+      });
+      if (assignments.length > 1) {
+        const matrices = await Promise.all(
+          assignments.map((assignment) =>
+            this.facultyWeekSingle(
+              user,
+              resolvedStaffId,
+              {
+                ...filters,
+                shiftId: assignment.shiftId,
+              },
+              assignment.shift,
+            ),
+          ),
+        );
+        return this.mergeFacultyWeekResults(matrices);
+      }
+    }
+
+    return this.facultyWeekSingle(user, resolvedStaffId, filters);
+  }
+
+  private async facultyWeekSingle(
+    user: JwtUser,
+    resolvedStaffId: string,
+    filters?: { shiftId?: string; streamId?: string },
+    shiftMeta?: { id: string; code: string; name: string } | null,
+  ) {
     const staff = await this.prisma.staffProfile.findFirst({
       where: { tenantId: user.tid, id: resolvedStaffId, deletedAt: null },
       select: { primaryShiftId: true, teachingShiftCategory: true },
@@ -1053,11 +1091,64 @@ export class TimetableEngineService {
     }
 
     const plan = await this.latestPublishedPlan(user.tid, planFilters);
-    if (!plan) return { entries: [] };
+    if (!plan) return { entries: [], rows: [], days: [] };
     const matrix = await this.print.matrix(user.tid, plan.id, {
       staffProfileId: resolvedStaffId,
     });
-    return { plan, ...matrix };
+    const shift =
+      shiftMeta ??
+      (plan.shiftId
+        ? await this.prisma.shift.findFirst({
+            where: { tenantId: user.tid, id: plan.shiftId },
+            select: { id: true, code: true, name: true },
+          })
+        : null);
+    const rows = (matrix.rows ?? []).map(
+      (row: { entries?: Record<string, unknown>[] }) => ({
+        ...row,
+        entries: (row.entries ?? []).map((entry) => ({
+          ...entry,
+          shiftId: shift?.id ?? plan.shiftId ?? null,
+          shiftCode: shift?.code ?? null,
+          shiftName: shift?.name ?? null,
+        })),
+      }),
+    );
+    return { plan, ...matrix, rows };
+  }
+
+  private mergeFacultyWeekResults(
+    matrices: Array<{
+      plan?: unknown;
+      rows?: Array<Record<string, unknown>>;
+      days?: unknown[];
+    }>,
+  ) {
+    const rowMap = new Map<string, Record<string, unknown>>();
+    for (const matrix of matrices) {
+      for (const row of matrix.rows ?? []) {
+        const key = `${row.dayOfWeek}:${row.startTime}:${row.endTime}:${row.id ?? row.label}`;
+        const existing = rowMap.get(key);
+        if (existing) {
+          existing.entries = [
+            ...((existing.entries as unknown[]) ?? []),
+            ...((row.entries as unknown[]) ?? []),
+          ];
+        } else {
+          rowMap.set(key, {
+            ...row,
+            entries: [...((row.entries as unknown[]) ?? [])],
+          });
+        }
+      }
+    }
+    const populated = matrices.find((matrix) => (matrix.rows?.length ?? 0) > 0);
+    return {
+      plan: matrices.find((matrix) => matrix.plan)?.plan,
+      days: populated?.days ?? [],
+      rows: Array.from(rowMap.values()),
+      mergedShifts: true,
+    };
   }
 
   async studentWeek(

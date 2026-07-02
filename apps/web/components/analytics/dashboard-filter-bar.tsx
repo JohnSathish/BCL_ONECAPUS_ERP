@@ -11,7 +11,12 @@ import {
 } from '@/services/organization';
 import { fetchPrograms } from '@/services/programs';
 import { fetchShifts } from '@/services/shifts';
-import { useDashboardFilters, useDashboardFiltersStore } from '@/store/dashboard-filters-store';
+import { useDashboardFiltersStore } from '@/store/dashboard-filters-store';
+import {
+  useEffectiveDashboardFilters,
+  useSyncWorkspaceDashboardShift,
+} from '@/hooks/use-effective-dashboard-filters';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { cn } from '@/utils/cn';
 import { formatDisplayDateTime } from '@/utils/format-date';
 
@@ -25,7 +30,9 @@ const selectClass =
   'h-9 min-w-0 rounded-lg border border-border/80 bg-background px-2 text-xs text-foreground';
 
 export function DashboardFilterBar({ lastUpdated, onRefresh, isRefreshing }: Props) {
-  const filters = useDashboardFilters();
+  useSyncWorkspaceDashboardShift();
+  const filters = useEffectiveDashboardFilters();
+  const { hideShiftSelectors } = useShiftScope();
   const autoRefresh = useDashboardFiltersStore((s) => s.autoRefresh);
   const setFilter = useDashboardFiltersStore((s) => s.setFilter);
   const setFilters = useDashboardFiltersStore((s) => s.setFilters);
@@ -41,7 +48,7 @@ export function DashboardFilterBar({ lastUpdated, onRefresh, isRefreshing }: Pro
   const programs = useQuery({ queryKey: ['programs', 1], queryFn: () => fetchPrograms(1) });
   const shifts = useQuery({
     queryKey: ['shifts', filters.campusId],
-    queryFn: () => fetchShifts({ campusId: filters.campusId }),
+    queryFn: () => fetchShifts({ campusId: filters.campusId, status: 'ACTIVE' }),
   });
 
   const semesters = useMemo(() => {
@@ -137,18 +144,20 @@ export function DashboardFilterBar({ lastUpdated, onRefresh, isRefreshing }: Pro
           ))}
         </select>
 
-        <select
-          className={selectClass}
-          value={filters.shiftId ?? ''}
-          onChange={(e) => setFilter('shiftId', e.target.value || undefined)}
-        >
-          <option value="">All shifts</option>
-          {(shifts.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code}
-            </option>
-          ))}
-        </select>
+        {!hideShiftSelectors ? (
+          <select
+            className={selectClass}
+            value={filters.shiftId ?? ''}
+            onChange={(e) => setFilter('shiftId', e.target.value || undefined)}
+          >
+            <option value="">All shifts</option>
+            {(shifts.data ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code}
+              </option>
+            ))}
+          </select>
+        ) : null}
 
         <select
           className={selectClass}

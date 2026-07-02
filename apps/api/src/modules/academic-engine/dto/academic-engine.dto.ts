@@ -293,6 +293,10 @@ export class UpdateRegistrationLinesDto {
   @ValidateNested({ each: true })
   @Type(() => RegistrationLineDto)
   lines!: RegistrationLineDto[];
+
+  @IsOptional()
+  @IsString()
+  auditReason?: string;
 }
 
 export class LockWindowDto {

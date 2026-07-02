@@ -174,7 +174,7 @@ export class CareersPortalService {
         facultyMembers: staffCount >= 20 ? staffCount : 150,
         students: studentCount >= 100 ? studentCount : 3000,
         departments: deptCount >= 5 ? deptCount : 17,
-        naacGrade: naacFromBadges ?? 'NAAC B Grade',
+        naacGrade: naacFromBadges ?? "NAAC Re-accredited with Grade 'B'",
         yearsOfExcellence: 39,
       },
       principalMessage: {

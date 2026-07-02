@@ -85,6 +85,10 @@ export class ProvisionPoolSectionsDto {
 
   @IsOptional()
   @IsUUID()
+  shiftId?: string;
+
+  @IsOptional()
+  @IsUUID()
   institutionId?: string;
 
   @IsOptional()

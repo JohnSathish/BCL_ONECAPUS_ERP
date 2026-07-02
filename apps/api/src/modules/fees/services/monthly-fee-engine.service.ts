@@ -352,11 +352,7 @@ export class MonthlyFeeEngineService {
         pts += 32;
       if (majorSlug.includes('commerce') && plan.code === 'COMMERCE') pts += 32;
       if (majorSlug.includes('science') && plan.code === 'SCIENCE') pts += 32;
-      if (
-        shiftCode &&
-        ['MORNING', 'EVENING'].includes(shiftCode) &&
-        plan.code === 'ARTS_MORNING'
-      )
+      if (shiftCode && shiftCode === 'MORNING' && plan.code === 'ARTS_MORNING')
         pts += 8;
       if (shiftCode === 'DAY' && plan.code === 'ARTS_DAY') pts += 8;
       return pts;

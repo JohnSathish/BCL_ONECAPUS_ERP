@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
+import { useWorkspaceBoundShiftState } from '@/hooks/use-workspace-bound-shift-state';
 import {
   createTeachingSubjectGroup,
   fetchTeachingSubjectGroups,
@@ -25,7 +26,8 @@ export default function TeachingSubjectGroupsPage() {
   const authReady = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [semesterNo, setSemesterNo] = useState(3);
-  const [shiftId, setShiftId] = useState('');
+  const { shiftId, setShiftId, effectiveShiftId, hideShiftFilter, workspaceShiftLabel } =
+    useWorkspaceBoundShiftState();
   const [category, setCategory] = useState('');
   const [error, setError] = useState('');
   const [code, setCode] = useState('');
@@ -46,11 +48,11 @@ export default function TeachingSubjectGroupsPage() {
   const params = useMemo(
     () => ({
       semesterNo,
-      shiftId: shiftId || undefined,
+      shiftId: effectiveShiftId,
       fyugpCategory: category || undefined,
       academicYearId,
     }),
-    [semesterNo, shiftId, category, academicYearId],
+    [academicYearId, category, effectiveShiftId, semesterNo],
   );
 
   const groupsQ = useQuery({
@@ -63,7 +65,7 @@ export default function TeachingSubjectGroupsPage() {
     mutationFn: () =>
       syncTeachingSubjectGroups({
         semesterNo,
-        shiftId: shiftId || undefined,
+        shiftId: effectiveShiftId,
         academicYearId: academicYearId,
         fyugpCategory: category || undefined,
       }),
@@ -81,7 +83,7 @@ export default function TeachingSubjectGroupsPage() {
         title,
         semesterNo,
         fyugpCategory: newCategory,
-        shiftId: shiftId || undefined,
+        shiftId: effectiveShiftId,
         academicYearId: academicYearId,
       }),
     onSuccess: () => {
@@ -129,18 +131,24 @@ export default function TeachingSubjectGroupsPage() {
           </div>
           <div>
             <Label>Shift</Label>
-            <select
-              className="mt-1 rounded-md border bg-background px-3 py-2 text-sm"
-              value={shiftId}
-              onChange={(e) => setShiftId(e.target.value)}
-            >
-              <option value="">All shifts</option>
-              {shifts.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            {!hideShiftFilter ? (
+              <select
+                className="mt-1 rounded-md border bg-background px-3 py-2 text-sm"
+                value={shiftId}
+                onChange={(e) => setShiftId(e.target.value)}
+              >
+                <option value="">All shifts</option>
+                {shifts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="mt-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                {workspaceShiftLabel ?? 'Workspace shift'}
+              </p>
+            )}
           </div>
           <div>
             <Label>Category</Label>

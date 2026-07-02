@@ -74,6 +74,7 @@ export type StudentFeeAccount = {
   receipts: Array<{ id: string; receiptNo: string; amount: number; issuedAt: string }>;
   studentPortal?: {
     onlineEnabled: boolean;
+    mobileRazorpayEnabled?: boolean;
     officePaymentEnabled: boolean;
     officeMethods: string[];
     showPayAtOffice: boolean;

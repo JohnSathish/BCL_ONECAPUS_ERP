@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { fetchMyAttendance } from '@/services/attendance';
 import type { AttendanceSubject, StudentAttendanceSummary } from '@/types/attendance';
+import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 
 function pct(value: number | string | null | undefined) {
   return Number(value ?? 0);
@@ -60,90 +61,94 @@ export default function StudentAttendanceScreen() {
 
   if (loading && !data) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.muted}>Loading attendance…</Text>
-      </View>
+      <StudentScreenShell title="Attendance" subtitle="Subject-wise register">
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.muted}>Loading attendance…</Text>
+        </View>
+      </StudentScreenShell>
     );
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
-    >
-      <Text style={styles.title}>My Attendance</Text>
-      <Text style={styles.subtitle}>Subject-wise register and eligibility warnings</Text>
+    <StudentScreenShell title="Attendance" subtitle="Subject-wise register & alerts">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
+      >
+        {message ? <Text style={styles.error}>{message}</Text> : null}
 
-      {message ? <Text style={styles.error}>{message}</Text> : null}
-
-      <View style={styles.kpiRow}>
-        <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Overall</Text>
-          <Text
-            style={[styles.kpiValue, { color: overall == null ? '#374151' : toneColor(overall) }]}
-          >
-            {overall == null ? '—' : pctLabel(overall)}
-          </Text>
-        </View>
-        <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Subjects</Text>
-          <Text style={styles.kpiValue}>{subjects.length}</Text>
-        </View>
-        <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Alerts</Text>
-          <Text style={[styles.kpiValue, { color: alerts.length ? '#d97706' : '#059669' }]}>
-            {alerts.length}
-          </Text>
-        </View>
-      </View>
-
-      {alerts.length > 0 ? (
-        <View style={styles.alertBox}>
-          <Text style={styles.alertTitle}>Attendance alerts</Text>
-          {alerts.map((alert, index) => (
-            <Text key={`${alert.courseId ?? 'alert'}-${index}`} style={styles.alertItem}>
-              {alert.message}: {pctLabel(alert.percentage)}
+        <View style={styles.kpiRow}>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Overall</Text>
+            <Text
+              style={[styles.kpiValue, { color: overall == null ? '#374151' : toneColor(overall) }]}
+            >
+              {overall == null ? '—' : pctLabel(overall)}
             </Text>
-          ))}
+          </View>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Subjects</Text>
+            <Text style={styles.kpiValue}>{subjects.length}</Text>
+          </View>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Alerts</Text>
+            <Text style={[styles.kpiValue, { color: alerts.length ? '#d97706' : '#059669' }]}>
+              {alerts.length}
+            </Text>
+          </View>
         </View>
-      ) : null}
 
-      <Text style={styles.section}>Subject register</Text>
-      {subjects.length === 0 ? (
-        <Text style={styles.muted}>No attendance records yet for this semester.</Text>
-      ) : (
-        subjects.map((subject) => {
-          const value = pct(subject.percentage);
-          return (
-            <View key={subject.id} style={styles.subjectCard}>
-              <View style={styles.subjectHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.subjectTitle}>{subjectLabel(subject)}</Text>
-                  <Text style={styles.muted}>
-                    Present {subject.presentCount}/{subject.totalSessions} · Absent{' '}
-                    {subject.absentCount}
+        {alerts.length > 0 ? (
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Attendance alerts</Text>
+            {alerts.map((alert, index) => (
+              <Text key={`${alert.courseId ?? 'alert'}-${index}`} style={styles.alertItem}>
+                {alert.message}: {pctLabel(alert.percentage)}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        <Text style={styles.section}>Subject register</Text>
+        {subjects.length === 0 ? (
+          <Text style={styles.muted}>No attendance records yet for this semester.</Text>
+        ) : (
+          subjects.map((subject) => {
+            const value = pct(subject.percentage);
+            return (
+              <View key={subject.id} style={styles.subjectCard}>
+                <View style={styles.subjectHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subjectTitle}>{subjectLabel(subject)}</Text>
+                    <Text style={styles.muted}>
+                      Present {subject.presentCount}/{subject.totalSessions} · Absent{' '}
+                      {subject.absentCount}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.badge,
+                      { color: toneColor(value), borderColor: toneColor(value) },
+                    ]}
+                  >
+                    {pctLabel(value)}
                   </Text>
                 </View>
-                <Text
-                  style={[styles.badge, { color: toneColor(value), borderColor: toneColor(value) }]}
-                >
-                  {pctLabel(value)}
-                </Text>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      { width: `${Math.min(100, value)}%`, backgroundColor: toneColor(value) },
+                    ]}
+                  />
+                </View>
               </View>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    { width: `${Math.min(100, value)}%`, backgroundColor: toneColor(value) },
-                  ]}
-                />
-              </View>
-            </View>
-          );
-        })
-      )}
-    </ScrollView>
+            );
+          })
+        )}
+      </ScrollView>
+    </StudentScreenShell>
   );
 }
 

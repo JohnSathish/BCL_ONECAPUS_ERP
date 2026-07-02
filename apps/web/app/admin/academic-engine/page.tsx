@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { FyugpStructurePanel } from '@/components/academic-engine/structure/FyugpStructurePanel';
+import { ShiftCurriculumShell } from '@/components/academic-engine/shift-curriculum/ShiftCurriculumShell';
 import { CategoryPoolsPanel } from '@/components/academic-engine/category-pools/CategoryPoolsPanel';
 import {
   createAcademicEngineOfferingSection,
@@ -33,7 +34,15 @@ import { fetchAcademicYears } from '@/services/organization';
 import { fetchPrograms } from '@/services/programs';
 import type { CourseOfferingRow, SeatUtilizationRow } from '@/types/academic-engine';
 
-type TabId = 'overview' | 'structure' | 'pools' | 'offerings' | 'sections' | 'windows' | 'reports';
+type TabId =
+  | 'overview'
+  | 'shift-curriculum'
+  | 'structure'
+  | 'pools'
+  | 'offerings'
+  | 'sections'
+  | 'windows'
+  | 'reports';
 
 export default function AcademicEnginePage() {
   const session = useRequireAuth();
@@ -41,6 +50,7 @@ export default function AcademicEnginePage() {
   const [tab, setTab] = useState<TabId>('overview');
   const [programVersionId, setProgramVersionId] = useState('');
   const [semFilter, setSemFilter] = useState('1');
+  const [provisionShiftId, setProvisionShiftId] = useState('');
   const [provisionMessage, setProvisionMessage] = useState<string | null>(null);
   const [windowForm, setWindowForm] = useState({
     semesterId: '',
@@ -86,17 +96,22 @@ export default function AcademicEnginePage() {
   const shifts = useQuery({
     queryKey: ['academic-engine', 'shifts'],
     queryFn: fetchShifts,
-    enabled: Boolean(session) && (tab === 'offerings' || tab === 'sections'),
+    enabled: Boolean(session),
   });
 
-  const dayShiftId = shifts.data?.find((s) => s.code === 'DAY')?.id ?? shifts.data?.[0]?.id ?? '';
+  const activeShifts = (shifts.data ?? []).filter((s) => s.status === 'ACTIVE');
+  const selectedProvisionShiftId =
+    provisionShiftId || activeShifts.find((s) => s.code === 'DAY')?.id || activeShifts[0]?.id || '';
+  const selectedProvisionShift =
+    activeShifts.find((s) => s.id === selectedProvisionShiftId) ?? activeShifts[0];
 
   const provisionMut = useMutation({
     mutationFn: () =>
       provisionPoolSections({
         semesterNo: Number(semFilter),
         categories: ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'],
-        shiftCode: 'DAY',
+        shiftCode: selectedProvisionShift?.code ?? 'DAY',
+        shiftId: selectedProvisionShiftId,
       }),
     onSuccess: (result) => {
       setProvisionMessage(
@@ -109,7 +124,7 @@ export default function AcademicEnginePage() {
   const addSectionMut = useMutation({
     mutationFn: (offeringId: string) =>
       createAcademicEngineOfferingSection(offeringId, {
-        shiftId: dayShiftId,
+        shiftId: selectedProvisionShiftId,
         sectionCode: 'A',
       }),
     onSuccess: () => {
@@ -198,6 +213,7 @@ export default function AcademicEnginePage() {
           onChange={setTab}
           tabs={[
             { id: 'overview', label: 'Overview' },
+            { id: 'shift-curriculum', label: 'Curriculum manager' },
             { id: 'structure', label: 'FYUGP structure' },
             { id: 'pools', label: 'Shared category pools' },
             { id: 'offerings', label: 'Offerings' },
@@ -249,6 +265,8 @@ export default function AcademicEnginePage() {
           </Card>
         ) : null}
 
+        {tab === 'shift-curriculum' ? <ShiftCurriculumShell /> : null}
+
         {tab === 'structure' ? (
           <FyugpStructurePanel
             programVersionId={pvId}
@@ -266,15 +284,26 @@ export default function AcademicEnginePage() {
             />
             <CompactCardBody className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 px-3 pt-3 sm:px-4">
+                <select
+                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
+                  value={selectedProvisionShiftId}
+                  onChange={(e) => setProvisionShiftId(e.target.value)}
+                >
+                  {activeShifts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={provisionMut.isPending || !dayShiftId}
+                  disabled={provisionMut.isPending || !selectedProvisionShiftId}
                   onClick={() => provisionMut.mutate()}
                 >
                   {provisionMut.isPending
                     ? 'Provisioning…'
-                    : 'Provision Day · Section A (pool offerings)'}
+                    : `Provision ${selectedProvisionShift?.code ?? 'shift'} · Section A (pool offerings)`}
                 </Button>
                 {poolOfferingsMissingSections > 0 ? (
                   <span className="text-xs text-amber-700 dark:text-amber-300">
@@ -357,7 +386,7 @@ export default function AcademicEnginePage() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-[11px]"
-                          disabled={!dayShiftId || addSectionMut.isPending}
+                          disabled={!selectedProvisionShiftId || addSectionMut.isPending}
                           onClick={() => addSectionMut.mutate(o.id)}
                         >
                           Add Day · A

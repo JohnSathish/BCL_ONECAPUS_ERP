@@ -41,6 +41,7 @@ async function main() {
       primaryColor: '#1e3a5f',
       accentColor: '#c8102e',
       sidebarColor: '#152a45',
+      logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
       portalExtrasJson: {
@@ -63,6 +64,7 @@ async function main() {
       primaryColor: '#1e3a5f',
       accentColor: '#c8102e',
       sidebarColor: '#152a45',
+      logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
       portalExtrasJson: {

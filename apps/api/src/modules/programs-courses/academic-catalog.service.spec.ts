@@ -3,6 +3,7 @@ import { AcademicCatalogService } from './academic-catalog.service';
 
 describe('AcademicCatalogService academic department guard', () => {
   const shiftScope = {} as never;
+  const shiftCurriculum = {} as never;
   const sectionStreams = {} as never;
   const cache = {
     wrap: async (_k: string, _ttl: number, fn: () => Promise<unknown>) => fn(),
@@ -23,6 +24,7 @@ describe('AcademicCatalogService academic department guard', () => {
     const service = new AcademicCatalogService(
       prisma as never,
       shiftScope,
+      shiftCurriculum,
       sectionStreams,
       cache,
     );
@@ -63,6 +65,7 @@ describe('AcademicCatalogService academic department guard', () => {
     const service = new AcademicCatalogService(
       prisma as never,
       shiftScope,
+      shiftCurriculum,
       sectionStreams,
       cache,
     );

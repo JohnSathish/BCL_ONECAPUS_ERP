@@ -43,6 +43,7 @@ export class UpdateBasicSectionDto {
   @IsOptional() @IsUUID() admissionBatchId?: string;
   @IsOptional() @IsString() rfidNumber?: string;
   @IsOptional() @IsString() abcId?: string;
+  @IsOptional() @IsString() auditReason?: string;
 }
 
 export class UpdateCategorySectionDto {

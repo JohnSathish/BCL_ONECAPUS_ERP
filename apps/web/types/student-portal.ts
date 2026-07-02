@@ -6,6 +6,9 @@ export type StudentPortalProfile = {
   fullName: string;
   displayFullName?: string | null;
   enrollmentNumber: string;
+  rollNumber: string | null;
+  universityRollNumber: string | null;
+  universityRegistrationNumber: string | null;
   photoUrl: string | null;
   programLabel: string;
   department: string | null;

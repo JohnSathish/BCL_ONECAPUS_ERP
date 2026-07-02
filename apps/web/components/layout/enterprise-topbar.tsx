@@ -9,7 +9,9 @@ import { AcademicContextStrip } from '@/components/layout/academic-context-strip
 import { QuickCreateMenu } from '@/components/layout/quick-create-menu';
 import { LicenseStatusBadge } from '@/components/licensing/license-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { WorkspaceBanner, WorkspaceSwitcher } from '@/components/layout/workspace-chrome';
 import { StudentUserMenu } from '@/components/student-portal/layout/student-user-menu';
+import { useStudentPortalMe } from '@/components/student-portal/hooks/use-student-portal-me';
 import { StaffUserMenu } from '@/components/staff-portal/layout/staff-user-menu';
 import { StaffPortalAvatar } from '@/components/staff-portal/layout/staff-portal-avatar';
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-dashboard';
@@ -27,6 +29,7 @@ import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout } from '@/services/auth';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { useNavPreferencesStore } from '@/store/nav-preferences-store';
 import { cn } from '@/utils/cn';
@@ -51,6 +54,7 @@ export function EnterpriseTopbar({
     broadcastSessionMessage({ type: 'LOGOUT' });
     tokenRefreshManager.clearSchedule();
     useAuthStore.getState().clear();
+    useWorkspaceStore.getState().clearWorkspace();
     try {
       await logout();
     } catch {
@@ -61,9 +65,13 @@ export function EnterpriseTopbar({
 
   const displayName = session?.user.email?.split('@')[0] ?? 'Admin';
   const staffMeQ = useStaffMe({ enabled: portalRole === 'staff' });
+  const studentMeQ = useStudentPortalMe({ enabled: portalRole === 'student' });
   const staffProfile = staffMeQ.data;
+  const studentProfile = studentMeQ.data;
 
   const staffDisplayName = staffProfile?.fullName ?? displayName;
+  const studentDisplayName =
+    studentProfile?.displayFullName?.trim() || studentProfile?.fullName?.trim() || displayName;
   const staffInstitution =
     staffProfile?.institutionName ?? staffProfile?.campusName ?? 'Staff Portal';
 
@@ -144,7 +152,8 @@ export function EnterpriseTopbar({
         )}
 
         {isAdminChrome ? (
-          <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
+          <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
+            <WorkspaceBanner />
             <LicenseStatusBadge />
           </div>
         ) : null}
@@ -168,6 +177,7 @@ export function EnterpriseTopbar({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {portalRole === 'admin' ? <WorkspaceSwitcher /> : null}
           {portalRole === 'admin' && showQuickCreate ? <QuickCreateMenu /> : null}
           <CommandPalette />
           <CampusSwitcher />
@@ -175,7 +185,12 @@ export function EnterpriseTopbar({
           <ThemeToggle />
 
           {portalRole === 'student' ? (
-            <StudentUserMenu displayName={displayName} email={session?.user.email} />
+            <StudentUserMenu
+              displayName={studentDisplayName}
+              fullName={studentProfile?.fullName ?? studentDisplayName}
+              photoUrl={studentProfile?.photoUrl}
+              email={session?.user.email}
+            />
           ) : portalRole === 'staff' ? (
             <StaffUserMenu
               fullName={staffDisplayName}

@@ -521,16 +521,88 @@ export async function fetchSem1EligibleMinors(params: {
   return data as Sem1EligibleMinorsPreview;
 }
 
+export async function downloadSem2AdmissionTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  shiftId?: string;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/template', {
+    params: { variant: 'sem2-admission', ...params },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export type Sem2ImportProgrammeOption = Sem1ImportProgrammeOption;
+
+export type Sem2ImportCurriculum = {
+  programVersionId: string;
+  programCode: string;
+  programName: string;
+  curriculumLabel: string;
+  semesterSequence: 2;
+  shiftId: string | null;
+  majorDepartments: { departmentName: string; paper: { code: string; title: string } }[];
+  mdcPapers: { code: string; title: string }[];
+  aecPapers: { code: string; title: string }[];
+  secPapers: { code: string; title: string }[];
+  vacPapers: { code: string; title: string }[];
+  minorByMajor: Record<string, string[]>;
+};
+
+export async function fetchSem2ImportProgrammes() {
+  const { data } = await api.get('/v1/students/import/sem2-curriculum/programmes');
+  return data as Sem2ImportProgrammeOption[];
+}
+
+export async function fetchSem2ImportCurriculum(params?: {
+  programme?: string;
+  programVersionId?: string;
+  shiftId?: string;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/sem2-curriculum', { params });
+  return data as Sem2ImportCurriculum;
+}
+
 export async function downloadSem3AdmissionTemplate(params?: {
   programme?: string;
   programVersionId?: string;
   semesterSequence?: number;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/template', {
     params: { variant: 'sem3-admission', ...params },
     responseType: 'blob',
   });
   return data as Blob;
+}
+
+export type Sem3ImportCurriculum = {
+  programVersionId: string;
+  programCode: string;
+  programName: string;
+  semesterSequence: number;
+  majorDepartments: {
+    departmentName: string;
+    paper1: { code: string; title: string };
+    paper2: { code: string; title: string };
+  }[];
+  mdcPapers: { code: string; title: string }[];
+  aecPapers: { code: string; title: string }[];
+  secPapers: { code: string; title: string }[];
+  vtcPapers: { code: string; title: string }[];
+};
+
+export async function fetchSem3ImportCurriculum(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  shiftId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/sem3-curriculum', { params });
+  return data as Sem3ImportCurriculum;
 }
 
 export type Sem3ImportProgrammeOption = {

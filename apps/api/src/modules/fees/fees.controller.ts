@@ -27,6 +27,8 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
+import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
+import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
 import { extractRequestHost } from '../../common/utils/request-host';
 import { TenantResolutionService } from '../tenants/tenant-resolution.service';
 import {
@@ -85,6 +87,8 @@ import { ExternalFeePaymentService } from './services/external-fee-payment.servi
 
 @ApiBearerAuth()
 @ApiTags('fees')
+@ShiftScoped()
+@UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'fees', version: '1' })
 export class FeesController {
   constructor(
@@ -395,12 +399,24 @@ export class FeesController {
   async initiateMyPayment(
     @CurrentUser() user: JwtUser,
     @Body() dto: Omit<GatewayPaymentDto, 'studentId'>,
+    @Headers('x-client-type') clientType?: string,
   ) {
     const ledger = await this.ledger.myLedger(user.tid, user.sub);
     if (!ledger.studentId)
       throw new BadRequestException(
         'No student profile linked to this account.',
       );
+    if (clientType === 'mobile') {
+      const config = await this.financeSettings.get(user.tid);
+      const portal = config.studentPortal as
+        | { mobileRazorpayEnabled?: boolean }
+        | undefined;
+      if (portal?.mobileRazorpayEnabled === false) {
+        throw new BadRequestException(
+          'Razorpay fee payment on the mobile app is disabled. Pay via the student web portal or accounts office.',
+        );
+      }
+    }
     return this.gateways.initiate(user, {
       ...dto,
       studentId: ledger.studentId,

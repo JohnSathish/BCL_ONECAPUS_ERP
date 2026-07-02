@@ -330,18 +330,20 @@ export class SubjectRegistrationEngineService {
 
     opts?: { assignedById?: string },
   ) {
-    return this.engine.updateRegistrationLines(
-      tenantId,
-      registrationId,
-      lines,
-      {
-        registrationSource: 'ADMIN_ASSIGNED',
+    return (
+      await this.engine.updateRegistrationLines(
+        tenantId,
+        registrationId,
+        lines,
+        {
+          registrationSource: 'ADMIN_ASSIGNED',
 
-        assignedById: opts?.assignedById,
+          assignedById: opts?.assignedById,
 
-        generatedBy: 'AUTO_ENGINE',
-      },
-    );
+          generatedBy: 'AUTO_ENGINE',
+        },
+      )
+    ).registration;
   }
 
   /** Merge subject selections from admission with auto-generated MAJOR/MINOR lines. */

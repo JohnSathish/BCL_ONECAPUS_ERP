@@ -23,7 +23,8 @@ import { WidgetSkeleton } from '@/components/analytics/widget-skeleton';
 import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel';
 import { LicenseDashboardWidget } from '@/components/licensing/license-dashboard-widget';
 import { fetchDashboardOverview } from '@/services/dashboard-analytics';
-import { useDashboardFilters, useDashboardFiltersStore } from '@/store/dashboard-filters-store';
+import { useEffectiveDashboardFilters } from '@/hooks/use-effective-dashboard-filters';
+import { useDashboardFiltersStore } from '@/store/dashboard-filters-store';
 import type { DashboardKpiMetric } from '@/types/dashboard-analytics';
 import { usePermissions } from '@/hooks/use-permissions';
 import { DASHBOARD_WIDGET_PERMISSIONS } from '@/lib/permissions/permission-registry';
@@ -42,7 +43,7 @@ const KPI_ICONS: Record<string, LucideIcon> = {
 
 export function EnterpriseAnalyticsDashboard() {
   const queryClient = useQueryClient();
-  const filters = useDashboardFilters();
+  const filters = useEffectiveDashboardFilters();
   const autoRefresh = useDashboardFiltersStore((s) => s.autoRefresh);
   const { canAny } = usePermissions();
 

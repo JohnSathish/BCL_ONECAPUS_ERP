@@ -60,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { toShiftOptions } from '@/lib/shift-options';
-import { fetchAcademicStreams } from '@/services/academic-engine';
+import { fetchAcademicStreams, fetchShiftProgrammes } from '@/services/academic-engine';
 import { fetchAdmissionBatches } from '@/services/academic-lifecycle';
 import {
   fetchAcademicDepartments,
@@ -195,6 +195,11 @@ export function AddStudentWizard() {
     queryFn: () => fetchShifts({ campusId, status: 'ACTIVE' }),
     enabled: Boolean(session) && Boolean(campusId),
   });
+  const shiftProgrammes = useQuery({
+    queryKey: ['shift-programmes', draft.primaryShiftId, institutionId],
+    queryFn: () => fetchShiftProgrammes(draft.primaryShiftId, institutionId),
+    enabled: Boolean(session) && Boolean(draft.primaryShiftId) && Boolean(institutionId),
+  });
   const streams = useQuery({
     queryKey: ['academic-engine', 'streams'],
     queryFn: fetchAcademicStreams,
@@ -248,8 +253,12 @@ export function AddStudentWizard() {
         if (v.status === 'PUBLISHED') rows.push({ id: v.id, label: `${p.code} v${v.version}` });
       }
     }
+    if (draft.primaryShiftId && shiftProgrammes.data?.length) {
+      const allowed = new Set(shiftProgrammes.data.flatMap((row) => row.publishedVersionIds));
+      return rows.filter((row) => allowed.has(row.id));
+    }
     return rows;
-  }, [programs.data]);
+  }, [programs.data, draft.primaryShiftId, shiftProgrammes.data]);
 
   const batchMeta: BatchMeta[] = useMemo(
     () =>

@@ -30,7 +30,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DashboardAiAssistant } from '@/components/dashboard/dashboard-ai-assistant';
+import { ShiftOperationsSection } from '@/components/dashboard/shift-operations-cards';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
+import { useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
+import { useShiftScope } from '@/hooks/use-shift-scope';
+import { useOptionalWorkspaceContext } from '@/providers/workspace-provider';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import type { OperationsActionItem, OperationsCenter } from '@/types/dashboard-analytics';
 import {
@@ -122,11 +126,14 @@ function actionDescription(action: OperationsActionItem) {
 
 export function OperationsCommandCenter({ userName }: { userName?: string }) {
   const { branding } = useInstitutionBranding();
+  const workspace = useOptionalWorkspaceContext();
+  const shiftScope = useShiftScope();
+  const effectiveShiftId = useEffectiveShiftId(undefined);
   const [clock, setClock] = useState('');
 
   const opsQ = useQuery({
-    queryKey: ['dashboard', 'operations'],
-    queryFn: () => fetchOperationsCenter(),
+    queryKey: ['dashboard', 'operations', effectiveShiftId, workspace?.kind],
+    queryFn: () => fetchOperationsCenter(effectiveShiftId ? { shiftId: effectiveShiftId } : {}),
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
@@ -203,6 +210,14 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
               {dayGreeting}, {displayName} 👋
             </h1>
             <p className="mt-1 text-sm font-semibold text-[#2563EB]">{institutionName}</p>
+            {shiftScope.hideShiftSelectors && shiftScope.activeShiftName ? (
+              <p className="mt-1 text-xs font-medium text-[#64748B]">
+                Workspace:{' '}
+                <span className="text-[#0F172A] dark:text-foreground">
+                  {shiftScope.activeShiftName}
+                </span>
+              </p>
+            ) : null}
             {ops ? (
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#475569]">
                 <span>
@@ -273,6 +288,8 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
           animate="show"
           className="space-y-6"
         >
+          <ShiftOperationsSection />
+
           {/* Section 2 — KPI Cards */}
           <div className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <KpiCard

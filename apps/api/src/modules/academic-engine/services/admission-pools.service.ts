@@ -20,6 +20,7 @@ import { MajorMinorEligibilityService } from './major-minor-eligibility.service'
 
 import { SemesterRulesService } from './semester-rules.service';
 import { CourseEligibilityService } from './course-eligibility.service';
+import { ShiftCurriculumService } from './shift-curriculum.service';
 import {
   evaluateCourseEligibility,
   isRulesEmpty,
@@ -118,6 +119,8 @@ export class AdmissionPoolsService {
     private readonly semesterRules: SemesterRulesService,
 
     private readonly courseEligibility: CourseEligibilityService,
+
+    private readonly shiftCurriculum: ShiftCurriculumService,
   ) {}
 
   async getAdmissionPools(
@@ -168,6 +171,8 @@ export class AdmissionPoolsService {
       programVersionId,
 
       semesterSequence,
+
+      { shiftId },
     );
 
     const major = await this.mapSubjectPathsToPoolOfferings(
@@ -196,6 +201,10 @@ export class AdmissionPoolsService {
               majorSubjectSlug,
 
               semesterSequence,
+
+              undefined,
+
+              shiftId,
             )
 
             .then((paths) =>
@@ -234,6 +243,8 @@ export class AdmissionPoolsService {
           semesterSequence,
 
           cat,
+
+          shiftId,
         );
       } else {
         pools[cat] = [];
@@ -329,6 +340,8 @@ export class AdmissionPoolsService {
     semesterSequence: number,
 
     category: string,
+
+    shiftId?: string,
   ): Promise<NepPoolOffering[]> {
     const rows = await this.offerings.listOfferings(tenantId, {
       programVersionId,
@@ -336,6 +349,8 @@ export class AdmissionPoolsService {
       semesterSequence,
 
       category: category.trim().toUpperCase(),
+
+      shiftId,
     });
 
     return this.dedupeOfferings(rows.map((row) => this.mapToPoolOffering(row)));

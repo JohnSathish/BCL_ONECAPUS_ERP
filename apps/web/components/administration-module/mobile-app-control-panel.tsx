@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, LayoutDashboard, Smartphone } from 'lucide-react';
+import { Bell, CreditCard, LayoutDashboard, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
   fetchMobileAppSettings,
   updateMobileAppSettings,
 } from '@/services/mobile-app';
+import { fetchFeeSettings } from '@/services/fee-cycle';
 import { MobileAppPhonePreview } from '@/components/administration-module/mobile-app-phone-preview';
 
 const STUDENT_CARDS = [
@@ -75,6 +76,10 @@ export function MobileAppControlPanel() {
   const analyticsQ = useQuery({
     queryKey: ['mobile-app', 'analytics'],
     queryFn: () => fetchMobileAnalytics(30),
+  });
+  const feeSettingsQ = useQuery({
+    queryKey: ['fee-settings'],
+    queryFn: fetchFeeSettings,
   });
 
   const saveMut = useMutation({
@@ -257,6 +262,38 @@ export function MobileAppControlPanel() {
                   }
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Mobile fee payment (Razorpay)
+              </CardTitle>
+              <CardDescription>
+                Native Pay now in the student app requires an EAS dev/production build (not Expo Go)
+                and Razorpay keys on the API server.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <div className="rounded-lg border p-3 text-sm">
+                <p className="font-medium">Online Gateway (master)</p>
+                <p className="text-muted-foreground">
+                  {feeSettingsQ.data?.collectionModes?.gateway ? 'Enabled' : 'Disabled'}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 text-sm">
+                <p className="font-medium">Razorpay on mobile app</p>
+                <p className="text-muted-foreground">
+                  {feeSettingsQ.data?.studentPortal?.mobileRazorpayEnabled === false
+                    ? 'Disabled — students see web portal / office message'
+                    : 'Enabled (when Online Gateway is on)'}
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="/admin/fees/settings">Open Fee Settings →</Link>
+              </Button>
             </CardContent>
           </Card>
 

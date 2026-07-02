@@ -4,9 +4,9 @@ export const ADMISSION_DEMAND_TYPE = 'ADMISSION_SESSION';
 export const DON_BOSCO_MONTHLY_PLANS = [
   {
     code: 'ARTS_MORNING',
-    name: 'FYUP Arts — Morning/Evening',
+    name: 'FYUP Arts — Morning',
     majorSlug: 'arts',
-    shiftCodes: ['MORNING', 'EVENING'],
+    shiftCodes: ['MORNING'],
     lines: [
       { code: 'TUITION', name: 'Tuition Fee', amount: 100 },
       { code: 'COLLEGE_FEE', name: 'College Fee', amount: 600 },

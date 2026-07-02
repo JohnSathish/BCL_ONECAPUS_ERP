@@ -75,6 +75,7 @@ export class ExaminationsService {
         tenantId,
         deletedAt: null,
         ...(query.status ? { status: query.status } : {}),
+        ...(query.shiftId ? { shiftId: query.shiftId } : {}),
       },
       orderBy: [{ createdAt: 'desc' }],
       take: 200,

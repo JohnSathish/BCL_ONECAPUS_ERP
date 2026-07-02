@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -16,6 +17,8 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
+import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
 import {
   BuiltinReportQueryDto,
   CreateSavedReportDto,
@@ -36,6 +39,8 @@ import { StudentReportsService } from './services/student-reports.service';
 @ApiBearerAuth()
 @ApiTags('student-reports')
 @RequireAnyPermission('reports:read', 'students:read')
+@ShiftScoped()
+@UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'student-reports', version: '1' })
 export class StudentReportsController {
   constructor(

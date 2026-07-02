@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CurrentUser,
@@ -8,6 +16,8 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
+import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
+import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
 import {
   AttendanceCorrectionDto,
   AttendanceEligibilityQueryDto,
@@ -20,6 +30,8 @@ import { StudentAttendanceService } from './student-attendance.service';
 
 @ApiBearerAuth()
 @ApiTags('student-attendance')
+@ShiftScoped()
+@UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'student-attendance', version: '1' })
 export class StudentAttendanceController {
   constructor(private readonly service: StudentAttendanceService) {}

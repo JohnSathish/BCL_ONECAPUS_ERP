@@ -33,6 +33,7 @@ import {
 } from '../../common/constants/course-delivery';
 import { courseDeliveryDefaultsFromCredits } from '../../common/services/course-delivery-fee.service';
 import { normalizeCourseEligibilityRules } from '../academic-engine/domain/course-eligibility.engine';
+import { ShiftCurriculumService } from '../academic-engine/services/shift-curriculum.service';
 import {
   computeTotalContactHours,
   validateCourseAcademicStructure,
@@ -145,6 +146,7 @@ export class AcademicCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shiftScope: ShiftScopeService,
+    private readonly shiftCurriculum: ShiftCurriculumService,
     private readonly sectionStreams: OfferingSectionStreamsService,
     private readonly cache: CacheService,
   ) {}
@@ -599,6 +601,42 @@ export class AcademicCatalogService {
     );
   }
 
+  private async buildShiftCatalogScope(
+    tenantId: string,
+    shiftId: string,
+  ): Promise<Prisma.CourseWhereInput> {
+    const [programmes, departments] = await Promise.all([
+      this.shiftCurriculum.listProgrammesForShift(tenantId, shiftId),
+      this.shiftCurriculum.listDepartmentsForShift(tenantId, shiftId),
+    ]);
+    const versionIds = programmes.flatMap((row) => row.publishedVersionIds);
+    const departmentIds = departments
+      .filter((row) => row.enabled)
+      .map((row) => row.departmentId);
+
+    const scopeOr: Prisma.CourseWhereInput[] = [];
+    if (versionIds.length) {
+      scopeOr.push({
+        offerings: {
+          some: {
+            deletedAt: null,
+            programVersionId: { in: versionIds },
+          },
+        },
+      });
+    }
+    if (departmentIds.length) {
+      scopeOr.push({
+        offerings: { none: { deletedAt: null } },
+        departmentId: { in: departmentIds },
+      });
+    }
+    if (!scopeOr.length) {
+      return { id: '00000000-0000-0000-0000-000000000000' };
+    }
+    return { OR: scopeOr };
+  }
+
   private buildCourseSearchOr(
     term: string,
     offeringFilter: Prisma.CourseOfferingWhereInput,
@@ -637,6 +675,15 @@ export class AcademicCatalogService {
     const offeringFilter = this.buildOfferingFilter(listQuery);
     const curriculumFilters = this.hasCurriculumFilters(listQuery);
     const searchTerm = listQuery.search?.trim();
+    const shiftScopeWhere = listQuery.shiftId
+      ? await this.buildShiftCatalogScope(tenantId, listQuery.shiftId)
+      : null;
+
+    const scopedAnd: Prisma.CourseWhereInput[] = [];
+    if (shiftScopeWhere) scopedAnd.push(shiftScopeWhere);
+    if (curriculumFilters) {
+      scopedAnd.push({ offerings: { some: offeringFilter } });
+    }
 
     const where: Prisma.CourseWhereInput = {
       tenantId,
@@ -648,7 +695,7 @@ export class AcademicCatalogService {
       ...(listQuery.deliveryType
         ? { deliveryType: listQuery.deliveryType }
         : {}),
-      ...(curriculumFilters ? { offerings: { some: offeringFilter } } : {}),
+      ...(scopedAnd.length ? { AND: scopedAnd } : {}),
       ...(searchTerm
         ? { OR: this.buildCourseSearchOr(searchTerm, offeringFilter) }
         : {}),

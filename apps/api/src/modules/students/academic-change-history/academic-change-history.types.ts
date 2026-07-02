@@ -1,0 +1,49 @@
+export const ACADEMIC_CHANGE_TYPES = {
+  PROGRAMME_CHANGED: 'PROGRAMME_CHANGED',
+  DEPARTMENT_CHANGED: 'DEPARTMENT_CHANGED',
+  SHIFT_CHANGED: 'SHIFT_CHANGED',
+  MAJOR_CHANGED: 'MAJOR_CHANGED',
+  MINOR_CHANGED: 'MINOR_CHANGED',
+  MDC_CHANGED: 'MDC_CHANGED',
+  AEC_CHANGED: 'AEC_CHANGED',
+  SEC_CHANGED: 'SEC_CHANGED',
+  VAC_CHANGED: 'VAC_CHANGED',
+  VTC_CHANGED: 'VTC_CHANGED',
+  SEMESTER_CHANGED: 'SEMESTER_CHANGED',
+  SUBJECT_ADDED: 'SUBJECT_ADDED',
+  SUBJECT_REMOVED: 'SUBJECT_REMOVED',
+  SUBJECT_REPLACED: 'SUBJECT_REPLACED',
+  REGISTRATION_UPDATED: 'REGISTRATION_UPDATED',
+  ROLL_NUMBER_CHANGED: 'ROLL_NUMBER_CHANGED',
+} as const;
+
+export type AcademicChangeType =
+  (typeof ACADEMIC_CHANGE_TYPES)[keyof typeof ACADEMIC_CHANGE_TYPES];
+
+export const CATEGORY_TO_CHANGE_TYPE: Record<string, AcademicChangeType> = {
+  MAJOR: ACADEMIC_CHANGE_TYPES.MAJOR_CHANGED,
+  MINOR: ACADEMIC_CHANGE_TYPES.MINOR_CHANGED,
+  MDC: ACADEMIC_CHANGE_TYPES.MDC_CHANGED,
+  AEC: ACADEMIC_CHANGE_TYPES.AEC_CHANGED,
+  SEC: ACADEMIC_CHANGE_TYPES.SEC_CHANGED,
+  VAC: ACADEMIC_CHANGE_TYPES.VAC_CHANGED,
+  VTC: ACADEMIC_CHANGE_TYPES.VTC_CHANGED,
+};
+
+export type AcademicChangeAuditContext = {
+  actorId?: string;
+  actorName?: string;
+  actorRoles?: string[];
+  reason?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  semesterId?: string | null;
+  academicYearId?: string | null;
+};
+
+export type AcademicChangeInput = {
+  changeType: AcademicChangeType;
+  fieldName?: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+};

@@ -222,6 +222,7 @@ export class StudentAttendanceService {
       where.offeringSectionId = query.offeringSectionId;
     if (query.courseId) where.courseId = query.courseId;
     if (query.staffProfileId) where.primaryFacultyId = query.staffProfileId;
+    if (query.shiftId) where.shiftId = query.shiftId;
     if (query.semesterNo) where.semesterNo = query.semesterNo;
     if (query.status) where.status = query.status;
 

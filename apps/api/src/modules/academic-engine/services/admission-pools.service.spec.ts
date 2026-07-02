@@ -16,7 +16,13 @@ describe('AdmissionPoolsService', () => {
     listEligibleMinors: jest.fn(),
     normalizeSlug: jest.fn((v: string) => v.toLowerCase().replace(/\s+/g, '-')),
     validateMajorMinorPair: jest.fn(),
+    resolveCourseSubjectSlugCandidates: jest.fn(
+      (course: { subjectSlug?: string; title?: string }) => [
+        course.subjectSlug ?? course.title ?? '',
+      ],
+    ),
   };
+  const shiftCurriculum = {};
   const semesterRules = {
     getSemesterRule: jest.fn(),
     resolveHonoursTrackForStudent: jest.fn(),
@@ -33,6 +39,7 @@ describe('AdmissionPoolsService', () => {
     eligibility as never,
     semesterRules as never,
     courseEligibility as never,
+    shiftCurriculum as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -152,6 +159,8 @@ describe('AdmissionPoolsService', () => {
       'pv-1',
       'economics',
       1,
+      undefined,
+      undefined,
     );
     expect(result.minor).toHaveLength(4);
     expect(result.semesterSummary).toBe('mock');

@@ -41,6 +41,12 @@ import { DateInput } from '@/components/ui/date-input';
 import { formatDisplayDateTime } from '@/utils/format-date';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import {
+  executeShiftTransfer,
+  fetchStudentRollShiftHistory,
+  previewShiftTransfer,
+} from '@/services/roll-number';
+import { ShiftTransferConfirmDialog } from '@/components/students-module/profile/shift-transfer-confirm-dialog';
 import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
 
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
@@ -251,6 +257,10 @@ export function AcademicIdentitySection({
   profile: StudentProfile;
   canEdit: boolean;
 }) {
+  const rollHistoryQ = useQuery({
+    queryKey: ['students', profile.id, 'roll-shift-history'],
+    queryFn: () => fetchStudentRollShiftHistory(profile.id),
+  });
   const nehuRegistration =
     profile.universityRegistrationNumber ??
     (profile.enrollmentNumber && profile.enrollmentNumber !== profile.rollNumber
@@ -317,6 +327,12 @@ export function AcademicIdentitySection({
             value={form.rollNumber}
             onChange={(e) => setForm((f) => ({ ...f, rollNumber: e.target.value }))}
           />
+          {rollHistoryQ.data?.previousRollNumber ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Previous roll:{' '}
+              <span className="font-mono">{rollHistoryQ.data.previousRollNumber}</span>
+            </p>
+          ) : null}
         </Field>
         <Field label="Student ERP ID">
           <input
@@ -676,17 +692,20 @@ export function AcademicSection({
           </Field>
         </FieldGrid>
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {(['mdc', 'aec', 'sec', 'vac', 'vtc'] as const).map((cat) => (
-          <div key={cat} className="rounded-md border border-border p-3">
-            <p className="text-xs font-medium uppercase text-muted-foreground">{cat}</p>
-            <ul className="mt-1 space-y-1 text-sm">
+          <div key={cat} className="rounded-lg border border-border/70 bg-muted/15 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {cat}
+            </p>
+            <ul className="mt-2 space-y-1.5 text-sm leading-snug">
               {(nep?.[cat] ?? []).length === 0 ? (
                 <li className="text-muted-foreground">—</li>
               ) : (
                 nep[cat].map((c) => (
-                  <li key={c.code}>
-                    {c.code} — {c.title}
+                  <li key={c.code} className="break-words">
+                    <span className="font-mono text-xs text-muted-foreground">{c.code}</span>
+                    <span className="text-foreground"> — {c.title}</span>
                   </li>
                 ))
               )}
@@ -780,11 +799,23 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
   const [shiftId, setShiftId] = useState('');
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
+  const [auditReason, setAuditReason] = useState('');
+  const [confirmTransferOpen, setConfirmTransferOpen] = useState(false);
 
   const context = useQuery({
     queryKey: ['admin-registrations', 'context', profile.id, 'first-semester-correction'],
     queryFn: () => fetchStudentRegistrationContext(profile.id),
     enabled: open,
+  });
+
+  const currentPrimaryShiftId =
+    context.data?.student.primaryShiftId ?? profile.primaryShiftId ?? '';
+  const shiftChanging = Boolean(shiftId && shiftId !== currentPrimaryShiftId);
+
+  const shiftPreviewQ = useQuery({
+    queryKey: ['students', profile.id, 'shift-transfer-preview', shiftId],
+    queryFn: () => previewShiftTransfer(profile.id, shiftId),
+    enabled: open && shiftChanging && Boolean(shiftId),
   });
 
   const semesterSequence = context.data?.semesterSequence ?? profile.semester ?? 1;
@@ -914,6 +945,7 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      let auditCount = 0;
       if (!registration?.id) {
         throw new Error(`No Semester ${semesterSequence} registration found for this student`);
       }
@@ -952,19 +984,29 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
           offeringSectionId: line.offeringSectionId ?? undefined,
         }));
 
-      if (shiftId && shiftId !== context.data?.student.primaryShiftId) {
-        await updateStudentProfileSection(profile.id, 'basic', {
-          primaryShiftId: shiftId,
+      if (programVersionId && programVersionId !== context.data?.student.programVersionId) {
+        const basicResult = (await updateStudentProfileSection(profile.id, 'basic', {
           programVersionId,
           departmentId,
-        });
-      } else if (programVersionId && programVersionId !== context.data?.student.programVersionId) {
-        await updateStudentProfileSection(profile.id, 'basic', {
-          programVersionId,
-          departmentId,
-        });
+          auditReason: auditReason.trim() || undefined,
+        })) as { auditRecorded?: number };
+        auditCount += basicResult.auditRecorded ?? 0;
       }
-      await updateAdminRegistrationLines(registration.id, [...selectedLines, ...preservedLines]);
+
+      let shiftTransferResult: Awaited<ReturnType<typeof executeShiftTransfer>> | null = null;
+      if (shiftChanging && shiftId) {
+        shiftTransferResult = await executeShiftTransfer(profile.id, {
+          toShiftId: shiftId,
+          reason: auditReason.trim() || 'Shift transfer',
+        });
+        auditCount += shiftTransferResult.auditRecorded ?? 0;
+      }
+      const regResult = await updateAdminRegistrationLines(
+        registration.id,
+        [...selectedLines, ...preservedLines],
+        { auditReason: auditReason.trim() || undefined },
+      );
+      auditCount += regResult.auditRecorded ?? 0;
 
       const majorSlug = subjectSlugFromSection(sectionById.get(selections.MAJOR ?? ''));
       const minorSlug = subjectSlugFromSection(sectionById.get(selections.MINOR ?? ''));
@@ -980,13 +1022,28 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
           subjectSlug: minorSlug,
         });
       }
+      return { auditCount, shiftTransferResult };
     },
-    onSuccess: () => {
-      setMessage(`Semester ${semesterSequence} subjects and shift updated. Refreshing profile...`);
+    onSuccess: ({ auditCount, shiftTransferResult }) => {
+      const historyNote =
+        auditCount > 0
+          ? ` ${auditCount} academic change${auditCount === 1 ? '' : 's'} recorded in Academic Change History.`
+          : '';
+      const shiftNote = shiftTransferResult
+        ? ` Shift changed: ${shiftTransferResult.oldShift.name} → ${shiftTransferResult.newShift.name}. Roll: ${shiftTransferResult.oldRollNumber ?? '—'} → ${shiftTransferResult.newRollNumber ?? '—'}.`
+        : '';
+      setMessage(
+        `Academic details updated successfully.${shiftNote}${historyNote} Refreshing profile...`,
+      );
+      setConfirmTransferOpen(false);
       void qc.invalidateQueries({ queryKey: ['students', profile.id, 'profile'] });
       void qc.invalidateQueries({ queryKey: ['students', profile.id, 'semester-registrations'] });
       void qc.invalidateQueries({ queryKey: ['academic-engine', 'profile', profile.id] });
       void qc.invalidateQueries({ queryKey: ['admin-registrations', 'context', profile.id] });
+      void qc.invalidateQueries({
+        queryKey: ['students', profile.id, 'academic-change-history'],
+      });
+      void qc.invalidateQueries({ queryKey: ['students', profile.id, 'roll-shift-history'] });
     },
     onError: (error) => {
       setMessage(apiErrorMessage(error, `Could not update Semester ${semesterSequence} subjects`));
@@ -994,7 +1051,7 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
   });
 
   return (
-    <div className="rounded-md border border-border bg-muted/20 p-3">
+    <div className="rounded-lg border border-border/70 bg-muted/15 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-medium">Change Semester {semesterSequence} Subjects / Shift</p>
@@ -1061,7 +1118,37 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
               </select>
             </Field>
           </FieldGrid>
-          <div className="grid gap-3 md:grid-cols-2">
+
+          {shiftChanging ? (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+              <p className="font-medium">Shift transfer preview</p>
+              {shiftPreviewQ.isLoading ? (
+                <p className="mt-1 text-muted-foreground">Calculating new roll number…</p>
+              ) : shiftPreviewQ.error ? (
+                <p className="mt-1 text-destructive">
+                  {apiErrorMessage(shiftPreviewQ.error, 'Could not preview roll number')}
+                </p>
+              ) : shiftPreviewQ.data ? (
+                <dl className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-muted-foreground">Current roll</dt>
+                    <dd className="font-mono">{shiftPreviewQ.data.currentRollNumber ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">New roll</dt>
+                    <dd className="font-mono font-semibold text-primary">
+                      {shiftPreviewQ.data.previewRollNumber}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
+              <p className="mt-2 text-muted-foreground">
+                Saving will assign a new roll number in the destination shift sequence.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {changeCategories.map((category) => {
               const options = sectionsByCategory.get(category) ?? [];
               return (
@@ -1088,12 +1175,27 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
               );
             })}
           </div>
+          <Field label="Reason (optional)">
+            <textarea
+              className={cn(inputClass, 'min-h-[60px] resize-y')}
+              placeholder="e.g. Student requested shift transfer"
+              value={auditReason}
+              disabled={!registrationEditable}
+              onChange={(event) => setAuditReason(event.target.value)}
+            />
+          </Field>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               size="sm"
               disabled={saveMut.isPending || !registrationEditable || !registration?.id}
-              onClick={() => saveMut.mutate()}
+              onClick={() => {
+                if (shiftChanging) {
+                  setConfirmTransferOpen(true);
+                } else {
+                  saveMut.mutate();
+                }
+              }}
             >
               {saveMut.isPending ? 'Saving...' : 'Save subject / shift changes'}
             </Button>
@@ -1110,6 +1212,13 @@ function FirstSemesterSubjectCorrectionEditor({ profile }: { profile: StudentPro
             saved into the draft registration.
           </p>
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+          <ShiftTransferConfirmDialog
+            open={confirmTransferOpen}
+            onOpenChange={setConfirmTransferOpen}
+            preview={shiftPreviewQ.data ?? null}
+            pending={saveMut.isPending}
+            onConfirm={() => saveMut.mutate()}
+          />
         </div>
       ) : null}
     </div>

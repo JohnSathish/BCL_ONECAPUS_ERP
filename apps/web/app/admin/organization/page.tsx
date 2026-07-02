@@ -170,7 +170,11 @@ export default function AdminOrganizationSetupPage() {
 
   const shiftList = useQuery({
     queryKey: ['shifts', shiftCampusId],
-    queryFn: () => fetchShifts({ campusId: shiftCampusId || undefined }),
+    queryFn: () =>
+      fetchShifts({
+        campusId: shiftCampusId || undefined,
+        includeInactive: true,
+      }),
     enabled: Boolean(session) && Boolean(shiftCampusId),
   });
 

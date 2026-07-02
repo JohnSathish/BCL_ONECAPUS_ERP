@@ -151,6 +151,7 @@ export function studentPortalPaymentHints(
 
   return {
     onlineEnabled: modes.gateway,
+    mobileRazorpayEnabled: metadata?.mobileRazorpayEnabled !== false,
     officePaymentEnabled: officeMethods.length > 0,
     officeMethods,
     showPayAtOffice: officeMethods.length > 0,

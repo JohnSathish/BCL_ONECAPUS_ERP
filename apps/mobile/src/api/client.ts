@@ -2,7 +2,14 @@ import { API_BASE, getAppType, mobileHeaders, setAppType } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
 import { refreshAccessToken } from '@/auth/token-refresh';
 
-export { APP_VERSION, API_BASE, TENANT_SLUG, getAppType, setAppType } from '@/api/config';
+export {
+  APP_VERSION,
+  API_BASE,
+  TENANT_SLUG,
+  getAppType,
+  hydrateAppType,
+  setAppType,
+} from '@/api/config';
 
 let authFailureHandler: (() => void) | null = null;
 

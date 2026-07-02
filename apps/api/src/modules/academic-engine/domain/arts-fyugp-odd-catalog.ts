@@ -177,42 +177,29 @@ const MDC_SEM1_TITLES: Record<number, string> = {
   113: 'Health and Wellness',
   114: 'Financial Literacy',
   115: 'Science, Technology and Society',
-  116: 'Creative Writing',
+  116: 'Introduction to National Cadet Corps',
   117: 'Public Speaking',
-  118: 'Introduction to Psychology',
-  119: 'Legal Awareness',
+  118: 'Mathematics in Daily Life',
+  119: 'Philosophy of Culture',
 };
 
 const MDC_SEM3_TITLES: Record<number, string> = {
-  210: 'Earth Sciences',
-  211: 'Gender and Society',
-  212: 'Entrepreneurship Development',
-  213: 'Media and Communication',
-  214: 'Science for Everyday Life',
-  215: 'Education for Sustainable Development',
+  210: 'English Proficiency and Soft Skill Development',
+  211: 'Gender Studies',
+  212: 'Financial Literacy',
+  213: 'National Service Scheme',
+  214: 'Physics Around Us',
+  215: 'Development of Education in North-East India',
   216: 'Indian Art and Aesthetics',
   217: 'Human Rights and Duties',
   218: 'Digital Citizenship',
   219: 'Community Development',
 };
 
-const AEC_SEM1_TITLES: Record<number, string> = {
-  120: 'Communicative English',
-  121: 'Alternative English',
-  122: 'MIL — Garo',
-  123: 'MIL — Hindi',
-  124: 'MIL — Bengali',
-  125: 'MIL — Assamese',
-  126: 'MIL — Nepali',
-  127: 'MIL — Khasi',
-  128: 'MIL — Kokborok',
-  129: 'MIL — Other Regional Language',
-};
-
 const AEC_SEM3_TITLES: Record<number, string> = {
   220: 'Advanced English Communication',
-  221: 'Business Communication',
-  222: 'Creative Writing in English',
+  221: 'Introduction to Academic Writing (Commerce)',
+  222: 'Introduction to Academic Writing (Arts)',
   223: 'MIL — Garo (Advanced)',
   224: 'MIL — Hindi (Advanced)',
   225: 'MIL — Bengali (Advanced)',
@@ -222,30 +209,43 @@ const AEC_SEM3_TITLES: Record<number, string> = {
   229: 'MIL — Kokborok (Advanced)',
 };
 
+const SEC_SEM3_TITLES: Record<number, string> = {
+  230: 'Introduction to Translation',
+  231: 'Web Design Basics',
+  232: 'Conflict Resolution',
+  233: 'Goods and Service Tax (GST)',
+  234: 'Analytical Thinking',
+  235: 'Disaster Response Skills',
+  236: 'Financial Planning',
+  237: 'Content Creation',
+  238: 'Social Media Management',
+  239: 'Research Methodology Skills',
+};
+
+const AEC_SEM1_TITLES: Record<number, string> = {
+  120: 'Communicative English',
+  121: 'Alternative English',
+  122: 'MIL-I: Garo',
+  123: 'MIL — Hindi',
+  124: 'MIL — Bengali',
+  125: 'MIL — Assamese',
+  126: 'MIL — Nepali',
+  127: 'MIL — Khasi',
+  128: 'MIL — Kokborok',
+  129: 'MIL — Other Regional Language',
+};
+
 const SEC_SEM1_TITLES: Record<number, string> = {
   130: 'Office Management',
-  131: 'Digital Documentation',
-  132: 'Computer Applications',
-  133: 'Soft Skills Development',
+  131: 'Motivation',
+  132: 'Personality Development',
+  133: 'Public Speaking',
   134: 'Yoga and Wellness',
   135: 'Tourism and Hospitality',
   136: 'Retail Management',
   137: 'Event Management',
   138: 'Photography Basics',
   139: 'Community Service',
-};
-
-const SEC_SEM3_TITLES: Record<number, string> = {
-  230: 'Data Analysis with Spreadsheets',
-  231: 'Web Design Basics',
-  232: 'Graphic Design',
-  233: 'Public Speaking and Debate',
-  234: 'Leadership Skills',
-  235: 'Disaster Response Skills',
-  236: 'Financial Planning',
-  237: 'Content Creation',
-  238: 'Social Media Management',
-  239: 'Research Methodology Skills',
 };
 
 const VTC_SEM3_TITLES: Record<number, string> = {
@@ -324,6 +324,31 @@ function poolCourses(
   );
 }
 
+/** Cross-department Sem 5 minor (-303) direct offerings on each BA programme version. */
+export function buildArtsFyugpSem5MinorCourseDefs(
+  hostProgramCode: string,
+): ArtsFyugpCourseDef[] {
+  const host = ARTS_FYUGP_DEPARTMENTS.find(
+    (dept) => dept.programCode === hostProgramCode,
+  );
+  if (!host) return [];
+
+  return ARTS_FYUGP_DEPARTMENTS.filter(
+    (dept) => dept.programCode !== hostProgramCode,
+  ).map((dept) =>
+    theoryCourse({
+      code: `${dept.code}-303`,
+      title: dept.papers.sem5Minor,
+      credits: 4,
+      category: 'MINOR',
+      semesterSequence: 5,
+      departmentCode: dept.code,
+      subjectSlug: dept.subjectSlug,
+      programCode: hostProgramCode,
+    }),
+  );
+}
+
 export function buildArtsFyugpOddCourses(): ArtsFyugpCourseDef[] {
   const courses: ArtsFyugpCourseDef[] = [];
 
@@ -382,7 +407,6 @@ export function buildArtsFyugpOddCourses(): ArtsFyugpCourseDef[] {
         semesterSequence: 5,
         departmentCode: dept.code,
         subjectSlug: dept.subjectSlug,
-        programCode: dept.programCode,
       }),
       internshipCourse({
         code: `${dept.code}-304`,

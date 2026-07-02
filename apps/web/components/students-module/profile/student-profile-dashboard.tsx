@@ -27,6 +27,7 @@ import { StudentProfileAttendanceTab } from '@/components/students-module/profil
 import { StudentProfileLibraryTab } from '@/components/library/student-profile-library-tab';
 import { StudentSubjectsTab } from '@/components/students-module/profile/student-subjects-tab';
 import { StudentRollShiftHistoryCard } from '@/components/students-module/profile/student-roll-shift-history-card';
+import { AcademicChangeHistoryPanel } from '@/components/students-module/profile/academic-change-history-panel';
 import { AdminStudentIdCardPanel } from '@/components/id-cards/admin-student-id-card-panel';
 import { buttonVariants } from '@/components/ui/button';
 import { uploadStudentPhoto } from '@/services/students';
@@ -96,18 +97,26 @@ function ProfileTabPanel({
       );
     case 'academic':
       return (
-        <div className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-2">
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <AcademicSection profile={profile} canEdit={canEdit} />
-            <BoardExamSection profile={profile} canEdit={canEdit} />
-            <CuetSection profile={profile} canEdit={canEdit} />
+            <div className="space-y-4">
+              <BoardExamSection profile={profile} canEdit={canEdit} />
+              <CuetSection profile={profile} canEdit={canEdit} />
+            </div>
           </div>
+
           <SectionCard
             title="Registered subjects"
             description="Semester-wise subject registrations"
           >
             <StudentSubjectsTab profile={profile} />
           </SectionCard>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StudentRollShiftHistoryCard studentId={profile.id} />
+            <AcademicChangeHistoryPanel studentId={profile.id} compact sticky={false} />
+          </div>
         </div>
       );
     case 'subjects':
@@ -386,6 +395,7 @@ export function StudentProfileDashboard({ profile, canEdit, onRefresh }: Props) 
       </div>
 
       <ErpWorkspaceGrid
+        className={cn(tab === 'academic' && 'lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]')}
         main={
           <div role="tabpanel" className="min-w-0">
             <ProfileTabPanel tab={tab} profile={profile} canEdit={canEdit} onRefresh={onRefresh} />

@@ -268,8 +268,19 @@ export class LeaveService {
         earned: 0,
         pendingRequests: 0,
         balances: [],
+        leaveTypes: [],
       };
-    return this.portalSummary(user.tid, staff.id);
+
+    const [summary, leaveTypes] = await Promise.all([
+      this.portalSummary(user.tid, staff.id),
+      this.prisma.staffLeaveType.findMany({
+        where: { tenantId: user.tid, active: true },
+        select: { id: true, code: true, name: true, yearlyLimit: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    return { ...summary, leaveTypes };
   }
 
   async listApplicationsForSelf(user: JwtUser) {

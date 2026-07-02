@@ -93,3 +93,22 @@ export class BulkShiftTransferDto {
   @IsString()
   reason?: string;
 }
+
+export class ExecuteShiftTransferDto {
+  @IsUUID()
+  toShiftId!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class PreviewShiftTransferBulkDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  studentIds!: string[];
+
+  @IsUUID()
+  toShiftId!: string;
+}

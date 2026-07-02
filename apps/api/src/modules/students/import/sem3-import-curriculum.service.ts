@@ -135,6 +135,7 @@ export class Sem3ImportCurriculumService {
       programVersionId?: string;
       programme?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ): Promise<Sem3ImportCurriculumCatalog> {
     const semesterSequence = input.semesterSequence ?? 3;
@@ -143,6 +144,7 @@ export class Sem3ImportCurriculumService {
       tenantId,
       version.id,
       semesterSequence,
+      { shiftId: input.shiftId },
     );
 
     const offerings: CurriculumOffering[] = [

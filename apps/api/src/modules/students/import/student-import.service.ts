@@ -26,6 +26,7 @@ import {
   type NormalizedStudentImportRow,
 } from './student-import.handler';
 import { Sem1ImportCurriculumService } from './sem1-import-curriculum.service';
+import { Sem2ImportCurriculumService } from './sem2-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './sem5-import-curriculum.service';
 
@@ -44,6 +45,7 @@ export class StudentImportService {
     private readonly handler: StudentImportHandler,
 
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
+    private readonly sem2Curriculum: Sem2ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
     private readonly sem5Curriculum: Sem5ImportCurriculumService,
 
@@ -62,6 +64,16 @@ export class StudentImportService {
     academicYearId?: string;
   }) {
     return this.handler.buildSem1AdmissionTemplateWorkbook(options);
+  }
+
+  buildSem2AdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    shiftId?: string;
+    academicYearId?: string;
+  }) {
+    return this.handler.buildSem2AdmissionTemplateWorkbook(options);
   }
 
   buildSem1LegacyFullAdmissionTemplate() {
@@ -86,6 +98,7 @@ export class StudentImportService {
     programme?: string;
     programVersionId?: string;
     semesterSequence?: number;
+    shiftId?: string;
   }) {
     return this.handler.buildSem3AdmissionTemplateWorkbook(options);
   }
@@ -108,6 +121,34 @@ export class StudentImportService {
     return this.sem1Curriculum.listPublishedProgrammes(tenantId);
   }
 
+  listSem2ImportProgrammes(tenantId: string) {
+    return this.sem2Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  getSem2ImportCurriculum(
+    tenantId: string,
+    input: {
+      programme?: string;
+      programVersionId?: string;
+      shiftId?: string;
+      academicYearId?: string;
+    },
+  ) {
+    return this.sem2Curriculum.buildCatalog(tenantId, input);
+  }
+
+  getSem2EligibleMinors(
+    tenantId: string,
+    input: {
+      programVersionId: string;
+      majorDepartment: string;
+      shiftId?: string;
+      academicYearId?: string;
+    },
+  ) {
+    return this.sem2Curriculum.listEligibleMinorsForMajor(tenantId, input);
+  }
+
   listSem5ImportProgrammes(tenantId: string) {
     return this.sem5Curriculum.listPublishedProgrammes(tenantId);
   }
@@ -118,6 +159,7 @@ export class StudentImportService {
       programme?: string;
       programVersionId?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ) {
     return this.sem3Curriculum.buildCatalog(tenantId, input);

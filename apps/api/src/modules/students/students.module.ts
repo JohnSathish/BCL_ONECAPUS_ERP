@@ -23,6 +23,7 @@ import { StudentImportProfileWriterService } from './import/student-import-profi
 import { StudentImportProcessor } from './import/student-import.processor';
 import { StudentImportService } from './import/student-import.service';
 import { Sem1ImportCurriculumService } from './import/sem1-import-curriculum.service';
+import { Sem2ImportCurriculumService } from './import/sem2-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './import/sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './import/sem5-import-curriculum.service';
 import { MigrationStatusService } from './migration/migration-status.service';
@@ -45,9 +46,11 @@ import { StudentPortalService } from './services/student-portal.service';
 import { StudentPortalCalendarService } from './services/student-portal-calendar.service';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
 import { StudentLeaveService } from './services/student-leave.service';
+import { AcademicChangeHistoryModule } from './academic-change-history/academic-change-history.module';
 
 @Module({
   imports: [
+    AcademicChangeHistoryModule,
     AcademicEngineModule,
     ShiftsModule,
     ImportModule,
@@ -91,6 +94,7 @@ import { StudentLeaveService } from './services/student-leave.service';
     StudentImportProcessor,
     Sem3ImportCurriculumService,
     Sem1ImportCurriculumService,
+    Sem2ImportCurriculumService,
     Sem5ImportCurriculumService,
     StudentBulkUpdateService,
     StudentBulkSectionWriterService,

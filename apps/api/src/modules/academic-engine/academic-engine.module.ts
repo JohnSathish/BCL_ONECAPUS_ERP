@@ -30,11 +30,14 @@ import { CurriculumCompletionService } from './services/curriculum-completion.se
 import { StudentMajorMinorTrackService } from './services/student-major-minor-track.service';
 import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
+import { ShiftCurriculumService } from './services/shift-curriculum.service';
 import { LmsModule } from '../lms/lms.module';
 import { FeesModule } from '../fees/fees.module';
+import { AcademicChangeHistoryModule } from '../students/academic-change-history/academic-change-history.module';
 
 @Module({
   imports: [
+    AcademicChangeHistoryModule,
     forwardRef(() => AcademicLifecycleModule),
     ShiftsModule,
     ImportModule,
@@ -72,6 +75,7 @@ import { FeesModule } from '../fees/fees.module';
     StudentMajorMinorTrackService,
     StudentVtcTrackService,
     CourseEligibilityService,
+    ShiftCurriculumService,
   ],
   exports: [
     AcademicEngineService,
@@ -86,6 +90,7 @@ import { FeesModule } from '../fees/fees.module';
     StudentVtcTrackService,
     OfferingsService,
     CourseEligibilityService,
+    ShiftCurriculumService,
     AllocationService,
   ],
 })

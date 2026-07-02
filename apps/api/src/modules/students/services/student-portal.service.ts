@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
@@ -20,6 +21,7 @@ const SNAPSHOT_CATEGORY_LABELS: Record<string, string> = {
   AEC: 'AEC',
   SEC: 'SEC',
   VAC: 'VAC',
+  VTC: 'VTC',
 };
 
 const REGISTRATION_COMPLETE = new Set([
@@ -106,7 +108,10 @@ export class StudentPortalService {
       fullName: student.masterProfile?.fullName ?? '',
       displayFullName: displayName,
       enrollmentNumber: student.enrollmentNumber,
-      photoUrl: student.masterProfile?.photoPath ?? null,
+      rollNumber: student.rollNumber,
+      universityRollNumber: student.universityRollNumber,
+      universityRegistrationNumber: student.universityRegistrationNumber,
+      photoUrl: toPublicUploadUrl(student.masterProfile?.photoPath),
       rfidNumber: student.rfidNumber,
       department: student.department?.name ?? null,
       programName: student.programVersion?.program?.name ?? null,
@@ -182,7 +187,10 @@ export class StudentPortalService {
         fullName: student.masterProfile?.fullName ?? '',
         displayFullName: displayName,
         enrollmentNumber: student.enrollmentNumber,
-        photoUrl: student.masterProfile?.photoPath ?? null,
+        rollNumber: student.rollNumber,
+        universityRollNumber: student.universityRollNumber,
+        universityRegistrationNumber: student.universityRegistrationNumber,
+        photoUrl: toPublicUploadUrl(student.masterProfile?.photoPath),
         programLabel: headerDepartment,
         department: headerDepartment,
         semesterSequence,
@@ -480,7 +488,9 @@ export class StudentPortalService {
 
     for (const line of lines) {
       const category = String(line.category ?? '').toUpperCase();
-      if (['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC'].includes(category)) {
+      if (
+        ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC'].includes(category)
+      ) {
         chips.push({
           category,
           label: SNAPSHOT_CATEGORY_LABELS[category] ?? category,
@@ -511,9 +521,437 @@ export class StudentPortalService {
       });
     }
 
-    const order = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC'];
+    const order = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC'];
     return chips.sort(
       (a, b) => order.indexOf(a.category) - order.indexOf(b.category),
     );
+  }
+
+  async getMobileAcademics(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    const [
+      registration,
+      attendance,
+      creditSummary,
+      weekTimetable,
+      lmsDash,
+      examResults,
+      academicYear,
+      shift,
+      allRegistrations,
+      programVersion,
+    ] = await Promise.all([
+      this.academicEngine
+        .getMyRegistration(user.tid, user.sub)
+        .catch(() => null),
+      this.attendance.studentPortalSummary(user).catch(() => null),
+      this.academicEngine
+        .getMyCreditSummary(user.tid, user.sub)
+        .catch(() => null),
+      this.timetable
+        .studentWeek(user)
+        .catch(() => ({ entries: [] as Record<string, unknown>[] })),
+      this.lms.studentDashboard(user).catch(() => null),
+      this.examinations.studentResults(user).catch(() => null),
+      this.prisma.academicYear.findFirst({
+        where: {
+          tenantId: user.tid,
+          deletedAt: null,
+          OR: [{ status: 'ACTIVE' }, { isPrimarySession: true }],
+        },
+        select: { name: true },
+        orderBy: { startDate: 'desc' },
+      }),
+      student.primaryShiftId
+        ? this.prisma.shift.findFirst({
+            where: { id: student.primaryShiftId, tenantId: user.tid },
+            select: { name: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.semesterRegistration.findMany({
+        where: { tenantId: user.tid, studentId: student.id },
+        include: {
+          semester: { select: { sequence: true, name: true } },
+          lines: {
+            include: {
+              offering: { include: { course: true } },
+              offeringSection: {
+                include: { shift: { select: { name: true } } },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      student.programVersionId
+        ? this.prisma.programVersion.findFirst({
+            where: { id: student.programVersionId, tenantId: user.tid },
+            select: {
+              version: true,
+              program: { select: { name: true } },
+              structureTemplate: {
+                select: { totalSemesters: true, semesterCreditTarget: true },
+              },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const majorMinor = registration?.majorMinorTrack;
+    const headerDepartment = await this.resolveHeaderMajorDepartment(
+      user.tid,
+      registration,
+      majorMinor,
+      student,
+    );
+    const semesterSequence =
+      registration?.standing?.currentSemesterSequence ??
+      registration?.registration?.semesterSequence ??
+      null;
+    const lines = registration?.registration?.lines ?? [];
+    const sectionIds = [
+      ...new Set(lines.map((l) => l.offeringSectionId).filter(Boolean)),
+    ] as string[];
+    const offeringIds = [
+      ...new Set(lines.map((l) => l.offeringId).filter(Boolean)),
+    ] as string[];
+
+    const [teachingGroups, offerings, classrooms] = await Promise.all([
+      sectionIds.length
+        ? this.prisma.teachingSubjectGroup.findMany({
+            where: {
+              tenantId: user.tid,
+              offeringSectionId: { in: sectionIds },
+            },
+            include: {
+              primaryStaffProfile: {
+                select: { fullName: true, employeeCode: true },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      offeringIds.length
+        ? this.prisma.courseOffering.findMany({
+            where: { tenantId: user.tid, id: { in: offeringIds } },
+            include: {
+              course: {
+                select: { id: true, code: true, title: true, credits: true },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      (() => {
+        const classroomIds = [
+          ...new Set(
+            (weekTimetable.entries ?? [])
+              .map((e) => e.classroomId as string | undefined)
+              .filter(Boolean),
+          ),
+        ] as string[];
+        return classroomIds.length
+          ? this.prisma.classroom.findMany({
+              where: { tenantId: user.tid, id: { in: classroomIds } },
+              select: { id: true, name: true, code: true },
+            })
+          : Promise.resolve([]);
+      })(),
+    ]);
+
+    const facultyBySection = new Map(
+      teachingGroups.map((g) => [
+        g.offeringSectionId,
+        g.primaryStaffProfile?.fullName ?? null,
+      ]),
+    );
+    const offeringMap = new Map(offerings.map((o) => [o.id, o]));
+    const classroomMap = new Map(
+      classrooms.map((c) => [c.id, c.name ?? c.code]),
+    );
+
+    const attendanceByCourseId = new Map<string, number>();
+    for (const row of attendance?.subjects ?? []) {
+      if (row.courseId) {
+        attendanceByCourseId.set(row.courseId, Number(row.percentage ?? 0));
+      }
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      const code = meta.courseCode as string | undefined;
+      if (code) attendanceByCourseId.set(code, Number(row.percentage ?? 0));
+    }
+
+    const examMarks =
+      (
+        examResults as {
+          marks?: {
+            marksObtained?: unknown;
+            maxMarks?: unknown;
+            paperId?: string;
+          }[];
+        }
+      )?.marks ?? [];
+    const examPapers =
+      (
+        examResults as {
+          papers?: { id: string; paperCode?: string; paperTitle?: string }[];
+        }
+      )?.papers ?? [];
+    const paperMap = new Map(examPapers.map((p) => [p.id, p]));
+
+    const majorCount = { n: 0 };
+    const categoryOrder = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC'];
+    const subjects = lines
+      .map((line) => {
+        const category = String(line.category ?? '').toUpperCase();
+        const course =
+          line.offering?.course ?? offeringMap.get(line.offeringId)?.course;
+        const courseId = course?.id ?? null;
+        const courseCode = course?.code ?? '—';
+        const courseTitle = course?.title ?? courseCode;
+        const credits = Number(line.credits ?? course?.credits ?? 0);
+
+        let categoryLabel = SNAPSHOT_CATEGORY_LABELS[category] ?? category;
+        if (category === 'MAJOR') {
+          majorCount.n += 1;
+          categoryLabel =
+            majorCount.n === 1
+              ? 'Major Paper I'
+              : majorCount.n === 2
+                ? 'Major Paper II'
+                : `Major ${majorCount.n}`;
+        }
+
+        const roomEntry = (weekTimetable.entries ?? []).find(
+          (e) =>
+            e.courseOfferingId === line.offeringId &&
+            (e.offeringSectionId == null ||
+              e.offeringSectionId === line.offeringSectionId),
+        );
+        const roomId = roomEntry?.classroomId as string | undefined;
+        const room = roomId ? (classroomMap.get(roomId) ?? null) : null;
+
+        const matchingMark = examMarks.find((m) => {
+          const paper = m.paperId ? paperMap.get(m.paperId) : null;
+          if (!paper) return false;
+          return (
+            paper.paperCode === courseCode ||
+            paper.paperTitle?.toLowerCase().includes(courseTitle.toLowerCase())
+          );
+        });
+
+        return {
+          id: line.id,
+          category,
+          categoryLabel,
+          courseCode,
+          courseTitle,
+          credits,
+          facultyName: line.offeringSectionId
+            ? (facultyBySection.get(line.offeringSectionId) ?? null)
+            : null,
+          room,
+          attendancePercent:
+            courseId != null
+              ? (attendanceByCourseId.get(courseId) ??
+                attendanceByCourseId.get(courseCode) ??
+                null)
+              : null,
+          internalMarks: matchingMark
+            ? {
+                obtained: Number(matchingMark.marksObtained ?? 0),
+                max: Number(matchingMark.maxMarks ?? 20),
+              }
+            : null,
+          assignmentStatus: null as string | null,
+          offeringId: line.offeringId,
+          offeringSectionId: line.offeringSectionId,
+        };
+      })
+      .sort(
+        (a, b) =>
+          categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category),
+      );
+
+    const snapshot = this.academicSnapshotChips(registration, majorMinor);
+    const registrationStatus = String(
+      registration?.registration?.status ?? 'not_registered',
+    );
+    const totalCredits =
+      creditSummary?.total ?? subjects.reduce((sum, s) => sum + s.credits, 0);
+    const targetCredits =
+      programVersion?.structureTemplate?.semesterCreditTarget ?? 20;
+
+    const today = new Date().getDay();
+    const todayClasses = (weekTimetable.entries ?? [])
+      .filter((e) => e.dayOfWeek === today)
+      .sort(
+        (a, b) =>
+          (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
+          (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
+      )
+      .map((entry) => {
+        const offering = entry.courseOfferingId
+          ? offeringMap.get(String(entry.courseOfferingId))
+          : null;
+        const start = String(entry.startTime ?? '');
+        const title =
+          offering?.course?.title ?? offering?.course?.code ?? 'Class';
+        const roomId = entry.classroomId as string | undefined;
+        return {
+          time: start,
+          title,
+          room: roomId ? (classroomMap.get(roomId) ?? null) : null,
+          isCurrent: isCurrentSlot(start, String(entry.endTime ?? '')),
+        };
+      });
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyTimetable = dayNames.map((day, dayOfWeek) => ({
+      day,
+      dayOfWeek,
+      slots: (weekTimetable.entries ?? [])
+        .filter((e) => e.dayOfWeek === dayOfWeek)
+        .sort(
+          (a, b) =>
+            (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
+            (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
+        )
+        .map((entry) => {
+          const offering = entry.courseOfferingId
+            ? offeringMap.get(String(entry.courseOfferingId))
+            : null;
+          const roomId = entry.classroomId as string | undefined;
+          return {
+            time: `${entry.startTime ?? ''} – ${entry.endTime ?? ''}`,
+            title: offering?.course?.title ?? offering?.course?.code ?? 'Class',
+            room: roomId ? (classroomMap.get(roomId) ?? null) : null,
+          };
+        }),
+    }));
+
+    const attendanceBySubject = (attendance?.subjects ?? []).map(
+      (row: {
+        metadata?: unknown;
+        percentage?: unknown;
+        presentCount?: number;
+        totalSessions?: number;
+      }) => {
+        const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        const title =
+          (meta.courseTitle as string | undefined) ??
+          (meta.courseCode as string | undefined) ??
+          (meta.title as string | undefined) ??
+          'Subject';
+        return {
+          label: title,
+          percentage: Number(row.percentage ?? 0),
+          presentCount: row.presentCount,
+          totalSessions: row.totalSessions,
+        };
+      },
+    );
+
+    const semesterProgress = categoryOrder
+      .filter(
+        (cat) => subjects.some((s) => s.category === cat) || cat === 'MAJOR',
+      )
+      .map((cat) => {
+        const catSubjects = subjects.filter((s) => s.category === cat);
+        if (cat === 'MINOR' && catSubjects.length === 0) return null;
+        return {
+          category: cat,
+          label: SNAPSHOT_CATEGORY_LABELS[cat] ?? cat,
+          registered: catSubjects.length > 0,
+          credits: catSubjects.reduce((sum, s) => sum + s.credits, 0),
+        };
+      })
+      .filter(Boolean) as {
+      category: string;
+      label: string;
+      registered: boolean;
+      credits: number;
+    }[];
+
+    const totalSemesters =
+      programVersion?.structureTemplate?.totalSemesters ?? 6;
+    const currentSem = semesterSequence ?? 1;
+    const completedSemesters = new Set(
+      allRegistrations
+        .filter((r) =>
+          ['submitted', 'approved', 'completed', 'confirmed'].includes(
+            String(r.status).toLowerCase(),
+          ),
+        )
+        .map((r) => r.semester?.sequence)
+        .filter((n): n is number => n != null),
+    );
+
+    const journey = Array.from({ length: totalSemesters }, (_, i) => {
+      const sem = i + 1;
+      const reg = allRegistrations.find((r) => r.semester?.sequence === sem);
+      let status: 'completed' | 'current' | 'upcoming' = 'upcoming';
+      if (sem < currentSem || completedSemesters.has(sem)) status = 'completed';
+      else if (sem === currentSem) status = 'current';
+      return {
+        semesterSequence: sem,
+        label: `Semester ${sem}`,
+        status,
+        registrationStatus: reg?.status ?? null,
+        subjectCount: reg?.lines?.length ?? 0,
+        credits: (reg?.lines ?? []).reduce(
+          (sum, line) =>
+            sum + Number(line.credits ?? line.offering?.course?.credits ?? 0),
+          0,
+        ),
+      };
+    });
+
+    return {
+      header: {
+        academicYear: academicYear?.name ?? null,
+        programme:
+          programVersion?.program?.name ??
+          student.programVersion?.program?.name ??
+          'Programme',
+        semesterSequence,
+        semesterLabel:
+          semesterSequence != null ? `Semester ${semesterSequence}` : '—',
+        shift: shift?.name ?? lines[0]?.offeringSection?.shift?.name ?? null,
+        department: headerDepartment,
+        registrationStatus,
+        registrationComplete: REGISTRATION_COMPLETE.has(
+          registrationStatus.toLowerCase(),
+        ),
+        totalCredits,
+        targetCredits,
+        curriculumVersion: programVersion
+          ? `Version ${programVersion.version}`
+          : null,
+        status: 'ACTIVE',
+        major: majorMinor?.majorSubject?.name ?? null,
+        minor: majorMinor?.minorSubject?.name ?? null,
+      },
+      snapshot,
+      subjects,
+      attendanceBySubject,
+      todayClasses,
+      weeklyTimetable,
+      semesterProgress,
+      journey,
+      internalMarks: subjects
+        .filter((s) => s.internalMarks)
+        .map((s) => ({
+          label: s.courseTitle,
+          category: s.categoryLabel,
+          ...s.internalMarks!,
+        })),
+      assignmentsDue: Number(
+        (lmsDash as { cards?: { assignmentsDue?: number } })?.cards
+          ?.assignmentsDue ?? 0,
+      ),
+      downloads: {
+        syllabusAvailable: false,
+        curriculumAvailable: Boolean(programVersion?.version),
+        subjectListAvailable: subjects.length > 0,
+      },
+    };
   }
 }

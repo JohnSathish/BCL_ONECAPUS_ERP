@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Download, Printer } from 'lucide-react';
 
@@ -8,13 +8,12 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
 import { DistributionReportPanel } from '@/components/student-reports/distribution-report-panel';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import {
@@ -42,9 +41,8 @@ export function StudentReportSectionPage({
 }: Props) {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
-  const [filters, setFilters] = useState(emptyReportFilters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const [message, setMessage] = useState('');
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
   const filterOptions = useStudentReportFilterOptions();
 
   const report = useQuery({
@@ -100,7 +98,8 @@ export function StudentReportSectionPage({
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           {...filterOptions}
         />
 

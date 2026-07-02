@@ -141,7 +141,7 @@ export class AuthController {
     }
     const session = await this.auth.login(
       tenantId,
-      dto.email,
+      dto.email ?? dto.identifier ?? '',
       dto.password,
       dto.challengeToken,
       dto.challengeAnswer,

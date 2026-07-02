@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -16,6 +17,8 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
+import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
 import {
   AllocateRoomsDto,
   ExamPaperDto,
@@ -29,6 +32,8 @@ import { ExaminationsService } from './examinations.service';
 
 @ApiBearerAuth()
 @ApiTags('examinations')
+@ShiftScoped()
+@UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'examinations', version: '1' })
 export class ExaminationsController {
   constructor(private readonly service: ExaminationsService) {}

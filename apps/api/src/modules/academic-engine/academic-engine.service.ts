@@ -56,6 +56,8 @@ import {
   assignmentSourceForPool,
   MAPPING_SOURCE,
 } from './domain/category-pools';
+import { AcademicChangeHistoryService } from '../students/academic-change-history/academic-change-history.service';
+import type { AcademicChangeAuditContext } from '../students/academic-change-history/academic-change-history.types';
 
 @Injectable()
 export class AcademicEngineService {
@@ -75,6 +77,7 @@ export class AcademicEngineService {
     private readonly vtcTrack: StudentVtcTrackService,
     private readonly courseEligibility: CourseEligibilityService,
     private readonly feeEnforcement: FeeEnforcementService,
+    private readonly academicChangeHistory: AcademicChangeHistoryService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -543,7 +546,9 @@ export class AcademicEngineService {
       })),
       sanitizedLines,
     );
-    return this.updateRegistrationLines(tenantId, registrationId, merged);
+    return (
+      await this.updateRegistrationLines(tenantId, registrationId, merged)
+    ).registration;
   }
 
   async submitMyRegistration(
@@ -700,12 +705,16 @@ export class AcademicEngineService {
       registrationSource?: string;
       assignedById?: string;
       generatedBy?: string;
+      audit?: AcademicChangeAuditContext;
     },
   ) {
     const reg = await this.getRegistration(tenantId, registrationId);
     if (reg.status !== 'draft') {
       throw new BadRequestException('Only draft registrations can be edited');
     }
+
+    const beforeSnapshots =
+      this.academicChangeHistory.formatRegistrationLineSnapshots(reg.lines);
 
     const profile = await this.prisma.studentAcademicProfile.findUnique({
       where: { studentId: reg.studentId },
@@ -794,7 +803,36 @@ export class AcademicEngineService {
       );
     }
 
-    return this.getRegistration(tenantId, registrationId);
+    const registration = await this.getRegistration(tenantId, registrationId);
+    const afterSnapshots =
+      this.academicChangeHistory.formatRegistrationLineSnapshots(
+        registration.lines,
+      );
+
+    let auditRecorded = 0;
+    if (opts?.audit) {
+      const actor = await this.academicChangeHistory.resolveActorContext(
+        tenantId,
+        opts.audit.actorId ?? opts.assignedById,
+        opts.audit.actorRoles,
+      );
+      const auditResult =
+        await this.academicChangeHistory.logRegistrationLineChanges(
+          tenantId,
+          reg.studentId,
+          {
+            id: reg.id,
+            semesterId: reg.semesterId,
+            semesterSequence: reg.semesterSequence,
+          },
+          beforeSnapshots,
+          afterSnapshots,
+          { ...opts.audit, ...actor, semesterId: reg.semesterId },
+        );
+      auditRecorded = auditResult.recorded;
+    }
+
+    return { registration, auditRecorded };
   }
 
   async validateRegistration(tenantId: string, registrationId: string) {

@@ -44,7 +44,7 @@ export const SEM5_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
   Programme: 'Select from dropdown — e.g. BA-ECO, BA-GEO',
   'Admission Batch': 'BATCH-2026',
   Stream: 'ARTS',
-  Shift: 'DAY',
+  Shift: 'MORNING or DAY — Semester 5 curriculum is identical for both shifts',
   'Academic Session': '2026-27',
   'Current Semester': 'Must be 5',
   'Major Department':
@@ -65,7 +65,7 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   Programme: 'BA-ECO',
   'Admission Batch': 'BATCH-2026',
   Stream: 'ARTS',
-  Shift: 'DAY',
+  Shift: 'MORNING',
   'Academic Session': '2026-27',
   'Current Semester': '5',
   'Major Department': 'Economics',

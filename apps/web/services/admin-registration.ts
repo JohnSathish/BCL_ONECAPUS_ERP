@@ -106,11 +106,13 @@ export async function updateAdminRegistrationLines(
     eligibilityOverride?: boolean;
     eligibilityOverrideReason?: string;
   }[],
+  options?: { auditReason?: string },
 ) {
   const { data } = await api.patch(`/v1/academic-engine/registrations/${registrationId}/lines`, {
     lines,
+    auditReason: options?.auditReason,
   });
-  return data as SemesterRegistration;
+  return data as SemesterRegistration & { auditRecorded?: number };
 }
 
 export async function validateAdminRegistration(registrationId: string) {

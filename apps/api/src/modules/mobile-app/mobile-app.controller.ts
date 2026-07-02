@@ -181,6 +181,12 @@ export class MobileAppController {
     return this.home.studentHome(user);
   }
 
+  @Get('student/academics')
+  @RequirePermissions('student:portal:self')
+  studentAcademics(@CurrentUser() user: JwtUser) {
+    return this.home.studentAcademics(user);
+  }
+
   @Get('staff/home')
   @RequirePermissions('staff:portal:self')
   staffHome(@CurrentUser() user: JwtUser) {

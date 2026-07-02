@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -31,10 +31,8 @@ import {
   deleteTimetableEntry,
   deleteTimetablePlan,
   fetchStreamMasterRoutine,
-  fetchTimetableContext,
   fetchTimetableDashboard,
   fetchTimetableMatrix,
-  fetchTimetablePlans,
   generateTimetablePlan,
   publishTimetablePlan,
   submitTimetablePlan,
@@ -47,6 +45,7 @@ import {
 } from '@/services/timetable';
 import { cn } from '@/utils/cn';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
+import { useTimetableWorkspaceFilters } from '@/hooks/use-timetable-workspace-filters';
 import type { TimetablePrintParams } from '@/lib/timetable/open-timetable-print';
 
 const TABS = [
@@ -67,11 +66,22 @@ export function TimetableManualWorkspace() {
   const session = useRequireAuth();
   const authReady = useAuthQueryEnabled();
   const [tab, setTab] = useState<TabId>('manual');
-  const [shiftId, setShiftId] = useState('');
-  const [streamId, setStreamId] = useState('');
-  const [semesterMode, setSemesterMode] = useState<'ODD' | 'EVEN'>('ODD');
-  const [academicYearId, setAcademicYearId] = useState('');
-  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const {
+    shiftId,
+    setShiftId,
+    effectiveShiftId,
+    hideShiftFilter,
+    streamId,
+    setStreamId,
+    semesterMode,
+    setSemesterMode,
+    academicYearId,
+    setAcademicYearId,
+    selectedPlanId,
+    setSelectedPlanId,
+    plans,
+    context: contextData,
+  } = useTimetableWorkspaceFilters();
   const [validation, setValidation] = useState<TimetableConflictSummary>();
   const [slotOpen, setSlotOpen] = useState(false);
   const [slotContext, setSlotContext] = useState<SlotModalContext>();
@@ -80,33 +90,12 @@ export function TimetableManualWorkspace() {
   const [roomFilter, setRoomFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState<number | ''>('');
 
-  const contextQ = useQuery({
-    queryKey: ['timetable', 'context'],
-    queryFn: fetchTimetableContext,
-    enabled: authReady,
-  });
   const dashboardQ = useQuery({
     queryKey: ['timetable', 'dashboard'],
     queryFn: fetchTimetableDashboard,
     enabled: authReady,
   });
 
-  useEffect(() => {
-    if (contextQ.data?.currentAcademicMode) {
-      setSemesterMode(contextQ.data.currentAcademicMode);
-    }
-  }, [contextQ.data?.currentAcademicMode]);
-  const plansQ = useQuery({
-    queryKey: ['timetable', 'plans', shiftId, streamId, semesterMode],
-    queryFn: () =>
-      fetchTimetablePlans({
-        shiftId: shiftId || undefined,
-        streamId: streamId || undefined,
-        semesterMode,
-      }),
-    enabled: authReady,
-  });
-  const plans = useMemo(() => plansQ.data ?? [], [plansQ.data]);
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId),
     [plans, selectedPlanId],
@@ -128,7 +117,7 @@ export function TimetableManualWorkspace() {
   });
 
   const allowedSemesters =
-    contextQ.data?.allowedSemesters ?? (semesterMode === 'ODD' ? [1, 3, 5] : [2, 4, 6]);
+    contextData?.allowedSemesters ?? (semesterMode === 'ODD' ? [1, 3, 5] : [2, 4, 6]);
 
   const printOptions = useMemo((): TimetablePrintParams | undefined => {
     if (!selectedPlanId) return undefined;
@@ -145,12 +134,12 @@ export function TimetableManualWorkspace() {
   const createManualMut = useMutation({
     mutationFn: () => {
       const streamName =
-        contextQ.data?.streams.find((stream) => stream.id === streamId)?.name ?? 'All Streams';
+        contextData?.streams.find((stream) => stream.id === streamId)?.name ?? 'All Streams';
       const shiftName =
-        contextQ.data?.shifts.find((shift) => shift.id === shiftId)?.name ?? 'Day Shift';
+        contextData?.shifts.find((shift) => shift.id === effectiveShiftId)?.name ?? 'Day Shift';
       return createManualTimetablePlan({
         name: `${streamName} · ${shiftName} · ${semesterMode} · Weekly Routine`,
-        shiftId: shiftId || undefined,
+        shiftId: effectiveShiftId,
         streamId: streamId || undefined,
         semesterMode,
         academicYearId: academicYearId || undefined,
@@ -298,11 +287,12 @@ export function TimetableManualWorkspace() {
           selectedPlanId={selectedPlanId}
           setSelectedPlanId={setSelectedPlanId}
           plans={plans}
-          context={contextQ.data}
+          context={contextData}
+          hideShiftFilter={hideShiftFilter}
           onDeletePlan={(planId) => deletePlanMut.mutate(planId)}
           deleteBusy={deletePlanMut.isPending}
         />
-        <TimetableCyclePanel context={contextQ.data} dashboard={dashboardQ.data} />
+        <TimetableCyclePanel context={contextData} dashboard={dashboardQ.data} />
 
         <div className="flex flex-wrap gap-2">
           {TABS.map((item) => (

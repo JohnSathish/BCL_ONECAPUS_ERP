@@ -351,3 +351,53 @@ export async function fetchStudentRollShiftHistory(
   );
   return data;
 }
+
+export type ShiftTransferPreview = {
+  studentId: string;
+  currentShift: { id: string; code: string; name: string };
+  targetShift: { id: string; code: string; name: string };
+  currentRollNumber: string | null;
+  previewRollNumber: string;
+  admissionYear: number;
+  prefix: string;
+};
+
+export type ShiftTransferExecuteResult = {
+  transferId: string;
+  studentId: string;
+  oldRollNumber: string | null;
+  newRollNumber: string | null;
+  oldShift: { id: string; code: string; name: string };
+  newShift: { id: string; code: string; name: string };
+  auditRecorded?: number;
+};
+
+export async function previewShiftTransfer(studentId: string, toShiftId: string) {
+  const { data } = await api.get<ShiftTransferPreview>(
+    `/v1/students/${studentId}/shift-transfer/preview`,
+    { params: { toShiftId } },
+  );
+  return data;
+}
+
+export async function executeShiftTransfer(
+  studentId: string,
+  payload: { toShiftId: string; reason?: string },
+) {
+  const { data } = await api.post<ShiftTransferExecuteResult>(
+    `/v1/students/${studentId}/shift-transfer/execute`,
+    payload,
+  );
+  return data;
+}
+
+export async function previewBulkShiftTransfer(payload: {
+  studentIds: string[];
+  toShiftId: string;
+}) {
+  const { data } = await api.post<{
+    previews: ShiftTransferPreview[];
+    errors: Array<{ studentId: string; error: string }>;
+  }>('/v1/students/shift-transfers/preview-bulk', payload);
+  return data;
+}

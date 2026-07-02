@@ -5,13 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DistributionReportPanel } from '@/components/student-reports/distribution-report-panel';
-import {
-  emptyReportFilters,
-  StudentReportFiltersBar,
-  toApiFilters,
-} from '@/components/student-reports/student-report-filters';
+import { StudentReportFiltersBar } from '@/components/student-reports/student-report-filters';
 import { StudentReportsShell } from '@/components/student-reports/student-reports-shell';
-import { useStudentReportFilterOptions } from '@/components/student-reports/use-student-report-filters';
+import {
+  useStudentReportFilterOptions,
+  useStudentReportFilterState,
+} from '@/components/student-reports/use-student-report-filters';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { fetchStudentDistributionReport } from '@/services/student-reports';
@@ -25,8 +24,7 @@ export default function AcademicReportsPage() {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('strength');
-  const [filters, setFilters] = useState(emptyReportFilters);
-  const apiFilters = toApiFilters(filters);
+  const { filters, patchFilters, apiFilters, hideShiftFilter } = useStudentReportFilterState();
   const filterOptions = useStudentReportFilterOptions();
 
   const strength = useQuery({
@@ -51,7 +49,8 @@ export default function AcademicReportsPage() {
       >
         <StudentReportFiltersBar
           filters={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))}
+          onChange={patchFilters}
+          hideShiftFilter={hideShiftFilter}
           {...filterOptions}
         />
 

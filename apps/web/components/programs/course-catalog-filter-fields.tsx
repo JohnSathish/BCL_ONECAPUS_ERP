@@ -28,6 +28,7 @@ type Props = {
   programVersions: ProgramVersionOption[];
   layout?: 'inline' | 'stacked';
   className?: string;
+  allowAllProgrammes?: boolean;
 };
 
 export function CourseCatalogFilterFields({
@@ -37,6 +38,7 @@ export function CourseCatalogFilterFields({
   programVersions,
   layout = 'inline',
   className,
+  allowAllProgrammes = true,
 }: Props) {
   const gridClass =
     layout === 'inline' ? 'flex flex-wrap items-end gap-2' : 'grid gap-3 sm:grid-cols-2';
@@ -91,7 +93,7 @@ export function CourseCatalogFilterFields({
         value={filters.programVersionId}
         onChange={(v) => onFilterChange('programVersionId', v)}
       >
-        <option value="">All programmes</option>
+        {allowAllProgrammes ? <option value="">All programmes</option> : null}
         {programVersions.map((pv) => (
           <option key={pv.id} value={pv.id}>
             {pv.program.code} v{pv.version}

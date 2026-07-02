@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import {
   defaultNehuTemplateLines,
@@ -8,6 +8,7 @@ import {
   DEFAULT_SEMESTER_CREDIT_TARGET,
 } from '../src/modules/academic-engine/domain/fyugp-templates';
 import { seedDbcFyugpRules } from './seed-dbc-fyugp-rules';
+import { seedDbcShiftCurriculum } from './seed-dbc-shift-curriculum';
 import { seedArtsFyugpCatalog } from './seed-arts-fyugp-catalog';
 import { seedArtsOddTimetable } from './seed-arts-odd-timetable';
 import { seedArtsShiftIiTimetable } from './seed-arts-shift-ii-timetable';
@@ -108,13 +109,14 @@ async function main() {
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
-        'NAAC Accredited',
+        "NAAC Re-accredited with Grade 'B'",
         'NEP 2020',
         'FYUGP',
       ],
       primaryColor: '#1e3a5f',
       accentColor: '#c8102e',
       sidebarColor: '#152a45',
+      logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       showPoweredBy: true,
       brandingEnabled: true,
@@ -128,13 +130,14 @@ async function main() {
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
-        'NAAC Accredited',
+        "NAAC Re-accredited with Grade 'B'",
         'NEP 2020',
         'FYUGP',
       ],
       primaryColor: '#1e3a5f',
       accentColor: '#c8102e',
       sidebarColor: '#152a45',
+      logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       showPoweredBy: true,
       brandingEnabled: true,
@@ -2506,6 +2509,7 @@ async function main() {
       sortOrder: 0,
       start: shiftTime(6, 30),
       end: shiftTime(9, 30),
+      status: 'ACTIVE' as const,
     },
     {
       code: 'DAY',
@@ -2513,6 +2517,7 @@ async function main() {
       sortOrder: 1,
       start: shiftTime(9, 45),
       end: shiftTime(15, 30),
+      status: 'ACTIVE' as const,
     },
     {
       code: 'SHIFT_II',
@@ -2520,6 +2525,7 @@ async function main() {
       sortOrder: 2,
       start: shiftTime(9, 45),
       end: shiftTime(15, 30),
+      status: 'INACTIVE' as const,
     },
     {
       code: 'EVENING',
@@ -2527,6 +2533,7 @@ async function main() {
       sortOrder: 3,
       start: shiftTime(14, 45),
       end: shiftTime(17, 45),
+      status: 'INACTIVE' as const,
     },
   ];
   const activeCampuses = await prisma.campus.findMany({
@@ -2555,7 +2562,7 @@ async function main() {
             startTime: s.start,
             endTime: s.end,
             shiftType: 'REGULAR',
-            status: 'ACTIVE',
+            status: s.status,
             sortOrder: s.sortOrder,
           },
         });
@@ -2567,7 +2574,7 @@ async function main() {
             startTime: s.start,
             endTime: s.end,
             sortOrder: s.sortOrder,
-            status: 'ACTIVE',
+            status: s.status,
           },
         });
       }
@@ -2769,7 +2776,6 @@ async function main() {
         ? [
             { shift: 'MORNING', cap: 40, wl: 10 },
             { shift: 'DAY', cap: 60, wl: 15 },
-            { shift: 'EVENING', cap: 30, wl: 8 },
           ]
         : [{ shift: 'DAY', cap: 40, wl: 10 }];
 
@@ -2844,6 +2850,18 @@ async function main() {
     createdById: adminUser.id,
   });
 
+  const fyugpRules = await seedDbcFyugpRules(prisma, tenant.id, institution.id);
+  await seedDbcShiftCurriculum({
+    prisma,
+    tenantId: tenant.id,
+    institutionId: institution.id,
+    shifts,
+    createdById: adminUser.id,
+  });
+  console.log(
+    'DBC shift curriculum seeded (Morning/Day Sem 1–3 pools, programmes, sections)',
+  );
+
   await syncProgramPromotionMappings(prisma, tenant.id, programVersion.id, [
     { fromSequence: 1, toSequence: 2 },
     { fromSequence: 2, toSequence: 3 },
@@ -2886,8 +2904,6 @@ async function main() {
   for (const [code, cap] of [
     ['MORNING', 30],
     ['DAY', 60],
-    ['SHIFT_II', 40],
-    ['EVENING', 30],
   ] as const) {
     const shiftId = shifts[code]!.id;
     const existingCap = await prisma.admissionIntakeShift.findFirst({
@@ -3350,7 +3366,6 @@ async function main() {
     naacSeed.aqarId,
   );
   await seedCategoryPools(tenant.id, institution.id, adminUser.id);
-  const fyugpRules = await seedDbcFyugpRules(prisma, tenant.id, institution.id);
   console.log(
     'FYUGP major/minor rules seeded:',
     fyugpRules.subjectCount,
@@ -3878,23 +3893,34 @@ async function seedCategoryPools(
     }
 
     for (const version of ugVersions) {
-      await prisma.programmePoolAssignment.upsert({
-        where: {
-          programVersionId_semesterNo_poolId: {
+      const existingAssignment = await prisma.programmePoolAssignment.findFirst(
+        {
+          where: {
+            tenantId,
             programVersionId: version.id,
             semesterNo: def.semesterNo,
             poolId: pool.id,
+            shiftId: null,
           },
         },
-        create: {
-          tenantId,
-          programVersionId: version.id,
-          semesterNo: def.semesterNo,
-          poolId: pool.id,
-          active: true,
-        },
-        update: { active: true },
-      });
+      );
+      if (existingAssignment) {
+        await prisma.programmePoolAssignment.update({
+          where: { id: existingAssignment.id },
+          data: { active: true },
+        });
+      } else {
+        await prisma.programmePoolAssignment.create({
+          data: {
+            tenantId,
+            programVersionId: version.id,
+            semesterNo: def.semesterNo,
+            poolId: pool.id,
+            shiftId: null,
+            active: true,
+          },
+        });
+      }
     }
   }
 

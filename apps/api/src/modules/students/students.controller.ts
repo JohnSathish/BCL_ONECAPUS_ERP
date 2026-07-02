@@ -10,18 +10,21 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
+import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
+import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import {
   RequireAnyPermission,
@@ -52,6 +55,8 @@ import {
 } from './dto/students.dto';
 import {
   BulkShiftTransferDto,
+  ExecuteShiftTransferDto,
+  PreviewShiftTransferBulkDto,
   ReserveRollNumberDto,
   UpsertRollShiftRangesDto,
 } from './dto/roll-shift-range.dto';
@@ -71,11 +76,16 @@ import { StudentPortalProfileService } from './services/student-portal-profile.s
 import { StudentProfileService } from './services/student-profile.service';
 import { IdCardsService } from '../id-cards/id-cards.service';
 import { StudentsService } from './students.service';
+import { AcademicChangeHistoryService } from './academic-change-history/academic-change-history.service';
+import { ListAcademicChangeHistoryQueryDto } from './dto/academic-change-history.dto';
+import { extractClientIp } from '../../common/utils/request-host';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 @ApiBearerAuth()
 @ApiTags('students')
+@ShiftScoped()
+@UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'students', version: '1' })
 export class StudentsController {
   constructor(
@@ -88,6 +98,7 @@ export class StudentsController {
     private readonly assetsService: StudentAssetsService,
     private readonly studentImport: StudentImportService,
     private readonly migrationStatusService: MigrationStatusService,
+    private readonly academicChangeHistory: AcademicChangeHistoryService,
   ) {}
 
   @Get('summary')
@@ -212,12 +223,14 @@ export class StudentsController {
       | 'default'
       | 'full-admission'
       | 'sem1-admission'
+      | 'sem2-admission'
       | 'sem3-admission'
       | 'sem5-admission' = 'full-admission',
     @Query('programme') programme?: string,
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     const buffer =
       variant === 'full-admission'
@@ -235,29 +248,38 @@ export class StudentsController {
               semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
               academicYearId,
             })
-          : variant === 'sem3-admission'
-            ? await this.studentImport.buildSem3AdmissionTemplate({
+          : variant === 'sem2-admission'
+            ? await this.studentImport.buildSem2AdmissionTemplate({
                 tenantId: user.tid,
                 programme,
                 programVersionId,
-                semesterSequence: semesterSequence
-                  ? Number(semesterSequence)
-                  : 3,
+                shiftId,
+                academicYearId,
               })
-            : variant === 'sem5-admission'
-              ? await this.studentImport.buildSem5AdmissionTemplate({
+            : variant === 'sem3-admission'
+              ? await this.studentImport.buildSem3AdmissionTemplate({
                   tenantId: user.tid,
                   programme,
                   programVersionId,
                   semesterSequence: semesterSequence
                     ? Number(semesterSequence)
-                    : 5,
-                  academicYearId,
+                    : 3,
+                  shiftId,
                 })
-              : await this.studentImport.buildTemplate({
-                  mode,
-                  tenantId: user.tid,
-                });
+              : variant === 'sem5-admission'
+                ? await this.studentImport.buildSem5AdmissionTemplate({
+                    tenantId: user.tid,
+                    programme,
+                    programVersionId,
+                    semesterSequence: semesterSequence
+                      ? Number(semesterSequence)
+                      : 5,
+                    academicYearId,
+                  })
+                : await this.studentImport.buildTemplate({
+                    mode,
+                    tenantId: user.tid,
+                  });
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -267,11 +289,13 @@ export class StudentsController {
         ? 'Full_Admission_Import_Template.xlsx'
         : variant === 'sem1-admission'
           ? 'Sem1_Admission_Import_Template.xlsx'
-          : variant === 'sem3-admission'
-            ? 'Sem3_Admission_Import_Template.xlsx'
-            : variant === 'sem5-admission'
-              ? 'Sem5_Admission_Import_Template.xlsx'
-              : 'Student_Import_Template.xlsx';
+          : variant === 'sem2-admission'
+            ? 'Sem2_Admission_Import_Template.xlsx'
+            : variant === 'sem3-admission'
+              ? 'Sem3_Admission_Import_Template.xlsx'
+              : variant === 'sem5-admission'
+                ? 'Sem5_Admission_Import_Template.xlsx'
+                : 'Student_Import_Template.xlsx';
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
   }
@@ -286,6 +310,46 @@ export class StudentsController {
   @RequirePermissions('students:import')
   listSem1ImportProgrammes(@CurrentUser() user: JwtUser) {
     return this.studentImport.listSem1ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem2-curriculum/programmes')
+  @RequirePermissions('students:import')
+  listSem2ImportProgrammes(@CurrentUser() user: JwtUser) {
+    return this.studentImport.listSem2ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem2-curriculum/eligible-minors')
+  @RequirePermissions('students:import')
+  getSem2EligibleMinors(
+    @CurrentUser() user: JwtUser,
+    @Query('programVersionId') programVersionId: string,
+    @Query('majorDepartment') majorDepartment: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.studentImport.getSem2EligibleMinors(user.tid, {
+      programVersionId,
+      majorDepartment,
+      shiftId,
+      academicYearId,
+    });
+  }
+
+  @Get('import/sem2-curriculum')
+  @RequirePermissions('students:import')
+  getSem2ImportCurriculum(
+    @CurrentUser() user: JwtUser,
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.studentImport.getSem2ImportCurriculum(user.tid, {
+      programme,
+      programVersionId,
+      shiftId,
+      academicYearId,
+    });
   }
 
   @Get('import/sem1-curriculum/eligible-minors')
@@ -335,11 +399,13 @@ export class StudentsController {
     @Query('programme') programme?: string,
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.studentImport.getSem3ImportCurriculum(user.tid, {
       programme,
       programVersionId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+      shiftId,
     });
   }
 
@@ -611,8 +677,60 @@ export class StudentsController {
   bulkShiftTransfer(
     @CurrentUser() user: JwtUser,
     @Body() dto: BulkShiftTransferDto,
+    @Req() req: Request,
   ) {
-    return this.students.bulkShiftTransfer(user.tid, dto, user.sub);
+    return this.students.bulkShiftTransfer(user.tid, dto, user.sub, {
+      actorId: user.sub,
+      actorRoles: user.roles,
+      reason: dto.reason,
+      ipAddress: extractClientIp(req),
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Post('shift-transfers/preview-bulk')
+  @RequirePermissions('shift:students:manage', 'students:manage')
+  previewBulkShiftTransfer(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: PreviewShiftTransferBulkDto,
+  ) {
+    return this.students.previewShiftTransferBulk(user.tid, dto);
+  }
+
+  @Get(':id/shift-transfer/preview')
+  @RequirePermissions('students:manage', 'shift:students:manage')
+  previewShiftTransfer(
+    @CurrentUser() user: JwtUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('toShiftId', ParseUUIDPipe) toShiftId: string,
+  ) {
+    return this.students.previewShiftTransfer(user.tid, id, toShiftId);
+  }
+
+  @Post(':id/shift-transfer/execute')
+  @RequirePermissions('students:manage', 'shift:students:manage')
+  executeShiftTransfer(
+    @CurrentUser() user: JwtUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExecuteShiftTransferDto,
+    @Req() req: Request,
+  ) {
+    return this.students.executeShiftTransfer(
+      user.tid,
+      {
+        studentId: id,
+        toShiftId: dto.toShiftId,
+        reason: dto.reason,
+      },
+      user.sub,
+      {
+        actorId: user.sub,
+        actorRoles: user.roles,
+        reason: dto.reason,
+        ipAddress: extractClientIp(req),
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 
   @Get(':id/roll-number-history')
@@ -757,6 +875,40 @@ export class StudentsController {
     return this.sectionsService.getCompletion(user.tid, id);
   }
 
+  @Get(':id/academic-change-history')
+  @RequireAnyPermission('students:read', 'students:manage')
+  listAcademicChangeHistory(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() query: ListAcademicChangeHistoryQueryDto,
+  ) {
+    return this.academicChangeHistory.list(user.tid, id, query);
+  }
+
+  @Get(':id/academic-change-history/export.csv')
+  @RequireAnyPermission('students:read', 'students:manage')
+  async exportAcademicChangeHistory(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() query: ListAcademicChangeHistoryQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.academicChangeHistory.exportCsv(user.tid, id, {
+      semesterId: query.semesterId,
+      academicYearId: query.academicYearId,
+      changeType: query.changeType,
+      changedById: query.changedById,
+      from: query.from,
+      to: query.to,
+    });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="academic-change-history-${id}.csv"`,
+    );
+    res.send(csv);
+  }
+
   @Get(':id/profile/sections/:sectionKey')
   getProfileSection(
     @CurrentUser() user: JwtUser,
@@ -773,13 +925,23 @@ export class StudentsController {
     @Param('id') id: string,
     @Param('sectionKey') sectionKey: string,
     @Body() dto: Record<string, unknown>,
+    @Req() req: Request,
   ) {
+    const auditReason =
+      typeof dto.auditReason === 'string' ? dto.auditReason : undefined;
     return this.sectionsService.updateSection(
       user.tid,
       id,
       sectionKey,
       dto,
       user.sub,
+      {
+        actorId: user.sub,
+        actorRoles: user.roles,
+        reason: auditReason,
+        ipAddress: extractClientIp(req),
+        userAgent: req.headers['user-agent'],
+      },
     );
   }
 
