@@ -16,6 +16,7 @@ import type { DataScope } from '../../common/permissions/permission-resolver.ser
 import { isSuperAdmin } from '../../common/permissions/permission-registry';
 import { PasswordPolicyService } from '../../common/security/password-policy.service';
 import { MfaService } from './mfa/mfa.service';
+import { resolveLoginHintFromRoles } from './login-hint.util';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -419,6 +420,22 @@ export class AuthService {
       },
       include,
     });
+  }
+
+  async getLoginHint(tenantId: string, loginId: string) {
+    const trimmed = loginId?.trim();
+    if (!trimmed) return { recognized: false as const };
+
+    const user = await this.resolveLoginUser(tenantId, trimmed);
+    if (!user) return { recognized: false as const };
+
+    const roleCodes = (user.roles ?? [])
+      .map((entry) => entry.role?.slug)
+      .filter((slug): slug is string => Boolean(slug));
+    const hint = resolveLoginHintFromRoles(roleCodes);
+    if (!hint) return { recognized: false as const };
+
+    return { recognized: true as const, ...hint };
   }
 
   async login(

@@ -15,6 +15,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   preview: ShiftTransferPreview | null;
   pending?: boolean;
+  loading?: boolean;
+  errorMessage?: string | null;
   bulkCount?: number;
   onConfirm: () => void;
 };
@@ -24,17 +26,32 @@ export function ShiftTransferConfirmDialog({
   onOpenChange,
   preview,
   pending = false,
+  loading = false,
+  errorMessage = null,
   bulkCount = 1,
   onConfirm,
 }: Props) {
   const isBulk = bulkCount > 1;
+  const canConfirm = isBulk || Boolean(preview);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Confirm shift transfer</DialogTitle>
         </DialogHeader>
-        {preview && !isBulk ? (
+        {loading && !preview && !errorMessage ? (
+          <p className="text-sm text-muted-foreground">Loading preview…</p>
+        ) : errorMessage ? (
+          <div className="space-y-2 text-sm">
+            <p className="font-medium text-destructive">Could not prepare shift transfer</p>
+            <p className="text-muted-foreground">{errorMessage}</p>
+            <p className="text-xs text-muted-foreground">
+              Configure destination shift roll ranges under Administration → Roll Number → Shift
+              Ranges, then try again.
+            </p>
+          </div>
+        ) : preview && !isBulk ? (
           <div className="space-y-3 text-sm">
             <dl className="grid gap-2 rounded-md border border-border/70 bg-muted/20 p-3">
               <div className="grid grid-cols-2 gap-1">
@@ -52,7 +69,7 @@ export function ShiftTransferConfirmDialog({
             </dl>
             <p className="text-xs text-amber-700 dark:text-amber-300">
               This action will permanently assign a new roll number. The previous roll number will
-              be preserved in the audit history.
+              be preserved in the audit history. Major papers and other subjects stay the same.
             </p>
           </div>
         ) : isBulk ? (
@@ -72,7 +89,7 @@ export function ShiftTransferConfirmDialog({
           >
             Cancel
           </Button>
-          <Button type="button" disabled={pending || (!preview && !isBulk)} onClick={onConfirm}>
+          <Button type="button" disabled={pending || loading || !canConfirm} onClick={onConfirm}>
             {pending ? 'Transferring…' : 'Confirm transfer'}
           </Button>
         </DialogFooter>

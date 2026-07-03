@@ -479,11 +479,15 @@ export type Sem1ImportCurriculum = {
   programName: string;
   curriculumLabel: string;
   semesterSequence: number;
-  majorDepartments: { departmentName: string; paper: { code: string; title: string } }[];
-  mdcDepartments: { code: string; title: string }[];
-  aecPapers: { code: string; title: string }[];
-  secPapers: { code: string; title: string }[];
-  vacPaper: { code: string; title: string };
+  majorDepartments: {
+    departmentName: string;
+    papers?: { code: string; title: string; offeringId?: string }[];
+    paper: { code: string; title: string; offeringId?: string };
+  }[];
+  mdcDepartments: { code: string; title: string; offeringId?: string }[];
+  aecPapers: { code: string; title: string; offeringId?: string }[];
+  secPapers: { code: string; title: string; offeringId?: string }[];
+  vacPaper: { code: string; title: string; offeringId?: string };
   minorByMajor: Record<string, string[]>;
 };
 
@@ -543,11 +547,15 @@ export type Sem2ImportCurriculum = {
   curriculumLabel: string;
   semesterSequence: 2;
   shiftId: string | null;
-  majorDepartments: { departmentName: string; paper: { code: string; title: string } }[];
-  mdcPapers: { code: string; title: string }[];
-  aecPapers: { code: string; title: string }[];
-  secPapers: { code: string; title: string }[];
-  vacPapers: { code: string; title: string }[];
+  majorDepartments: {
+    departmentName: string;
+    papers?: { code: string; title: string; offeringId?: string }[];
+    paper: { code: string; title: string; offeringId?: string };
+  }[];
+  mdcPapers: { code: string; title: string; offeringId?: string }[];
+  aecPapers: { code: string; title: string; offeringId?: string }[];
+  secPapers: { code: string; title: string; offeringId?: string }[];
+  vacPapers: { code: string; title: string; offeringId?: string }[];
   minorByMajor: Record<string, string[]>;
 };
 

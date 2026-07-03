@@ -40,6 +40,16 @@ export const STUDENT_REPORT_FIELD_GROUPS: Record<
 export const STUDENT_REPORT_FIELDS: StudentReportFieldDef[] = [
   { key: 'rollNumber', label: 'Roll Number', group: 'identity' },
   { key: 'enrollmentNumber', label: 'Registration No.', group: 'identity' },
+  {
+    key: 'universityRollNumber',
+    label: 'NEHU Roll Number',
+    group: 'identity',
+  },
+  {
+    key: 'universityRegistrationNumber',
+    label: 'NEHU Registration Number',
+    group: 'identity',
+  },
   { key: 'admissionNumber', label: 'Admission No.', group: 'identity' },
   { key: 'applicationNumber', label: 'Application No.', group: 'identity' },
   { key: 'rfidNumber', label: 'RFID', group: 'identity' },

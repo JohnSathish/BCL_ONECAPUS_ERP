@@ -1699,7 +1699,8 @@ function Sem5TemplateDialog({
         <h2 className="text-lg font-semibold">Download Semester 5 Template</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Select academic year, programme, and curriculum. The Excel template uses Major Department,
-          Minor Department, and Internship Area only — no course codes.
+          Minor Department, and Internship Area. Internship Area lists registered courses such as
+          ECO-304 — Economics Internship (must match the major department).
         </p>
 
         <label className="mt-4 block text-sm font-medium">

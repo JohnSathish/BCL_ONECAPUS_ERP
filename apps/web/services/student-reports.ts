@@ -1,5 +1,15 @@
 import { api } from '@/services/api';
-import { downloadBlob } from '@/utils/download-blob';
+import { downloadBlob, filenameFromContentDisposition } from '@/utils/download-blob';
+
+function slugFilename(name: string) {
+  const slug = name
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'student-report';
+}
 
 export type StudentReportFilters = {
   campusId?: string;
@@ -235,12 +245,18 @@ export async function exportSavedReport(
   id: string,
   format: 'xlsx' | 'csv',
   filters?: StudentReportFilters,
+  reportName?: string,
 ): Promise<void> {
   const response = await api.get(`/v1/student-reports/saved/${id}/export`, {
     params: { ...cleanParams(filters), format },
     responseType: 'blob',
   });
-  downloadBlob(response.data, `saved-report-${id}.${format === 'xlsx' ? 'xlsx' : 'csv'}`);
+  const ext = format === 'xlsx' ? 'xlsx' : 'csv';
+  const fromHeader = filenameFromContentDisposition(
+    response.headers?.['content-disposition'] ?? response.headers?.['Content-Disposition'],
+  );
+  const fallback = reportName ? `${slugFilename(reportName)}.${ext}` : `student-report.${ext}`;
+  downloadBlob(response.data, fromHeader || fallback);
 }
 
 export type ScheduledReport = {

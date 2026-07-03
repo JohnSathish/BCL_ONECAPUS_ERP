@@ -369,6 +369,7 @@ export type ShiftTransferExecuteResult = {
   newRollNumber: string | null;
   oldShift: { id: string; code: string; name: string };
   newShift: { id: string; code: string; name: string };
+  remappedRegistrationLines?: number;
   auditRecorded?: number;
 };
 
@@ -382,7 +383,7 @@ export async function previewShiftTransfer(studentId: string, toShiftId: string)
 
 export async function executeShiftTransfer(
   studentId: string,
-  payload: { toShiftId: string; reason?: string },
+  payload: { toShiftId: string; reason?: string; manualRollNumber?: string },
 ) {
   const { data } = await api.post<ShiftTransferExecuteResult>(
     `/v1/students/${studentId}/shift-transfer/execute`,

@@ -19,10 +19,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/api/client';
 import {
-  detectIdentifierHint,
   getSemesterLabel,
   getTimeGreeting,
   looksLikeCapsLock,
+  useIdentifierHint,
 } from '@/auth/identifier-hint';
 import { performLogin } from '@/auth/login-flow';
 import { authColors, authTheme } from '@/components/auth/auth-theme';
@@ -87,7 +87,7 @@ export default function LoginScreen() {
   const newsFade = useRef(new Animated.Value(1)).current;
 
   const greeting = getTimeGreeting();
-  const identifierHint = detectIdentifierHint(identifier);
+  const identifierHint = useIdentifierHint(identifier);
   const capsWarning = looksLikeCapsLock(password);
   const offline = !config && !!bootstrapError;
 

@@ -18,6 +18,8 @@ export type Sem2PaperOption = {
 export type Sem2MajorDepartmentOption = {
   departmentName: string;
   subjectSlug: string;
+  papers: Sem2PaperOption[];
+  /** @deprecated Prefer `papers[0]` — kept for older import clients. */
   paper: Sem2PaperOption;
 };
 
@@ -383,24 +385,33 @@ export class Sem2ImportCurriculumService {
   private buildMajorDepartments(
     majorOfferings: CurriculumOffering[],
   ): Sem2MajorDepartmentOption[] {
-    const grouped = new Map<string, CurriculumOffering>();
+    const grouped = new Map<string, CurriculumOffering[]>();
     for (const offering of majorOfferings) {
       const departmentName =
         offering.course.department?.name?.trim() ||
         this.departmentFromCourseCode(offering.course.code);
       if (!departmentName) continue;
       const key = this.normalizeLabel(departmentName);
-      if (!grouped.has(key)) grouped.set(key, offering);
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(offering);
+      grouped.set(key, bucket);
     }
     return [...grouped.entries()]
-      .map(([, offering]) => {
-        const departmentName = offering.course.department?.name ?? '';
+      .map(([, bucket]) => {
+        const departmentName = bucket[0]?.course.department?.name ?? '';
+        const papers = [...bucket]
+          .sort((a, b) => a.course.code.localeCompare(b.course.code))
+          .map((offering) => this.toPaperOption(offering));
+        const paper = papers[0];
+        if (!paper || !departmentName) return null;
         return {
           departmentName,
           subjectSlug: slugifySubject(departmentName),
-          paper: this.toPaperOption(offering),
+          papers,
+          paper,
         };
       })
+      .filter((row): row is Sem2MajorDepartmentOption => row != null)
       .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
   }
 

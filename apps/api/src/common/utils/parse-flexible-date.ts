@@ -13,21 +13,21 @@ export function parseFlexibleDate(value: unknown): string | null {
   let match = text.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
   if (match) {
     const [, y, m, d] = match;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return toValidIsoDate(Number(y), Number(m), Number(d));
   }
 
   // DD/MM/YYYY or DD-MM-YYYY
   match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (match) {
     const [, d, m, y] = match;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return toValidIsoDate(Number(y), Number(m), Number(d));
   }
 
   // DD.MM.YYYY (common in Indian Excel exports)
   match = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (match) {
     const [, d, m, y] = match;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return toValidIsoDate(Number(y), Number(m), Number(d));
   }
 
   // M/D/YY (US short year, e.g. 8/18/07)
@@ -35,7 +35,7 @@ export function parseFlexibleDate(value: unknown): string | null {
   if (match) {
     const [, m, d, yy] = match;
     const year = Number(yy) > 30 ? 1900 + Number(yy) : 2000 + Number(yy);
-    return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return toValidIsoDate(year, Number(m), Number(d));
   }
 
   // Excel serial (rough range for birth dates ~1950–2015)
@@ -49,6 +49,34 @@ export function parseFlexibleDate(value: unknown): string | null {
   const parsed = new Date(text);
   if (!Number.isNaN(parsed.getTime())) return formatIsoDate(parsed);
   return null;
+}
+
+/** Reject impossible calendar dates (e.g. month 13) that `new Date` cannot represent. */
+function toValidIsoDate(
+  year: number,
+  month: number,
+  day: number,
+): string | null {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function formatIsoDate(value: Date) {

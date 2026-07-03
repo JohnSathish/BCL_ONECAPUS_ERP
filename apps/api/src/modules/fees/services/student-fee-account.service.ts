@@ -10,6 +10,8 @@ import {
   type FeePaymentSource,
 } from '../constants/payment-source.constants';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
+import { FeeFineEngineService } from './fee-fine-engine.service';
+import { MonthlyFeeEngineService } from './monthly-fee-engine.service';
 import { StudentFeeSummaryService } from './student-fee-summary.service';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class StudentFeeAccountService {
     private readonly prisma: PrismaService,
     private readonly feeSummary: StudentFeeSummaryService,
     private readonly financeSettings: FeeFinanceSettingsService,
+    private readonly fineEngine: FeeFineEngineService,
+    private readonly monthlyEngine: MonthlyFeeEngineService,
   ) {}
 
   private db() {
@@ -43,6 +47,16 @@ export class StudentFeeAccountService {
   }
 
   async getAccount(tenantId: string, studentId: string) {
+    const settings = await this.financeSettings.get(tenantId);
+    // Fines accrued before late fees were disabled must be waived so the desk
+    // matches current policy (base tuition only).
+    if (!settings.lateFeeEnabled || Number(settings.lateFeeAmount) === 0) {
+      await this.fineEngine.clearOutstandingFines(tenantId, studentId);
+    }
+    // Fix mis-matched plans (e.g. Political Science → SCIENCE) then VTC ₹100.
+    await this.monthlyEngine.reconcileOpenMonthlyDemands(tenantId, studentId);
+    await this.monthlyEngine.ensureVtcFeeOnOpenDemands(tenantId, studentId);
+
     const [
       demands,
       receipts,
@@ -50,7 +64,6 @@ export class StudentFeeAccountService {
       summary,
       concessions,
       cycles,
-      settings,
       payments,
       ledgerEntries,
     ] = await Promise.all([
@@ -93,7 +106,6 @@ export class StudentFeeAccountService {
         where: { tenantId, deletedAt: null },
         orderBy: { startSemester: 'asc' },
       }),
-      this.financeSettings.get(tenantId),
       this.db().paymentTransaction.findMany({
         where: {
           tenantId,

@@ -191,6 +191,7 @@ declare module 'expo-router' {
             pathname: `/../src/components/student-portal/drawer-menu`;
             params?: Router.UnknownInputParams;
           }
+        | { pathname: `/../src/utils/password-policy`; params?: Router.UnknownInputParams }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }
         | { pathname: `${'/(auth)'}/login` | `/login`; params?: Router.UnknownInputParams }
         | {
@@ -399,6 +400,7 @@ declare module 'expo-router' {
             pathname: `/../src/components/student-portal/drawer-menu`;
             params?: Router.UnknownOutputParams;
           }
+        | { pathname: `/../src/utils/password-policy`; params?: Router.UnknownOutputParams }
         | { pathname: `/_sitemap`; params?: Router.UnknownOutputParams }
         | { pathname: `${'/(auth)'}/login` | `/login`; params?: Router.UnknownOutputParams }
         | {
@@ -517,6 +519,7 @@ declare module 'expo-router' {
         | `/../src/components/faculty-portal/drawer-menu${`?${string}` | `#${string}` | ''}`
         | `/../src/components/ui/date-field${`?${string}` | `#${string}` | ''}`
         | `/../src/components/student-portal/drawer-menu${`?${string}` | `#${string}` | ''}`
+        | `/../src/utils/password-policy${`?${string}` | `#${string}` | ''}`
         | `/_sitemap${`?${string}` | `#${string}` | ''}`
         | `${'/(auth)'}/login${`?${string}` | `#${string}` | ''}`
         | `/login${`?${string}` | `#${string}` | ''}`
@@ -716,6 +719,7 @@ declare module 'expo-router' {
             pathname: `/../src/components/student-portal/drawer-menu`;
             params?: Router.UnknownInputParams;
           }
+        | { pathname: `/../src/utils/password-policy`; params?: Router.UnknownInputParams }
         | { pathname: `/_sitemap`; params?: Router.UnknownInputParams }
         | { pathname: `${'/(auth)'}/login` | `/login`; params?: Router.UnknownInputParams }
         | {

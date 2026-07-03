@@ -2144,29 +2144,56 @@ function LedgerRow({
           ) : null}
         </td>
         <td className="cursor-pointer py-2 pr-2 text-right" onClick={onToggle}>
-          {formatInr(row.totalAmount)}
+          <span>{formatInr(row.totalAmount)}</span>
+          {row.fineAmount > 0 ? (
+            <span className="mt-0.5 block text-xs text-rose-600">
+              + late fine {formatInr(row.fineAmount)}
+            </span>
+          ) : null}
         </td>
         <td className="cursor-pointer py-2 pr-2 text-right" onClick={onToggle}>
           {formatInr(row.paidAmount)}
         </td>
         <td className="cursor-pointer py-2 pr-2 text-right font-medium" onClick={onToggle}>
-          {formatInr(row.balanceAmount)}
+          <span>{formatInr(row.balanceAmount)}</span>
+          {row.fineAmount > 0 && row.paidAmount <= 0 ? (
+            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+              Tuition {formatInr(row.totalAmount)} + fine {formatInr(row.fineAmount)}
+            </span>
+          ) : null}
         </td>
         <td className="cursor-pointer py-2" onClick={onToggle}>
           <StatusPill status={row.status} />
         </td>
       </tr>
-      {expanded && row.lines?.length ? (
+      {expanded ? (
         <tr className="bg-muted/20">
           <td colSpan={7} className="px-4 py-2">
             <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Breakdown</p>
             <ul className="space-y-0.5 text-xs">
-              {row.lines.map((line) => (
-                <li key={line.code} className="flex justify-between">
-                  <span>{line.name}</span>
-                  <span>{formatInr(line.amount)}</span>
+              {row.lines?.length ? (
+                row.lines.map((line) => (
+                  <li key={line.code} className="flex justify-between">
+                    <span>{line.name}</span>
+                    <span>{formatInr(line.amount)}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="flex justify-between">
+                  <span>{row.feeType}</span>
+                  <span>{formatInr(row.totalAmount)}</span>
                 </li>
-              ))}
+              )}
+              {row.fineAmount > 0 ? (
+                <li className="flex justify-between text-rose-600">
+                  <span>Late fine</span>
+                  <span>{formatInr(row.fineAmount)}</span>
+                </li>
+              ) : null}
+              <li className="flex justify-between border-t border-border/50 pt-1 font-medium">
+                <span>Balance due</span>
+                <span>{formatInr(row.balanceAmount)}</span>
+              </li>
             </ul>
           </td>
         </tr>

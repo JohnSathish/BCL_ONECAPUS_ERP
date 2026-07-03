@@ -17,6 +17,7 @@ import {
   type BuiltinReportKey,
 } from '@/services/student-reports';
 import { apiErrorMessage } from '@/utils/api-error';
+import { formatDisplayDate } from '@/utils/format-date';
 
 type Props = {
   reportKey: BuiltinReportKey;
@@ -155,6 +156,11 @@ function normalizeColumns(
 function formatCell(value: unknown) {
   if (value == null || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) return formatDisplayDate(value);
+  if (typeof value === 'string') {
+    // Strip ISO time from DOB / admission dates (e.g. 2007-01-25T00:00:00.000Z).
+    const isoDate = value.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+    if (isoDate) return formatDisplayDate(isoDate[1]);
+  }
   return String(value);
 }

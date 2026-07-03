@@ -259,7 +259,7 @@ export class Sem5ImportCurriculumService {
       semesterSequence: 5,
       majorDepartments,
       minorDepartments,
-      internshipAreas: [...SEM5_INTERNSHIP_AREAS],
+      internshipAreas: this.listInternshipCourseLabels(majorDepartments),
       minorByMajor,
     };
   }
@@ -351,11 +351,64 @@ export class Sem5ImportCurriculumService {
     return allowed.find((minor) => this.normalizeLabel(minor) === normalized);
   }
 
+  /** Legacy placement-type labels (NGO / Bank / …) kept for older Excel files. */
   resolveInternshipArea(input: string): string | undefined {
     const normalized = this.normalizeLabel(input);
     return SEM5_INTERNSHIP_AREAS.find(
       (area) => this.normalizeLabel(area) === normalized,
     );
+  }
+
+  formatInternshipCourseLabel(paper: Sem5PaperOption): string {
+    const code = paper.code.replace(/[\u2010-\u2015]/g, '-').trim();
+    return `${code} — ${paper.title.trim()}`;
+  }
+
+  matchesInternshipPaper(paper: Sem5PaperOption, input: string): boolean {
+    const normalized = this.normalizeLabel(input);
+    if (!normalized || !paper?.code) return false;
+    return (
+      normalized ===
+        this.normalizeLabel(this.formatInternshipCourseLabel(paper)) ||
+      normalized === this.normalizeLabel(paper.code) ||
+      normalized === this.normalizeLabel(paper.title) ||
+      normalized === this.normalizeLabel(`${paper.code} ${paper.title}`)
+    );
+  }
+
+  /** Resolve registered internship course from "CODE — Title", code, or title. */
+  resolveInternshipPaper(
+    catalog: Sem5ImportCurriculumCatalog,
+    input: string,
+    preferred?: Sem5PaperOption,
+  ): Sem5PaperOption | undefined {
+    if (preferred && this.matchesInternshipPaper(preferred, input)) {
+      return preferred;
+    }
+
+    for (const department of catalog.majorDepartments) {
+      if (this.matchesInternshipPaper(department.internship, input)) {
+        return department.internship;
+      }
+    }
+    return undefined;
+  }
+
+  /** Unique internship course labels across departments (for Excel dropdowns). */
+  listInternshipCourseLabels(
+    majorDepartments: Sem5MajorDepartmentOption[],
+  ): string[] {
+    const seen = new Set<string>();
+    const labels: string[] = [];
+    for (const department of majorDepartments) {
+      if (!department.internship?.code) continue;
+      const label = this.formatInternshipCourseLabel(department.internship);
+      const key = this.normalizeLabel(label);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      labels.push(label);
+    }
+    return labels.sort((a, b) => a.localeCompare(b));
   }
 
   private buildMinorDepartments(

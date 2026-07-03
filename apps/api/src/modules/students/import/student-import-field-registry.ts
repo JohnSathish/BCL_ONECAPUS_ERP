@@ -659,6 +659,8 @@ export const STUDENT_IMPORT_FIELD_REGISTRY: StudentImportFieldDef[] = [
     required: false,
     visible: true,
     readOnly: false,
+    helper:
+      'Registered course for this major (e.g. ECO-304 — Economics Internship)',
   },
   // Identity
   {

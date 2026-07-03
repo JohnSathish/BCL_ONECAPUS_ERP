@@ -11,7 +11,7 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
 
   return (
-    <div className="flex h-screen w-full max-w-full overflow-hidden bg-background">
+    <div className="flex h-dvh max-h-dvh w-full max-w-full overflow-hidden bg-background">
       <WorkspaceThemeEffect />
       <EnterpriseSidebar role="admin" />
       <div
@@ -20,7 +20,8 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
           collapsed ? 'md:pl-[72px]' : 'md:pl-[260px] lg:pl-[280px]',
         )}
       >
-        {children}
+        {/* Bounded flex child so page shells (DashboardShell) can scroll internally. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
         <MobileBottomNav />
       </div>
     </div>

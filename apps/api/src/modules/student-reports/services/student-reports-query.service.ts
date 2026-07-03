@@ -135,10 +135,11 @@ export class StudentReportsQueryService {
 
   async loadLookupMap(tenantId: string, lookupType: string) {
     const rows = await this.prisma.masterLookup.findMany({
-      where: { tenantId, lookupType, isActive: true },
+      // Include inactive rows so historical student values still resolve to labels.
+      where: { tenantId, lookupType },
       select: { id: true, label: true, code: true },
     });
-    return new Map(rows.map((r) => [r.id, r.label]));
+    return new Map(rows.map((r) => [r.id, r.label || r.code]));
   }
 
   pct(count: number, total: number) {

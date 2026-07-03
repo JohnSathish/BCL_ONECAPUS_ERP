@@ -2322,6 +2322,7 @@ export class StudentsService {
       studentId: string;
       toShiftId: string;
       reason?: string;
+      manualRollNumber?: string;
     },
     actorId: string,
     audit?: AcademicChangeAuditContext,

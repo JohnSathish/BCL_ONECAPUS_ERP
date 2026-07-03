@@ -28,6 +28,65 @@ describe('Sem5ImportCurriculumService', () => {
     expect(service.resolveInternshipArea('Unknown Area')).toBeUndefined();
   });
 
+  it('resolveInternshipPaper matches registered course labels', () => {
+    const catalog = {
+      programVersionId: 'pv-1',
+      programCode: 'BA-ECO',
+      programName: 'BA Economics',
+      curriculumLabel: 'FYUGP',
+      semesterSequence: 5 as const,
+      majorDepartments: [
+        {
+          departmentName: 'Economics',
+          subjectSlug: 'economics',
+          paper1: {
+            title: 'P1',
+            code: 'ECO-300',
+            courseId: 'c1',
+            offeringId: 'o1',
+          },
+          paper2: {
+            title: 'P2',
+            code: 'ECO-301',
+            courseId: 'c2',
+            offeringId: 'o2',
+          },
+          paper3: {
+            title: 'P3',
+            code: 'ECO-302',
+            courseId: 'c3',
+            offeringId: 'o3',
+          },
+          internship: {
+            title: 'Economics Internship',
+            code: 'ECO-304',
+            courseId: 'c4',
+            offeringId: 'o4',
+          },
+        },
+      ],
+      minorDepartments: [],
+      internshipAreas: ['ECO-304 — Economics Internship'],
+      minorByMajor: { economics: ['History'] },
+    };
+
+    expect(
+      service.formatInternshipCourseLabel(
+        catalog.majorDepartments[0]!.internship,
+      ),
+    ).toBe('ECO-304 — Economics Internship');
+    expect(
+      service.resolveInternshipPaper(catalog, 'ECO-304 — Economics Internship')
+        ?.code,
+    ).toBe('ECO-304');
+    expect(service.resolveInternshipPaper(catalog, 'eco-304')?.title).toBe(
+      'Economics Internship',
+    );
+    expect(
+      service.resolveInternshipPaper(catalog, 'Bank Internship'),
+    ).toBeUndefined();
+  });
+
   it('resolveMajorDepartment finds department by normalized name', () => {
     const catalog = {
       programVersionId: 'pv-1',

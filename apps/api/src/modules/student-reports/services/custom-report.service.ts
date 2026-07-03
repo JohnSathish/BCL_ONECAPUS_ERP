@@ -185,8 +185,13 @@ export class CustomReportService {
     const exportResult = await this.tabularExport.toBuffer(
       {
         sheetName: template?.name ?? key,
+        reportTitle: template?.name ?? key,
+        reportIcon: '🎓',
         columns: columnDefs,
         rows: result.rows as Record<string, unknown>[],
+        tenantId,
+        generatedBy: user?.email ?? user?.sub,
+        filters: dto,
       },
       dto.format ?? 'xlsx',
     );
@@ -218,8 +223,13 @@ export class CustomReportService {
     const exportResult = await this.tabularExport.toBuffer(
       {
         sheetName: dto.name ?? 'Custom Student Report',
+        reportTitle: dto.name ?? 'Custom Student Report',
+        reportIcon: '🎓',
         columns: columnDefs,
         rows: result.rows as Record<string, unknown>[],
+        tenantId,
+        generatedBy: user?.email ?? user?.sub,
+        filters: dto,
       },
       dto.format ?? 'xlsx',
     );
@@ -261,8 +271,13 @@ export class CustomReportService {
     const exportResult = await this.tabularExport.toBuffer(
       {
         sheetName: name,
+        reportTitle: name,
+        reportIcon: '🎓',
         columns: columnDefs,
         rows: result.rows as Record<string, unknown>[],
+        tenantId,
+        generatedBy: user?.email ?? user?.sub,
+        filters: overrides,
       },
       format,
     );

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -117,6 +118,24 @@ export class AuthController {
   @Get('challenge')
   getChallenge() {
     return this.challenge.createChallenge();
+  }
+
+  @Public()
+  @Get('login-hint')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async loginHint(
+    @Query('identifier') identifier: string,
+    @Req() req: Request,
+  ) {
+    let tenantId = this.cls.get<string>(CLS_TENANT_ID);
+    if (!tenantId) {
+      const loginHost =
+        (req.headers['x-login-host'] as string | undefined)?.trim() ||
+        extractRequestHost(req);
+      const tenant = await this.tenantResolution.resolveHost(loginHost);
+      tenantId = tenant.id;
+    }
+    return this.auth.getLoginHint(tenantId, identifier ?? '');
   }
 
   @Public()

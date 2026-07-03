@@ -27,21 +27,6 @@ type RegistrationSummary = {
   semesterSequence: number;
 };
 
-function formatRegistrationSource(source?: string | null) {
-  if (!source) return '—';
-  return source
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function formatGeneratedBy(value?: string | null) {
-  if (!value) return '—';
-  if (value === 'AUTO_ENGINE') return 'Auto engine';
-  return formatRegistrationSource(value);
-}
-
 function normalizeCategory(value?: string | null) {
   return String(value ?? '')
     .trim()
@@ -269,12 +254,24 @@ export function StudentSubjectsTab({ profile }: { profile: StudentProfile }) {
           {semIds.map((sem) => (
             <div key={sem}>
               <h3 className="mb-2 text-sm font-semibold">Semester {sem}</h3>
-              <EnrollmentTable rows={bySemester.get(sem) ?? []} />
+              <CategorizedRegistration
+                rows={bySemester.get(sem) ?? []}
+                majorName={
+                  trackContextQuery.data?.majorMinorTrack?.majorSubject?.name ??
+                  profile.programChoices?.find((c) => c.choiceType === 'MAJOR')?.subjectName
+                }
+              />
             </div>
           ))}
         </div>
       ) : (
-        <EnrollmentTable rows={rows} />
+        <CategorizedRegistration
+          rows={rows}
+          majorName={
+            trackContextQuery.data?.majorMinorTrack?.majorSubject?.name ??
+            profile.programChoices?.find((c) => c.choiceType === 'MAJOR')?.subjectName
+          }
+        />
       )}
 
       {semId ? (
@@ -289,7 +286,39 @@ export function StudentSubjectsTab({ profile }: { profile: StudentProfile }) {
   );
 }
 
-function EnrollmentTable({ rows }: { rows: TableRow[] }) {
+function departmentFromCourseCode(code?: string | null) {
+  const prefix = String(code ?? '')
+    .split(/[-:]/)[0]
+    ?.trim()
+    .toUpperCase();
+  const map: Record<string, string> = {
+    ECO: 'Economics',
+    EDU: 'Education',
+    ENG: 'English',
+    GAR: 'Garo',
+    GEO: 'Geography',
+    HIS: 'History',
+    PHI: 'Philosophy',
+    POL: 'Political Science',
+    SOC: 'Sociology',
+  };
+  return prefix ? map[prefix] : undefined;
+}
+
+function rowCourse(row: TableRow) {
+  if (isApiRow(row)) {
+    return { code: row.course.code, title: row.course.title, category: row.category };
+  }
+  return { code: row.courseCode, title: row.courseTitle, category: row.category };
+}
+
+function CategorizedRegistration({
+  rows,
+  majorName,
+}: {
+  rows: TableRow[];
+  majorName?: string | null;
+}) {
   if (rows.length === 0) {
     return (
       <p className="rounded-md border border-border py-6 text-center text-sm text-muted-foreground">
@@ -298,65 +327,64 @@ function EnrollmentTable({ rows }: { rows: TableRow[] }) {
     );
   }
 
-  return (
-    <div className="overflow-x-auto rounded-md border border-border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr>
-            <th className="px-2 py-1.5 text-left">Semester</th>
-            <th className="px-2 py-1.5 text-left">Course Code</th>
-            <th className="px-2 py-1.5 text-left">Subject Name</th>
-            <th className="px-2 py-1.5 text-left">Category</th>
-            <th className="px-2 py-1.5 text-right">Credits</th>
-            <th className="px-2 py-1.5 text-left">Section</th>
-            <th className="px-2 py-1.5 text-left">Faculty</th>
-            <th className="px-2 py-1.5 text-left">Registration Status</th>
-            <th className="px-2 py-1.5 text-left">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => {
-            const apiRow = isApiRow(row);
-            const semesterSequence = apiRow ? row.semesterSequence : row.semesterSequence;
-            const courseCode = apiRow ? row.course.code : row.courseCode;
-            const courseTitle = apiRow ? row.course.title : row.courseTitle;
-            const category = apiRow ? row.category : row.category;
-            const credits = apiRow ? row.course.credits : row.credits;
-            const sectionCode = apiRow ? row.section?.sectionCode : row.sectionCode;
-            const facultyName = apiRow ? row.faculty?.name : row.facultyName;
-            const status = apiRow ? row.lineStatus : row.status;
-            const registrationStatus = apiRow
-              ? row.registrationStatus
-              : (row.registrationStatus ?? status);
-            const source = apiRow ? row.registrationSource : row.registrationSource;
-            const generatedBy = apiRow ? row.generatedBy : row.generatedBy;
+  const majorPapers = rows.filter((row) => normalizeCategory(rowCourse(row).category) === 'MAJOR');
+  const majorDepartment =
+    majorName ?? departmentFromCourseCode(rowCourse(majorPapers[0] ?? rows[0]).code) ?? '—';
+  const categories = ['MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'INTERNSHIP'] as const;
 
-            return (
-              <tr
-                key={apiRow ? row.lineId : `${row.registrationId}-${i}`}
-                className="border-t border-border"
-              >
-                <td className="px-2 py-1.5">{semesterSequence}</td>
-                <td className="px-2 py-1.5 font-medium">{courseCode}</td>
-                <td className="px-2 py-1.5">{courseTitle}</td>
-                <td className="px-2 py-1.5">{category}</td>
-                <td className="px-2 py-1.5 text-right">{credits ?? '—'}</td>
-                <td className="px-2 py-1.5">{sectionCode ?? '—'}</td>
-                <td className="px-2 py-1.5">{facultyName ?? '—'}</td>
-                <td className="px-2 py-1.5">
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    {registrationStatus}
-                  </span>
-                </td>
-                <td className="px-2 py-1.5 text-xs text-muted-foreground">
-                  {formatRegistrationSource(source)}
-                  {generatedBy ? ` · ${formatGeneratedBy(generatedBy)}` : ''}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+  return (
+    <div className="space-y-3 rounded-md border border-border p-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Major Department
+        </p>
+        <p className="text-sm font-medium">{majorDepartment}</p>
+      </div>
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Major Papers
+        </p>
+        <ul className="mt-1 space-y-1 text-sm">
+          {majorPapers.length ? (
+            majorPapers.map((row, index) => {
+              const course = rowCourse(row);
+              return (
+                <li key={`${course.code}-${index}`}>
+                  • <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
+                  {' — '}
+                  {course.title}
+                </li>
+              );
+            })
+          ) : (
+            <li className="text-muted-foreground">—</li>
+          )}
+        </ul>
+      </div>
+      {categories.map((category) => {
+        const items = rows.filter((row) => normalizeCategory(rowCourse(row).category) === category);
+        if (!items.length) return null;
+        return (
+          <div key={category}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {category}
+            </p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {items.map((row, index) => {
+                const course = rowCourse(row);
+                return (
+                  <li key={`${category}-${course.code}-${index}`}>
+                    • {course.title}
+                    <span className="ml-1 font-mono text-xs text-muted-foreground">
+                      ({course.code})
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -87,10 +87,16 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
           level: 'UG',
         },
       });
-    } else if (program.departmentId !== departmentId) {
+    } else if (
+      program.departmentId !== departmentId ||
+      program.name !== dept.programName
+    ) {
       program = await prisma.program.update({
         where: { id: program.id },
-        data: { departmentId },
+        data: {
+          departmentId,
+          name: dept.programName,
+        },
       });
     }
 

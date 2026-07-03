@@ -14,6 +14,7 @@ import {
   updateRollShiftRanges,
 } from '@/services/roll-number';
 import { fetchInstitutions } from '@/services/organization';
+import { apiErrorMessage } from '@/utils/api-error';
 
 type ShiftDraft = Record<
   string,
@@ -67,6 +68,24 @@ export function RollNumberShiftConfigSection() {
     setDraft(next);
   }, [rangesQ.data]);
 
+  const updateDraft = (
+    shiftId: string,
+    current: ShiftDraft[string],
+    patch: Partial<ShiftDraft[string]>,
+  ) => {
+    const next = { ...current, ...patch };
+    const start = Number(next.sequenceStart);
+    const end = Number(next.sequenceEnd);
+    const seq = Number(next.nextSequence);
+    // Keep Next Seq inside Start–End when Start/End change.
+    if (Number.isFinite(start) && (!next.nextSequence || (Number.isFinite(seq) && seq < start))) {
+      next.nextSequence = String(start);
+    } else if (Number.isFinite(end) && Number.isFinite(seq) && seq > end + 1) {
+      next.nextSequence = String(end);
+    }
+    setDraft((prev) => ({ ...prev, [shiftId]: next }));
+  };
+
   const saveMut = useMutation({
     mutationFn: () =>
       updateRollShiftRanges({
@@ -75,12 +94,18 @@ export function RollNumberShiftConfigSection() {
           .map((shift) => {
             const d = draft[shift.shiftId];
             if (!d?.sequenceStart || !d?.sequenceEnd) return null;
+            const sequenceStart = Number(d.sequenceStart);
+            const sequenceEnd = Number(d.sequenceEnd);
+            let nextSequence = d.nextSequence ? Number(d.nextSequence) : sequenceStart;
+            if (!Number.isFinite(nextSequence) || nextSequence < sequenceStart) {
+              nextSequence = sequenceStart;
+            }
             return {
               shiftId: shift.shiftId,
               admissionYear,
-              sequenceStart: Number(d.sequenceStart),
-              sequenceEnd: Number(d.sequenceEnd),
-              nextSequence: d.nextSequence ? Number(d.nextSequence) : undefined,
+              sequenceStart,
+              sequenceEnd,
+              nextSequence,
             };
           })
           .filter(Boolean) as Array<{
@@ -150,9 +175,17 @@ export function RollNumberShiftConfigSection() {
             />
           </div>
           <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-            Save Shift Ranges
+            {saveMut.isPending ? 'Saving…' : 'Save Shift Ranges'}
           </Button>
         </div>
+        {saveMut.isError ? (
+          <p className="mt-2 text-sm text-destructive">
+            {apiErrorMessage(saveMut.error, 'Could not save shift ranges')}
+          </p>
+        ) : null}
+        {saveMut.isSuccess ? (
+          <p className="mt-2 text-sm text-emerald-600">Shift ranges saved.</p>
+        ) : null}
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
@@ -173,6 +206,13 @@ export function RollNumberShiftConfigSection() {
                   sequenceEnd: '',
                   nextSequence: '',
                 };
+                const start = Number(d.sequenceStart);
+                const next = Number(d.nextSequence);
+                const invalidNext =
+                  Number.isFinite(start) &&
+                  Number.isFinite(next) &&
+                  d.nextSequence !== '' &&
+                  next < start;
                 return (
                   <tr key={row.shiftId} className="border-b border-border/40">
                     <td className="py-2 pr-3">
@@ -185,10 +225,7 @@ export function RollNumberShiftConfigSection() {
                         type="number"
                         value={d.sequenceStart}
                         onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            [row.shiftId]: { ...d, sequenceStart: e.target.value },
-                          }))
+                          updateDraft(row.shiftId, d, { sequenceStart: e.target.value })
                         }
                       />
                     </td>
@@ -198,26 +235,25 @@ export function RollNumberShiftConfigSection() {
                         type="number"
                         value={d.sequenceEnd}
                         onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            [row.shiftId]: { ...d, sequenceEnd: e.target.value },
-                          }))
+                          updateDraft(row.shiftId, d, { sequenceEnd: e.target.value })
                         }
                       />
                     </td>
                     <td className="py-2 pr-3">
                       <Input
-                        className="h-8 w-24"
+                        className={`h-8 w-24 ${invalidNext ? 'border-destructive' : ''}`}
                         type="number"
                         placeholder={d.sequenceStart || '1'}
                         value={d.nextSequence}
                         onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            [row.shiftId]: { ...d, nextSequence: e.target.value },
-                          }))
+                          updateDraft(row.shiftId, d, { nextSequence: e.target.value })
                         }
                       />
+                      {invalidNext ? (
+                        <p className="mt-1 text-[11px] text-destructive">
+                          Must be ≥ Start ({d.sequenceStart})
+                        </p>
+                      ) : null}
                     </td>
                     <td className="py-2 pr-3">{row.configured ? row.availableSeats : '—'}</td>
                     <td className="py-2 text-xs">

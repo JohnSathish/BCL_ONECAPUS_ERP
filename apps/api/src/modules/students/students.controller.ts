@@ -721,6 +721,7 @@ export class StudentsController {
         studentId: id,
         toShiftId: dto.toShiftId,
         reason: dto.reason,
+        manualRollNumber: dto.manualRollNumber,
       },
       user.sub,
       {

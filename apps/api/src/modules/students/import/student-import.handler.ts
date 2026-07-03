@@ -2244,25 +2244,60 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         }
 
         if (!internshipArea) {
-          ctx.errors.push('Internship Area is required for Semester 5 import.');
+          ctx.errors.push(
+            'Internship course is required for Semester 5 import. Choose the registered course from the template dropdown (e.g. ECO-304 — Economics Internship).',
+          );
         } else {
-          const resolvedArea =
-            this.sem5Curriculum.resolveInternshipArea(internshipArea);
-          if (!resolvedArea) {
-            ctx.errors.push(
-              `Unknown Internship Area "${internshipArea}". Choose from the template dropdown.`,
-            );
+          const internshipPaper = this.sem5Curriculum.resolveInternshipPaper(
+            catalog,
+            internshipArea,
+            department.internship,
+          );
+          if (internshipPaper) {
+            const expected = department.internship;
+            const sameCourse =
+              internshipPaper.courseId === expected.courseId ||
+              this.sem5Curriculum.normalizeLabel(internshipPaper.code) ===
+                this.sem5Curriculum.normalizeLabel(expected.code);
+            if (!sameCourse) {
+              ctx.errors.push(
+                `Internship course "${internshipArea}" does not match Major Department "${department.departmentName}". Choose "${this.sem5Curriculum.formatInternshipCourseLabel(expected)}".`,
+              );
+            } else {
+              mapping.internshipArea = {
+                input: internshipArea,
+                slug: slugifySubject(internshipPaper.title),
+                resolvedLabel:
+                  this.sem5Curriculum.formatInternshipCourseLabel(
+                    internshipPaper,
+                  ),
+              };
+              mapping.internship = this.resolveSem5OfferingSelection(
+                internshipPaper,
+                'INTERNSHIP',
+                subjectCtx,
+              );
+            }
           } else {
-            mapping.internshipArea = {
-              input: internshipArea,
-              slug: slugifySubject(resolvedArea),
-              resolvedLabel: resolvedArea,
-            };
-            mapping.internship = this.resolveSem5OfferingSelection(
-              department.internship,
-              'INTERNSHIP',
-              subjectCtx,
-            );
+            // Backward compatible: older templates used placement types (NGO / Bank).
+            const resolvedArea =
+              this.sem5Curriculum.resolveInternshipArea(internshipArea);
+            if (!resolvedArea) {
+              ctx.errors.push(
+                `Unknown Internship course "${internshipArea}". Choose a registered course from the template dropdown (e.g. ${this.sem5Curriculum.formatInternshipCourseLabel(department.internship)}).`,
+              );
+            } else {
+              mapping.internshipArea = {
+                input: internshipArea,
+                slug: slugifySubject(resolvedArea),
+                resolvedLabel: resolvedArea,
+              };
+              mapping.internship = this.resolveSem5OfferingSelection(
+                department.internship,
+                'INTERNSHIP',
+                subjectCtx,
+              );
+            }
           }
         }
       }
@@ -3565,7 +3600,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           fullName: n.fullName,
           email: n.email,
           gender: n.gender,
-          dateOfBirth: n.dateOfBirth ? new Date(n.dateOfBirth) : null,
+          dateOfBirth: this.toValidDateOrNull(n.dateOfBirth),
           mobileNumber: n.mobileNumber,
           whatsappNumber: n.whatsappNumber,
           nationalId: n.nationalId,
@@ -3693,7 +3728,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (n.fullName) profileUpdates.fullName = n.fullName;
       if (n.email) profileUpdates.email = n.email;
       if (n.gender) profileUpdates.gender = n.gender;
-      if (n.dateOfBirth) profileUpdates.dateOfBirth = new Date(n.dateOfBirth);
+      if (n.dateOfBirth) {
+        const dob = this.toValidDateOrNull(n.dateOfBirth);
+        if (dob) profileUpdates.dateOfBirth = dob;
+      }
       if (n.mobileNumber) profileUpdates.mobileNumber = n.mobileNumber;
       if (n.whatsappNumber) profileUpdates.whatsappNumber = n.whatsappNumber;
       if (n.nationalId) profileUpdates.nationalId = n.nationalId;
@@ -3723,7 +3761,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             fullName: n.fullName,
             email: n.email,
             gender: n.gender,
-            dateOfBirth: n.dateOfBirth ? new Date(n.dateOfBirth) : null,
+            dateOfBirth: this.toValidDateOrNull(n.dateOfBirth),
             mobileNumber: n.mobileNumber,
             nationalId: n.nationalId,
             categoryLookupId: n.categoryLookupId,
@@ -3935,6 +3973,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
   private parseImportDate(value: string) {
     return parseFlexibleDate(value);
+  }
+
+  private toValidDateOrNull(value?: string | null): Date | null {
+    if (!value) return null;
+    const iso = parseFlexibleDate(value);
+    if (!iso) return null;
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   private parseResidenceType(hostelRaw: string) {
@@ -4684,7 +4730,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       {
         name: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
         headers: ['Internship Subject'],
-        rows: sem5Catalog.internshipAreas.map((area) => [area]),
+        // Tenant-wide list (all programmes), not a single programme catalog.
+        rows: this.sem5Curriculum
+          .listInternshipCourseLabels(sem5MajorDepartments)
+          .map((label) => [label]),
       },
       {
         name: FULL_ADMISSION_HIDDEN_SHEETS.sem5AllMinors,
@@ -5678,7 +5727,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       'Current Semester': String(semesterSequence),
       'Major Department': sampleMajor,
       'Minor Department': sampleMinor,
-      'Internship Area': catalog.internshipAreas[0] ?? 'Bank Internship',
+      'Internship Area': catalog.majorDepartments[0]
+        ? this.sem5Curriculum.formatInternshipCourseLabel(
+            catalog.majorDepartments[0].internship,
+          )
+        : (catalog.internshipAreas[0] ?? ''),
     };
 
     sheet.addRow(headers);
@@ -5757,8 +5810,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       },
       {
         name: SEM5_HIDDEN_SHEETS.internshipAreas,
-        headers: ['Internship Area'],
-        rows: catalog.internshipAreas.map((area) => [area]),
+        headers: ['Internship Course'],
+        // All majors across programmes so every department internship appears.
+        rows: this.sem5Curriculum
+          .listInternshipCourseLabels(majorDepartments)
+          .map((label) => [label]),
       },
       {
         name: SEM5_HIDDEN_SHEETS.minorsByMajor,

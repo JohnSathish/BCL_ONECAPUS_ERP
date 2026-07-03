@@ -78,8 +78,8 @@ export default function SavedReportsPage() {
   });
 
   const exportMut = useMutation({
-    mutationFn: ({ id, format }: { id: string; format: 'xlsx' | 'csv' }) =>
-      exportSavedReport(id, format, apiFilters),
+    mutationFn: ({ id, format, name }: { id: string; format: 'xlsx' | 'csv'; name: string }) =>
+      exportSavedReport(id, format, apiFilters, name),
     onSuccess: () => setMessage('Export downloaded.'),
     onError: (e) => setMessage(apiErrorMessage(e, 'Export failed')),
   });
@@ -87,6 +87,7 @@ export default function SavedReportsPage() {
   const preview = previewQuery.data;
   const columnDefs = normalizeColumns(preview?.columns);
   const previewRows = (preview?.rows ?? []).slice(0, 20);
+  const activeReport = reports.find((report) => report.id === activeId);
 
   return (
     <DashboardShell title="Student Reports">
@@ -149,7 +150,13 @@ export default function SavedReportsPage() {
                     size="sm"
                     variant="outline"
                     disabled={exportMut.isPending}
-                    onClick={() => exportMut.mutate({ id: activeId, format: 'xlsx' })}
+                    onClick={() =>
+                      exportMut.mutate({
+                        id: activeId,
+                        format: 'xlsx',
+                        name: activeReport?.name ?? 'student-report',
+                      })
+                    }
                   >
                     <Download className="mr-1 h-3.5 w-3.5" />
                     Excel
@@ -158,7 +165,13 @@ export default function SavedReportsPage() {
                     size="sm"
                     variant="ghost"
                     disabled={exportMut.isPending}
-                    onClick={() => exportMut.mutate({ id: activeId, format: 'csv' })}
+                    onClick={() =>
+                      exportMut.mutate({
+                        id: activeId,
+                        format: 'csv',
+                        name: activeReport?.name ?? 'student-report',
+                      })
+                    }
                   >
                     CSV
                   </Button>
@@ -300,5 +313,12 @@ function normalizeColumns(
 function formatCell(value: unknown) {
   if (value == null || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'string') {
+    const isoDate = value.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+    if (isoDate) return isoDate[1];
+  }
   return String(value);
 }

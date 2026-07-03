@@ -114,29 +114,37 @@ export function StudentReportsDashboardPage() {
               </CompactCard>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <CompactCard>
-                <CompactCardHeader title="Programme-wise Strength" />
-                <CompactCardBody>
-                  <BarChartWidget data={toChart(d.programmeWise)} height={240} layout="vertical" />
-                </CompactCardBody>
-              </CompactCard>
+            <CompactCard>
+              <CompactCardHeader
+                title="Programme-wise Strength"
+                description={`${d.programmeWise.length} programmes · hover a bar for the full name`}
+              />
+              <CompactCardBody className="pb-6">
+                <BarChartWidget
+                  data={toChart(d.programmeWise)}
+                  layout="vertical"
+                  labelMaxChars={42}
+                />
+              </CompactCardBody>
+            </CompactCard>
+
+            <div className="grid gap-4 lg:grid-cols-3">
               <CompactCard>
                 <CompactCardHeader title="Semester-wise Strength" />
-                <CompactCardBody>
-                  <BarChartWidget data={toChart(d.semesterWise)} height={240} />
+                <CompactCardBody className="pb-6">
+                  <BarChartWidget data={toChart(d.semesterWise)} height={280} />
                 </CompactCardBody>
               </CompactCard>
               <CompactCard>
                 <CompactCardHeader title="Gender Distribution" />
-                <CompactCardBody>
-                  <DonutChartWidget data={toChart(d.genderWise)} />
+                <CompactCardBody className="pb-6">
+                  <DonutChartWidget data={toChart(d.genderWise)} height={280} />
                 </CompactCardBody>
               </CompactCard>
               <CompactCard>
                 <CompactCardHeader title="Category Distribution" />
-                <CompactCardBody>
-                  <DonutChartWidget data={toChart(d.categoryWise)} />
+                <CompactCardBody className="pb-6">
+                  <DonutChartWidget data={toChart(d.categoryWise)} height={280} />
                 </CompactCardBody>
               </CompactCard>
             </div>

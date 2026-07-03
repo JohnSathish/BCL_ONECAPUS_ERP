@@ -64,6 +64,7 @@ import {
 import { FeeCycleConfigService } from './services/fee-cycle-config.service';
 import { FeeCycleEngineService } from './services/fee-cycle-engine.service';
 import { FeeFinanceSettingsService } from './services/fee-finance-settings.service';
+import { FeeFineEngineService } from './services/fee-fine-engine.service';
 import { FeeHeadMasterService } from './services/fee-head-master.service';
 import { FeeReceiptDocumentService } from './services/fee-receipt-document.service';
 import { FeeReceiptNotificationService } from './services/fee-receipt-notification.service';
@@ -108,6 +109,7 @@ export class FeesController {
     private readonly monthlyPlans: MonthlyFeePlanService,
     private readonly monthlyEngine: MonthlyFeeEngineService,
     private readonly financeSettings: FeeFinanceSettingsService,
+    private readonly fineEngine: FeeFineEngineService,
     private readonly receiptDocs: FeeReceiptDocumentService,
     private readonly receiptNotify: FeeReceiptNotificationService,
     private readonly feeReversal: FeeReversalService,
@@ -723,11 +725,11 @@ export class FeesController {
 
   @Patch('settings')
   @RequirePermissions('fees:manage')
-  updateFinanceSettings(
+  async updateFinanceSettings(
     @CurrentUser() user: JwtUser,
     @Body() dto: Record<string, unknown>,
   ) {
-    return this.financeSettings.update(
+    const updated = await this.financeSettings.update(
       user,
       dto as {
         monthlyDueDay?: number;
@@ -743,6 +745,10 @@ export class FeesController {
         blockRegistrationOnDue?: boolean;
       },
     );
+    if (!updated.lateFeeEnabled || Number(updated.lateFeeAmount ?? 0) === 0) {
+      await this.fineEngine.clearOutstandingFines(user.tid);
+    }
+    return updated;
   }
 
   @Get('monthly-plans')

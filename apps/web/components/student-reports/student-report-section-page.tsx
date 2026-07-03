@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Download, Printer } from 'lucide-react';
 
@@ -31,6 +31,8 @@ type Props = {
   description: string;
   reportType: StudentReportType;
   mode?: 'distribution' | 'combinations' | 'age';
+  /** Rendered inside the scrollable shell (e.g. sub-tabs). */
+  beforeFilters?: ReactNode;
 };
 
 export function StudentReportSectionPage({
@@ -38,6 +40,7 @@ export function StudentReportSectionPage({
   description,
   reportType,
   mode = 'distribution',
+  beforeFilters,
 }: Props) {
   const session = useRequireAuth();
   const perms = useStudentPermissions();
@@ -96,55 +99,60 @@ export function StudentReportSectionPage({
           </>
         }
       >
-        <StudentReportFiltersBar
-          filters={filters}
-          onChange={patchFilters}
-          hideShiftFilter={hideShiftFilter}
-          {...filterOptions}
-        />
+        <div className="space-y-4 pb-8">
+          {beforeFilters}
+          <StudentReportFiltersBar
+            filters={filters}
+            onChange={patchFilters}
+            hideShiftFilter={hideShiftFilter}
+            {...filterOptions}
+          />
 
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+          {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
 
-        {report.isLoading ? <p className="text-sm text-muted-foreground">Loading report…</p> : null}
+          {report.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading report…</p>
+          ) : null}
 
-        {mode === 'combinations' && data && 'combinations' in data ? (
-          <CompactCard>
-            <CompactCardHeader
-              title="Subject Combination Analysis"
-              description={`${data.total.toLocaleString()} students in scope`}
-            />
-            <CompactCardBody>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Major</th>
-                      <th className="pb-2 font-medium">Minor</th>
-                      <th className="pb-2 font-medium">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.combinations.map((c) => (
-                      <tr key={`${c.major}-${c.minor}`} className="border-b border-border/40">
-                        <td className="py-1.5">{c.major}</td>
-                        <td className="py-1.5">{c.minor}</td>
-                        <td className="py-1.5 tabular-nums">{c.count}</td>
+          {mode === 'combinations' && data && 'combinations' in data ? (
+            <CompactCard>
+              <CompactCardHeader
+                title="Subject Combination Analysis"
+                description={`${data.total.toLocaleString()} students in scope`}
+              />
+              <CompactCardBody>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 font-medium">Major</th>
+                        <th className="pb-2 font-medium">Minor</th>
+                        <th className="pb-2 font-medium">Count</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CompactCardBody>
-          </CompactCard>
-        ) : null}
+                    </thead>
+                    <tbody>
+                      {data.combinations.map((c) => (
+                        <tr key={`${c.major}-${c.minor}`} className="border-b border-border/40">
+                          <td className="py-1.5">{c.major}</td>
+                          <td className="py-1.5">{c.minor}</td>
+                          <td className="py-1.5 tabular-nums">{c.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CompactCardBody>
+            </CompactCard>
+          ) : null}
 
-        {mode === 'age' && data && 'averageAge' in data ? (
-          <AgeReportView report={data as AgeReport} />
-        ) : null}
+          {mode === 'age' && data && 'averageAge' in data ? (
+            <AgeReportView report={data as AgeReport} />
+          ) : null}
 
-        {mode === 'distribution' && data && 'buckets' in data ? (
-          <DistributionReportView report={data as DistributionReport} />
-        ) : null}
+          {mode === 'distribution' && data && 'buckets' in data ? (
+            <DistributionReportView report={data as DistributionReport} />
+          ) : null}
+        </div>
       </StudentReportsShell>
     </DashboardShell>
   );
@@ -152,7 +160,7 @@ export function StudentReportSectionPage({
 
 function DistributionReportView({ report }: { report: DistributionReport }) {
   return (
-    <>
+    <div className="space-y-4">
       <DistributionReportPanel
         title={report.title}
         total={report.total}
@@ -191,13 +199,13 @@ function DistributionReportView({ report }: { report: DistributionReport }) {
           buckets={report.minorWise}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
 function AgeReportView({ report }: { report: AgeReport }) {
   return (
-    <>
+    <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <CompactCard>
           <CompactCardBody className="pt-4">
@@ -227,6 +235,6 @@ function AgeReportView({ report }: { report: AgeReport }) {
         total={report.total}
         buckets={report.buckets}
       />
-    </>
+    </div>
   );
 }

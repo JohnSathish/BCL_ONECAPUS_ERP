@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
-import { MONTHLY_DEMAND_TYPE } from '../constants/monthly-fee.constants';
+import {
+  MONTHLY_DEMAND_TYPE,
+  VTC_MONTHLY_MODIFIER,
+} from '../constants/monthly-fee.constants';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import { FeeLedgerService } from './fee-ledger.service';
 import { StudentFeeSummaryService } from './student-fee-summary.service';
@@ -224,70 +227,7 @@ export class MonthlyFeeEngineService {
       };
     }
 
-    const lines = [
-      ...(plan.lines ?? []).map(
-        (l: { code: string; name: string; amount: unknown }) => ({
-          code: l.code,
-          name: l.name,
-          category: 'MONTHLY',
-          unitAmount: Number(l.amount),
-          amount: Number(l.amount),
-          quantity: 1,
-          sourceType: 'MONTHLY_PLAN',
-          sourceRefId: plan.id,
-        }),
-      ),
-    ];
-
-    const majorSlug =
-      student.programChoices?.[0]?.subjectSlug?.toLowerCase() ?? '';
-    if (
-      majorSlug.includes('geography') &&
-      !lines.some((l) => l.code === 'LAB_FEE')
-    ) {
-      lines.push({
-        code: 'LAB_FEE',
-        name: 'Lab Fee (Geography Practical)',
-        category: 'MONTHLY',
-        unitAmount: 200,
-        amount: 200,
-        quantity: 1,
-        sourceType: 'MODIFIER',
-        sourceRefId: plan.id,
-      });
-    }
-
-    const sciencePracticalCount = await this.countSciencePracticals(
-      tenantId,
-      student.id,
-    );
-    if (sciencePracticalCount > 0 && plan.code === 'SCIENCE') {
-      const labPerSubject = 450 + 350;
-      lines.push({
-        code: 'SCIENCE_LAB_PER_SUBJECT',
-        name: `Science Lab (${sciencePracticalCount} practical subject(s))`,
-        category: 'MONTHLY',
-        unitAmount: labPerSubject,
-        amount: labPerSubject * sciencePracticalCount,
-        quantity: sciencePracticalCount,
-        sourceType: 'MODIFIER',
-        sourceRefId: plan.id,
-      });
-    }
-
-    const hasVtc = await this.hasActiveVtc(tenantId, student.id);
-    if (hasVtc) {
-      lines.push({
-        code: 'VTC',
-        name: 'VTC Subject',
-        category: 'MONTHLY',
-        unitAmount: 100,
-        amount: 100,
-        quantity: 1,
-        sourceType: 'MODIFIER',
-        sourceRefId: plan.id,
-      });
-    }
+    const lines = await this.buildCurrentMonthLines(tenantId, student, plan);
 
     const currentPeriod = this.billingPeriod();
     let arrears = 0;
@@ -325,15 +265,165 @@ export class MonthlyFeeEngineService {
     };
   }
 
+  /**
+   * Stream for monthly fee plans. Prefer immutable program codes (BA-*, BSC-*,
+   * BCOM) so display renames (e.g. "FYUP in Political Science") never mis-route
+   * fees. Never treat substring "science" in political-science as B.Sc.
+   */
+  private resolveStudentStream(
+    student: StudentCtx,
+  ): 'arts' | 'commerce' | 'science' | 'geography' {
+    const majorSlug = (
+      student.programChoices?.[0]?.subjectSlug ?? ''
+    ).toLowerCase();
+    const programName = (
+      student.programVersion?.program?.name ?? ''
+    ).toLowerCase();
+    const programCode = (
+      student.programVersion?.program?.code ?? ''
+    ).toUpperCase();
+    const programText = `${programName} ${programCode.toLowerCase()}`;
+    const tokens = majorSlug.split(/[-_\s/]+/).filter(Boolean);
+
+    // Geography practical plan (arts with lab fee).
+    if (
+      programCode === 'BA-GEO' ||
+      tokens.includes('geography') ||
+      programText.includes('geography')
+    ) {
+      return 'geography';
+    }
+
+    // Immutable codes first (stable across NEP display renames).
+    if (programCode.startsWith('BCOM') || programCode === 'B.COM') {
+      return 'commerce';
+    }
+    if (programCode.startsWith('BSC-')) return 'science';
+    if (programCode.startsWith('BA-')) return 'arts';
+
+    // Legacy / name / slug fallbacks (Bachelor of … and FYUP in …).
+    if (
+      tokens.includes('commerce') ||
+      /bachelor of commerce|fyup in commerce/.test(programText)
+    ) {
+      return 'commerce';
+    }
+
+    const scienceMajors = new Set([
+      'physics',
+      'chemistry',
+      'botany',
+      'zoology',
+      'mathematics',
+      'maths',
+      'biochemistry',
+      'biotechnology',
+      'microbiology',
+    ]);
+    if (
+      tokens.some((t) => scienceMajors.has(t)) ||
+      /bachelor of science|fyup in (physics|chemistry|botany|zoology|mathematics)/.test(
+        programText,
+      )
+    ) {
+      return 'science';
+    }
+    // Exact stream slug only — not "*science*" (political-science, etc.)
+    if (majorSlug === 'science' || tokens.join('-') === 'science') {
+      return 'science';
+    }
+
+    if (
+      tokens.includes('political') ||
+      programText.includes('political science') ||
+      /bachelor of arts|fyup in /.test(programText)
+    ) {
+      return 'arts';
+    }
+
+    return 'arts';
+  }
+
+  private async buildCurrentMonthLines(
+    tenantId: string,
+    student: StudentCtx,
+    plan: { id: string; code?: string; lines?: Array<Record<string, unknown>> },
+  ) {
+    const lines = [
+      ...(plan.lines ?? []).map(
+        (l: { code?: string; name?: string; amount?: unknown }) => ({
+          code: String(l.code),
+          name: String(l.name),
+          category: 'MONTHLY',
+          unitAmount: Number(l.amount),
+          amount: Number(l.amount),
+          quantity: 1,
+          sourceType: 'MONTHLY_PLAN',
+          sourceRefId: plan.id,
+        }),
+      ),
+    ];
+
+    const stream = this.resolveStudentStream(student);
+    if (stream === 'geography' && !lines.some((l) => l.code === 'LAB_FEE')) {
+      lines.push({
+        code: 'LAB_FEE',
+        name: 'Lab Fee (Geography Practical)',
+        category: 'MONTHLY',
+        unitAmount: 200,
+        amount: 200,
+        quantity: 1,
+        sourceType: 'MODIFIER',
+        sourceRefId: plan.id,
+      });
+    }
+
+    const sciencePracticalCount = await this.countSciencePracticals(
+      tenantId,
+      student.id,
+    );
+    if (sciencePracticalCount > 0 && plan.code === 'SCIENCE') {
+      const labPerSubject = 450 + 350;
+      lines.push({
+        code: 'SCIENCE_LAB_PER_SUBJECT',
+        name: `Science Lab (${sciencePracticalCount} practical subject(s))`,
+        category: 'MONTHLY',
+        unitAmount: labPerSubject,
+        amount: labPerSubject * sciencePracticalCount,
+        quantity: sciencePracticalCount,
+        sourceType: 'MODIFIER',
+        sourceRefId: plan.id,
+      });
+    }
+
+    const hasVtc = await this.hasActiveVtc(tenantId, student.id);
+    if (hasVtc && !lines.some((l) => l.code === VTC_MONTHLY_MODIFIER.code)) {
+      lines.push({
+        code: VTC_MONTHLY_MODIFIER.code,
+        name: VTC_MONTHLY_MODIFIER.name,
+        category: 'MONTHLY',
+        unitAmount: VTC_MONTHLY_MODIFIER.amount,
+        amount: VTC_MONTHLY_MODIFIER.amount,
+        quantity: 1,
+        sourceType: 'MODIFIER',
+        sourceRefId: plan.id,
+      });
+    }
+
+    return lines;
+  }
+
   private async resolvePlan(tenantId: string, student: StudentCtx) {
     const plans = await this.db().monthlyFeePlan.findMany({
       where: { tenantId, deletedAt: null, status: 'ACTIVE' },
       include: { lines: { orderBy: { sortOrder: 'asc' } } },
     });
-    const majorSlug =
-      student.programChoices?.[0]?.subjectSlug?.toLowerCase() ?? '';
+    const stream = this.resolveStudentStream(student);
     const shiftCode = student.primaryShift?.code?.toUpperCase() ?? '';
     const programId = student.programVersion?.programId;
+    // Fee structure: Morning & Evening share Arts Morning rates.
+    const artsMorningShift =
+      shiftCode === 'MORNING' || shiftCode === 'EVENING' || !shiftCode;
 
     const score = (plan: {
       programId?: string | null;
@@ -346,15 +436,29 @@ export class MonthlyFeeEngineService {
       else if (!plan.programId) pts += 1;
       if (plan.shiftId && plan.shiftId === student.primaryShiftId) pts += 4;
       else if (!plan.shiftId) pts += 1;
-      if (plan.majorSlug && majorSlug.includes(plan.majorSlug)) pts += 16;
-      else if (!plan.majorSlug) pts += 1;
-      if (majorSlug.includes('geography') && plan.code === 'ARTS_GEO_PRACTICAL')
-        pts += 32;
-      if (majorSlug.includes('commerce') && plan.code === 'COMMERCE') pts += 32;
-      if (majorSlug.includes('science') && plan.code === 'SCIENCE') pts += 32;
-      if (shiftCode && shiftCode === 'MORNING' && plan.code === 'ARTS_MORNING')
-        pts += 8;
-      if (shiftCode === 'DAY' && plan.code === 'ARTS_DAY') pts += 8;
+
+      if (stream === 'geography' && plan.code === 'ARTS_GEO_PRACTICAL')
+        pts += 40;
+      if (stream === 'commerce' && plan.code === 'COMMERCE') pts += 40;
+      if (stream === 'science' && plan.code === 'SCIENCE') pts += 40;
+      if (stream === 'arts' && artsMorningShift && plan.code === 'ARTS_MORNING')
+        pts += 40;
+      if (stream === 'arts' && shiftCode === 'DAY' && plan.code === 'ARTS_DAY')
+        pts += 40;
+      // Geography uses its own plan; do not also score arts shift plans higher.
+      if (
+        stream === 'geography' &&
+        artsMorningShift &&
+        plan.code === 'ARTS_MORNING'
+      )
+        pts += 4;
+      if (
+        stream === 'geography' &&
+        shiftCode === 'DAY' &&
+        plan.code === 'ARTS_DAY'
+      )
+        pts += 4;
+
       return pts;
     };
 
@@ -365,11 +469,240 @@ export class MonthlyFeeEngineService {
     );
   }
 
-  private async hasActiveVtc(tenantId: string, studentId: string) {
+  /**
+   * True when the student has an active VTC paper (registration line or VTC track).
+   * Sem 3 imports register VTC on semester lines; track may be empty.
+   */
+  async hasActiveVtc(tenantId: string, studentId: string) {
     const track = await this.db().studentVtcTrack.findFirst({
       where: { tenantId, studentId, resetAt: null },
     });
-    return Boolean(track);
+    if (track) return true;
+
+    const standing = await this.db().studentAcademicStanding.findUnique({
+      where: { studentId },
+      select: { currentSemesterSequence: true },
+    });
+    const seq = standing?.currentSemesterSequence ?? 1;
+
+    // Sem 3–6 VTC papers live on registration lines; imports often never
+    // create studentVtcTrack rows.
+    const registrations = await this.db().semesterRegistration.findMany({
+      where: {
+        tenantId,
+        studentId,
+        semesterSequence: { in: [seq, 3, 4, 5, 6] },
+        status: { notIn: ['cancelled', 'CANCELLED'] },
+      },
+      include: {
+        lines: {
+          include: {
+            offering: { include: { course: { select: { code: true } } } },
+          },
+        },
+      },
+      take: 8,
+    });
+
+    for (const reg of registrations) {
+      for (const line of reg.lines ?? []) {
+        const lineStatus = String(line.status ?? '').toLowerCase();
+        if (lineStatus === 'cancelled' || lineStatus === 'dropped') continue;
+
+        const category = String(line.category ?? '').toUpperCase();
+        const offeringCategory = String(
+          line.offering?.category ?? '',
+        ).toUpperCase();
+        const code = String(line.offering?.course?.code ?? '').toUpperCase();
+        if (
+          category === 'VTC' ||
+          offeringCategory === 'VTC' ||
+          code.startsWith('VTC')
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Rebuild open monthly demands when plan matching was wrong
+   * (e.g. Political Science matched SCIENCE via substring "science").
+   */
+  async reconcileOpenMonthlyDemands(tenantId: string, studentId: string) {
+    const student = await this.loadStudent(tenantId, studentId);
+    if (!student) return { updated: 0 };
+
+    const plan = await this.resolvePlan(tenantId, student);
+    if (!plan) return { updated: 0 };
+
+    const demands = await this.db().studentFeeDemand.findMany({
+      where: {
+        tenantId,
+        studentId,
+        demandType: MONTHLY_DEMAND_TYPE,
+        status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID'] },
+      },
+      include: { lines: true },
+    });
+
+    let updated = 0;
+    for (const demand of demands) {
+      const metadata = (demand.metadata ?? {}) as {
+        planCode?: string;
+        arrearsCarriedForward?: number;
+      };
+      if (metadata.planCode === plan.code) continue;
+
+      const existingLines = (demand.lines ?? []) as Array<{
+        id: string;
+        code?: string;
+        amount?: unknown;
+      }>;
+      const arrearsLine = existingLines.find((l) => l.code === 'ARREARS');
+      const arrearsAmount = arrearsLine ? Number(arrearsLine.amount) : 0;
+
+      const correctLines = await this.buildCurrentMonthLines(
+        tenantId,
+        student,
+        plan,
+      );
+      const monthlyTotal = correctLines.reduce((s, l) => s + l.amount, 0);
+      const newTotal = monthlyTotal + arrearsAmount;
+      const oldTotal = Number(demand.totalAmount);
+      const delta = newTotal - oldTotal;
+      if (delta === 0 && metadata.planCode === plan.code) continue;
+
+      const paid = Number(demand.paidAmount ?? 0);
+      const newBalance = Math.max(0, newTotal - paid);
+
+      await this.db().studentFeeDemandLine.deleteMany({
+        where: {
+          demandId: demand.id,
+          code: { not: 'ARREARS' },
+        },
+      });
+
+      for (const line of correctLines) {
+        await this.db().studentFeeDemandLine.create({
+          data: {
+            tenantId,
+            demandId: demand.id,
+            code: line.code,
+            name: line.name,
+            category: line.category,
+            quantity: line.quantity,
+            unitAmount: line.unitAmount,
+            amount: line.amount,
+            sourceType: line.sourceType,
+            sourceRefId: line.sourceRefId,
+          },
+        });
+      }
+
+      await this.db().studentFeeDemand.update({
+        where: { id: demand.id },
+        data: {
+          monthlyFeePlanId: plan.id,
+          totalAmount: newTotal,
+          balanceAmount: newBalance,
+          metadata: {
+            ...metadata,
+            planCode: plan.code,
+            arrearsCarriedForward: arrearsAmount,
+            reconciledFromPlan: metadata.planCode ?? null,
+          },
+        },
+      });
+
+      if (delta !== 0) {
+        await this.ledger.post({
+          tenantId,
+          studentId,
+          demandId: demand.id,
+          entryType: delta > 0 ? 'CHARGE' : 'REVERSAL',
+          debitAmount: delta > 0 ? delta : 0,
+          creditAmount: delta < 0 ? Math.abs(delta) : 0,
+          referenceType: 'DEMAND',
+          referenceId: demand.id,
+          description: `Monthly plan correction (${metadata.planCode ?? '?'} → ${plan.code}) — ${demand.billingPeriod}`,
+        });
+      }
+      updated += 1;
+    }
+
+    if (updated > 0) {
+      await this.feeSummary.touchAfterPayment(tenantId, studentId);
+    }
+    return { updated };
+  }
+
+  /**
+   * Add ₹100 VTC line to open monthly demands that are missing it
+   * (for students who already had tuition generated before VTC detection was fixed).
+   */
+  async ensureVtcFeeOnOpenDemands(tenantId: string, studentId: string) {
+    const hasVtc = await this.hasActiveVtc(tenantId, studentId);
+    if (!hasVtc) return { updated: 0 };
+
+    const demands = await this.db().studentFeeDemand.findMany({
+      where: {
+        tenantId,
+        studentId,
+        demandType: MONTHLY_DEMAND_TYPE,
+        status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID'] },
+      },
+      include: { lines: true },
+    });
+
+    let updated = 0;
+    for (const demand of demands) {
+      const lines = (demand.lines ?? []) as Array<{ code?: string }>;
+      if (lines.some((line) => line.code === VTC_MONTHLY_MODIFIER.code)) {
+        continue;
+      }
+
+      const amount = VTC_MONTHLY_MODIFIER.amount;
+      await this.db().studentFeeDemandLine.create({
+        data: {
+          tenantId,
+          demandId: demand.id,
+          code: VTC_MONTHLY_MODIFIER.code,
+          name: VTC_MONTHLY_MODIFIER.name,
+          category: 'MONTHLY',
+          quantity: 1,
+          unitAmount: amount,
+          amount,
+          sourceType: 'MODIFIER',
+        },
+      });
+
+      await this.db().studentFeeDemand.update({
+        where: { id: demand.id },
+        data: {
+          totalAmount: Number(demand.totalAmount) + amount,
+          balanceAmount: Number(demand.balanceAmount) + amount,
+        },
+      });
+
+      await this.ledger.post({
+        tenantId,
+        studentId,
+        demandId: demand.id,
+        entryType: 'CHARGE',
+        debitAmount: amount,
+        referenceType: 'DEMAND',
+        referenceId: demand.id,
+        description: `VTC subject fee — ${demand.billingPeriod}`,
+      });
+      updated += 1;
+    }
+
+    if (updated > 0) {
+      await this.feeSummary.touchAfterPayment(tenantId, studentId);
+    }
+    return { updated };
   }
 
   private async countSciencePracticals(tenantId: string, studentId: string) {

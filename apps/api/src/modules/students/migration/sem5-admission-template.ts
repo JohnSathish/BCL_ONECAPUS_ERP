@@ -48,12 +48,11 @@ export const SEM5_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
   'Academic Session': '2026-27',
   'Current Semester': 'Must be 5',
   'Major Department':
-    'Select department — ERP assigns Major Papers 1, 2 & 3 automatically',
-  'Minor Department':
-    'Select allowed minor department — ERP maps to Minor paper automatically',
+    'Department name only — ERP assigns Major Papers 1–3 automatically',
+  'Minor Department': 'Allowed minor department for this major',
   'Internship Area':
-    'Select internship type — ERP maps to Internship paper automatically',
-  'Section Code': 'A, B, or Core — applies to all papers unless overridden',
+    'Select registered internship course (e.g. ECO-304 — Economics Internship)',
+  'Section Code': 'A, B, or Core',
 };
 
 export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
@@ -70,7 +69,7 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   'Current Semester': '5',
   'Major Department': 'Economics',
   'Minor Department': 'History',
-  'Internship Area': 'Bank Internship',
+  'Internship Area': 'ECO-304 — Economics Internship',
   'Section Code': 'A',
   Category: 'GENERAL',
   Religion: 'CHRISTIAN',
@@ -79,11 +78,11 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 };
 
 export const SEM5_STRUCTURE_NOTES = [
-  'Semester 5 FYUGP: 3 Major/Core (auto from Major Department) + 1 Minor/Core + 1 Internship = 5 papers, 20 credits.',
-  'There is no MDC, AEC, SEC, or VTC in Semester 5. Do not enter course codes — select names from dropdowns only.',
-  'Major Papers 1, 2 and 3 are assigned automatically when you choose Major Department.',
+  'Semester 5 FYUGP: 3 Major papers + 1 Minor + 1 Internship course = 5 papers, 20 credits.',
+  'Major Department auto-assigns Major Papers 1–3. Internship Area must be the registered internship course for that major.',
+  'Internship Area dropdown lists real courses (e.g. ECO-304 — Economics Internship, COM-303 — Internship).',
+  'Pick the internship course that matches the Major Department (Economics → ECO-304, Commerce → COM-303, etc.).',
   'Minor Department options depend on the selected Major Department (NEHU major-minor rules).',
-  'Internship Area selects the internship category; the ERP maps it to the major department internship course.',
 ];
 
 export const SEM5_HIDDEN_SHEETS = {

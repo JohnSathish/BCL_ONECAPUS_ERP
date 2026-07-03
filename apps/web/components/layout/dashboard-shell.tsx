@@ -50,9 +50,9 @@ export function DashboardShell({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="relative z-0 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-20 sm:px-5 md:pb-4 lg:px-6"
+            className="relative z-0 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pb-28 sm:px-5 md:pb-10 lg:px-6"
           >
-            <ErpPageContent>
+            <ErpPageContent className="min-h-0 pb-10">
               {showPageHeader ? <ErpPageHeaderSection title={title!} subtitle={subtitle} /> : null}
               {children}
             </ErpPageContent>

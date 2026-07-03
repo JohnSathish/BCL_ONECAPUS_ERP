@@ -4,6 +4,10 @@ export function abbreviateProgramme(name: string | null | undefined): string | n
   const raw = name.trim();
   const lower = raw.toLowerCase();
 
+  // NEP 2020 FYUP display names (NEHU)
+  const fyupMatch = raw.match(/^fyup in (.+)$/i);
+  if (fyupMatch) return `FYUP (${titleCase(fyupMatch[1])})`;
+
   const inMatch = raw.match(/bachelor of arts in (.+)/i);
   if (inMatch) return `BA (${titleCase(inMatch[1])})`;
 

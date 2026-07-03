@@ -441,8 +441,14 @@ export class StudentReportsController {
     res.setHeader('Content-Type', result.contentType);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${result.filename}"`,
+      this.contentDisposition(result.filename),
     );
     res.send(result.buffer);
+  }
+
+  private contentDisposition(filename: string) {
+    const safe = filename.replace(/["\r\n]/g, '_');
+    const encoded = encodeURIComponent(safe);
+    return `attachment; filename="${safe}"; filename*=UTF-8''${encoded}`;
   }
 }

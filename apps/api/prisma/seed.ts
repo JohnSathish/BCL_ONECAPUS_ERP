@@ -1254,10 +1254,18 @@ async function main() {
           level,
         },
       });
-    } else if (row.departmentId !== owningDepartment.id) {
+    } else if (
+      row.departmentId !== owningDepartment.id ||
+      row.name !== name ||
+      row.level !== level
+    ) {
       row = await prisma.program.update({
         where: { id: row.id },
-        data: { departmentId: owningDepartment.id },
+        data: {
+          departmentId: owningDepartment.id,
+          name,
+          level,
+        },
       });
     }
     return row;
@@ -1294,12 +1302,7 @@ async function main() {
     });
   }
 
-  await upsertProgramDepartment(
-    'BA-ECO',
-    'Bachelor of Arts in Economics',
-    'UG',
-    'ECO',
-  );
+  await upsertProgramDepartment('BA-ECO', 'FYUP in Economics', 'UG', 'ECO');
 
   let programVersion = await prisma.programVersion.findFirst({
     where: { programId: program.id, version: 1 },

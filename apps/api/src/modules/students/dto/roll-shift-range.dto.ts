@@ -101,6 +101,15 @@ export class ExecuteShiftTransferDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  /**
+   * Transitional override: assign this roll number instead of auto-allocating
+   * from the destination shift range (e.g. roll already issued in Excel).
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  manualRollNumber?: string;
 }
 
 export class PreviewShiftTransferBulkDto {

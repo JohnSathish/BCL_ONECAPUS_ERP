@@ -49,6 +49,8 @@ export type ShiftTransferResult = {
   newRollNumber: string | null;
   oldShift: { id: string; code: string; name: string };
   newShift: { id: string; code: string; name: string };
+  /** Registration lines remapped onto destination-shift sections. */
+  remappedRegistrationLines: number;
 };
 
 type TransferStudentContext = {
@@ -218,13 +220,7 @@ export class RollShiftRangeService {
     for (const item of ranges) {
       if (item.sequenceStart > item.sequenceEnd) {
         throw new BadRequestException(
-          `Invalid range for shift ${item.shiftId}: start must be <= end`,
-        );
-      }
-      const next = item.nextSequence ?? item.sequenceStart;
-      if (next < item.sequenceStart || next > item.sequenceEnd + 1) {
-        throw new BadRequestException(
-          `nextSequence for shift ${item.shiftId} must be within ${item.sequenceStart}–${item.sequenceEnd + 1}`,
+          `Invalid range: start (${item.sequenceStart}) must be <= end (${item.sequenceEnd}).`,
         );
       }
 
@@ -238,6 +234,16 @@ export class RollShiftRangeService {
       });
       if (!shift) {
         throw new NotFoundException(`Shift ${item.shiftId} not found`);
+      }
+
+      // Clamp next sequence into the range when start/end were edited without
+      // updating next (e.g. Morning start=601 but next still 600).
+      let next = item.nextSequence ?? item.sequenceStart;
+      if (next < item.sequenceStart) next = item.sequenceStart;
+      if (next > item.sequenceEnd + 1) {
+        throw new BadRequestException(
+          `${shift.code}: Next Seq (${item.nextSequence}) must be between ${item.sequenceStart} and ${item.sequenceEnd + 1}.`,
+        );
       }
 
       await this.prisma.rollShiftRangeConfig.upsert({
@@ -691,8 +697,13 @@ export class RollShiftRangeService {
       toShiftId: string;
       reason?: string;
       actorId?: string;
+      /** When set, use this roll (e.g. from Excel) instead of auto-allocation. */
+      manualRollNumber?: string;
     },
   ): Promise<ShiftTransferResult> {
+    const manualRollNumber =
+      input.manualRollNumber?.trim().toUpperCase() || undefined;
+
     const ctx = await this.resolveTransferStudentContext(
       tenantId,
       input.studentId,
@@ -718,6 +729,14 @@ export class RollShiftRangeService {
       },
     });
 
+    // Plan curriculum remap before roll change so a missing destination paper
+    // does not leave the student on a new roll with Day-shift sections.
+    const remapPlan = await this.buildRegistrationRemapPlan(
+      tenantId,
+      input.studentId,
+      input.toShiftId,
+    );
+
     await this.prisma.studentAcademicProfile.updateMany({
       where: { studentId: input.studentId },
       data: { preferredShiftId: input.toShiftId },
@@ -730,17 +749,26 @@ export class RollShiftRangeService {
       transferId: transfer.id,
       reason: input.reason ?? 'Shift transfer',
       actorId: input.actorId,
+      manualRollNumber,
     });
 
     if (
+      !manualRollNumber &&
       rollChange.oldRollNumber &&
       rollChange.newRollNumber &&
       rollChange.oldRollNumber === rollChange.newRollNumber
     ) {
       throw new BadRequestException(
-        'Roll number was not reassigned. Verify shift ranges are configured for the destination shift.',
+        'Roll number was not reassigned. Enter the Excel roll number manually, or configure destination shift ranges.',
       );
     }
+
+    const remappedRegistrationLines = await this.applyRegistrationRemapPlan(
+      tenantId,
+      input.studentId,
+      input.toShiftId,
+      remapPlan,
+    );
 
     return {
       transferId: transfer.id,
@@ -749,7 +777,325 @@ export class RollShiftRangeService {
       newRollNumber: rollChange.newRollNumber,
       oldShift: ctx.student.primaryShift!,
       newShift: toShift,
+      remappedRegistrationLines,
     };
+  }
+
+  private async buildRegistrationRemapPlan(
+    tenantId: string,
+    studentId: string,
+    toShiftId: string,
+  ) {
+    const registrations = await this.prisma.semesterRegistration.findMany({
+      where: { tenantId, studentId, archivedAt: null },
+      select: { id: true },
+    });
+
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId,
+        registrationId: { in: registrations.map((row) => row.id) },
+        offeringSectionId: { not: null },
+      },
+      include: {
+        offeringSection: {
+          include: {
+            courseOffering: {
+              include: {
+                course: { select: { id: true, code: true, title: true } },
+              },
+            },
+          },
+        },
+        registration: { select: { id: true, semesterSequence: true } },
+      },
+      orderBy: [{ priorityRank: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const updates: {
+      lineId: string;
+      offeringId: string;
+      offeringSectionId: string;
+    }[] = [];
+    const unmapped: string[] = [];
+
+    for (const line of lines) {
+      const current = line.offeringSection;
+      if (!current?.courseOffering?.course) {
+        unmapped.push(`registration line ${line.id} (missing course)`);
+        continue;
+      }
+      if (current.shiftId === toShiftId) continue;
+
+      const destination = await this.findEquivalentSectionOnShift(
+        tenantId,
+        toShiftId,
+        {
+          courseId: current.courseOffering.course.id,
+          courseCode: current.courseOffering.course.code,
+          courseTitle: current.courseOffering.course.title,
+          category: line.category ?? current.courseOffering.category,
+          semesterSequence:
+            line.registration.semesterSequence ??
+            current.courseOffering.semesterSequence,
+          sectionCode: current.sectionCode,
+        },
+      );
+
+      if (!destination) {
+        unmapped.push(
+          `${current.courseOffering.course.code} — ${current.courseOffering.course.title}`,
+        );
+        continue;
+      }
+
+      if (
+        destination.id === line.offeringSectionId &&
+        destination.courseOfferingId === line.offeringId
+      ) {
+        continue;
+      }
+
+      updates.push({
+        lineId: line.id,
+        offeringId: destination.courseOfferingId,
+        offeringSectionId: destination.id,
+      });
+    }
+
+    if (unmapped.length) {
+      throw new BadRequestException(
+        `Cannot transfer shift: ${unmapped.length} subject(s) have no matching section on the destination shift: ${unmapped.join('; ')}. Add those papers to the destination shift curriculum, then retry.`,
+      );
+    }
+
+    return updates;
+  }
+
+  private async applyRegistrationRemapPlan(
+    tenantId: string,
+    studentId: string,
+    toShiftId: string,
+    updates: {
+      lineId: string;
+      offeringId: string;
+      offeringSectionId: string;
+    }[],
+  ): Promise<number> {
+    await this.prisma.semesterRegistration.updateMany({
+      where: {
+        tenantId,
+        studentId,
+        archivedAt: null,
+        NOT: { shiftId: toShiftId },
+      },
+      data: { shiftId: toShiftId },
+    });
+
+    for (const update of updates) {
+      await this.prisma.semesterRegistrationLine.update({
+        where: { id: update.lineId },
+        data: {
+          offeringId: update.offeringId,
+          offeringSectionId: update.offeringSectionId,
+        },
+      });
+    }
+
+    await this.remapVtcTrackOfferings(tenantId, studentId, toShiftId);
+    return updates.length;
+  }
+
+  private async findEquivalentSectionOnShift(
+    tenantId: string,
+    toShiftId: string,
+    source: {
+      courseId: string;
+      courseCode: string;
+      courseTitle: string;
+      category?: string | null;
+      semesterSequence?: number | null;
+      sectionCode?: string | null;
+    },
+  ) {
+    const sectionInclude = {
+      courseOffering: {
+        include: { course: { select: { id: true, code: true, title: true } } },
+      },
+    } as const;
+
+    const baseWhere = {
+      tenantId,
+      shiftId: toShiftId,
+      deletedAt: null,
+      status: 'active',
+    };
+
+    // 1) Same course row + preferred section code
+    if (source.sectionCode) {
+      const exactSection = await this.prisma.offeringSection.findFirst({
+        where: {
+          ...baseWhere,
+          sectionCode: source.sectionCode,
+          courseOffering: {
+            deletedAt: null,
+            courseId: source.courseId,
+          },
+        },
+        include: sectionInclude,
+        orderBy: { createdAt: 'asc' },
+      });
+      if (exactSection) return exactSection;
+    }
+
+    const sameCourse = await this.prisma.offeringSection.findFirst({
+      where: {
+        ...baseWhere,
+        courseOffering: {
+          deletedAt: null,
+          courseId: source.courseId,
+          ...(source.semesterSequence != null
+            ? { semesterSequence: source.semesterSequence }
+            : {}),
+        },
+      },
+      include: sectionInclude,
+      orderBy: [{ sectionCode: 'asc' }, { createdAt: 'asc' }],
+    });
+    if (sameCourse) return sameCourse;
+
+    // 2) Same course code (handles VTC-240.3 vs VTC: 240.3 style variants)
+    const codeKey = this.normalizeCourseCode(source.courseCode);
+    const codeCandidates = await this.prisma.offeringSection.findMany({
+      where: {
+        ...baseWhere,
+        courseOffering: {
+          deletedAt: null,
+          ...(source.semesterSequence != null
+            ? { semesterSequence: source.semesterSequence }
+            : {}),
+          ...(source.category
+            ? { category: { equals: source.category, mode: 'insensitive' } }
+            : {}),
+        },
+      },
+      include: sectionInclude,
+      orderBy: [{ sectionCode: 'asc' }, { createdAt: 'asc' }],
+      take: 100,
+    });
+    const byCode = codeCandidates.find(
+      (section) =>
+        this.normalizeCourseCode(section.courseOffering.course.code) ===
+        codeKey,
+    );
+    if (byCode) return byCode;
+
+    // 3) Same title within category/semester (last resort)
+    const titleKey = this.normalizePaperLabel(source.courseTitle);
+    return (
+      codeCandidates.find(
+        (section) =>
+          this.normalizePaperLabel(section.courseOffering.course.title) ===
+          titleKey,
+      ) ?? null
+    );
+  }
+
+  private async remapVtcTrackOfferings(
+    tenantId: string,
+    studentId: string,
+    toShiftId: string,
+  ) {
+    const track = await this.prisma.studentVtcTrack.findFirst({
+      where: { tenantId, studentId },
+      include: {
+        selectedSem3Offering: {
+          include: {
+            course: { select: { id: true, code: true, title: true } },
+          },
+        },
+        selectedSem4Offering: {
+          include: {
+            course: { select: { id: true, code: true, title: true } },
+          },
+        },
+        selectedSem6Offering: {
+          include: {
+            course: { select: { id: true, code: true, title: true } },
+          },
+        },
+      },
+    });
+    if (!track) return;
+
+    const mapOffering = async (
+      offering:
+        | {
+            id: string;
+            category: string | null;
+            semesterSequence: number | null;
+            course: { id: string; code: string; title: string };
+          }
+        | null
+        | undefined,
+    ) => {
+      if (!offering) return null;
+      const section = await this.findEquivalentSectionOnShift(
+        tenantId,
+        toShiftId,
+        {
+          courseId: offering.course.id,
+          courseCode: offering.course.code,
+          courseTitle: offering.course.title,
+          category: offering.category,
+          semesterSequence: offering.semesterSequence,
+        },
+      );
+      return section?.courseOfferingId ?? offering.id;
+    };
+
+    const selectedSem3OfferingId = await mapOffering(
+      track.selectedSem3Offering,
+    );
+    const selectedSem4OfferingId = await mapOffering(
+      track.selectedSem4Offering,
+    );
+    const selectedSem6OfferingId = await mapOffering(
+      track.selectedSem6Offering,
+    );
+
+    if (
+      selectedSem3OfferingId === track.selectedSem3OfferingId &&
+      selectedSem4OfferingId === track.selectedSem4OfferingId &&
+      selectedSem6OfferingId === track.selectedSem6OfferingId
+    ) {
+      return;
+    }
+
+    await this.prisma.studentVtcTrack.update({
+      where: { id: track.id },
+      data: {
+        selectedSem3OfferingId,
+        selectedSem4OfferingId,
+        selectedSem6OfferingId,
+      },
+    });
+  }
+
+  private normalizeCourseCode(code: string) {
+    return code
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+  }
+
+  private normalizePaperLabel(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   async allocateInShiftRange(
@@ -924,6 +1270,7 @@ export class RollShiftRangeService {
       transferId: string;
       reason?: string;
       actorId?: string;
+      manualRollNumber?: string;
     },
   ) {
     const student = await this.prisma.student.findFirst({
@@ -966,16 +1313,7 @@ export class RollShiftRangeService {
     }
 
     const admissionYear = profile.admissionBatch!.admissionYear;
-    const shiftRangesActive = await this.hasActiveShiftRanges(
-      tenantId,
-      institutionId,
-      admissionYear,
-    );
-    if (!shiftRangesActive) {
-      throw new BadRequestException(
-        'Shift roll number ranges are not configured for this admission year',
-      );
-    }
+    const manualRollNumber = input.manualRollNumber?.trim().toUpperCase();
 
     const settings = await this.prisma.rollNumberSettings.findUnique({
       where: { tenantId },
@@ -984,6 +1322,150 @@ export class RollShiftRangeService {
       sequenceLength: settings?.sequenceLength ?? 3,
       separator: settings?.separator ?? '-',
     };
+
+    const oldRollNumber = student.rollNumber;
+
+    // Manual path: staff already assigned the roll in Excel — no auto sequence.
+    if (manualRollNumber) {
+      if (
+        oldRollNumber &&
+        oldRollNumber.trim().toUpperCase() === manualRollNumber
+      ) {
+        throw new BadRequestException(
+          `Roll number ${manualRollNumber} is already assigned to this student. Enter the new Morning/Day roll from Excel.`,
+        );
+      }
+
+      return this.prisma.$transaction(async (tx) => {
+        // Drop vacancy/reserve rows for the Excel roll so it can be assigned.
+        await tx.rollNumberVacancy.deleteMany({
+          where: { tenantId, rollNumber: manualRollNumber },
+        });
+
+        const taken = await this.isRollNumberTaken(
+          tx,
+          tenantId,
+          manualRollNumber,
+          input.studentId,
+        );
+        if (taken) {
+          throw new ConflictException(
+            `Roll number ${manualRollNumber} is already assigned to another student`,
+          );
+        }
+
+        if (oldRollNumber) {
+          await tx.rollNumberVacancy.upsert({
+            where: {
+              tenantId_rollNumber: { tenantId, rollNumber: oldRollNumber },
+            },
+            create: {
+              tenantId,
+              institutionId,
+              rollNumber: oldRollNumber,
+              shiftId: input.fromShiftId,
+              sequenceNo: this.parseRollNumber(oldRollNumber, rollSettings)
+                ?.sequence,
+              admissionYear,
+              studentId: input.studentId,
+              status: 'VACANT',
+              reason: input.reason ?? 'Shift transfer (manual roll)',
+              createdById: input.actorId,
+            },
+            update: {
+              status: 'VACANT',
+              reason: input.reason ?? 'Shift transfer (manual roll)',
+              shiftId: input.fromShiftId,
+              studentId: input.studentId,
+              vacatedAt: new Date(),
+              createdById: input.actorId,
+            },
+          });
+        }
+
+        await tx.student.update({
+          where: { id: input.studentId },
+          data: {
+            rollNumber: manualRollNumber,
+            primaryShiftId: input.toShiftId,
+            lastModifiedById: input.actorId,
+          },
+        });
+
+        await tx.studentAcademicProfile.updateMany({
+          where: { studentId: input.studentId },
+          data: { preferredShiftId: input.toShiftId },
+        });
+
+        await tx.studentShiftTransfer.update({
+          where: { id: input.transferId },
+          data: {
+            oldRollNumber,
+            newRollNumber: manualRollNumber,
+          },
+        });
+
+        await tx.studentRollNumberAuditLog.create({
+          data: {
+            tenantId,
+            institutionId,
+            studentId: input.studentId,
+            action: 'SHIFT_TRANSFER',
+            rollNumber: manualRollNumber,
+            oldValue: oldRollNumber,
+            newValue: manualRollNumber,
+            createdById: input.actorId,
+            metadata: {
+              fromShiftId: input.fromShiftId,
+              toShiftId: input.toShiftId,
+              transferId: input.transferId,
+              reason: input.reason,
+              manualRollNumber: true,
+              source: 'EXCEL',
+            } as Prisma.InputJsonValue,
+          },
+        });
+
+        // If the manual roll falls in a configured range, advance nextSequence
+        // past it so future auto-allocations do not collide.
+        const parsed = this.parseRollNumber(manualRollNumber, rollSettings);
+        if (parsed) {
+          const config = await tx.rollShiftRangeConfig.findFirst({
+            where: {
+              tenantId,
+              institutionId,
+              shiftId: input.toShiftId,
+              admissionYear,
+              isActive: true,
+            },
+          });
+          if (
+            config &&
+            parsed.sequence >= config.sequenceStart &&
+            parsed.sequence <= config.sequenceEnd &&
+            config.nextSequence <= parsed.sequence
+          ) {
+            await tx.rollShiftRangeConfig.update({
+              where: { id: config.id },
+              data: { nextSequence: parsed.sequence + 1 },
+            });
+          }
+        }
+
+        return { oldRollNumber, newRollNumber: manualRollNumber };
+      });
+    }
+
+    const shiftRangesActive = await this.hasActiveShiftRanges(
+      tenantId,
+      institutionId,
+      admissionYear,
+    );
+    if (!shiftRangesActive) {
+      throw new BadRequestException(
+        'Shift roll number ranges are not configured for this admission year. Enter the roll number from Excel instead.',
+      );
+    }
 
     const prefixConfig = await this.prisma.rollPrefixConfig.findFirst({
       where: { tenantId, streamId: profile.streamId!, isActive: true },
@@ -995,7 +1477,6 @@ export class RollShiftRangeService {
     }
 
     const yearSuffix = String(admissionYear).slice(-2);
-    const oldRollNumber = student.rollNumber;
 
     return this.prisma.$transaction(async (tx) => {
       if (oldRollNumber) {
@@ -1040,7 +1521,7 @@ export class RollShiftRangeService {
 
       if (!allocated) {
         throw new BadRequestException(
-          'Target shift has no roll number range configured',
+          'Target shift has no roll number range configured. Enter the roll number from Excel instead.',
         );
       }
 

@@ -42,7 +42,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'ECO',
     programCode: 'BA-ECO',
-    programName: 'Bachelor of Arts in Economics',
+    programName: 'FYUP in Economics',
     subjectSlug: 'economics',
     papers: {
       sem1: 'Microeconomics I',
@@ -59,7 +59,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'EDU',
     programCode: 'BA-EDU',
-    programName: 'Bachelor of Arts in Education',
+    programName: 'FYUP in Education',
     subjectSlug: 'education',
     papers: {
       sem1: 'Foundations of Education',
@@ -76,7 +76,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'ENG',
     programCode: 'BA-ENG',
-    programName: 'Bachelor of Arts in English',
+    programName: 'FYUP in English',
     subjectSlug: 'english',
     papers: {
       sem1: 'British Poetry and Drama',
@@ -89,7 +89,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'GAR',
     programCode: 'BA-GAR',
-    programName: 'Bachelor of Arts in Garo',
+    programName: 'FYUP in Garo',
     subjectSlug: 'garo',
     papers: {
       sem1: 'Garo Language and Literature I',
@@ -102,7 +102,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'GEO',
     programCode: 'BA-GEO',
-    programName: 'Bachelor of Arts in Geography',
+    programName: 'FYUP in Geography',
     subjectSlug: 'geography',
     papers: {
       sem1: 'Introduction to Human Geography',
@@ -115,7 +115,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'HIS',
     programCode: 'BA-HIS',
-    programName: 'Bachelor of Arts in History',
+    programName: 'FYUP in History',
     subjectSlug: 'history',
     papers: {
       sem1: 'History of India (Ancient to 1200 CE)',
@@ -128,7 +128,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'PHI',
     programCode: 'BA-PHI',
-    programName: 'Bachelor of Arts in Philosophy',
+    programName: 'FYUP in Philosophy',
     subjectSlug: 'philosophy',
     papers: {
       sem1: 'Introduction to Philosophy',
@@ -141,7 +141,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'POL',
     programCode: 'BA-POL',
-    programName: 'Bachelor of Arts in Political Science',
+    programName: 'FYUP in Political Science',
     subjectSlug: 'political-science',
     papers: {
       sem1: 'Introduction to Political Science',
@@ -158,7 +158,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
   {
     code: 'SOC',
     programCode: 'BA-SOC',
-    programName: 'Bachelor of Arts in Sociology',
+    programName: 'FYUP in Sociology',
     subjectSlug: 'sociology',
     papers: {
       sem1: 'Introduction to Sociology',

@@ -1,6 +1,5 @@
 'use client';
 
-import { erpSelectClass } from '@/components/erp/form-primitives';
 import type { StudentReportFilters } from '@/services/student-reports';
 
 export type StudentReportFilterState = {
@@ -60,6 +59,9 @@ type Props = {
   hideShiftFilter?: boolean;
 };
 
+const filterSelectClass =
+  'h-9 min-w-[9.5rem] max-w-[12rem] shrink-0 rounded-md border border-border bg-card px-2.5 text-sm';
+
 export function StudentReportFiltersBar({
   filters,
   onChange,
@@ -72,9 +74,9 @@ export function StudentReportFiltersBar({
   hideShiftFilter = false,
 }: Props) {
   return (
-    <div className="flex flex-wrap gap-2 rounded-xl border border-border/60 bg-card/80 p-3 print:hidden">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/80 p-3 print:hidden">
       <select
-        className={`${erpSelectClass} max-w-[180px]`}
+        className={filterSelectClass}
         value={filters.programVersionId}
         onChange={(e) => onChange({ programVersionId: e.target.value })}
       >
@@ -87,7 +89,7 @@ export function StudentReportFiltersBar({
       </select>
       {departmentOptions.length > 0 ? (
         <select
-          className={`${erpSelectClass} max-w-[160px]`}
+          className={filterSelectClass}
           value={filters.departmentId}
           onChange={(e) => onChange({ departmentId: e.target.value })}
         >
@@ -100,7 +102,7 @@ export function StudentReportFiltersBar({
         </select>
       ) : null}
       <select
-        className={`${erpSelectClass} max-w-[140px]`}
+        className={filterSelectClass}
         value={filters.batchId}
         onChange={(e) => onChange({ batchId: e.target.value })}
       >
@@ -112,7 +114,7 @@ export function StudentReportFiltersBar({
         ))}
       </select>
       <select
-        className={`${erpSelectClass} max-w-[120px]`}
+        className={filterSelectClass}
         value={filters.semester}
         onChange={(e) => onChange({ semester: e.target.value })}
       >
@@ -124,7 +126,7 @@ export function StudentReportFiltersBar({
         ))}
       </select>
       <select
-        className={`${erpSelectClass} max-w-[140px]`}
+        className={filterSelectClass}
         value={filters.streamId}
         onChange={(e) => onChange({ streamId: e.target.value })}
       >
@@ -137,7 +139,7 @@ export function StudentReportFiltersBar({
       </select>
       {!hideShiftFilter ? (
         <select
-          className={`${erpSelectClass} max-w-[130px]`}
+          className={filterSelectClass}
           value={filters.shiftId}
           onChange={(e) => onChange({ shiftId: e.target.value })}
         >
@@ -150,7 +152,7 @@ export function StudentReportFiltersBar({
         </select>
       ) : null}
       <select
-        className={`${erpSelectClass} max-w-[130px]`}
+        className={filterSelectClass}
         value={filters.admissionStatus}
         onChange={(e) => onChange({ admissionStatus: e.target.value })}
       >
@@ -160,7 +162,7 @@ export function StudentReportFiltersBar({
         <option value="CANCELLED">Cancelled</option>
       </select>
       <select
-        className={`${erpSelectClass} max-w-[130px]`}
+        className={filterSelectClass}
         value={filters.studentStatus}
         onChange={(e) => onChange({ studentStatus: e.target.value })}
       >
@@ -173,7 +175,7 @@ export function StudentReportFiltersBar({
       {extended ? (
         <>
           <select
-            className={`${erpSelectClass} max-w-[120px]`}
+            className={filterSelectClass}
             value={filters.gender}
             onChange={(e) => onChange({ gender: e.target.value })}
           >
@@ -183,7 +185,7 @@ export function StudentReportFiltersBar({
             <option value="OTHER">Other</option>
           </select>
           <select
-            className={`${erpSelectClass} max-w-[130px]`}
+            className={filterSelectClass}
             value={filters.feeStatus}
             onChange={(e) => onChange({ feeStatus: e.target.value })}
           >
@@ -194,7 +196,7 @@ export function StudentReportFiltersBar({
             <option value="PARTIAL">Partial</option>
           </select>
           <select
-            className={`${erpSelectClass} max-w-[140px]`}
+            className={filterSelectClass}
             value={filters.residenceType}
             onChange={(e) => onChange({ residenceType: e.target.value })}
           >

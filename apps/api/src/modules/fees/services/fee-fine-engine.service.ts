@@ -18,9 +18,71 @@ export class FeeFineEngineService {
     return this.prisma as unknown as Record<string, any>;
   }
 
+  /**
+   * Remove outstanding late fines (e.g. when late fees are disabled in settings).
+   * Reduces balance by the fine amount and posts a ledger credit waiver.
+   */
+  async clearOutstandingFines(tenantId: string, studentId?: string) {
+    const demands = await this.db().studentFeeDemand.findMany({
+      where: {
+        tenantId,
+        ...(studentId ? { studentId } : {}),
+        fineAmount: { gt: 0 },
+        status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID'] },
+      },
+    });
+
+    let updated = 0;
+    const touchedStudents = new Set<string>();
+
+    for (const demand of demands) {
+      const fine = Number(demand.fineAmount ?? 0);
+      if (fine <= 0) continue;
+
+      const balance = Number(demand.balanceAmount ?? 0);
+      const credit = Math.min(fine, Math.max(0, balance));
+      const newBalance = Math.max(0, balance - credit);
+
+      await this.db().studentFeeDemand.update({
+        where: { id: demand.id },
+        data: {
+          fineAmount: 0,
+          balanceAmount: newBalance,
+        },
+      });
+
+      if (credit > 0) {
+        await this.ledger.post({
+          tenantId,
+          studentId: demand.studentId,
+          demandId: demand.id,
+          entryType: 'REVERSAL',
+          creditAmount: credit,
+          referenceType: 'FINE_WAIVER',
+          referenceId: demand.id,
+          description: 'Late fee waived — late fees disabled in fee settings',
+        });
+      }
+
+      updated += 1;
+      touchedStudents.add(demand.studentId);
+    }
+
+    await Promise.all(
+      [...touchedStudents].map((id) =>
+        this.feeSummary.touchAfterPayment(tenantId, id),
+      ),
+    );
+
+    return { updated, students: touchedStudents.size };
+  }
+
   async accrueForTenant(tenantId: string) {
     const config = await this.settings.get(tenantId);
-    if (!config.lateFeeEnabled) return { updated: 0 };
+    if (!config.lateFeeEnabled || Number(config.lateFeeAmount) === 0) {
+      // Keep balances aligned with policy when late fees are turned off.
+      return this.clearOutstandingFines(tenantId);
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
