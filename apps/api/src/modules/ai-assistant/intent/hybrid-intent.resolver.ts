@@ -11,6 +11,8 @@ import { applyErpDictionary, isActiveStudentFollowUp } from './erp-dictionary';
 import {
   defaultStudentReportColumns,
   parseStudentReportIntent,
+  parseFeeReportIntent,
+  parseAttendanceReportIntent,
 } from './report-intent.parser';
 
 const DEFAULT_REPORT_COLUMNS = [
@@ -119,22 +121,46 @@ export class HybridIntentResolver {
     }
 
     if (this.isFeeReport(lower)) {
+      const feeSpec = parseFeeReportIntent(q);
+      if (feeSpec) {
+        return {
+          action: 'generate_fee_report',
+          filters: feeSpec.filters,
+          feeReportType: feeSpec.feeReportType,
+          format: feeSpec.format,
+          confidence: 0.92,
+          question: q,
+        };
+      }
       return {
         action: 'generate_fee_report',
         filters,
         feeReportType: this.feeReportType(lower),
         format: format ?? 'xlsx',
         confidence: 0.9,
+        question: q,
       };
     }
 
     if (this.isAttendanceReport(lower)) {
+      const attSpec = parseAttendanceReportIntent(q);
+      if (attSpec) {
+        return {
+          action: 'generate_attendance_report',
+          filters: attSpec.filters,
+          attendanceReportType: attSpec.attendanceReportType,
+          format: attSpec.format,
+          confidence: 0.92,
+          question: q,
+        };
+      }
       return {
         action: 'generate_attendance_report',
         filters,
         attendanceReportType: this.attendanceReportType(lower),
         format: format ?? 'xlsx',
         confidence: 0.9,
+        question: q,
       };
     }
 
@@ -422,6 +448,23 @@ export class HybridIntentResolver {
         format: format ?? 'xlsx',
         confidence: 0.95,
         needsClarification: missing.length ? missing : undefined,
+      };
+    }
+
+    if (
+      (pending.action === 'generate_fee_report' ||
+        pending.action === 'generate_attendance_report') &&
+      pending.awaitingReportConfirm &&
+      this.isReportConfirmPhrase(lower)
+    ) {
+      return {
+        action: pending.action,
+        filters: pending.filters,
+        feeReportType: pending.feeReportType,
+        attendanceReportType: pending.attendanceReportType,
+        format: pending.format ?? 'xlsx',
+        reportConfirmed: true,
+        confidence: 1,
       };
     }
 

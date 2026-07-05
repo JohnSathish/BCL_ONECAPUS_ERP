@@ -18,7 +18,11 @@ import { KnowledgeQueryService } from '../knowledge-base/knowledge-query.service
 import { HybridIntentResolver } from './intent/hybrid-intent.resolver';
 import {
   buildReportPreviewMarkdown,
+  buildFeeReportPreviewMarkdown,
+  buildAttendanceReportPreviewMarkdown,
   parseStudentReportIntent,
+  parseFeeReportIntent,
+  parseAttendanceReportIntent,
 } from './intent/report-intent.parser';
 import type {
   AiActiveStudent,
@@ -1327,14 +1331,56 @@ export class AiToolsService {
     this.assertPerm(user, AI_PERMS.fees, 'fee reports');
     const type = intent.feeReportType ?? 'outstanding';
     const format = intent.format === 'csv' ? 'csv' : 'xlsx';
+    const query = await this.buildFeeReportQuery(user.tid, intent.filters);
+    const rowCount = await this.countFeeReportRows(
+      user.tid,
+      type,
+      query,
+      intent.filters,
+    );
+
+    if (!intent.reportConfirmed) {
+      const spec = parseFeeReportIntent(intent.question ?? '') ?? {
+        reportType: 'fee_report' as const,
+        feeReportType: type,
+        filters: intent.filters,
+        format,
+        filterLabels: this.describeFilterLabels(intent.filters),
+        reportTitle: type,
+      };
+
+      return this.reportPreviewResult({
+        answer: buildFeeReportPreviewMarkdown(spec, rowCount),
+        rowCount,
+        format,
+        pendingIntent: {
+          action: 'generate_fee_report',
+          filters: intent.filters,
+          format: format as 'xlsx' | 'csv',
+          feeReportType: type,
+          awaitingReportConfirm: true,
+        },
+        links: [{ label: 'Financial reports', href: '/admin/fees/reports' }],
+      });
+    }
+
+    if (rowCount === 0) {
+      return {
+        answer: 'No fee records match the selected filters.',
+        source: 'live' as const,
+        links: [{ label: 'Financial reports', href: '/admin/fees/reports' }],
+      };
+    }
+
     const exported = await this.feeReports.exportReport(user.tid, type, {
+      ...query,
       format,
     } as never);
 
     if (format === 'csv' && 'content' in exported) {
       const content = String(exported.content ?? '');
       return {
-        answer: `Fee report “${type}” ready (${format.toUpperCase()}).`,
+        answer: `Generated ${format.toUpperCase()} fee report “${type}” with ${rowCount} row(s). Download below.`,
         source: 'live' as const,
         downloads: [
           {
@@ -1357,7 +1403,7 @@ export class AiToolsService {
       };
     }
     return {
-      answer: `Fee report “${type}” ready (${format.toUpperCase()}).`,
+      answer: `Generated ${format.toUpperCase()} fee report “${type}” with ${rowCount} row(s). Download below.`,
       source: 'live' as const,
       downloads: [
         {
@@ -1376,6 +1422,50 @@ export class AiToolsService {
   private async attendanceReport(user: JwtUser, intent: ResolvedIntent) {
     this.assertPerm(user, AI_PERMS.attendance, 'attendance reports');
     const type = intent.attendanceReportType ?? 'shortage';
+    const format = intent.format === 'csv' ? 'csv' : 'xlsx';
+    const rowCount = await this.countAttendanceReportRows(
+      user.tid,
+      type,
+      intent.filters,
+    );
+
+    if (!intent.reportConfirmed) {
+      const spec = parseAttendanceReportIntent(intent.question ?? '') ?? {
+        reportType: 'attendance_report' as const,
+        attendanceReportType: type,
+        filters: intent.filters,
+        format,
+        filterLabels: this.describeFilterLabels(intent.filters),
+        reportTitle: type,
+      };
+
+      return this.reportPreviewResult({
+        answer: buildAttendanceReportPreviewMarkdown(spec, rowCount),
+        rowCount,
+        format,
+        pendingIntent: {
+          action: 'generate_attendance_report',
+          filters: intent.filters,
+          format: format as 'xlsx' | 'csv',
+          attendanceReportType: type,
+          awaitingReportConfirm: true,
+        },
+        links: [
+          { label: 'Attendance module', href: '/admin/academics/attendance' },
+        ],
+      });
+    }
+
+    if (rowCount === 0) {
+      return {
+        answer: 'No attendance records match the selected filters.',
+        source: 'live' as const,
+        links: [
+          { label: 'Attendance module', href: '/admin/academics/attendance' },
+        ],
+      };
+    }
+
     const rows = (await this.attendance.reports(
       user.tid,
       type,
@@ -1384,7 +1474,12 @@ export class AiToolsService {
       | Array<Record<string, unknown>>
       | { data?: Array<Record<string, unknown>> };
     const list = Array.isArray(rows) ? rows : (rows.data ?? []);
-    const flat = list.slice(0, this.maxRows()).map((row) => {
+    const filtered = await this.filterAttendanceRows(
+      user.tid,
+      list,
+      intent.filters,
+    );
+    const flat = filtered.slice(0, this.maxRows()).map((row) => {
       const r = row as Record<string, unknown>;
       return {
         studentId: r.studentId ?? r.id ?? '—',
@@ -1419,7 +1514,7 @@ export class AiToolsService {
     });
 
     return {
-      answer: `Attendance ${type} report with ${flat.length} row(s). Download Excel below.`,
+      answer: `Generated attendance ${type} report with ${flat.length} row(s). Download below.`,
       source: 'live' as const,
       downloads: [
         {
@@ -1443,6 +1538,109 @@ export class AiToolsService {
         { label: 'Attendance module', href: '/admin/academics/attendance' },
       ],
     };
+  }
+
+  private reportPreviewResult(input: {
+    answer: string;
+    rowCount: number;
+    format: 'xlsx' | 'csv';
+    pendingIntent: import('./ai-assistant.types').AiPendingIntent;
+    links?: import('./ai-assistant.types').AiLink[];
+  }): ToolResult {
+    return {
+      answer: input.answer,
+      source: 'live' as const,
+      ...(input.rowCount > 0
+        ? {
+            confirmation: {
+              confirmationId: 'report-generate',
+              summary: `${input.rowCount} row(s) match these filters. Generate the ${input.format.toUpperCase()} file?`,
+              actionLabel: 'Generate report',
+              reportGenerate: true,
+            },
+            suggestedFollowUps: ['Yes, generate report'],
+            _pendingReportIntent: input.pendingIntent,
+          }
+        : {}),
+      links: input.links,
+    };
+  }
+
+  private async buildFeeReportQuery(
+    tenantId: string,
+    filters: AiIntentFilters,
+  ): Promise<Record<string, unknown>> {
+    const query: Record<string, unknown> = {};
+    const built = await this.buildReportFilters(tenantId, filters);
+    if (built.dto.programVersionId) {
+      query.programVersionId = built.dto.programVersionId;
+    }
+    if (built.dto.shiftId) query.shiftId = built.dto.shiftId;
+    return query;
+  }
+
+  private async countFeeReportRows(
+    tenantId: string,
+    type: string,
+    query: Record<string, unknown>,
+    filters: AiIntentFilters,
+  ) {
+    const report = await this.feeReports.report(tenantId, type, query as never);
+    let rows = (report as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+    rows = await this.filterRowsByStudentFilters(tenantId, rows, filters);
+    return rows.length;
+  }
+
+  private async countAttendanceReportRows(
+    tenantId: string,
+    type: string,
+    filters: AiIntentFilters,
+  ) {
+    const rows = (await this.attendance.reports(
+      tenantId,
+      type,
+      {} as never,
+    )) as Array<Record<string, unknown>>;
+    const list = Array.isArray(rows) ? rows : [];
+    const filtered = await this.filterAttendanceRows(tenantId, list, filters);
+    return filtered.length;
+  }
+
+  private async filterAttendanceRows(
+    tenantId: string,
+    rows: Array<Record<string, unknown>>,
+    filters: AiIntentFilters,
+  ) {
+    if (!filters.semester && !filters.shiftName && !filters.programmeName) {
+      return rows;
+    }
+    return this.filterRowsByStudentFilters(tenantId, rows, filters);
+  }
+
+  private async filterRowsByStudentFilters(
+    tenantId: string,
+    rows: Array<Record<string, unknown>>,
+    filters: AiIntentFilters,
+  ) {
+    if (!filters.semester && !filters.programmeName && !filters.shiftName) {
+      return rows;
+    }
+    const studentIds = rows
+      .map((r) => String(r.studentId ?? r.id ?? ''))
+      .filter(Boolean);
+    if (!studentIds.length) return rows;
+
+    const built = await this.buildReportFilters(tenantId, filters);
+    const where = this.reportQueries.buildWhere(tenantId, {
+      ...(built.dto as object),
+      studentIds,
+    } as never);
+    const matched = await this.prisma.student.findMany({
+      where,
+      select: { id: true },
+    });
+    const allowed = new Set(matched.map((s) => s.id));
+    return rows.filter((r) => allowed.has(String(r.studentId ?? r.id ?? '')));
   }
 
   private async chart(user: JwtUser, intent: ResolvedIntent) {

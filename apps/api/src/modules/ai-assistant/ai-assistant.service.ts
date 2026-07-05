@@ -229,18 +229,24 @@ export class AiAssistantService {
     const pending = state.pendingIntent;
     if (
       !pending ||
-      pending.action !== 'generate_student_report' ||
-      !pending.awaitingReportConfirm
+      !pending.awaitingReportConfirm ||
+      ![
+        'generate_student_report',
+        'generate_fee_report',
+        'generate_attendance_report',
+      ].includes(pending.action)
     ) {
       throw new BadRequestException(
-        'No student report preview is waiting for confirmation. Ask for a report first.',
+        'No report preview is waiting for confirmation. Ask for a report first.',
       );
     }
 
     const intent: ResolvedIntent = {
-      action: 'generate_student_report',
+      action: pending.action,
       filters: pending.filters,
       columns: pending.columns,
+      feeReportType: pending.feeReportType,
+      attendanceReportType: pending.attendanceReportType,
       format: pending.format === 'pdf' ? 'xlsx' : (pending.format ?? 'xlsx'),
       reportConfirmed: true,
       confidence: 1,
@@ -267,7 +273,7 @@ export class AiAssistantService {
       sessionId: sid,
       question,
       intent,
-      tools: ['generate_student_report'],
+      tools: [pending.action],
       resultSummary: result.answer.slice(0, 500),
     });
     return { ...result, sessionId: sid };

@@ -113,8 +113,21 @@ export type OperationsCenter = {
 export type DashboardAiResponse = {
   answer: string;
   links?: Array<{ label: string; href: string }>;
-  source: 'live' | 'estimated' | 'rules';
+  source: 'live' | 'estimated' | 'rules' | 'llm';
   suggestedFollowUps?: string[];
+  fieldOptions?: Array<{ key: string; label: string; selected?: boolean }>;
+  downloads?: Array<{
+    label: string;
+    filename: string;
+    contentType: string;
+    base64: string;
+  }>;
+  table?: {
+    columns: Array<{ key: string; label: string }>;
+    rows: Array<Record<string, unknown>>;
+    totalRows?: number;
+  };
+  sessionId?: string;
 };
 
 export type ChartSeriesPoint = {

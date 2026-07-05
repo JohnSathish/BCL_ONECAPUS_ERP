@@ -401,24 +401,203 @@ export function buildReportPreviewMarkdown(
       ? spec.filterLabels.map((f) => `✓ ${f}`).join('\n')
       : '✓ All students (no filter detected — specify Major, Semester, etc. to narrow)';
 
-  return [
-    'Generating Student Report…',
-    '',
-    '**Report Type:** Student Report',
+  return buildOperationalReportPreviewMarkdown({
+    title: 'Student Report',
+    filterLabels: spec.filterLabels,
+    filterBlockFallback: filterBlock,
+    rowCount,
+    detailLines: ['**Columns selected**', ...cols.map((c) => `✓ ${c}`)],
+    format: spec.format,
+  });
+}
+
+export type ParsedFeeReportSpec = {
+  reportType: 'fee_report';
+  feeReportType: string;
+  filters: AiIntentFilters;
+  format: 'xlsx' | 'csv';
+  filterLabels: string[];
+  reportTitle: string;
+};
+
+export type ParsedAttendanceReportSpec = {
+  reportType: 'attendance_report';
+  attendanceReportType: string;
+  filters: AiIntentFilters;
+  format: 'xlsx' | 'csv';
+  filterLabels: string[];
+  reportTitle: string;
+};
+
+const FEE_REPORT_TITLES: Record<string, string> = {
+  outstanding: 'Outstanding Fee Report',
+  defaulters: 'Fee Defaulters Report',
+  'daily-collection': 'Daily Fee Collection',
+  'monthly-collection': 'Monthly Fee Collection',
+  'cash-book': 'Cash Book',
+  collections: 'Fee Collections',
+};
+
+const ATTENDANCE_REPORT_TITLES: Record<string, string> = {
+  shortage: 'Attendance Shortage Report',
+  defaulters: 'Attendance Defaulters Report',
+  daily: 'Daily Attendance Report',
+  unmarked: 'Unmarked Sessions Report',
+};
+
+export function parseFeeReportIntent(
+  question: string,
+): ParsedFeeReportSpec | null {
+  const q = question.trim();
+  const lower = q.toLowerCase();
+  if (!isFeeReportPrompt(lower)) return null;
+
+  const filters = extractReportFilters(q, lower);
+  const format = /\bcsv\b/.test(lower) ? 'csv' : 'xlsx';
+  const feeReportType = resolveFeeReportType(lower);
+  const filterLabels = describeFilters(filters);
+  if (/today|daily/.test(lower)) filterLabels.push('Period: Today');
+  if (/this month|monthly/.test(lower)) filterLabels.push('Period: This month');
+
+  return {
+    reportType: 'fee_report',
+    feeReportType,
+    filters,
+    format,
+    filterLabels,
+    reportTitle:
+      FEE_REPORT_TITLES[feeReportType] ??
+      `${feeReportType.replace(/-/g, ' ')} Report`,
+  };
+}
+
+export function parseAttendanceReportIntent(
+  question: string,
+): ParsedAttendanceReportSpec | null {
+  const q = question.trim();
+  const lower = q.toLowerCase();
+  if (!isAttendanceReportPrompt(lower)) return null;
+
+  const filters = extractReportFilters(q, lower);
+  const format = /\bcsv\b/.test(lower) ? 'csv' : 'xlsx';
+  const attendanceReportType = resolveAttendanceReportType(lower);
+  const filterLabels = describeFilters(filters);
+  if (/today|daily/.test(lower)) filterLabels.push('Period: Today');
+
+  return {
+    reportType: 'attendance_report',
+    attendanceReportType,
+    filters,
+    format,
+    filterLabels,
+    reportTitle:
+      ATTENDANCE_REPORT_TITLES[attendanceReportType] ??
+      `${attendanceReportType} Attendance Report`,
+  };
+}
+
+export function buildFeeReportPreviewMarkdown(
+  spec: ParsedFeeReportSpec,
+  rowCount: number,
+) {
+  return buildOperationalReportPreviewMarkdown({
+    title: spec.reportTitle,
+    filterLabels: spec.filterLabels,
+    rowCount,
+    format: spec.format,
+  });
+}
+
+export function buildAttendanceReportPreviewMarkdown(
+  spec: ParsedAttendanceReportSpec,
+  rowCount: number,
+) {
+  return buildOperationalReportPreviewMarkdown({
+    title: spec.reportTitle,
+    filterLabels: spec.filterLabels,
+    rowCount,
+    format: spec.format,
+  });
+}
+
+function buildOperationalReportPreviewMarkdown(input: {
+  title: string;
+  filterLabels: string[];
+  filterBlockFallback?: string;
+  rowCount: number;
+  detailLines?: string[];
+  format: 'xlsx' | 'csv';
+}) {
+  const filterBlock =
+    input.filterLabels.length > 0
+      ? input.filterLabels.map((f) => `✓ ${f}`).join('\n')
+      : (input.filterBlockFallback ??
+        '✓ All records (no filter detected — specify Semester, Programme, etc. to narrow)');
+
+  const lines = [
+    `Generating ${input.title}…`,
     '',
     '**Filters applied**',
     filterBlock,
     '',
-    `**Estimated rows:** ${rowCount}`,
-    '',
-    '**Columns selected**',
-    ...cols.map((c) => `✓ ${c}`),
+    `**Estimated rows:** ${input.rowCount}`,
+  ];
+
+  if (input.detailLines?.length) {
+    lines.push('', ...input.detailLines);
+  }
+
+  lines.push(
     '',
     '**Output**',
-    `✓ ${spec.format.toUpperCase()}`,
+    `✓ ${input.format.toUpperCase()}`,
     '',
-    rowCount > 0
+    input.rowCount > 0
       ? 'Reply **Yes, generate report** or click **Generate report** to download.'
-      : 'No students match these filters. Adjust your request before generating.',
-  ].join('\n');
+      : 'No records match these filters. Adjust your request before generating.',
+  );
+
+  return lines.join('\n');
+}
+
+function isFeeReportPrompt(lower: string) {
+  return (
+    (/\b(generate|export|download|prepare|create)\b/.test(lower) &&
+      /\bfee\b|\bcollection\b|\bdefaulter\b|\boutstanding\b|\bcash book\b/.test(
+        lower,
+      )) ||
+    /\bfee defaulters?\b|\boutstanding fees?\b|\bfee collection report\b/.test(
+      lower,
+    )
+  );
+}
+
+function isAttendanceReportPrompt(lower: string) {
+  return (
+    (/\b(generate|export|download|prepare|create)\b/.test(lower) &&
+      /\battendance\b|\babsentee\b|\bshortage\b/.test(lower)) ||
+    /\battendance (report|analysis|defaulters?)\b|\blow attendance\b/.test(
+      lower,
+    )
+  );
+}
+
+function resolveFeeReportType(lower: string) {
+  if (/defaulter/.test(lower)) return 'defaulters';
+  if (/monthly/.test(lower)) return 'monthly-collection';
+  if (/daily|today/.test(lower)) return 'daily-collection';
+  if (/cash book/.test(lower)) return 'cash-book';
+  if (/collection/.test(lower) && !/outstanding/.test(lower)) {
+    return 'collections';
+  }
+  return 'outstanding';
+}
+
+function resolveAttendanceReportType(lower: string) {
+  if (/unmarked|not marked/.test(lower)) return 'unmarked';
+  if (/daily|today/.test(lower)) return 'daily';
+  if (/defaulter|shortage|low attendance|below 75/.test(lower)) {
+    return 'shortage';
+  }
+  return 'shortage';
 }
