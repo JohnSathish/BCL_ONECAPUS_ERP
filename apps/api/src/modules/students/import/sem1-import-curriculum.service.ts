@@ -187,6 +187,7 @@ export class Sem1ImportCurriculumService {
       programme?: string;
       semesterSequence?: number;
       academicYearId?: string;
+      shiftId?: string;
     },
   ): Promise<Sem1ImportCurriculumCatalog> {
     const semesterSequence = input.semesterSequence ?? 1;
@@ -195,6 +196,7 @@ export class Sem1ImportCurriculumService {
       tenantId,
       version.id,
       semesterSequence,
+      { shiftId: input.shiftId },
     );
 
     const offerings: CurriculumOffering[] = [
@@ -240,6 +242,7 @@ export class Sem1ImportCurriculumService {
       semesterSequence,
       majorDepartments,
       input.academicYearId,
+      input.shiftId,
     );
 
     return {
@@ -264,12 +267,14 @@ export class Sem1ImportCurriculumService {
       majorDepartment: string;
       academicYearId?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ) {
     const catalog = await this.buildCatalog(tenantId, {
       programVersionId: input.programVersionId,
       semesterSequence: input.semesterSequence ?? 1,
       academicYearId: input.academicYearId,
+      shiftId: input.shiftId,
     });
     const major = this.resolveMajorDepartment(catalog, input.majorDepartment);
     if (!major) {
@@ -290,6 +295,7 @@ export class Sem1ImportCurriculumService {
   async buildTenantMajorDepartments(
     tenantId: string,
     semesterSequence = 1,
+    shiftId?: string,
   ): Promise<Sem1MajorDepartmentOption[]> {
     const versions = await this.prisma.programVersion.findMany({
       where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
@@ -297,13 +303,18 @@ export class Sem1ImportCurriculumService {
     });
     const merged = new Map<string, Sem1MajorDepartmentOption>();
     for (const version of versions) {
-      const catalog = await this.buildCatalog(tenantId, {
-        programVersionId: version.id,
-        semesterSequence,
-      });
-      for (const department of catalog.majorDepartments) {
-        const key = this.normalizeLabel(department.departmentName);
-        if (!merged.has(key)) merged.set(key, department);
+      try {
+        const catalog = await this.buildCatalog(tenantId, {
+          programVersionId: version.id,
+          semesterSequence,
+          shiftId,
+        });
+        for (const department of catalog.majorDepartments) {
+          const key = this.normalizeLabel(department.departmentName);
+          if (!merged.has(key)) merged.set(key, department);
+        }
+      } catch {
+        // Skip programmes without a complete Sem 1 curriculum for this shift.
       }
     }
     return [...merged.values()].sort((a, b) =>
@@ -372,6 +383,7 @@ export class Sem1ImportCurriculumService {
     semesterSequence: number,
     majorDepartments: Sem1MajorDepartmentOption[],
     academicYearId?: string,
+    shiftId?: string,
   ): Promise<Record<string, string[]>> {
     const minorByMajor: Record<string, string[]> = {};
     for (const major of majorDepartments) {
@@ -382,6 +394,7 @@ export class Sem1ImportCurriculumService {
           major.subjectSlug,
           semesterSequence,
           academicYearId,
+          shiftId,
         );
       const names = eligibleMinors
         .map((subject) => subject.department?.name ?? subject.name)
@@ -455,7 +468,7 @@ export class Sem1ImportCurriculumService {
     const prefix = code.split('-')[0]?.trim().toUpperCase();
     const map: Record<string, string> = {
       ECO: 'Economics',
-      EDU: 'Education',
+      EDN: 'Education',
       ENG: 'English',
       GAR: 'Garo',
       GEO: 'Geography',

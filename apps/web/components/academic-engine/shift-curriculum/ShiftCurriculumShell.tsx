@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { CurriculumManagerPanel } from '@/components/academic-engine/shift-curriculum/CurriculumManagerPanel';
+import { MajorMinorCombinationsPanel } from '@/components/academic-engine/shift-curriculum/MajorMinorCombinationsPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useShiftScope } from '@/hooks/use-shift-scope';
@@ -21,7 +22,7 @@ type Props = {
   mode?: 'full' | 'scope' | 'status';
 };
 
-type PanelTab = 'manager' | 'scope' | 'status';
+type PanelTab = 'manager' | 'scope' | 'status' | 'major-minor';
 
 export function ShiftCurriculumShell({ institutionId, mode = 'full' }: Props) {
   const shiftScope = useShiftScope();
@@ -110,6 +111,7 @@ export function ShiftCurriculumShell({ institutionId, mode = 'full' }: Props) {
             [
               ['manager', 'Curriculum Manager'],
               ['scope', 'Shift scope'],
+              ['major-minor', 'Major–Minor combinations'],
               ['status', 'Configuration status'],
             ] as const
           ).map(([id, label]) => (
@@ -128,6 +130,13 @@ export function ShiftCurriculumShell({ institutionId, mode = 'full' }: Props) {
 
       {panelTab === 'manager' && mode !== 'scope' && mode !== 'status' ? (
         <CurriculumManagerPanel institutionId={institutionId} initialShiftId={selectedShiftId} />
+      ) : null}
+
+      {panelTab === 'major-minor' && mode !== 'scope' && mode !== 'status' ? (
+        <MajorMinorCombinationsPanel
+          institutionId={institutionId}
+          initialShiftId={selectedShiftId}
+        />
       ) : null}
 
       {panelTab === 'scope' && mode !== 'status' ? (

@@ -1,82 +1,73 @@
 Course Code,Course Title,Delivery Type,Total Credits,Theory Credits,Practical Credits,Weekly Theory Hours,Weekly Practical Hours,Total Theory Contact Hours,Total Practical Contact Hours,Total Contact Hours,CBCS Catalog Type,Department Code,Description
 ECO-100,Microeconomics I,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-200,Macroeconomics I,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-201,Indian Economy,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-300,International Economics,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-301,Public Finance,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-302,Development Economics,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-303,Environmental Economics,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
-ECO-304,Economics Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,ECO,Arts FYUGP ODD semester catalog
-EDU-100,Foundations of Education,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-200,Educational Psychology,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-201,School Management,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-300,Educational Technology,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-301,Guidance and Counselling,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-302,Comparative Education,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-303,Education Extension,THEORY,4,4,0,4,0,60,0,60,CORE,EDU,Arts FYUGP ODD semester catalog
-EDU-304,Teaching Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,EDU,Arts FYUGP ODD semester catalog
-ENG-100,British Poetry and Drama,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-200,American Literature,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-201,Indian Writing in English,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-300,Literary Theory,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-301,Postcolonial Literature,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-302,World Literature,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-303,Functional English,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
-ENG-304,English Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,ENG,Arts FYUGP ODD semester catalog
-GAR-100,Garo Language and Literature I,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-200,Garo Prose and Poetry,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-201,Garo Folklore,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-300,Garo Drama,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-301,Garo Linguistics,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-302,Translation Studies,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-303,Garo Culture Studies,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
-GAR-304,Garo Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,GAR,Arts FYUGP ODD semester catalog
+ECO-200,Economics of Growth and Development,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
+ECO-201,Mathematical Methods for Economics I,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
+ECO-300,Statistical Methods for Economics,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
+ECO-301,Microeconomics II,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
+ECO-302,Indian Economy,THEORY,4,4,0,4,0,60,0,60,CORE,ECO,Arts FYUGP ODD semester catalog
+ECO-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,ECO,Arts FYUGP ODD semester catalog
+EDN-100,Introduction to Education,THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-200,Development of Education in India-I (Pre-Independence Period),THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-201,Development of Education in India-II (Post-Independence Period),THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-300,Educational Management,THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-301,Curriculum Development,THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-302,Education for Sustainable Development,THEORY,4,4,0,4,0,60,0,60,CORE,EDN,Arts FYUGP ODD semester catalog
+EDN-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,EDN,Arts FYUGP ODD semester catalog
+ENG-100,Introduction to English Literature,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-200,British Fiction (19th and 20th Century),THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-201,British Drama (16th Century to the Present),THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-300,Classical Indian Literature,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-301,Contemporary Literary Theory & Criticism-I,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-302,Indian Writings in English,THEORY,4,4,0,4,0,60,0,60,CORE,ENG,Arts FYUGP ODD semester catalog
+ENG-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,ENG,Arts FYUGP ODD semester catalog
+GAR-100,Introduction to Garo Prose and Poetry,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-200,History of Garo Language,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-201,History of Garo Literature,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-300,Prabandher Rupriti O Nirbachito Prabandhaboli,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-301,Kothasahityer Rupriti O Bangla Kotha Sahitya,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-302,Rabindra Sahitya,THEORY,4,4,0,4,0,60,0,60,CORE,GAR,Arts FYUGP ODD semester catalog
+GAR-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,GAR,Arts FYUGP ODD semester catalog
 GEO-100,Introduction to Human Geography,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-200,Physical Geography,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-201,Geographical Techniques,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-300,Regional Planning,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-301,Remote Sensing,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-302,Climate and Environment,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-303,Disaster Management,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
-GEO-304,Geography Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,GEO,Arts FYUGP ODD semester catalog
+GEO-200,Regional Geography of India,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
+GEO-201,Historical Development of Geography,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
+GEO-300,Thematic Cartography and Survey Techniques II,PRACTICAL,4,0,4,0,6,0,120,120,CORE,GEO,Arts FYUGP ODD semester catalog
+GEO-301,Population Geography,THEORY,4,4,0,4,0,60,0,60,CORE,GEO,Arts FYUGP ODD semester catalog
+GEO-302,Introduction to Remote Sensing and GIS,PRACTICAL,4,0,4,0,6,0,120,120,CORE,GEO,Arts FYUGP ODD semester catalog
+GEO-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,GEO,Arts FYUGP ODD semester catalog
 HIS-100,History of India (Ancient to 1200 CE),THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-200,Medieval India,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-201,Modern India,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-300,World History,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-301,Historiography,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-302,History of North East India,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-303,Archaeology Basics,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
-HIS-304,History Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,HIS,Arts FYUGP ODD semester catalog
-PHI-100,Introduction to Philosophy,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-200,Indian Philosophy,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-201,Western Philosophy,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-300,Ethics,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-301,Logic,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-302,Contemporary Philosophy,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-303,Applied Ethics,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
-PHI-304,Philosophy Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,PHI,Arts FYUGP ODD semester catalog
-POL-100,Introduction to Political Science,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-200,Indian Government and Politics,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-201,Western Political Thought,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-300,International Relations,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-301,Public Administration,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-302,Comparative Politics,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-303,Human Rights,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
-POL-304,Political Science Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,POL,Arts FYUGP ODD semester catalog
+HIS-200,History of Early Medieval India (650–1206 C.E.),THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
+HIS-201,History of World Civilizations,THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
+HIS-300,History of Modern India (1757-1857 C.E.),THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
+HIS-301,Contemporary North East India (1947-1987 C.E.),THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
+HIS-302,Modern World (1815 to 1945 C.E.),THEORY,4,4,0,4,0,60,0,60,CORE,HIS,Arts FYUGP ODD semester catalog
+HIS-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,HIS,Arts FYUGP ODD semester catalog
+PHI-100,Understanding Philosophy,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-200,Logic,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-201,Indian Philosophy-1,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-300,Epistemology and Metaphysics,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-301,Existentialism,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-302,Philosophy of Value,THEORY,4,4,0,4,0,60,0,60,CORE,PHI,Arts FYUGP ODD semester catalog
+PHI-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,PHI,Arts FYUGP ODD semester catalog
+POL-100,Political Theory,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-200,Introduction to International Relations,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-201,Public Administration,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-300,Socialist Political Thought,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-301,State and Democracy in India,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-302,Government and Politics in Northeast India,THEORY,4,4,0,4,0,60,0,60,CORE,POL,Arts FYUGP ODD semester catalog
+POL-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,POL,Arts FYUGP ODD semester catalog
 SOC-100,Introduction to Sociology,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-200,Indian Society,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-201,Social Research Methods,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-300,Sociological Theory,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-301,Gender Studies,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-302,Rural Sociology,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-303,Social Work Basics,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
-SOC-304,Sociology Internship,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,SOC,Arts FYUGP ODD semester catalog
-MDC-110,Understanding India,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
+SOC-200,Society in India,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
+SOC-201,Social Change,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
+SOC-300,Economic Sociology,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
+SOC-301,Political Sociology,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
+SOC-302,Sociology of Environment,THEORY,4,4,0,4,0,60,0,60,CORE,SOC,Arts FYUGP ODD semester catalog
+SOC-303,Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project,INTERNSHIP,4,0,0,0,0,0,0,120,SKILL,SOC,Arts FYUGP ODD semester catalog
+MDC-110,Commercial Arithmetic & Elementary Statistics,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-111,Culture and Society,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-112,Fundamentals of Computer Systems,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-113,Health and Wellness,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-114,Financial Literacy,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
-MDC-115,"Science, Technology and Society",THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
+MDC-115,Introduction to Life Sciences,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-116,Introduction to National Cadet Corps,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-117,Public Speaking,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-118,Mathematics in Daily Life,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
@@ -91,10 +82,10 @@ MDC-216,Indian Art and Aesthetics,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP O
 MDC-217,Human Rights and Duties,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-218,Digital Citizenship,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 MDC-219,Community Development,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
-AEC-120,Communicative English,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
+AEC-120,Alternative English,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 AEC-121,Alternative English,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 AEC-122,MIL-I: Garo,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
-AEC-123,MIL — Hindi,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
+AEC-123,MIL-I: Garo,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 AEC-124,MIL — Bengali,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 AEC-125,MIL — Assamese,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog
 AEC-126,MIL — Nepali,THEORY,3,3,0,3,0,45,0,45,CORE,ENG,Arts FYUGP ODD semester catalog

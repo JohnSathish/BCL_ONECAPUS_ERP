@@ -1,10 +1,15 @@
 import type { PrismaClient } from '@prisma/client';
-import { readCatalogSeedExclusions } from '../src/common/services/catalog-seed-exclusions.util';
+import {
+  readCatalogSeedExclusions,
+  reinstateCatalogSeedCourseCodes,
+} from '../src/common/services/catalog-seed-exclusions.util';
+import { normalizeNehuCourseCode } from '../src/modules/academic-engine/domain/course-code.util';
 import {
   buildArtsFyugpEvenCourses,
   buildArtsFyugpSem2MinorCourseDefs,
 } from '../src/modules/academic-engine/domain/arts-fyugp-even-catalog';
-import { buildDbcMorningSem3VtcCourses } from '../src/modules/academic-engine/domain/dbc-morning-sem3-catalog';
+import { buildDbcDaySem3VtcCourses } from '../src/modules/academic-engine/domain/dbc-day-sem3-electives-catalog';
+import { buildDbcDaySem6VtcCourses } from '../src/modules/academic-engine/domain/dbc-day-sem6-vtc-electives-catalog';
 import {
   ARTS_FYUGP_DEPARTMENTS,
   buildArtsFyugpOddCourses,
@@ -35,6 +40,229 @@ const PROMOTION_PAIRS = [
   { fromSequence: 7, toSequence: 8 },
 ] as const;
 
+const LEGACY_EDUCATION_COURSE_CODES: ReadonlyArray<readonly [string, string]> =
+  [
+    ['EDU-100', 'EDN-100'],
+    ['EDU-150', 'EDN-150'],
+    ['EDU-151', 'EDN-151'],
+    ['EDU-200', 'EDN-200'],
+    ['EDU-201', 'EDN-201'],
+    ['EDU-250', 'EDN-250'],
+    ['EDU-251', 'EDN-251'],
+    ['EDU-252', 'EDN-252'],
+    ['EDU-253', 'EDN-253'],
+    ['EDU-300', 'EDN-300'],
+    ['EDU-301', 'EDN-301'],
+    ['EDU-302', 'EDN-302'],
+    ['EDU-303', 'EDN-303'],
+    ['EDU-304', 'EDN-303'],
+  ];
+
+async function migrateLegacyEducationCatalog(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const eduDept = await prisma.department.findFirst({
+    where: { tenantId, code: 'EDU', deletedAt: null },
+  });
+  const ednDept = await prisma.department.findFirst({
+    where: { tenantId, code: 'EDN', deletedAt: null },
+  });
+  if (eduDept && !ednDept) {
+    await prisma.department.update({
+      where: { id: eduDept.id },
+      data: { code: 'EDN' },
+    });
+  }
+
+  for (const [legacyCode, targetCode] of LEGACY_EDUCATION_COURSE_CODES) {
+    const legacyCourse = await prisma.course.findFirst({
+      where: { tenantId, code: legacyCode },
+      orderBy: { createdAt: 'asc' },
+    });
+    const targetCourse = await prisma.course.findFirst({
+      where: { tenantId, code: targetCode },
+      orderBy: { deletedAt: 'asc' },
+    });
+    if (!legacyCourse) continue;
+    if (!targetCourse || targetCourse.deletedAt) {
+      if (targetCourse?.deletedAt && targetCourse.id !== legacyCourse.id) {
+        await prisma.course.update({
+          where: { id: targetCourse.id },
+          data: {
+            code: `${targetCode}__retired_${targetCourse.id.slice(0, 8)}`,
+          },
+        });
+      }
+      await prisma.course.update({
+        where: { id: legacyCourse.id },
+        data: { code: targetCode, deletedAt: null },
+      });
+      continue;
+    }
+    if (legacyCourse.id !== targetCourse.id) {
+      await prisma.course.update({
+        where: { id: legacyCourse.id },
+        data: { deletedAt: new Date() },
+      });
+    }
+  }
+}
+
+async function retireLegacyEnglishInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'ENG-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'ENG-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacyGaroInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'GAR-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'GAR-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacyGeographyInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'GEO-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'GEO-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacyHistoryInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'HIS-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'HIS-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacyPhilosophyInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'PHI-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'PHI-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacyPoliticalScienceInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'POL-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'POL-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
+async function retireLegacySociologyInternship(
+  prisma: PrismaClient,
+  tenantId: string,
+) {
+  const internship = await prisma.course.findFirst({
+    where: { tenantId, code: 'SOC-303', deletedAt: null },
+    select: { id: true, deliveryType: true },
+  });
+  if (!internship || internship.deliveryType !== 'INTERNSHIP') return;
+
+  const legacy = await prisma.course.findFirst({
+    where: { tenantId, code: 'SOC-304', deletedAt: null },
+    select: { id: true },
+  });
+  if (legacy) {
+    await prisma.course.update({
+      where: { id: legacy.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
+
 export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const {
     prisma,
@@ -50,12 +278,11 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     throw new Error('Day shift required for Arts FYUGP catalog seed');
   }
 
+  await migrateLegacyEducationCatalog(prisma, tenantId);
+
   const academicSettings = await prisma.tenantAcademicSettings.findUnique({
     where: { tenantId },
   });
-  const seedExclusions = readCatalogSeedExclusions(
-    academicSettings?.nepProfile as Record<string, unknown> | null,
-  );
 
   const departments = await prisma.department.findMany({
     where: { tenantId, deletedAt: null },
@@ -123,8 +350,28 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const courseByCode = new Map<string, string>();
   const oddCourses = buildArtsFyugpOddCourses();
   const evenCourses = buildArtsFyugpEvenCourses();
-  const sem3VtcCourses = buildDbcMorningSem3VtcCourses();
-  const allCourses = [...oddCourses, ...evenCourses, ...sem3VtcCourses];
+  const sem3VtcCourses = buildDbcDaySem3VtcCourses();
+  const sem6VtcCourses = buildDbcDaySem6VtcCourses();
+  const allCourses = [
+    ...oddCourses,
+    ...evenCourses,
+    ...sem3VtcCourses,
+    ...sem6VtcCourses,
+  ];
+
+  await reinstateCatalogSeedCourseCodes(
+    prisma,
+    tenantId,
+    allCourses.map((course) => course.code),
+  );
+  const seedExclusions = readCatalogSeedExclusions(
+    (
+      await prisma.tenantAcademicSettings.findUnique({
+        where: { tenantId },
+        select: { nepProfile: true },
+      })
+    )?.nepProfile as Record<string, unknown> | null,
+  );
 
   for (const courseDef of allCourses) {
     if (seedExclusions.excludedCourseCodes.has(courseDef.code)) {
@@ -140,6 +387,14 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     courseByCode.set(courseDef.code, courseId);
   }
 
+  await retireLegacyEnglishInternship(prisma, tenantId);
+  await retireLegacyGaroInternship(prisma, tenantId);
+  await retireLegacyGeographyInternship(prisma, tenantId);
+  await retireLegacyHistoryInternship(prisma, tenantId);
+  await retireLegacyPhilosophyInternship(prisma, tenantId);
+  await retireLegacyPoliticalScienceInternship(prisma, tenantId);
+  await retireLegacySociologyInternship(prisma, tenantId);
+
   const shiftIdsForSections = [dayShiftId, morningShiftId].filter(
     Boolean,
   ) as string[];
@@ -147,7 +402,7 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   for (const courseDef of oddCourses) {
     if (courseDef.sharedPool) continue;
     const programCode = courseDef.programCode;
-    if (!programCode) continue;
+    if (!programCode?.startsWith('BA-')) continue;
     const version = programVersions.get(programCode);
     if (!version) continue;
     await upsertDirectOffering(
@@ -162,6 +417,8 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   }
 
   for (const [programCode, version] of programVersions) {
+    if (!programCode.startsWith('BA-')) continue;
+
     const sem2Major = evenCourses.find(
       (c) => c.programCode === programCode && c.category === 'MAJOR',
     );
@@ -172,6 +429,25 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
         version.id,
         courseByCode.get(sem2Major.code)!,
         sem2Major,
+        semesterBySeq,
+        shiftIdsForSections,
+      );
+    }
+
+    for (const honoursDef of evenCourses.filter(
+      (c) =>
+        c.programCode === programCode &&
+        c.category === 'MAJOR' &&
+        (c.semesterSequence === 4 || c.semesterSequence === 6),
+    )) {
+      const courseId = courseByCode.get(honoursDef.code);
+      if (!courseId) continue;
+      await upsertDirectOffering(
+        prisma,
+        tenantId,
+        version.id,
+        courseId,
+        honoursDef,
         semesterBySeq,
         shiftIdsForSections,
       );
@@ -245,6 +521,7 @@ async function upsertArtsCourse(
   courseDef: ArtsFyugpCourseDef,
   departmentId?: string,
 ) {
+  const code = normalizeNehuCourseCode(courseDef.code);
   const deliveryType = courseDef.deliveryType ?? 'THEORY';
   const creditCalculationMode =
     courseDef.creditCalculationMode ?? 'AUTO_CALCULATED';
@@ -263,6 +540,7 @@ async function upsertArtsCourse(
     requiresTheorySplit: theoryCredits > 0,
     requiresPracticalSplit: practicalCredits > 0,
     hasPractical,
+    labRequired: hasPractical,
     theoryCredits,
     practicalCredits,
     theoryHoursPerWeek: courseDef.theoryHoursPerWeek ?? 0,
@@ -277,7 +555,7 @@ async function upsertArtsCourse(
   };
 
   const existing = await prisma.course.findFirst({
-    where: { tenantId, code: courseDef.code },
+    where: { tenantId, code },
   });
 
   let title = courseDef.title;
@@ -292,14 +570,14 @@ async function upsertArtsCourse(
       },
     });
     if (titleClash) {
-      title = `${courseDef.title} (${courseDef.code})`;
+      title = `${courseDef.title} (${code})`;
     }
   }
 
   if (existing) {
     const course = await prisma.course.update({
       where: { id: existing.id },
-      data: { ...data, title },
+      data: { ...data, title, code },
     });
     return course.id;
   }
@@ -307,7 +585,7 @@ async function upsertArtsCourse(
   const course = await prisma.course.create({
     data: {
       tenantId,
-      code: courseDef.code,
+      code,
       title,
       ...data,
       departmentId,

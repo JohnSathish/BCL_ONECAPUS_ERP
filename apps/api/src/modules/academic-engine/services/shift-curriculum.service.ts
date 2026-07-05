@@ -915,7 +915,7 @@ export class ShiftCurriculumService {
     const prefix = code.split('-')[0]?.trim().toUpperCase();
     const map: Record<string, string> = {
       ECO: 'Economics',
-      EDU: 'Education',
+      EDN: 'Education',
       ENG: 'English',
       GAR: 'Garo',
       GEO: 'Geography',

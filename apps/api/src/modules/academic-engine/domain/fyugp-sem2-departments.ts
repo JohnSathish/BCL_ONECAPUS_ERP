@@ -13,14 +13,14 @@ export type FyugpSem2Department = {
 
 export const SEM2_MAJOR_TITLES: Record<string, string> = {
   ECO: 'Macroeconomics I',
-  EDU: 'Foundation of Education',
+  EDN: 'Foundation to Education',
   ENG: 'British Poetry: Milton To the Present',
-  GAR: 'Garo Oral Narratives and Folklore',
+  GAR: 'Oral Narratives and Folklore',
   GEO: 'Introduction to Physical Geography',
   HIS: 'History of India: Maurya to Post Gupta Period',
   PHI: 'Ethics',
   POL: 'Indian Political System',
-  SOC: 'Principle of Sociology',
+  SOC: 'Principles of Sociology',
   BOT: 'Plant Diversity -II: Gymnosperm and Paleobotany, Angiosperm Morphology, Plant Anatomy',
   CHE: 'Introductory Chemistry II',
   MTH: 'Fundamental Mathematics-II',
@@ -38,7 +38,7 @@ const ARTS_PROGRAMS: Omit<FyugpSem2Department, 'sem2MajorTitle'>[] = [
     stream: 'ARTS',
   },
   {
-    code: 'EDU',
+    code: 'EDN',
     programCode: 'BA-EDU',
     programName: 'FYUP in Education',
     subjectSlug: 'education',

@@ -399,8 +399,44 @@ export class AcademicEngineController {
   listMajorMinorRules(
     @CurrentUser() user: JwtUser,
     @Query('institutionId') institutionId?: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('majorSubjectId') majorSubjectId?: string,
   ) {
-    return this.eligibility.listMajorMinorRules(user.tid, institutionId);
+    return this.eligibility.listMajorMinorRules(user.tid, {
+      institutionId,
+      shiftId,
+      majorSubjectId,
+    });
+  }
+
+  @Put('fyugp/major-minor-rules')
+  @RequirePermissions('academic-engine:manage')
+  syncMajorMinorRules(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      majorSubjectId: string;
+      allowedMinorSubjectIds: string[];
+      shiftId?: string | null;
+      academicYearId?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.eligibility.syncMajorMinorRules(user.tid, body);
+  }
+
+  @Patch('fyugp/major-minor-rules/:ruleId')
+  @RequirePermissions('academic-engine:manage')
+  setMajorMinorRuleActive(
+    @CurrentUser() user: JwtUser,
+    @Param('ruleId') ruleId: string,
+    @Body() body: { isActive: boolean },
+  ) {
+    return this.eligibility.setMajorMinorRuleActive(
+      user.tid,
+      ruleId,
+      body.isActive,
+    );
   }
 
   @Post('admissions/validate-subject-basket')

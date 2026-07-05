@@ -426,6 +426,7 @@ export async function downloadFullAdmissionImportTemplate(params?: {
   programme?: string;
   programVersionId?: string;
   academicYearId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/template', {
     params: { variant: 'full-admission', ...params },
@@ -458,6 +459,7 @@ export async function downloadSem1AdmissionTemplate(params?: {
   programVersionId?: string;
   semesterSequence?: number;
   academicYearId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/template', {
     params: { variant: 'sem1-admission', ...params },
@@ -508,6 +510,7 @@ export async function fetchSem1ImportCurriculum(params?: {
   programVersionId?: string;
   semesterSequence?: number;
   academicYearId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/sem1-curriculum', { params });
   return data as Sem1ImportCurriculum;
@@ -518,6 +521,7 @@ export async function fetchSem1EligibleMinors(params: {
   majorDepartment: string;
   academicYearId?: string;
   semesterSequence?: number;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/sem1-curriculum/eligible-minors', {
     params,
@@ -629,6 +633,7 @@ export async function downloadSem5AdmissionTemplate(params?: {
   programVersionId?: string;
   semesterSequence?: number;
   academicYearId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/template', {
     params: { variant: 'sem5-admission', ...params },
@@ -678,6 +683,7 @@ export async function fetchSem5ImportCurriculum(params?: {
   programVersionId?: string;
   semesterSequence?: number;
   academicYearId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/sem5-curriculum', { params });
   return data as Sem5ImportCurriculum;
@@ -688,6 +694,7 @@ export async function fetchSem5EligibleMinors(params: {
   majorDepartment: string;
   academicYearId?: string;
   semesterSequence?: number;
+  shiftId?: string;
 }) {
   const { data } = await api.get('/v1/students/import/sem5-curriculum/eligible-minors', {
     params,

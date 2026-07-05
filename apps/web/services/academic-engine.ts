@@ -552,11 +552,58 @@ export async function upsertShiftDepartments(
   return data as ShiftDepartmentRow[];
 }
 
-export async function fetchMajorMinorRules(institutionId?: string) {
+export async function fetchMajorMinorRules(params?: {
+  institutionId?: string;
+  shiftId?: string;
+  majorSubjectId?: string;
+}) {
   const { data } = await api.get('/v1/academic-engine/fyugp/major-minor-rules', {
-    params: institutionId ? { institutionId } : undefined,
+    params,
   });
-  return data;
+  return data as MajorMinorRuleRow[];
+}
+
+export type MajorMinorRuleRow = {
+  id: string;
+  majorSubjectId: string;
+  allowedMinorSubjectId: string;
+  shiftId: string | null;
+  academicYearId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  majorSubject: {
+    id: string;
+    name: string;
+    slug: string;
+    department?: { id: string; name: string; code: string } | null;
+  };
+  allowedMinorSubject: {
+    id: string;
+    name: string;
+    slug: string;
+    department?: { id: string; name: string; code: string } | null;
+  };
+  shift?: { id: string; code: string; name: string } | null;
+  academicYear?: { id: string; name: string } | null;
+};
+
+export async function syncMajorMinorRules(body: {
+  majorSubjectId: string;
+  allowedMinorSubjectIds: string[];
+  shiftId?: string | null;
+  academicYearId?: string | null;
+  isActive?: boolean;
+}) {
+  const { data } = await api.put('/v1/academic-engine/fyugp/major-minor-rules', body);
+  return data as MajorMinorRuleRow[];
+}
+
+export async function setMajorMinorRuleActive(ruleId: string, isActive: boolean) {
+  const { data } = await api.patch(`/v1/academic-engine/fyugp/major-minor-rules/${ruleId}`, {
+    isActive,
+  });
+  return data as MajorMinorRuleRow;
 }
 
 export async function fetchAcademicSubjects(institutionId?: string) {

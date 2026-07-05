@@ -10,70 +10,44 @@ import {
   FYUGP_SEM2_PROGRAM_DEPARTMENTS,
   SEM2_MAJOR_TITLES,
 } from './fyugp-sem2-departments';
+import { SCIENCE_NEHU_ALIGNED_DEPT_CODES } from './science-fyugp-odd-catalog';
+import { COMMERCE_NEHU_ALIGNED_DEPT_CODES } from './commerce-fyugp-odd-catalog';
+import { ECONOMICS_NEHU_PAPERS } from './economics-fyugp-nehu';
+import { EDUCATION_NEHU_PAPERS } from './education-fyugp-nehu';
+import { ENGLISH_NEHU_PAPERS } from './english-fyugp-nehu';
+import { GARO_NEHU_PAPERS } from './garo-fyugp-nehu';
+import { buildGeographyHonoursEvenSemCourses } from './geography-fyugp-nehu.util';
+import { HISTORY_NEHU_PAPERS } from './history-fyugp-nehu';
+import { PHILOSOPHY_NEHU_PAPERS } from './philosophy-fyugp-nehu';
+import { POLITICAL_SCIENCE_NEHU_PAPERS } from './political-science-fyugp-nehu';
+import { SOCIOLOGY_NEHU_PAPERS } from './sociology-fyugp-nehu';
+import { buildNehuHonoursEvenSemCourses } from './fyugp-nehu-honours.util';
+import {
+  DAY_SEM2_AEC_CODES,
+  DAY_SEM2_AEC_TITLES,
+  DAY_SEM2_MDC_CODES,
+  DAY_SEM2_MDC_TITLES,
+  DAY_SEM2_SEC_CODES,
+  DAY_SEM2_SEC_TITLES,
+  DAY_SEM2_VAC_CODES,
+  DAY_SEM2_VAC_TITLES,
+} from './dbc-day-sem2-electives-catalog';
 
 export type { ArtsFyugpCourseDef };
 
-export const MORNING_SEM2_MDC_CODES = [
-  'MDC-162',
-  'MDC-163',
-  'MDC-165',
-  'MDC-168',
-  'MDC-169',
-] as const;
+export {
+  MORNING_SEM2_AEC_CODES,
+  MORNING_SEM2_MDC_CODES,
+  MORNING_SEM2_SEC_CODES,
+  MORNING_SEM2_VAC_CODES,
+} from './dbc-morning-sem2-electives-catalog';
 
-export const MORNING_SEM2_AEC_CODES = ['AEC-170', 'AEC-173'] as const;
-export const MORNING_SEM2_SEC_CODES = ['SEC-180', 'SEC-181'] as const;
-export const MORNING_SEM2_VAC_CODES = ['VAC-191', 'VAC-192'] as const;
-
-/** Day Shift Sem 2 elective pools (DBC official list). */
-export const DAY_SEM2_MDC_CODES = [
-  'MDC-161',
-  'MDC-162',
-  'MDC-163',
-  'MDC-164',
-  'MDC-165',
-  'MDC-167',
-  'MDC-168',
-  'MDC-169',
-] as const;
-
-export const DAY_SEM2_AEC_CODES = ['AEC-170', 'AEC-173'] as const;
-export const DAY_SEM2_SEC_CODES = [
-  'SEC-180',
-  'SEC-181',
-  'SEC-182',
-  'SEC-183',
-] as const;
-export const DAY_SEM2_VAC_CODES = ['VAC-190', 'VAC-191', 'VAC-192'] as const;
-
-const MDC_SEM2_TITLES: Record<number, string> = {
-  161: 'Entrepreneurship',
-  162: 'Environmental Ethics',
-  163: 'Fundamentals of Statistics',
-  164: 'Health & Hygiene Environmental Education and Disaster Management',
-  165: 'Introduction to Educational Psychology',
-  167: 'Physical Education and Sports Science',
-  168: 'Physical Geology & Geodynamics',
-  169: 'Understanding Human Rights',
-};
-
-const AEC_SEM2_TITLES: Record<number, string> = {
-  170: 'Communicative English',
-  173: 'MIL-II: Communicative Garo',
-};
-
-const SEC_SEM2_TITLES: Record<number, string> = {
-  180: 'Communication Skills',
-  181: 'Confidence Building',
-  182: 'E-Commerce',
-  183: 'Python Programming',
-};
-
-const VAC_SEM2_TITLES: Record<number, string> = {
-  190: 'Health and Wellness',
-  191: 'Life Skills Education',
-  192: 'Understanding India',
-};
+export {
+  DAY_SEM2_AEC_CODES,
+  DAY_SEM2_MDC_CODES,
+  DAY_SEM2_SEC_CODES,
+  DAY_SEM2_VAC_CODES,
+} from './dbc-day-sem2-electives-catalog';
 
 function theoryCourse(
   partial: Omit<
@@ -118,10 +92,73 @@ function poolCourses(
   );
 }
 
+export function buildEconomicsHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const economics = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'ECO');
+  if (!economics) return [];
+  return buildNehuHonoursEvenSemCourses(economics, ECONOMICS_NEHU_PAPERS);
+}
+
+export function buildEducationHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const education = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'EDN');
+  if (!education) return [];
+  return buildNehuHonoursEvenSemCourses(education, EDUCATION_NEHU_PAPERS);
+}
+
+export function buildEnglishHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const english = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'ENG');
+  if (!english) return [];
+  return buildNehuHonoursEvenSemCourses(english, ENGLISH_NEHU_PAPERS);
+}
+
+export function buildGaroHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const garo = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'GAR');
+  if (!garo) return [];
+  return buildNehuHonoursEvenSemCourses(garo, GARO_NEHU_PAPERS);
+}
+
+export function buildHistoryHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const history = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'HIS');
+  if (!history) return [];
+  return buildNehuHonoursEvenSemCourses(history, HISTORY_NEHU_PAPERS);
+}
+
+export function buildPhilosophyHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const philosophy = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'PHI');
+  if (!philosophy) return [];
+  return buildNehuHonoursEvenSemCourses(philosophy, PHILOSOPHY_NEHU_PAPERS);
+}
+
+export function buildPoliticalScienceHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const politicalScience = ARTS_FYUGP_DEPARTMENTS.find(
+    (dept) => dept.code === 'POL',
+  );
+  if (!politicalScience) return [];
+  return buildNehuHonoursEvenSemCourses(
+    politicalScience,
+    POLITICAL_SCIENCE_NEHU_PAPERS,
+  );
+}
+
+export function buildSociologyHonoursEvenSemCourses(): ArtsFyugpCourseDef[] {
+  const sociology = ARTS_FYUGP_DEPARTMENTS.find((dept) => dept.code === 'SOC');
+  if (!sociology) return [];
+  return buildNehuHonoursEvenSemCourses(sociology, SOCIOLOGY_NEHU_PAPERS);
+}
+
 export function buildArtsFyugpEvenCourses(): ArtsFyugpCourseDef[] {
   const courses: ArtsFyugpCourseDef[] = [];
 
   for (const dept of FYUGP_SEM2_PROGRAM_DEPARTMENTS) {
+    if (
+      SCIENCE_NEHU_ALIGNED_DEPT_CODES.includes(
+        dept.code as (typeof SCIENCE_NEHU_ALIGNED_DEPT_CODES)[number],
+      ) ||
+      COMMERCE_NEHU_ALIGNED_DEPT_CODES.includes(
+        dept.code as (typeof COMMERCE_NEHU_ALIGNED_DEPT_CODES)[number],
+      )
+    ) {
+      continue;
+    }
     courses.push(
       theoryCourse({
         code: `${dept.code}-150`,
@@ -146,10 +183,27 @@ export function buildArtsFyugpEvenCourses(): ArtsFyugpCourseDef[] {
   }
 
   courses.push(
-    ...poolCourses('MDC', 2, 'MDC', 3, MDC_SEM2_TITLES, 'ENG', 'mdc'),
-    ...poolCourses('AEC', 2, 'AEC', 3, AEC_SEM2_TITLES, 'ENG', 'english'),
-    ...poolCourses('SEC', 2, 'SEC', 3, SEC_SEM2_TITLES, 'ENG', 'sec'),
-    ...poolCourses('VAC', 2, 'VAC', 3, VAC_SEM2_TITLES, 'ENG', 'environment'),
+    ...poolCourses('MDC', 2, 'MDC', 3, DAY_SEM2_MDC_TITLES, 'ENG', 'mdc'),
+    ...poolCourses('AEC', 2, 'AEC', 3, DAY_SEM2_AEC_TITLES, 'ENG', 'english'),
+    ...poolCourses('SEC', 2, 'SEC', 3, DAY_SEM2_SEC_TITLES, 'ENG', 'sec'),
+    ...poolCourses(
+      'VAC',
+      2,
+      'VAC',
+      3,
+      DAY_SEM2_VAC_TITLES,
+      'ENG',
+      'environment',
+    ),
+    ...buildEconomicsHonoursEvenSemCourses(),
+    ...buildEducationHonoursEvenSemCourses(),
+    ...buildEnglishHonoursEvenSemCourses(),
+    ...buildGaroHonoursEvenSemCourses(),
+    ...buildGeographyHonoursEvenSemCourses(),
+    ...buildHistoryHonoursEvenSemCourses(),
+    ...buildPhilosophyHonoursEvenSemCourses(),
+    ...buildPoliticalScienceHonoursEvenSemCourses(),
+    ...buildSociologyHonoursEvenSemCourses(),
   );
 
   return courses;

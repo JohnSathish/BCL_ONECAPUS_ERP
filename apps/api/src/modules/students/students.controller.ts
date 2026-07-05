@@ -239,6 +239,7 @@ export class StudentsController {
             programme,
             programVersionId,
             academicYearId,
+            shiftId,
           })
         : variant === 'sem1-admission'
           ? await this.studentImport.buildSem1AdmissionTemplate({
@@ -247,6 +248,7 @@ export class StudentsController {
               programVersionId,
               semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
               academicYearId,
+              shiftId,
             })
           : variant === 'sem2-admission'
             ? await this.studentImport.buildSem2AdmissionTemplate({
@@ -275,6 +277,7 @@ export class StudentsController {
                       ? Number(semesterSequence)
                       : 5,
                     academicYearId,
+                    shiftId,
                   })
                 : await this.studentImport.buildTemplate({
                     mode,
@@ -360,12 +363,14 @@ export class StudentsController {
     @Query('majorDepartment') majorDepartment: string,
     @Query('academicYearId') academicYearId?: string,
     @Query('semesterSequence') semesterSequence?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.studentImport.getSem1EligibleMinors(user.tid, {
       programVersionId,
       majorDepartment,
       academicYearId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+      shiftId,
     });
   }
 
@@ -377,12 +382,14 @@ export class StudentsController {
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.studentImport.getSem1ImportCurriculum(user.tid, {
       programme,
       programVersionId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
       academicYearId,
+      shiftId,
     });
   }
 
@@ -423,12 +430,14 @@ export class StudentsController {
     @Query('majorDepartment') majorDepartment: string,
     @Query('academicYearId') academicYearId?: string,
     @Query('semesterSequence') semesterSequence?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.studentImport.getSem5EligibleMinors(user.tid, {
       programVersionId,
       majorDepartment,
       academicYearId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
+      shiftId,
     });
   }
 
@@ -440,12 +449,14 @@ export class StudentsController {
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
   ) {
     return this.studentImport.getSem5ImportCurriculum(user.tid, {
       programme,
       programVersionId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
       academicYearId,
+      shiftId,
     });
   }
 

@@ -31,6 +31,37 @@ export function readCatalogSeedExclusions(
   };
 }
 
+export async function reinstateCatalogSeedCourseCodes(
+  prisma: PrismaClient,
+  tenantId: string,
+  courseCodes: string[],
+) {
+  const existing = await prisma.tenantAcademicSettings.findUnique({
+    where: { tenantId },
+  });
+  const profile =
+    (existing?.nepProfile as Record<string, unknown> | null) ?? {};
+  const current = readCatalogSeedExclusions(profile);
+  let changed = false;
+  for (const code of courseCodes) {
+    if (current.excludedCourseCodes.delete(code)) changed = true;
+  }
+  if (!changed) return;
+
+  const nepProfile = {
+    ...profile,
+    excludedCourseCodes: [...current.excludedCourseCodes],
+    excludedCurriculumKeys: [...current.excludedCurriculumKeys],
+    catalogCustomizedCourseCodes: [...current.catalogCustomizedCourseCodes],
+  };
+
+  await prisma.tenantAcademicSettings.upsert({
+    where: { tenantId },
+    create: { tenantId, nepProfile },
+    update: { nepProfile },
+  });
+}
+
 export async function mergeCatalogSeedExclusions(
   prisma: PrismaClient,
   tenantId: string,

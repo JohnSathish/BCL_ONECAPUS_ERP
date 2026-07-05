@@ -113,10 +113,10 @@ export class CurriculumResolutionService {
     }
 
     const rows = await this.prisma.programmePoolAssignment.findMany({
-      where: { ...baseWhere, shiftId: null },
+      where: baseWhere,
       select: { poolId: true },
     });
-    return rows.map((row) => row.poolId);
+    return [...new Set(rows.map((row) => row.poolId))];
   }
 
   async getExcludedCourseIdsByPool(

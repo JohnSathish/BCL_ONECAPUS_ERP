@@ -21,6 +21,7 @@ import { isAcademicDepartment } from '../../organization/department-rules';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
 import { StudentMajorMinorTrackService } from '../../academic-engine/services/student-major-minor-track.service';
 import { slugifySubject } from '../../academic-engine/domain/nep-categories';
+import { normalizeNehuCourseCode } from '../../academic-engine/domain/course-code.util';
 import type { StudentImportMode } from '../dto/students.dto';
 import { StudentSemesterResolverService } from '../services/student-semester-resolver.service';
 import { StudentAbcService } from '../services/student-abc.service';
@@ -256,6 +257,7 @@ type OfferingCandidate = {
       programVersionId: string;
       semesterNo: number;
       active: boolean;
+      shiftId: string | null;
     }[];
   } | null;
   sections: {
@@ -556,6 +558,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
                   programVersionId: true,
                   semesterNo: true,
                   active: true,
+                  shiftId: true,
                 },
               },
             },
@@ -708,11 +711,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const fileUniversityRegs = new Set<string>();
     const fileAbcs = new Set<string>();
     const fileMobiles = new Set<string>();
+    const activeShiftIds = [...new Set(shifts.map((shift) => shift.id))];
     const sem1Catalogs = await this.preloadSem1Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
+      activeShiftIds,
     );
-    const activeShiftIds = [...new Set(shifts.map((shift) => shift.id))];
     const sem2Catalogs = await this.preloadSem2Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
@@ -726,6 +730,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const sem5Catalogs = await this.preloadSem5Catalogs(
       tenantId,
       programVersions.map((version) => version.id),
+      activeShiftIds,
     );
     return rows.map((row) =>
       this.validateRow(row, {
@@ -1666,11 +1671,19 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       );
       return mapping;
     }
+    if (!ctx.shiftId) {
+      ctx.errors.push(
+        'Shift is required to resolve Semester 1 paper selections.',
+      );
+      return mapping;
+    }
 
-    const catalog = ctx.sem1Catalogs?.get(ctx.programVersionId);
+    const catalog = ctx.sem1Catalogs?.get(
+      this.shiftCatalogKey(ctx.programVersionId, ctx.shiftId),
+    );
     if (!catalog) {
       ctx.errors.push(
-        'Semester 1 curriculum is not configured for the selected programme.',
+        'Semester 1 curriculum is not configured for the selected programme and shift.',
       );
       return mapping;
     }
@@ -1914,7 +1927,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const catalog = ctx.sem2Catalogs?.get(
-      `${ctx.programVersionId}:${ctx.shiftId}`,
+      this.shiftCatalogKey(ctx.programVersionId, ctx.shiftId),
     );
     if (!catalog) {
       ctx.errors.push(
@@ -2158,11 +2171,19 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       );
       return mapping;
     }
+    if (!ctx.shiftId) {
+      ctx.errors.push(
+        'Shift is required to resolve Semester 5 paper selections.',
+      );
+      return mapping;
+    }
 
-    const catalog = ctx.sem5Catalogs?.get(ctx.programVersionId);
+    const catalog = ctx.sem5Catalogs?.get(
+      this.sem5CatalogKey(ctx.programVersionId, ctx.shiftId),
+    );
     if (!catalog) {
       ctx.errors.push(
-        'Semester 5 curriculum is not configured for the selected programme.',
+        'Semester 5 curriculum is not configured for the selected programme and shift.',
       );
       return mapping;
     }
@@ -2224,7 +2245,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           );
           if (!allowedMinor) {
             ctx.errors.push(
-              `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
+              this.sem5Curriculum.formatInvalidMinorMessage(
+                department.departmentName,
+                minorDepartment,
+                catalog,
+              ),
             );
           } else {
             const minorOption =
@@ -2251,7 +2276,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
         if (!internshipArea) {
           ctx.errors.push(
-            'Internship course is required for Semester 5 import. Choose the registered course from the template dropdown (e.g. ECO-304 — Economics Internship).',
+            'Internship course is required for Semester 5 import. Choose the registered course from the template dropdown (e.g. ECO-303 — Internship).',
           );
         } else {
           const internshipPaper = this.sem5Curriculum.resolveInternshipPaper(
@@ -2405,7 +2430,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const catalog = ctx.sem3Catalogs?.get(
-      `${ctx.programVersionId}:${ctx.shiftId}`,
+      this.shiftCatalogKey(ctx.programVersionId, ctx.shiftId),
     );
     if (!catalog) {
       ctx.errors.push(
@@ -2593,18 +2618,18 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
     const preferredSection =
       ctx.sectionPreferences?.[category] ?? ctx.defaultSectionCode;
-    const section = preferredSection
-      ? (offering.sections.find(
-          (entry) =>
-            entry.shiftId === ctx.shiftId &&
-            entry.sectionCode.toUpperCase() === preferredSection.toUpperCase(),
-        ) ??
-        offering.sections.find(
-          (entry) =>
-            entry.sectionCode.toUpperCase() === preferredSection.toUpperCase(),
-        ))
-      : (offering.sections.find((entry) => entry.shiftId === ctx.shiftId) ??
-        offering.sections[0]);
+    const sectionResult = this.resolveOfferingSection(
+      offering.sections,
+      ctx.shiftId,
+      preferredSection,
+    );
+    if (sectionResult.error) {
+      ctx.errors.push(
+        `${category} paper "${paper.title}" (${paper.code}): ${sectionResult.error}`,
+      );
+      return undefined;
+    }
+    const section = sectionResult.section;
     const subjectSlug =
       offering.course.subjectSlug ??
       this.subjectSlugForOffering(offering, ctx.fyugp.subjectMasters, category);
@@ -2639,43 +2664,67 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   private async preloadSem1Catalogs(
     tenantId: string,
     programVersionIds: string[],
+    shiftIds: string[],
   ): Promise<Map<string, Sem1ImportCurriculumCatalog>> {
     const catalogs = new Map<string, Sem1ImportCurriculumCatalog>();
     const uniqueIds = [...new Set(programVersionIds)];
+    const uniqueShifts = [...new Set(shiftIds)];
     await Promise.all(
-      uniqueIds.map(async (programVersionId) => {
-        try {
-          const catalog = await this.sem1Curriculum.buildCatalog(tenantId, {
-            programVersionId,
-            semesterSequence: 1,
-          });
-          catalogs.set(programVersionId, catalog);
-        } catch {
-          // Programme may not have Sem 1 curriculum yet — validation will surface per row.
-        }
-      }),
+      uniqueIds.flatMap((programVersionId) =>
+        uniqueShifts.map(async (shiftId) => {
+          try {
+            const catalog = await this.sem1Curriculum.buildCatalog(tenantId, {
+              programVersionId,
+              semesterSequence: 1,
+              shiftId,
+            });
+            catalogs.set(
+              this.shiftCatalogKey(programVersionId, shiftId),
+              catalog,
+            );
+          } catch {
+            // Programme/shift may not have Sem 1 curriculum yet — validation will surface per row.
+          }
+        }),
+      ),
     );
     return catalogs;
+  }
+
+  private shiftCatalogKey(programVersionId: string, shiftId: string) {
+    return `${programVersionId}:${shiftId}`;
+  }
+
+  private sem5CatalogKey(programVersionId: string, shiftId: string) {
+    return this.shiftCatalogKey(programVersionId, shiftId);
   }
 
   private async preloadSem5Catalogs(
     tenantId: string,
     programVersionIds: string[],
+    shiftIds: string[],
   ): Promise<Map<string, Sem5ImportCurriculumCatalog>> {
     const catalogs = new Map<string, Sem5ImportCurriculumCatalog>();
     const uniqueIds = [...new Set(programVersionIds)];
+    const uniqueShifts = [...new Set(shiftIds)];
     await Promise.all(
-      uniqueIds.map(async (programVersionId) => {
-        try {
-          const catalog = await this.sem5Curriculum.buildCatalog(tenantId, {
-            programVersionId,
-            semesterSequence: 5,
-          });
-          catalogs.set(programVersionId, catalog);
-        } catch {
-          // Programme may not have Sem 5 curriculum yet — validation will surface per row.
-        }
-      }),
+      uniqueIds.flatMap((programVersionId) =>
+        uniqueShifts.map(async (shiftId) => {
+          try {
+            const catalog = await this.sem5Curriculum.buildCatalog(tenantId, {
+              programVersionId,
+              semesterSequence: 5,
+              shiftId,
+            });
+            catalogs.set(
+              this.sem5CatalogKey(programVersionId, shiftId),
+              catalog,
+            );
+          } catch {
+            // Programme/shift may not have Sem 5 curriculum yet — validation will surface per row.
+          }
+        }),
+      ),
     );
     return catalogs;
   }
@@ -2696,7 +2745,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
               programVersionId,
               shiftId,
             });
-            catalogs.set(`${programVersionId}:${shiftId}`, catalog);
+            catalogs.set(
+              this.shiftCatalogKey(programVersionId, shiftId),
+              catalog,
+            );
           } catch {
             // Programme/shift may not have Sem 2 curriculum yet.
           }
@@ -2723,7 +2775,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
               semesterSequence: 3,
               shiftId,
             });
-            catalogs.set(`${programVersionId}:${shiftId}`, catalog);
+            catalogs.set(
+              this.shiftCatalogKey(programVersionId, shiftId),
+              catalog,
+            );
           } catch {
             // Programme/shift may not have Sem 3 curriculum yet.
           }
@@ -2830,6 +2885,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             category,
             ctx.programVersionId,
             ctx.semesterSequence,
+            ctx.shiftId,
           ),
       );
     if (
@@ -2853,6 +2909,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         category,
         ctx.programVersionId,
         ctx.semesterSequence,
+        ctx.shiftId,
       ),
     );
     if (offeringMatches.length && !scoped.length) {
@@ -2893,6 +2950,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const picked = this.pickBestOffering(scoped, ctx.shiftId);
+    if (!picked) {
+      ctx.errors.push(
+        `${category} Subject "${input}" is not offered for the selected shift.`,
+      );
+      return undefined;
+    }
     const preferredSection =
       ctx.sectionPreferences?.[category] ?? ctx.defaultSectionCode;
     const sectionResult = this.resolveOfferingSection(
@@ -3030,6 +3093,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     const picked = this.pickBestOffering(scoped, ctx.shiftId);
+    if (!picked) {
+      ctx.errors.push(
+        `${category} Subject "${input}" is not offered for the selected shift.`,
+      );
+      return undefined;
+    }
     const preferredSection =
       ctx.sectionPreferences?.[category] ?? ctx.defaultSectionCode;
     const sectionResult = this.resolveOfferingSection(
@@ -3269,6 +3338,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     category: FyugpCategory,
     programVersionId?: string,
     semesterSequence?: number,
+    shiftId?: string,
   ) {
     if (
       category === 'MINOR' &&
@@ -3292,6 +3362,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       category,
       programVersionId,
       semesterSequence,
+      shiftId,
     );
   }
 
@@ -3300,6 +3371,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     category: FyugpCategory,
     programVersionId?: string,
     semesterSequence?: number,
+    shiftId?: string,
   ) {
     if (
       semesterSequence &&
@@ -3327,7 +3399,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       offering.categoryPool?.assignments.some(
         (assignment) =>
           assignment.programVersionId === programVersionId &&
-          (!semesterSequence || assignment.semesterNo === semesterSequence),
+          (!semesterSequence || assignment.semesterNo === semesterSequence) &&
+          (!shiftId ||
+            assignment.shiftId == null ||
+            assignment.shiftId === shiftId),
       ),
     );
   }
@@ -3360,15 +3435,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   }
 
   private pickBestOffering(offerings: OfferingCandidate[], shiftId?: string) {
-    return [...offerings].sort((a, b) => {
-      const aShift = a.sections.some((section) => section.shiftId === shiftId)
-        ? 0
-        : 1;
-      const bShift = b.sections.some((section) => section.shiftId === shiftId)
-        ? 0
-        : 1;
-      return aShift - bShift;
-    })[0];
+    if (shiftId) {
+      const shiftMatched = offerings.filter((offering) =>
+        offering.sections.some((section) => section.shiftId === shiftId),
+      );
+      return shiftMatched[0];
+    }
+    return offerings[0];
   }
 
   private resolveOfferingSection(
@@ -3383,6 +3456,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const scoped = shiftId
       ? sections.filter((section) => section.shiftId === shiftId)
       : sections;
+    if (shiftId && !scoped.length) {
+      return { error: 'This paper is not offered for the selected shift.' };
+    }
     const pool = scoped.length ? scoped : sections;
     if (!pool.length) {
       return preferredSectionCode
@@ -4353,6 +4429,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     programme?: string;
     programVersionId?: string;
     academicYearId?: string;
+    shiftId?: string;
   }): Promise<Buffer> {
     let programme = options.programme;
     let programVersionId = options.programVersionId;
@@ -4391,17 +4468,20 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         programVersionId,
         semesterSequence: 1,
         academicYearId: options.academicYearId,
+        shiftId: options.shiftId,
       }),
       this.sem3Curriculum.buildCatalog(options.tenantId, {
         programme,
         programVersionId,
         semesterSequence: 3,
+        shiftId: options.shiftId,
       }),
       this.sem5Curriculum.buildCatalog(options.tenantId, {
         programme,
         programVersionId,
         semesterSequence: 5,
         academicYearId: options.academicYearId,
+        shiftId: options.shiftId,
       }),
       this.sem1Curriculum.buildTenantMajorDepartments(options.tenantId, 1),
       this.sem3Curriculum.buildTenantMajorDepartments(options.tenantId, 3),
@@ -4586,11 +4666,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         Object.values(sem1Catalog.minorByMajor).flatMap((minors) => minors),
       ),
     ].sort((a, b) => a.localeCompare(b));
-    const allSem5Minors = [
-      ...new Set(
-        Object.values(sem5Catalog.minorByMajor).flatMap((minors) => minors),
-      ),
-    ].sort((a, b) => a.localeCompare(b));
+    const sem5MinorsByMajorRows = sem5Catalog.majorDepartments.map((major) => {
+      const minors =
+        sem5Catalog.minorByMajor[
+          this.sem5Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
 
     const hiddenSheets: {
       name: string;
@@ -4734,18 +4816,25 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         rows: sem5MajorDepartments.map((d) => [d.departmentName]),
       },
       {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
+        headers: [
+          'Major Department (Sem 5)',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: sem5MinorsByMajorRows,
+        hidden: true,
+      },
+      {
         name: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
         headers: ['Internship Subject'],
         // Tenant-wide list (all programmes), not a single programme catalog.
         rows: this.sem5Curriculum
           .listInternshipCourseLabels(sem5MajorDepartments)
           .map((label) => [label]),
-      },
-      {
-        name: FULL_ADMISSION_HIDDEN_SHEETS.sem5AllMinors,
-        headers: ['Minor Department (Sem 5)'],
-        rows: allSem5Minors.map((minor) => [minor]),
-        hidden: true,
       },
     ];
 
@@ -4758,6 +4847,28 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         col.width = 32;
       });
       if (ref.hidden) refSheet.state = 'veryHidden';
+    }
+
+    const sem5MinorsSheet = workbook.getWorksheet(
+      FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
+    );
+    if (sem5MinorsSheet) {
+      sem5Catalog.majorDepartments.forEach((major, index) => {
+        const rowNumber = index + 2;
+        const minors =
+          sem5Catalog.minorByMajor[
+            this.sem5Curriculum.normalizeLabel(major.departmentName)
+          ] ?? [];
+        if (!minors.length) return;
+        const endCol = excelColumnLetter(1 + minors.length);
+        const rangeName = this.excelSem5MajorMinorsRangeName(
+          major.departmentName,
+        );
+        workbook.definedNames.add(
+          rangeName,
+          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
+        );
+      });
     }
 
     const curriculumInfo = workbook.addWorksheet('Curriculum Info');
@@ -4801,7 +4912,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 36;
     });
 
-    this.applyFullAdmissionDropdowns(sheet, headers, hiddenSheets);
+    this.applyFullAdmissionDropdowns(sheet, headers, hiddenSheets, sem5Catalog);
 
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
@@ -4811,6 +4922,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     sheet: ExcelJS.Worksheet,
     headers: string[],
     references: { name: string; rows: (string | number | null)[][] }[],
+    sem5Catalog: Sem5ImportCurriculumCatalog,
   ) {
     const refByName = new Map(references.map((ref) => [ref.name, ref]));
     const requiredHeaders = new Set(['Programme', 'Semester']);
@@ -4901,10 +5013,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5MajorDepartments,
         column: 'A',
       },
-      'Minor Department (Sem 5)': {
-        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5AllMinors,
-        column: 'A',
-      },
       'Internship Subject': {
         refName: FULL_ADMISSION_HIDDEN_SHEETS.sem5Internship,
         column: 'A',
@@ -4926,6 +5034,31 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         { allowBlank: !requiredHeaders.has(header) },
       );
     }
+
+    const sem5MajorColIndex = headers.indexOf('Major Department (Sem 5)') + 1;
+    const sem5MinorColIndex = headers.indexOf('Minor Department (Sem 5)') + 1;
+    const sem5MajorColLetter = sem5MajorColIndex
+      ? excelColumnLetter(sem5MajorColIndex)
+      : null;
+    if (
+      sem5MinorColIndex &&
+      sem5MajorColLetter &&
+      sem5Catalog.majorDepartments.length
+    ) {
+      for (let row = 3; row <= 1000; row += 1) {
+        sheet.getCell(row, sem5MinorColIndex).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            `=INDIRECT("Sem5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected Semester 5 major department.',
+        };
+      }
+    }
   }
 
   async buildSem1AdmissionTemplateWorkbook(options: {
@@ -4934,6 +5067,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     programVersionId?: string;
     semesterSequence?: number;
     academicYearId?: string;
+    shiftId?: string;
   }): Promise<Buffer> {
     const semesterSequence = options.semesterSequence ?? 1;
     let programme = options.programme;
@@ -4958,11 +5092,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       programVersionId,
       semesterSequence,
       academicYearId: options.academicYearId,
+      shiftId: options.shiftId,
     });
     const majorDepartments =
       await this.sem1Curriculum.buildTenantMajorDepartments(
         options.tenantId,
         semesterSequence,
+        options.shiftId,
       );
     const programmes = await this.sem1Curriculum.listPublishedProgrammes(
       options.tenantId,
@@ -5684,6 +5820,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     programVersionId?: string;
     semesterSequence?: number;
     academicYearId?: string;
+    shiftId?: string;
   }): Promise<Buffer> {
     const semesterSequence = options.semesterSequence ?? 5;
     let programme = options.programme;
@@ -5708,11 +5845,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       programVersionId,
       semesterSequence,
       academicYearId: options.academicYearId,
+      shiftId: options.shiftId,
     });
     const majorDepartments =
       await this.sem5Curriculum.buildTenantMajorDepartments(
         options.tenantId,
         semesterSequence,
+        options.shiftId,
       );
     const programmes = await this.sem5Curriculum.listPublishedProgrammes(
       options.tenantId,
@@ -5910,6 +6049,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       .replace(/[^a-zA-Z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
     return `${sanitized || 'Major'}_Minors`;
+  }
+
+  private excelSem5MajorMinorsRangeName(majorDepartment: string) {
+    const sanitized = majorDepartment
+      .trim()
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return `Sem5_${sanitized || 'Major'}_Minors`;
   }
 
   private applySem5Dropdowns(
@@ -6258,7 +6405,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   }
 
   private templateCourseCode(code: string) {
-    return code.replace(/[\u2010-\u2015]/g, '-').trim();
+    return normalizeNehuCourseCode(code);
   }
 
   private programmeApplicability(offering: any) {

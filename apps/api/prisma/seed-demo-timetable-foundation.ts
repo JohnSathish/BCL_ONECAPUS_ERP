@@ -658,7 +658,11 @@ async function seedDemoStudents(
     });
 
     let student = await prisma.student.findFirst({
-      where: { tenantId, enrollmentNumber, deletedAt: null },
+      where: {
+        tenantId,
+        OR: [{ enrollmentNumber }, { userId: user.id }],
+      },
+      orderBy: { createdAt: 'asc' },
     });
     if (!student) {
       student = await prisma.student.create({
@@ -679,6 +683,34 @@ async function seedDemoStudents(
         data: {
           tenantId,
           studentId: student.id,
+          fullName: `Demo Student ${seq}`,
+          email,
+          studentStatus: 'STUDYING',
+        },
+      });
+    } else {
+      student = await prisma.student.update({
+        where: { id: student.id },
+        data: {
+          enrollmentNumber,
+          rollNumber: `ARTS25${seq}`,
+          admissionNumber: `ADM25${seq}`,
+          programVersionId: artsProgram?.id ?? student.programVersionId,
+          primaryShiftId: shiftIi?.id ?? student.primaryShiftId,
+          importSource: 'DEMO_SEED',
+          deletedAt: null,
+        },
+      });
+      await prisma.studentProfile.upsert({
+        where: { studentId: student.id },
+        create: {
+          tenantId,
+          studentId: student.id,
+          fullName: `Demo Student ${seq}`,
+          email,
+          studentStatus: 'STUDYING',
+        },
+        update: {
           fullName: `Demo Student ${seq}`,
           email,
           studentStatus: 'STUDYING',

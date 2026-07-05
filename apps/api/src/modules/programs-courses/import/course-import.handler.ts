@@ -13,6 +13,7 @@ import {
   resolveDeliveryType,
   type CourseDeliveryType,
 } from '../../../common/constants/course-delivery';
+import { normalizeNehuCourseCode } from '../../academic-engine/domain/course-code.util';
 import {
   createWorkbookWithSheets,
   DATA_SHEET_NAME,
@@ -193,7 +194,7 @@ export class CourseImportHandler implements ImportModuleHandler<NormalizedCourse
       );
     }
 
-    const code = codeRaw.trim().toUpperCase();
+    const code = normalizeNehuCourseCode(codeRaw);
     if (code) {
       if (ctx.existingCodes.has(code)) {
         errors.push('Duplicate course code — already exists in catalog');
@@ -505,8 +506,8 @@ export class CourseImportHandler implements ImportModuleHandler<NormalizedCourse
             'Arts FYUGP Sem 1 VAC',
           ],
           [
-            'ECO-304',
-            'Economics Internship',
+            'ECO-303',
+            'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
             'INTERNSHIP',
             4,
             0,
@@ -522,7 +523,7 @@ export class CourseImportHandler implements ImportModuleHandler<NormalizedCourse
           ],
           [
             'GEO-250',
-            'Geography Theory',
+            'Settlement Geography',
             'THEORY',
             4,
             4,

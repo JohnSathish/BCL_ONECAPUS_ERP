@@ -1,0 +1,8 @@
+Course Code,Course Title,Delivery Type,Total Credits,Theory Credits,Practical Credits,Weekly Theory Hours,Weekly Practical Hours,Total Theory Contact Hours,Total Practical Contact Hours,Total Contact Hours,CBCS Catalog Type,Department Code,Description
+PHY-100,"Mathematical Physics I, Properties of Matter and Waves",THEORY_PRACTICAL,4,3,1,3,1,45,30,75,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-200,Mathematical Physics II and Experimental Physics III,THEORY_PRACTICAL,4,3,1,3,1,45,30,75,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-201,Heat & Thermodynamics and Experimental Physics IV,THEORY_PRACTICAL,4,3,1,3,1,45,30,75,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-300,Electromagnetic Theory,THEORY,4,4,0,4,0,60,0,60,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-301,Electronics II and Computational Physics I,THEORY,4,4,0,4,0,60,0,60,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-302,Thermal and Statistical Physics,THEORY,4,4,0,4,0,60,0,60,CORE,PHY,Science FYUGP ODD semester catalog
+PHY-303,"Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project",INTERNSHIP,4,0,4,0,0,0,120,120,SKILL,PHY,Science FYUGP ODD semester catalog

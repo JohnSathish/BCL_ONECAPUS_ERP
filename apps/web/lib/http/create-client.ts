@@ -97,6 +97,18 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
       return res;
     },
     async (error: AxiosError) => {
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text) as unknown;
+          if (parsed && typeof parsed === 'object') {
+            error.response.data = parsed;
+          }
+        } catch {
+          // Keep original blob payload when it is not JSON.
+        }
+      }
+
       const config = error.config as InternalAxiosRequestConfig & {
         _retryCount?: number;
         _authRetry?: boolean;

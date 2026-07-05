@@ -51,7 +51,7 @@ export const SEM5_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
     'Department name only — ERP assigns Major Papers 1–3 automatically',
   'Minor Department': 'Allowed minor department for this major',
   'Internship Area':
-    'Select registered internship course (e.g. ECO-304 — Economics Internship)',
+    'Select registered internship course (e.g. ECO-303 — Internship)',
   'Section Code': 'A, B, or Core',
 };
 
@@ -69,7 +69,7 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   'Current Semester': '5',
   'Major Department': 'Economics',
   'Minor Department': 'History',
-  'Internship Area': 'ECO-304 — Economics Internship',
+  'Internship Area': 'ECO-303 — Economics Internship',
   'Section Code': 'A',
   Category: 'GENERAL',
   Religion: 'CHRISTIAN',
@@ -80,8 +80,8 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 export const SEM5_STRUCTURE_NOTES = [
   'Semester 5 FYUGP: 3 Major papers + 1 Minor + 1 Internship course = 5 papers, 20 credits.',
   'Major Department auto-assigns Major Papers 1–3. Internship Area must be the registered internship course for that major.',
-  'Internship Area dropdown lists real courses (e.g. ECO-304 — Economics Internship, COM-303 — Internship).',
-  'Pick the internship course that matches the Major Department (Economics → ECO-304, Commerce → COM-303, etc.).',
+  'Internship Area dropdown lists real courses (e.g. ECO-303 — Internship, COM-303 — Internship).',
+  'Pick the internship course that matches the Major Department (Economics → ECO-303, Commerce → COM-303, etc.).',
   'Minor Department options depend on the selected Major Department (NEHU major-minor rules).',
 ];
 

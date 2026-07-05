@@ -4,6 +4,8 @@
  */
 
 import type { ArtsFyugpCourseDef } from './arts-fyugp-odd-catalog';
+import { DBC_DAY_SEM3_COURSE_TITLES } from './dbc-day-sem3-electives-catalog';
+import { buildNehuSem3VtcCourse } from './dbc-vtc-sem3.util';
 
 export const MORNING_SEM3_MDC_CODES = [
   'MDC-210',
@@ -13,6 +15,7 @@ export const MORNING_SEM3_MDC_CODES = [
   'MDC-215',
 ] as const;
 
+/** Morning Sem 3 AEC is compulsory — single paper auto-assigned for BA programmes. */
 export const MORNING_SEM3_AEC_CODES = ['AEC-222'] as const;
 
 export const MORNING_SEM3_SEC_CODES = [
@@ -21,6 +24,7 @@ export const MORNING_SEM3_SEC_CODES = [
   'SEC-233',
 ] as const;
 
+/** Official Morning Shift Sem 3 VTC pool (choose one). */
 export const MORNING_SEM3_VTC_CODES = [
   'VTC-240.3',
   'VTC-241.2',
@@ -32,28 +36,8 @@ export const MORNING_SEM3_VTC_CODES = [
   'VTC-248.1',
 ] as const;
 
-/** NEHU / DBC official titles for Sem 3 shared pool courses. */
-export const DBC_SEM3_COURSE_TITLES: Record<string, string> = {
-  'MDC-210': 'English Proficiency and Soft Skill Development',
-  'MDC-211': 'Gender Studies',
-  'MDC-212': 'Financial Literacy',
-  'MDC-213': 'National Service Scheme',
-  'MDC-215': 'Development of Education in North-East India',
-  'AEC-222': 'Introduction to Academic Writing (Arts)',
-  'SEC-230': 'Introduction to Translation',
-  'SEC-232': 'Conflict Resolution',
-  'SEC-233': 'Goods and Service Tax (GST)',
-  'VTC-240.3': 'Bee Keeping – I',
-  'VTC-241.2': 'Mushroom Cultivation – I',
-  'VTC-243.2': 'Desktop Publishing – I',
-  'VTC-243.3': 'Computerized Accounting',
-  'VTC-244.2': 'Event Management – I',
-  'VTC-245.3': 'Guitar – I',
-  'VTC-246.1': 'Baking and Confectionery – I',
-  'VTC-248.1': 'Photography',
-};
-
-export const DBC_SEM3_MDC_ELIGIBILITY: Record<
+/** Morning-specific MDC eligibility (official DBC Morning Sem 3 sheet). */
+export const DBC_MORNING_SEM3_MDC_ELIGIBILITY: Record<
   string,
   Record<string, unknown>
 > = {
@@ -69,39 +53,23 @@ export const DBC_SEM3_MDC_ELIGIBILITY: Record<
       },
     ],
   },
+  'MDC-212': {},
+  'MDC-213': {},
   'MDC-215': {
     excludedMajorSubjectSlugs: ['education'],
     excludedMinorSubjectSlugs: ['education'],
   },
 };
 
-const VTC_SEM3_CREDITS = 4;
+/** @deprecated Use DBC_DAY_SEM3_COURSE_TITLES */
+export const DBC_SEM3_COURSE_TITLES = DBC_DAY_SEM3_COURSE_TITLES;
 
-function vtcCourse(code: string, title: string): ArtsFyugpCourseDef {
-  return {
-    code,
-    title,
-    credits: VTC_SEM3_CREDITS,
-    category: 'VTC',
-    semesterSequence: 3,
-    departmentCode: 'ENG',
-    subjectSlug: 'vtc',
-    sharedPool: true,
-    deliveryType: 'THEORY',
-    theoryCredits: VTC_SEM3_CREDITS,
-    practicalCredits: 0,
-    theoryHoursPerWeek: VTC_SEM3_CREDITS,
-    practicalHoursPerWeek: 0,
-    totalTheoryContactHours: VTC_SEM3_CREDITS * 15,
-    totalPracticalContactHours: 0,
-    totalContactHours: VTC_SEM3_CREDITS * 15,
-  };
-}
+/** @deprecated Use DBC_MORNING_SEM3_MDC_ELIGIBILITY */
+export const DBC_SEM3_MDC_ELIGIBILITY = DBC_MORNING_SEM3_MDC_ELIGIBILITY;
 
-/** Decimal-track VTC papers used by DBC Morning Sem 3 (global master additions). */
 export function buildDbcMorningSem3VtcCourses(): ArtsFyugpCourseDef[] {
   return MORNING_SEM3_VTC_CODES.map((code) =>
-    vtcCourse(code, DBC_SEM3_COURSE_TITLES[code] ?? code),
+    buildNehuSem3VtcCourse(code, DBC_DAY_SEM3_COURSE_TITLES[code] ?? code),
   );
 }
 

@@ -17,7 +17,7 @@ export const DBC_MAJOR_MINOR_MATRIX: Record<string, string[]> = {
   Mathematics: ['Physics', 'Chemistry'],
   Zoology: ['Botany', 'Chemistry'],
   Physics: ['Chemistry', 'Mathematics'],
-  'Accounting For Business': ['Economics', 'Mathematics', 'Geography'],
+  Commerce: ['Economics', 'Mathematics', 'Geography'],
 };
 
 const SUBJECT_PROGRAMME_GROUP: Record<string, string> = {
@@ -35,12 +35,12 @@ const SUBJECT_PROGRAMME_GROUP: Record<string, string> = {
   Mathematics: 'SCIENCE',
   Zoology: 'SCIENCE',
   Physics: 'SCIENCE',
-  'Accounting For Business': 'COMMERCE',
+  Commerce: 'COMMERCE',
 };
 
 const DEPT_CODE_BY_NAME: Record<string, string> = {
   Economics: 'ECO',
-  Education: 'EDU',
+  Education: 'EDN',
   English: 'ENG',
   Garo: 'GAR',
   Geography: 'GEO',
@@ -53,7 +53,7 @@ const DEPT_CODE_BY_NAME: Record<string, string> = {
   Mathematics: 'MTH',
   Zoology: 'ZOO',
   Physics: 'PHY',
-  'Accounting For Business': 'COM',
+  Commerce: 'COM',
 };
 
 export async function seedDbcFyugpRules(

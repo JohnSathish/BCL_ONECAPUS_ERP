@@ -38,6 +38,7 @@ export type Sem5ImportCurriculumCatalog = {
   programName: string;
   curriculumLabel: string;
   semesterSequence: 5;
+  shiftId?: string;
   majorDepartments: Sem5MajorDepartmentOption[];
   minorDepartments: Sem5MinorDepartmentOption[];
   internshipAreas: string[];
@@ -195,6 +196,7 @@ export class Sem5ImportCurriculumService {
       programme?: string;
       semesterSequence?: number;
       academicYearId?: string;
+      shiftId?: string;
     },
   ): Promise<Sem5ImportCurriculumCatalog> {
     const semesterSequence = input.semesterSequence ?? 5;
@@ -203,6 +205,7 @@ export class Sem5ImportCurriculumService {
       tenantId,
       version.id,
       semesterSequence,
+      { shiftId: input.shiftId },
     );
 
     const offerings: CurriculumOffering[] = [
@@ -247,8 +250,8 @@ export class Sem5ImportCurriculumService {
       version.id,
       semesterSequence,
       majorDepartments,
-      byCategory('MINOR'),
       input.academicYearId,
+      input.shiftId,
     );
 
     return {
@@ -257,6 +260,7 @@ export class Sem5ImportCurriculumService {
       programName: version.program.name,
       curriculumLabel: this.curriculumLabelFromVersion(version),
       semesterSequence: 5,
+      shiftId: input.shiftId,
       majorDepartments,
       minorDepartments,
       internshipAreas: this.listInternshipCourseLabels(majorDepartments),
@@ -271,12 +275,14 @@ export class Sem5ImportCurriculumService {
       majorDepartment: string;
       academicYearId?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ) {
     const catalog = await this.buildCatalog(tenantId, {
       programVersionId: input.programVersionId,
       semesterSequence: input.semesterSequence ?? 5,
       academicYearId: input.academicYearId,
+      shiftId: input.shiftId,
     });
     const major = this.resolveMajorDepartment(catalog, input.majorDepartment);
     if (!major) {
@@ -297,6 +303,7 @@ export class Sem5ImportCurriculumService {
   async buildTenantMajorDepartments(
     tenantId: string,
     semesterSequence = 5,
+    shiftId?: string,
   ): Promise<Sem5MajorDepartmentOption[]> {
     const versions = await this.prisma.programVersion.findMany({
       where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
@@ -304,13 +311,18 @@ export class Sem5ImportCurriculumService {
     });
     const merged = new Map<string, Sem5MajorDepartmentOption>();
     for (const version of versions) {
-      const catalog = await this.buildCatalog(tenantId, {
-        programVersionId: version.id,
-        semesterSequence,
-      });
-      for (const department of catalog.majorDepartments) {
-        const key = this.normalizeLabel(department.departmentName);
-        if (!merged.has(key)) merged.set(key, department);
+      try {
+        const catalog = await this.buildCatalog(tenantId, {
+          programVersionId: version.id,
+          semesterSequence,
+          shiftId,
+        });
+        for (const department of catalog.majorDepartments) {
+          const key = this.normalizeLabel(department.departmentName);
+          if (!merged.has(key)) merged.set(key, department);
+        }
+      } catch {
+        // Skip programmes without a complete Sem 5 curriculum for this shift.
       }
     }
     return [...merged.values()].sort((a, b) =>
@@ -435,13 +447,30 @@ export class Sem5ImportCurriculumService {
       .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
   }
 
+  formatInvalidMinorMessage(
+    majorDepartment: string,
+    minorDepartment: string,
+    catalog: Sem5ImportCurriculumCatalog,
+  ) {
+    const allowed =
+      catalog.minorByMajor[this.normalizeLabel(majorDepartment)] ?? [];
+    const allowedLines = allowed.map((minor) => `• ${minor}`).join('\n');
+    return [
+      'Invalid Minor Subject.',
+      '',
+      `For ${majorDepartment} Major, allowed Minor subjects are:`,
+      '',
+      allowedLines || '• (none configured)',
+    ].join('\n');
+  }
+
   private async buildMinorByMajor(
     tenantId: string,
     programVersionId: string,
     semesterSequence: number,
     majorDepartments: Sem5MajorDepartmentOption[],
-    minorOfferings: CurriculumOffering[],
     academicYearId?: string,
+    shiftId?: string,
   ): Promise<Record<string, string[]>> {
     const minorByMajor: Record<string, string[]> = {};
     for (const major of majorDepartments) {
@@ -452,6 +481,7 @@ export class Sem5ImportCurriculumService {
           major.subjectSlug,
           semesterSequence,
           academicYearId,
+          shiftId,
         );
       const names = eligibleMinors
         .map((subject) => subject.department?.name ?? subject.name)
@@ -547,7 +577,7 @@ export class Sem5ImportCurriculumService {
     const prefix = code.split('-')[0]?.trim().toUpperCase();
     const map: Record<string, string> = {
       ECO: 'Economics',
-      EDU: 'Education',
+      EDN: 'Education',
       ENG: 'English',
       GAR: 'Garo',
       GEO: 'Geography',

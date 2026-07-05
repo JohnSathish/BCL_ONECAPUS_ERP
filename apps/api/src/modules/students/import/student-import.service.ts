@@ -62,6 +62,7 @@ export class StudentImportService {
     programVersionId?: string;
     semesterSequence?: number;
     academicYearId?: string;
+    shiftId?: string;
   }) {
     return this.handler.buildSem1AdmissionTemplateWorkbook(options);
   }
@@ -85,6 +86,7 @@ export class StudentImportService {
     programme?: string;
     programVersionId?: string;
     academicYearId?: string;
+    shiftId?: string;
   }) {
     return this.handler.buildFullAdmissionTemplateWorkbook(options);
   }
@@ -109,6 +111,7 @@ export class StudentImportService {
     programVersionId?: string;
     semesterSequence?: number;
     academicYearId?: string;
+    shiftId?: string;
   }) {
     return this.handler.buildSem5AdmissionTemplateWorkbook(options);
   }
@@ -172,6 +175,7 @@ export class StudentImportService {
       programVersionId?: string;
       semesterSequence?: number;
       academicYearId?: string;
+      shiftId?: string;
     },
   ) {
     return this.sem1Curriculum.buildCatalog(tenantId, input);
@@ -184,6 +188,7 @@ export class StudentImportService {
       majorDepartment: string;
       academicYearId?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ) {
     return this.sem1Curriculum.listEligibleMinorsForMajor(tenantId, input);
@@ -196,6 +201,7 @@ export class StudentImportService {
       programVersionId?: string;
       semesterSequence?: number;
       academicYearId?: string;
+      shiftId?: string;
     },
   ) {
     return this.sem5Curriculum.buildCatalog(tenantId, input);
@@ -208,6 +214,7 @@ export class StudentImportService {
       majorDepartment: string;
       academicYearId?: string;
       semesterSequence?: number;
+      shiftId?: string;
     },
   ) {
     return this.sem5Curriculum.listEligibleMinorsForMajor(tenantId, input);

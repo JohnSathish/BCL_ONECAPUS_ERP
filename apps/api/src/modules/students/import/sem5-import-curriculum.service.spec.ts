@@ -59,14 +59,14 @@ describe('Sem5ImportCurriculumService', () => {
           },
           internship: {
             title: 'Economics Internship',
-            code: 'ECO-304',
+            code: 'ECO-303',
             courseId: 'c4',
             offeringId: 'o4',
           },
         },
       ],
       minorDepartments: [],
-      internshipAreas: ['ECO-304 — Economics Internship'],
+      internshipAreas: ['ECO-303 — Economics Internship'],
       minorByMajor: { economics: ['History'] },
     };
 
@@ -74,12 +74,12 @@ describe('Sem5ImportCurriculumService', () => {
       service.formatInternshipCourseLabel(
         catalog.majorDepartments[0]!.internship,
       ),
-    ).toBe('ECO-304 — Economics Internship');
+    ).toBe('ECO-303 — Economics Internship');
     expect(
-      service.resolveInternshipPaper(catalog, 'ECO-304 — Economics Internship')
+      service.resolveInternshipPaper(catalog, 'ECO-303 — Economics Internship')
         ?.code,
-    ).toBe('ECO-304');
-    expect(service.resolveInternshipPaper(catalog, 'eco-304')?.title).toBe(
+    ).toBe('ECO-303');
+    expect(service.resolveInternshipPaper(catalog, 'eco-303')?.title).toBe(
       'Economics Internship',
     );
     expect(
@@ -118,7 +118,7 @@ describe('Sem5ImportCurriculumService', () => {
           },
           internship: {
             title: 'Internship',
-            code: 'ECO-304',
+            code: 'ECO-303',
             courseId: 'c4',
             offeringId: 'o4',
           },

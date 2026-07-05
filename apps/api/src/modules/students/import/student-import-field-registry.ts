@@ -659,8 +659,7 @@ export const STUDENT_IMPORT_FIELD_REGISTRY: StudentImportFieldDef[] = [
     required: false,
     visible: true,
     readOnly: false,
-    helper:
-      'Registered course for this major (e.g. ECO-304 — Economics Internship)',
+    helper: 'Registered course for this major (e.g. ECO-303 — Internship)',
   },
   // Identity
   {
@@ -761,7 +760,7 @@ export const FULL_ADMISSION_HIDDEN_SHEETS = {
   sem3Sec: 'FA Sem3 SEC',
   sem3Vtc: 'FA Sem3 VTC',
   sem5MajorDepartments: 'FA Sem5 Majors',
-  sem5AllMinors: 'FA Sem5 Minor Depts',
+  sem5MinorsByMajor: 'FA Sem5 Minors By Major',
   sem5Internship: 'FA Sem5 Internship',
   gender: 'FA Gender',
   semester: 'FA Semester',

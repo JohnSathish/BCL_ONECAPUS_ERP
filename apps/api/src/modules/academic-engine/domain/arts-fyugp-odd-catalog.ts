@@ -3,6 +3,8 @@
  * Shared by seed, course import templates, and timetable routine Excel.
  */
 
+import { buildGeographyOddSemCourses } from './geography-fyugp-nehu.util';
+
 export type ArtsFyugpCourseDef = {
   code: string;
   title: string;
@@ -46,31 +48,43 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     subjectSlug: 'economics',
     papers: {
       sem1: 'Microeconomics I',
-      sem3: ['Macroeconomics I', 'Indian Economy'],
-      sem5: [
-        'International Economics',
-        'Public Finance',
-        'Development Economics',
+      sem3: [
+        'Economics of Growth and Development',
+        'Mathematical Methods for Economics I',
       ],
-      sem5Minor: 'Environmental Economics',
-      internship: 'Economics Internship',
+      sem5: [
+        'Statistical Methods for Economics',
+        'Microeconomics II',
+        'Indian Economy',
+      ],
+      sem5Minor: 'Indian Economy',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
-    code: 'EDU',
+    code: 'EDN',
     programCode: 'BA-EDU',
     programName: 'FYUP in Education',
     subjectSlug: 'education',
     papers: {
-      sem1: 'Foundations of Education',
-      sem3: ['Educational Psychology', 'School Management'],
-      sem5: [
-        'Educational Technology',
-        'Guidance and Counselling',
-        'Comparative Education',
+      sem1: 'Introduction to Education',
+      sem3: [
+        'Development of Education in India-I (Pre-Independence Period)',
+        'Development of Education in India-II (Post-Independence Period)',
       ],
-      sem5Minor: 'Education Extension',
-      internship: 'Teaching Internship',
+      sem5: [
+        'Educational Management',
+        'Curriculum Development',
+        'Education for Sustainable Development',
+      ],
+      sem5Minor: 'Inclusive Education I',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -79,11 +93,21 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     programName: 'FYUP in English',
     subjectSlug: 'english',
     papers: {
-      sem1: 'British Poetry and Drama',
-      sem3: ['American Literature', 'Indian Writing in English'],
-      sem5: ['Literary Theory', 'Postcolonial Literature', 'World Literature'],
-      sem5Minor: 'Functional English',
-      internship: 'English Internship',
+      sem1: 'Introduction to English Literature',
+      sem3: [
+        'British Fiction (19th and 20th Century)',
+        'British Drama (16th Century to the Present)',
+      ],
+      sem5: [
+        'Classical Indian Literature',
+        'Contemporary Literary Theory & Criticism-I',
+        'Indian Writings in English',
+      ],
+      sem5Minor: 'Indian Writings in English',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -92,11 +116,18 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     programName: 'FYUP in Garo',
     subjectSlug: 'garo',
     papers: {
-      sem1: 'Garo Language and Literature I',
-      sem3: ['Garo Prose and Poetry', 'Garo Folklore'],
-      sem5: ['Garo Drama', 'Garo Linguistics', 'Translation Studies'],
-      sem5Minor: 'Garo Culture Studies',
-      internship: 'Garo Internship',
+      sem1: 'Introduction to Garo Prose and Poetry',
+      sem3: ['History of Garo Language', 'History of Garo Literature'],
+      sem5: [
+        'Prabandher Rupriti O Nirbachito Prabandhaboli',
+        'Kothasahityer Rupriti O Bangla Kotha Sahitya',
+        'Rabindra Sahitya',
+      ],
+      sem5Minor: 'Rabindra Sahitya',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -106,10 +137,20 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     subjectSlug: 'geography',
     papers: {
       sem1: 'Introduction to Human Geography',
-      sem3: ['Physical Geography', 'Geographical Techniques'],
-      sem5: ['Regional Planning', 'Remote Sensing', 'Climate and Environment'],
-      sem5Minor: 'Disaster Management',
-      internship: 'Geography Internship',
+      sem3: [
+        'Regional Geography of India',
+        'Historical Development of Geography',
+      ],
+      sem5: [
+        'Thematic Cartography and Survey Techniques II',
+        'Population Geography',
+        'Introduction to Remote Sensing and GIS',
+      ],
+      sem5Minor: 'Geography and Environment',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -119,10 +160,20 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     subjectSlug: 'history',
     papers: {
       sem1: 'History of India (Ancient to 1200 CE)',
-      sem3: ['Medieval India', 'Modern India'],
-      sem5: ['World History', 'Historiography', 'History of North East India'],
-      sem5Minor: 'Archaeology Basics',
-      internship: 'History Internship',
+      sem3: [
+        'History of Early Medieval India (650–1206 C.E.)',
+        'History of World Civilizations',
+      ],
+      sem5: [
+        'History of Modern India (1757-1857 C.E.)',
+        'Contemporary North East India (1947-1987 C.E.)',
+        'Modern World (1815 to 1945 C.E.)',
+      ],
+      sem5Minor: 'Modern World (1815 to 1945 C.E.)',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -131,11 +182,18 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     programName: 'FYUP in Philosophy',
     subjectSlug: 'philosophy',
     papers: {
-      sem1: 'Introduction to Philosophy',
-      sem3: ['Indian Philosophy', 'Western Philosophy'],
-      sem5: ['Ethics', 'Logic', 'Contemporary Philosophy'],
-      sem5Minor: 'Applied Ethics',
-      internship: 'Philosophy Internship',
+      sem1: 'Understanding Philosophy',
+      sem3: ['Logic', 'Indian Philosophy-1'],
+      sem5: [
+        'Epistemology and Metaphysics',
+        'Existentialism',
+        'Philosophy of Value',
+      ],
+      sem5Minor: 'Philosophy of Value',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -144,15 +202,21 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     programName: 'FYUP in Political Science',
     subjectSlug: 'political-science',
     papers: {
-      sem1: 'Introduction to Political Science',
-      sem3: ['Indian Government and Politics', 'Western Political Thought'],
-      sem5: [
-        'International Relations',
+      sem1: 'Political Theory',
+      sem3: [
+        'Introduction to International Relations',
         'Public Administration',
-        'Comparative Politics',
       ],
-      sem5Minor: 'Human Rights',
-      internship: 'Political Science Internship',
+      sem5: [
+        'Socialist Political Thought',
+        'State and Democracy in India',
+        'Government and Politics in Northeast India',
+      ],
+      sem5Minor: 'Government and Politics in Northeast India',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
   {
@@ -162,21 +226,28 @@ export const ARTS_FYUGP_DEPARTMENTS = [
     subjectSlug: 'sociology',
     papers: {
       sem1: 'Introduction to Sociology',
-      sem3: ['Indian Society', 'Social Research Methods'],
-      sem5: ['Sociological Theory', 'Gender Studies', 'Rural Sociology'],
-      sem5Minor: 'Social Work Basics',
-      internship: 'Sociology Internship',
+      sem3: ['Society in India', 'Social Change'],
+      sem5: [
+        'Economic Sociology',
+        'Political Sociology',
+        'Sociology of Environment',
+      ],
+      sem5Minor: 'Sociology of Environment',
+      sem5MinorCode: '302',
+      internship:
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internshipCode: '303',
     },
   },
 ] as const;
 
 const MDC_SEM1_TITLES: Record<number, string> = {
-  110: 'Understanding India',
+  110: 'Commercial Arithmetic & Elementary Statistics',
   111: 'Culture and Society',
   112: 'Fundamentals of Computer Systems',
   113: 'Health and Wellness',
   114: 'Financial Literacy',
-  115: 'Science, Technology and Society',
+  115: 'Introduction to Life Sciences',
   116: 'Introduction to National Cadet Corps',
   117: 'Public Speaking',
   118: 'Mathematics in Daily Life',
@@ -197,7 +268,7 @@ const MDC_SEM3_TITLES: Record<number, string> = {
 };
 
 const AEC_SEM3_TITLES: Record<number, string> = {
-  220: 'Advanced English Communication',
+  220: 'Critical Reading (Science)',
   221: 'Introduction to Academic Writing (Commerce)',
   222: 'Introduction to Academic Writing (Arts)',
   223: 'MIL — Garo (Advanced)',
@@ -223,10 +294,10 @@ const SEC_SEM3_TITLES: Record<number, string> = {
 };
 
 const AEC_SEM1_TITLES: Record<number, string> = {
-  120: 'Communicative English',
+  120: 'Alternative English',
   121: 'Alternative English',
   122: 'MIL-I: Garo',
-  123: 'MIL — Hindi',
+  123: 'MIL-I: Garo',
   124: 'MIL — Bengali',
   125: 'MIL — Assamese',
   126: 'MIL — Nepali',
@@ -335,24 +406,30 @@ export function buildArtsFyugpSem5MinorCourseDefs(
 
   return ARTS_FYUGP_DEPARTMENTS.filter(
     (dept) => dept.programCode !== hostProgramCode,
-  ).map((dept) =>
-    theoryCourse({
-      code: `${dept.code}-303`,
-      title: dept.papers.sem5Minor,
+  ).map((dept) => {
+    const minorCode =
+      'sem5MinorCode' in dept.papers && dept.papers.sem5MinorCode
+        ? dept.papers.sem5MinorCode
+        : '303';
+    const minorTitle = dept.papers.sem5Minor;
+    return theoryCourse({
+      code: `${dept.code}-${minorCode}`,
+      title: minorTitle,
       credits: 4,
       category: 'MINOR',
       semesterSequence: 5,
       departmentCode: dept.code,
       subjectSlug: dept.subjectSlug,
       programCode: hostProgramCode,
-    }),
-  );
+    });
+  });
 }
 
 export function buildArtsFyugpOddCourses(): ArtsFyugpCourseDef[] {
   const courses: ArtsFyugpCourseDef[] = [];
 
   for (const dept of ARTS_FYUGP_DEPARTMENTS) {
+    if (dept.code === 'GEO') continue;
     courses.push(
       theoryCourse({
         code: `${dept.code}-100`,
@@ -398,18 +475,39 @@ export function buildArtsFyugpOddCourses(): ArtsFyugpCourseDef[] {
       );
     });
 
+    const internshipCode =
+      'internshipCode' in dept.papers && dept.papers.internshipCode
+        ? dept.papers.internshipCode
+        : '304';
+    const sem5MinorCode =
+      'sem5MinorCode' in dept.papers && dept.papers.sem5MinorCode
+        ? dept.papers.sem5MinorCode
+        : '303';
+    const sem5MajorCodes = dept.papers.sem5.map(
+      (_, index) => `${dept.code}-30${index}`,
+    );
+    const sem5MinorCourseCode = `${dept.code}-${sem5MinorCode}`;
+
+    if (
+      sem5MinorCourseCode !== `${dept.code}-${internshipCode}` &&
+      !sem5MajorCodes.includes(sem5MinorCourseCode)
+    ) {
+      courses.push(
+        theoryCourse({
+          code: sem5MinorCourseCode,
+          title: dept.papers.sem5Minor,
+          credits: 4,
+          category: 'MINOR',
+          semesterSequence: 5,
+          departmentCode: dept.code,
+          subjectSlug: dept.subjectSlug,
+        }),
+      );
+    }
+
     courses.push(
-      theoryCourse({
-        code: `${dept.code}-303`,
-        title: dept.papers.sem5Minor,
-        credits: 4,
-        category: 'MINOR',
-        semesterSequence: 5,
-        departmentCode: dept.code,
-        subjectSlug: dept.subjectSlug,
-      }),
       internshipCourse({
-        code: `${dept.code}-304`,
+        code: `${dept.code}-${internshipCode}`,
         title: dept.papers.internship,
         credits: 4,
         category: 'INTERNSHIP',
@@ -439,6 +537,7 @@ export function buildArtsFyugpOddCourses(): ArtsFyugpCourseDef[] {
       sharedPool: true,
     }),
     ...poolCourses('VTC', 3, 'VTC', 4, VTC_SEM3_TITLES, 'ENG', 'vtc'),
+    ...buildGeographyOddSemCourses(),
   );
 
   return courses;
@@ -480,7 +579,7 @@ export const ARTS_ODD_PAPER_BASKET: ArtsPaperBasketRow[] = [
     creditsEach: 3,
     codePattern: 'AEC-120 … AEC-129',
     exampleCode: 'AEC-120',
-    exampleTitle: 'Communicative English',
+    exampleTitle: 'Alternative English',
   },
   {
     semester: 1,
@@ -507,7 +606,7 @@ export const ARTS_ODD_PAPER_BASKET: ArtsPaperBasketRow[] = [
     creditsEach: 4,
     codePattern: '{DEPT}-200, {DEPT}-201',
     exampleCode: 'ECO-200',
-    exampleTitle: 'Macroeconomics I',
+    exampleTitle: 'Economics of Growth and Development',
   },
   {
     semester: 3,
@@ -553,25 +652,27 @@ export const ARTS_ODD_PAPER_BASKET: ArtsPaperBasketRow[] = [
     creditsEach: 4,
     codePattern: '{DEPT}-300, {DEPT}-301, {DEPT}-302',
     exampleCode: 'ECO-300',
-    exampleTitle: 'International Economics',
+    exampleTitle: 'Statistical Methods for Economics',
   },
   {
     semester: 5,
     category: 'MINOR',
     paperCount: 1,
     creditsEach: 4,
-    codePattern: '{OTHER-DEPT}-303',
-    exampleCode: 'POL-303',
-    exampleTitle: 'Human Rights',
+    codePattern:
+      '{OTHER-DEPT}-303 or {DEPT}-302 when minor paper matches major (e.g. ECO-302)',
+    exampleCode: 'ECO-302',
+    exampleTitle: 'Indian Economy',
   },
   {
     semester: 5,
     category: 'INTERNSHIP',
     paperCount: 1,
     creditsEach: 4,
-    codePattern: '{DEPT}-304',
-    exampleCode: 'ECO-304',
-    exampleTitle: 'Economics Internship',
+    codePattern: '{DEPT}-303 or {DEPT}-304',
+    exampleCode: 'ECO-303',
+    exampleTitle:
+      'Internship / Apprenticeship / Community Engagement and Service',
   },
 ];
 
@@ -763,7 +864,7 @@ export function buildArtsRoutineSampleRows(
       semester: 5,
       day: 'Saturday',
       period: 'P2',
-      subjectCode: 'ECO-304',
+      subjectCode: 'ECO-303',
       category: 'INTERNSHIP',
       section,
     },
@@ -815,7 +916,7 @@ export function buildArtsOddTimetableSeedEntries(
       semester: 1,
       day: 'Tuesday',
       period: 'P4',
-      subjectCode: 'EDU-100',
+      subjectCode: 'EDN-100',
       category: 'MAJOR',
       section,
     },

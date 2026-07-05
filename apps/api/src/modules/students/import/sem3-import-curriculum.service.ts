@@ -198,6 +198,7 @@ export class Sem3ImportCurriculumService {
   async buildTenantMajorDepartments(
     tenantId: string,
     semesterSequence = 3,
+    shiftId?: string,
   ): Promise<Sem3MajorDepartmentOption[]> {
     const versions = await this.prisma.programVersion.findMany({
       where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
@@ -205,13 +206,18 @@ export class Sem3ImportCurriculumService {
     });
     const merged = new Map<string, Sem3MajorDepartmentOption>();
     for (const version of versions) {
-      const catalog = await this.buildCatalog(tenantId, {
-        programVersionId: version.id,
-        semesterSequence,
-      });
-      for (const department of catalog.majorDepartments) {
-        const key = this.normalizeLabel(department.departmentName);
-        if (!merged.has(key)) merged.set(key, department);
+      try {
+        const catalog = await this.buildCatalog(tenantId, {
+          programVersionId: version.id,
+          semesterSequence,
+          shiftId,
+        });
+        for (const department of catalog.majorDepartments) {
+          const key = this.normalizeLabel(department.departmentName);
+          if (!merged.has(key)) merged.set(key, department);
+        }
+      } catch {
+        // Skip programmes without a complete Sem 3 curriculum for this shift.
       }
     }
     return [...merged.values()].sort((a, b) =>
@@ -340,7 +346,7 @@ export class Sem3ImportCurriculumService {
     const prefix = code.split('-')[0]?.trim().toUpperCase();
     const map: Record<string, string> = {
       ECO: 'Economics',
-      EDU: 'Education',
+      EDN: 'Education',
       ENG: 'English',
       GAR: 'Garo',
       GEO: 'Geography',

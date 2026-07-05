@@ -7,9 +7,12 @@ import {
   DEFAULT_DEGREE_MIN_CREDITS,
   DEFAULT_SEMESTER_CREDIT_TARGET,
 } from '../src/modules/academic-engine/domain/fyugp-templates';
+import { readCatalogSeedExclusions } from '../src/common/services/catalog-seed-exclusions.util';
 import { seedDbcFyugpRules } from './seed-dbc-fyugp-rules';
 import { seedDbcShiftCurriculum } from './seed-dbc-shift-curriculum';
 import { seedArtsFyugpCatalog } from './seed-arts-fyugp-catalog';
+import { seedScienceFyugpCatalog } from './seed-science-fyugp-catalog';
+import { seedCommerceFyugpCatalog } from './seed-commerce-fyugp-catalog';
 import { seedArtsOddTimetable } from './seed-arts-odd-timetable';
 import { seedArtsShiftIiTimetable } from './seed-arts-shift-ii-timetable';
 import { seedDemoLiveReady } from './seed-demo-live-ready';
@@ -1159,7 +1162,7 @@ async function main() {
     departmentType: string;
   }[] = [
     { name: 'Economics', code: 'ECO', departmentType: 'ARTS' },
-    { name: 'Education', code: 'EDU', departmentType: 'ARTS' },
+    { name: 'Education', code: 'EDN', departmentType: 'ARTS' },
     { name: 'English', code: 'ENG', departmentType: 'ARTS' },
     { name: 'Garo', code: 'GAR', departmentType: 'ARTS' },
     { name: 'Geography', code: 'GEO', departmentType: 'ARTS' },
@@ -1199,9 +1202,27 @@ async function main() {
   ];
 
   for (const dept of DEPARTMENT_MASTER) {
-    const existing = await prisma.department.findFirst({
+    let existing = await prisma.department.findFirst({
       where: { tenantId: tenant.id, code: dept.code, deletedAt: null },
     });
+    if (!existing && dept.code === 'EDN') {
+      const legacyEdu = await prisma.department.findFirst({
+        where: { tenantId: tenant.id, code: 'EDU', deletedAt: null },
+      });
+      if (legacyEdu) {
+        await prisma.department.update({
+          where: { id: legacyEdu.id },
+          data: {
+            code: 'EDN',
+            name: dept.name,
+            departmentType: dept.departmentType,
+            status: 'ACTIVE',
+            ...(legacyEdu.campusId ? {} : { campusId: campus.id }),
+          },
+        });
+        continue;
+      }
+    }
     if (!existing) {
       await prisma.department.create({
         data: {
@@ -2655,24 +2676,11 @@ async function main() {
   const academicSettings = await prisma.tenantAcademicSettings.findUnique({
     where: { tenantId: tenant.id },
   });
-  const excludedCurriculum = new Set<string>(
-    Array.isArray(
-      (academicSettings?.nepProfile as Record<string, unknown> | null)
-        ?.excludedCurriculumKeys,
-    )
-      ? ((academicSettings?.nepProfile as Record<string, unknown>)
-          .excludedCurriculumKeys as string[])
-      : [],
+  const seedExclusions = readCatalogSeedExclusions(
+    academicSettings?.nepProfile as Record<string, unknown> | null,
   );
-  const excludedCourseCodes = new Set<string>(
-    Array.isArray(
-      (academicSettings?.nepProfile as Record<string, unknown> | null)
-        ?.excludedCourseCodes,
-    )
-      ? ((academicSettings?.nepProfile as Record<string, unknown>)
-          .excludedCourseCodes as string[])
-      : [],
-  );
+  const excludedCurriculum = seedExclusions.excludedCurriculumKeys;
+  const excludedCourseCodes = seedExclusions.excludedCourseCodes;
 
   for (const c of nepCourses) {
     if (excludedCourseCodes.has(c.code)) {
@@ -2845,6 +2853,24 @@ async function main() {
   }
 
   await seedArtsFyugpCatalog({
+    prisma,
+    tenantId: tenant.id,
+    institutionId: institution.id,
+    semesterBySeq,
+    shifts,
+    createdById: adminUser.id,
+  });
+
+  await seedScienceFyugpCatalog({
+    prisma,
+    tenantId: tenant.id,
+    institutionId: institution.id,
+    semesterBySeq,
+    shifts,
+    createdById: adminUser.id,
+  });
+
+  await seedCommerceFyugpCatalog({
     prisma,
     tenantId: tenant.id,
     institutionId: institution.id,
@@ -3259,7 +3285,7 @@ async function main() {
       sortOrder: 13,
     },
     {
-      subjectCode: 'EDU',
+      subjectCode: 'EDN',
       subjectName: 'Education',
       category: 'ARTS',
       sortOrder: 14,
@@ -3368,7 +3394,8 @@ async function main() {
     'metrics, AQAR:',
     naacSeed.aqarId,
   );
-  await seedCategoryPools(tenant.id, institution.id, adminUser.id);
+  // Legacy NEP demo pools superseded by seedDbcShiftCurriculum (Day/Morning Sem 1–6).
+  // await seedCategoryPools(tenant.id, institution.id, adminUser.id);
   console.log(
     'FYUGP major/minor rules seeded:',
     fyugpRules.subjectCount,

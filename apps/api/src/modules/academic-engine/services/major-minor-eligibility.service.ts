@@ -74,6 +74,7 @@ export class MajorMinorEligibilityService {
     tenantId: string,
     programVersionId: string,
     category: string,
+    shiftId?: string,
   ): Promise<Set<string>> {
     const semesters = await this.prisma.courseOffering.findMany({
       where: {
@@ -94,7 +95,7 @@ export class MajorMinorEligibilityService {
         tenantId,
         programVersionId,
         semesterSequence,
-        { category },
+        { category, shiftId },
       );
       for (const offering of resolved.directOfferings) {
         this.addOfferingSlugs(slugs, offering);
@@ -106,23 +107,145 @@ export class MajorMinorEligibilityService {
     return slugs;
   }
 
-  async listMajorMinorRules(tenantId: string, institutionId?: string) {
+  async listMajorMinorRules(
+    tenantId: string,
+    filters?: {
+      institutionId?: string;
+      shiftId?: string;
+      majorSubjectId?: string;
+    },
+  ) {
     return this.prisma.majorMinorRule.findMany({
       where: {
         tenantId,
-        isActive: true,
-        ...(institutionId
-          ? { majorSubject: { institutionId, deletedAt: null } }
+        ...(filters?.majorSubjectId
+          ? { majorSubjectId: filters.majorSubjectId }
+          : {}),
+        ...(filters?.shiftId
+          ? { OR: [{ shiftId: filters.shiftId }, { shiftId: null }] }
+          : {}),
+        ...(filters?.institutionId
+          ? {
+              majorSubject: {
+                institutionId: filters.institutionId,
+                deletedAt: null,
+              },
+            }
           : {}),
       },
       include: {
         majorSubject: { include: { department: true } },
         allowedMinorSubject: { include: { department: true } },
+        shift: { select: { id: true, code: true, name: true } },
+        academicYear: { select: { id: true, name: true } },
       },
       orderBy: [
         { majorSubject: { name: 'asc' } },
         { allowedMinorSubject: { name: 'asc' } },
       ],
+    });
+  }
+
+  async syncMajorMinorRules(
+    tenantId: string,
+    input: {
+      majorSubjectId: string;
+      allowedMinorSubjectIds: string[];
+      shiftId?: string | null;
+      academicYearId?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    const {
+      majorSubjectId,
+      allowedMinorSubjectIds,
+      shiftId = null,
+      academicYearId = null,
+      isActive = true,
+    } = input;
+    const uniqueMinorIds = [...new Set(allowedMinorSubjectIds.filter(Boolean))];
+
+    const majorSubject = await this.prisma.academicSubject.findFirst({
+      where: { id: majorSubjectId, tenantId, deletedAt: null },
+    });
+    if (!majorSubject) {
+      throw new BadRequestException('Major subject not found.');
+    }
+
+    if (uniqueMinorIds.includes(majorSubjectId)) {
+      throw new BadRequestException(
+        'Major and minor subjects must be different.',
+      );
+    }
+
+    const existing = await this.prisma.majorMinorRule.findMany({
+      where: {
+        tenantId,
+        majorSubjectId,
+        shiftId,
+        academicYearId,
+      },
+    });
+    const allowedSet = new Set(uniqueMinorIds);
+
+    for (const rule of existing) {
+      if (!allowedSet.has(rule.allowedMinorSubjectId)) {
+        await this.prisma.majorMinorRule.update({
+          where: { id: rule.id },
+          data: { isActive: false },
+        });
+      }
+    }
+
+    for (const minorSubjectId of uniqueMinorIds) {
+      const found = existing.find(
+        (rule) => rule.allowedMinorSubjectId === minorSubjectId,
+      );
+      if (found) {
+        await this.prisma.majorMinorRule.update({
+          where: { id: found.id },
+          data: { isActive },
+        });
+      } else {
+        await this.prisma.majorMinorRule.create({
+          data: {
+            tenantId,
+            majorSubjectId,
+            allowedMinorSubjectId: minorSubjectId,
+            shiftId,
+            academicYearId,
+            isActive,
+          },
+        });
+      }
+    }
+
+    return this.listMajorMinorRules(tenantId, {
+      shiftId: shiftId ?? undefined,
+      majorSubjectId,
+    });
+  }
+
+  async setMajorMinorRuleActive(
+    tenantId: string,
+    ruleId: string,
+    isActive: boolean,
+  ) {
+    const rule = await this.prisma.majorMinorRule.findFirst({
+      where: { id: ruleId, tenantId },
+    });
+    if (!rule) {
+      throw new BadRequestException('Major/minor rule not found.');
+    }
+    return this.prisma.majorMinorRule.update({
+      where: { id: ruleId },
+      data: { isActive },
+      include: {
+        majorSubject: { include: { department: true } },
+        allowedMinorSubject: { include: { department: true } },
+        shift: { select: { id: true, code: true, name: true } },
+        academicYear: { select: { id: true, name: true } },
+      },
     });
   }
 
@@ -245,6 +368,7 @@ export class MajorMinorEligibilityService {
       tenantId,
       programVersionId,
       'MINOR',
+      shiftId,
     );
 
     const eligibleSlugs = [...allowedSlugs].filter((slug) =>
@@ -283,6 +407,7 @@ export class MajorMinorEligibilityService {
     majorSubjectSlug: string,
     minorSubjectSlug: string,
     academicYearId?: string,
+    shiftId?: string,
   ): Promise<{ ok: boolean; issues: { code: string; message: string }[] }> {
     const issues: { code: string; message: string }[] = [];
     const majorSlug = this.normalizeSlug(majorSubjectSlug);
@@ -325,23 +450,63 @@ export class MajorMinorEligibilityService {
     }
     if (!majorSubject || !minorSubject) return { ok: false, issues };
 
-    const rule = await this.prisma.majorMinorRule.findFirst({
+    const rules = await this.prisma.majorMinorRule.findMany({
       where: {
         tenantId,
         majorSubjectId: majorSubject.id,
         allowedMinorSubjectId: minorSubject.id,
         isActive: true,
-        OR: [
-          { academicYearId: academicYearId ?? undefined },
-          { academicYearId: null },
+        AND: [
+          {
+            OR: [
+              { academicYearId: academicYearId ?? undefined },
+              { academicYearId: null },
+            ],
+          },
+          ...(shiftId ? [{ OR: [{ shiftId }, { shiftId: null }] }] : []),
         ],
       },
     });
 
-    if (!rule) {
+    if (rules.length === 0) {
+      const minorRules = await this.prisma.majorMinorRule.findMany({
+        where: {
+          tenantId,
+          majorSubjectId: majorSubject.id,
+          isActive: true,
+          AND: [
+            {
+              OR: [
+                { academicYearId: academicYearId ?? undefined },
+                { academicYearId: null },
+              ],
+            },
+            ...(shiftId ? [{ OR: [{ shiftId }, { shiftId: null }] }] : []),
+          ],
+        },
+        include: {
+          allowedMinorSubject: { include: { department: true } },
+        },
+      });
+      const allowedNames = [
+        ...new Set(
+          minorRules.map(
+            (rule) =>
+              rule.allowedMinorSubject.department?.name ??
+              rule.allowedMinorSubject.name,
+          ),
+        ),
+      ].sort((a, b) => a.localeCompare(b));
+      const allowedLines = allowedNames.map((name) => `• ${name}`).join('\n');
       issues.push({
         code: 'INVALID_MAJOR_MINOR_PAIR',
-        message: `${majorSubject.name} cannot be paired with ${minorSubject.name} as minor.`,
+        message: [
+          'Invalid Minor Subject.',
+          '',
+          `For ${majorSubject.name} Major, allowed Minor subjects are:`,
+          '',
+          allowedLines || '• (none configured)',
+        ].join('\n'),
       });
     }
 
@@ -353,12 +518,14 @@ export class MajorMinorEligibilityService {
     majorSubjectSlug: string,
     minorSubjectSlug: string,
     academicYearId?: string,
+    shiftId?: string,
   ) {
     const result = await this.validateMajorMinorPair(
       tenantId,
       majorSubjectSlug,
       minorSubjectSlug,
       academicYearId,
+      shiftId,
     );
     if (!result.ok) {
       throw new BadRequestException({
