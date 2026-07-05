@@ -240,6 +240,12 @@ export function validateDeskPaymentForm(
   return null;
 }
 
+export type PaymentMethodSource =
+  | 'INSTITUTION_DEFAULT'
+  | 'CASHIER_LAST_USED'
+  | 'SINGLE_MODE'
+  | 'MANUAL';
+
 export function buildCollectionPayload(
   method: DeskPaymentMethodDef,
   values: DeskPaymentFormValues,
@@ -247,6 +253,7 @@ export function buildCollectionPayload(
   demandIds: string[],
   amount: number,
   collectedByName?: string,
+  paymentMethodSource?: PaymentMethodSource,
 ) {
   const externalReference = resolveExternalReference(method, values);
   const utrNumber = values.utrNumber?.trim() || undefined;
@@ -262,6 +269,7 @@ export function buildCollectionPayload(
     metadata: {
       collectionMethod: method.id,
       collectionMethodLabel: method.label,
+      paymentMethodSource: paymentMethodSource ?? 'MANUAL',
       ...values,
       utrNumber,
       transactionReference:
@@ -274,4 +282,36 @@ export function buildCollectionPayload(
       clearanceStatus: method.pendingClearance ? 'PENDING' : 'CLEARED',
     },
   };
+}
+
+/** Resolve institution default / last-used / single-mode preselection. */
+export function resolveDefaultDeskPaymentMethod(input: {
+  enabledMethodIds: DeskPaymentMethodId[];
+  institutionDefault?: string | null;
+  rememberLast?: boolean;
+  lastUsedMethodId?: string | null;
+}): { methodId: DeskPaymentMethodId | ''; source: PaymentMethodSource | null } {
+  const enabled = new Set(input.enabledMethodIds);
+
+  if (
+    input.rememberLast &&
+    input.lastUsedMethodId &&
+    enabled.has(input.lastUsedMethodId as DeskPaymentMethodId)
+  ) {
+    return {
+      methodId: input.lastUsedMethodId as DeskPaymentMethodId,
+      source: 'CASHIER_LAST_USED',
+    };
+  }
+
+  const inst = String(input.institutionDefault ?? 'NONE');
+  if (inst && inst !== 'NONE' && enabled.has(inst as DeskPaymentMethodId)) {
+    return { methodId: inst as DeskPaymentMethodId, source: 'INSTITUTION_DEFAULT' };
+  }
+
+  if (input.enabledMethodIds.length === 1) {
+    return { methodId: input.enabledMethodIds[0], source: 'SINGLE_MODE' };
+  }
+
+  return { methodId: '', source: null };
 }

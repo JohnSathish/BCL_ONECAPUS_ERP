@@ -68,9 +68,11 @@ import { MonthlyFeeSetupGuide } from '@/components/fees-module/monthly-fee-setup
 import {
   buildCollectionPayload,
   enabledDeskPaymentMethods,
+  resolveDefaultDeskPaymentMethod,
   validateDeskPaymentForm,
   type DeskPaymentFormValues,
   type DeskPaymentMethodId,
+  type PaymentMethodSource,
 } from '@/lib/fee-collection-methods';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -152,6 +154,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   const [payChannel, setPayChannel] = useState<'OFFICE_QR' | 'PAYMENT_LINK'>('OFFICE_QR');
   const [manualReference, setManualReference] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState<DeskPaymentMethodId | ''>('');
+  const [paymentMethodSource, setPaymentMethodSource] = useState<PaymentMethodSource | null>(null);
   const [paymentFormValues, setPaymentFormValues] = useState<DeskPaymentFormValues>({});
 
   const settingsQ = useQuery({ queryKey: ['fee-settings'], queryFn: fetchFeeSettings });
@@ -410,6 +413,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
           demandIds,
           selectedTotal,
           collectorName,
+          paymentMethodSource ?? 'MANUAL',
         ),
       );
     },
@@ -425,6 +429,14 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
             ? `Payment collected — receipt ${res.receipt?.receiptNo ?? 'issued'}. Print receipt, then click Next student.`
             : `Payment collected — receipt ${res.receipt?.receiptNo ?? 'issued'}.`,
         );
+      }
+      if (settingsQ.data?.rememberLastPaymentMethod && paymentMethodId) {
+        const uid = session?.user?.id ?? session?.user?.email ?? 'cashier';
+        try {
+          localStorage.setItem(`fee-desk-last-method:${uid}`, paymentMethodId);
+        } catch {
+          /* ignore */
+        }
       }
       setPaymentFormValues({});
       void accountQ.refetch();
@@ -759,6 +771,30 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   const collectorName = session?.user?.displayName ?? session?.user?.email ?? 'Cashier';
   const isCollection = variant === 'collection';
 
+  // Preselect institution default / cashier last-used / single enabled mode.
+  useEffect(() => {
+    if (!settingsQ.data) return;
+    const methods = enabledDeskPaymentMethods(settingsQ.data.collectionModes);
+    const enabledIds = methods.map((m) => m.id);
+    const uid = session?.user?.id ?? session?.user?.email ?? 'cashier';
+    let lastUsed: string | null = null;
+    if (settingsQ.data.rememberLastPaymentMethod) {
+      try {
+        lastUsed = localStorage.getItem(`fee-desk-last-method:${uid}`);
+      } catch {
+        lastUsed = null;
+      }
+    }
+    const resolved = resolveDefaultDeskPaymentMethod({
+      enabledMethodIds: enabledIds,
+      institutionDefault: settingsQ.data.defaultPaymentMethod,
+      rememberLast: settingsQ.data.rememberLastPaymentMethod,
+      lastUsedMethodId: lastUsed,
+    });
+    setPaymentMethodId(resolved.methodId);
+    setPaymentMethodSource(resolved.source);
+  }, [settingsQ.data, studentId, session?.user?.id, session?.user?.email]);
+
   function resetForNextStudent() {
     setStudentId('');
     setSelectedStudent(null);
@@ -770,7 +806,6 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
     setActiveCheckout(null);
     setLastReceiptId(null);
     setManualReference('');
-    setPaymentMethodId('');
     setPaymentFormValues({});
     setMessage('Ready for next student — scan roll number or search.');
     window.setTimeout(() => searchRef.current?.focus(), 80);
@@ -1302,7 +1337,11 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   methodId={paymentMethodId}
                   values={paymentFormValues}
                   collectedByName={collectorName}
-                  onMethodChange={setPaymentMethodId}
+                  methodSource={paymentMethodSource}
+                  onMethodChange={(id) => {
+                    setPaymentMethodId(id);
+                    setPaymentMethodSource(id ? 'MANUAL' : null);
+                  }}
                   onValuesChange={setPaymentFormValues}
                 />
 

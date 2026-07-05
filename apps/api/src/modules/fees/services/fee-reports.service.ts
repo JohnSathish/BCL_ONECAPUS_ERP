@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import puppeteer from 'puppeteer';
+import {
+  buildInstitutionalExcelReport,
+  type InstitutionalReportColumn,
+} from '../../../common/reports';
 import { PrismaService } from '../../../database/prisma.service';
 import type { ReportsQueryDto } from '../dto/fees.dto';
 import { FEE_PAYMENT_SOURCE_LABELS } from '../constants/payment-source.constants';
@@ -122,7 +126,9 @@ export class FeeReportsService {
             Number(b.balanceAmount ?? 0) - Number(a.balanceAmount ?? 0),
         )
         .slice(0, 10)
-        .map((d: any) => this.enrichDemandRow(d, studentMap.get(d.studentId))),
+        .map((d: any) =>
+          this.enrichDemandRow(d, studentMap.get(String(d.studentId ?? ''))),
+        ),
     };
   }
 
@@ -177,59 +183,101 @@ export class FeeReportsService {
       };
     }
     if (type === 'outstanding' || type === 'defaulters') {
+      const includeOrphans = Boolean(
+        (query as { includeOrphans?: boolean }).includeOrphans,
+      );
       const demands = await this.db().studentFeeDemand.findMany({
         where: {
           tenantId,
           balanceAmount: { gt: 0 },
+          status: { notIn: ['CANCELLED', 'ROLLED_BACK'] },
           ...this.academicWhere(query),
         },
-        orderBy: { balanceAmount: 'desc' },
-        take: 2000,
+        orderBy: [{ balanceAmount: 'desc' }, { demandNo: 'asc' }],
+        take: 5000,
       });
       const studentIds = this.uniqueStudentIds(demands);
       const studentMap = await this.loadStudents(tenantId, studentIds);
       if (type === 'defaulters') {
         const byStudent = new Map<string, Record<string, unknown>>();
         for (const d of demands) {
-          const student = studentMap.get(d.studentId);
-          const existing = byStudent.get(d.studentId) ?? {
-            studentId: d.studentId,
-            studentName:
-              student?.masterProfile?.fullName ??
-              student?.user?.displayName ??
-              '—',
-            enrollmentNumber: student?.enrollmentNumber ?? '—',
+          const sid = String(d.studentId);
+          const student = studentMap.get(sid);
+          if (!includeOrphans && !student) continue;
+          const existing = byStudent.get(sid) ?? {
+            studentId: sid,
+            studentName: this.studentDisplayName(student, sid),
+            rollNumber: student?.rollNumber ?? '—',
+            universityRollNumber: student?.universityRollNumber ?? '—',
             mobileNumber: student?.masterProfile?.mobileNumber ?? '—',
             programme: student?.programVersion?.program?.name ?? '—',
             amountDue: 0,
             monthsPending: 0,
+            _missingStudent: !student,
           };
           const balance = Number(d.balanceAmount ?? 0);
           existing.amountDue = Number(existing.amountDue) + balance;
           if (d.demandType === 'MONTHLY_TUITION' && balance > 0) {
             existing.monthsPending = Number(existing.monthsPending) + 1;
           }
-          byStudent.set(d.studentId, existing);
+          byStudent.set(sid, existing);
         }
-        const rows = Array.from(byStudent.values()).sort(
-          (a, b) => Number(b.amountDue) - Number(a.amountDue),
-        );
+        const rows = Array.from(byStudent.values()).sort((a, b) => {
+          const miss =
+            Number(Boolean(a._missingStudent)) -
+            Number(Boolean(b._missingStudent));
+          if (miss !== 0) return miss;
+          return Number(b.amountDue) - Number(a.amountDue);
+        });
         return {
           type,
-          total: rows.reduce((s, r) => s + Number(r.amountDue), 0),
+          total: rows.reduce(
+            (s: number, r: { amountDue?: unknown }) => s + Number(r.amountDue),
+            0,
+          ),
           rows,
+          meta: {
+            includeOrphans,
+            linkedStudents: rows.filter(
+              (r: { _missingStudent?: boolean }) => !r._missingStudent,
+            ).length,
+            orphanStudents: rows.filter(
+              (r: { _missingStudent?: boolean }) => r._missingStudent,
+            ).length,
+          },
         };
       }
-      const rows = demands.map((d: any) =>
-        this.enrichDemandRow(d, studentMap.get(d.studentId)),
-      );
+      let rows = demands.map((d: { studentId?: unknown }) =>
+        this.enrichDemandRow(d, studentMap.get(String(d.studentId ?? ''))),
+      ) as Array<{
+        _missingStudent?: boolean;
+        balanceAmount?: number;
+        [key: string]: unknown;
+      }>;
+      const orphanCount = rows.filter((r) => r._missingStudent).length;
+      if (!includeOrphans) {
+        rows = rows.filter((r) => !r._missingStudent);
+      }
+      rows = rows.sort((a, b) => {
+        const miss =
+          Number(Boolean(a._missingStudent)) -
+          Number(Boolean(b._missingStudent));
+        if (miss !== 0) return miss;
+        return Number(b.balanceAmount) - Number(a.balanceAmount);
+      });
       return {
         type,
-        total: demands.reduce(
-          (sum: number, row: any) => sum + Number(row.balanceAmount ?? 0),
+        total: rows.reduce(
+          (sum, row) => sum + Number(row.balanceAmount ?? 0),
           0,
         ),
         rows,
+        meta: {
+          includeOrphans,
+          linkedDemands: rows.filter((r) => !r._missingStudent).length,
+          orphanDemandsExcluded: includeOrphans ? 0 : orphanCount,
+          orphanDemandsIncluded: includeOrphans ? orphanCount : 0,
+        },
       };
     }
     if (type === 'reconciliation') {
@@ -420,14 +468,16 @@ export class FeeReportsService {
     );
 
     const rows = payments.map((p: any) => {
-      const student = studentMap.get(p.studentId);
+      const student = studentMap.get(String(p.studentId ?? ''));
       return {
         date: p.paidAt ?? p.createdAt,
         receiptNo: receiptMap.get(p.id) ?? '—',
         transactionNo: p.transactionNo,
         studentId: p.studentId,
-        studentName:
-          student?.masterProfile?.fullName ?? student?.user?.displayName ?? '—',
+        studentName: this.studentDisplayName(
+          student,
+          String(p.studentId ?? ''),
+        ),
         amount: Number(p.amount),
         paymentMode: p.paymentMode,
         collectedBy: p.collectedById
@@ -486,15 +536,29 @@ export class FeeReportsService {
     }
 
     if (format === 'xlsx' || format === 'excel') {
-      const buffer = await this.buildExcelBuffer(`${type} report`, rows);
-      return { format: 'xlsx', buffer, filename: `${type}-report.xlsx` };
+      const total = Number((report as { total?: number }).total ?? 0);
+      const reportMeta = (report as { meta?: Record<string, unknown> }).meta;
+      const built = await this.buildInstitutionalFeeExcel(
+        type,
+        rows,
+        total,
+        reportMeta,
+      );
+      return {
+        format: 'xlsx',
+        buffer: built.buffer,
+        filename: built.filename,
+      };
     }
 
     if (format === 'pdf') {
-      const buffer = await this.buildPdfBuffer(
-        `${type.replace(/_/g, ' ')} Report`,
+      const total = Number((report as { total?: number }).total ?? 0);
+      const reportMeta = (report as { meta?: Record<string, unknown> }).meta;
+      const buffer = await this.buildInstitutionalFeePdf(
+        type,
         rows,
-        `Total: ₹${Number((report as { total?: number }).total ?? 0).toLocaleString('en-IN')}`,
+        total,
+        reportMeta,
       );
       return { format: 'pdf', buffer, filename: `${type}-report.pdf` };
     }
@@ -595,21 +659,216 @@ export class FeeReportsService {
     title: string,
     rows: Record<string, unknown>[],
   ) {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Report');
-    sheet.addRow([title]);
-    sheet.addRow([]);
-    if (!rows.length) {
-      sheet.addRow(['No records']);
-    } else {
-      const keys = Object.keys(rows[0]);
-      sheet.addRow(keys);
-      for (const row of rows) {
-        sheet.addRow(keys.map((k) => row[k] ?? ''));
+    const built = await this.buildInstitutionalFeeExcel(
+      title
+        .replace(/\s+report$/i, '')
+        .replace(/\s+/g, '-')
+        .toLowerCase() || 'fee',
+      rows,
+      0,
+    );
+    return built.buffer;
+  }
+
+  private feeReportTitle(type: string) {
+    const titles: Record<string, string> = {
+      outstanding: 'Outstanding Fee Report',
+      defaulters: 'Fee Defaulters Report',
+      'daily-collection': 'Daily Fee Collection',
+      'monthly-collection': 'Monthly Fee Collection',
+      'yearly-collection': 'Yearly Fee Collection',
+      'cash-book': 'Cash Book',
+      collections: 'Fee Collections',
+      fines: 'Fine Report',
+      scholarships: 'Scholarship Report',
+      'fee-heads': 'Fee Heads Report',
+      'payment-modes': 'Payment Modes Report',
+      'admission-cycles': 'Admission Cycles Fee Report',
+      'monthly-status': 'Monthly Fee Status',
+      audit: 'Fee Audit Report',
+    };
+    return (
+      titles[type] ??
+      `${type.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} Report`
+    );
+  }
+
+  /** Prefer human-readable columns; hide internal UUIDs / JSON blobs. */
+  private feeExcelColumns(
+    type: string,
+    sample: Record<string, unknown> | undefined,
+  ): InstitutionalReportColumn[] {
+    const presets: Record<string, InstitutionalReportColumn[]> = {
+      outstanding: [
+        { key: 'demandNo', label: 'Demand No.' },
+        { key: 'rollNumber', label: 'Roll No.' },
+        { key: 'universityRollNumber', label: 'NEHU Roll No.' },
+        { key: 'studentName', label: 'Student Name' },
+        { key: 'programme', label: 'Programme' },
+        { key: 'demandType', label: 'Demand Type' },
+        { key: 'billingPeriod', label: 'Billing Period' },
+        { key: 'status', label: 'Status' },
+        { key: 'totalAmount', label: 'Total Amount', align: 'right' },
+        { key: 'paidAmount', label: 'Paid', align: 'right' },
+        { key: 'fineAmount', label: 'Fine', align: 'right' },
+        { key: 'concessionAmount', label: 'Concession', align: 'right' },
+        { key: 'balanceAmount', label: 'Balance Due', align: 'right' },
+        { key: 'dueDate', label: 'Due Date' },
+        { key: 'mobileNumber', label: 'Mobile' },
+      ],
+      defaulters: [
+        { key: 'rollNumber', label: 'Roll No.' },
+        { key: 'universityRollNumber', label: 'NEHU Roll No.' },
+        { key: 'studentName', label: 'Student Name' },
+        { key: 'programme', label: 'Programme' },
+        { key: 'mobileNumber', label: 'Mobile' },
+        { key: 'amountDue', label: 'Amount Due', align: 'right' },
+        { key: 'monthsPending', label: 'Months Pending', align: 'center' },
+      ],
+      'daily-collection': [
+        { key: 'receiptNo', label: 'Receipt No.' },
+        { key: 'dateTime', label: 'Date & Time' },
+        { key: 'studentName', label: 'Student' },
+        { key: 'rollNumber', label: 'Admission / Roll No.' },
+        { key: 'programme', label: 'Programme' },
+        { key: 'semester', label: 'Sem', align: 'center' },
+        { key: 'feeCategory', label: 'Fee Category' },
+        { key: 'mode', label: 'Payment Mode' },
+        { key: 'amount', label: 'Amount', align: 'right' },
+        { key: 'collectedBy', label: 'Collected By' },
+      ],
+    };
+    if (presets[type]) return presets[type];
+
+    const hidden = new Set([
+      'id',
+      'tenantId',
+      'studentId',
+      'feeStructureId',
+      'feeCycleId',
+      'academicYearId',
+      'semesterId',
+      'monthlyFeePlanId',
+      'generatedBy',
+      'metadata',
+      'deletedAt',
+      'createdAt',
+      'updatedAt',
+      'feeProductCode',
+      'billingLayer',
+    ]);
+    const keys = sample
+      ? Object.keys(sample).filter(
+          (k) =>
+            !hidden.has(k) &&
+            !k.toLowerCase().endsWith('id') &&
+            typeof sample[k] !== 'object',
+        )
+      : ['value'];
+    return keys.map((key) => ({
+      key,
+      label: key
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
+      align: /amount|total|paid|balance|fine|due|count/i.test(key)
+        ? ('right' as const)
+        : undefined,
+    }));
+  }
+
+  private formatFeeExcelCell(key: string, value: unknown) {
+    if (value == null || value === '') return '—';
+    if (
+      /amount|total|paid|balance|fine|concession|due/i.test(key) &&
+      value !== '—'
+    ) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : value;
+    }
+    if (
+      value instanceof Date ||
+      ((/at$/i.test(key) || /date/i.test(key)) &&
+        typeof value === 'string' &&
+        /^\d{4}-\d{2}/.test(value))
+    ) {
+      const d = value instanceof Date ? value : new Date(String(value));
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
       }
     }
-    const buffer = await workbook.xlsx.writeBuffer();
-    return Buffer.from(buffer);
+    if (typeof value === 'object') return JSON.stringify(value);
+    return value;
+  }
+
+  private async buildInstitutionalFeeExcel(
+    type: string,
+    rows: Record<string, unknown>[],
+    total: number,
+    reportMeta?: Record<string, unknown>,
+  ) {
+    const title = this.feeReportTitle(type);
+    const columns = this.feeExcelColumns(type, rows[0]);
+    const missingStudents = rows.filter((r) => r._missingStudent).length;
+    const linkedStudents = rows.length - missingStudents;
+    const excluded = Number(reportMeta?.orphanDemandsExcluded ?? 0);
+    const displayRows = rows.map((row) => {
+      const out: Record<string, unknown> = {};
+      for (const col of columns) {
+        out[col.key] = this.formatFeeExcelCell(col.key, row[col.key]);
+      }
+      return out;
+    });
+
+    return buildInstitutionalExcelReport({
+      meta: {
+        institutionName: 'Don Bosco College, Tura',
+        institutionTagline: 'Affiliated to NEHU | NAAC Accredited | Meghalaya',
+        productName: 'BCL OneCampus ERP',
+        reportTitle: title,
+        reportIcon: '₹',
+        summary: {
+          Records: displayRows.length,
+          'With student details': linkedStudents,
+          ...(missingStudents > 0
+            ? { 'Missing student record': missingStudents }
+            : {}),
+          ...(excluded > 0 ? { 'Orphan demands excluded': excluded } : {}),
+          'Total Outstanding / Amount': `₹${Number(total || 0).toLocaleString('en-IN')}`,
+        },
+        filterLines: [
+          { label: 'Report type', value: type },
+          { label: 'Currency', value: 'INR' },
+          {
+            label: 'Accuracy',
+            value:
+              excluded > 0
+                ? `Excludes ${excluded} orphan demand(s) (no student record)`
+                : missingStudents > 0
+                  ? `Includes ${missingStudents} orphan demand(s)`
+                  : 'Linked students only',
+          },
+        ],
+      },
+      sheets: [
+        {
+          name: 'Fee Report',
+          columns,
+          rows: displayRows.length
+            ? displayRows
+            : [
+                Object.fromEntries(
+                  columns.map((c, i) => [c.key, i === 0 ? 'No records' : '—']),
+                ),
+              ],
+        },
+      ],
+      filenameBase: `${type}-report`,
+    });
   }
 
   private escapeHtml(value: unknown) {
@@ -627,37 +886,378 @@ export class FeeReportsService {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  private formatInrPdf(amount: number) {
+    return `₹${Number(amount || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  private formatDateLong(value: unknown) {
+    const d = value instanceof Date ? value : new Date(String(value ?? ''));
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  private formatDateTimePdf(value: unknown) {
+    const d = value instanceof Date ? value : new Date(String(value ?? ''));
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  private async buildInstitutionalFeePdf(
+    type: string,
+    rows: Record<string, unknown>[],
+    total: number,
+    reportMeta?: Record<string, unknown>,
+  ) {
+    const title = this.feeReportTitle(type);
+    const generatedAt = new Date();
+    const reportId = `${type.toUpperCase()}-${generatedAt
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, '')}-${String(rows.length).padStart(4, '0')}`;
+    const verifyPayload = Buffer.from(
+      JSON.stringify({
+        reportId,
+        type,
+        total,
+        generatedAt: generatedAt.toISOString(),
+        institution: 'DBC-TURA',
+      }),
+    ).toString('base64url');
+    const verifyUrl = `https://erp.donboscocollege.ac.in/verify/fee-report?t=${verifyPayload}`;
+    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(verifyUrl)}`;
+
+    const modeSummary =
+      (reportMeta?.modeSummary as Array<{
+        mode: string;
+        count: number;
+        amount: number;
+      }>) ?? [];
+    const txnCount = Number(reportMeta?.transactionCount ?? rows.length);
+    const onlineCount = Number(reportMeta?.onlineCount ?? 0);
+    const offlineCount = Number(reportMeta?.offlineCount ?? 0);
+    const refunds = Number(reportMeta?.refunds ?? 0);
+    const filters = (reportMeta?.filters ?? {}) as {
+      from?: string | null;
+      to?: string | null;
+    };
+
+    const isCollection =
+      type === 'daily-collection' ||
+      type === 'collections' ||
+      type === 'monthly-collection';
+
+    let tableBody = '';
+    if (isCollection && rows.some((r) => r.date || r.dateTime)) {
+      const byDate = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const key = String(row.date ?? String(row.dateTime).slice(0, 10));
+        const list = byDate.get(key) ?? [];
+        list.push(row);
+        byDate.set(key, list);
+      }
+      const sortedDates = [...byDate.keys()].sort((a, b) => b.localeCompare(a));
+      let serial = 1;
+      for (const dateKey of sortedDates) {
+        const dayRows = byDate.get(dateKey) ?? [];
+        const subtotal = dayRows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
+        tableBody += `<tr class="date-group"><td colspan="10">${this.escapeHtml(this.formatDateLong(dateKey))}</td></tr>`;
+        for (const row of dayRows) {
+          tableBody += `<tr>
+            <td class="c">${serial++}</td>
+            <td>${this.escapeHtml(row.receiptNo)}</td>
+            <td>${this.escapeHtml(this.formatDateTimePdf(row.dateTime ?? row.date))}</td>
+            <td>${this.escapeHtml(row.studentName)}</td>
+            <td>${this.escapeHtml(row.rollNumber ?? row.enrollmentNumber)}</td>
+            <td>${this.escapeHtml(row.programme ?? '—')}</td>
+            <td class="c">${this.escapeHtml(row.semester ?? '—')}</td>
+            <td>${this.escapeHtml(row.feeCategory ?? 'Fee Payment')}</td>
+            <td>${this.escapeHtml(row.mode)}</td>
+            <td class="num">${this.escapeHtml(this.formatInrPdf(Number(row.amount ?? 0)))}</td>
+          </tr>`;
+        }
+        tableBody += `<tr class="subtotal"><td colspan="9">Subtotal — ${this.escapeHtml(this.formatDateLong(dateKey))}</td><td class="num">${this.escapeHtml(this.formatInrPdf(subtotal))}</td></tr>`;
+      }
+    } else {
+      const columns = this.feeExcelColumns(type, rows[0]);
+      tableBody = rows
+        .slice(0, 500)
+        .map((row, i) => {
+          const cells = columns
+            .map((col) => {
+              const raw = this.formatFeeExcelCell(col.key, row[col.key]);
+              const isMoney = /amount|total|paid|balance|fine|due/i.test(
+                col.key,
+              );
+              const display =
+                isMoney && typeof raw === 'number'
+                  ? this.formatInrPdf(raw)
+                  : String(raw ?? '—');
+              return `<td class="${isMoney ? 'num' : ''}">${this.escapeHtml(display)}</td>`;
+            })
+            .join('');
+          return `<tr><td class="c">${i + 1}</td>${cells}</tr>`;
+        })
+        .join('');
+    }
+
+    const collectionHead = `<tr>
+      <th>Sl.</th><th>Receipt No.</th><th>Date &amp; Time</th><th>Student</th>
+      <th>Admission / Roll No.</th><th>Programme</th><th>Sem</th>
+      <th>Fee Category</th><th>Payment Mode</th><th>Amount</th>
+    </tr>`;
+    const genericHead = `<tr><th>Sl.</th>${this.feeExcelColumns(type, rows[0])
+      .map((c) => `<th>${this.escapeHtml(c.label)}</th>`)
+      .join('')}</tr>`;
+
+    const modeSummaryHtml =
+      modeSummary.length > 0
+        ? modeSummary
+            .map(
+              (m) =>
+                `<tr><td>${this.escapeHtml(m.mode)}</td><td class="c">${m.count}</td><td class="num">${this.escapeHtml(this.formatInrPdf(m.amount))}</td></tr>`,
+            )
+            .join('')
+        : '';
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+  @page { size: A4 landscape; margin: 14mm 12mm 18mm 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    color: #0f172a;
+    font-size: 10px;
+    margin: 0;
+    position: relative;
+  }
+  body::before {
+    content: "DON BOSCO COLLEGE  ·  BCL OneCampus ERP";
+    position: fixed;
+    top: 42%;
+    left: 8%;
+    width: 84%;
+    text-align: center;
+    font-size: 34px;
+    font-weight: 700;
+    color: rgba(30, 58, 138, 0.06);
+    transform: rotate(-24deg);
+    z-index: 0;
+    pointer-events: none;
+  }
+  .page { position: relative; z-index: 1; }
+  .header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 12px; }
+  .college { font-size: 18px; font-weight: 800; color: #1e3a8a; letter-spacing: 0.04em; }
+  .tagline { font-size: 10px; color: #475569; margin-top: 2px; }
+  .product { font-size: 11px; font-weight: 700; color: #1e3a8a; margin-top: 6px; }
+  .report-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 6px; text-transform: uppercase; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-top: 10px; text-align: left; font-size: 10px; color: #334155; }
+  .meta-grid strong { color: #0f172a; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+  .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; background: #f8fafc; }
+  .card .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; font-weight: 700; }
+  .card .value { font-size: 14px; font-weight: 800; color: #1e3a8a; margin-top: 2px; }
+  .filters { margin: 8px 0 12px; padding: 8px 10px; background: #f1f5f9; border-radius: 6px; font-size: 9px; color: #475569; }
+  .filters strong { color: #0f172a; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 9px; }
+  table.data th {
+    background: #1e3a8a;
+    color: #fff;
+    padding: 6px 5px;
+    text-align: left;
+    font-weight: 700;
+  }
+  table.data td { padding: 5px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  table.data tr:nth-child(even):not(.date-group):not(.subtotal) td { background: #f8fafc; }
+  table.data .date-group td {
+    background: #dbeafe !important;
+    color: #1e3a8a;
+    font-weight: 800;
+    padding-top: 8px;
+    border-top: 1px solid #93c5fd;
+  }
+  table.data .subtotal td {
+    background: #f1f5f9 !important;
+    font-weight: 700;
+    border-top: 1px solid #cbd5e1;
+  }
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .c { text-align: center; }
+  .totals {
+    margin-top: 10px;
+    border-top: 2px solid #1e3a8a;
+    padding-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 24px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .summary-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+  .summary-box h3 { margin: 0 0 6px; font-size: 11px; color: #1e3a8a; }
+  .summary-box table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  .summary-box th, .summary-box td { border: 1px solid #e2e8f0; padding: 4px 6px; }
+  .summary-box th { background: #eff6ff; text-align: left; }
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-top: 28px;
+    text-align: center;
+    font-size: 10px;
+  }
+  .signatures .line { border-top: 1px solid #334155; margin: 28px 16px 6px; }
+  .footer-bar {
+    margin-top: 18px;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+    font-size: 8px;
+    color: #64748b;
+  }
+  .footer-bar .center { text-align: center; }
+  .footer-bar .right { text-align: right; }
+  .verify { display: flex; align-items: center; gap: 8px; }
+  .verify img { width: 72px; height: 72px; border: 1px solid #e2e8f0; }
+  .confidential { font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; }
+</style></head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="college">DON BOSCO COLLEGE, TURA</div>
+    <div class="tagline">Affiliated to NEHU · NAAC Accredited · Meghalaya</div>
+    <div class="product">BCL OneCampus ERP</div>
+    <div class="report-title">${this.escapeHtml(title)}</div>
+    <div class="meta-grid">
+      <div><strong>Report ID:</strong> ${this.escapeHtml(reportId)}</div>
+      <div><strong>Generated On:</strong> ${this.escapeHtml(this.formatDateTimePdf(generatedAt))}</div>
+      <div><strong>Report Period:</strong> ${this.escapeHtml(
+        filters.from || filters.to
+          ? `${filters.from ?? '—'} to ${filters.to ?? '—'}`
+          : 'All available payments',
+      )}</div>
+      <div><strong>Generated By:</strong> System Administrator</div>
+      <div><strong>Currency:</strong> INR</div>
+      <div><strong>Status:</strong> Paid / Successful only</div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Total Collection</div><div class="value">${this.escapeHtml(this.formatInrPdf(total))}</div></div>
+    <div class="card"><div class="label">Total Transactions</div><div class="value">${txnCount}</div></div>
+    <div class="card"><div class="label">Online Payments</div><div class="value">${onlineCount}</div></div>
+    <div class="card"><div class="label">Offline / Cash</div><div class="value">${offlineCount}</div></div>
+  </div>
+
+  <div class="filters">
+    <strong>Filters applied:</strong>
+    Date range: ${this.escapeHtml(filters.from ?? 'All')} – ${this.escapeHtml(filters.to ?? 'All')}
+    · Payment mode: All · Department: All · Programme: All · Status: Paid
+    · Refunds: ${refunds}
+  </div>
+
+  <table class="data">
+    <thead>${isCollection ? collectionHead : genericHead}</thead>
+    <tbody>
+      ${tableBody || '<tr><td colspan="10">No records</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div>Total Transactions: ${txnCount}</div>
+    <div>Grand Total: ${this.escapeHtml(this.formatInrPdf(total))}</div>
+  </div>
+
+  ${
+    modeSummaryHtml
+      ? `<div class="summary-wrap">
+    <div class="summary-box">
+      <h3>Payment Mode Summary</h3>
+      <table>
+        <thead><tr><th>Mode</th><th>Count</th><th>Amount</th></tr></thead>
+        <tbody>${modeSummaryHtml}
+        <tr><th>Grand Total</th><th class="c">${txnCount}</th><th class="num">${this.escapeHtml(this.formatInrPdf(total))}</th></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="summary-box">
+      <h3>Collection Snapshot</h3>
+      <table>
+        <tbody>
+          <tr><td>Online payments</td><td class="num">${onlineCount}</td></tr>
+          <tr><td>Offline / cash payments</td><td class="num">${offlineCount}</td></tr>
+          <tr><td>Refunds</td><td class="num">${refunds}</td></tr>
+          <tr><td><strong>Net collection</strong></td><td class="num"><strong>${this.escapeHtml(this.formatInrPdf(total))}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`
+      : ''
+  }
+
+  <div class="signatures">
+    <div><div class="line"></div>Prepared By</div>
+    <div><div class="line"></div>Verified By</div>
+    <div><div class="line"></div>Bursar / Accounts Officer</div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="verify">
+      <img src="${qrImg}" alt="Verify report"/>
+      <div>
+        <div><strong>Scan to verify report</strong></div>
+        <div>ID: ${this.escapeHtml(reportId)}</div>
+      </div>
+    </div>
+    <div class="center">
+      <div class="confidential">Confidential</div>
+      <div>Generated by BCL OneCampus ERP · Powered by BaseCode Labs</div>
+    </div>
+    <div class="right">
+      <div>${this.escapeHtml(this.formatDateTimePdf(generatedAt))}</div>
+      <div>Page 1</div>
+    </div>
+  </div>
+</div>
+</body></html>`;
+
+    return this.htmlToPdf(html);
+  }
+
   private async buildPdfBuffer(
     title: string,
     rows: Record<string, unknown>[],
     summary?: string,
   ) {
-    const keys = rows.length ? Object.keys(rows[0]) : [];
-    const tableHead = keys
-      .map((k) => `<th>${this.escapeHtml(this.formatPdfColumnLabel(k))}</th>`)
-      .join('');
-    const tableRows = rows
-      .slice(0, 500)
-      .map(
-        (row) =>
-          `<tr>${keys.map((k) => `<td>${this.escapeHtml(row[k])}</td>`).join('')}</tr>`,
-      )
-      .join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
-      body{font-family:Arial,sans-serif;padding:24px;font-size:12px;color:#111}
-      h1{font-size:18px;margin-bottom:8px}
-      .meta{color:#555;margin-bottom:12px}
-      table{width:100%;border-collapse:collapse;margin-top:16px}
-      th,td{border:1px solid #ccc;padding:6px;text-align:left;vertical-align:top}
-      th{background:#f3f4f6}
-      tr:nth-child(even){background:#fafafa}
-    </style></head><body>
-      <h1>${this.escapeHtml(title)}</h1>
-      ${summary ? `<p class="meta">${this.escapeHtml(summary)}</p>` : ''}
-      <p class="meta">Generated ${this.escapeHtml(new Date().toLocaleString('en-IN'))}</p>
-      <table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows || '<tr><td colspan="99">No records</td></tr>'}</tbody></table>
-    </body></html>`;
-    return this.htmlToPdf(html);
+    return this.buildInstitutionalFeePdf(
+      title
+        .replace(/\s+report$/i, '')
+        .replace(/\s+/g, '-')
+        .toLowerCase() || 'fee',
+      rows,
+      Number(
+        String(summary ?? '')
+          .replace(/[^\d.]/g, '')
+          .replace(/^$/, '0'),
+      ),
+    );
   }
 
   private async buildDayClosingPdf(
@@ -747,11 +1347,11 @@ export class FeeReportsService {
         })
       : [];
     const studentMap = new Map(
-      students.map((s: Record<string, unknown>) => [s.id, s]),
+      students.map((s: Record<string, unknown>) => [String(s.id), s]),
     );
 
     return receipts.map((r: Record<string, unknown>) => {
-      const student = studentMap.get(r.studentId as string) as
+      const student = studentMap.get(String(r.studentId ?? '')) as
         | {
             enrollmentNumber?: string;
             user?: { displayName?: string };
@@ -904,15 +1504,18 @@ export class FeeReportsService {
     }
 
     const transactions = payments.map((p: Record<string, unknown>) => {
-      const student = studentMap.get(p.studentId as string);
+      const student = studentMap.get(String(p.studentId ?? ''));
       return {
         id: p.id,
         transactionNo: p.transactionNo,
         studentId: p.studentId,
-        studentName:
-          (student as { masterProfile?: { fullName?: string } })?.masterProfile
-            ?.fullName ??
-          (student as { user?: { displayName?: string } })?.user?.displayName,
+        studentName: this.studentDisplayName(
+          student as {
+            masterProfile?: { fullName?: string | null };
+            user?: { displayName?: string | null };
+          },
+          String(p.studentId ?? ''),
+        ),
         enrollmentNumber: (student as { enrollmentNumber?: string })
           ?.enrollmentNumber,
         paymentMode: p.paymentMode,
@@ -949,17 +1552,48 @@ export class FeeReportsService {
     };
   }
 
+  private studentDisplayName(
+    student:
+      | {
+          masterProfile?: { fullName?: string | null } | null;
+          user?: { displayName?: string | null } | null;
+        }
+      | null
+      | undefined,
+    studentId?: string,
+  ) {
+    const name =
+      student?.masterProfile?.fullName?.trim() ||
+      student?.user?.displayName?.trim() ||
+      '';
+    if (name) return name;
+    if (studentId) {
+      return `Missing student record (${String(studentId).slice(0, 8)}…)`;
+    }
+    return 'Unknown student';
+  }
+
+  /** Explicit display fields only — never spread raw demand (avoids UUID noise). */
   private enrichDemandRow(demand: any, student?: any) {
+    const studentId = String(demand.studentId ?? '');
     return {
-      ...demand,
-      studentName:
-        student?.user?.displayName ?? student?.masterProfile?.fullName ?? null,
-      enrollmentNumber: student?.enrollmentNumber ?? null,
+      demandNo: demand.demandNo ?? '—',
       rollNumber: student?.rollNumber ?? null,
-      mobileNumber:
-        student?.masterProfile?.mobileNumber ?? student?.mobileNumber ?? null,
+      universityRollNumber: student?.universityRollNumber ?? null,
+      studentName: this.studentDisplayName(student, studentId),
       programme: student?.programVersion?.program?.name ?? null,
+      demandType: demand.demandType ?? '—',
+      billingPeriod: demand.billingPeriod ?? '—',
+      status: demand.status ?? '—',
+      totalAmount: Number(demand.totalAmount ?? 0),
+      paidAmount: Number(demand.paidAmount ?? 0),
+      fineAmount: Number(demand.fineAmount ?? 0),
+      concessionAmount: Number(demand.concessionAmount ?? 0),
+      balanceAmount: Number(demand.balanceAmount ?? 0),
+      dueDate: demand.dueDate ?? null,
+      mobileNumber: student?.masterProfile?.mobileNumber ?? null,
       amountDue: Number(demand.balanceAmount ?? 0),
+      _missingStudent: !student,
     };
   }
 
@@ -975,15 +1609,33 @@ export class FeeReportsService {
 
   private async loadStudents(tenantId: string, studentIds: string[]) {
     if (!studentIds.length) return new Map<string, any>();
-    const students = await this.db().student.findMany({
-      where: { tenantId, id: { in: studentIds } },
-      include: {
-        user: { select: { displayName: true } },
-        masterProfile: { select: { fullName: true, mobileNumber: true } },
-        programVersion: { include: { program: true } },
-      },
-    });
-    return new Map(students.map((s: any) => [s.id, s]));
+    const ids = [...new Set(studentIds.map((id) => String(id)))];
+    const map = new Map<string, any>();
+    const chunkSize = 400;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const students = await this.prisma.student.findMany({
+        where: {
+          tenantId,
+          id: { in: chunk },
+        },
+        include: {
+          user: { select: { displayName: true } },
+          masterProfile: { select: { fullName: true, mobileNumber: true } },
+          programVersion: {
+            include: { program: { select: { name: true, code: true } } },
+          },
+          primaryShift: { select: { name: true, code: true } },
+          academicStanding: {
+            select: { currentSemesterSequence: true },
+          },
+        },
+      });
+      for (const student of students) {
+        map.set(String(student.id), student);
+      }
+    }
+    return map;
   }
 
   private async dailyCollectionReport(
@@ -994,6 +1646,14 @@ export class FeeReportsService {
       where: { tenantId, status: 'SUCCESS', ...this.paidAtDateWhere(query) },
       orderBy: { paidAt: 'desc' },
       take: 2000,
+      include: {
+        allocations: {
+          include: {
+            demand: { select: { demandType: true } },
+          },
+          take: 3,
+        },
+      },
     });
     const studentMap = await this.loadStudents(
       tenantId,
@@ -1023,31 +1683,78 @@ export class FeeReportsService {
     );
 
     const rows = payments.map((p: any) => {
-      const student = studentMap.get(p.studentId);
+      const student = studentMap.get(String(p.studentId ?? ''));
+      const paidAt = p.paidAt ?? p.createdAt;
+      const demandTypes = (p.allocations ?? [])
+        .map((a: { demand?: { demandType?: string } }) => a.demand?.demandType)
+        .filter(Boolean);
+      const feeCategory =
+        demandTypes.length > 0
+          ? [...new Set(demandTypes)]
+              .map((t) => String(t).replace(/_/g, ' '))
+              .join(', ')
+          : 'Fee Payment';
+      const modeLabel =
+        FEE_PAYMENT_SOURCE_LABELS[
+          (p.paymentSource ??
+            p.paymentMode) as keyof typeof FEE_PAYMENT_SOURCE_LABELS
+        ] ??
+        p.paymentSource ??
+        p.paymentMode;
       return {
-        date: String(p.paidAt ?? p.createdAt).slice(0, 10),
+        date: String(paidAt).slice(0, 10),
+        dateTime: paidAt,
         receiptNo: receiptMap.get(p.id) ?? '—',
         transactionNo: p.transactionNo,
-        studentName:
-          student?.masterProfile?.fullName ?? student?.user?.displayName ?? '—',
+        studentName: this.studentDisplayName(
+          student,
+          String(p.studentId ?? ''),
+        ),
+        rollNumber: student?.rollNumber ?? student?.enrollmentNumber ?? '—',
         enrollmentNumber: student?.enrollmentNumber ?? '—',
+        programme: student?.programVersion?.program?.name ?? '—',
+        semester: student?.academicStanding?.currentSemesterSequence ?? '—',
+        feeCategory,
         amount: Number(p.amount ?? 0),
-        mode:
-          FEE_PAYMENT_SOURCE_LABELS[
-            (p.paymentSource ??
-              p.paymentMode) as keyof typeof FEE_PAYMENT_SOURCE_LABELS
-          ] ??
-          p.paymentSource ??
-          p.paymentMode,
+        mode: modeLabel,
+        paymentModeRaw: String(p.paymentMode ?? p.paymentSource ?? ''),
         collectedBy: p.collectedById
           ? String(collectorMap.get(p.collectedById) ?? 'Staff')
           : '—',
       };
     });
+
+    const modeSummary = new Map<string, { count: number; amount: number }>();
+    let onlineCount = 0;
+    let offlineCount = 0;
+    for (const row of rows) {
+      const mode = String(row.mode ?? 'Other');
+      const bucket = modeSummary.get(mode) ?? { count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += row.amount;
+      modeSummary.set(mode, bucket);
+      if (/cash|offline/i.test(String(row.paymentModeRaw))) offlineCount += 1;
+      else onlineCount += 1;
+    }
+
     return {
       type: 'daily-collection',
       total: rows.reduce((s: number, r: { amount: number }) => s + r.amount, 0),
       rows,
+      meta: {
+        transactionCount: rows.length,
+        onlineCount,
+        offlineCount,
+        refunds: 0,
+        modeSummary: Array.from(modeSummary.entries()).map(([mode, v]) => ({
+          mode,
+          ...v,
+        })),
+        filters: {
+          from: query.from ?? null,
+          to: query.to ?? null,
+        },
+      },
     };
   }
 
@@ -1350,10 +2057,12 @@ export class FeeReportsService {
       this.uniqueStudentIds(concessions),
     );
     const rows = concessions.map((c: any) => {
-      const student = studentMap.get(c.studentId);
+      const student = studentMap.get(String(c.studentId ?? ''));
       return {
-        studentName:
-          student?.masterProfile?.fullName ?? student?.user?.displayName ?? '—',
+        studentName: this.studentDisplayName(
+          student,
+          String(c.studentId ?? ''),
+        ),
         enrollmentNumber: student?.enrollmentNumber ?? '—',
         scholarshipType: c.schemeName ?? c.type ?? 'Concession',
         amountWaived: Number(c.approvedAmount ?? c.amount ?? 0),
@@ -1382,10 +2091,12 @@ export class FeeReportsService {
       this.uniqueStudentIds(demands),
     );
     const rows = demands.map((d: any) => {
-      const student = studentMap.get(d.studentId);
+      const student = studentMap.get(String(d.studentId ?? ''));
       return {
-        studentName:
-          student?.masterProfile?.fullName ?? student?.user?.displayName ?? '—',
+        studentName: this.studentDisplayName(
+          student,
+          String(d.studentId ?? ''),
+        ),
         enrollmentNumber: student?.enrollmentNumber ?? '—',
         demandType: d.demandType,
         billingPeriod: d.billingPeriod,

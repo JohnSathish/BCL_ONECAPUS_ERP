@@ -92,6 +92,61 @@ export function FeeSettingsPanel() {
 
       <Card className="glass-card border-0">
         <CardHeader>
+          <CardTitle>Fee Collection Settings</CardTitle>
+          <CardDescription>
+            Preselect a payment method on the Fee Collection desk to speed up cashiers. They can
+            still change it before collecting.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="default-payment-method">Default payment method</Label>
+            <select
+              id="default-payment-method"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={s.defaultPaymentMethod ?? 'NONE'}
+              onChange={(e) => saveMut.mutate({ defaultPaymentMethod: e.target.value })}
+            >
+              {(
+                s.defaultPaymentMethodOptions ?? [
+                  { value: 'NONE', label: 'None (Always ask)' },
+                  { value: 'cash', label: 'Cash' },
+                  { value: 'college_qr', label: 'UPI / QR Payment' },
+                  { value: 'gateway', label: 'Online Payment Gateway' },
+                  { value: 'cheque', label: 'Cheque' },
+                  { value: 'dd', label: 'Demand Draft (DD)' },
+                  { value: 'bank_transfer', label: 'Bank Transfer' },
+                  { value: 'other', label: 'POS / Other' },
+                ]
+              ).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Applied when a student is opened on Fee Collection. Only enabled collection modes are
+              used.
+            </p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
+            <div>
+              <Label>Remember last payment method used by this cashier</Label>
+              <p className="text-xs text-muted-foreground">
+                When enabled, each cashier&apos;s last method overrides the institution default for
+                their next collection.
+              </p>
+            </div>
+            <Switch
+              checked={Boolean(s.rememberLastPaymentMethod)}
+              onCheckedChange={(v) => saveMut.mutate({ rememberLastPaymentMethod: v })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card border-0">
+        <CardHeader>
           <CardTitle>Receipt templates</CardTitle>
           <CardDescription>
             Half A4 is recommended for college offices — two receipts fit on one sheet when cut.

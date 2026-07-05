@@ -10,7 +10,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class FeeComponentDto {
   @IsString()
@@ -358,6 +358,23 @@ export class ReportsQueryDto {
   @IsOptional()
   @IsUUID()
   shiftId?: string;
+
+  /** When true, outstanding/defaulters include demands with missing students. Default false. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  includeOrphans?: boolean;
+}
+
+export class OrphanDemandCleanupDto {
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  demandIds?: string[];
 }
 
 export class SendReceiptDto {

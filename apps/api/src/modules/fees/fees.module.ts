@@ -33,6 +33,7 @@ import { StudentFeeAccountService } from './services/student-fee-account.service
 import { StudentFeeSummaryService } from './services/student-fee-summary.service';
 import { ExternalFeePaymentService } from './services/external-fee-payment.service';
 import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
+import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
     ExternalFeePaymentService,
     ScholarshipSchemeService,
     FeeReceiptPdfProcessor,
+    FeeOrphanDemandService,
   ],
   exports: [
     FeeStructureService,
@@ -84,6 +86,7 @@ import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
     StudentFeeAccountService,
     StudentFeeSummaryService,
     FeeReceiptPdfProcessor,
+    FeeOrphanDemandService,
   ],
 })
 export class FeesModule {}

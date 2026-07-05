@@ -14,6 +14,20 @@ import {
 } from '../constants/collection-modes.constants';
 import { resolveReceiptTemplateFormat } from '../templates/fee-receipt.template';
 
+export const DEFAULT_PAYMENT_METHOD_VALUES = [
+  'NONE',
+  'cash',
+  'college_qr',
+  'gateway',
+  'cheque',
+  'dd',
+  'bank_transfer',
+  'other',
+] as const;
+
+export type DefaultPaymentMethodValue =
+  (typeof DEFAULT_PAYMENT_METHOD_VALUES)[number];
+
 export type FeeFinanceSettingsDto = {
   monthlyDueDay?: number;
   lateFeeEnabled?: boolean;
@@ -29,6 +43,8 @@ export type FeeFinanceSettingsDto = {
   blockHallTicketOnDue?: boolean;
   blockRegistrationOnDue?: boolean;
   collectionModes?: Partial<CollectionModesConfig>;
+  defaultPaymentMethod?: DefaultPaymentMethodValue | string;
+  rememberLastPaymentMethod?: boolean;
   metadata?: Record<string, unknown>;
 };
 
@@ -47,6 +63,9 @@ export class FeeFinanceSettingsService {
     const modes = resolveCollectionModes(
       settings as Parameters<typeof resolveCollectionModes>[0],
     );
+    const defaultPaymentMethod = String(
+      settings.defaultPaymentMethod ?? 'NONE',
+    );
     return {
       ...settings,
       collectionModes: modes,
@@ -54,7 +73,33 @@ export class FeeFinanceSettingsService {
       onlinePaymentEnabled: modes.gateway,
       officeQrEnabled: modes.upi_qr,
       cashReceiptPrefix: String(settings.cashReceiptPrefix ?? 'DBC/CASH'),
+      defaultPaymentMethod,
+      rememberLastPaymentMethod: Boolean(
+        settings.rememberLastPaymentMethod ?? false,
+      ),
       availablePaymentMethods: enabledCollectionModes(modes),
+      defaultPaymentMethodOptions: [
+        { value: 'NONE', label: 'None (Always ask)', deskId: '' },
+        { value: 'cash', label: 'Cash', deskId: 'cash' },
+        {
+          value: 'college_qr',
+          label: 'UPI / QR Payment',
+          deskId: 'college_qr',
+        },
+        {
+          value: 'gateway',
+          label: 'Online Payment Gateway (Card / Net Banking)',
+          deskId: 'gateway',
+        },
+        { value: 'cheque', label: 'Cheque', deskId: 'cheque' },
+        { value: 'dd', label: 'Demand Draft (DD)', deskId: 'dd' },
+        {
+          value: 'bank_transfer',
+          label: 'Bank Transfer (NEFT/RTGS/IMPS)',
+          deskId: 'bank_transfer',
+        },
+        { value: 'other', label: 'POS / Other', deskId: 'other' },
+      ],
       studentPortal: studentPortalPaymentHints(
         modes,
         settings.metadata as Record<string, unknown> | null,
@@ -143,6 +188,18 @@ export class FeeFinanceSettingsService {
           : {}),
         ...(dto.blockRegistrationOnDue !== undefined
           ? { blockRegistrationOnDue: dto.blockRegistrationOnDue }
+          : {}),
+        ...(dto.defaultPaymentMethod !== undefined
+          ? {
+              defaultPaymentMethod: DEFAULT_PAYMENT_METHOD_VALUES.includes(
+                dto.defaultPaymentMethod as DefaultPaymentMethodValue,
+              )
+                ? dto.defaultPaymentMethod
+                : 'NONE',
+            }
+          : {}),
+        ...(dto.rememberLastPaymentMethod !== undefined
+          ? { rememberLastPaymentMethod: dto.rememberLastPaymentMethod }
           : {}),
         ...(dto.metadata !== undefined
           ? {

@@ -6,6 +6,7 @@ import {
   type DeskPaymentFormValues,
   type DeskPaymentMethodDef,
   type DeskPaymentMethodId,
+  type PaymentMethodSource,
   enabledDeskPaymentMethods,
 } from '@/lib/fee-collection-methods';
 import { Input } from '@/components/ui/input';
@@ -16,9 +17,17 @@ type PaymentFieldsProps = {
   methodId: DeskPaymentMethodId | '';
   values: DeskPaymentFormValues;
   collectedByName?: string;
+  methodSource?: PaymentMethodSource | null;
   onMethodChange: (id: DeskPaymentMethodId | '') => void;
   onValuesChange: (values: DeskPaymentFormValues) => void;
   selectId?: string;
+};
+
+const SOURCE_HINT: Record<PaymentMethodSource, string> = {
+  INSTITUTION_DEFAULT: 'Default from institution settings',
+  CASHIER_LAST_USED: 'Your last used method',
+  SINGLE_MODE: 'Only enabled method',
+  MANUAL: 'Selected manually',
 };
 
 export function FeeCollectionPaymentFields({
@@ -26,6 +35,7 @@ export function FeeCollectionPaymentFields({
   methodId,
   values,
   collectedByName,
+  methodSource,
   onMethodChange,
   onValuesChange,
   selectId = 'desk-payment-method',
@@ -51,9 +61,13 @@ export function FeeCollectionPaymentFields({
           {methods.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
+              {methodId === m.id && methodSource && methodSource !== 'MANUAL' ? ' (Default)' : ''}
             </option>
           ))}
         </select>
+        {methodId && methodSource && methodSource !== 'MANUAL' ? (
+          <p className="text-xs text-muted-foreground">{SOURCE_HINT[methodSource]}</p>
+        ) : null}
       </div>
 
       {method ? (

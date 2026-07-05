@@ -123,3 +123,48 @@ export async function fetchFeeReport(type: string, params?: Record<string, strin
   const { data } = await api.get(`/v1/fees/reports/${type}`, { params });
   return data;
 }
+
+export type OrphanDemandRow = {
+  id: string;
+  demandNo: string;
+  studentId: string;
+  demandType: string;
+  billingPeriod: string | null;
+  status: string;
+  totalAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  canAutoCancel: boolean;
+  blockReason?: string;
+};
+
+export type OrphanDemandList = {
+  summary: {
+    total: number;
+    cancellable: number;
+    blockedPaid: number;
+    outstandingAmount: number;
+  };
+  rows: OrphanDemandRow[];
+};
+
+export async function fetchOrphanFeeDemands(): Promise<OrphanDemandList> {
+  const { data } = await api.get<OrphanDemandList>('/v1/fees/orphan-demands');
+  return data;
+}
+
+export async function cleanupOrphanFeeDemands(payload?: {
+  dryRun?: boolean;
+  demandIds?: string[];
+}) {
+  const { data } = await api.post('/v1/fees/orphan-demands/cleanup', payload ?? {});
+  return data as {
+    dryRun: boolean;
+    cancelled?: number;
+    cancelledAmount?: number;
+    wouldCancel?: number;
+    wouldCancelAmount?: number;
+    skipped: number;
+    errors?: Array<{ demandId: string; message: string }>;
+  };
+}

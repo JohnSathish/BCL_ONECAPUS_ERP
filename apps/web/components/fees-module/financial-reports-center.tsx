@@ -34,6 +34,7 @@ import {
 import { cn } from '@/utils/cn';
 import { useBindWorkspaceShift, useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
 import { useShiftScope } from '@/hooks/use-shift-scope';
+import { OrphanDemandsPanel } from '@/components/fees-module/orphan-demands-panel';
 
 type ReportFilters = {
   from: string;
@@ -273,6 +274,8 @@ export function FinancialReportsCenter() {
           Generate audit-ready fee reports with filters and one-click PDF, Excel, and CSV export.
         </p>
       </div>
+
+      <OrphanDemandsPanel />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <KpiCard

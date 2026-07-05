@@ -278,6 +278,14 @@ export type FeeFinanceSettings = {
   cashCollectionEnabled: boolean;
   collectionModes?: CollectionModesConfig;
   availablePaymentMethods?: Array<{ key: CollectionModeKey; label: string }>;
+  /** Desk method id or NONE */
+  defaultPaymentMethod?: string;
+  rememberLastPaymentMethod?: boolean;
+  defaultPaymentMethodOptions?: Array<{
+    value: string;
+    label: string;
+    deskId: string;
+  }>;
   studentPortal?: {
     onlineEnabled: boolean;
     mobileRazorpayEnabled?: boolean;

@@ -43,6 +43,7 @@ import {
   GenerateDemandDto,
   PublishDemandDto,
   RefundPaymentDto,
+  OrphanDemandCleanupDto,
   ReportsQueryDto,
   SendReceiptDto,
   CreatePaymentRequestDto,
@@ -85,6 +86,7 @@ import { RenewalFeeService } from './services/renewal-fee.service';
 import { FeePaymentRequestService } from './services/fee-payment-request.service';
 import { FeeReversalService } from './services/fee-reversal.service';
 import { ExternalFeePaymentService } from './services/external-fee-payment.service';
+import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
 
 @ApiBearerAuth()
 @ApiTags('fees')
@@ -118,6 +120,7 @@ export class FeesController {
     private readonly feeReminders: FeeReminderService,
     private readonly scholarships: ScholarshipSchemeService,
     private readonly tenantResolution: TenantResolutionService,
+    private readonly orphanDemands: FeeOrphanDemandService,
   ) {}
 
   @Get('dashboard')
@@ -499,6 +502,24 @@ export class FeesController {
   @RequireAnyPermission('fees:read', 'fees:manage')
   auditLogs(@CurrentUser() user: JwtUser) {
     return this.reports.auditLogs(user.tid);
+  }
+
+  @Get('orphan-demands')
+  @RequireAnyPermission('fees:read', 'fees:manage')
+  listOrphanDemands(@CurrentUser() user: JwtUser) {
+    return this.orphanDemands.listOrphans(user.tid);
+  }
+
+  @Post('orphan-demands/cleanup')
+  @RequirePermissions('fees:manage')
+  cleanupOrphanDemands(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: OrphanDemandCleanupDto,
+  ) {
+    return this.orphanDemands.cleanup(user, {
+      dryRun: dto.dryRun,
+      demandIds: dto.demandIds,
+    });
   }
 
   // --- Academic Fee Cycle (Don Bosco FYUGP model) ---
