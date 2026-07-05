@@ -77,6 +77,8 @@ import { BackupEngineModule } from './modules/backup-engine/backup-engine.module
 import { PrincipalDeskModule } from './modules/principal-desk/principal-desk.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { OfficialDocumentsModule } from './modules/official-documents/official-documents.module';
+import { AiAssistantModule } from './modules/ai-assistant/ai-assistant.module';
+import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
 
 @Module({
   imports: [
@@ -107,6 +109,8 @@ import { OfficialDocumentsModule } from './modules/official-documents/official-d
     BrandingModule,
     UsersModule,
     DashboardAnalyticsModule,
+    AiAssistantModule,
+    KnowledgeBaseModule,
     OrganizationModule,
     ShiftsModule,
     FacultyShiftsModule,

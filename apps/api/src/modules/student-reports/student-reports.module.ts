@@ -22,6 +22,10 @@ import { StudentTabularExportService } from './services/student-tabular-export.s
     StudentTabularExportService,
     CustomReportService,
   ],
-  exports: [StudentReportsService, CustomReportService],
+  exports: [
+    StudentReportsService,
+    CustomReportService,
+    StudentReportsQueryService,
+  ],
 })
 export class StudentReportsModule {}

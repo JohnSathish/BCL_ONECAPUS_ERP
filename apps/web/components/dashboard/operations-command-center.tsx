@@ -9,24 +9,29 @@ import {
   ArrowRight,
   Bell,
   BookOpen,
-  Bus,
   CalendarDays,
   ClipboardList,
+  Database,
   FileSpreadsheet,
   GraduationCap,
+  HardDrive,
   IndianRupee,
   Library,
+  Mail,
   Megaphone,
   RefreshCw,
   Search,
+  Server,
   Settings,
   UserPlus,
   Users,
   Wallet,
   Clock,
-  Home,
   BookMarked,
+  Award,
+  UserCheck,
 } from 'lucide-react';
+import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DashboardAiAssistant } from '@/components/dashboard/dashboard-ai-assistant';
@@ -79,24 +84,147 @@ const QUICK_ACTIONS = [
   { label: 'Settings', href: '/admin/organization', icon: Settings },
 ];
 
-const SMART_SHORTCUTS = [
-  { label: 'Student Search', href: '/admin/students', icon: Search },
-  { label: 'Staff Directory', href: '/admin/hr', icon: Users },
-  { label: 'Course Management', href: '/admin/academics/courses', icon: BookMarked },
-  { label: 'Timetable', href: '/admin/academics/timetable', icon: CalendarDays },
-  { label: 'Fee Structure', href: '/admin/fees/settings', icon: IndianRupee },
-  { label: 'Transport', href: '/admin/transport', icon: Bus },
-  { label: 'Hostel', href: '/admin/hostel', icon: Home },
-  { label: 'Library', href: '/admin/library', icon: Library },
+type HealthStatus = 'healthy' | 'warning' | 'critical';
+
+const SYSTEM_HEALTH_GROUPS: Array<{
+  title: string;
+  items: Array<{ id: string; label: string; status: HealthStatus; meta?: string }>;
+}> = [
+  {
+    title: 'Infrastructure',
+    items: [
+      { id: 'db', label: 'Database', status: 'healthy', meta: 'PostgreSQL' },
+      { id: 'api', label: 'API', status: 'healthy', meta: 'NestJS' },
+      { id: 'redis', label: 'Redis', status: 'healthy', meta: 'Cache & queues' },
+      { id: 'queue', label: 'Queue', status: 'healthy', meta: 'Background jobs' },
+    ],
+  },
+  {
+    title: 'Communication',
+    items: [
+      { id: 'email', label: 'Email', status: 'healthy' },
+      { id: 'sms', label: 'SMS', status: 'warning', meta: 'Check gateway' },
+      { id: 'wa', label: 'WhatsApp', status: 'healthy' },
+    ],
+  },
+  {
+    title: 'Storage',
+    items: [
+      { id: 'pg-store', label: 'PostgreSQL', status: 'healthy' },
+      { id: 'backup', label: 'Backups', status: 'healthy', meta: 'Last run OK' },
+      { id: 'cloud', label: 'Cloud storage', status: 'healthy' },
+    ],
+  },
 ];
 
-const SYSTEM_HEALTH = [
-  { id: 'db', label: 'Database Status', status: 'healthy' as const },
-  { id: 'server', label: 'Server Status', status: 'healthy' as const },
-  { id: 'backup', label: 'Backup Status', status: 'healthy' as const },
-  { id: 'pg', label: 'Payment Gateway', status: 'healthy' as const },
-  { id: 'sms', label: 'SMS Gateway', status: 'warning' as const },
-  { id: 'api', label: 'API Health', status: 'healthy' as const },
+const SHORTCUT_GROUPS: Array<{
+  title: string;
+  permissionAny?: string[];
+  items: Array<{ label: string; href: string; icon: typeof Search; permissionAny?: string[] }>;
+}> = [
+  {
+    title: 'Student',
+    permissionAny: ['students:read', 'admissions:read', 'certificates:read'],
+    items: [
+      {
+        label: 'Student Search',
+        href: '/admin/students',
+        icon: Search,
+        permissionAny: ['students:read'],
+      },
+      {
+        label: 'Admission',
+        href: '/admin/admissions',
+        icon: GraduationCap,
+        permissionAny: ['admissions:read'],
+      },
+      {
+        label: 'Certificates',
+        href: '/admin/certificates',
+        icon: Award,
+        permissionAny: ['certificates:read'],
+      },
+      {
+        label: 'Subject Registration',
+        href: '/admin/academics/registration',
+        icon: ClipboardList,
+        permissionAny: ['academic:read'],
+      },
+    ],
+  },
+  {
+    title: 'Academic',
+    permissionAny: ['academic:read', 'academic:manage'],
+    items: [
+      {
+        label: 'Curriculum',
+        href: '/admin/programs',
+        icon: BookMarked,
+        permissionAny: ['academic:read'],
+      },
+      {
+        label: 'Timetable',
+        href: '/admin/academics/timetable',
+        icon: CalendarDays,
+        permissionAny: ['academic:read'],
+      },
+      {
+        label: 'Faculty Allocation',
+        href: '/admin/hr',
+        icon: UserCheck,
+        permissionAny: ['staff:read', 'hr:read'],
+      },
+      {
+        label: 'Attendance',
+        href: '/admin/academics/attendance',
+        icon: BookOpen,
+        permissionAny: ['academic:read'],
+      },
+    ],
+  },
+  {
+    title: 'Finance',
+    permissionAny: ['fees:read', 'fees:manage'],
+    items: [
+      {
+        label: 'Fee Collection',
+        href: '/admin/fees/collections',
+        icon: IndianRupee,
+        permissionAny: ['fees:read'],
+      },
+      {
+        label: 'Receipts',
+        href: '/admin/fees/reports',
+        icon: FileSpreadsheet,
+        permissionAny: ['fees:read'],
+      },
+      {
+        label: 'Scholarships',
+        href: '/admin/fees/reports',
+        icon: Wallet,
+        permissionAny: ['fees:read'],
+      },
+    ],
+  },
+  {
+    title: 'HR',
+    permissionAny: ['staff:read', 'hr:read', 'hr:manage'],
+    items: [
+      {
+        label: 'Staff Directory',
+        href: '/admin/hr',
+        icon: Users,
+        permissionAny: ['staff:read', 'hr:read'],
+      },
+      { label: 'Leave', href: '/admin/hr', icon: CalendarDays, permissionAny: ['hr:read'] },
+      {
+        label: 'Recruitment',
+        href: '/admin/hr/recruitment',
+        icon: UserPlus,
+        permissionAny: ['hr:read'],
+      },
+    ],
+  },
 ];
 
 const NOTIFICATION_ICONS = [Bell, GraduationCap, Wallet, ClipboardList, Library];
@@ -124,11 +252,21 @@ function actionDescription(action: OperationsActionItem) {
   return map[action.id] ?? 'Tap to open the related module';
 }
 
+function hasAnyPermission(permissions: string[] | undefined, required?: string[]) {
+  if (!required?.length) return true;
+  // While session permissions are loading, show full shortcut set.
+  if (!permissions?.length) return true;
+  const set = new Set(permissions);
+  if (set.has('*') || set.has('admin:*')) return true;
+  return required.some((p) => set.has(p));
+}
+
 export function OperationsCommandCenter({ userName }: { userName?: string }) {
   const { branding } = useInstitutionBranding();
   const workspace = useOptionalWorkspaceContext();
   const shiftScope = useShiftScope();
   const effectiveShiftId = useEffectiveShiftId(undefined);
+  const permissions = useAuthStore((s) => s.session?.user?.permissions);
   const [clock, setClock] = useState('');
 
   const opsQ = useQuery({
@@ -168,33 +306,79 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
 
   const notifications = useMemo(() => {
     if (!ops) return [];
-    const items = ops.announcements.map((a, i) => ({
-      id: `ann-${i}`,
-      icon: NOTIFICATION_ICONS[i % NOTIFICATION_ICONS.length],
-      message: a.title,
-      timestamp: a.date,
-      href: a.href,
-    }));
-    if (ops.communication.smsToday > 0) {
-      items.unshift({
-        id: 'sms',
-        icon: Megaphone,
-        message: `Fee reminder sent to ${ops.communication.smsToday} recipients`,
-        timestamp: 'Today',
-        href: '/admin/communication',
-      });
-    }
+    const items: Array<{
+      id: string;
+      icon: typeof Bell;
+      message: string;
+      timestamp: string;
+      href: string;
+      count?: number;
+    }> = [];
+
     if (ops.admissions?.pendingReview) {
-      items.unshift({
+      items.push({
         id: 'adm',
         icon: GraduationCap,
-        message: `${ops.admissions.pendingReview} admissions approved pending enrollment`,
-        timestamp: 'Today',
+        message: 'Pending admissions',
+        timestamp: 'Review applications',
         href: '/admin/admissions',
+        count: ops.admissions.pendingReview,
+      });
+    }
+    if (ops.finance.defaulters > 0) {
+      items.push({
+        id: 'fees',
+        icon: Wallet,
+        message: 'Fee approvals / defaulters',
+        timestamp: 'Outstanding balances',
+        href: '/admin/fees/defaulters',
+        count: ops.finance.defaulters,
+      });
+    }
+    for (const action of ops.actions) {
+      if (action.id === 'leave') {
+        items.push({
+          id: 'leave',
+          icon: CalendarDays,
+          message: 'Leave requests',
+          timestamp: action.message,
+          href: action.href,
+          count: action.count,
+        });
+      }
+      if (action.id === 'registrations') {
+        items.push({
+          id: 'reg',
+          icon: ClipboardList,
+          message: 'Registration tasks',
+          timestamp: action.message,
+          href: action.href,
+          count: action.count,
+        });
+      }
+    }
+    for (const [i, a] of ops.announcements.slice(0, 2).entries()) {
+      items.push({
+        id: `ann-${i}`,
+        icon: NOTIFICATION_ICONS[i % NOTIFICATION_ICONS.length],
+        message: a.title,
+        timestamp: a.date,
+        href: a.href ?? '/admin',
       });
     }
     return items.slice(0, 6);
   }, [ops]);
+
+  const shortcutGroups = useMemo(
+    () =>
+      SHORTCUT_GROUPS.filter((g) => hasAnyPermission(permissions, g.permissionAny))
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((item) => hasAnyPermission(permissions, item.permissionAny)),
+        }))
+        .filter((g) => g.items.length > 0),
+    [permissions],
+  );
 
   return (
     <div className="min-h-full space-y-6 rounded-2xl bg-[#F8FAFC] pb-6 dark:bg-background">
@@ -290,29 +474,28 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
         >
           <ShiftOperationsSection />
 
-          {/* Section 2 — KPI Cards */}
-          <div className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {/* KPI strip */}
+          <div className="grid items-stretch gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             <KpiCard
-              label="Admissions"
-              value={String(ops.admissions?.pendingReview ?? ops.admissions?.submitted ?? 0)}
-              subValue="Pending reviews"
-              hint={`${ops.admissions?.received ?? 0} applications received`}
-              icon={GraduationCap}
-              tone="orange"
-              href="/admin/admissions"
+              label="Students"
+              value={ops.institution.studentCount.toLocaleString('en-IN')}
+              subValue={`${ops.admissions?.approved ?? 0} new admissions`}
+              hint="Active enrollment"
+              icon={Users}
+              tone="purple"
+              href="/admin/students"
             />
             <KpiCard
-              label="Today's Collection"
-              value={money(ops.finance.todayCollection)}
-              subValue={`${money(ops.finance.monthCollection)} this month`}
-              hint={`${pct(ops.finance.collectionRate)} overall collection rate`}
-              icon={IndianRupee}
-              tone="green"
-              href="/admin/fees/collections"
-              trend={collectionTrend}
+              label="Faculty / Staff"
+              value={ops.institution.staffCount.toLocaleString('en-IN')}
+              subValue="On record"
+              hint="Teaching & non-teaching"
+              icon={UserCheck}
+              tone="blue"
+              href="/admin/hr"
             />
             <KpiCard
-              label="Attendance Today"
+              label="Today's Attendance"
               value={ops.academic.dataSource === 'live' ? pct(ops.pulse.attendanceTodayPct) : '—'}
               subValue={
                 ops.academic.dataSource === 'live'
@@ -325,73 +508,99 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
               href="/admin/academics/attendance"
             />
             <KpiCard
-              label="Outstanding Fees"
+              label="Today's Collection"
+              value={money(ops.finance.todayCollection)}
+              subValue={`${money(ops.finance.monthCollection)} this month`}
+              hint={`${pct(ops.finance.collectionRate)} collection rate`}
+              icon={IndianRupee}
+              tone="green"
+              href="/admin/fees/collections"
+              trend={collectionTrend}
+            />
+            <KpiCard
+              label="Pending Fees"
               value={money(ops.pulse.pendingDues)}
               subValue={`${ops.finance.defaulters} defaulters`}
-              hint={`${ops.finance.monthlyTuitionPending} monthly tuition pending`}
+              hint={`${ops.finance.monthlyTuitionPending} monthly pending`}
               icon={AlertTriangle}
               tone="red"
               href="/admin/fees/defaulters"
             />
             <KpiCard
-              label="Total Students"
-              value={ops.institution.studentCount.toLocaleString('en-IN')}
-              subValue={`${ops.admissions?.approved ?? 0} new admissions`}
-              hint={`${ops.institution.staffCount} staff on campus`}
-              icon={Users}
-              tone="purple"
-              href="/admin/students"
+              label="Admissions"
+              value={String(ops.admissions?.pendingReview ?? ops.admissions?.submitted ?? 0)}
+              subValue="Pending reviews"
+              hint={`${ops.admissions?.received ?? 0} applications received`}
+              icon={GraduationCap}
+              tone="orange"
+              href="/admin/admissions"
             />
           </div>
 
-          {/* Section 3 — Action Center */}
-          <SaaSCard
-            id="action-center"
-            className="border-[#2563EB]/20 bg-gradient-to-br from-[#2563EB]/5 to-white"
-          >
-            <SectionTitle
-              title="Action Center"
-              subtitle="Pending tasks requiring immediate attention"
-              action={
-                ops.actions.length ? (
-                  <span className="rounded-full bg-[#2563EB]/10 px-3 py-1 text-xs font-bold text-[#2563EB]">
-                    {ops.actions.length} pending
-                  </span>
-                ) : null
-              }
-            />
-            <div className="grid gap-2 sm:grid-cols-2">
-              {ops.actions.length ? (
-                ops.actions.map((action) => <ActionRow key={action.id} action={action} />)
-              ) : (
-                <p className="col-span-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800">
-                  All clear — no urgent actions today.
-                </p>
-              )}
-            </div>
-          </SaaSCard>
+          {/* Hero — OneCampus AI Assistant */}
+          <DashboardAiAssistant variant="hero" />
 
-          {/* Section 4 — Quick Actions */}
-          <SaaSCard>
-            <SectionTitle
-              title="Quick Actions"
-              subtitle="Perform critical operations in one click"
-            />
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-              {QUICK_ACTIONS.map((action) => (
-                <QuickActionCard key={action.href} {...action} />
-              ))}
-            </div>
-          </SaaSCard>
+          {/* Operational widgets */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <SystemHealthPanel />
+            <SmartShortcutsPanel groups={shortcutGroups} />
+            <NotificationsPanel items={notifications} actions={ops.actions} />
+          </div>
 
-          {/* Sections 5–7 — Overview row */}
+          {/* Analytics */}
           <div className="grid gap-4 lg:grid-cols-3">
             <AdmissionsOverview ops={ops} />
             <FeeOverview ops={ops} />
             <AttendanceOverview ops={ops} />
           </div>
 
-          {/* Sections 8–9 — Events & Notifications */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SaaSCard>
+              <SectionTitle
+                title="Department Strength"
+                subtitle="Students and attendance by department"
+                action={<ArrowLink href="/admin/analytics" label="Full analytics" />}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {ops.departments.length ? (
+                  ops.departments.map((d) => (
+                    <DeptProgressBar
+                      key={d.name}
+                      name={d.name}
+                      value={d.attendancePct}
+                      metric={`${d.students} students`}
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-[#64748B]">No department data available.</p>
+                )}
+              </div>
+            </SaaSCard>
+
+            <SaaSCard id="action-center">
+              <SectionTitle
+                title="Pending Approvals"
+                subtitle="Tasks requiring attention"
+                action={
+                  ops.actions.length ? (
+                    <span className="rounded-full bg-[#2563EB]/10 px-3 py-1 text-xs font-bold text-[#2563EB]">
+                      {ops.actions.length} pending
+                    </span>
+                  ) : null
+                }
+              />
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {ops.actions.length ? (
+                  ops.actions.map((action) => <ActionRow key={action.id} action={action} />)
+                ) : (
+                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800">
+                    All clear — no urgent actions today.
+                  </p>
+                )}
+              </div>
+            </SaaSCard>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <SaaSCard>
               <SectionTitle
@@ -428,88 +637,10 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
             </SaaSCard>
 
             <SaaSCard>
-              <SectionTitle title="Recent Notifications" subtitle="Latest institutional activity" />
-              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                {notifications.length ? (
-                  notifications.map((n) => (
-                    <Link
-                      key={n.id}
-                      href={n.href ?? '#'}
-                      className="flex items-start gap-3 rounded-xl border border-slate-100 p-3 transition-colors hover:bg-slate-50"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                        <n.icon className="h-4 w-4 text-[#475569]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[#0F172A]">{n.message}</p>
-                        <p className="text-[11px] text-[#64748B]">{n.timestamp}</p>
-                      </div>
-                    </Link>
-                  ))
-                ) : (
-                  <p className="text-sm text-[#64748B]">No recent notifications.</p>
-                )}
-              </div>
-            </SaaSCard>
-          </div>
-
-          {/* Section 10 — Department Performance */}
-          <SaaSCard>
-            <SectionTitle
-              title="Department Performance"
-              subtitle="Attendance and engagement by department"
-              action={<ArrowLink href="/admin/analytics" label="Full analytics" />}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              {ops.departments.length ? (
-                ops.departments.map((d) => (
-                  <DeptProgressBar
-                    key={d.name}
-                    name={d.name}
-                    value={d.attendancePct}
-                    metric={`${d.students} students`}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-[#64748B]">No department data available.</p>
-              )}
-            </div>
-          </SaaSCard>
-
-          {/* Sections 11–13 — AI, System Health, Shortcuts */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            <DashboardAiAssistant className="lg:col-span-1" />
-
-            <SaaSCard>
-              <SectionTitle
-                title="System Health"
-                subtitle="Infrastructure and integration status"
-              />
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SYSTEM_HEALTH.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2.5"
-                  >
-                    <span className="text-sm font-medium text-[#0F172A]">{item.label}</span>
-                    <StatusDot status={item.status} />
-                  </div>
-                ))}
-              </div>
-            </SaaSCard>
-
-            <SaaSCard>
-              <SectionTitle title="Smart Shortcuts" subtitle="Frequently used modules" />
+              <SectionTitle title="Quick Actions" subtitle="One-click operations" />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {SMART_SHORTCUTS.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-100 p-3 text-center transition-all hover:border-[#2563EB]/30 hover:shadow-sm"
-                  >
-                    <item.icon className="h-5 w-5 text-[#2563EB]" />
-                    <span className="text-[10px] font-semibold text-[#475569]">{item.label}</span>
-                  </Link>
+                {QUICK_ACTIONS.map((action) => (
+                  <QuickActionCard key={action.href} {...action} />
                 ))}
               </div>
             </SaaSCard>
@@ -517,6 +648,150 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
         </motion.div>
       ) : null}
     </div>
+  );
+}
+
+function SystemHealthPanel() {
+  return (
+    <SaaSCard className="h-full">
+      <SectionTitle title="System Health" subtitle="Infrastructure & integrations" />
+      <div className="space-y-4">
+        {SYSTEM_HEALTH_GROUPS.map((group) => (
+          <div key={group.title}>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
+              {group.title}
+            </p>
+            <div className="grid gap-1.5">
+              {group.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#0F172A]">{item.label}</p>
+                    {item.meta ? <p className="text-[10px] text-[#64748B]">{item.meta}</p> : null}
+                  </div>
+                  <StatusDot status={item.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-[10px] text-[#64748B]">
+          <div className="flex items-center gap-1.5">
+            <Server className="h-3.5 w-3.5" /> CPU / Memory OK
+          </div>
+          <div className="flex items-center gap-1.5">
+            <HardDrive className="h-3.5 w-3.5" /> Disk healthy
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Database className="h-3.5 w-3.5" /> DB online
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5" /> Jobs running
+          </div>
+        </div>
+      </div>
+    </SaaSCard>
+  );
+}
+
+function SmartShortcutsPanel({
+  groups,
+}: {
+  groups: Array<{
+    title: string;
+    items: Array<{ label: string; href: string; icon: typeof Search }>;
+  }>;
+}) {
+  return (
+    <SaaSCard className="h-full">
+      <SectionTitle title="Smart Shortcuts" subtitle="Role-aware module access" />
+      <div className="max-h-[340px] space-y-3 overflow-y-auto pr-1">
+        {groups.length ? (
+          groups.map((group) => (
+            <div key={group.title}>
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
+                {group.title}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {group.items.map((item) => (
+                  <Link
+                    key={`${group.title}-${item.href}-${item.label}`}
+                    href={item.href}
+                    className="flex items-center gap-2 rounded-lg border border-slate-100 px-2 py-2 text-left transition-all hover:border-[#2563EB]/30 hover:bg-[#2563EB]/5"
+                  >
+                    <item.icon className="h-4 w-4 shrink-0 text-[#2563EB]" />
+                    <span className="text-[11px] font-semibold text-[#334155]">{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-[#64748B]">No shortcuts for your role.</p>
+        )}
+      </div>
+    </SaaSCard>
+  );
+}
+
+function NotificationsPanel({
+  items,
+  actions,
+}: {
+  items: Array<{
+    id: string;
+    icon: typeof Bell;
+    message: string;
+    timestamp: string;
+    href: string;
+    count?: number;
+  }>;
+  actions: OperationsActionItem[];
+}) {
+  return (
+    <SaaSCard className="h-full">
+      <SectionTitle
+        title="Notifications"
+        subtitle="Pending work & alerts"
+        action={
+          actions.length ? (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+              {actions.length} open
+            </span>
+          ) : null
+        }
+      />
+      <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+        {items.length ? (
+          items.map((n) => (
+            <Link
+              key={n.id}
+              href={n.href}
+              className="flex items-start gap-3 rounded-xl border border-slate-100 p-3 transition-colors hover:bg-slate-50"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#2563EB]/10">
+                <n.icon className="h-4 w-4 text-[#2563EB]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-[#0F172A]">{n.message}</p>
+                  {n.count != null ? (
+                    <span className="rounded-full bg-[#0F172A] px-2 py-0.5 text-[10px] font-bold text-white">
+                      {n.count}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-[#64748B]">{n.timestamp}</p>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <p className="text-sm text-[#64748B]">No pending notifications.</p>
+        )}
+      </div>
+    </SaaSCard>
   );
 }
 

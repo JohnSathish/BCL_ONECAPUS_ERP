@@ -6471,6 +6471,9 @@ model FeeFinanceSettings {
   officeQrEnabled       Boolean  @default(true) @map("office_qr_enabled")
   blockHallTicketOnDue  Boolean  @default(true) @map("block_hall_ticket_on_due")
   blockRegistrationOnDue Boolean @default(true) @map("block_registration_on_due")
+  /// Desk default: NONE | cash | college_qr | gateway | cheque | dd | bank_transfer | other
+  defaultPaymentMethod  String   @default("NONE") @map("default_payment_method")
+  rememberLastPaymentMethod Boolean @default(false) @map("remember_last_payment_method")
   metadata              Json?
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
@@ -10723,5 +10726,122 @@ model ScheduledReport {
   @@index([tenantId, module, isActive])
   @@index([tenantId, nextRunAt])
   @@map("scheduled_reports")
+  @@schema("platform")
+}
+
+// --- OneCampus Knowledge Base (institutional documents) ---
+
+model KnowledgeDocument {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  title       String
+  sourceType  String    @default("CURRICULUM") @map("source_type")
+  version     String?
+  fileName    String?   @map("file_name")
+  pageCount   Int?      @map("page_count")
+  status      String    @default("ACTIVE")
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  courses       KnowledgeCourse[]
+  semesterPlans KnowledgeSemesterPlan[]
+  facts         KnowledgeFact[]
+  chunks        KnowledgeChunk[]
+  definitions   KnowledgeDefinition[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, sourceType])
+  @@map("knowledge_documents")
+  @@schema("platform")
+}
+
+model KnowledgeDefinition {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  term       String
+  definition String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, term])
+  @@index([tenantId, term])
+  @@map("knowledge_definitions")
+  @@schema("platform")
+}
+
+model KnowledgeCourse {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  code       String
+  title      String
+  category   String
+  credits    Decimal? @db.Decimal(5, 2)
+  semester   Int?
+  pageRef    String?  @map("page_ref")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, documentId, code])
+  @@index([tenantId, code])
+  @@index([tenantId, category])
+  @@index([tenantId, semester])
+  @@map("knowledge_courses")
+  @@schema("platform")
+}
+
+model KnowledgeSemesterPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  documentId   String   @map("document_id") @db.Uuid
+  semester     Int
+  totalCredits Int      @map("total_credits")
+  lines        Json
+  pageRef      String?  @map("page_ref")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, documentId, semester])
+  @@index([tenantId, semester])
+  @@map("knowledge_semester_plans")
+  @@schema("platform")
+}
+
+model KnowledgeFact {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  key        String
+  label      String
+  value      String
+  pageRef    String?  @map("page_ref")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, documentId, key])
+  @@index([tenantId, key])
+  @@map("knowledge_facts")
+  @@schema("platform")
+}
+
+model KnowledgeChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  pageNo     Int?     @map("page_no")
+  heading    String?
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("knowledge_chunks")
   @@schema("platform")
 }

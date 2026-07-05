@@ -19,6 +19,7 @@ import { parseFlexibleDate } from '../../../common/utils/parse-flexible-date';
 import { PrismaService } from '../../../database/prisma.service';
 import { isAcademicDepartment } from '../../organization/department-rules';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
+import { StudentMajorMinorTrackService } from '../../academic-engine/services/student-major-minor-track.service';
 import { slugifySubject } from '../../academic-engine/domain/nep-categories';
 import type { StudentImportMode } from '../dto/students.dto';
 import { StudentSemesterResolverService } from '../services/student-semester-resolver.service';
@@ -415,6 +416,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   constructor(
     private readonly prisma: PrismaService,
     private readonly academicEngine: AcademicEngineService,
+    private readonly majorMinorTrack: StudentMajorMinorTrackService,
     private readonly semesterResolver: StudentSemesterResolverService,
     private readonly abcService: StudentAbcService,
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
@@ -1419,6 +1421,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         const studentId = n.existingStudentId
           ? await this.mergeStudentRecord(ctx, n.existingStudentId, n)
           : await this.createStudentRecord(ctx, n);
+        await this.majorMinorTrack.ensureTrackAfterImport(
+          ctx.tenantId,
+          studentId,
+        );
         created.push({ rowNumber: row.rowNumber, entityId: studentId });
         await options?.onProgress?.(index + 1, total);
       } catch (error) {

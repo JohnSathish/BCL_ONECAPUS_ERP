@@ -59,6 +59,12 @@ export async function fetchShiftIntelligence(
 }
 
 export async function askDashboardAi(question: string): Promise<DashboardAiResponse> {
-  const { data } = await api.post<DashboardAiResponse>('/v1/dashboard/ai/ask', { question });
-  return data;
+  const { chatWithAiAssistant } = await import('@/services/ai-assistant');
+  const res = await chatWithAiAssistant(question);
+  return {
+    answer: res.answer,
+    links: res.links,
+    source: res.source === 'llm' ? 'rules' : res.source,
+    suggestedFollowUps: res.suggestedFollowUps,
+  };
 }

@@ -105,6 +105,119 @@ export class StudentMajorMinorTrackService {
     });
   }
 
+  /**
+   * After student import or bootstrap — populate major/minor track from
+   * program choices, then programme name, then department.
+   */
+  async ensureTrackAfterImport(tenantId: string, studentId: string) {
+    const existing = await this.getTrack(tenantId, studentId);
+    if (existing?.isTrackLocked) return existing;
+
+    try {
+      const synced = await this.syncFromProgramChoices(tenantId, studentId);
+      if (synced) return synced;
+    } catch {
+      // Fall through to programme / department resolution.
+    }
+
+    return this.syncFromProgrammeOrDepartment(tenantId, studentId);
+  }
+
+  private async syncFromProgrammeOrDepartment(
+    tenantId: string,
+    studentId: string,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId, deletedAt: null },
+      select: {
+        departmentId: true,
+        programVersion: {
+          select: {
+            program: {
+              select: {
+                name: true,
+                department: { select: { institutionId: true } },
+              },
+            },
+          },
+        },
+        department: { select: { institutionId: true } },
+      },
+    });
+    if (!student) return null;
+
+    const institutionId =
+      student.programVersion?.program?.department?.institutionId ??
+      student.department?.institutionId ??
+      (
+        await this.prisma.institution.findFirst({
+          where: { tenantId, deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        })
+      )?.id;
+    if (!institutionId) return null;
+
+    const programmeName = student.programVersion?.program?.name;
+    if (programmeName) {
+      const match = programmeName.match(/^FYUP in\s+(.+)$/i);
+      if (match?.[1]) {
+        const subject = await this.prisma.academicSubject.findFirst({
+          where: {
+            tenantId,
+            institutionId,
+            slug: slugifySubject(match[1].trim()),
+            deletedAt: null,
+            isActive: true,
+          },
+        });
+        if (subject) {
+          return this.upsertTrack(tenantId, studentId, subject.id, null);
+        }
+      }
+    }
+
+    if (student.departmentId) {
+      const subject = await this.prisma.academicSubject.findFirst({
+        where: {
+          tenantId,
+          institutionId,
+          departmentId: student.departmentId,
+          deletedAt: null,
+          isActive: true,
+        },
+        orderBy: { name: 'asc' },
+      });
+      if (subject) {
+        return this.upsertTrack(tenantId, studentId, subject.id, null);
+      }
+    }
+
+    return null;
+  }
+
+  private upsertTrack(
+    tenantId: string,
+    studentId: string,
+    majorSubjectId: string,
+    minorSubjectId: string | null,
+  ) {
+    return this.prisma.studentMajorMinorTrack.upsert({
+      where: { studentId },
+      create: {
+        tenantId,
+        studentId,
+        majorSubjectId,
+        minorSubjectId,
+      },
+      update: {
+        majorSubjectId,
+        minorSubjectId,
+      },
+      include: trackInclude,
+    });
+  }
+
   async lockOnPromotion(
     tenantId: string,
     studentId: string,

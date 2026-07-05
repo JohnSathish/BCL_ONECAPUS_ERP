@@ -88,6 +88,14 @@ export class StudentReportFiltersDto {
   residenceType?: string;
 
   @IsOptional()
+  @IsUUID()
+  majorSubjectId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  minorSubjectId?: string;
+
+  @IsOptional()
   @IsString()
   sortBy?: string;
 

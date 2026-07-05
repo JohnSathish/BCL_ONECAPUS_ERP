@@ -103,6 +103,20 @@ export class StudentReportsQueryService {
       where = { ...where, id: { in: filters.studentIds } };
     }
 
+    if (filters.majorSubjectId || filters.minorSubjectId) {
+      where = {
+        ...where,
+        majorMinorTrack: {
+          ...(filters.majorSubjectId
+            ? { majorSubjectId: filters.majorSubjectId }
+            : {}),
+          ...(filters.minorSubjectId
+            ? { minorSubjectId: filters.minorSubjectId }
+            : {}),
+        },
+      };
+    }
+
     if (user) {
       where = this.dataScope.applyStudentListScope(where, user);
     }

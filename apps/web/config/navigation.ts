@@ -1709,6 +1709,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],
           },
           {
+            label: 'Knowledge Base',
+            href: '/admin/administration/knowledge-base',
+            permissions: ['academic:read', 'academic:manage'],
+          },
+          {
             label: 'Import / Export',
             href: '/admin/administration/import-export',
             permissions: ['imports:manage'],

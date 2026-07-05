@@ -1225,6 +1225,8 @@ export class AcademicEngineService {
       }
     }
 
+    await this.majorMinorTrack.ensureTrackAfterImport(tenantId, studentId);
+
     return { studentId: student.id, bootstrapped: true };
   }
 
