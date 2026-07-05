@@ -52,12 +52,38 @@ export const ADMIN_COMMAND_LINKS = [
   { label: 'Settings', href: '/admin/organization', keywords: 'configuration' },
 ];
 
-export const AI_QUICK_PROMPTS = [
-  'How many students have pending fees?',
-  "Show today's attendance summary",
-  "Show today's staff absentees",
-  'Which department has lowest staff attendance this month?',
-  'Show missing OUT punches today',
-  'Generate finance report',
-  'List admission applications pending',
-];
+export const AI_PROMPT_CATEGORIES = [
+  {
+    id: 'reports',
+    label: 'Reports',
+    prompts: [
+      'Generate Student Report',
+      'Generate Fee Report',
+      'Export Attendance',
+      'Download Admission Register',
+    ],
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    prompts: [
+      'Admission Trends',
+      'Fee Collection Summary',
+      'Attendance Analysis',
+      'Gender Distribution',
+    ],
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    prompts: ['Find Student', 'Search Staff', 'Search Application', 'Find Subject'],
+  },
+  {
+    id: 'actions',
+    label: 'Actions',
+    prompts: ['Generate Certificates', 'Promote Students', 'Send SMS', 'Send Email'],
+  },
+] as const;
+
+/** Flat list for command palette quick prompts */
+export const AI_QUICK_PROMPTS = AI_PROMPT_CATEGORIES.flatMap((c) => [...c.prompts]);
