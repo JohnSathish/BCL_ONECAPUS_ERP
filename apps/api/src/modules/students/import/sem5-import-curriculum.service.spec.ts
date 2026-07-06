@@ -58,7 +58,8 @@ describe('Sem5ImportCurriculumService', () => {
             offeringId: 'o3',
           },
           internship: {
-            title: 'Economics Internship',
+            title:
+              'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
             code: 'ECO-303',
             courseId: 'c4',
             offeringId: 'o4',
@@ -66,7 +67,7 @@ describe('Sem5ImportCurriculumService', () => {
         },
       ],
       minorDepartments: [],
-      internshipAreas: ['ECO-303 — Economics Internship'],
+      internshipAreas: ['ECO-303 — Internship'],
       minorByMajor: { economics: ['History'] },
     };
 
@@ -74,13 +75,26 @@ describe('Sem5ImportCurriculumService', () => {
       service.formatInternshipCourseLabel(
         catalog.majorDepartments[0]!.internship,
       ),
-    ).toBe('ECO-303 — Economics Internship');
+    ).toBe('ECO-303 — Internship');
     expect(
-      service.resolveInternshipPaper(catalog, 'ECO-303 — Economics Internship')
-        ?.code,
+      service.resolveInternshipPaper(catalog, 'ECO-303 — Internship')?.code,
+    ).toBe('ECO-303');
+    expect(
+      service.resolveInternshipPaper(
+        catalog,
+        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+        catalog.majorDepartments[0]!.internship,
+      )?.code,
+    ).toBe('ECO-303');
+    expect(
+      service.resolveInternshipPaper(
+        catalog,
+        'Internship',
+        catalog.majorDepartments[0]!.internship,
+      )?.code,
     ).toBe('ECO-303');
     expect(service.resolveInternshipPaper(catalog, 'eco-303')?.title).toBe(
-      'Economics Internship',
+      'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
     );
     expect(
       service.resolveInternshipPaper(catalog, 'Bank Internship'),

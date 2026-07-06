@@ -8,7 +8,10 @@ import { slugifySubject } from '../../academic-engine/domain/nep-categories';
 import { CurriculumResolutionService } from '../../academic-engine/services/curriculum-resolution.service';
 import { MajorMinorEligibilityService } from '../../academic-engine/services/major-minor-eligibility.service';
 import { PrismaService } from '../../../database/prisma.service';
-import { SEM5_INTERNSHIP_AREAS } from '../migration/sem5-admission-template';
+import {
+  SEM5_INTERNSHIP_AREAS,
+  SEM5_INTERNSHIP_COURSE_SHORT_TITLE,
+} from '../migration/sem5-admission-template';
 
 export type Sem5PaperOption = {
   title: string;
@@ -411,12 +414,19 @@ export class Sem5ImportCurriculumService {
 
   formatInternshipCourseLabel(paper: Sem5PaperOption): string {
     const code = paper.code.replace(/[\u2010-\u2015]/g, '-').trim();
-    return `${code} — ${paper.title.trim()}`;
+    return `${code} — ${SEM5_INTERNSHIP_COURSE_SHORT_TITLE}`;
   }
 
   matchesInternshipPaper(paper: Sem5PaperOption, input: string): boolean {
     const normalized = this.normalizeLabel(input);
     if (!normalized || !paper?.code) return false;
+    const shortTitle = this.normalizeLabel(SEM5_INTERNSHIP_COURSE_SHORT_TITLE);
+    if (
+      normalized === shortTitle &&
+      this.isInternshipSlotCourseCode(paper.code)
+    ) {
+      return true;
+    }
     return (
       normalized ===
         this.normalizeLabel(this.formatInternshipCourseLabel(paper)) ||
@@ -426,7 +436,7 @@ export class Sem5ImportCurriculumService {
     );
   }
 
-  /** Resolve registered internship course from "CODE — Title", code, or title. */
+  /** Resolve registered internship course from "CODE — Internship", code, title, or legacy labels. */
   resolveInternshipPaper(
     catalog: Sem5ImportCurriculumCatalog,
     input: string,
@@ -435,6 +445,11 @@ export class Sem5ImportCurriculumService {
     if (preferred && this.matchesInternshipPaper(preferred, input)) {
       return preferred;
     }
+
+    const shortOnly =
+      this.normalizeLabel(input) ===
+      this.normalizeLabel(SEM5_INTERNSHIP_COURSE_SHORT_TITLE);
+    if (shortOnly) return undefined;
 
     for (const department of catalog.majorDepartments) {
       if (this.matchesInternshipPaper(department.internship, input)) {

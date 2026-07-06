@@ -13,6 +13,9 @@ export const SEM5_INTERNSHIP_AREAS = [
   'Teaching Practice',
 ] as const;
 
+/** Short Excel/import label for every *-303 internship slot (full NEHU title stays in course master). */
+export const SEM5_INTERNSHIP_COURSE_SHORT_TITLE = 'Internship';
+
 export const SEM5_ADMISSION_TEMPLATE_HEADERS = [
   'Registration Number',
   'Full Name',
@@ -69,7 +72,7 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   'Current Semester': '5',
   'Major Department': 'Economics',
   'Minor Department': 'History',
-  'Internship Area': 'ECO-303 — Economics Internship',
+  'Internship Area': 'ECO-303 — Internship',
   'Section Code': 'A',
   Category: 'GENERAL',
   Religion: 'CHRISTIAN',
