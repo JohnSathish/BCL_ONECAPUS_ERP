@@ -179,7 +179,30 @@ export function excelSheetListFormula(
   return `='${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
 }
 
-/** One list-validation rule on a column — INDIRECT adjusts per row (dependent dropdowns). */
+/** Sheet name for Excel formulas (quotes + escaped apostrophes). */
+export function excelQuotedSheetName(sheetName: string): string {
+  return `'${sheetName.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Dependent minor dropdown via OFFSET/MATCH on a "Minors By Major" hidden sheet.
+ * Avoids workbook definedNames — ExcelJS corrupts them and Excel removes named ranges on open.
+ */
+export function excelMinorByMajorOffsetFormula(
+  minorsSheetName: string,
+  majorColumnLetter: string,
+  options?: { maxMinors?: number; anchorRow?: number },
+): string {
+  const maxMinors = options?.maxMinors ?? 10;
+  const anchorRow = options?.anchorRow ?? IMPORT_TEMPLATE_DATA_FIRST_ROW;
+  const sheet = excelQuotedSheetName(minorsSheetName);
+  const majorCell = `$${majorColumnLetter}${anchorRow}`;
+  const match = `MATCH(${majorCell},${sheet}!$A:$A,0)-1`;
+  const rowSlice = `OFFSET(${sheet}!$B$1,${match},0,1,${maxMinors})`;
+  return `=OFFSET(${sheet}!$B$1,${match},0,1,COUNTA(${rowSlice}))`;
+}
+
+/** One list-validation rule on a column — formula adjusts per row (dependent dropdowns). */
 export function applyDependentIndirectListValidation(
   sheet: ExcelJS.Worksheet,
   columnIndex: number,

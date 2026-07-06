@@ -8,6 +8,7 @@ import {
   excelSheetListFormula,
   applyWorksheetListValidation,
   applyDependentIndirectListValidation,
+  excelMinorByMajorOffsetFormula,
   IMPORT_TEMPLATE_DATA_FIRST_ROW,
 } from '../../../common/import/excel.util';
 import type {
@@ -4869,28 +4870,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (ref.hidden) refSheet.state = 'veryHidden';
     }
 
-    const sem5MinorsSheet = workbook.getWorksheet(
-      FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
-    );
-    if (sem5MinorsSheet) {
-      sem5MajorDepartments.forEach((major, index) => {
-        const rowNumber = index + 2;
-        const minors =
-          sem5TenantMinorByMajor[
-            this.sem5Curriculum.normalizeLabel(major.departmentName)
-          ] ?? [];
-        if (!minors.length) return;
-        const endCol = excelColumnLetter(1 + minors.length);
-        const rangeName = this.excelSem5MajorMinorsRangeName(
-          major.departmentName,
-        );
-        workbook.definedNames.add(
-          rangeName,
-          `'${FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
-        );
-      });
-    }
-
     const curriculumInfo = workbook.addWorksheet('Curriculum Info');
     curriculumInfo.addRow(['Field', 'Value']);
     curriculumInfo.addRow(['Programme', sem1Catalog.programCode]);
@@ -5073,7 +5052,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       applyDependentIndirectListValidation(
         sheet,
         sem5MinorColIndex,
-        `=INDIRECT("Sem5_"&SUBSTITUTE($${sem5MajorColLetter}$${IMPORT_TEMPLATE_DATA_FIRST_ROW}," ","_")&"_Minors")`,
+        excelMinorByMajorOffsetFormula(
+          FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
+          sem5MajorColLetter,
+        ),
         {
           allowBlank: true,
           errorTitle: 'Invalid minor',
@@ -5246,24 +5228,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (ref.hidden) {
         refSheet.state = 'veryHidden';
       }
-    }
-
-    const minorsSheet = workbook.getWorksheet(SEM1_HIDDEN_SHEETS.minorsByMajor);
-    if (minorsSheet) {
-      catalog.majorDepartments.forEach((major, index) => {
-        const rowNumber = index + 2;
-        const minors =
-          catalog.minorByMajor[
-            this.sem1Curriculum.normalizeLabel(major.departmentName)
-          ] ?? [];
-        if (!minors.length) return;
-        const endCol = excelColumnLetter(1 + minors.length);
-        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
-        workbook.definedNames.add(
-          rangeName,
-          `'${SEM1_HIDDEN_SHEETS.minorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
-        );
-      });
     }
 
     const curriculumInfo = workbook.addWorksheet('Curriculum Info');
@@ -5581,19 +5545,20 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     if (minorColIndex && majorColIndex && catalog.majorDepartments.length) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, minorColIndex).dataValidation = {
-          type: 'list',
+      applyDependentIndirectListValidation(
+        sheet,
+        minorColIndex,
+        excelMinorByMajorOffsetFormula(
+          SEM1_HIDDEN_SHEETS.minorsByMajor,
+          majorColLetter,
+        ),
+        {
           allowBlank: true,
-          formulae: [
-            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
-          ],
-          showErrorMessage: true,
           errorTitle: 'Invalid minor',
           error:
             'Choose a minor department allowed for the selected major department.',
-        };
-      }
+        },
+      );
     }
   }
 
@@ -6033,24 +5998,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       }
     }
 
-    const minorsSheet = workbook.getWorksheet(SEM5_HIDDEN_SHEETS.minorsByMajor);
-    if (minorsSheet) {
-      majorDepartments.forEach((major, index) => {
-        const rowNumber = index + 2;
-        const minors =
-          tenantMinorByMajor[
-            this.sem5Curriculum.normalizeLabel(major.departmentName)
-          ] ?? [];
-        if (!minors.length) return;
-        const endCol = excelColumnLetter(1 + minors.length);
-        const rangeName = this.excelMajorMinorsRangeName(major.departmentName);
-        workbook.definedNames.add(
-          rangeName,
-          `'${SEM5_HIDDEN_SHEETS.minorsByMajor.replace(/'/g, "''")}'!$B$${rowNumber}:$${endCol}$${rowNumber}`,
-        );
-      });
-    }
-
     const curriculumInfo = workbook.addWorksheet('Curriculum Info');
     curriculumInfo.addRow(['Field', 'Value']);
     curriculumInfo.addRow(['Programme', catalog.programCode]);
@@ -6090,22 +6037,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     );
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
-  }
-
-  private excelMajorMinorsRangeName(majorDepartment: string) {
-    const sanitized = majorDepartment
-      .trim()
-      .replace(/[^a-zA-Z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    return `${sanitized || 'Major'}_Minors`;
-  }
-
-  private excelSem5MajorMinorsRangeName(majorDepartment: string) {
-    const sanitized = majorDepartment
-      .trim()
-      .replace(/[^a-zA-Z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    return `Sem5_${sanitized || 'Major'}_Minors`;
   }
 
   private applySem5Dropdowns(
@@ -6153,7 +6084,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       applyDependentIndirectListValidation(
         sheet,
         minorColIndex,
-        `=INDIRECT(SUBSTITUTE($${majorColLetter}$${IMPORT_TEMPLATE_DATA_FIRST_ROW}," ","_")&"_Minors")`,
+        excelMinorByMajorOffsetFormula(
+          SEM5_HIDDEN_SHEETS.minorsByMajor,
+          majorColLetter,
+        ),
         {
           allowBlank: true,
           errorTitle: 'Invalid minor',
