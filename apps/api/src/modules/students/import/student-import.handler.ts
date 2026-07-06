@@ -7,6 +7,8 @@ import {
   excelColumnLetter,
   excelSheetListFormula,
   applyWorksheetListValidation,
+  applyDependentIndirectListValidation,
+  IMPORT_TEMPLATE_DATA_FIRST_ROW,
 } from '../../../common/import/excel.util';
 import type {
   ImportModuleHandler,
@@ -3955,10 +3957,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       if (!raw.vtcSubject && raw.vtcPaper) raw.vtcSubject = raw.vtcPaper;
     }
     if (semester === 5) {
-      if (!raw.majorDepartment && raw.majorDepartmentSem5) {
+      if (raw.majorDepartmentSem5) {
         raw.majorDepartment = raw.majorDepartmentSem5;
       }
-      if (!raw.minorDepartment && raw.minorDepartmentSem5) {
+      if (raw.minorDepartmentSem5) {
         raw.minorDepartment = raw.minorDepartmentSem5;
       }
     }
@@ -4456,6 +4458,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       sem1MajorDepartments,
       sem3MajorDepartments,
       sem5MajorDepartments,
+      sem5TenantMinorByMajor,
       batches,
       streams,
       shifts,
@@ -4483,9 +4486,26 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         academicYearId: options.academicYearId,
         shiftId: options.shiftId,
       }),
-      this.sem1Curriculum.buildTenantMajorDepartments(options.tenantId, 1),
-      this.sem3Curriculum.buildTenantMajorDepartments(options.tenantId, 3),
-      this.sem5Curriculum.buildTenantMajorDepartments(options.tenantId, 5),
+      this.sem1Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        1,
+        options.shiftId,
+      ),
+      this.sem3Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        3,
+        options.shiftId,
+      ),
+      this.sem5Curriculum.buildTenantMajorDepartments(
+        options.tenantId,
+        5,
+        options.shiftId,
+      ),
+      this.sem5Curriculum.buildTenantMinorByMajor(
+        options.tenantId,
+        options.shiftId,
+        options.academicYearId,
+      ),
       this.prisma.admissionBatch.findMany({
         where: { tenantId: options.tenantId, deletedAt: null },
         select: { batchCode: true },
@@ -4666,9 +4686,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         Object.values(sem1Catalog.minorByMajor).flatMap((minors) => minors),
       ),
     ].sort((a, b) => a.localeCompare(b));
-    const sem5MinorsByMajorRows = sem5Catalog.majorDepartments.map((major) => {
+    const sem5MinorsByMajorRows = sem5MajorDepartments.map((major) => {
       const minors =
-        sem5Catalog.minorByMajor[
+        sem5TenantMinorByMajor[
           this.sem5Curriculum.normalizeLabel(major.departmentName)
         ] ?? [];
       return [major.departmentName, ...minors];
@@ -4853,10 +4873,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       FULL_ADMISSION_HIDDEN_SHEETS.sem5MinorsByMajor,
     );
     if (sem5MinorsSheet) {
-      sem5Catalog.majorDepartments.forEach((major, index) => {
+      sem5MajorDepartments.forEach((major, index) => {
         const rowNumber = index + 2;
         const minors =
-          sem5Catalog.minorByMajor[
+          sem5TenantMinorByMajor[
             this.sem5Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
@@ -4912,7 +4932,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 36;
     });
 
-    this.applyFullAdmissionDropdowns(sheet, headers, hiddenSheets, sem5Catalog);
+    this.applyFullAdmissionDropdowns(
+      sheet,
+      headers,
+      hiddenSheets,
+      sem5MajorDepartments.length,
+    );
 
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
@@ -4922,7 +4947,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     sheet: ExcelJS.Worksheet,
     headers: string[],
     references: { name: string; rows: (string | number | null)[][] }[],
-    sem5Catalog: Sem5ImportCurriculumCatalog,
+    sem5MajorDepartmentCount: number,
   ) {
     const refByName = new Map(references.map((ref) => [ref.name, ref]));
     const requiredHeaders = new Set(['Programme', 'Semester']);
@@ -5043,21 +5068,19 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (
       sem5MinorColIndex &&
       sem5MajorColLetter &&
-      sem5Catalog.majorDepartments.length
+      sem5MajorDepartmentCount > 0
     ) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, sem5MinorColIndex).dataValidation = {
-          type: 'list',
+      applyDependentIndirectListValidation(
+        sheet,
+        sem5MinorColIndex,
+        `=INDIRECT("Sem5_"&SUBSTITUTE($${sem5MajorColLetter}$${IMPORT_TEMPLATE_DATA_FIRST_ROW}," ","_")&"_Minors")`,
+        {
           allowBlank: true,
-          formulae: [
-            `=INDIRECT("Sem5_"&SUBSTITUTE($${sem5MajorColLetter}${row}," ","_")&"_Minors")`,
-          ],
-          showErrorMessage: true,
           errorTitle: 'Invalid minor',
           error:
             'Choose a minor department allowed for the selected Semester 5 major department.',
-        };
-      }
+        },
+      );
     }
   }
 
@@ -5853,9 +5876,24 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         semesterSequence,
         options.shiftId,
       );
+    const tenantMinorByMajor =
+      await this.sem5Curriculum.buildTenantMinorByMajor(
+        options.tenantId,
+        options.shiftId,
+        options.academicYearId,
+      );
     const programmes = await this.sem5Curriculum.listPublishedProgrammes(
       options.tenantId,
     );
+    const shifts = await this.prisma.shift.findMany({
+      where: {
+        tenantId: options.tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+      },
+      select: { code: true },
+      orderBy: { code: 'asc' },
+    });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Students');
@@ -5897,9 +5935,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 24;
     });
 
-    const minorsByMajorRows = catalog.majorDepartments.map((major) => {
+    const minorsByMajorRows = majorDepartments.map((major) => {
       const minors =
-        catalog.minorByMajor[
+        tenantMinorByMajor[
           this.sem5Curriculum.normalizeLabel(major.departmentName)
         ] ?? [];
       return [major.departmentName, ...minors];
@@ -5920,6 +5958,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           programme.programVersionId,
           programme.curriculumLabel,
         ]),
+        hidden: true,
+      },
+      {
+        name: SEM5_HIDDEN_SHEETS.shifts,
+        headers: ['Shift'],
+        rows: shifts.map((shift) => [shift.code]),
         hidden: true,
       },
       {
@@ -5991,10 +6035,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
     const minorsSheet = workbook.getWorksheet(SEM5_HIDDEN_SHEETS.minorsByMajor);
     if (minorsSheet) {
-      catalog.majorDepartments.forEach((major, index) => {
+      majorDepartments.forEach((major, index) => {
         const rowNumber = index + 2;
         const minors =
-          catalog.minorByMajor[
+          tenantMinorByMajor[
             this.sem5Curriculum.normalizeLabel(major.departmentName)
           ] ?? [];
         if (!minors.length) return;
@@ -6038,7 +6082,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 36;
     });
 
-    this.applySem5Dropdowns(sheet, headers, hiddenSheets, programmes, catalog);
+    this.applySem5Dropdowns(
+      sheet,
+      headers,
+      hiddenSheets,
+      majorDepartments.length,
+    );
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
   }
@@ -6066,12 +6115,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       name: string;
       rows: (string | number | null)[][];
     }[],
-    programmes: { code: string }[],
-    catalog: Sem5ImportCurriculumCatalog,
+    majorDepartmentCount: number,
   ) {
     const nameDropdownMap: Record<string, { refName: string; column: string }> =
       {
         Programme: { refName: SEM5_HIDDEN_SHEETS.programmes, column: 'A' },
+        Shift: { refName: SEM5_HIDDEN_SHEETS.shifts, column: 'A' },
         'Major Department': {
           refName: SEM5_HIDDEN_SHEETS.majorDepartments,
           column: 'A',
@@ -6091,53 +6140,27 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     for (const [header, config] of Object.entries(nameDropdownMap)) {
       const columnIndex = headers.indexOf(header) + 1;
       const ref = refByName.get(config.refName);
-      if (!columnIndex) continue;
-      if (header === 'Programme' && programmes.length) {
-        const values = programmes.map((programme) => programme.code).join(',');
-        for (let row = 3; row <= 1000; row += 1) {
-          sheet.getCell(row, columnIndex).dataValidation = {
-            type: 'list',
-            allowBlank: false,
-            formulae: [`"${values}"`],
-            showErrorMessage: true,
-            errorTitle: 'Invalid programme',
-            error: 'Choose a programme from the dropdown.',
-          };
-        }
-        continue;
-      }
-      if (!ref?.rows.length) continue;
-      const formula = this.excelReferenceFormula(
-        config.refName,
-        ref.rows.length,
-        config.column,
+      if (!columnIndex || !ref?.rows.length) continue;
+      applyWorksheetListValidation(
+        sheet,
+        columnIndex,
+        excelSheetListFormula(config.refName, ref.rows.length, config.column),
+        { allowBlank: header !== 'Programme' && header !== 'Shift' },
       );
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, columnIndex).dataValidation = {
-          type: 'list',
-          allowBlank: header === 'Programme' ? false : true,
-          formulae: [formula],
-          showErrorMessage: true,
-          errorTitle: 'Invalid selection',
-          error: `Choose a valid option from ${config.refName}.`,
-        };
-      }
     }
 
-    if (minorColIndex && majorColIndex && catalog.majorDepartments.length) {
-      for (let row = 3; row <= 1000; row += 1) {
-        sheet.getCell(row, minorColIndex).dataValidation = {
-          type: 'list',
+    if (minorColIndex && majorColIndex && majorDepartmentCount > 0) {
+      applyDependentIndirectListValidation(
+        sheet,
+        minorColIndex,
+        `=INDIRECT(SUBSTITUTE($${majorColLetter}$${IMPORT_TEMPLATE_DATA_FIRST_ROW}," ","_")&"_Minors")`,
+        {
           allowBlank: true,
-          formulae: [
-            `=INDIRECT(SUBSTITUTE($${majorColLetter}${row}," ","_")&"_Minors")`,
-          ],
-          showErrorMessage: true,
           errorTitle: 'Invalid minor',
           error:
             'Choose a minor department allowed for the selected major department.',
-        };
-      }
+        },
+      );
     }
   }
 

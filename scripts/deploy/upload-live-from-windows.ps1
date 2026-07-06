@@ -39,4 +39,9 @@ git pull origin master
 bash scripts/deploy/vps-restore-db-and-update.sh $DumpFile
 "@
 
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "Deploy failed (exit $LASTEXITCODE). SSH to VPS and check logs." -ForegroundColor Red
+  exit $LASTEXITCODE
+}
+
 Write-Host "Done. Open https://erp.donboscocollege.ac.in and hard-refresh (Ctrl+Shift+R)."

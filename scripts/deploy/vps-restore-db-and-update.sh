@@ -47,7 +47,7 @@ source .env
 set +a
 
 BACKUP_NAME="backup_before_restore_$(date +%Y%m%d_%H%M%S).dump"
-echo "=== [1/6] Backup current live database → $BACKUP_NAME ==="
+echo "=== [1/7] Backup current live database → $BACKUP_NAME ==="
 "${COMPOSE[@]}" up -d postgres
 for i in $(seq 1 60); do
   if "${COMPOSE[@]}" exec -T postgres pg_isready -U "${POSTGRES_USER:-nep}" -d "${POSTGRES_DB:-nep_erp}" >/dev/null 2>&1; then
@@ -60,31 +60,42 @@ done
 echo "Saved: $APP_DIR/$BACKUP_NAME"
 
 echo
-echo "=== [2/6] Restore database from $(basename "$DUMP_FILE") ==="
+echo "=== [2/7] Stop app containers (release DB connections) ==="
+"${COMPOSE[@]}" stop api worker web nginx 2>/dev/null || true
+
+echo
+echo "=== [3/7] Restore database from $(basename "$DUMP_FILE") ==="
 docker cp "$DUMP_FILE" "$("${COMPOSE[@]}" ps -q postgres):/tmp/restore.dump"
 "${COMPOSE[@]}" exec -T postgres bash -c "
-  set -e
-  dropdb -U ${POSTGRES_USER:-nep} --if-exists ${POSTGRES_DB:-nep_erp}
-  createdb -U ${POSTGRES_USER:-nep} ${POSTGRES_DB:-nep_erp}
-  pg_restore -U ${POSTGRES_USER:-nep} -d ${POSTGRES_DB:-nep_erp} --no-owner --no-acl /tmp/restore.dump
+  set -euo pipefail
+  DB_USER='${POSTGRES_USER:-nep}'
+  DB_NAME='${POSTGRES_DB:-nep_erp}'
+  psql -U \"\$DB_USER\" -d postgres -v ON_ERROR_STOP=1 -c \"
+    SELECT pg_terminate_backend(pid)
+    FROM pg_stat_activity
+    WHERE datname = '\$DB_NAME' AND pid <> pg_backend_pid();
+  \"
+  dropdb -U \"\$DB_USER\" --if-exists \"\$DB_NAME\"
+  createdb -U \"\$DB_USER\" \"\$DB_NAME\"
+  pg_restore -U \"\$DB_USER\" -d \"\$DB_NAME\" --no-owner --no-acl /tmp/restore.dump
   rm -f /tmp/restore.dump
 "
 echo "Restore complete."
 
 echo
-echo "=== [3/6] Pull latest code and rebuild (vps-update.sh) ==="
+echo "=== [4/7] Pull latest code and rebuild (vps-update.sh) ==="
 bash scripts/deploy/vps-update.sh
 
 echo
-echo "=== [4/6] Finalize curriculum lock (skip seed — data already clean) ==="
+echo "=== [5/7] Finalize curriculum lock (skip seed — data already clean) ==="
 TENANT="${TENANT:-demo}" bash scripts/deploy/vps-curriculum-update.sh --skip-seed
 
 echo
-echo "=== [5/6] Restart API and web ==="
-"${COMPOSE[@]}" up -d api web nginx
+echo "=== [6/7] Restart API and web ==="
+"${COMPOSE[@]}" up -d api web worker nginx
 
 echo
-echo "=== [6/6] Health check ==="
+echo "=== [7/7] Health check ==="
 HOST="${NEXT_PUBLIC_LOGIN_HOST:-erp.donboscocollege.ac.in}"
 curl -sf "https://${HOST}/api/health/ready" | head -c 400 || curl -sf "http://localhost/api/health/ready" | head -c 400
 echo

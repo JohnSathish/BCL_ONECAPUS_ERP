@@ -79,10 +79,12 @@ export const SEM5_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 
 export const SEM5_STRUCTURE_NOTES = [
   'Semester 5 FYUGP: 3 Major papers + 1 Minor + 1 Internship course = 5 papers, 20 credits.',
-  'Major Department auto-assigns Major Papers 1–3. Internship Area must be the registered internship course for that major.',
-  'Internship Area dropdown lists real courses (e.g. ECO-303 — Internship, COM-303 — Internship).',
-  'Pick the internship course that matches the Major Department (Economics → ECO-303, Commerce → COM-303, etc.).',
+  'Major Department auto-assigns Major Papers 1–3. Internship Area must be the registered internship course for that major (XXX-303).',
+  'Minor Department uses the NEHU major–minor matrix (XXX-302 minor papers only — never internship codes).',
+  'Internship Area dropdown lists registered courses (e.g. ECO-303 — Internship, GAR-303 — Internship).',
+  'Pick the internship course that matches the Major Department (Economics → ECO-303, Garo → GAR-303, etc.).',
   'Minor Department options depend on the selected Major Department (NEHU major-minor rules).',
+  'Shift: MORNING or DAY — Semester 5 curriculum is identical for both shifts.',
 ];
 
 export const SEM5_HIDDEN_SHEETS = {
@@ -91,4 +93,5 @@ export const SEM5_HIDDEN_SHEETS = {
   internshipAreas: 'Internship Areas',
   minorsByMajor: 'Minors By Major',
   programmes: 'Programmes',
+  shifts: 'Shifts',
 } as const;

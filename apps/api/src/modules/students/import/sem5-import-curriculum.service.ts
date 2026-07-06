@@ -300,6 +300,44 @@ export class Sem5ImportCurriculumService {
     };
   }
 
+  /** NEHU major → allowed minor department names for Excel dropdowns (tenant-wide). */
+  async buildTenantMinorByMajor(
+    tenantId: string,
+    shiftId?: string,
+    academicYearId?: string,
+  ): Promise<Record<string, string[]>> {
+    const majors = await this.buildTenantMajorDepartments(tenantId, 5, shiftId);
+    const referenceVersion = await this.prisma.programVersion.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'PUBLISHED',
+        program: { deletedAt: null, code: { startsWith: 'BA-' } },
+      },
+      orderBy: [{ program: { code: 'asc' } }, { effectiveFrom: 'desc' }],
+      select: { id: true },
+    });
+    const minorByMajor: Record<string, string[]> = {};
+    if (!referenceVersion) return minorByMajor;
+
+    for (const major of majors) {
+      const eligibleMinors =
+        await this.majorMinorEligibility.listEligibleMinors(
+          tenantId,
+          referenceVersion.id,
+          major.subjectSlug,
+          5,
+          academicYearId,
+          shiftId,
+        );
+      minorByMajor[this.normalizeLabel(major.departmentName)] = eligibleMinors
+        .map((subject) => subject.department?.name ?? subject.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+    }
+    return minorByMajor;
+  }
+
   async buildTenantMajorDepartments(
     tenantId: string,
     semesterSequence = 5,
@@ -423,11 +461,16 @@ export class Sem5ImportCurriculumService {
     return labels.sort((a, b) => a.localeCompare(b));
   }
 
+  private isInternshipSlotCourseCode(code: string) {
+    return /-303$/i.test(code.replace(/[\u2010-\u2015]/g, '-').trim());
+  }
+
   private buildMinorDepartments(
     minorOfferings: CurriculumOffering[],
   ): Sem5MinorDepartmentOption[] {
     const grouped = new Map<string, CurriculumOffering>();
     for (const offering of minorOfferings) {
+      if (this.isInternshipSlotCourseCode(offering.course.code)) continue;
       const departmentName =
         offering.course.department?.name?.trim() ||
         this.departmentFromCourseCode(offering.course.code);
@@ -588,6 +631,7 @@ export class Sem5ImportCurriculumService {
       BOT: 'Botany',
       CHE: 'Chemistry',
       MAT: 'Mathematics',
+      MTH: 'Mathematics',
       PHY: 'Physics',
       ZOO: 'Zoology',
       COM: 'Commerce',

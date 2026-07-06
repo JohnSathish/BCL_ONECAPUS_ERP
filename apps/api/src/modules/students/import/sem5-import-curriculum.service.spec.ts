@@ -153,4 +153,36 @@ describe('Sem5ImportCurriculumService', () => {
       }),
     ).toBe('FYUGP Arts');
   });
+
+  it('buildMinorDepartments excludes internship slot -303 courses', () => {
+    const minors = (
+      service as unknown as {
+        buildMinorDepartments: (
+          offerings: {
+            course: {
+              code: string;
+              title: string;
+              department?: { name: string; code: string } | null;
+            };
+          }[],
+        ) => { departmentName: string }[];
+      }
+    ).buildMinorDepartments([
+      {
+        course: {
+          code: 'GAR-303',
+          title: 'Internship',
+          department: { name: 'Garo', code: 'GAR' },
+        },
+      },
+      {
+        course: {
+          code: 'GAR-302',
+          title: 'Rabindra Sahitya',
+          department: { name: 'Garo', code: 'GAR' },
+        },
+      },
+    ]);
+    expect(minors.map((row) => row.departmentName)).toEqual(['Garo']);
+  });
 });

@@ -136,6 +136,8 @@ type WorksheetWithValidations = ExcelJS.Worksheet & {
         allowBlank?: boolean;
         formulae: string[];
         showErrorMessage?: boolean;
+        errorTitle?: string;
+        error?: string;
       },
     ) => void;
   };
@@ -175,6 +177,36 @@ export function excelSheetListFormula(
   if (rowCount <= 0) return '" "';
   const safeName = sheetName.replace(/'/g, "''");
   return `='${safeName}'!$${column}$2:$${column}$${rowCount + 1}`;
+}
+
+/** One list-validation rule on a column — INDIRECT adjusts per row (dependent dropdowns). */
+export function applyDependentIndirectListValidation(
+  sheet: ExcelJS.Worksheet,
+  columnIndex: number,
+  indirectFormula: string,
+  options?: {
+    allowBlank?: boolean;
+    firstRow?: number;
+    lastRow?: number;
+    errorTitle?: string;
+    error?: string;
+  },
+) {
+  if (!columnIndex || !indirectFormula) return;
+  const firstRow = options?.firstRow ?? IMPORT_TEMPLATE_DATA_FIRST_ROW;
+  const lastRow = options?.lastRow ?? IMPORT_TEMPLATE_DATA_LAST_ROW;
+  const col = excelColumnLetter(columnIndex);
+  (sheet as WorksheetWithValidations).dataValidations.add(
+    `${col}${firstRow}:${col}${lastRow}`,
+    {
+      type: 'list',
+      allowBlank: options?.allowBlank ?? true,
+      formulae: [indirectFormula],
+      showErrorMessage: true,
+      errorTitle: options?.errorTitle,
+      error: options?.error,
+    },
+  );
 }
 
 export { DATA_SHEET_NAME, INSTRUCTIONS_SHEET_NAME };
