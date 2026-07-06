@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NODE_OPTIONS: ${API_NODE_OPTIONS:---max-old-space-size=1024}
+      NODE_OPTIONS: ${API_NODE_OPTIONS:---max-old-space-size=2048}
       HOST: 0.0.0.0
       API_HOST: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL}
@@ -53,6 +53,12 @@ services:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage
       - nep_backups:/data/backups
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3001/api/health/live']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 240s
 
   web:
     restart: unless-stopped
