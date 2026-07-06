@@ -1,60 +1,12 @@
 import type { PrismaClient } from '@prisma/client';
 import { slugifySubject } from '../src/modules/academic-engine/domain/nep-categories';
+import {
+  DBC_MAJOR_MINOR_DEPT_CODE,
+  DBC_MAJOR_MINOR_MATRIX,
+  DBC_MAJOR_MINOR_PROGRAMME_GROUP,
+} from '../src/modules/academic-engine/domain/dbc-major-minor-matrix';
 
-/** Don Bosco College official major → allowed minors matrix. */
-export const DBC_MAJOR_MINOR_MATRIX: Record<string, string[]> = {
-  Economics: ['Geography', 'History', 'Political Science', 'Sociology'],
-  Education: ['Garo', 'History', 'Philosophy'],
-  English: ['Education', 'Geography', 'Philosophy', 'Political Science'],
-  Garo: ['Education', 'Geography', 'Philosophy', 'Sociology'],
-  Geography: ['Economics', 'Garo'],
-  History: ['Economics', 'Philosophy', 'Political Science', 'Sociology'],
-  Philosophy: ['Education', 'Garo', 'Geography'],
-  'Political Science': ['Economics', 'Education', 'History', 'Sociology'],
-  Sociology: ['Economics', 'Garo', 'History', 'Political Science'],
-  Botany: ['Zoology', 'Chemistry'],
-  Chemistry: ['Mathematics', 'Physics'],
-  Mathematics: ['Physics', 'Chemistry'],
-  Zoology: ['Botany', 'Chemistry'],
-  Physics: ['Chemistry', 'Mathematics'],
-  Commerce: ['Economics', 'Mathematics', 'Geography'],
-};
-
-const SUBJECT_PROGRAMME_GROUP: Record<string, string> = {
-  Economics: 'ARTS',
-  Education: 'ARTS',
-  English: 'ARTS',
-  Garo: 'ARTS',
-  Geography: 'ARTS',
-  History: 'ARTS',
-  Philosophy: 'ARTS',
-  'Political Science': 'ARTS',
-  Sociology: 'ARTS',
-  Botany: 'SCIENCE',
-  Chemistry: 'SCIENCE',
-  Mathematics: 'SCIENCE',
-  Zoology: 'SCIENCE',
-  Physics: 'SCIENCE',
-  Commerce: 'COMMERCE',
-};
-
-const DEPT_CODE_BY_NAME: Record<string, string> = {
-  Economics: 'ECO',
-  Education: 'EDN',
-  English: 'ENG',
-  Garo: 'GAR',
-  Geography: 'GEO',
-  History: 'HIS',
-  Philosophy: 'PHI',
-  'Political Science': 'POL',
-  Sociology: 'SOC',
-  Botany: 'BOT',
-  Chemistry: 'CHE',
-  Mathematics: 'MTH',
-  Zoology: 'ZOO',
-  Physics: 'PHY',
-  Commerce: 'COM',
-};
+export { DBC_MAJOR_MINOR_MATRIX } from '../src/modules/academic-engine/domain/dbc-major-minor-matrix';
 
 export async function seedDbcFyugpRules(
   prisma: PrismaClient,
@@ -77,7 +29,7 @@ export async function seedDbcFyugpRules(
 
   for (const name of allSubjectNames) {
     const slug = slugifySubject(name);
-    const deptCode = DEPT_CODE_BY_NAME[name];
+    const deptCode = DBC_MAJOR_MINOR_DEPT_CODE[name];
     const departmentId = deptCode ? deptByCode.get(deptCode) : undefined;
 
     const row = await prisma.academicSubject.upsert({
@@ -85,7 +37,7 @@ export async function seedDbcFyugpRules(
       update: {
         name,
         departmentId: departmentId ?? null,
-        programmeGroup: SUBJECT_PROGRAMME_GROUP[name] ?? null,
+        programmeGroup: DBC_MAJOR_MINOR_PROGRAMME_GROUP[name] ?? null,
         isActive: true,
         deletedAt: null,
       },
@@ -95,7 +47,7 @@ export async function seedDbcFyugpRules(
         slug,
         name,
         departmentId: departmentId ?? null,
-        programmeGroup: SUBJECT_PROGRAMME_GROUP[name] ?? null,
+        programmeGroup: DBC_MAJOR_MINOR_PROGRAMME_GROUP[name] ?? null,
         isActive: true,
       },
     });

@@ -14,6 +14,7 @@ import {
   CANONICAL_POOL_NAMES,
   LEGACY_EXCLUDED_COURSE_CODES,
   buildCanonicalCourseCodeSet,
+  FYUGP_MINOR_SEMESTER_SEQUENCES,
   legacyPoolToCanonicalName,
   normalizeCourseCode,
   poolCodesForName,
@@ -945,6 +946,98 @@ async function removeInvalidLateSemesterPoolOfferings(
   }
 }
 
+/** Semesters 1, 3, 4, and 6 never carry MINOR offerings in NEHU FYUGP. */
+async function removeInvalidMinorSemesterOfferings(
+  tenantId: string,
+  stats: Stats,
+) {
+  const offerings = await prisma.courseOffering.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      mappingSource: 'DIRECT',
+      category: { equals: 'MINOR', mode: 'insensitive' },
+      semesterSequence: { notIn: [...FYUGP_MINOR_SEMESTER_SEQUENCES] },
+    },
+    include: {
+      course: { select: { code: true } },
+      programVersion: { include: { program: { select: { code: true } } } },
+    },
+  });
+
+  for (const offering of offerings) {
+    const activeRegs = await prisma.semesterRegistrationLine.count({
+      where: {
+        offeringId: offering.id,
+        status: { in: ['confirmed', 'pending', 'waitlisted'] },
+      },
+    });
+    const programCode = offering.programVersion?.program.code ?? '?';
+    if (activeRegs > 0) {
+      console.log(
+        `  KEEP invalid MINOR offering ${offering.course.code} @ ${programCode} sem ${offering.semesterSequence} (regs=${activeRegs})`,
+      );
+      continue;
+    }
+    console.log(
+      `  RETIRE invalid MINOR offering ${offering.course.code} @ ${programCode} sem ${offering.semesterSequence}`,
+    );
+    if (apply) {
+      await prisma.courseOffering.update({
+        where: { id: offering.id },
+        data: { deletedAt: new Date() },
+      });
+      stats.retiredOfferings += 1;
+    }
+  }
+}
+
+/** Paper slot -303 is the department internship; it must never appear as MINOR. */
+async function removeInvalidInternshipMinorOfferings(
+  tenantId: string,
+  stats: Stats,
+) {
+  const offerings = await prisma.courseOffering.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      mappingSource: 'DIRECT',
+      category: { equals: 'MINOR', mode: 'insensitive' },
+      course: { code: { endsWith: '-303' } },
+    },
+    include: {
+      course: { select: { code: true } },
+      programVersion: { include: { program: { select: { code: true } } } },
+    },
+  });
+
+  for (const offering of offerings) {
+    const activeRegs = await prisma.semesterRegistrationLine.count({
+      where: {
+        offeringId: offering.id,
+        status: { in: ['confirmed', 'pending', 'waitlisted'] },
+      },
+    });
+    const programCode = offering.programVersion?.program.code ?? '?';
+    if (activeRegs > 0) {
+      console.log(
+        `  KEEP invalid internship-as-minor ${offering.course.code} @ ${programCode} (regs=${activeRegs})`,
+      );
+      continue;
+    }
+    console.log(
+      `  RETIRE invalid internship-as-minor ${offering.course.code} @ ${programCode}`,
+    );
+    if (apply) {
+      await prisma.courseOffering.update({
+        where: { id: offering.id },
+        data: { deletedAt: new Date() },
+      });
+      stats.retiredOfferings += 1;
+    }
+  }
+}
+
 async function removeInvalidPoolAssignments(tenantId: string) {
   const assignments = await prisma.programmePoolAssignment.findMany({
     where: { tenantId, active: true },
@@ -1030,6 +1123,16 @@ async function main() {
     '\n=== Phase 4b: Retire invalid Sem 4+ pool-category DIRECT offerings ===',
   );
   await removeInvalidLateSemesterPoolOfferings(tenant.id, stats);
+
+  console.log(
+    '\n=== Phase 4c: Retire invalid MINOR offerings outside Sem 2/5 ===',
+  );
+  await removeInvalidMinorSemesterOfferings(tenant.id, stats);
+
+  console.log(
+    '\n=== Phase 4d: Retire *-303 internship courses wrongly mapped as MINOR ===',
+  );
+  await removeInvalidInternshipMinorOfferings(tenant.id, stats);
 
   console.log('\n=== Phase 5: Remove invalid pool assignments ===');
   await removeInvalidPoolAssignments(tenant.id);

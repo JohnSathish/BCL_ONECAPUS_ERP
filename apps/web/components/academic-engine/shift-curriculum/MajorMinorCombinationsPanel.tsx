@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DataTable } from '@/components/erp/data-table';
 import {
   fetchAcademicSubjects,
+  fetchMajorMinorMatrix,
   fetchMajorMinorRules,
   fetchShifts,
   syncMajorMinorRules,
@@ -51,6 +52,11 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
     enabled: Boolean(resolvedInstitutionId),
   });
 
+  const officialMatrix = useQuery({
+    queryKey: ['major-minor-matrix'],
+    queryFn: fetchMajorMinorMatrix,
+  });
+
   const activeShiftId = shiftId || shifts.data?.find((s) => s.status === 'ACTIVE')?.id || '';
 
   const rules = useQuery({
@@ -64,13 +70,46 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
     enabled: Boolean(resolvedInstitutionId),
   });
 
-  const artsMajors = useMemo(() => {
+  const matrixMajors = useMemo(() => {
+    const majorNames = new Set(Object.keys(officialMatrix.data ?? {}));
     return (subjects.data ?? [])
-      .filter((s) => s.programmeGroup === 'ARTS')
+      .filter((subject) => majorNames.has(subject.name))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [subjects.data]);
+  }, [subjects.data, officialMatrix.data]);
 
-  const artsMinors = artsMajors;
+  const selectedMajor = matrixMajors.find((subject) => subject.id === majorSubjectId);
+
+  const officialMinorNames = useMemo(() => {
+    if (!selectedMajor) return [];
+    return officialMatrix.data?.[selectedMajor.name] ?? [];
+  }, [officialMatrix.data, selectedMajor]);
+
+  const minorOptions = useMemo(() => {
+    const byName = new Map((subjects.data ?? []).map((subject) => [subject.name, subject]));
+    return officialMinorNames
+      .map((name) => byName.get(name))
+      .filter((subject): subject is NonNullable<typeof subject> => Boolean(subject));
+  }, [officialMinorNames, subjects.data]);
+
+  useEffect(() => {
+    if (!majorSubjectId) {
+      setSelectedMinorIds([]);
+      return;
+    }
+    const activeMinors = (rules.data ?? [])
+      .filter((rule) => {
+        if (rule.majorSubjectId !== majorSubjectId || !rule.isActive) return false;
+        const shiftOk = !activeShiftId
+          ? rule.shiftId == null
+          : rule.shiftId === activeShiftId || rule.shiftId == null;
+        const yearOk = academicYearId
+          ? rule.academicYearId === academicYearId
+          : rule.academicYearId == null;
+        return shiftOk && yearOk;
+      })
+      .map((rule) => rule.allowedMinorSubjectId);
+    setSelectedMinorIds(activeMinors);
+  }, [majorSubjectId, rules.data, activeShiftId, academicYearId]);
 
   const groupedRules = useMemo(() => {
     const map = new Map<
@@ -110,13 +149,6 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
 
   const loadMajorForEdit = (majorId: string) => {
     setMajorSubjectId(majorId);
-    const activeMinors = (rules.data ?? [])
-      .filter(
-        (rule) =>
-          rule.majorSubjectId === majorId && rule.isActive && rule.shiftId === activeShiftId,
-      )
-      .map((rule) => rule.allowedMinorSubjectId);
-    setSelectedMinorIds(activeMinors);
   };
 
   return (
@@ -125,8 +157,9 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
         <CardHeader>
           <CardTitle>Major–Minor combinations</CardTitle>
           <CardDescription>
-            Configure allowed minor subjects per major for each shift. Used by bulk import Excel
-            dropdowns, subject registration, and import validation.
+            Configure allowed minor subjects per major for each shift. Options follow the official
+            NEHU FYUGP matrix (Arts, Science, and Commerce). Used by bulk import Excel dropdowns,
+            subject registration, and import validation.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -167,25 +200,33 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
             <select
               className="mt-1 h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
               value={majorSubjectId}
-              onChange={(e) => {
-                setMajorSubjectId(e.target.value);
-                setSelectedMinorIds([]);
-              }}
+              onChange={(e) => setMajorSubjectId(e.target.value)}
             >
               <option value="">Select major</option>
-              {artsMajors.map((subject) => (
+              {matrixMajors.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name}
                 </option>
               ))}
             </select>
           </label>
+          {selectedMajor && officialMinorNames.length > 0 ? (
+            <p className="text-sm text-muted-foreground lg:col-span-2">
+              Official NEHU minors for {selectedMajor.name}: {officialMinorNames.join(', ')}
+            </p>
+          ) : null}
           <div className="lg:col-span-2">
             <p className="mb-2 text-sm font-medium">Allowed minor subjects</p>
-            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-              {artsMinors
-                .filter((minor) => minor.id !== majorSubjectId)
-                .map((minor) => (
+            {!majorSubjectId ? (
+              <p className="text-sm text-muted-foreground">Select a major to configure minors.</p>
+            ) : minorOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No minor subjects found in the catalog for this major. Run database seed to sync
+                academic subjects.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                {minorOptions.map((minor) => (
                   <label key={minor.id} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -201,7 +242,8 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
                     {minor.name}
                   </label>
                 ))}
-            </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 lg:col-span-2">
             <Button
@@ -219,7 +261,8 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
         <CardHeader>
           <CardTitle>Configured mappings</CardTitle>
           <CardDescription>
-            Semester 5 Arts programmes use these rules together with shift curriculum offerings.
+            Active rules per major. Global rules apply to all shifts unless overridden for a
+            specific shift.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -231,7 +274,7 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
               onChange={(e) => setFilterMajorId(e.target.value)}
             >
               <option value="">All majors</option>
-              {artsMajors.map((subject) => (
+              {matrixMajors.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name}
                 </option>
@@ -289,7 +332,8 @@ export function MajorMinorCombinationsPanel({ institutionId, initialShiftId }: P
         </CardHeader>
         <CardContent>
           <DataTable
-            data={rules.data ?? []}
+            rows={rules.data ?? []}
+            getRowKey={(row) => row.id}
             columns={[
               {
                 key: 'major',

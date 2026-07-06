@@ -395,7 +395,7 @@ function poolCourses(
   );
 }
 
-/** Cross-department Sem 5 minor (-303) direct offerings on each BA programme version. */
+/** Cross-department Sem 5 minor (-302) direct offerings on each BA programme version. */
 export function buildArtsFyugpSem5MinorCourseDefs(
   hostProgramCode: string,
 ): ArtsFyugpCourseDef[] {
@@ -410,7 +410,7 @@ export function buildArtsFyugpSem5MinorCourseDefs(
     const minorCode =
       'sem5MinorCode' in dept.papers && dept.papers.sem5MinorCode
         ? dept.papers.sem5MinorCode
-        : '303';
+        : '302';
     const minorTitle = dept.papers.sem5Minor;
     return theoryCourse({
       code: `${dept.code}-${minorCode}`,

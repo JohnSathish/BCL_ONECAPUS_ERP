@@ -63,6 +63,7 @@ import {
 } from './dto/curriculum-completion-query.dto';
 import { AdmissionPoolsService } from './services/admission-pools.service';
 import { MajorMinorEligibilityService } from './services/major-minor-eligibility.service';
+import { DBC_MAJOR_MINOR_MATRIX } from './domain/dbc-major-minor-matrix';
 import { CourseEligibilityService } from './services/course-eligibility.service';
 import {
   AddPoolCourseDto,
@@ -392,6 +393,12 @@ export class AcademicEngineController {
     },
   ) {
     return this.shiftCurriculum.upsertCurriculumPolicy(user.tid, shiftId, body);
+  }
+
+  @Get('fyugp/major-minor-matrix')
+  @RequirePermissions('academic-engine:read')
+  getMajorMinorMatrix() {
+    return DBC_MAJOR_MINOR_MATRIX;
   }
 
   @Get('fyugp/major-minor-rules')

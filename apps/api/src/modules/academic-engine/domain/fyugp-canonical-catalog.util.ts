@@ -252,6 +252,9 @@ export const CANONICAL_POOL_NAMES = new Set(
   CANONICAL_POOL_DEFS.map((d) => d.poolName),
 );
 
+/** NEHU FYUGP: minor/core papers are offered only in Semesters 2 and 5. */
+export const FYUGP_MINOR_SEMESTER_SEQUENCES = [2, 5] as const;
+
 /** Legacy import / demo codes that must never be re-seeded. */
 export const LEGACY_EXCLUDED_COURSE_CODES = [
   'BCA-M101',

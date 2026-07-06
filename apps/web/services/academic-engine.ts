@@ -552,6 +552,11 @@ export async function upsertShiftDepartments(
   return data as ShiftDepartmentRow[];
 }
 
+export async function fetchMajorMinorMatrix() {
+  const { data } = await api.get('/v1/academic-engine/fyugp/major-minor-matrix');
+  return data as Record<string, string[]>;
+}
+
 export async function fetchMajorMinorRules(params?: {
   institutionId?: string;
   shiftId?: string;
