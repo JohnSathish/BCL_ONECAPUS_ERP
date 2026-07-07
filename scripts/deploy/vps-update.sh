@@ -51,6 +51,16 @@ echo "Starting API and waiting until healthy…"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
 
 echo "Starting web, worker, nginx…"
+if docker ps --format '{{.Names}}' | grep -q '^donboscocollege-web$'; then
+  ERP_NET=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | xargs -r docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1)
+  if [[ -z "${ERP_NET}" ]]; then
+    ERP_NET="$(basename "$APP_DIR")_default"
+  fi
+  if docker network inspect "${ERP_NET}" >/dev/null 2>&1; then
+    docker network connect "${ERP_NET}" donboscocollege-web 2>/dev/null || true
+    echo "College website container attached to Docker network: ${ERP_NET}"
+  fi
+fi
 "${COMPOSE[@]}" up -d web worker nginx
 
 echo "Fixing data volume permissions…"
