@@ -92,4 +92,28 @@ describe('CurriculumResolutionService', () => {
     );
     expect(result.inheritedPoolOfferings).toHaveLength(0);
   });
+
+  it('filters offerings whose course is soft-deleted', async () => {
+    prisma.programmePoolAssignment.findMany.mockResolvedValue([]);
+    prisma.programmePoolCourseExclusion.findMany.mockResolvedValue([]);
+    prisma.courseOffering.findMany.mockResolvedValue([
+      {
+        id: 'edn-1',
+        category: 'MAJOR',
+        semesterSequence: 5,
+        course: { code: 'EDN-300', deletedAt: null },
+      },
+    ]);
+    prisma.categoryPool.findMany.mockResolvedValue([]);
+
+    await service.resolveProgrammeCurriculum('tenant-1', 'pv-1', 5);
+
+    expect(prisma.courseOffering.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          course: { deletedAt: null },
+        }),
+      }),
+    );
+  });
 });

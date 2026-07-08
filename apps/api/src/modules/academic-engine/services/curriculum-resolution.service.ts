@@ -66,6 +66,8 @@ export class CurriculumResolutionService {
       deletedAt: null,
       programVersionId,
       semesterSequence,
+      // Soft-deleted courses (e.g. legacy EDU-*) must not win over active replacements (EDN-*).
+      course: { deletedAt: null },
       OR: [{ mappingSource: MAPPING_SOURCE.DIRECT }, { categoryPoolId: null }],
       ...(normalizedCategory
         ? { category: { equals: normalizedCategory, mode: 'insensitive' } }
@@ -201,6 +203,7 @@ export class CurriculumResolutionService {
                   deletedAt: null,
                   mappingSource: MAPPING_SOURCE.SHARED_POOL,
                   semesterSequence,
+                  course: { deletedAt: null },
                 },
                 include: offeringInclude,
                 orderBy: [
@@ -252,6 +255,7 @@ export class CurriculumResolutionService {
           categoryPoolId: { in: poolIds },
           semesterSequence,
           deletedAt: null,
+          course: { deletedAt: null },
           ...(normalizedCategory
             ? { category: { equals: normalizedCategory, mode: 'insensitive' } }
             : {}),

@@ -520,6 +520,7 @@ export class StudentsController {
       dto.batchId,
       dto.mode,
       dto.importMode ?? 'CREATE',
+      { preferSync: dto.preferSync === true },
     );
   }
 

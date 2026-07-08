@@ -159,6 +159,8 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const [sem5Downloading, setSem5Downloading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [recoveryRetrying, setRecoveryRetrying] = useState(false);
+  const [recoveryRetriedAt, setRecoveryRetriedAt] = useState<string | null>(null);
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
     dryRunValidation: false,
     autoGenerateRollNumbers: true,
@@ -329,6 +331,8 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     setCommitMode('VALID_ONLY');
     setCommitResult(null);
     setCommitProgress(null);
+    setRecoveryRetrying(false);
+    setRecoveryRetriedAt(null);
     setSelectedFile(null);
     setNotice('');
   }, []);
@@ -358,10 +362,47 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const pollUntilCommitted = useCallback(
     async (batchId: string) => {
       const maxAttempts = 300;
+      const maxAutoRetries = 3;
+      let autoRetryCount = 0;
       for (let i = 0; i < maxAttempts; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const batch = await fetchStudentImportBatch(batchId);
         setCommitProgress(getStudentImportCommitProgress(batch));
+        if (
+          batch.status === 'VALIDATED' &&
+          batch.successfulRows === 0 &&
+          autoRetryCount < maxAutoRetries
+        ) {
+          autoRetryCount += 1;
+          setRecoveryRetrying(true);
+          setRecoveryRetriedAt(
+            new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          );
+          const retry = await commitStudentImport(batchId, commitMode, importMode, {
+            preferSync: true,
+          });
+          if (!retry.async) {
+            setCommitProgress({
+              percent: 100,
+              processed: retry.successfulRows,
+              total: retry.successfulRows,
+              label: 'Import complete',
+              indeterminate: false,
+            });
+            setCommitResult(retry);
+            setStep('done');
+            setNotice('');
+            setRecoveryRetrying(false);
+            void qc.invalidateQueries({ queryKey: ['students'] });
+            void qc.invalidateQueries({ queryKey: ['student-import-batches'] });
+            return;
+          }
+          setNotice(
+            retry.message ??
+              `Recovered stalled import, retrying in background (attempt ${autoRetryCount}/${maxAutoRetries}).`,
+          );
+          continue;
+        }
         if (batch.status === 'COMMITTED') {
           setCommitResult({
             batchId,
@@ -371,17 +412,22 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
           });
           setStep('done');
           setNotice('');
+          setRecoveryRetrying(false);
           void qc.invalidateQueries({ queryKey: ['students'] });
           void qc.invalidateQueries({ queryKey: ['student-import-batches'] });
           return;
         }
         if (batch.status === 'FAILED') {
+          setRecoveryRetrying(false);
           throw new Error(batch.errorMessage ?? 'Import failed in background');
         }
       }
-      throw new Error('Import is still processing. Check Import History in a few minutes.');
+      setRecoveryRetrying(false);
+      throw new Error(
+        `Import is still processing after ${maxAutoRetries} automatic recovery attempts. Check Import History in a few minutes.`,
+      );
     },
-    [qc],
+    [qc, commitMode, importMode],
   );
 
   const commitMut = useMutation({
@@ -391,6 +437,8 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     },
     onMutate: () => {
       setStep('committing');
+      setRecoveryRetrying(false);
+      setRecoveryRetriedAt(null);
       const total = preview?.summary.valid ?? 0;
       setCommitProgress({
         percent: 0,
@@ -424,6 +472,7 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
     onError: () => {
       setStep('preview');
       setCommitProgress(null);
+      setRecoveryRetrying(false);
     },
   });
 
@@ -861,6 +910,12 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
                       <p className="font-semibold text-rose-950">
                         {commitProgress?.label ?? `Importing ${preview.summary.valid} students…`}
                       </p>
+                      {recoveryRetrying ? (
+                        <span className="mt-2 inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                          Recovered stalled import, retrying...
+                          {recoveryRetriedAt ? ` (${recoveryRetriedAt})` : ''}
+                        </span>
+                      ) : null}
                       <p className="mt-1 font-medium text-rose-900/90">
                         Large imports run in the background and may take several minutes. Please
                         keep this page open until completion.

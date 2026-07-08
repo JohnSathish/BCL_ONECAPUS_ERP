@@ -119,11 +119,29 @@ export class ImportBatchRepository {
     batchId: string,
     updates: { rowNumber: number; courseId: string }[],
   ) {
-    for (const u of updates) {
-      await this.prisma.importBatchRow.updateMany({
-        where: { batchId, rowNumber: u.rowNumber },
-        data: { status: 'IMPORTED', courseId: u.courseId },
-      });
+    if (updates.length === 0) return;
+
+    const chunkSize = 100;
+    for (let offset = 0; offset < updates.length; offset += chunkSize) {
+      const chunk = updates.slice(offset, offset + chunkSize);
+      const rowNumbers = chunk.map((row) => row.rowNumber);
+      const courseIds = chunk.map((row) => row.courseId);
+      await this.prisma.$executeRaw`
+        UPDATE academic.import_batch_rows AS r
+        SET
+          status = 'IMPORTED',
+          course_id = v.course_id,
+          updated_at = NOW()
+        FROM (
+          SELECT *
+          FROM UNNEST(
+            ${rowNumbers}::int[],
+            ${courseIds}::uuid[]
+          ) AS t(row_number, course_id)
+        ) AS v
+        WHERE r.batch_id = ${batchId}::uuid
+          AND r.row_number = v.row_number
+      `;
     }
   }
 }

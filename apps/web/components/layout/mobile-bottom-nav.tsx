@@ -9,7 +9,7 @@ import { cn } from '@/utils/cn';
 const ITEMS = [
   { label: 'Home', href: '/admin', icon: LayoutDashboard, exact: true, color: '#3b82f6' },
   { label: 'Students', href: '/admin/students', icon: GraduationCap, color: '#22c55e' },
-  { label: 'Finance', href: '/admin/fees', icon: Wallet, color: '#f59e0b' },
+  { label: 'Fee Management', href: '/admin/fees', icon: Wallet, color: '#f59e0b' },
   { label: 'Academics', href: '/admin/programs', icon: BookOpen, color: '#8b5cf6' },
 ] as const;
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { slugifySubject } from '../domain/nep-categories';
 import { CurriculumResolutionService } from './curriculum-resolution.service';
 import { ShiftCurriculumService } from './shift-curriculum.service';
+import { StudentMajorMinorOverrideService } from './student-major-minor-override.service';
 
 export type SubjectPathRow = {
   id: string;
@@ -19,6 +20,7 @@ export class MajorMinorEligibilityService {
     private readonly prisma: PrismaService,
     private readonly curriculum: CurriculumResolutionService,
     private readonly shiftCurriculum: ShiftCurriculumService,
+    private readonly majorMinorOverride: StudentMajorMinorOverrideService,
   ) {}
 
   normalizeSlug(value: string) {
@@ -526,6 +528,89 @@ export class MajorMinorEligibilityService {
       minorSubjectSlug,
       academicYearId,
       shiftId,
+    );
+    if (!result.ok) {
+      throw new BadRequestException({
+        message: 'Invalid major/minor combination',
+        issues: result.issues,
+      });
+    }
+  }
+
+  async validateMajorMinorPairForStudent(
+    tenantId: string,
+    studentId: string,
+    majorSubjectSlug: string,
+    minorSubjectSlug: string,
+    academicYearId?: string,
+    shiftId?: string,
+    options?: { semesterSequence?: number; programVersionId?: string },
+  ): Promise<{
+    ok: boolean;
+    source: 'RULES' | 'STUDENT_OVERRIDE';
+    issues: { code: string; message: string }[];
+  }> {
+    const base = await this.validateMajorMinorPair(
+      tenantId,
+      majorSubjectSlug,
+      minorSubjectSlug,
+      academicYearId,
+      shiftId,
+    );
+    if (base.ok) return { ...base, source: 'RULES' };
+
+    const override = await this.majorMinorOverride.getActiveOverride(
+      tenantId,
+      studentId,
+      {
+        semesterSequence: options?.semesterSequence,
+        programVersionId: options?.programVersionId,
+        shiftId,
+        academicYearId,
+      },
+    );
+    if (!override) return { ...base, source: 'RULES' };
+
+    const [major, minor] = await Promise.all([
+      this.prisma.academicSubject.findFirst({
+        where: { id: override.majorSubjectId, tenantId, deletedAt: null },
+        select: { slug: true },
+      }),
+      this.prisma.academicSubject.findFirst({
+        where: { id: override.minorSubjectId, tenantId, deletedAt: null },
+        select: { slug: true },
+      }),
+    ]);
+    const majorSlug = this.normalizeSlug(majorSubjectSlug);
+    const minorSlug = this.normalizeSlug(minorSubjectSlug);
+    if (
+      major?.slug &&
+      minor?.slug &&
+      major.slug === majorSlug &&
+      minor.slug === minorSlug
+    ) {
+      return { ok: true, source: 'STUDENT_OVERRIDE', issues: [] };
+    }
+    return { ...base, source: 'RULES' };
+  }
+
+  async assertValidMajorMinorPairForStudent(
+    tenantId: string,
+    studentId: string,
+    majorSubjectSlug: string,
+    minorSubjectSlug: string,
+    academicYearId?: string,
+    shiftId?: string,
+    options?: { semesterSequence?: number; programVersionId?: string },
+  ) {
+    const result = await this.validateMajorMinorPairForStudent(
+      tenantId,
+      studentId,
+      majorSubjectSlug,
+      minorSubjectSlug,
+      academicYearId,
+      shiftId,
+      options,
     );
     if (!result.ok) {
       throw new BadRequestException({

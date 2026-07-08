@@ -752,6 +752,7 @@ export async function commitStudentImport(
   batchId: string,
   mode: 'VALID_ONLY' | 'STRICT' = 'VALID_ONLY',
   importMode: StudentImportMode = 'CREATE',
+  options?: { preferSync?: boolean },
 ) {
   const { data } = await api.post(
     '/v1/students/import/commit',
@@ -759,6 +760,7 @@ export async function commitStudentImport(
       batchId,
       mode,
       importMode,
+      preferSync: options?.preferSync === true ? true : undefined,
     },
     { timeout: 600_000 },
   );

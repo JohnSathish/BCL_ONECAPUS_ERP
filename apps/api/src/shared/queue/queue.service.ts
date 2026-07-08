@@ -28,6 +28,17 @@ export class QueueService {
     return { waiting, active, completed, failed, delayed };
   }
 
+  async getExportsQueueStats() {
+    const [waiting, active, completed, failed, delayed] = await Promise.all([
+      this.exports.getWaitingCount(),
+      this.exports.getActiveCount(),
+      this.exports.getCompletedCount(),
+      this.exports.getFailedCount(),
+      this.exports.getDelayedCount(),
+    ]);
+    return { waiting, active, completed, failed, delayed };
+  }
+
   enqueueExport(payload: Record<string, unknown>) {
     return this.exports.add('generate', payload);
   }
@@ -58,8 +69,8 @@ export class QueueService {
   }) {
     return this.exports.add('student-import-commit', payload, {
       attempts: 2,
-      // Process before routine staff biometric / attendance jobs (lower = sooner).
-      priority: 1,
+      // BullMQ: lower number = higher priority (jump ahead of routine biometric jobs).
+      priority: -100,
     });
   }
 

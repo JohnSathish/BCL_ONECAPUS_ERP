@@ -309,34 +309,27 @@ export class Sem5ImportCurriculumService {
     shiftId?: string,
     academicYearId?: string,
   ): Promise<Record<string, string[]>> {
-    const majors = await this.buildTenantMajorDepartments(tenantId, 5, shiftId);
-    const referenceVersion = await this.prisma.programVersion.findFirst({
-      where: {
-        tenantId,
-        deletedAt: null,
-        status: 'PUBLISHED',
-        program: { deletedAt: null, code: { startsWith: 'BA-' } },
-      },
-      orderBy: [{ program: { code: 'asc' } }, { effectiveFrom: 'desc' }],
+    const versions = await this.prisma.programVersion.findMany({
+      where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
       select: { id: true },
     });
     const minorByMajor: Record<string, string[]> = {};
-    if (!referenceVersion) return minorByMajor;
-
-    for (const major of majors) {
-      const eligibleMinors =
-        await this.majorMinorEligibility.listEligibleMinors(
-          tenantId,
-          referenceVersion.id,
-          major.subjectSlug,
-          5,
+    for (const version of versions) {
+      try {
+        const catalog = await this.buildCatalog(tenantId, {
+          programVersionId: version.id,
+          semesterSequence: 5,
           academicYearId,
           shiftId,
-        );
-      minorByMajor[this.normalizeLabel(major.departmentName)] = eligibleMinors
-        .map((subject) => subject.department?.name ?? subject.name)
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
+        });
+        for (const [majorKey, minors] of Object.entries(catalog.minorByMajor)) {
+          if (!minorByMajor[majorKey]) {
+            minorByMajor[majorKey] = minors;
+          }
+        }
+      } catch {
+        // Skip programmes without a complete Sem 5 curriculum for this shift.
+      }
     }
     return minorByMajor;
   }
@@ -636,6 +629,8 @@ export class Sem5ImportCurriculumService {
     const map: Record<string, string> = {
       ECO: 'Economics',
       EDN: 'Education',
+      // Legacy prefix retained only as a label fallback; deleted EDU courses are filtered upstream.
+      EDU: 'Education',
       ENG: 'English',
       GAR: 'Garo',
       GEO: 'Geography',

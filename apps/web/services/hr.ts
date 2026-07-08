@@ -22,8 +22,8 @@ export type LeaveApplication = {
 };
 
 export async function fetchLeaveBalances(params?: { staffProfileId?: string; year?: number }) {
-  const { data } = await api.get<{ data: LeaveBalance[] }>('/v1/hr/leave/balances', { params });
-  return data.data;
+  const { data } = await api.get<LeaveBalance[]>('/v1/hr/leave/balances', { params });
+  return data ?? [];
 }
 
 export async function fetchLeaveApplications(params?: {
@@ -31,10 +31,10 @@ export async function fetchLeaveApplications(params?: {
   status?: string;
   pendingApproval?: boolean;
 }) {
-  const { data } = await api.get<{ data: LeaveApplication[] }>('/v1/hr/leave/applications', {
+  const { data } = await api.get<LeaveApplication[]>('/v1/hr/leave/applications', {
     params,
   });
-  return data.data;
+  return data ?? [];
 }
 
 export async function approveLeaveApplication(
@@ -74,8 +74,8 @@ export async function fetchPortalLeaveSummary() {
 }
 
 export async function fetchPortalLeaveApplications() {
-  const { data } = await api.get<{ data: LeaveApplication[] }>('/v1/hr/leave/applications/me');
-  return data.data;
+  const { data } = await api.get<LeaveApplication[]>('/v1/hr/leave/applications/me');
+  return data ?? [];
 }
 
 export type RecruitmentVacancy = {
@@ -390,10 +390,10 @@ export async function fetchPensionStats() {
 }
 
 export async function fetchPensionEnrollments(staffProfileId?: string) {
-  const { data } = await api.get<{ data: PensionEnrollment[] }>('/v1/hr/pension/enrollments', {
+  const { data } = await api.get<PensionEnrollment[]>('/v1/hr/pension/enrollments', {
     params: { staffProfileId },
   });
-  return data.data;
+  return data ?? [];
 }
 
 export async function fetchPensionLedger(staffProfileId?: string, year?: number) {
@@ -422,8 +422,8 @@ export type StaffAppraisal = {
 };
 
 export async function fetchAppraisalCycles() {
-  const { data } = await api.get<{ data: AppraisalCycle[] }>('/v1/hr/appraisal/cycles');
-  return data.data;
+  const { data } = await api.get<AppraisalCycle[]>('/v1/hr/appraisal/cycles');
+  return data ?? [];
 }
 
 export async function createAppraisalCycle(body: {
@@ -445,10 +445,10 @@ export async function fetchAppraisalRecords(params?: {
   cycleId?: string;
   staffProfileId?: string;
 }) {
-  const { data } = await api.get<{ data: StaffAppraisal[] }>('/v1/hr/appraisal/records', {
+  const { data } = await api.get<StaffAppraisal[]>('/v1/hr/appraisal/records', {
     params,
   });
-  return data.data;
+  return data ?? [];
 }
 
 export async function scoreAppraisal(

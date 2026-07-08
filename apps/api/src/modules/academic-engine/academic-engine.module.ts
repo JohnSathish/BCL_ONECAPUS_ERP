@@ -28,6 +28,7 @@ import { SemesterRulesService } from './services/semester-rules.service';
 import { HonoursTrackService } from './services/honours-track.service';
 import { CurriculumCompletionService } from './services/curriculum-completion.service';
 import { StudentMajorMinorTrackService } from './services/student-major-minor-track.service';
+import { StudentMajorMinorOverrideService } from './services/student-major-minor-override.service';
 import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
 import { ShiftCurriculumService } from './services/shift-curriculum.service';
@@ -73,6 +74,7 @@ import { AcademicChangeHistoryModule } from '../students/academic-change-history
     HonoursTrackService,
     CurriculumCompletionService,
     StudentMajorMinorTrackService,
+    StudentMajorMinorOverrideService,
     StudentVtcTrackService,
     CourseEligibilityService,
     ShiftCurriculumService,
@@ -87,6 +89,7 @@ import { AcademicChangeHistoryModule } from '../students/academic-change-history
     SemesterRulesService,
     HonoursTrackService,
     StudentMajorMinorTrackService,
+    StudentMajorMinorOverrideService,
     StudentVtcTrackService,
     OfferingsService,
     CourseEligibilityService,

@@ -31,7 +31,19 @@ import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './sem5-import-curriculum.service';
 
 /** Large student imports run in the background to avoid HTTP timeouts. */
-const STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD = 50;
+const STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD = Number(
+  process.env.STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD ?? 150,
+);
+const STUDENT_IMPORT_PROGRESS_UPDATE_INTERVAL = Number(
+  process.env.STUDENT_IMPORT_PROGRESS_UPDATE_INTERVAL ?? 25,
+);
+const STUDENT_IMPORT_STALLED_COMMIT_MS = Number(
+  process.env.STUDENT_IMPORT_STALLED_COMMIT_MS ?? 90_000,
+);
+/** When exports queue waiting jobs exceed this, commit runs in-process instead of enqueueing. */
+const STUDENT_IMPORT_QUEUE_BACKLOG_SYNC_THRESHOLD = Number(
+  process.env.STUDENT_IMPORT_QUEUE_BACKLOG_SYNC_THRESHOLD ?? 25,
+);
 
 @Injectable()
 export class StudentImportService {
@@ -260,6 +272,8 @@ export class StudentImportService {
     mode: ImportCommitMode,
 
     importMode: StudentImportMode = 'CREATE',
+
+    options?: { preferSync?: boolean },
   ) {
     const batch = await this.batches.getBatch(batchId, tenantId);
 
@@ -276,11 +290,20 @@ export class StudentImportService {
         };
       }
 
-      // A prior background job may have been consumed by the wrong worker and
-      // marked complete without importing — allow the user to retry commit.
-      await this.batches.updateBatch(batchId, tenantId, {
-        status: 'VALIDATED',
-      });
+      if (!this.isStalledAtZeroProgress(batch.updatedAt)) {
+        return {
+          batchId,
+          status: 'COMMITTING',
+          async: true,
+          message: 'Import is starting. Waiting for progress update.',
+        };
+      }
+
+      await this.resetStalledCommit(
+        batchId,
+        tenantId,
+        'auto-retrying from commit endpoint',
+      );
     }
 
     const latestBatch = await this.batches.getBatch(batchId, tenantId);
@@ -306,7 +329,12 @@ export class StudentImportService {
       throw new ConflictException('No valid rows to import');
     }
 
-    if (validDbRows.length > STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD) {
+    const runSync =
+      validDbRows.length <= STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD ||
+      options?.preferSync === true ||
+      (await this.shouldCommitSynchronouslyDueToQueueBacklog());
+
+    if (!runSync) {
       await this.batches.updateBatch(batchId, tenantId, {
         status: 'COMMITTING',
         strictMode: mode === 'STRICT',
@@ -325,6 +353,15 @@ export class StudentImportService {
         message:
           'Import queued for background processing. This may take several minutes for large files.',
       };
+    }
+
+    if (validDbRows.length > STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD) {
+      await this.batches.updateBatch(batchId, tenantId, {
+        errorMessage:
+          options?.preferSync === true
+            ? 'Running import in-process after stall recovery.'
+            : 'Running import in-process because background queue is busy.',
+      });
     }
 
     return this.commitSync(
@@ -385,7 +422,8 @@ export class StudentImportService {
             if (
               processed === 1 ||
               processed === total ||
-              processed - lastProgressUpdate >= 2
+              processed - lastProgressUpdate >=
+                STUDENT_IMPORT_PROGRESS_UPDATE_INTERVAL
             ) {
               lastProgressUpdate = processed;
               await this.batches.updateBatch(batchId, tenantId, {
@@ -430,8 +468,22 @@ export class StudentImportService {
   }
 
   async getBatch(tenantId: string, batchId: string) {
-    const batch = await this.batches.getBatch(batchId, tenantId);
+    let batch = await this.batches.getBatch(batchId, tenantId);
     if (!batch) throw new NotFoundException('Import batch not found');
+
+    if (
+      batch.status === 'COMMITTING' &&
+      batch.successfulRows === 0 &&
+      this.isStalledAtZeroProgress(batch.updatedAt)
+    ) {
+      await this.resetStalledCommit(
+        batch.id,
+        tenantId,
+        'auto-reset stale zero-progress commit',
+      );
+      const refreshed = await this.batches.getBatch(batch.id, tenantId);
+      if (refreshed) batch = refreshed;
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { id: batch.uploadedByUserId },
@@ -442,6 +494,31 @@ export class StudentImportService {
       ...batch,
       uploadedByEmail: user?.email ?? null,
     };
+  }
+
+  private isStalledAtZeroProgress(updatedAt: Date) {
+    return Date.now() - updatedAt.getTime() >= STUDENT_IMPORT_STALLED_COMMIT_MS;
+  }
+
+  private async shouldCommitSynchronouslyDueToQueueBacklog() {
+    try {
+      const stats = await this.queue.getExportsQueueStats();
+      return stats.waiting >= STUDENT_IMPORT_QUEUE_BACKLOG_SYNC_THRESHOLD;
+    } catch {
+      return true;
+    }
+  }
+
+  private async resetStalledCommit(
+    batchId: string,
+    tenantId: string,
+    reason: string,
+  ) {
+    await this.batches.updateBatch(batchId, tenantId, {
+      status: 'VALIDATED',
+      completedAt: null,
+      errorMessage: `Recovered stalled import (${reason}).`,
+    });
   }
 
   async listBatches(tenantId: string, query: PaginationQueryDto) {

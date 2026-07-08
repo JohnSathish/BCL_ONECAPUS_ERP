@@ -5347,6 +5347,39 @@ model StudentMajorMinorTrack {
   @@schema("academic")
 }
 
+model StudentMajorMinorOverride {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  studentId             String    @map("student_id") @db.Uuid
+  majorSubjectId        String    @map("major_subject_id") @db.Uuid
+  minorSubjectId        String    @map("minor_subject_id") @db.Uuid
+  programVersionId      String?   @map("program_version_id") @db.Uuid
+  shiftId               String?   @map("shift_id") @db.Uuid
+  academicYearId        String?   @map("academic_year_id") @db.Uuid
+  effectiveFromSemester Int       @default(1) @map("effective_from_semester")
+  effectiveToSemester   Int?      @map("effective_to_semester")
+  status                String    @default("APPROVED")
+  reason                String
+  approvalAuthority     String    @map("approval_authority")
+  approvedById          String?   @map("approved_by_id") @db.Uuid
+  approvedAt            DateTime? @map("approved_at")
+  supportingDocumentUrl String?   @map("supporting_document_url")
+  approvalRef           String?   @map("approval_ref")
+  metadata              Json?
+  createdById           String?   @map("created_by_id") @db.Uuid
+  revokedById           String?   @map("revoked_by_id") @db.Uuid
+  revokedAt             DateTime? @map("revoked_at")
+  revokedReason         String?   @map("revoked_reason")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, majorSubjectId, minorSubjectId])
+  @@index([tenantId, programVersionId, shiftId, academicYearId])
+  @@map("student_major_minor_overrides")
+  @@schema("academic")
+}
+
 model StudentVtcTrack {
   id                     String    @id @default(uuid()) @db.Uuid
   tenantId               String    @map("tenant_id") @db.Uuid

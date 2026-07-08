@@ -52,6 +52,12 @@ import {
   CreateFyugpTemplateDto,
   UpdateFyugpTemplateDto,
 } from './dto/fyugp-structure-template.dto';
+import {
+  CreateStudentMajorMinorOverrideDto,
+  ListStudentMajorMinorOverridesQueryDto,
+  ResolveStudentMajorMinorOverrideQueryDto,
+  RevokeStudentMajorMinorOverrideDto,
+} from './dto/major-minor-override.dto';
 import { FyugpStructureTemplateService } from './services/fyugp-structure-template.service';
 import { CategoryPoolService } from './services/category-pool.service';
 import { CurriculumCompletionService } from './services/curriculum-completion.service';
@@ -799,6 +805,66 @@ export class AcademicEngineController {
     return this.engine.unlockMajorMinorTrack(
       user.tid,
       studentId,
+      user.sub,
+      dto.reason,
+    );
+  }
+
+  @Post('students/:studentId/major-minor-overrides')
+  @RequirePermissions('academic-engine:manage')
+  createStudentMajorMinorOverride(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Body() dto: CreateStudentMajorMinorOverrideDto,
+  ) {
+    return this.engine.createStudentMajorMinorOverride(
+      user.tid,
+      studentId,
+      user.sub,
+      dto,
+    );
+  }
+
+  @Get('students/:studentId/major-minor-overrides')
+  @RequirePermissions('academic-engine:read')
+  listStudentMajorMinorOverrides(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Query() query: ListStudentMajorMinorOverridesQueryDto,
+  ) {
+    return this.engine.listStudentMajorMinorOverrides(
+      user.tid,
+      studentId,
+      query.status,
+    );
+  }
+
+  @Get('students/:studentId/major-minor-overrides/active')
+  @RequirePermissions('academic-engine:read')
+  getStudentMajorMinorActiveOverride(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Query() query: ResolveStudentMajorMinorOverrideQueryDto,
+  ) {
+    return this.engine.getStudentMajorMinorActiveOverride(
+      user.tid,
+      studentId,
+      query,
+    );
+  }
+
+  @Patch('students/:studentId/major-minor-overrides/:overrideId/revoke')
+  @RequirePermissions('academic-engine:manage')
+  revokeStudentMajorMinorOverride(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Param('overrideId') overrideId: string,
+    @Body() dto: RevokeStudentMajorMinorOverrideDto,
+  ) {
+    return this.engine.revokeStudentMajorMinorOverride(
+      user.tid,
+      studentId,
+      overrideId,
       user.sub,
       dto.reason,
     );

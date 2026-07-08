@@ -1015,8 +1015,9 @@ export class StudentProfileSectionsService {
       await this.assertClass12SubjectsExist(tenantId, dto.class12Subjects);
     }
     if (dto.majorSubjectSlug && dto.minorSubjectSlug) {
-      await this.eligibility.assertValidMajorMinorPair(
+      await this.eligibility.assertValidMajorMinorPairForStudent(
         tenantId,
+        studentId,
         dto.majorSubjectSlug,
         dto.minorSubjectSlug,
       );

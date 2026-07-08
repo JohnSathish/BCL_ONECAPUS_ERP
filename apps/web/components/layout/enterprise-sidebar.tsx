@@ -253,6 +253,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
       Students: s.institution.studentCount.toLocaleString(),
       Staff: s.institution.staffCount.toLocaleString(),
       Finance: s.finance.defaulters > 0 ? String(s.finance.defaulters) : '',
+      'Fee Management': s.finance.defaulters > 0 ? String(s.finance.defaulters) : '',
       'Human Resources': s.actions.find((a) => a.id === 'leave')?.count
         ? String(s.actions.find((a) => a.id === 'leave')!.count)
         : '',

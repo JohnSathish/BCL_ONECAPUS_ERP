@@ -168,6 +168,42 @@ describe('Sem5ImportCurriculumService', () => {
     ).toBe('FYUGP Arts');
   });
 
+  it('buildTenantMinorByMajor merges minors from each programme version', async () => {
+    prisma.programVersion.findMany.mockResolvedValue([
+      { id: 'bcom-v' },
+      { id: 'ba-eco-v' },
+    ]);
+    const buildCatalogSpy = jest
+      .spyOn(service, 'buildCatalog')
+      .mockResolvedValueOnce({
+        minorByMajor: {
+          commerce: ['Economics', 'Geography', 'Mathematics'],
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        minorByMajor: {
+          economics: ['Geography', 'History', 'Political Science', 'Sociology'],
+        },
+      } as never);
+
+    const result = await service.buildTenantMinorByMajor('tenant-1', 'shift-1');
+
+    expect(buildCatalogSpy).toHaveBeenNthCalledWith(1, 'tenant-1', {
+      programVersionId: 'bcom-v',
+      semesterSequence: 5,
+      academicYearId: undefined,
+      shiftId: 'shift-1',
+    });
+    expect(result.commerce).toEqual(['Economics', 'Geography', 'Mathematics']);
+    expect(result.economics).toEqual([
+      'Geography',
+      'History',
+      'Political Science',
+      'Sociology',
+    ]);
+    buildCatalogSpy.mockRestore();
+  });
+
   it('buildMinorDepartments excludes internship slot -303 courses', () => {
     const minors = (
       service as unknown as {

@@ -6,6 +6,8 @@ describe('StudentImportHandler', () => {
 
     admissionBatch: { findMany: jest.fn() },
 
+    semester: { findMany: jest.fn() },
+
     academicStream: { findMany: jest.fn() },
 
     shift: { findMany: jest.fn() },
@@ -19,6 +21,10 @@ describe('StudentImportHandler', () => {
     academicYear: { findMany: jest.fn() },
 
     campus: { findMany: jest.fn() },
+
+    academicSubject: { findMany: jest.fn() },
+
+    courseOffering: { findMany: jest.fn() },
   };
 
   const handler = new StudentImportHandler(
@@ -27,7 +33,10 @@ describe('StudentImportHandler', () => {
     {} as never,
     {} as never,
     {} as never,
-    {} as never,
+    { buildCatalog: jest.fn() } as never,
+    { buildCatalog: jest.fn() } as never,
+    { buildCatalog: jest.fn() } as never,
+    { buildCatalog: jest.fn() } as never,
     {} as never,
   );
 
@@ -44,9 +53,13 @@ describe('StudentImportHandler', () => {
 
         batchCode: '2026-BCA',
 
-        currentSemester: 1,
+        currentSemester: 5,
 
         entrySessionId: 'session-1',
+
+        institutionId: 'inst-1',
+
+        entrySession: { name: '2026-27' },
       },
     ]);
 
@@ -59,7 +72,12 @@ describe('StudentImportHandler', () => {
     ]);
 
     prisma.department.findMany.mockResolvedValue([
-      { id: 'dept-1', code: 'CS', campusId: 'campus-1' },
+      {
+        id: 'dept-1',
+        code: 'CS',
+        campusId: 'campus-1',
+        departmentType: 'ACADEMIC',
+      },
     ]);
 
     prisma.student.findMany.mockResolvedValue([]);
@@ -85,6 +103,12 @@ describe('StudentImportHandler', () => {
     ]);
 
     prisma.campus.findMany.mockResolvedValue([{ id: 'campus-1' }]);
+
+    prisma.semester.findMany.mockResolvedValue([]);
+
+    prisma.academicSubject.findMany.mockResolvedValue([]);
+
+    prisma.courseOffering.findMany.mockResolvedValue([]);
   });
 
   it('validates a correct row', async () => {
@@ -108,6 +132,10 @@ describe('StudentImportHandler', () => {
           streamCode: 'SCIENCE',
 
           shiftCode: 'MORNING',
+
+          fatherName: 'John Doe',
+
+          motherName: 'Jane Doe',
 
           categoryCode: 'GENERAL',
         },

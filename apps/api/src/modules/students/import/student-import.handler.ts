@@ -342,6 +342,38 @@ const SINGLE_SLOT_REGISTRATION_CATEGORIES = new Set<FyugpCategory>([
 type FyugpResolutionContext = {
   subjectMasters: SubjectMasterRow[];
   offerings: OfferingCandidate[];
+  majorMinorOverridesByStudent: Map<
+    string,
+    {
+      majorSubjectId: string;
+      minorSubjectId: string;
+      programVersionId: string | null;
+      shiftId: string | null;
+      academicYearId: string | null;
+      effectiveFromSemester: number;
+      effectiveToSemester: number | null;
+    }[]
+  >;
+};
+
+type StudentImportCommitCache = {
+  studentRole: { id: string } | null;
+  defaultPasswordHash: string;
+  shifts: Map<string, { id: string; campusId: string | null }>;
+  batches: Map<
+    string,
+    {
+      id: string;
+      currentSemester: number;
+      institutionId: string;
+      entrySessionId: string;
+      entrySession?: { institutionId?: string | null } | null;
+    }
+  >;
+  semesters: Map<
+    string,
+    { id: string; semesterNumber: number; institutionId: string }
+  >;
 };
 
 const PROGRAMME_LOOKUP_LIMIT = 15;
@@ -449,7 +481,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       academicSessions,
       activeCampuses,
       subjectMasters,
-      courseOfferings,
     ] = await Promise.all([
       this.prisma.programVersion.findMany({
         where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
@@ -543,33 +574,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         where: { tenantId, deletedAt: null },
         include: {
           department: { select: { id: true, code: true, name: true } },
-        },
-      }),
-      this.prisma.courseOffering.findMany({
-        where: { tenantId, deletedAt: null },
-        include: {
-          course: {
-            include: {
-              department: { select: { id: true, code: true, name: true } },
-            },
-          },
-          categoryPool: {
-            include: {
-              assignments: {
-                where: { active: true },
-                select: {
-                  programVersionId: true,
-                  semesterNo: true,
-                  active: true,
-                  shiftId: true,
-                },
-              },
-            },
-          },
-          sections: {
-            where: { deletedAt: null, status: { in: ['active', 'ACTIVE'] } },
-            include: { seatLedger: true },
-          },
         },
       }),
     ]);
@@ -714,27 +718,97 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const fileUniversityRegs = new Set<string>();
     const fileAbcs = new Set<string>();
     const fileMobiles = new Set<string>();
-    const activeShiftIds = [...new Set(shifts.map((shift) => shift.id))];
-    const sem1Catalogs = await this.preloadSem1Catalogs(
+    const existingStudentIds = existingStudents.map((student) => student.id);
+    const majorMinorOverrides = existingStudentIds.length
+      ? await this.prisma.$queryRaw<
+          {
+            studentId: string;
+            majorSubjectId: string;
+            minorSubjectId: string;
+            programVersionId: string | null;
+            shiftId: string | null;
+            academicYearId: string | null;
+            effectiveFromSemester: number;
+            effectiveToSemester: number | null;
+          }[]
+        >`
+          select
+            student_id as "studentId",
+            major_subject_id as "majorSubjectId",
+            minor_subject_id as "minorSubjectId",
+            program_version_id as "programVersionId",
+            shift_id as "shiftId",
+            academic_year_id as "academicYearId",
+            effective_from_semester as "effectiveFromSemester",
+            effective_to_semester as "effectiveToSemester"
+          from academic.student_major_minor_overrides
+          where tenant_id = ${tenantId}::uuid
+            and student_id = any(${existingStudentIds}::uuid[])
+            and status = 'APPROVED'
+            and revoked_at is null
+        `
+      : [];
+    const majorMinorOverridesByStudent = new Map<
+      string,
+      {
+        majorSubjectId: string;
+        minorSubjectId: string;
+        programVersionId: string | null;
+        shiftId: string | null;
+        academicYearId: string | null;
+        effectiveFromSemester: number;
+        effectiveToSemester: number | null;
+      }[]
+    >();
+    for (const override of majorMinorOverrides) {
+      const bucket = majorMinorOverridesByStudent.get(override.studentId) ?? [];
+      bucket.push(override);
+      majorMinorOverridesByStudent.set(override.studentId, bucket);
+    }
+    const validationScope = this.collectImportValidationScope(rows, {
+      pvByCode,
+      shiftByCampusAndCode,
+      deptByCode,
+      batchByCode,
+      defaultCampusId: activeCampuses[0]?.id,
+      allProgramVersionIds: programVersions.map((version) => version.id),
+      allShiftIds: shifts.map((shift) => shift.id),
+    });
+    const courseOfferings = await this.loadCourseOfferingsForImport(
       tenantId,
-      programVersions.map((version) => version.id),
-      activeShiftIds,
+      validationScope.programVersionIds,
     );
-    const sem2Catalogs = await this.preloadSem2Catalogs(
-      tenantId,
-      programVersions.map((version) => version.id),
-      activeShiftIds,
-    );
-    const sem3Catalogs = await this.preloadSem3Catalogs(
-      tenantId,
-      programVersions.map((version) => version.id),
-      activeShiftIds,
-    );
-    const sem5Catalogs = await this.preloadSem5Catalogs(
-      tenantId,
-      programVersions.map((version) => version.id),
-      activeShiftIds,
-    );
+    const [sem1Catalogs, sem2Catalogs, sem3Catalogs, sem5Catalogs] =
+      await Promise.all([
+        validationScope.semesterNeeds.sem1
+          ? this.preloadSem1Catalogs(
+              tenantId,
+              validationScope.programVersionIds,
+              validationScope.shiftIds,
+            )
+          : Promise.resolve(new Map()),
+        validationScope.semesterNeeds.sem2
+          ? this.preloadSem2Catalogs(
+              tenantId,
+              validationScope.programVersionIds,
+              validationScope.shiftIds,
+            )
+          : Promise.resolve(new Map()),
+        validationScope.semesterNeeds.sem3
+          ? this.preloadSem3Catalogs(
+              tenantId,
+              validationScope.programVersionIds,
+              validationScope.shiftIds,
+            )
+          : Promise.resolve(new Map()),
+        validationScope.semesterNeeds.sem5
+          ? this.preloadSem5Catalogs(
+              tenantId,
+              validationScope.programVersionIds,
+              validationScope.shiftIds,
+            )
+          : Promise.resolve(new Map()),
+      ]);
     return rows.map((row) =>
       this.validateRow(row, {
         importMode,
@@ -782,6 +856,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         fyugp: {
           subjectMasters,
           offerings: courseOfferings,
+          majorMinorOverridesByStudent,
         },
       }),
     );
@@ -1257,6 +1332,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       programVersionId,
       semesterSequence: targetSemester,
       shiftId: shift?.id,
+      existingStudentId,
       fyugp: ctx.fyugp,
       errors,
       warnings,
@@ -1423,16 +1499,21 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   ) {
     const created: { rowNumber: number; entityId: string }[] = [];
     const total = rows.length;
+    const commitCache = await this.buildCommitCache(
+      ctx.tenantId,
+      rows.map((row) => row.normalized),
+    );
     for (const [index, row] of rows.entries()) {
       const n = row.normalized;
       try {
         const studentId = n.existingStudentId
-          ? await this.mergeStudentRecord(ctx, n.existingStudentId, n)
-          : await this.createStudentRecord(ctx, n);
-        await this.majorMinorTrack.ensureTrackAfterImport(
-          ctx.tenantId,
-          studentId,
-        );
+          ? await this.mergeStudentRecord(
+              ctx,
+              n.existingStudentId,
+              n,
+              commitCache,
+            )
+          : await this.createStudentRecord(ctx, n, commitCache);
         created.push({ rowNumber: row.rowNumber, entityId: studentId });
         await options?.onProgress?.(index + 1, total);
       } catch (error) {
@@ -1446,12 +1527,52 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     return created;
   }
 
+  private async buildCommitCache(
+    tenantId: string,
+    rows: NormalizedStudentImportRow[],
+  ): Promise<StudentImportCommitCache> {
+    const shiftIds = [
+      ...new Set(rows.map((row) => row.shiftId).filter(Boolean)),
+    ] as string[];
+    const batchIds = [
+      ...new Set(rows.map((row) => row.admissionBatchId).filter(Boolean)),
+    ] as string[];
+    const [studentRole, defaultPasswordHash, shifts, batches] =
+      await Promise.all([
+        this.prisma.role.findFirst({
+          where: { tenantId, slug: 'student' },
+          select: { id: true },
+        }),
+        bcrypt.hash('Student@123', 12),
+        shiftIds.length
+          ? this.prisma.shift.findMany({
+              where: { tenantId, id: { in: shiftIds } },
+              select: { id: true, campusId: true },
+            })
+          : Promise.resolve([]),
+        batchIds.length
+          ? this.prisma.admissionBatch.findMany({
+              where: { tenantId, id: { in: batchIds } },
+              include: { entrySession: { select: { institutionId: true } } },
+            })
+          : Promise.resolve([]),
+      ]);
+    return {
+      studentRole,
+      defaultPasswordHash,
+      shifts: new Map(shifts.map((shift) => [shift.id, shift])),
+      batches: new Map(batches.map((batch) => [batch.id, batch])),
+      semesters: new Map(),
+    };
+  }
+
   private resolveFyugpMapping(
     raw: Record<string, unknown>,
     ctx: {
       programVersionId?: string;
       semesterSequence?: number;
       shiftId?: string;
+      existingStudentId?: string;
       fyugp: FyugpResolutionContext;
       errors: string[];
       warnings: string[];
@@ -2121,6 +2242,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       programVersionId?: string;
       semesterSequence?: number;
       shiftId?: string;
+      existingStudentId?: string;
       fyugp: FyugpResolutionContext;
       errors: string[];
       warnings: string[];
@@ -2246,7 +2368,18 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             department.departmentName,
             minorDepartment,
           );
-          if (!allowedMinor) {
+          const overrideAllowed = !allowedMinor
+            ? this.matchesStudentMajorMinorOverride({
+                majorDepartment: department.departmentName,
+                minorDepartment,
+                studentId: ctx.existingStudentId,
+                semesterSequence: ctx.semesterSequence,
+                programVersionId: ctx.programVersionId,
+                shiftId: ctx.shiftId,
+                fyugp: ctx.fyugp,
+              })
+            : false;
+          if (!allowedMinor && !overrideAllowed) {
             ctx.errors.push(
               this.sem5Curriculum.formatInvalidMinorMessage(
                 department.departmentName,
@@ -2361,6 +2494,59 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     }
 
     return mapping;
+  }
+
+  private matchesStudentMajorMinorOverride(input: {
+    majorDepartment: string;
+    minorDepartment: string;
+    studentId?: string;
+    semesterSequence?: number;
+    programVersionId?: string;
+    shiftId?: string;
+    fyugp: FyugpResolutionContext;
+  }) {
+    if (!input.studentId) return false;
+    const overrides =
+      input.fyugp.majorMinorOverridesByStudent.get(input.studentId) ?? [];
+    if (!overrides.length) return false;
+    const byId = new Map(
+      input.fyugp.subjectMasters.map((subject) => [subject.id, subject]),
+    );
+    const normalize = (value: string) =>
+      this.sem5Curriculum.normalizeLabel(value);
+    const requestedMajor = normalize(input.majorDepartment);
+    const requestedMinor = normalize(input.minorDepartment);
+    for (const override of overrides) {
+      if (
+        input.semesterSequence != null &&
+        input.semesterSequence < override.effectiveFromSemester
+      ) {
+        continue;
+      }
+      if (
+        input.semesterSequence != null &&
+        override.effectiveToSemester != null &&
+        input.semesterSequence > override.effectiveToSemester
+      ) {
+        continue;
+      }
+      if (
+        override.programVersionId &&
+        input.programVersionId !== override.programVersionId
+      ) {
+        continue;
+      }
+      if (override.shiftId && input.shiftId !== override.shiftId) continue;
+      const major = byId.get(override.majorSubjectId);
+      const minor = byId.get(override.minorSubjectId);
+      if (!major || !minor) continue;
+      const majorLabel = normalize(major.department?.name ?? major.name);
+      const minorLabel = normalize(minor.department?.name ?? minor.name);
+      if (majorLabel === requestedMajor && minorLabel === requestedMinor) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private resolveSem5OfferingSelection(
@@ -2662,6 +2848,201 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         subject.slug === slugifySubject(majorDepartment),
     );
     return match?.slug ?? slugifySubject(majorDepartment);
+  }
+
+  /** Limit curriculum preload to programme/shift/semester combinations present in the file. */
+  private collectImportValidationScope(
+    rows: ParsedImportRow[],
+    ctx: {
+      pvByCode: Map<string, string>;
+      shiftByCampusAndCode: Map<string, { id: string; campusId: string }>;
+      deptByCode: Map<
+        string,
+        { id: string; campusId: string | null; departmentType?: string | null }
+      >;
+      batchByCode: Map<string, { currentSemester: number }>;
+      defaultCampusId?: string;
+      allProgramVersionIds: string[];
+      allShiftIds: string[];
+    },
+  ): {
+    programVersionIds: string[];
+    shiftIds: string[];
+    semesterNeeds: {
+      sem1: boolean;
+      sem2: boolean;
+      sem3: boolean;
+      sem5: boolean;
+    };
+  } {
+    const programVersionIds = new Set<string>();
+    const shiftIds = new Set<string>();
+    const semesterNeeds = {
+      sem1: false,
+      sem2: false,
+      sem3: false,
+      sem5: false,
+    };
+
+    for (const row of rows) {
+      const raw = row.raw as Record<string, unknown>;
+      const programmeCode = String(
+        raw.programme ?? raw.programmeCode ?? raw.programCode ?? '',
+      )
+        .trim()
+        .toUpperCase();
+      const shiftCode = String(raw.shift ?? raw.shiftCode ?? '')
+        .trim()
+        .toUpperCase();
+      const deptCode = String(raw.department ?? raw.departmentCode ?? '')
+        .trim()
+        .toUpperCase();
+      const batchCode = String(
+        raw.admissionBatch ?? raw.batchCode ?? raw.batch ?? '',
+      )
+        .trim()
+        .toUpperCase();
+      const department = deptCode ? ctx.deptByCode.get(deptCode) : undefined;
+      const campusId = department?.campusId ?? ctx.defaultCampusId;
+      const shift =
+        campusId && shiftCode
+          ? ctx.shiftByCampusAndCode.get(`${campusId}:${shiftCode}`)
+          : undefined;
+      const programVersionId =
+        ctx.pvByCode.get(programmeCode) ??
+        ctx.pvByCode.get(this.normalizeProgrammeCode(programmeCode));
+      if (programVersionId && shift?.id) {
+        programVersionIds.add(programVersionId);
+        shiftIds.add(shift.id);
+      }
+
+      if (
+        this.firstText(raw, [
+          'majorDepartmentSem5',
+          'minorDepartmentSem5',
+          'internshipSubject',
+        ])
+      ) {
+        semesterNeeds.sem5 = true;
+      }
+      if (
+        this.firstText(raw, [
+          'majorDepartmentSem3',
+          'minorDepartmentSem3',
+          'mdcPaperSem3',
+        ])
+      ) {
+        semesterNeeds.sem3 = true;
+      }
+
+      const batch = batchCode ? ctx.batchByCode.get(batchCode) : undefined;
+      let semesterHint = batch?.currentSemester;
+      const currentSemRaw = raw.currentSemester;
+      if (currentSemRaw != null && String(currentSemRaw).trim() !== '') {
+        const parsed = Number(currentSemRaw);
+        if (Number.isFinite(parsed) && parsed > 0) semesterHint = parsed;
+      }
+      if (semesterHint === 1) semesterNeeds.sem1 = true;
+      if (semesterHint === 2) semesterNeeds.sem2 = true;
+      if (semesterHint === 3) semesterNeeds.sem3 = true;
+      if (semesterHint === 5) semesterNeeds.sem5 = true;
+
+      if (
+        this.firstText(raw, [
+          'majorDepartment',
+          'minorDepartment',
+          'mdcPaper',
+          'aecPaper',
+          'secPaper',
+        ]) &&
+        semesterHint == null
+      ) {
+        semesterNeeds.sem1 = true;
+        semesterNeeds.sem3 = true;
+        semesterNeeds.sem5 = true;
+      }
+    }
+
+    const hasScopedPairs = programVersionIds.size > 0 && shiftIds.size > 0;
+    const hasSemesterNeeds =
+      semesterNeeds.sem1 ||
+      semesterNeeds.sem2 ||
+      semesterNeeds.sem3 ||
+      semesterNeeds.sem5;
+
+    return {
+      programVersionIds: hasScopedPairs
+        ? [...programVersionIds]
+        : ctx.allProgramVersionIds,
+      shiftIds: hasScopedPairs ? [...shiftIds] : ctx.allShiftIds,
+      semesterNeeds: hasSemesterNeeds
+        ? semesterNeeds
+        : { sem1: true, sem2: true, sem3: true, sem5: true },
+    };
+  }
+
+  private courseOfferingInclude() {
+    return {
+      course: {
+        include: {
+          department: { select: { id: true, code: true, name: true } },
+        },
+      },
+      categoryPool: {
+        include: {
+          assignments: {
+            where: { active: true },
+            select: {
+              programVersionId: true,
+              semesterNo: true,
+              active: true,
+              shiftId: true,
+            },
+          },
+        },
+      },
+      sections: {
+        where: { deletedAt: null, status: { in: ['active', 'ACTIVE'] } },
+        include: { seatLedger: true },
+      },
+    } satisfies Prisma.CourseOfferingInclude;
+  }
+
+  private loadCourseOfferingsForImport(
+    tenantId: string,
+    programVersionIds: string[],
+  ) {
+    const include = this.courseOfferingInclude();
+    const uniqueIds = [...new Set(programVersionIds)];
+    // Never expose offerings tied to soft-deleted courses (e.g. legacy EDU-* vs EDN-*).
+    const activeCourse = { course: { deletedAt: null, status: 'ACTIVE' } };
+    if (uniqueIds.length === 0) {
+      return this.prisma.courseOffering.findMany({
+        where: { tenantId, deletedAt: null, ...activeCourse },
+        include,
+      });
+    }
+    return this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        ...activeCourse,
+        OR: [
+          { programVersionId: { in: uniqueIds } },
+          {
+            categoryPool: {
+              assignments: {
+                some: {
+                  programVersionId: { in: uniqueIds },
+                  active: true,
+                },
+              },
+            },
+          },
+        ],
+      },
+      include,
+    });
   }
 
   private async preloadSem1Catalogs(
@@ -3599,6 +3980,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
   private async createStudentRecord(
     ctx: ImportModuleHandlerContext,
     n: NormalizedStudentImportRow,
+    cache: StudentImportCommitCache,
   ) {
     const { tenantId, userId, batchId } = ctx;
     const existingStudentId = await this.findExistingStudentIdForImport(
@@ -3606,23 +3988,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       n,
     );
     if (existingStudentId) {
-      return this.mergeStudentRecord(ctx, existingStudentId, n);
+      return this.mergeStudentRecord(ctx, existingStudentId, n, cache);
     }
 
     const existingUser = await this.prisma.user.findUnique({
       where: { tenantId_email: { tenantId, email: n.email } },
     });
-    const passwordHash = await bcrypt.hash('Student@123', 12);
-    const studentRole = await this.prisma.role.findFirst({
-      where: { tenantId, slug: 'student' },
-    });
-    const shift = await this.prisma.shift.findFirst({
-      where: { id: n.shiftId, tenantId },
-    });
-    const batch = await this.prisma.admissionBatch.findFirst({
-      where: { id: n.admissionBatchId, tenantId },
-      include: { entrySession: true },
-    });
+    const passwordHash = cache.defaultPasswordHash;
+    const studentRole = cache.studentRole;
+    const shift = n.shiftId ? cache.shifts.get(n.shiftId) : undefined;
+    const batch = cache.batches.get(n.admissionBatchId);
     if (!batch) throw new BadRequestException('Invalid batch');
     const targetSemester =
       n.semesterOverride && n.currentSemester != null
@@ -3724,6 +4099,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         student.id,
         n,
         targetSemester,
+        cache,
       );
       await tx.studentAcademicStanding.upsert({
         where: { studentId: student.id },
@@ -3757,6 +4133,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     ctx: ImportModuleHandlerContext,
     studentId: string,
     n: NormalizedStudentImportRow,
+    cache: StudentImportCommitCache,
   ) {
     const { tenantId, userId, batchId } = ctx;
     const existing = await this.prisma.student.findFirst({
@@ -3764,15 +4141,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       include: { masterProfile: true, user: true },
     });
     if (!existing) throw new BadRequestException('Student not found for merge');
-    const shift = n.shiftId
-      ? await this.prisma.shift.findFirst({
-          where: { id: n.shiftId, tenantId },
-        })
-      : null;
-    const batch = await this.prisma.admissionBatch.findFirst({
-      where: { id: n.admissionBatchId, tenantId },
-      include: { entrySession: true },
-    });
+    const shift = n.shiftId ? cache.shifts.get(n.shiftId) : null;
+    const batch = cache.batches.get(n.admissionBatchId);
     if (!batch) throw new BadRequestException('Invalid batch');
     const targetSemester =
       n.semesterOverride && n.currentSemester != null
@@ -3935,6 +4305,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         studentId,
         n,
         targetSemester,
+        cache,
       );
     });
     if (n.abcId) {
@@ -4160,6 +4531,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     studentId: string,
     n: NormalizedStudentImportRow,
     semesterSequence: number,
+    cache?: StudentImportCommitCache,
   ) {
     const mapping = n.academicMapping;
     if (!mapping) return;
@@ -4179,19 +4551,29 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     );
     if (!selections.length) return;
 
-    const batch = await tx.admissionBatch.findFirst({
-      where: { id: n.admissionBatchId, tenantId },
-    });
-    const semester = await tx.semester.findFirst({
-      where: {
-        tenantId,
-        semesterNumber: semesterSequence,
-        deletedAt: null,
-        ...(batch?.institutionId ? { institutionId: batch.institutionId } : {}),
-      },
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-    });
-    if (!semester) return;
+    const batch =
+      cache?.batches.get(n.admissionBatchId) ??
+      (await tx.admissionBatch.findFirst({
+        where: { id: n.admissionBatchId, tenantId },
+      }));
+    const semesterKey = `${n.admissionBatchId}:${semesterSequence}:${batch?.institutionId ?? ''}`;
+    let semester = cache?.semesters.get(semesterKey);
+    if (!semester) {
+      const found = await tx.semester.findFirst({
+        where: {
+          tenantId,
+          semesterNumber: semesterSequence,
+          deletedAt: null,
+          ...(batch?.institutionId
+            ? { institutionId: batch.institutionId }
+            : {}),
+        },
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      });
+      if (!found) return;
+      semester = found;
+      cache?.semesters.set(semesterKey, found);
+    }
 
     const registration = await tx.semesterRegistration.upsert({
       where: { studentId_semesterId: { studentId, semesterId: semester.id } },

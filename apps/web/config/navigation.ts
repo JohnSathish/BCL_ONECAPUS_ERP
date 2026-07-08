@@ -943,11 +943,11 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Finance',
+    label: 'Fee Management',
     zone: 'scroll',
     items: [
       {
-        label: 'Finance',
+        label: 'Fee Management',
         href: '/admin/fees',
         icon: Wallet,
         module: 'finance',

@@ -358,6 +358,11 @@ export class CommitStudentImportDto {
   @IsOptional()
   @IsIn([...STUDENT_IMPORT_MODES])
   importMode?: StudentImportMode;
+
+  /** Run commit in-process instead of queue (used after stall recovery). */
+  @IsOptional()
+  @IsBoolean()
+  preferSync?: boolean;
 }
 
 export class UploadStudentDocumentDto {

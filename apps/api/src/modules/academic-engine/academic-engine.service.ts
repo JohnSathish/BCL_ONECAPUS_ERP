@@ -49,6 +49,7 @@ import {
   type RegistrationWorkflowSettings,
 } from './services/registration-workflow.service';
 import { StudentMajorMinorTrackService } from './services/student-major-minor-track.service';
+import { StudentMajorMinorOverrideService } from './services/student-major-minor-override.service';
 import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
 import { FeeEnforcementService } from '../fees/services/fee-enforcement.service';
@@ -58,6 +59,10 @@ import {
 } from './domain/category-pools';
 import { AcademicChangeHistoryService } from '../students/academic-change-history/academic-change-history.service';
 import type { AcademicChangeAuditContext } from '../students/academic-change-history/academic-change-history.types';
+import type {
+  CreateStudentMajorMinorOverrideDto,
+  ResolveStudentMajorMinorOverrideQueryDto,
+} from './dto/major-minor-override.dto';
 
 @Injectable()
 export class AcademicEngineService {
@@ -74,6 +79,7 @@ export class AcademicEngineService {
     private readonly deliveryFees: CourseDeliveryFeeService,
     private readonly registrationWorkflow: RegistrationWorkflowService,
     private readonly majorMinorTrack: StudentMajorMinorTrackService,
+    private readonly majorMinorOverride: StudentMajorMinorOverrideService,
     private readonly vtcTrack: StudentVtcTrackService,
     private readonly courseEligibility: CourseEligibilityService,
     private readonly feeEnforcement: FeeEnforcementService,
@@ -350,6 +356,84 @@ export class AcademicEngineService {
       },
     });
     return track;
+  }
+
+  async createStudentMajorMinorOverride(
+    tenantId: string,
+    studentId: string,
+    actorId: string,
+    dto: CreateStudentMajorMinorOverrideDto,
+  ) {
+    const created = await this.majorMinorOverride.createOverride(
+      tenantId,
+      studentId,
+      actorId,
+      dto,
+    );
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: actorId,
+        module: 'academic-engine',
+        action: 'student_major_minor_override_created',
+        entityType: 'StudentMajorMinorOverride',
+        entityId: created.id,
+        metadata: {
+          studentId,
+          reason: dto.reason,
+          approvalAuthority: dto.approvalAuthority,
+        },
+      },
+    });
+    return created;
+  }
+
+  async listStudentMajorMinorOverrides(
+    tenantId: string,
+    studentId: string,
+    status?: string,
+  ) {
+    return this.majorMinorOverride.listOverrides(tenantId, studentId, status);
+  }
+
+  async getStudentMajorMinorActiveOverride(
+    tenantId: string,
+    studentId: string,
+    query: ResolveStudentMajorMinorOverrideQueryDto,
+  ) {
+    return this.majorMinorOverride.getActiveOverride(
+      tenantId,
+      studentId,
+      query,
+    );
+  }
+
+  async revokeStudentMajorMinorOverride(
+    tenantId: string,
+    studentId: string,
+    overrideId: string,
+    actorId: string,
+    reason: string,
+  ) {
+    const revoked = await this.majorMinorOverride.revokeOverride(
+      tenantId,
+      studentId,
+      overrideId,
+      actorId,
+      reason,
+    );
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: actorId,
+        module: 'academic-engine',
+        action: 'student_major_minor_override_revoked',
+        entityType: 'StudentMajorMinorOverride',
+        entityId: overrideId,
+        metadata: { studentId, reason },
+      },
+    });
+    return revoked;
   }
 
   async resetVtcTrack(

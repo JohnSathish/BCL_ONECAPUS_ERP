@@ -140,12 +140,14 @@ export class SubjectRegistrationEngineService {
     }
 
     if (needsMinor && minorChoice?.subjectSlug) {
-      await this.eligibility.assertValidMajorMinorPair(
+      await this.eligibility.assertValidMajorMinorPairForStudent(
         tenantId,
-
+        studentId,
         majorChoice.subjectSlug,
-
         minorChoice.subjectSlug,
+        undefined,
+        shiftId ?? undefined,
+        { semesterSequence, programVersionId },
       );
     }
 
