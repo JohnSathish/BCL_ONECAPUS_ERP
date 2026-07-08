@@ -39,3 +39,22 @@ _migration-pack/
 # Runtime backup artifacts (managed via Backup & DR Center)
 apps/api/backups/**
 !apps/api/backups/.gitkeep
+
+# Local / runtime artifacts (do not commit)
+/_local/
+staffcredentials.txt
+Private and Public Keys.txt
+**/*credentials*.txt
+*.dump
+apps/worker/backups/
+apps/api/storage/fee-receipts/
+apps/worker/storage/fee-receipts/
+apps/api/prisma/data/benchmark-*.xlsx
+apps/api/prisma/data/student-import-test-*.xlsx
+import-validation-output*.txt
+courses_export_*.xlsx
+III SEM*.xls
+Emulator Start CMD.txt
+Nano editor shortcut keys.txt
+Soft Delete Demo Data.txt
+dbctura website latest.txt
