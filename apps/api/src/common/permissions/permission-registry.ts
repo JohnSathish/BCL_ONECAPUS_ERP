@@ -19,7 +19,13 @@ export const MODULE_PERMISSIONS = {
     'library:read',
   ],
   admissions: ['admissions:read', 'admissions:manage', 'students:read'],
-  students: ['students:read', 'students:manage'],
+  students: [
+    'students:read',
+    'students:manage',
+    'students:verify-documents',
+    'students:profile-verify',
+    'students:profile-policy',
+  ],
   academics: [
     'academic:read',
     'academic:manage',
@@ -62,7 +68,14 @@ export const MODULE_PERMISSIONS = {
     'certificates:manage',
     'certificates:approve',
   ],
-  finance: ['fees:read', 'fees:manage', 'fees:cash:collect'],
+  finance: [
+    'fees:read',
+    'fees:manage',
+    'fees:cash:collect',
+    'payment-gateway:read',
+    'payment-gateway:manage',
+  ],
+  accounts: ['accounts:read', 'accounts:manage', 'accounts:post'],
   library: [
     'library:read',
     'library:manage',
@@ -230,6 +243,12 @@ export const ERP_MODULES: ErpModule[] = [
     defaultHome: '/admin/fees',
   },
   {
+    id: 'accounts',
+    label: 'Finance & Accounts',
+    permissions: MODULE_PERMISSIONS.accounts,
+    defaultHome: '/admin/accounts',
+  },
+  {
     id: 'hr',
     label: 'Human Resources',
     permissions: MODULE_PERMISSIONS.hr,
@@ -389,6 +408,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { prefix: '/admin/library', permissions: [...MODULE_PERMISSIONS.library] },
   { prefix: '/admin/hr', permissions: [...MODULE_PERMISSIONS.hr] },
   { prefix: '/admin/fees', permissions: [...MODULE_PERMISSIONS.finance] },
+  {
+    prefix: '/admin/accounts',
+    permissions: [...MODULE_PERMISSIONS.accounts],
+  },
   {
     prefix: '/admin/transport',
     permissions: [...MODULE_PERMISSIONS.transport],

@@ -150,8 +150,11 @@ export class MobileAppController {
 
   @Get('devices/sessions')
   @RequireAnyPermission('student:portal:self', 'staff:portal:self')
-  listDeviceSessions(@CurrentUser() user: JwtUser) {
-    return this.sessions.listSessions(user);
+  listDeviceSessions(
+    @CurrentUser() user: JwtUser,
+    @Headers('x-device-id') deviceId?: string,
+  ) {
+    return this.sessions.listSessions(user, deviceId);
   }
 
   @Delete('devices/sessions/:id')

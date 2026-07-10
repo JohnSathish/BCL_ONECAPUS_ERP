@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -20,12 +21,15 @@ import { RequireAnyPermission } from '../../common/decorators/require-permission
 import {
   StudentIdCardPrintRequestDto,
   StudentPortalChangeRequestDto,
+  SubmitProfileChangesDto,
   UpdateAbcIdDto,
   UploadStudentPortalDocumentDto,
+  UpsertClassXiiDto,
 } from './dto/student-portal-profile.dto';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
 import { StudentPortalService } from './services/student-portal.service';
 import { StudentLeaveService } from './services/student-leave.service';
+import { StudentProfileChangeRequestService } from './services/student-profile-change-request.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -37,6 +41,7 @@ export class StudentPortalController {
     private readonly portal: StudentPortalService,
     private readonly portalProfile: StudentPortalProfileService,
     private readonly studentLeave: StudentLeaveService,
+    private readonly changeRequests: StudentProfileChangeRequestService,
   ) {}
 
   @Get('me')
@@ -93,6 +98,80 @@ export class StudentPortalController {
   @RequireAnyPermission('student:portal:self')
   getProfile(@CurrentUser() user: JwtUser) {
     return this.portalProfile.getMyProfile(user);
+  }
+
+  @Get('me/profile/completion')
+  @RequireAnyPermission('student:portal:self')
+  async getMyCompletion(@CurrentUser() user: JwtUser) {
+    const student = await this.portal.resolveStudent(user);
+    const [completion, softGate] = await Promise.all([
+      this.changeRequests.getCompletion(user.tid, student.id),
+      this.changeRequests.evaluateSoftGate(user.tid, student.id),
+    ]);
+    return { ...completion, softGate };
+  }
+
+  @Get('me/profile/bootstrap')
+  @RequireAnyPermission('student:portal:self')
+  async getMyProfileBootstrap(@CurrentUser() user: JwtUser) {
+    const student = await this.portal.resolveStudent(user);
+    return this.changeRequests.getProfileBootstrap(user.tid, student.id);
+  }
+
+  @Get('me/profile/sections/:section')
+  @RequireAnyPermission('student:portal:self')
+  async getMySection(
+    @CurrentUser() user: JwtUser,
+    @Param('section') section: string,
+  ) {
+    const student = await this.portal.resolveStudent(user);
+    return this.changeRequests.getSectionSnapshot(
+      user.tid,
+      student.id,
+      section,
+    );
+  }
+
+  @Post('me/profile/submissions')
+  @RequireAnyPermission('student:portal:self')
+  async submitProfileChanges(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SubmitProfileChangesDto,
+  ) {
+    const student = await this.portal.resolveStudent(user);
+    return this.changeRequests.submitFieldChanges(
+      user,
+      student.id,
+      dto.changes.map((c) => ({
+        sectionKey: c.sectionKey,
+        fieldKey: c.fieldKey,
+        newValue: c.newValue ?? null,
+      })),
+    );
+  }
+
+  @Get('me/profile/class-xii')
+  @RequireAnyPermission('student:portal:self')
+  async getClassXii(@CurrentUser() user: JwtUser) {
+    const student = await this.portal.resolveStudent(user);
+    return this.changeRequests.getClassXii(user.tid, student.id);
+  }
+
+  @Put('me/profile/class-xii')
+  @RequireAnyPermission('student:portal:self')
+  async upsertClassXii(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: UpsertClassXiiDto,
+  ) {
+    const student = await this.portal.resolveStudent(user);
+    return this.changeRequests.upsertClassXii(user, student.id, dto);
+  }
+
+  @Get('me/profile/change-requests')
+  @RequireAnyPermission('student:portal:self')
+  async myChangeRequests(@CurrentUser() user: JwtUser) {
+    const student = await this.portal.resolveStudent(user);
+    return this.portalProfile.listChangeRequests(user.tid, student.id);
   }
 
   @Post('me/profile/change-requests')

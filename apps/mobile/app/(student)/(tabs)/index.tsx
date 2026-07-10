@@ -9,6 +9,7 @@ import { studentTheme } from '@/components/student-portal/theme';
 import { DeviceSessionsPanel } from '@/components/auth/device-sessions-panel';
 import { isMvpStudentCard } from '@/constants/release';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
+import { ProfileCompletionCard } from '@/components/student-portal/profile-completion-card';
 import {
   fetchStudentHomeWidgets,
   type StudentDashboardWidgets,
@@ -97,6 +98,8 @@ export default function StudentHomeScreen() {
             <Badge label="Status" value={feeStatus} />
           </View>
         </View>
+
+        <ProfileCompletionCard />
 
         {academicChips.length > 0 ? (
           <Pressable

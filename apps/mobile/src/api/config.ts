@@ -1,9 +1,14 @@
 import { getDeviceId } from '@/auth/device';
+import { getApiBase, getTenantSlug } from '@/auth/school-config';
 import { getStoredAppType, type StoredAppType } from '@/auth/session';
 
 export const APP_VERSION = '1.0.0';
-export const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'demo';
+
+/** @deprecated Use getApiBase() — kept for legacy imports during migration */
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+
+/** @deprecated Use getTenantSlug() */
+export const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'demo';
 
 let appType: StoredAppType = 'student';
 let cachedDeviceId: string | null = null;
@@ -34,10 +39,10 @@ export async function ensureDeviceId() {
 export async function mobileHeadersAsync(
   extra?: Record<string, string>,
 ): Promise<Record<string, string>> {
-  const deviceId = await ensureDeviceId();
+  const [deviceId, tenantSlug] = await Promise.all([ensureDeviceId(), getTenantSlug()]);
   return {
     'Content-Type': 'application/json',
-    'X-Tenant-Slug': TENANT_SLUG,
+    'X-Tenant-Slug': tenantSlug,
     'X-Client-Type': 'mobile',
     'X-App-Type': appType,
     'X-App-Version': APP_VERSION,
@@ -46,6 +51,7 @@ export async function mobileHeadersAsync(
   };
 }
 
+/** Prefer mobileHeadersAsync — sync variant may use stale tenant before hydrate. */
 export function mobileHeaders(extra?: Record<string, string>) {
   return {
     'Content-Type': 'application/json',
@@ -57,3 +63,5 @@ export function mobileHeaders(extra?: Record<string, string>) {
     ...extra,
   };
 }
+
+export { getApiBase, getTenantSlug } from '@/auth/school-config';

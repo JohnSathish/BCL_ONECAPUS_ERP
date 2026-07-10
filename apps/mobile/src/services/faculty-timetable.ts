@@ -48,7 +48,9 @@ export function fetchFacultyWeekTimetable(params?: { shiftId?: string; streamId?
 
 export function formatTimetableTime(value: string) {
   if (!value) return '—';
-  const match = value.match(/^(\d{2}):(\d{2})/);
+  const isoMatch = value.match(/T(\d{2}):(\d{2})/);
+  const timePart = isoMatch ? `${isoMatch[1]}:${isoMatch[2]}` : value;
+  const match = timePart.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return value;
   const hour = Number(match[1]);
   const minute = match[2];

@@ -1,0 +1,15 @@
+# google-services.json placeholder
+
+Replace this file with the real Firebase Android config downloaded from:
+
+Firebase Console → Project settings → Your apps → Android (`edu.onecampus.mobile`) → google-services.json
+
+Save the real file as:
+
+```
+apps/mobile/google-services.json
+```
+
+That path is gitignored. See `docs/firebase-setup.md`.
+
+EAS / local builds need the real file present (or provided as an EAS file secret).

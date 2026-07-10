@@ -363,7 +363,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
       if (paper.offeringId && section.courseOffering.id === paper.offeringId) return true;
       return normalizeLabel(course.code) === normalizeLabel(paper.code);
     });
-    return matches.find((section) => section.shiftId === preferredShift) ?? matches[0] ?? null;
+    return matches.find((section) => section.shift?.id === preferredShift) ?? matches[0] ?? null;
   };
 
   const selectedElectivePreview = useMemo(() => {
@@ -898,7 +898,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
                     ) : (
                       <p className="text-sm text-muted-foreground">—</p>
                     )}
-                    {changing && selected !== 'KEEP' ? (
+                    {changing ? (
                       <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-sm">
                         <p className="text-[11px] uppercase text-muted-foreground">Selected</p>
                         <p>{paperLabel(selected)}</p>

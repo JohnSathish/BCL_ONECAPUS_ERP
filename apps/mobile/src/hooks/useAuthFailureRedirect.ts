@@ -7,7 +7,7 @@ export function useAuthFailureRedirect() {
 
   useEffect(() => {
     setAuthFailureHandler(() => {
-      router.replace('/(auth)/splash');
+      router.replace('/(auth)/login?reason=session_expired');
     });
     return () => setAuthFailureHandler(() => {});
   }, [router]);

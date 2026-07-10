@@ -7,9 +7,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ['geist'],
   // Next.js 15.5+ buffers proxied request bodies (default 10MB). Photo ZIP uploads exceed that.
   experimental: {
-    proxyClientMaxBodySize: '512mb',
     middlewareClientMaxBodySize: '512mb',
-  },
+  } as NextConfig['experimental'],
   eslint: {
     // ESLint runs in CI (web-lint job); Docker build stays resilient.
     ignoreDuringBuilds: true,

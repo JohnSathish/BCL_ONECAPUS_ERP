@@ -2,11 +2,14 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { PrismaService } from '../../../database/prisma.service';
 
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+
+import type { PayrollJournalBridgeService } from '../../accounting/services/payroll-journal-bridge.service';
 
 import { LoanService } from './loan.service';
 
@@ -28,6 +31,9 @@ export class PayrollApprovalService {
     private readonly payslipDocs: PayslipDocumentService,
 
     private readonly payslipNotify: PayslipNotificationService,
+
+    @Optional()
+    private readonly payrollJournalBridge?: PayrollJournalBridgeService,
   ) {}
 
   async transition(
@@ -137,6 +143,18 @@ export class PayrollApprovalService {
       userId: user.sub,
     });
 
+    if (action === 'publish') {
+      try {
+        await this.payrollJournalBridge?.onPayrollPublished({
+          tenantId: user.tid,
+          payrollRunId: runId,
+          postedById: user.sub,
+        });
+      } catch {
+        // non-blocking GL integration
+      }
+    }
+
     return updated;
   }
 
@@ -170,6 +188,16 @@ export class PayrollApprovalService {
 
       userId: user.sub,
     });
+
+    try {
+      await this.payrollJournalBridge?.onPayrollPaid({
+        tenantId: user.tid,
+        payrollRunId: runId,
+        postedById: user.sub,
+      });
+    } catch {
+      // non-blocking GL integration
+    }
 
     return updated;
   }

@@ -47,6 +47,9 @@ import { StudentPortalCalendarService } from './services/student-portal-calendar
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
 import { StudentLeaveService } from './services/student-leave.service';
 import { AcademicChangeHistoryModule } from './academic-change-history/academic-change-history.module';
+import { StudentProfileUpdatePolicyService } from './services/student-profile-update-policy.service';
+import { StudentProfileChangeRequestService } from './services/student-profile-change-request.service';
+import { StudentProfileVerificationController } from './student-profile-verification.controller';
 
 @Module({
   imports: [
@@ -69,6 +72,7 @@ import { AcademicChangeHistoryModule } from './academic-change-history/academic-
   ],
   controllers: [
     StudentPortalController,
+    StudentProfileVerificationController,
     StudentPhotoBulkController,
     StudentBulkUpdateController,
     StudentsController,
@@ -78,6 +82,8 @@ import { AcademicChangeHistoryModule } from './academic-change-history/academic-
     StudentPortalService,
     StudentPortalCalendarService,
     StudentPortalProfileService,
+    StudentProfileUpdatePolicyService,
+    StudentProfileChangeRequestService,
     StudentLeaveService,
     StudentProfileService,
     StudentDirectoryEnrichmentService,
@@ -113,6 +119,8 @@ import { AcademicChangeHistoryModule } from './academic-change-history/academic-
     StudentPortalService,
     StudentLeaveService,
     StudentDirectoryEnrichmentService,
+    StudentProfileChangeRequestService,
+    StudentProfileUpdatePolicyService,
     StudentImportProcessor,
     StudentBulkUpdateProcessor,
     StudentPhotoBulkProcessor,

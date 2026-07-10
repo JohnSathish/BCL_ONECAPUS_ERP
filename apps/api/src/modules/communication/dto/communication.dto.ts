@@ -164,6 +164,10 @@ export class CommunicationCampaignDto {
   attachments?: Record<string, unknown>[];
 
   @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+
+  @IsOptional()
   @IsISO8601()
   scheduledAt?: string;
 }

@@ -197,6 +197,42 @@ export class HybridIntentResolver {
       };
     }
 
+    if (this.isProfileCompletion(lower)) {
+      const profileFilters = { ...filters };
+      if (
+        /incomplete\s+profile|profile\s+incomplete|incomplete\s+profiles|profile\s+completion/.test(
+          lower,
+        )
+      ) {
+        profileFilters.incompleteProfile = true;
+      }
+      if (
+        /missing\s+class\s*xii|class\s*xii\s+missing|no\s+class\s*xii/.test(
+          lower,
+        )
+      ) {
+        profileFilters.missingClassXii = true;
+        profileFilters.incompleteProfile = true;
+      }
+      if (
+        /pending\s+(profile\s+)?verif|profile\s+update\s+pending|awaiting\s+verif/.test(
+          lower,
+        )
+      ) {
+        profileFilters.pendingProfileVerification = true;
+      }
+      if (/without\s+aadhaar|no\s+aadhaar|missing\s+aadhaar/.test(lower)) {
+        profileFilters.missingAadhaar = true;
+        profileFilters.incompleteProfile = true;
+      }
+      return {
+        action: 'profile_completion_summary',
+        filters: profileFilters,
+        confidence: 0.92,
+        question: q,
+      };
+    }
+
     if (this.isSearchStaff(lower)) {
       const searchQuery = this.extractSearchQuery(q, lower, 'staff');
       return {
@@ -535,6 +571,15 @@ export class HybridIntentResolver {
     if (/without\s+abc|no\s+abc|missing\s+abc/.test(lower)) {
       filters.missingAbcId = true;
     }
+    if (/incomplete\s+profile|profile\s+incomplete/.test(lower)) {
+      filters.incompleteProfile = true;
+    }
+    if (/missing\s+class\s*xii|class\s*xii\s+missing/.test(lower)) {
+      filters.missingClassXii = true;
+    }
+    if (/pending\s+(profile\s+)?verif/.test(lower)) {
+      filters.pendingProfileVerification = true;
+    }
 
     if (/pending\s+fee|outstanding|defaulter|overdue/.test(lower)) {
       filters.feeStatus = 'DUE';
@@ -806,6 +851,19 @@ export class HybridIntentResolver {
 
   private isSearchDepartments(lower: string) {
     return /\b(find|search)\b.*\bdepartment\b/.test(lower);
+  }
+
+  private isProfileCompletion(lower: string) {
+    return (
+      /\bprofile\s+completion\b/.test(lower) ||
+      /\bincomplete\s+profiles?\b/.test(lower) ||
+      /\bmissing\s+class\s*xii\b/.test(lower) ||
+      /\bpending\s+(profile\s+)?verif/.test(lower) ||
+      /\bstudents?\s+missing\s+(aadhaar|bank|photo|class\s*xii)\b/.test(
+        lower,
+      ) ||
+      /\bhow\s+many\s+incomplete\s+profiles?\b/.test(lower)
+    );
   }
 
   private proposeAction(lower: string): ResolvedIntent {

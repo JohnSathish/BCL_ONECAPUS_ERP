@@ -12,6 +12,7 @@ const TOOL_NAMES = [
   'search_applications',
   'search_subjects',
   'search_departments',
+  'profile_completion_summary',
   'generate_student_report',
   'generate_fee_report',
   'generate_attendance_report',

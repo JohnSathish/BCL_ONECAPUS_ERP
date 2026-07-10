@@ -2,8 +2,15 @@ import { Platform } from 'react-native';
 import { apiFetch, setAppType } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
 import { canAccessMobile, resolveMobileRoute } from '@/auth/role-router';
-import { saveAppType, saveSession, saveUserSnapshot, saveLastLoginAt } from '@/auth/session';
+import {
+  saveAppType,
+  saveLastLoginAt,
+  saveRememberMe,
+  saveSession,
+  saveUserSnapshot,
+} from '@/auth/session';
 import type { Challenge } from '@/components/auth/captcha-widget';
+import { registerDeviceWithPush } from '@/services/push-notifications';
 
 export type LoginResponse = {
   accessToken: string;
@@ -67,19 +74,29 @@ export async function performLogin(input: {
 
   await saveSession(session.accessToken, session.refreshToken);
   await saveUserSnapshot(session.user);
+  await saveRememberMe(input.rememberMe ?? false);
   await saveLastLoginAt(new Date().toISOString());
   setAppType(route.appType);
   await saveAppType(route.appType);
 
-  const deviceId = await getDeviceId();
-  await apiFetch('/v1/mobile-app/devices/register', {
-    method: 'POST',
-    body: JSON.stringify({
-      deviceId,
-      appType: route.appType === 'student' ? 'STUDENT' : 'STAFF',
-      platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
-    }),
-  });
+  const appType = route.appType === 'student' ? 'STUDENT' : 'STAFF';
+  try {
+    await registerDeviceWithPush(appType);
+  } catch {
+    try {
+      const deviceId = await getDeviceId();
+      await apiFetch('/v1/mobile-app/devices/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          deviceId,
+          appType,
+          platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        }),
+      });
+    } catch {
+      // Device registration must not block login
+    }
+  }
 
   return {
     route,

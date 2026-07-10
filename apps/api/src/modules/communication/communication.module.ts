@@ -19,12 +19,14 @@ import { CommunicationWhatsAppService } from './services/communication-whatsapp.
 import { UserNotificationsService } from './services/user-notifications.service';
 import { CommunicationNotificationProcessor } from './processors/communication-notification.processor';
 import { FcmPushService } from './services/fcm-push.service';
+import { CommunicationAssetsService } from './services/communication-assets.service';
 
 @Module({
   controllers: [CommunicationController],
   providers: [
     CommunicationTemplatesService,
     CommunicationCampaignsService,
+    CommunicationAssetsService,
     CommunicationDashboardService,
     CommunicationAnalyticsService,
     CommunicationSettingsService,

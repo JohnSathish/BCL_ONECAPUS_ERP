@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import type { FeesJournalBridgeService } from '../../accounting/services/fees-journal-bridge.service';
 
 type LedgerPostInput = {
   tenantId: string;
@@ -19,7 +20,10 @@ type LedgerPostInput = {
 
 @Injectable()
 export class FeeLedgerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly feesJournalBridge?: FeesJournalBridgeService,
+  ) {}
 
   private db() {
     return this.prisma as unknown as Record<string, any>;
@@ -119,7 +123,7 @@ export class FeeLedgerService {
       input.studentId,
       Number(input.debitAmount ?? 0) - Number(input.creditAmount ?? 0),
     );
-    return this.db().studentFeeLedgerEntry.create({
+    const entry = await this.db().studentFeeLedgerEntry.create({
       data: {
         tenantId: input.tenantId,
         studentId: input.studentId,
@@ -138,6 +142,24 @@ export class FeeLedgerService {
         metadata: input.metadata,
       },
     });
+
+    if (this.feesJournalBridge) {
+      void this.feesJournalBridge
+        .onFeeLedgerPosted({
+          tenantId: input.tenantId,
+          studentId: input.studentId,
+          entryType: input.entryType,
+          paymentId: input.paymentId,
+          creditAmount: input.creditAmount,
+          debitAmount: input.debitAmount,
+          description: input.description,
+          postedById: input.postedById,
+          feeLedgerEntryId: entry.id,
+        })
+        .catch(() => undefined);
+    }
+
+    return entry;
   }
 
   private summarize(entries: any[]) {

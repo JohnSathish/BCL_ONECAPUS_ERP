@@ -288,7 +288,7 @@ export class GatewayPaymentDto {
   @Min(0)
   amount!: number;
 
-  @IsIn(['RAZORPAY', 'CASHFREE', 'PAYU', 'CUSTOM'])
+  @IsIn(['RAZORPAY', 'CASHFREE', 'NTT_DATA', 'PAYU', 'CUSTOM'])
   provider!: string;
 }
 

@@ -19,13 +19,28 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EAS_BUILD_PROFILE": "preview"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EAS_BUILD_PROFILE": "production"
+      },
       "android": {
         "buildType": "app-bundle"
+      }
+    },
+    "production-apk": {
+      "distribution": "internal",
+      "env": {
+        "EAS_BUILD_PROFILE": "production"
+      },
+      "android": {
+        "buildType": "apk"
       }
     }
   },

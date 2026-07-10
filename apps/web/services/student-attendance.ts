@@ -12,11 +12,19 @@ export type StudentAttendanceSession = {
   offeringSectionId?: string | null;
   courseId?: string | null;
   course?: { code?: string; title?: string; courseType?: string } | null;
+  paperCourse?: { code?: string; title?: string; courseType?: string } | null;
   subjectGroup?: {
     id?: string;
     code?: string;
     title?: string;
     fyugpCategory?: string;
+  } | null;
+  displayTitle?: string | null;
+  displayHeader?: {
+    title?: string;
+    subtitle?: string;
+    details?: string;
+    lines?: string[];
   } | null;
   linkedPapers?: Array<{ id: string; code: string; title: string }>;
   section?: { sectionCode?: string | null } | null;
@@ -31,6 +39,9 @@ export type StudentAttendanceSession = {
     floorId?: string | null;
   } | null;
   counts?: { total: number; present: number; absent: number; other: number };
+  rosterSize?: number | null;
+  timetableLinked?: boolean;
+  timetablePlanName?: string | null;
 };
 
 export type StudentAttendanceRosterRow = {
@@ -166,4 +177,38 @@ export async function fetchStudentAttendanceReport(
 export async function fetchMyStudentAttendance() {
   const { data } = await api.get('/v1/student-attendance/portal/me');
   return data;
+}
+
+export type AttendancePolicy = {
+  id: string;
+  tenantId: string;
+  attendanceMode: 'FIRST_LAST' | 'EVERY_PERIOD';
+  shortageThresholdPct: number;
+  defaulterThresholdPct: number;
+};
+
+export async function fetchAttendancePolicy() {
+  const { data } = await api.get<AttendancePolicy>('/v1/student-attendance/policy');
+  return data;
+}
+
+export async function updateAttendancePolicy(payload: {
+  attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
+  shortageThresholdPct?: number;
+  defaulterThresholdPct?: number;
+}) {
+  const { data } = await api.patch<AttendancePolicy>('/v1/student-attendance/policy', payload);
+  return data;
+}
+
+export async function exportStudentAttendanceReport(
+  type: string,
+  params: Record<string, string | number | undefined>,
+  format: 'xlsx' | 'csv',
+) {
+  const { data } = await api.get(`/v1/student-attendance/reports/${type}`, {
+    params: { ...params, format },
+    responseType: 'blob',
+  });
+  return data as Blob;
 }

@@ -1,8 +1,37 @@
-import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { FacultyDrawer } from '@/components/faculty-portal/faculty-drawer';
 import { FacultyPortalProvider } from '@/components/faculty-portal/faculty-portal-context';
+import { getAccessToken, getRefreshToken } from '@/auth/session';
 
 export default function StaffLayout() {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [access, refresh] = await Promise.all([getAccessToken(), getRefreshToken()]);
+      if (!access && !refresh) {
+        router.replace('/(auth)/login');
+        return;
+      }
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
   return (
     <FacultyPortalProvider>
       <FacultyDrawer />
@@ -14,6 +43,13 @@ export default function StaffLayout() {
         <Stack.Screen name="marks/[paperId]" />
         <Stack.Screen name="class-roster/[sectionId]" />
         <Stack.Screen name="leave" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="calendar" />
+        <Stack.Screen name="teaching-load" />
+        <Stack.Screen name="notices" />
+        <Stack.Screen name="payroll" />
+        <Stack.Screen name="notification-preferences" />
+        <Stack.Screen name="about" />
       </Stack>
     </FacultyPortalProvider>
   );

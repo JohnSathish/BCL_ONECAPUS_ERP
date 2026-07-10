@@ -3,8 +3,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
-  ImageBackground,
   Linking,
   Pressable,
   ScrollView,
@@ -15,7 +13,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/api/client';
 import {
@@ -27,6 +25,7 @@ import {
 import { performLogin } from '@/auth/login-flow';
 import { authColors, authTheme } from '@/components/auth/auth-theme';
 import { CaptchaWidget, type Challenge } from '@/components/auth/captcha-widget';
+import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
   COLLEGE_NAME,
   DEFAULT_PORTAL_STATS,
@@ -38,7 +37,8 @@ import {
   WHATSAPP_SUPPORT_URL,
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { resolveCollegeLogoUri } from '@/utils/upload-asset-url';
+import { useSchoolConfig } from '@/hooks/use-school-config';
+import { InstitutionLogo } from '@/components/auth/institution-logo';
 
 const MORE_LOGIN_OPTIONS = [
   { label: 'Scan Student QR', id: 'qr' },
@@ -65,10 +65,13 @@ function campusShortName() {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ reason?: string }>();
+  const sessionExpired = params.reason === 'session_expired';
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = authColors(scheme);
   const { config, error: bootstrapError } = useBootstrap();
+  const { school } = useSchoolConfig();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -82,8 +85,6 @@ export default function LoginScreen() {
 
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
-  const particleA = useRef(new Animated.Value(0)).current;
-  const particleB = useRef(new Animated.Value(0)).current;
   const newsFade = useRef(new Animated.Value(1)).current;
 
   const greeting = getTimeGreeting();
@@ -104,8 +105,6 @@ export default function LoginScreen() {
   const announcement = config?.maintenanceMessage?.trim() || updates[0] || null;
   const announceDetail = updates[1] ?? 'Tap View for details';
 
-  const logoUri = resolveCollegeLogoUri(config?.branding);
-
   const surface = scheme === 'dark' ? '#1e293b' : '#ffffff';
   const pageBg = scheme === 'dark' ? '#0f172a' : '#eef2ff';
 
@@ -117,19 +116,7 @@ export default function LoginScreen() {
         Animated.timing(buttonScale, { toValue: 1, duration: 1500, useNativeDriver: true }),
       ]),
     ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(particleA, { toValue: 1, duration: 4200, useNativeDriver: true }),
-        Animated.timing(particleA, { toValue: 0, duration: 4200, useNativeDriver: true }),
-      ]),
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(particleB, { toValue: 1, duration: 5600, useNativeDriver: true }),
-        Animated.timing(particleB, { toValue: 0, duration: 5600, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, [buttonScale, fadeIn, particleA, particleB]);
+  }, [buttonScale, fadeIn]);
 
   useEffect(() => {
     if (newsItems.length <= 1) return;
@@ -181,42 +168,10 @@ export default function LoginScreen() {
     ]);
   }
 
-  const particleATranslate = particleA.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -18],
-  });
-  const particleBTranslate = particleB.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 14],
-  });
-
   const currentNews = newsItems[newsIndex % newsItems.length];
 
   return (
     <View style={[styles.root, { backgroundColor: pageBg }]}>
-      <ImageBackground
-        source={require('../../assets/splash.png')}
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ opacity: scheme === 'dark' ? 0.06 : 0.09 }}
-      />
-      <View style={styles.gridOverlay} pointerEvents="none" />
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particleOne,
-          { transform: [{ translateY: particleATranslate }] },
-        ]}
-        pointerEvents="none"
-      />
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particleTwo,
-          { transform: [{ translateY: particleBTranslate }] },
-        ]}
-        pointerEvents="none"
-      />
-
       <ScrollView
         bounces={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -228,14 +183,11 @@ export default function LoginScreen() {
           colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
           style={[styles.header, { paddingTop: insets.top + 12 }]}
         >
+          <SchoolInstitutionChip light />
           <View style={styles.logoRing}>
-            {logoUri ? (
-              <Image source={{ uri: logoUri }} style={styles.logoImage} />
-            ) : (
-              <Image source={require('../../assets/icon.png')} style={styles.logoImage} />
-            )}
+            <InstitutionLogo branding={config?.branding} size={40} style={styles.logoImage} />
           </View>
-          <Text style={styles.collegeName}>{COLLEGE_NAME}</Text>
+          <Text style={styles.collegeName}>{school?.name ?? COLLEGE_NAME}</Text>
           <Text style={styles.productName}>{PRODUCT_NAME}</Text>
 
           <View style={styles.headerDivider} />
@@ -255,6 +207,13 @@ export default function LoginScreen() {
           <Pressable style={styles.offlineStrip} onPress={() => router.replace('/')}>
             <Text style={styles.offlineText}>Offline — Connect to internet to sign in</Text>
           </Pressable>
+        ) : null}
+
+        {sessionExpired ? (
+          <View style={styles.sessionExpiredStrip}>
+            <Text style={styles.sessionExpiredTitle}>Your session has expired.</Text>
+            <Text style={styles.sessionExpiredBody}>Please sign in again to continue.</Text>
+          </View>
         ) : null}
 
         {announcement ? (
@@ -461,21 +420,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  gridOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.04,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    // subtle grid via repeating borders
-    borderColor: '#1e40af',
-  },
-  particle: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: 'rgba(37,99,235,0.12)',
-  },
-  particleOne: { width: 8, height: 8, top: '18%', left: '12%' },
-  particleTwo: { width: 6, height: 6, top: '28%', right: '16%' },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 18,
@@ -511,6 +455,25 @@ const styles = StyleSheet.create({
     borderBottomColor: '#fecaca',
   },
   offlineText: { color: '#b91c1c', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  sessionExpiredStrip: {
+    backgroundColor: '#fff7ed',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fed7aa',
+  },
+  sessionExpiredTitle: {
+    color: '#c2410c',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  sessionExpiredBody: {
+    color: '#9a3412',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   announceStrip: {
     flexDirection: 'row',
     alignItems: 'center',

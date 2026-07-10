@@ -66,7 +66,6 @@ export function StudentReportsShell({ children, title, description, actions }: P
               )}
             >
               {item.label}
-              {item.soon ? <span className="ml-1 text-[10px] text-amber-600">Soon</span> : null}
             </Link>
           );
         })}

@@ -1,10 +1,14 @@
-# Google Play — DBC Student app (v1.0)
+# Google Play — BCL OneCampus ERP (v1.0.0)
 
-Use this when creating the Play Console listing for the Don Bosco College Tura student mobile app.
-
+**Application name:** BCL OneCampus ERP  
 **Package name:** `edu.onecampus.mobile`  
-**Production API:** `https://erp.donboscocollege.ac.in/api`  
-**Tenant slug:** `demo` (must match database seed)
+**Version:** 1.0.0 (`versionCode` 1)  
+**Developer:** BaseCode Labs Pvt. Ltd.
+
+See also:
+
+- [docs/firebase-setup.md](docs/firebase-setup.md) — Firebase / FCM Console steps
+- [docs/play-data-safety.md](docs/play-data-safety.md) — Data Safety form answers
 
 ---
 
@@ -13,156 +17,160 @@ Use this when creating the Play Console listing for the Don Bosco College Tura s
 ### App name (max 30 characters)
 
 ```
-DBC Student
-```
-
-Alternative if you prefer full college name:
-
-```
-Don Bosco College Student
+BCL OneCampus ERP
 ```
 
 ### Short description (max 80 characters)
 
 ```
-Fees, attendance & notifications for Don Bosco College Tura students.
+College ERP for students & staff — fees, attendance, classes & alerts.
 ```
 
 ### Full description
 
 ```
-DBC Student is the official mobile app for students of Don Bosco College, Tura.
+BCL OneCampus ERP is the official mobile companion for institutions running BaseCode Labs OneCampus.
 
-Sign in with your college student account to:
+Students can:
+• View and pay fees online
+• Check attendance and academic alerts
+• Read notifications and circulars
+• Access timetable, results, leave, and library features as enabled by the college
 
-• View and pay fees online (Razorpay)
-• Check subject-wise attendance and shortfall alerts
-• Read college notifications and mark them as read
+Faculty and staff can:
+• View today’s classes and weekly timetable
+• Mark attendance and enter internal marks
+• Apply for leave and view payslips
+• Receive push alerts for duties, circulars, and reminders
 
-Built on BCL OneCampus ERP. This v1 release focuses on everyday student needs. More features (timetable, results, library) will arrive in future updates.
+Built for multi-institution deployments with secure JWT login, encrypted local session storage, and Firebase Cloud Messaging for push notifications.
 
 Requirements:
-• Active student account issued by the college
+• Active student or staff account issued by your institution
 • Internet connection
+• Android 8.0+ recommended (notification permission on Android 13+)
 
-Support: principaldbct@gmail.com
-Privacy policy: https://donboscocollege.ac.in/mobile-privacy.html
+Support: contact@basecodelabs.com
+Website: https://basecodelabs.com
+Privacy policy: https://basecodelabs.com/privacy-policy.html
+Terms: https://basecodelabs.com/terms-and-conditions.html
 ```
 
-### App category
+### Keywords / tags
 
-- **Category:** Education
-- **Tags (if prompted):** Education, College, Student
+Education, College ERP, Fees, Attendance, Faculty, Student Portal, Notifications
 
-### Contact details
+### Feature list (Play highlights)
 
-| Field              | Value                                             |
-| ------------------ | ------------------------------------------------- |
-| Email              | principaldbct@gmail.com                           |
-| Website            | https://donboscocollege.ac.in                     |
-| Privacy policy URL | https://donboscocollege.ac.in/mobile-privacy.html |
+- Secure campus login
+- Fee dues & payments
+- Attendance & academic alerts
+- Faculty timetable, attendance, marks
+- Push notifications with preferences
+- In-app notification center
+- Privacy policy & terms in-app
 
----
+### Category
 
-## Content rating questionnaire (typical answers)
+Education
 
-| Question                              | Answer               |
-| ------------------------------------- | -------------------- |
-| Violence, sexual content, drugs, etc. | No                   |
-| User-generated content                | No                   |
-| Shares user location                  | No                   |
-| Digital purchases                     | Yes (fee payments)   |
-| Unrestricted internet                 | Yes (API + payments) |
+### Contact
 
-Expected rating: **Everyone** or **PEGI 3 / rated for 3+** (no mature content).
+| Field              | Value                                              |
+| ------------------ | -------------------------------------------------- |
+| Email              | contact@basecodelabs.com                           |
+| Phone              | +91 95663 63655                                    |
+| Website            | https://basecodelabs.com                           |
+| Privacy policy URL | https://basecodelabs.com/privacy-policy.html       |
+| Terms URL          | https://basecodelabs.com/terms-and-conditions.html |
 
----
-
-## Data safety form
-
-Declare the following (adjust if your live deployment differs):
-
-### Data collected
-
-| Data type                     | Collected | Shared        | Purpose                                     |
-| ----------------------------- | --------- | ------------- | ------------------------------------------- |
-| Email address                 | Yes       | No            | Account authentication                      |
-| Name                          | Yes       | No            | Display student profile                     |
-| User IDs                      | Yes       | No            | Session / device security                   |
-| Financial info                | Yes       | With Razorpay | Fee payment processing                      |
-| App activity (in-app actions) | Optional  | No            | Reliability (if you enable analytics later) |
-| Device or other IDs           | Yes       | No            | Device registration, fraud prevention       |
-
-### Security practices
-
-- Data encrypted in transit (HTTPS)
-- Users can request deletion via college administration
-- Data is not sold to third parties
-
-### Data deletion
-
-Students should contact the college office to deactivate portal access or request data handling per institutional policy.
+Institution-specific builds may override privacy URL via `EXPO_PUBLIC_PRIVACY_POLICY_URL`.
 
 ---
 
-## Screenshots (recommended)
+## Required assets (prepare outside repo or add under `assets/store/`)
 
-Capture on a phone with production or staging API:
-
-1. **Login** — “OneCampus Student” sign-in screen
-2. **Home** — Quick access cards (Fees, Attendance, Notifications)
-3. **Fees** — Fee summary / pay flow (mask real student data)
-4. **Attendance** — Subject-wise percentage view
-5. **Notifications** — Inbox list
-
-Minimum: **2 phone screenshots** (Play requirement). Provide 1080×1920 or 1080×2340 PNG/JPEG.
-
-Optional: 7-inch tablet screenshots if you enable tablet support later.
+| Asset              | Spec                                  |
+| ------------------ | ------------------------------------- |
+| App icon           | 512×512 PNG                           |
+| Adaptive icon      | Already configured in `app.config.ts` |
+| Splash             | Configured (`splash-solid.png`)       |
+| Feature graphic    | 1024×500 PNG                          |
+| Phone screenshots  | Min 2 (1080×1920 or similar)          |
+| Tablet screenshots | Optional                              |
 
 ---
 
-## Feature graphic
+## Data safety
 
-1024×500 PNG — college logo + “DBC Student” + tagline “Fees · Attendance · Notifications”.
+Use [docs/play-data-safety.md](docs/play-data-safety.md). Summary:
+
+- Collects name, email, user IDs, device IDs, academic/fee data as needed for ERP
+- Shared with payment gateway only for fee payments
+- Encrypted in transit (HTTPS); tokens in secure storage
+- Not sold
+- Users can disable push categories in-app
 
 ---
 
-## Release checklist
+## Runtime permissions
 
-1. Copy `apps/mobile/.env.production.example` → `.env` (or set EAS secrets).
-2. Deploy `apps/web/public/mobile-privacy.html` to `https://donboscocollege.ac.in/mobile-privacy.html`.
-3. Confirm API is live at `https://erp.donboscocollege.ac.in/api/v1/mobile-app/bootstrap?appType=student`.
-4. Build: `cd apps/mobile && npm run build:prod:android`
-5. Upload AAB to **Internal testing** first; test with a real student account.
-6. Test fee payment on a physical device (Razorpay LIVE keys on server).
-7. Promote to **Closed testing** → **Production** after verification.
+| Permission                           | When                                                |
+| ------------------------------------ | --------------------------------------------------- |
+| Notifications (`POST_NOTIFICATIONS`) | After login / first push registration (Android 13+) |
+| Internet                             | Always (API)                                        |
+| Camera / photos                      | Only when user uploads profile/docs (if enabled)    |
+| Biometric                            | Optional future secure login                        |
 
-### EAS secrets (optional, for cloud builds without local .env)
+---
+
+## Pre-publish testing checklist
+
+- [ ] Firebase project connected; `google-services.json` present for EAS/production builds
+- [ ] Push received in foreground, background, and terminated states
+- [ ] Android 13+ notification permission prompt works
+- [ ] Deep links open fees / attendance / results / timetable / staff screens
+- [ ] PUSH preferences skip disabled categories
+- [ ] Notification Center: read, unread, archive, delete, search
+- [ ] Admin Push Center → Compose with PUSH channel
+- [ ] Privacy Policy, Terms, About screens accessible
+- [ ] Release AAB installs and login works against production API
+- [ ] No critical crashes on smoke paths (login, home, fees, notifications)
+
+---
+
+## Release commands
 
 ```powershell
 cd apps/mobile
-eas secret:create --scope project --name EXPO_PUBLIC_API_URL --value "https://erp.donboscocollege.ac.in/api"
-eas secret:create --scope project --name EXPO_PUBLIC_TENANT_SLUG --value "demo"
-eas secret:create --scope project --name EXPO_PUBLIC_APP_NAME --value "DBC Student"
-eas secret:create --scope project --name EXPO_PUBLIC_PRIVACY_POLICY_URL --value "https://donboscocollege.ac.in/mobile-privacy.html"
-eas secret:create --scope project --name EXPO_PUBLIC_SUPPORT_EMAIL --value "principaldbct@gmail.com"
+# Place google-services.json, set .env / EAS secrets
+npm run build:prod:android
+npm run submit:android
+```
+
+### EAS secrets (example)
+
+```powershell
+eas secret:create --scope project --name EXPO_PUBLIC_API_URL --value "https://your-api.example/api"
+eas secret:create --scope project --name EXPO_PUBLIC_TENANT_SLUG --value "your-tenant"
+eas secret:create --scope project --name EXPO_PUBLIC_APP_NAME --value "BCL OneCampus ERP"
+eas secret:create --scope project --name EXPO_PUBLIC_PRIVACY_POLICY_URL --value "https://basecodelabs.com/privacy-policy.html"
+eas secret:create --scope project --name EXPO_PUBLIC_TERMS_URL --value "https://basecodelabs.com/terms-and-conditions.html"
+eas secret:create --scope project --name EXPO_PUBLIC_SUPPORT_EMAIL --value "contact@basecodelabs.com"
 ```
 
 ---
 
-## What to tell Google reviewers (release notes / testing instructions)
+## Reviewer notes
 
 ```
-Test account: Use a student demo account provided by the college administrator.
+Provide a demo student and/or staff account in Play Console App access.
 
 Steps:
-1. Open app → Sign in with student email and password.
-2. Complete the arithmetic challenge shown on screen.
-3. Home shows Fees, Attendance, Notifications.
-4. Fees → view balance; payment requires valid Razorpay configuration.
+1. Sign in with the demo account and complete the arithmetic challenge.
+2. Student: open Fees, Attendance, Notifications.
+3. Staff: open Dashboard, Timetable, Notifications.
+4. Profile → Notification preferences / About / Privacy / Terms.
 
-This app is for enrolled students of Don Bosco College Tura only.
-Staff accounts are not supported in v1.
+Push notifications require a production/dev-client build with Firebase google-services.json (not Expo Go).
 ```
-
-Provide a **real demo student** login in Play Console “App access” section (not committed to git).

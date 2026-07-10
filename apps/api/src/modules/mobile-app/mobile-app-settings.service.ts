@@ -8,9 +8,24 @@ import {
   type MobileAppType,
 } from './constants/dashboard-config';
 import type { UpdateMobileAppSettingsDto } from './dto/mobile-app.dto';
+import { toPublicUploadUrl } from '../../common/uploads/public-upload-url';
 import { isVersionBelow } from './utils/version.util';
 
 const CACHE_TTL = 900;
+
+/** ICO/favicon URLs do not render in React Native — omit so the app uses its PNG fallback. */
+function mobileBootstrapLogoUrl(
+  overrides: Record<string, string>,
+  brandingLogo: string | null | undefined,
+): string | null {
+  const raw = overrides.logoUrl ?? brandingLogo ?? null;
+  if (!raw?.trim()) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (trimmed.endsWith('.ico') || trimmed.includes('favicon')) {
+    return null;
+  }
+  return toPublicUploadUrl(raw) ?? raw;
+}
 
 @Injectable()
 export class MobileAppSettingsService {
@@ -142,7 +157,7 @@ export class MobileAppSettingsService {
           : settings.staffForceUpdate,
         forceUpdateMessage: settings.forceUpdateMessage,
         branding: {
-          logoUrl: overrides.logoUrl ?? branding?.logoUrl ?? null,
+          logoUrl: mobileBootstrapLogoUrl(overrides, branding?.logoUrl ?? null),
           splashImageUrl: overrides.splashImageUrl ?? null,
           primaryColor:
             overrides.primaryColor ?? branding?.primaryColor ?? null,

@@ -10,7 +10,15 @@ npm install
 npm start
 ```
 
-Set `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_TENANT_SLUG`, and `EXPO_PUBLIC_PRIVACY_POLICY_URL` in `.env`. On a physical device, use your PC LAN IP instead of `localhost`.
+## Universal multi-institution mode
+
+See [docs/universal-app.md](docs/universal-app.md). One Play app can connect to many isolated ERP servers via the institution picker. Publish `onecampus-schools.json` and set `EXPO_PUBLIC_SCHOOL_REGISTRY_URL`.
+
+For local dev without the picker, set `EXPO_PUBLIC_API_URL` + `EXPO_PUBLIC_TENANT_SLUG` in `.env`.
+
+## Environment
+
+Set `EXPO_PUBLIC_SCHOOL_REGISTRY_URL` (universal) or `EXPO_PUBLIC_API_URL` + `EXPO_PUBLIC_TENANT_SLUG` (single-college build), and `EXPO_PUBLIC_PRIVACY_POLICY_URL` in `.env`. On a physical device, use your PC LAN IP instead of `localhost`.
 
 Example privacy URL when web is deployed:
 

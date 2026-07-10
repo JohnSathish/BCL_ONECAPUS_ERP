@@ -8,9 +8,13 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { Public } from '../../common/decorators/public.decorator';
 import {
   CurrentUser,
@@ -32,6 +36,7 @@ import { CommunicationAnalyticsService } from './services/communication-analytic
 import { CommunicationApprovalService } from './services/communication-approval.service';
 import { CommunicationAudienceSegmentService } from './services/communication-audience-segment.service';
 import { CommunicationAutomationService } from './services/communication-automation.service';
+import { CommunicationAssetsService } from './services/communication-assets.service';
 import { CommunicationCampaignsService } from './services/communication-campaigns.service';
 import { CommunicationDashboardService } from './services/communication-dashboard.service';
 import { CommunicationDeliveryService } from './services/communication-delivery.service';
@@ -58,7 +63,24 @@ export class CommunicationController {
     private readonly email: CommunicationEmailService,
     private readonly whatsapp: CommunicationWhatsAppService,
     private readonly notifications: UserNotificationsService,
+    private readonly assets: CommunicationAssetsService,
   ) {}
+
+  @Post('attachments')
+  @RequirePermissions('communication:manage')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  uploadAttachment(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.assets.saveAttachment(user.tid, file);
+  }
 
   @Get('dashboard')
   @RequireAnyPermission('communication:read', 'communication:manage')

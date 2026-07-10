@@ -31,6 +31,11 @@ const SECTIONS: ReportSection[] = [
       { label: 'Student Export Hub', href: '/admin/students/export' },
       { label: 'Admission Register', href: '/admin/reports/admissions' },
       { label: 'Alumni Report', href: '/admin/students/archive' },
+      {
+        label: 'Profile Completion Dashboard',
+        href: '/admin/students/profile-verification/completion',
+      },
+      { label: 'Pending Profile Updates', href: '/admin/students/profile-verification/pending' },
     ],
   },
   {
@@ -39,9 +44,11 @@ const SECTIONS: ReportSection[] = [
     icon: ClipboardList,
     items: [
       { label: 'Student Attendance', href: '/admin/academics/attendance' },
+      { label: 'Monthly Attendance', href: '/admin/reports/attendance/monthly' },
+      { label: 'Cumulative Attendance', href: '/admin/reports/attendance/cumulative' },
+      { label: 'Defaulters & Eligibility', href: '/admin/reports/attendance/defaulters' },
       { label: 'Staff Daily Report', href: '/admin/staff/attendance/reports/daily' },
       { label: 'Staff Monthly Report', href: '/admin/staff/attendance/reports/monthly' },
-      { label: 'Defaulters & Eligibility', href: '/admin/reports/attendance/defaulters' },
     ],
   },
   {

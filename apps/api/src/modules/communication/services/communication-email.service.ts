@@ -13,6 +13,12 @@ export class CommunicationEmailService {
     subject: string;
     html?: string;
     text?: string;
+    attachments?: Array<{
+      filename: string;
+      path?: string;
+      content?: Buffer;
+      contentType?: string;
+    }>;
   }): Promise<{
     ok: boolean;
     provider: string;
@@ -22,7 +28,9 @@ export class CommunicationEmailService {
     const smtpHost = this.config.get<string>('SMTP_HOST');
 
     if (!smtpHost) {
-      this.logger.log(`[dev-email] to=${input.to} subject="${input.subject}"`);
+      this.logger.log(
+        `[dev-email] to=${input.to} subject="${input.subject}" attachments=${input.attachments?.length ?? 0}`,
+      );
       return {
         ok: true,
         provider: 'dev-log',
@@ -55,6 +63,7 @@ export class CommunicationEmailService {
         subject: input.subject,
         html: input.html,
         text: input.text ?? input.html?.replace(/<[^>]+>/g, ' '),
+        attachments: input.attachments,
       });
 
       return { ok: true, provider: 'smtp', providerRef: info.messageId };

@@ -9,6 +9,7 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import {
   AttendanceCorrectionDto,
   AttendanceEligibilityQueryDto,
+  AttendanceReportQueryDto,
   AttendanceSessionQueryDto,
   CreateExtraAttendanceSessionDto,
   GenerateAttendanceSessionsDto,
@@ -16,6 +17,12 @@ import {
 } from './dto/student-attendance.dto';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
 import { TeachingSubjectGroupService } from '../timetable-engine/teaching-subject-group.service';
+import { buildInstitutionalExcelReport } from '../../common/reports';
+import {
+  buildAttendanceHeaderMeta,
+  resolveAttendanceDisplayTitle,
+} from './attendance-display.util';
+import { AttendancePolicyService } from './attendance-policy.service';
 
 const PRESENT_STATUSES = new Set(['P', 'L', 'OD', 'SPORTS', 'NSS', 'NCC']);
 const ABSENT_STATUSES = new Set(['A']);
@@ -28,6 +35,7 @@ export class StudentAttendanceService {
     private readonly prisma: PrismaService,
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly subjectGroups: TeachingSubjectGroupService,
+    private readonly attendancePolicy: AttendancePolicyService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -80,13 +88,18 @@ export class StudentAttendanceService {
   ) {
     const sessionDate = this.startOfDay(dto.date);
     const dayOfWeek = sessionDate.getDay();
+
+    const planScope = dto.timetablePlanId
+      ? { planId: dto.timetablePlanId }
+      : await this.publishedPlanScope(user.tid);
+
     const entries = await this.prisma.timetablePlanEntry.findMany({
       where: {
         tenantId: user.tid,
         deletedAt: null,
         status: { not: 'CANCELLED' },
         dayOfWeek,
-        ...(dto.timetablePlanId ? { planId: dto.timetablePlanId } : {}),
+        ...planScope,
         ...(dto.offeringSectionId
           ? { offeringSectionId: dto.offeringSectionId }
           : {}),
@@ -98,8 +111,25 @@ export class StudentAttendanceService {
       orderBy: [{ startTime: 'asc' }],
     });
 
+    const dedupedEntries = this.deduplicateTimetableEntries(entries);
+    const policy = await this.attendancePolicy.getOrCreate(user.tid);
+    const teachingPeriodNos = [
+      ...new Set(
+        dedupedEntries
+          .map((e) => e.periodNo)
+          .filter((n): n is number => typeof n === 'number' && n > 0),
+      ),
+    ];
+    const countableEntries = dedupedEntries.filter((entry) =>
+      this.attendancePolicy.isPeriodCountable(
+        policy.attendanceMode,
+        entry.periodNo,
+        teachingPeriodNos,
+      ),
+    );
+
     let created = 0;
-    for (const entry of entries) {
+    for (const entry of countableEntries) {
       const metadata = (entry.metadata ?? {}) as Record<string, unknown>;
       const facultyTeam = Array.isArray(metadata.facultyTeam)
         ? metadata.facultyTeam
@@ -146,27 +176,50 @@ export class StudentAttendanceService {
             generatedFrom: 'TIMETABLE',
             teachingSubjectGroupId: entry.teachingSubjectGroupId,
             linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
+            timetablePlanId: entry.planId,
+            timetablePlanName: entry.plan?.name,
           },
         },
         update: {
           teachingSubjectGroupId: entry.teachingSubjectGroupId,
+          courseId: entry.courseId,
+          periodNo: entry.periodNo,
+          primaryFacultyId: entry.staffProfileId,
           metadata: {
             facultyTeam,
             fyugpCategory: entry.fyugpCategory,
             generatedFrom: 'TIMETABLE',
             teachingSubjectGroupId: entry.teachingSubjectGroupId,
             linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
+            timetablePlanId: entry.planId,
+            timetablePlanName: entry.plan?.name,
           },
         },
       });
       created += 1;
     }
+
+    const removedDuplicates = await this.cleanupDuplicateSessions(
+      user.tid,
+      sessionDate,
+    );
+
     await this.audit(user, 'GENERATE_SESSIONS', null, null, {
       date: dto.date,
       created,
       considered: entries.length,
+      deduped: dedupedEntries.length,
+      removedDuplicates,
+      publishedPlansOnly: !dto.timetablePlanId,
     });
-    return { considered: entries.length, created };
+    return {
+      considered: entries.length,
+      deduped: dedupedEntries.length,
+      countable: countableEntries.length,
+      attendanceMode: policy.attendanceMode,
+      created,
+      removedDuplicates,
+    };
   }
 
   async createExtraSession(
@@ -245,7 +298,6 @@ export class StudentAttendanceService {
       select: { id: true },
     });
     if (!staff) return [];
-    const today = this.startOfDay(new Date());
     const authorizedSections = await (
       this.prisma as any
     ).subjectTeachingAssignment.findMany({
@@ -260,33 +312,45 @@ export class StudentAttendanceService {
     const sectionIds = authorizedSections.map(
       (row: any) => row.offeringSectionId,
     );
-    const groupIds = await (this.prisma as any).teachingSubjectGroup.findMany({
-      where: {
-        tenantId: user.tid,
-        deletedAt: null,
-        primaryStaffProfileId: staff.id,
-      },
-      select: { id: true },
-    });
-    const groupIdList = groupIds.map((g: any) => g.id);
 
     const sessions = await this.listSessions(user.tid, {
-      date: today.toISOString(),
+      date: this.localDateString(new Date()),
     });
 
-    return sessions.filter((row: any) => {
+    const authorized = sessions.filter((row: any) => {
       if (row.primaryFacultyId === staff.id) return true;
-      if (
-        row.teachingSubjectGroupId &&
-        groupIdList.includes(row.teachingSubjectGroupId)
-      ) {
-        return true;
-      }
+      const facultyTeam = Array.isArray(row.metadata?.facultyTeam)
+        ? row.metadata.facultyTeam
+        : [];
+      if (facultyTeam.includes(staff.id)) return true;
       if (row.offeringSectionId && sectionIds.includes(row.offeringSectionId)) {
         return true;
       }
       return false;
     });
+
+    const deduped = this.deduplicateSessions(authorized);
+    const rosterSizeCache = new Map<string, number>();
+
+    return Promise.all(
+      deduped.map(async (session: any) => {
+        const enriched = await this.enrichSession(session);
+        let rosterSize: number | null = null;
+        if (session.teachingSubjectGroupId) {
+          const cacheKey = `${session.teachingSubjectGroupId}:${session.semesterNo ?? ''}`;
+          if (!rosterSizeCache.has(cacheKey)) {
+            const students = await this.subjectGroups.studentsForGroup(
+              user.tid,
+              session.teachingSubjectGroupId,
+              session.semesterNo,
+            );
+            rosterSizeCache.set(cacheKey, students.length);
+          }
+          rosterSize = rosterSizeCache.get(cacheKey) ?? null;
+        }
+        return { ...enriched, rosterSize };
+      }),
+    );
   }
 
   async roster(tenantId: string, sessionId: string) {
@@ -500,27 +564,49 @@ export class StudentAttendanceService {
   async reports(
     tenantId: string,
     type: string,
-    query: AttendanceSessionQueryDto,
+    query: AttendanceReportQueryDto,
   ) {
+    const format = query.format ?? 'json';
     if (type === 'unmarked') {
       return this.listSessions(tenantId, { ...query, status: 'OPEN' });
-    }
-    if (type === 'shortage' || type === 'defaulters') {
-      return (this.prisma as any).studentAttendanceEligibilitySnapshot.findMany(
-        {
-          where: {
-            tenantId,
-            eligibilityStatus: { in: ['CONDONATION', 'DETAINED'] },
-          },
-          orderBy: [{ subjectPercentage: 'asc' }],
-          take: 500,
-        },
-      );
     }
     if (type === 'daily') {
       return this.listSessions(tenantId, query);
     }
+    if (type === 'monthly') {
+      const report = await this.buildPeriodAttendanceReport(tenantId, {
+        ...query,
+        scope: 'monthly',
+      });
+      return this.maybeExportReport(report, 'monthly-attendance', format);
+    }
+    if (type === 'cumulative') {
+      const report = await this.buildPeriodAttendanceReport(tenantId, {
+        ...query,
+        scope: 'cumulative',
+      });
+      return this.maybeExportReport(report, 'cumulative-attendance', format);
+    }
+    if (type === 'shortage' || type === 'defaulters') {
+      const report = await this.buildDefaulterReport(tenantId, query);
+      return this.maybeExportReport(report, 'attendance-defaulters', format);
+    }
     return this.summaries(tenantId, query as AttendanceEligibilityQueryDto);
+  }
+
+  async getPolicy(tenantId: string) {
+    return this.attendancePolicy.getOrCreate(tenantId);
+  }
+
+  async updatePolicy(
+    tenantId: string,
+    dto: {
+      attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
+      shortageThresholdPct?: number;
+      defaulterThresholdPct?: number;
+    },
+  ) {
+    return this.attendancePolicy.update(tenantId, dto);
   }
 
   async studentPortalSummary(user: JwtUser) {
@@ -723,6 +809,8 @@ export class StudentAttendanceService {
 
     if (!paperTargets.length) return;
 
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+
     for (const entry of session.entries) {
       for (const paper of paperTargets) {
         const sessionFilter: Record<string, unknown> = {
@@ -746,10 +834,31 @@ export class StudentAttendanceService {
             studentId: entry.studentId,
             session: sessionFilter,
           },
+          include: {
+            session: { select: { periodNo: true, sessionDate: true } },
+          },
         });
-        const counted = allEntries.filter(
-          (row: any) => !NEUTRAL_STATUSES.has(row.status),
-        );
+
+        const byDate = new Map<string, number[]>();
+        for (const row of allEntries) {
+          const dateKey = this.localDateString(row.session?.sessionDate);
+          const periodNo = Number(row.session?.periodNo ?? 0);
+          if (!periodNo) continue;
+          const bucket = byDate.get(dateKey) ?? [];
+          bucket.push(periodNo);
+          byDate.set(dateKey, bucket);
+        }
+
+        const counted = allEntries.filter((row: any) => {
+          if (NEUTRAL_STATUSES.has(row.status)) return false;
+          const dateKey = this.localDateString(row.session?.sessionDate);
+          const teachingNos = byDate.get(dateKey) ?? [];
+          return this.attendancePolicy.isPeriodCountable(
+            policy.attendanceMode,
+            row.session?.periodNo,
+            teachingNos,
+          );
+        });
         const present = counted.filter((row: any) =>
           PRESENT_STATUSES.has(row.status),
         ).length;
@@ -786,9 +895,12 @@ export class StudentAttendanceService {
             absentCount: absent,
             medicalLeaveCount: medical,
             percentage,
-            metadata: session.teachingSubjectGroupId
-              ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
-              : {},
+            metadata: {
+              ...(session.teachingSubjectGroupId
+                ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
+                : {}),
+              attendanceMode: policy.attendanceMode,
+            },
           },
           update: {
             totalSessions: counted.length,
@@ -797,9 +909,12 @@ export class StudentAttendanceService {
             medicalLeaveCount: medical,
             percentage,
             calculatedAt: new Date(),
-            metadata: session.teachingSubjectGroupId
-              ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
-              : {},
+            metadata: {
+              ...(session.teachingSubjectGroupId
+                ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
+                : {}),
+              attendanceMode: policy.attendanceMode,
+            },
           },
         });
       }
@@ -807,50 +922,68 @@ export class StudentAttendanceService {
   }
 
   private async enrichSession(session: any) {
-    const [course, section, faculty, classroom, subjectGroup, linkedPapers] =
-      await Promise.all([
-        session.courseId
-          ? this.prisma.course.findFirst({
-              where: { id: session.courseId },
-              select: { code: true, title: true, courseType: true },
-            })
-          : null,
-        session.offeringSectionId
-          ? this.prisma.offeringSection.findFirst({
-              where: { id: session.offeringSectionId },
-              select: { sectionCode: true },
-            })
-          : null,
-        session.primaryFacultyId
-          ? this.prisma.staffProfile.findFirst({
-              where: { id: session.primaryFacultyId },
-              select: { fullName: true, shortCode: true, employeeCode: true },
-            })
-          : null,
-        session.classroomId
-          ? this.prisma.classroom.findFirst({
-              where: { id: session.classroomId },
-              include: { campus: true, roomType: true },
-            })
-          : null,
-        session.teachingSubjectGroupId
-          ? (this.prisma as any).teachingSubjectGroup.findFirst({
-              where: { id: session.teachingSubjectGroupId },
-              select: {
-                id: true,
-                code: true,
-                title: true,
-                fyugpCategory: true,
-              },
-            })
-          : null,
-        session.teachingSubjectGroupId
-          ? this.subjectGroups.linkedPaperIds(
-              session.tenantId,
-              session.teachingSubjectGroupId,
-            )
-          : Promise.resolve([]),
-      ]);
+    const sessionMetadata = (session.metadata ?? {}) as Record<string, unknown>;
+    const [
+      course,
+      section,
+      faculty,
+      classroom,
+      subjectGroup,
+      linkedPapers,
+      planEntry,
+    ] = await Promise.all([
+      session.courseId
+        ? this.prisma.course.findFirst({
+            where: { id: session.courseId },
+            select: { code: true, title: true, courseType: true },
+          })
+        : null,
+      session.offeringSectionId
+        ? this.prisma.offeringSection.findFirst({
+            where: { id: session.offeringSectionId },
+            select: { sectionCode: true },
+          })
+        : null,
+      session.primaryFacultyId
+        ? this.prisma.staffProfile.findFirst({
+            where: { id: session.primaryFacultyId },
+            select: { fullName: true, shortCode: true, employeeCode: true },
+          })
+        : null,
+      session.classroomId
+        ? this.prisma.classroom.findFirst({
+            where: { id: session.classroomId },
+            include: { campus: true, roomType: true },
+          })
+        : null,
+      session.teachingSubjectGroupId
+        ? (this.prisma as any).teachingSubjectGroup.findFirst({
+            where: { id: session.teachingSubjectGroupId },
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              fyugpCategory: true,
+              academicSubject: { select: { id: true, name: true } },
+              department: { select: { id: true, name: true } },
+            },
+          })
+        : null,
+      session.teachingSubjectGroupId
+        ? this.subjectGroups.linkedPaperIds(
+            session.tenantId,
+            session.teachingSubjectGroupId,
+          )
+        : Promise.resolve([]),
+      session.timetablePlanEntryId
+        ? this.prisma.timetablePlanEntry.findFirst({
+            where: { id: session.timetablePlanEntryId },
+            select: {
+              plan: { select: { id: true, name: true, status: true } },
+            },
+          })
+        : null,
+    ]);
     const entries = session.entries ?? [];
     const paperCourses = linkedPapers.length
       ? await this.prisma.course.findMany({
@@ -858,21 +991,54 @@ export class StudentAttendanceService {
           select: { id: true, code: true, title: true },
         })
       : [];
+    const displayTitle = resolveAttendanceDisplayTitle({
+      fyugpCategory: subjectGroup?.fyugpCategory ?? course?.courseType,
+      departmentName: subjectGroup?.department?.name,
+      academicSubjectName: subjectGroup?.academicSubject?.name,
+      subjectGroupTitle: subjectGroup?.title,
+      courseTitle: course?.title,
+      courseCode: course?.code,
+    });
+    const displayHeader = buildAttendanceHeaderMeta({
+      displayTitle,
+      semesterNo: session.semesterNo,
+      sectionCode: section?.sectionCode,
+      periodNo: session.periodNo,
+      sessionType: session.sessionType,
+      roomLabel:
+        classroom?.code || classroom?.name
+          ? [classroom?.code, classroom?.name].filter(Boolean).join(' ')
+          : null,
+    });
     const displayCourse = subjectGroup
       ? {
           code: subjectGroup.code,
-          title: subjectGroup.title,
+          title: displayTitle,
           courseType: subjectGroup.fyugpCategory,
         }
-      : course;
+      : course
+        ? { ...course, title: displayTitle || course.title }
+        : { code: null, title: displayTitle, courseType: null };
+    const timetablePlanName =
+      planEntry?.plan?.name ??
+      (typeof sessionMetadata.timetablePlanName === 'string'
+        ? sessionMetadata.timetablePlanName
+        : null);
     return {
       ...session,
+      paperCourse: course,
       course: displayCourse,
-      subjectGroup,
+      subjectGroup: subjectGroup
+        ? { ...subjectGroup, title: displayTitle }
+        : subjectGroup,
+      displayTitle,
+      displayHeader,
       linkedPapers: paperCourses,
       section,
       faculty,
       classroom,
+      timetableLinked: Boolean(session.timetablePlanEntryId),
+      timetablePlanName,
       location: classroom
         ? {
             roomCode: classroom.code,
@@ -896,6 +1062,301 @@ export class StudentAttendanceService {
     };
   }
 
+  private async buildPeriodAttendanceReport(
+    tenantId: string,
+    query: AttendanceReportQueryDto & { scope: 'monthly' | 'cumulative' },
+  ) {
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    const range = this.resolveReportDateRange(query, query.scope);
+    const where: Record<string, unknown> = {
+      tenantId,
+      deletedAt: null,
+      status: { not: 'CANCELLED' },
+      sessionDate: { gte: range.from, lte: range.to },
+    };
+    if (query.shiftId) where.shiftId = query.shiftId;
+    if (query.semesterNo) where.semesterNo = query.semesterNo;
+    if (query.offeringSectionId)
+      where.offeringSectionId = query.offeringSectionId;
+    if (query.courseId) where.courseId = query.courseId;
+
+    const sessions = await (
+      this.prisma as any
+    ).studentAttendanceSession.findMany({
+      where,
+      include: { entries: true },
+      orderBy: [{ sessionDate: 'asc' }, { periodNo: 'asc' }],
+      take: 5000,
+    });
+
+    const byDate = new Map<string, number[]>();
+    for (const session of sessions) {
+      const dateKey = this.localDateString(session.sessionDate);
+      const periodNo = Number(session.periodNo ?? 0);
+      if (!periodNo) continue;
+      const bucket = byDate.get(dateKey) ?? [];
+      bucket.push(periodNo);
+      byDate.set(dateKey, bucket);
+    }
+
+    const countableSessions = sessions.filter((session: any) =>
+      this.attendancePolicy.isPeriodCountable(
+        policy.attendanceMode,
+        session.periodNo,
+        byDate.get(this.localDateString(session.sessionDate)) ?? [],
+      ),
+    );
+
+    const studentIds = [
+      ...new Set(
+        countableSessions.flatMap((session: any) =>
+          (session.entries ?? []).map(
+            (entry: any) => entry.studentId as string,
+          ),
+        ),
+      ),
+    ].filter((id): id is string =>
+      query.studentId ? id === query.studentId : Boolean(id),
+    );
+
+    const students = studentIds.length
+      ? await this.prisma.student.findMany({
+          where: { tenantId, id: { in: studentIds } },
+          select: {
+            id: true,
+            rollNumber: true,
+            enrollmentNumber: true,
+            admissionNumber: true,
+            masterProfile: { select: { fullName: true } },
+            user: { select: { displayName: true } },
+          },
+        })
+      : [];
+    const studentMap = new Map(
+      students.map(
+        (s: {
+          id: string;
+          rollNumber: string | null;
+          enrollmentNumber: string | null;
+          masterProfile?: { fullName?: string | null } | null;
+          user?: { displayName?: string | null } | null;
+        }) => [s.id, s],
+      ),
+    );
+
+    type Agg = {
+      studentId: string;
+      rollNumber: string | null;
+      enrollmentNumber: string | null;
+      fullName: string;
+      totalSessions: number;
+      presentCount: number;
+      absentCount: number;
+      medicalLeaveCount: number;
+    };
+    const map = new Map<string, Agg>();
+
+    for (const session of countableSessions) {
+      for (const entry of session.entries ?? []) {
+        if (NEUTRAL_STATUSES.has(entry.status)) continue;
+        if (query.studentId && entry.studentId !== query.studentId) continue;
+        const student = studentMap.get(entry.studentId);
+        const existing = map.get(entry.studentId) ?? {
+          studentId: entry.studentId,
+          rollNumber: student?.rollNumber ?? null,
+          enrollmentNumber: student?.enrollmentNumber ?? null,
+          fullName:
+            student?.masterProfile?.fullName ??
+            student?.user?.displayName ??
+            'Student',
+          totalSessions: 0,
+          presentCount: 0,
+          absentCount: 0,
+          medicalLeaveCount: 0,
+        };
+        existing.totalSessions += 1;
+        if (PRESENT_STATUSES.has(entry.status)) existing.presentCount += 1;
+        if (ABSENT_STATUSES.has(entry.status)) existing.absentCount += 1;
+        if (MEDICAL_STATUSES.has(entry.status)) existing.medicalLeaveCount += 1;
+        map.set(entry.studentId, existing);
+      }
+    }
+
+    const rows = Array.from(map.values())
+      .map((row) => ({
+        ...row,
+        percentage: row.totalSessions
+          ? Math.round((row.presentCount / row.totalSessions) * 10000) / 100
+          : 0,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    return {
+      type: query.scope,
+      attendanceMode: policy.attendanceMode,
+      from: this.localDateString(range.from),
+      to: this.localDateString(range.to),
+      shortageThresholdPct: policy.shortageThresholdPct,
+      defaulterThresholdPct: policy.defaulterThresholdPct,
+      summary: {
+        students: rows.length,
+        sessions: countableSessions.length,
+        averagePercentage: rows.length
+          ? Math.round(
+              (rows.reduce((sum, row) => sum + row.percentage, 0) /
+                rows.length) *
+                100,
+            ) / 100
+          : 0,
+      },
+      rows,
+    };
+  }
+
+  private async buildDefaulterReport(
+    tenantId: string,
+    query: AttendanceReportQueryDto,
+  ) {
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    const periodReport = await this.buildPeriodAttendanceReport(tenantId, {
+      ...query,
+      scope: query.from || query.to || query.month ? 'monthly' : 'cumulative',
+    });
+    const threshold = policy.defaulterThresholdPct;
+    const rows = periodReport.rows
+      .filter((row) => row.percentage < threshold)
+      .map((row) => ({
+        ...row,
+        eligibilityStatus:
+          row.percentage < 65
+            ? 'DETAINED'
+            : row.percentage < policy.shortageThresholdPct
+              ? 'CONDONATION'
+              : 'SHORTAGE',
+        thresholdPct: threshold,
+      }))
+      .sort((a, b) => a.percentage - b.percentage);
+
+    return {
+      type: 'defaulters',
+      attendanceMode: policy.attendanceMode,
+      from: periodReport.from,
+      to: periodReport.to,
+      shortageThresholdPct: policy.shortageThresholdPct,
+      defaulterThresholdPct: policy.defaulterThresholdPct,
+      summary: {
+        students: rows.length,
+        detained: rows.filter((r) => r.eligibilityStatus === 'DETAINED').length,
+        condonation: rows.filter((r) => r.eligibilityStatus === 'CONDONATION')
+          .length,
+      },
+      rows,
+    };
+  }
+
+  private resolveReportDateRange(
+    query: AttendanceReportQueryDto,
+    scope: 'monthly' | 'cumulative' = 'monthly',
+  ) {
+    if (query.from || query.to) {
+      return {
+        from: this.startOfDay(query.from ?? query.to ?? new Date()),
+        to: this.startOfDay(query.to ?? query.from ?? new Date()),
+      };
+    }
+    const now = new Date();
+    if (scope === 'cumulative' && query.month == null) {
+      // Default cumulative window: current calendar year to date
+      const from = new Date(Date.UTC(now.getFullYear(), 0, 1));
+      return { from: this.startOfDay(from), to: this.startOfDay(now) };
+    }
+    const year = query.year ?? now.getFullYear();
+    const month = (query.month ?? now.getMonth() + 1) - 1;
+    const from = new Date(Date.UTC(year, month, 1));
+    const to = new Date(Date.UTC(year, month + 1, 0));
+    return { from: this.startOfDay(from), to: this.startOfDay(to) };
+  }
+
+  private async maybeExportReport(
+    report: {
+      type: string;
+      from: string;
+      to: string;
+      attendanceMode: string;
+      summary: Record<string, number>;
+      rows: Array<Record<string, unknown>>;
+    },
+    filenameBase: string,
+    format: 'json' | 'xlsx' | 'csv',
+  ) {
+    if (format === 'json') return report;
+
+    const columns = [
+      { key: 'rollNumber', label: 'Roll No' },
+      { key: 'enrollmentNumber', label: 'Enrollment' },
+      { key: 'fullName', label: 'Student' },
+      { key: 'totalSessions', label: 'Sessions' },
+      { key: 'presentCount', label: 'Present' },
+      { key: 'absentCount', label: 'Absent' },
+      { key: 'medicalLeaveCount', label: 'Medical' },
+      { key: 'percentage', label: '%' },
+      ...(report.type === 'defaulters'
+        ? [{ key: 'eligibilityStatus', label: 'Status' }]
+        : []),
+    ];
+
+    if (format === 'csv') {
+      const headers = columns.map((c) => c.label);
+      const lines = [
+        headers.join(','),
+        ...report.rows.map((row) =>
+          columns
+            .map((col) => this.csvEscape(String(row[col.key] ?? '')))
+            .join(','),
+        ),
+      ];
+      return {
+        csv: `${lines.join('\n')}\n`,
+        filename: `${filenameBase}-${report.from}-to-${report.to}.csv`,
+      };
+    }
+
+    const built = await buildInstitutionalExcelReport({
+      meta: {
+        reportTitle:
+          report.type === 'defaulters'
+            ? 'Attendance Defaulters'
+            : report.type === 'monthly'
+              ? 'Monthly Attendance Report'
+              : 'Cumulative Attendance Report',
+        filterLines: [
+          { label: 'From', value: report.from },
+          { label: 'To', value: report.to },
+          { label: 'Mode', value: report.attendanceMode },
+        ],
+        summary: report.summary,
+      },
+      sheets: [
+        {
+          name: 'Attendance',
+          columns,
+          rows: report.rows,
+        },
+      ],
+      filenameBase,
+    });
+
+    return {
+      buffer: built.buffer,
+      filename: built.filename ?? `${filenameBase}.xlsx`,
+    };
+  }
+
+  private csvEscape(value: string) {
+    if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+    return value;
+  }
+
   private async audit(
     user: JwtUser,
     action: string,
@@ -917,6 +1378,138 @@ export class StudentAttendanceService {
 
   private uniqueById(rows: any[]) {
     return Array.from(new Map(rows.map((row) => [row.id, row])).values());
+  }
+
+  private async publishedPlanScope(tenantId: string) {
+    const publishedPlans = await this.prisma.timetablePlan.findMany({
+      where: { tenantId, status: 'PUBLISHED', deletedAt: null },
+      select: { id: true },
+    });
+    if (!publishedPlans.length) return {};
+    return { planId: { in: publishedPlans.map((plan) => plan.id) } };
+  }
+
+  private deduplicateTimetableEntries(entries: any[]) {
+    const buckets = new Map<string, any[]>();
+    for (const entry of entries) {
+      const key = this.timetableEntryDedupeKey(entry);
+      const bucket = buckets.get(key) ?? [];
+      bucket.push(entry);
+      buckets.set(key, bucket);
+    }
+    return Array.from(buckets.values()).map(
+      (bucket) =>
+        bucket.sort(
+          (a, b) =>
+            this.timetableEntryPriority(b) - this.timetableEntryPriority(a),
+        )[0],
+    );
+  }
+
+  private timetableEntryDedupeKey(entry: any) {
+    return [
+      entry.dayOfWeek,
+      entry.periodNo ?? '',
+      entry.offeringSectionId ?? '',
+      entry.teachingSubjectGroupId ?? entry.courseId ?? '',
+      entry.slotType ?? 'THEORY',
+    ].join('|');
+  }
+
+  private timetableEntryPriority(entry: any) {
+    const publishedAt = entry.plan?.publishedAt
+      ? new Date(entry.plan.publishedAt).getTime()
+      : 0;
+    return publishedAt + (entry.plan?.revision ?? 0);
+  }
+
+  private deduplicateSessions(sessions: any[]) {
+    const buckets = new Map<string, any[]>();
+    for (const session of sessions) {
+      const key = this.sessionSlotKey(session);
+      const bucket = buckets.get(key) ?? [];
+      bucket.push(session);
+      buckets.set(key, bucket);
+    }
+    return Array.from(buckets.values())
+      .map(
+        (bucket) =>
+          bucket.sort(
+            (a, b) =>
+              this.sessionPriorityScore(b) - this.sessionPriorityScore(a),
+          )[0],
+      )
+      .sort((a, b) => {
+        const periodDiff = (a.periodNo ?? 0) - (b.periodNo ?? 0);
+        if (periodDiff !== 0) return periodDiff;
+        return String(a.startTime ?? '').localeCompare(
+          String(b.startTime ?? ''),
+        );
+      });
+  }
+
+  private sessionSlotKey(session: any) {
+    return [
+      this.localDateString(session.sessionDate),
+      session.periodNo ?? '',
+      session.teachingSubjectGroupId ?? session.courseId ?? '',
+      session.offeringSectionId ?? '',
+      session.sessionType ?? 'THEORY',
+    ].join('|');
+  }
+
+  private sessionPriorityScore(session: any) {
+    let score = 0;
+    if (session.timetablePlanEntryId) score += 100_000;
+    if (['MARKED', 'LOCKED', 'FROZEN'].includes(session.status))
+      score += 10_000;
+    score += (session.entries?.length ?? 0) * 10;
+    if (session.updatedAt) {
+      score += new Date(session.updatedAt).getTime() / 1_000_000_000_000;
+    }
+    return score;
+  }
+
+  private async cleanupDuplicateSessions(tenantId: string, sessionDate: Date) {
+    const sessions = await (
+      this.prisma as any
+    ).studentAttendanceSession.findMany({
+      where: { tenantId, sessionDate, deletedAt: null },
+      include: { entries: true },
+    });
+    const buckets = new Map<string, any[]>();
+    for (const session of sessions) {
+      const key = this.sessionSlotKey(session);
+      const bucket = buckets.get(key) ?? [];
+      bucket.push(session);
+      buckets.set(key, bucket);
+    }
+
+    const removeIds: string[] = [];
+    for (const bucket of buckets.values()) {
+      if (bucket.length <= 1) continue;
+      const sorted = bucket.sort(
+        (a, b) => this.sessionPriorityScore(b) - this.sessionPriorityScore(a),
+      );
+      for (const duplicate of sorted.slice(1)) {
+        removeIds.push(duplicate.id);
+      }
+    }
+
+    if (!removeIds.length) return 0;
+
+    await (this.prisma as any).studentAttendanceSession.updateMany({
+      where: { id: { in: removeIds } },
+      data: { deletedAt: new Date() },
+    });
+    return removeIds.length;
+  }
+
+  private localDateString(value = new Date()) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private startOfDay(value: string | Date) {

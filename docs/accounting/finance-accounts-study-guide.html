@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Finance &amp; Accounts Study Guide | BCL OneCampus ERP</title>
+  <meta name="description" content="Printable training book for college ERP Finance & Accounts — double-entry, vouchers, books, reports, and module-by-module examples." />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --brand: #1e3a8a;
+      --brand-soft: #eff6ff;
+      --accent: #0f766e;
+      --warn: #9a3412;
+      --paper: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      color: var(--ink);
+      background: #e2e8f0;
+      line-height: 1.55;
+      font-size: 11.5pt;
+    }
+    .sheet {
+      max-width: 210mm;
+      margin: 16px auto;
+      background: var(--paper);
+      padding: 18mm 16mm 20mm;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12);
+    }
+    .no-print {
+      max-width: 210mm;
+      margin: 12px auto 0;
+      padding: 10px 14px;
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      border-radius: 8px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px;
+    }
+    .cover {
+      min-height: 240mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 2px solid var(--brand);
+      padding: 28mm 18mm;
+      page-break-after: always;
+    }
+    .cover .eyebrow {
+      font-family: "Segoe UI", Arial, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 11px;
+      color: var(--brand);
+      font-weight: 700;
+    }
+    .cover h1 {
+      font-size: 34pt;
+      line-height: 1.15;
+      margin: 18px 0 12px;
+      color: var(--brand);
+    }
+    .cover .subtitle {
+      font-size: 14pt;
+      color: var(--muted);
+      max-width: 36em;
+    }
+    .cover .meta-box {
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .cover .meta-box strong { color: var(--ink); }
+    h1, h2, h3, h4 {
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--brand);
+      line-height: 1.25;
+    }
+    h2 {
+      font-size: 18pt;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--brand);
+    }
+    h3 { font-size: 13.5pt; margin: 22px 0 8px; color: #1e40af; }
+    h4 { font-size: 11.5pt; margin: 16px 0 6px; color: var(--accent); }
+    p { margin: 0 0 10px; }
+    ul, ol { margin: 0 0 12px; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    a { color: var(--brand); }
+    .chapter {
+      page-break-before: always;
+      padding-top: 4px;
+    }
+    .chapter:first-of-type { page-break-before: auto; }
+    .chapter-num {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 10pt;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--brand-soft); color: #0b2f66; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .callout {
+      border-left: 4px solid var(--brand);
+      background: var(--brand-soft);
+      padding: 10px 12px;
+      margin: 12px 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10.5pt;
+    }
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: #fff7ed;
+    }
+    .callout.ok {
+      border-left-color: var(--accent);
+      background: #ecfdf5;
+    }
+    .rule {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10.5pt;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .example-title {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-weight: 700;
+      font-size: 10.5pt;
+      margin: 14px 0 6px;
+      color: var(--accent);
+    }
+    .voucher-box {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      margin: 8px 0 14px;
+      background: #fcfcfd;
+    }
+    .voucher-box .head {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10pt;
+      margin-bottom: 8px;
+      color: var(--muted);
+    }
+    .toc ol { columns: 2; gap: 24px; }
+    .toc li { break-inside: avoid; margin-bottom: 6px; font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; }
+    .toc a { text-decoration: none; }
+    .footer-note {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 9.5pt;
+      color: var(--muted);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0;
+    }
+    .mini-card {
+      border: 1px solid var(--line);
+      padding: 10px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10pt;
+    }
+    .mini-card strong { display: block; color: var(--brand); margin-bottom: 4px; }
+    .t-account {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      margin: 8px 0 14px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10pt;
+    }
+    .t-account .side { padding: 8px; }
+    .t-account .side + .side { border-left: 1px solid var(--line); }
+    .t-account .side h5 {
+      margin: 0 0 6px;
+      font-size: 10pt;
+      text-align: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 4px;
+    }
+    code, .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+    }
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .sheet {
+        margin: 0;
+        max-width: none;
+        box-shadow: none;
+        padding: 12mm 12mm 14mm;
+      }
+      .chapter { page-break-before: always; }
+      .cover { page-break-after: always; }
+      a { color: inherit; text-decoration: none; }
+      table, .voucher-box, .callout, .rule { break-inside: avoid; }
+    }
+    @page {
+      size: A4;
+      margin: 14mm 12mm 16mm;
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <strong>How to print:</strong> Open this file in Chrome/Edge → Ctrl+P → Destination: Save as PDF or your printer →
+    Margins: Default → Enable “Background graphics” if you want shaded tables. Expected length: roughly 50–70 A4 pages depending on printer scaling.
+    File path: <span class="mono">docs/accounting/finance-accounts-study-guide.html</span>
+  </div>
+
+  <div class="sheet">
+    <!-- COVER -->
+    <section class="cover">
+      <div>
+        <div class="eyebrow">BCL OneCampus ERP · Internal Training Book</div>
+        <h1>Finance &amp; Accounts<br />Study Guide</h1>
+        <p class="subtitle">
+          A practical, example-driven handbook for learning college accounting inside OneCampus —
+          written for product owners, implementers, and client trainers who are new to bookkeeping
+          but must explain every Finance &amp; Accounts screen with confidence.
+        </p>
+      </div>
+      <div class="meta-box">
+        <p><strong>Product:</strong> BCL OneCampus ERP — Finance &amp; Accounts module</p>
+        <p><strong>Audience:</strong> Sales, implementation, support, and college office staff</p>
+        <p><strong>Style:</strong> Double-entry bookkeeping with Indian college examples (₹)</p>
+        <p><strong>Financial year used in examples:</strong> FY 2025–26 (1 Apr 2025 – 31 Mar 2026)</p>
+        <p><strong>Sample institution:</strong> Don Bosco College (illustrative demo data)</p>
+        <p><strong>Version:</strong> Study Guide v1.0 · July 2026</p>
+      </div>
+    </section>
+
+    <!-- TOC -->
+    <section class="chapter" id="toc">
+      <div class="chapter-num">Contents</div>
+      <h2>Table of Contents</h2>
+      <nav class="toc">
+        <ol>
+          <li><a href="#ch1">1. Why college accounting exists</a></li>
+          <li><a href="#ch2">2. Golden rules of double-entry</a></li>
+          <li><a href="#ch3">3. Map of Finance &amp; Accounts screens</a></li>
+          <li><a href="#ch4">4. Accounts Dashboard</a></li>
+          <li><a href="#ch5">5. Chart of Accounts</a></li>
+          <li><a href="#ch6">6. Financial Years</a></li>
+          <li><a href="#ch7">7. Vouchers — the heart of accounting</a></li>
+          <li><a href="#ch8">8. Receipt Voucher (money in)</a></li>
+          <li><a href="#ch9">9. Payment Voucher (money out)</a></li>
+          <li><a href="#ch10">10. Journal Voucher (non-cash adjustments)</a></li>
+          <li><a href="#ch11">11. Contra Voucher (cash ↔ bank)</a></li>
+          <li><a href="#ch12">12. Opening Balance Voucher</a></li>
+          <li><a href="#ch13">13. Cash Book</a></li>
+          <li><a href="#ch14">14. Bank Book</a></li>
+          <li><a href="#ch15">15. General Ledger</a></li>
+          <li><a href="#ch16">16. Fee GL Mappings &amp; auto-posting</a></li>
+          <li><a href="#ch17">17. Vendors</a></li>
+          <li><a href="#ch18">18. Expenses</a></li>
+          <li><a href="#ch19">19. Budgets</a></li>
+          <li><a href="#ch20">20. Fixed Assets &amp; depreciation</a></li>
+          <li><a href="#ch21">21. Bank Reconciliation</a></li>
+          <li><a href="#ch22">22. Financial Reports</a></li>
+          <li><a href="#ch23">23. Audit Trail</a></li>
+          <li><a href="#ch24">24. Month-end &amp; year-end checklist</a></li>
+          <li><a href="#ch25">25. Client FAQ &amp; common mistakes</a></li>
+          <li><a href="#ch26">26. Worked mini-case (full day of college transactions)</a></li>
+          <li><a href="#ch27">27. Quick reference cheat sheets</a></li>
+          <li><a href="#ch28">28. Master transaction catalog (40+ events)</a></li>
+          <li><a href="#ch29">29. Practice worksheets (fill by hand)</a></li>
+          <li><a href="#glossary">Glossary</a></li>
+        </ol>
+      </nav>
+      <div class="callout">
+        <strong>How to study this book.</strong> Read Chapters 1–2 once for concepts. Then study each
+        module chapter with a highlighter. Finally work through Chapter 26 with pen and paper —
+        rewrite every voucher yourself. That is how you will be able to teach clients.
+      </div>
+    </section>
+
+    <!-- CH1 -->
+    <section class="chapter" id="ch1">
+      <div class="chapter-num">Chapter 1</div>
+      <h2>Why college accounting exists</h2>
+      <p>
+        A college is not only an academic institution. It is also a financial organisation.
+        Every day money moves: students pay fees, the college pays salaries, electricity bills,
+        vendors, scholarships, and bank deposits. Management, auditors, the university, and
+        funding agencies all ask the same question in different words:
+      </p>
+      <p><em>“Where did the money come from, where did it go, and what is left?”</em></p>
+      <p>
+        The Finance &amp; Accounts module answers that question in a structured, auditable way.
+        Fees module tells you <strong>which student paid</strong>. Accounts tells you
+        <strong>how that payment sits in the college books</strong>.
+      </p>
+
+      <h3>1.1 Two systems that must stay friends</h3>
+      <table>
+        <thead>
+          <tr><th>Module</th><th>Job</th><th>Example question it answers</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Fees / Student Finance</td>
+            <td>Student-wise dues, receipts, concessions</td>
+            <td>Does BA25-814 still owe exam fee?</td>
+          </tr>
+          <tr>
+            <td>Finance &amp; Accounts</td>
+            <td>Institution-wide books of account</td>
+            <td>How much tuition income did we earn in June?</td>
+          </tr>
+          <tr>
+            <td>Payroll</td>
+            <td>Staff salary calculation &amp; payment</td>
+            <td>What is net pay for employee EMP-102?</td>
+          </tr>
+          <tr>
+            <td>Accounts (again)</td>
+            <td>Posts salary into ledgers</td>
+            <td>What is total Salaries expense this month?</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>1.2 What “books of account” means</h3>
+      <p>
+        Think of the college as keeping a set of notebooks (today: digital ledgers). Each notebook
+        tracks one kind of thing: Cash, SBI Current Account, Tuition Fees Income, Electricity Expense,
+        Salary Payable, and so on. Every real-world event that has money impact is written into
+        <strong>at least two notebooks</strong> so the story stays balanced. That is double-entry.
+      </p>
+
+      <h3>1.3 What clients usually expect from you</h3>
+      <ul>
+        <li>Explain which screen to open for a given transaction.</li>
+        <li>Explain whether a voucher is Receipt, Payment, Journal, or Contra.</li>
+        <li>Explain why debit and credit must always match.</li>
+        <li>Explain how fee collection appears in Cash/Bank Book and in income ledgers.</li>
+        <li>Explain Trial Balance, Profit &amp; Loss (Surplus/Deficit), and Balance Sheet in plain language.</li>
+      </ul>
+      <div class="callout ok">
+        You do not need to become a Chartered Accountant. You need a clear mental model and
+        enough worked examples to teach office staff without guessing.
+      </div>
+    </section>
+
+    <!-- CH2 -->
+    <section class="chapter" id="ch2">
+      <div class="chapter-num">Chapter 2</div>
+      <h2>Golden rules of double-entry</h2>
+      <p>
+        Accounting has a vocabulary. Learn these words once; every screen in OneCampus uses them.
+      </p>
+
+      <h3>2.1 Assets, Liabilities, Income, Expenses</h3>
+      <table>
+        <thead>
+          <tr><th>Nature</th><th>Meaning in a college</th><th>Examples in OneCampus</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Asset</strong></td>
+            <td>What the college owns / is owed</td>
+            <td>Cash, Bank, Computers, Furniture</td>
+          </tr>
+          <tr>
+            <td><strong>Liability</strong></td>
+            <td>What the college owes others</td>
+            <td>Salary Payable, PF Payable, Vendor Payable, TDS Payable</td>
+          </tr>
+          <tr>
+            <td><strong>Income</strong></td>
+            <td>Money earned / received for services</td>
+            <td>Tuition Fees, Admission Fees, Exam Fees, Donations</td>
+          </tr>
+          <tr>
+            <td><strong>Expense</strong></td>
+            <td>Cost of running the college</td>
+            <td>Salaries, Electricity, Stationery, Depreciation</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 Debit and Credit — stop fearing them</h3>
+      <p>
+        Debit (Dr) and Credit (Cr) are simply the <strong>left and right sides</strong> of an entry.
+        They are not “good” and “bad”. The rule is mechanical:
+      </p>
+      <div class="rule">
+        <strong>Golden equation for every voucher:</strong><br />
+        Total Debits = Total Credits<br />
+        If they are not equal, OneCampus will not allow posting.
+      </div>
+
+      <h4>Memory aid (college version)</h4>
+      <table>
+        <thead>
+          <tr><th>If this happens…</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cash/Bank increases (money comes in)</td>
+            <td>Cash or Bank</td>
+            <td>Income / Receivable / Liability reduced</td>
+          </tr>
+          <tr>
+            <td>Cash/Bank decreases (money goes out)</td>
+            <td>Expense / Asset / Payable reduced</td>
+            <td>Cash or Bank</td>
+          </tr>
+          <tr>
+            <td>Expense incurred without paying cash yet</td>
+            <td>Expense</td>
+            <td>Payable (liability)</td>
+          </tr>
+          <tr>
+            <td>Cash deposited into bank</td>
+            <td>Bank</td>
+            <td>Cash</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>2.3 T-account picture</h3>
+      <p>Every ledger account can be drawn as a “T”:</p>
+      <div class="t-account">
+        <div class="side">
+          <h5>Debit (Dr)</h5>
+          <div>Left side</div>
+        </div>
+        <div class="side">
+          <h5>Credit (Cr)</h5>
+          <div>Right side</div>
+        </div>
+      </div>
+      <p class="example-title">Example — Student pays ₹10,000 tuition by UPI into SBI</p>
+      <div class="t-account">
+        <div class="side">
+          <h5>SBI Current A/c (Asset) — Debit</h5>
+          <div>+ ₹10,000 (bank increases)</div>
+        </div>
+        <div class="side">
+          <h5>Tuition Fees (Income) — Credit</h5>
+          <div>+ ₹10,000 (income increases)</div>
+        </div>
+      </div>
+
+      <h3>2.4 Draft vs Posted</h3>
+      <ul>
+        <li><strong>DRAFT</strong> — saved but not yet part of official books. Can be edited.</li>
+        <li><strong>POSTED</strong> — locked into ledger postings. Appears in Cash Book, Bank Book, Trial Balance, P&amp;L, Balance Sheet.</li>
+        <li><strong>CANCELLED</strong> — voided; should not affect live balances (follow office policy for reversals).</li>
+      </ul>
+      <div class="callout warn">
+        Never tell a client “just type in the report”. Reports are the <em>result</em> of posted vouchers.
+        If a report looks wrong, find the missing or wrong voucher.
+      </div>
+    </section>
+
+    <!-- CH3 -->
+    <section class="chapter" id="ch3">
+      <div class="chapter-num">Chapter 3</div>
+      <h2>Map of Finance &amp; Accounts screens</h2>
+      <p>
+        This matches the left sidebar under <strong>Finance &amp; Accounts</strong> in OneCampus Admin.
+      </p>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Menu item</th><th>Path</th><th>One-line purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Accounts Dashboard</td><td><span class="mono">/admin/accounts</span></td><td>Health snapshot: cash, bank, drafts, integrations</td></tr>
+          <tr><td>2</td><td>Chart of Accounts</td><td><span class="mono">.../chart-of-accounts</span></td><td>Master list of groups &amp; ledgers</td></tr>
+          <tr><td>3</td><td>Vouchers</td><td><span class="mono">.../vouchers</span></td><td>Create / post accounting entries</td></tr>
+          <tr><td>4</td><td>Cash Book</td><td><span class="mono">.../cash-book</span></td><td>All cash movements</td></tr>
+          <tr><td>5</td><td>Bank Book</td><td><span class="mono">.../bank-book</span></td><td>All bank movements</td></tr>
+          <tr><td>6</td><td>General Ledger</td><td><span class="mono">.../ledger</span></td><td>Full history of one ledger</td></tr>
+          <tr><td>7</td><td>Financial Years</td><td><span class="mono">.../financial-years</span></td><td>Open / activate FY (Apr–Mar)</td></tr>
+          <tr><td>8</td><td>Fee GL Mappings</td><td><span class="mono">.../settings</span></td><td>Link fee heads &amp; payment modes to ledgers</td></tr>
+          <tr><td>9</td><td>Vendors</td><td><span class="mono">.../vendors</span></td><td>Supplier master</td></tr>
+          <tr><td>10</td><td>Expenses</td><td><span class="mono">.../expenses</span></td><td>Operational spends → payment vouchers</td></tr>
+          <tr><td>11</td><td>Budgets</td><td><span class="mono">.../budgets</span></td><td>Allocate limits by dept/ledger</td></tr>
+          <tr><td>12</td><td>Fixed Assets</td><td><span class="mono">.../fixed-assets</span></td><td>Asset register &amp; depreciation</td></tr>
+          <tr><td>13</td><td>Bank Reconciliation</td><td><span class="mono">.../bank-reconciliation</span></td><td>Match bank statement to books</td></tr>
+          <tr><td>14</td><td>Financial Reports</td><td><span class="mono">.../reports</span></td><td>TB, P&amp;L, Balance Sheet</td></tr>
+          <tr><td>15</td><td>Audit Trail</td><td><span class="mono">.../audit-logs</span></td><td>Who changed what</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3.1 Decision tree — “Where do I register this?”</h3>
+      <table>
+        <thead>
+          <tr><th>Real-world event</th><th>Register where?</th><th>Typical voucher</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Student pays fee at counter / online</td><td>Fees module (auto → Accounts if mapped)</td><td>Receipt</td></tr>
+          <tr><td>Donation / grant received in bank</td><td>Vouchers</td><td>Receipt</td></tr>
+          <tr><td>Pay electricity bill from bank</td><td>Expenses (or Payment voucher)</td><td>Payment</td></tr>
+          <tr><td>Pay vendor for stationery</td><td>Vendors + Expenses / Payment</td><td>Payment</td></tr>
+          <tr><td>Salary published for the month</td><td>Payroll (auto Journal)</td><td>Journal</td></tr>
+          <tr><td>Salary actually paid from bank</td><td>Payroll paid (auto Payment)</td><td>Payment</td></tr>
+          <tr><td>Cash deposited into bank</td><td>Vouchers</td><td>Contra</td></tr>
+          <tr><td>Cash withdrawn from bank for office</td><td>Vouchers</td><td>Contra</td></tr>
+          <tr><td>Depreciation for computers</td><td>Fixed Assets → run depreciation</td><td>Journal</td></tr>
+          <tr><td>Opening balances on go-live</td><td>Vouchers / Opening</td><td>Opening</td></tr>
+          <tr><td>Bank statement mismatch</td><td>Bank Reconciliation</td><td>(matching, not a new income)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CH4 -->
+    <section class="chapter" id="ch4">
+      <div class="chapter-num">Chapter 4</div>
+      <h2>Accounts Dashboard</h2>
+      <p><strong>Menu:</strong> Finance &amp; Accounts → Accounts Dashboard</p>
+      <p>
+        The dashboard is your morning briefing. It does not replace books; it summarises them.
+      </p>
+      <h3>4.1 What you typically see</h3>
+      <ul>
+        <li>Cash balance and bank balance (from posted ledgers marked as cash/bank).</li>
+        <li>Count of draft vouchers waiting to be posted.</li>
+        <li>Recent postings.</li>
+        <li>Integration health: are Fees and Payroll auto-posting successfully?</li>
+        <li>Insights: YTD surplus/deficit signals, top income/expense heads, alerts.</li>
+      </ul>
+      <h3>4.2 How to explain it to a Principal</h3>
+      <div class="callout">
+        “This screen shows whether the college’s cash and bank positions look healthy, whether
+        any vouchers are still unposted, and whether fee/payroll money is flowing into accounts
+        automatically. Detailed investigation still happens in Cash Book, Bank Book, and Reports.”
+      </div>
+      <h3>4.3 Daily habit</h3>
+      <ol>
+        <li>Open Dashboard after login.</li>
+        <li>If drafts &gt; 0, open Vouchers and clear them (post or correct).</li>
+        <li>If fee/payroll integration shows failures, open Audit Trail / integration logs and Fee GL Mappings.</li>
+        <li>Glance at cash vs bank — unusual drops need investigation.</li>
+      </ol>
+    </section>
+
+    <!-- CH5 -->
+    <section class="chapter" id="ch5">
+      <div class="chapter-num">Chapter 5</div>
+      <h2>Chart of Accounts</h2>
+      <p><strong>Menu:</strong> Chart of Accounts</p>
+      <p>
+        This is the master dictionary of every account the college will use. If a ledger is missing
+        here, you cannot post a voucher to it.
+      </p>
+
+      <h3>5.1 Two levels</h3>
+      <ol>
+        <li><strong>Account Groups</strong> — folders by nature (Assets, Liabilities, Income, Expenses) and sub-folders (Current Assets, Fee Income, …).</li>
+        <li><strong>Ledger Accounts</strong> — the actual accounts you debit/credit (Cash, Tuition Fees, Electricity, …).</li>
+      </ol>
+
+      <h3>5.2 Default college chart (seeded by OneCampus)</h3>
+      <p>On first setup the system creates a practical college chart. Memorise these codes:</p>
+      <table>
+        <thead>
+          <tr><th>Code</th><th>Name</th><th>Nature</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>CASH</td><td>Cash</td><td>Asset</td><td>Physical cash / counter</td></tr>
+          <tr><td>SBI-CA</td><td>SBI Current Account</td><td>Asset</td><td>Bank ledger (isBank)</td></tr>
+          <tr><td>BOB-CA</td><td>Bank of Baroda Current A/c</td><td>Asset</td><td>Second bank</td></tr>
+          <tr><td>ADM-FEES</td><td>Admission Fees</td><td>Income</td><td>Fee income</td></tr>
+          <tr><td>TUITION-FEES</td><td>Tuition Fees</td><td>Income</td><td>Main academic income</td></tr>
+          <tr><td>EXAM-FEES</td><td>Examination Fees</td><td>Income</td><td></td></tr>
+          <tr><td>HOSTEL-FEES</td><td>Hostel Fees</td><td>Income</td><td></td></tr>
+          <tr><td>LIBRARY-FEES</td><td>Library Fees</td><td>Income</td><td></td></tr>
+          <tr><td>GRANTS</td><td>Grants</td><td>Income</td><td>Other income</td></tr>
+          <tr><td>DONATIONS</td><td>Donations</td><td>Income</td><td></td></tr>
+          <tr><td>SALARY-PAYABLE</td><td>Salary Payable</td><td>Liability</td><td>Net salary owed to staff</td></tr>
+          <tr><td>VENDOR-PAYABLE</td><td>Vendor Payable</td><td>Liability</td><td></td></tr>
+          <tr><td>PF-PAYABLE</td><td>PF Payable</td><td>Liability</td><td></td></tr>
+          <tr><td>PT-PAYABLE</td><td>Professional Tax Payable</td><td>Liability</td><td></td></tr>
+          <tr><td>TDS-PAYABLE</td><td>TDS Payable</td><td>Liability</td><td></td></tr>
+          <tr><td>SALARIES</td><td>Salaries</td><td>Expense</td><td></td></tr>
+          <tr><td>ELECTRICITY</td><td>Electricity</td><td>Expense</td><td></td></tr>
+          <tr><td>INTERNET</td><td>Internet</td><td>Expense</td><td></td></tr>
+          <tr><td>STATIONERY</td><td>Stationery</td><td>Expense</td><td></td></tr>
+          <tr><td>MAINTENANCE</td><td>Maintenance</td><td>Expense</td><td></td></tr>
+          <tr><td>DEPRECIATION</td><td>Depreciation</td><td>Expense</td><td></td></tr>
+          <tr><td>FA-FURNITURE</td><td>Furniture &amp; Fixtures</td><td>Asset</td><td>Fixed asset</td></tr>
+          <tr><td>FA-COMPUTERS</td><td>Computers &amp; IT</td><td>Asset</td><td>Fixed asset</td></tr>
+          <tr><td>ACCUM-DEP</td><td>Accumulated Depreciation</td><td>Asset (contra)</td><td>Reduces asset book value</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.3 When to add a new ledger</h3>
+      <ul>
+        <li>College opens a new bank account → create a new bank ledger (mark isBank).</li>
+        <li>New fee head that must appear separately in P&amp;L → create income ledger + Fee GL mapping.</li>
+        <li>New recurring expense (e.g. Security Agency) → create expense ledger.</li>
+      </ul>
+      <div class="callout warn">
+        Do not create dozens of tiny ledgers without need. Too many ledgers confuse Trial Balance.
+        Prefer meaningful heads that management actually reviews.
+      </div>
+
+      <h3>5.4 Client script</h3>
+      <p>
+        “Chart of Accounts is the list of buckets. Vouchers put money into buckets. Reports add up
+        the buckets. If the bucket does not exist, we create it here first.”
+      </p>
+    </section>
+
+    <!-- CH6 -->
+    <section class="chapter" id="ch6">
+      <div class="chapter-num">Chapter 6</div>
+      <h2>Financial Years</h2>
+      <p><strong>Menu:</strong> Financial Years (needs <span class="mono">accounts:manage</span>)</p>
+      <p>
+        Indian educational institutions commonly follow the government financial year:
+        <strong>1 April to 31 March</strong>. Example: FY 2025–26 means 1 Apr 2025 – 31 Mar 2026.
+      </p>
+      <h3>6.1 Why FY matters</h3>
+      <ul>
+        <li>Voucher numbers restart / sequence per type per year (RV, PV, JV, …).</li>
+        <li>Reports are usually run for a date range inside an FY.</li>
+        <li>Budgets and depreciation are FY-aware.</li>
+        <li>Only an <strong>OPEN / active</strong> year should receive day-to-day postings.</li>
+      </ul>
+      <h3>6.2 Typical lifecycle</h3>
+      <ol>
+        <li>Create next FY before 1 April.</li>
+        <li>Complete year-end adjustments in old FY.</li>
+        <li>Activate new FY for daily work.</li>
+        <li>Lock or close old FY after audit (as per college policy).</li>
+      </ol>
+      <div class="rule">
+        <strong>Client tip:</strong> If staff cannot post a voucher, first check whether the correct
+        financial year is active and the voucher date falls inside that year.
+      </div>
+    </section>
+
+    <!-- CH7 -->
+    <section class="chapter" id="ch7">
+      <div class="chapter-num">Chapter 7</div>
+      <h2>Vouchers — the heart of accounting</h2>
+      <p><strong>Menu:</strong> Vouchers · Create at <span class="mono">/admin/accounts/vouchers/new</span></p>
+      <p>
+        A voucher is a formal document that records one accounting event. In OneCampus, almost
+        everything important eventually becomes a voucher (manually or automatically).
+      </p>
+
+      <h3>7.1 Voucher types in OneCampus</h3>
+      <table>
+        <thead>
+          <tr><th>Code</th><th>Name</th><th>Prefix</th><th>When to use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>RECEIPT</td><td>Receipt Voucher</td><td>RV</td><td>Money coming into cash/bank</td></tr>
+          <tr><td>PAYMENT</td><td>Payment Voucher</td><td>PV</td><td>Money going out of cash/bank</td></tr>
+          <tr><td>JOURNAL</td><td>Journal Voucher</td><td>JV</td><td>Adjustments without immediate cash/bank movement</td></tr>
+          <tr><td>CONTRA</td><td>Contra Voucher</td><td>CV</td><td>Transfer between cash and bank (or bank↔bank)</td></tr>
+          <tr><td>OPENING</td><td>Opening Balance</td><td>OB</td><td>Starting balances when books begin</td></tr>
+        </tbody>
+      </table>
+
+      <h3>7.2 Anatomy of a voucher</h3>
+      <ul>
+        <li>Voucher type &amp; number (system-generated on post/create as configured)</li>
+        <li>Date</li>
+        <li>Narration (plain English story)</li>
+        <li>Lines: each line = one ledger + Debit or Credit + amount</li>
+        <li>Optional payment reference (cheque no., UTR, mode)</li>
+        <li>Status: DRAFT → POSTED</li>
+      </ul>
+
+      <h3>7.3 Posting rules enforced by the system</h3>
+      <ol>
+        <li>At least two lines.</li>
+        <li>Sum of debits = sum of credits.</li>
+        <li>Ledgers must exist and belong to the tenant.</li>
+        <li>Date must fit the financial year.</li>
+        <li>On post: ledger balances update; immutable posting rows are written for books/reports.</li>
+      </ol>
+
+      <h3>7.4 Manual vs automatic vouchers</h3>
+      <div class="grid-2">
+        <div class="mini-card">
+          <strong>Manual</strong>
+          Accountant opens Vouchers → New, chooses type, enters lines, posts.
+        </div>
+        <div class="mini-card">
+          <strong>Automatic</strong>
+          Fees payment, payroll publish/paid, expense approval, depreciation run create vouchers via bridges.
+        </div>
+      </div>
+    </section>
+
+    <!-- CH8 -->
+    <section class="chapter" id="ch8">
+      <div class="chapter-num">Chapter 8</div>
+      <h2>Receipt Voucher (money in)</h2>
+      <p>Use a Receipt when cash or bank balance <strong>increases</strong> because of income or recovery.</p>
+
+      <h3>8.1 Pattern</h3>
+      <div class="rule">
+        Debit: Cash or Bank (asset increases)<br />
+        Credit: Income ledger (or liability/receivable as applicable)
+      </div>
+
+      <p class="example-title">Example A — Counter cash fee (manual illustration)</p>
+      <div class="voucher-box">
+        <div class="head">RV-2025-26-00041 · 12-Jun-2025 · Receipt · Narration: Tuition fee received from BA25-814 (cash)</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Cash</td><td>Debit</td><td class="num">25,000.00</td></tr>
+            <tr><td>Tuition Fees</td><td>Credit</td><td class="num">25,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        In live OneCampus, this often happens automatically when the Fees module records a CASH payment
+        and Fee GL Mappings are configured (see Chapter 16).
+      </p>
+
+      <p class="example-title">Example B — UPI / gateway fee into SBI</p>
+      <div class="voucher-box">
+        <div class="head">RV-2025-26-00088 · 12-Jun-2025 · Receipt · UTR: 512345678901</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>SBI Current Account</td><td>Debit</td><td class="num">18,500.00</td></tr>
+            <tr><td>Tuition Fees</td><td>Credit</td><td class="num">15,000.00</td></tr>
+            <tr><td>Examination Fees</td><td>Credit</td><td class="num">3,500.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>One receipt can credit multiple income heads if the student paid a combined bill.</p>
+
+      <p class="example-title">Example C — Alumni donation</p>
+      <div class="voucher-box">
+        <div class="head">RV-2025-26-00102 · 20-Jun-2025 · Donation for library development</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>SBI Current Account</td><td>Debit</td><td class="num">100,000.00</td></tr>
+            <tr><td>Donations</td><td>Credit</td><td class="num">100,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="example-title">Example D — Government grant</p>
+      <div class="voucher-box">
+        <div class="head">RV-2025-26-00140 · Grant received for lab equipment</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>SBI Current Account</td><td>Debit</td><td class="num">500,000.00</td></tr>
+            <tr><td>Grants</td><td>Credit</td><td class="num">500,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>8.2 Where it appears after posting</h3>
+      <ul>
+        <li>Cash Book (if Cash debited) or Bank Book (if bank debited)</li>
+        <li>General Ledger of each income head</li>
+        <li>Profit &amp; Loss as income</li>
+        <li>Balance Sheet via higher cash/bank asset</li>
+      </ul>
+    </section>
+
+    <!-- CH9 -->
+    <section class="chapter" id="ch9">
+      <div class="chapter-num">Chapter 9</div>
+      <h2>Payment Voucher (money out)</h2>
+      <p>Use a Payment when cash or bank balance <strong>decreases</strong>.</p>
+      <div class="rule">
+        Debit: Expense / Asset / Payable<br />
+        Credit: Cash or Bank
+      </div>
+
+      <p class="example-title">Example A — Electricity bill paid by NEFT</p>
+      <div class="voucher-box">
+        <div class="head">PV-2025-26-00055 · 15-Jun-2025 · MeECL bill for May 2025</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Electricity</td><td>Debit</td><td class="num">86,400.00</td></tr>
+            <tr><td>SBI Current Account</td><td>Credit</td><td class="num">86,400.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="example-title">Example B — Stationery purchased from vendor (paid immediately)</p>
+      <div class="voucher-box">
+        <div class="head">PV-2025-26-00061 · Paid to M/s Tura Stationery Mart · Bill TS-778</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Stationery</td><td>Debit</td><td class="num">12,750.00</td></tr>
+            <tr><td>Cash</td><td>Credit</td><td class="num">12,750.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="example-title">Example C — Net salary paid (after payroll accrual)</p>
+      <div class="voucher-box">
+        <div class="head">PV-2025-26-00090 · June salary disbursement</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Salary Payable</td><td>Debit</td><td class="num">18,42,300.00</td></tr>
+            <tr><td>SBI Current Account</td><td>Credit</td><td class="num">18,42,300.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Notice: we debit <em>Salary Payable</em>, not Salaries expense, because the expense was already
+        recorded earlier by the payroll Journal (Chapter 16). Paying salary clears the liability.
+      </p>
+
+      <p class="example-title">Example D — Remit PF to EPFO</p>
+      <div class="voucher-box">
+        <div class="head">PV-2025-26-00095 · PF remittance for June</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>PF Payable</td><td>Debit</td><td class="num">2,15,600.00</td></tr>
+            <tr><td>SBI Current Account</td><td>Credit</td><td class="num">2,15,600.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CH10 -->
+    <section class="chapter" id="ch10">
+      <div class="chapter-num">Chapter 10</div>
+      <h2>Journal Voucher (non-cash adjustments)</h2>
+      <p>
+        Journal vouchers record accounting truth when cash/bank does not move at that moment —
+        or when we need to split an event into expense + liability.
+      </p>
+
+      <p class="example-title">Example A — Payroll accrual on publish (auto)</p>
+      <p>Assume June payroll: Gross ₹22,00,000; PF ₹1,80,000; PT ₹22,000; TDS ₹1,55,700; Net ₹18,42,300.</p>
+      <div class="voucher-box">
+        <div class="head">JV-2025-26-00030 · Payroll accrual June 2025</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Salaries</td><td>Debit</td><td class="num">22,00,000.00</td></tr>
+            <tr><td>PF Payable</td><td>Credit</td><td class="num">1,80,000.00</td></tr>
+            <tr><td>PT Payable</td><td>Credit</td><td class="num">22,000.00</td></tr>
+            <tr><td>TDS Payable</td><td>Credit</td><td class="num">1,55,700.00</td></tr>
+            <tr><td>Salary Payable</td><td>Credit</td><td class="num">18,42,300.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout ok">
+        Check: 22,00,000 debit = 1,80,000 + 22,000 + 1,55,700 + 18,42,300 credits. Balanced.
+      </div>
+
+      <p class="example-title">Example B — Monthly depreciation</p>
+      <div class="voucher-box">
+        <div class="head">JV-2025-26-00044 · Depreciation — Computers June 2025</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Depreciation</td><td>Debit</td><td class="num">25,000.00</td></tr>
+            <tr><td>Accumulated Depreciation</td><td>Credit</td><td class="num">25,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="example-title">Example C — Correction: fee wrongly posted to Admission instead of Tuition</p>
+      <div class="voucher-box">
+        <div class="head">JV-2025-26-00051 · Reclassification of fee income</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Admission Fees</td><td>Debit</td><td class="num">5,000.00</td></tr>
+            <tr><td>Tuition Fees</td><td>Credit</td><td class="num">5,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>No cash movement — only income heads are corrected.</p>
+    </section>
+
+    <!-- CH11 -->
+    <section class="chapter" id="ch11">
+      <div class="chapter-num">Chapter 11</div>
+      <h2>Contra Voucher (cash ↔ bank)</h2>
+      <p>
+        Contra is used when money moves between the college’s own cash and bank accounts.
+        It is <strong>not</strong> income and <strong>not</strong> expense.
+      </p>
+      <div class="rule">
+        Deposit cash into bank → Debit Bank, Credit Cash<br />
+        Withdraw cash from bank → Debit Cash, Credit Bank
+      </div>
+
+      <p class="example-title">Example A — Deposit day’s fee collection</p>
+      <div class="voucher-box">
+        <div class="head">CV-2025-26-00012 · Cash deposited in SBI</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>SBI Current Account</td><td>Debit</td><td class="num">1,25,000.00</td></tr>
+            <tr><td>Cash</td><td>Credit</td><td class="num">1,25,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="example-title">Example B — Withdraw cash for petty office use</p>
+      <div class="voucher-box">
+        <div class="head">CV-2025-26-00018 · Cash withdrawal</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Cash</td><td>Debit</td><td class="num">20,000.00</td></tr>
+            <tr><td>SBI Current Account</td><td>Credit</td><td class="num">20,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        Common client mistake: recording a cash deposit as a Receipt (income). That falsely inflates income.
+        Always use Contra for own-fund transfers.
+      </div>
+    </section>
+
+    <!-- CH12 -->
+    <section class="chapter" id="ch12">
+      <div class="chapter-num">Chapter 12</div>
+      <h2>Opening Balance Voucher</h2>
+      <p>
+        When a college goes live mid-year, or migrates from old software/manual books, opening
+        balances must be entered so the new system starts with the correct cash, bank, assets,
+        and liabilities.
+      </p>
+      <p class="example-title">Simplified opening illustration (go-live 1-Apr-2025)</p>
+      <div class="voucher-box">
+        <div class="head">OB-2025-26-00001 · Opening balances</div>
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            <tr><td>Cash</td><td>Debit</td><td class="num">45,000.00</td></tr>
+            <tr><td>SBI Current Account</td><td>Debit</td><td class="num">32,50,000.00</td></tr>
+            <tr><td>FA-Computers</td><td>Debit</td><td class="num">18,00,000.00</td></tr>
+            <tr><td>Accumulated Depreciation</td><td>Credit</td><td class="num">6,00,000.00</td></tr>
+            <tr><td>Capital / Corpus (or Opening Equity ledger)</td><td>Credit</td><td class="num">44,95,000.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Exact equity/corpus ledger naming depends on college chart design. The principle remains:
+        assets on debit, liabilities/capital on credit, totals equal.
+      </p>
+    </section>
+
+    <!-- CH13 -->
+    <section class="chapter" id="ch13">
+      <div class="chapter-num">Chapter 13</div>
+      <h2>Cash Book</h2>
+      <p><strong>Menu:</strong> Cash Book</p>
+      <p>
+        Cash Book is a filtered view of all posted movements on the Cash ledger for a date range.
+        It answers: “How much cash came in, went out, and what is the closing cash?”
+      </p>
+      <h3>13.1 Sample cash book extract (12-Jun-2025)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Voucher</th><th>Particulars</th>
+            <th class="num">Receipt (Dr)</th><th class="num">Payment (Cr)</th><th class="num">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td></td><td></td><td>Opening</td><td class="num"></td><td class="num"></td><td class="num">45,000.00</td></tr>
+          <tr><td>12-Jun</td><td>RV-041</td><td>Tuition fee BA25-814</td><td class="num">25,000.00</td><td class="num"></td><td class="num">70,000.00</td></tr>
+          <tr><td>12-Jun</td><td>PV-061</td><td>Stationery — Tura Mart</td><td class="num"></td><td class="num">12,750.00</td><td class="num">57,250.00</td></tr>
+          <tr><td>12-Jun</td><td>CV-012</td><td>Deposit to SBI</td><td class="num"></td><td class="num">1,25,000.00*</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:10pt;color:var(--muted);">
+        *Illustration only — if deposit exceeds available cash, books are wrong; always reconcile physical cash daily.
+      </p>
+      <h3>13.2 Client explanation</h3>
+      <p>
+        “Cash Book is not a place to type new income. It is a report of posted cash vouchers.
+        To change Cash Book, post or correct a Receipt/Payment/Contra voucher.”
+      </p>
+    </section>
+
+    <!-- CH14 -->
+    <section class="chapter" id="ch14">
+      <div class="chapter-num">Chapter 14</div>
+      <h2>Bank Book</h2>
+      <p><strong>Menu:</strong> Bank Book</p>
+      <p>Same idea as Cash Book, but for a selected bank ledger (SBI-CA, BOB-CA, …).</p>
+      <h3>14.1 Sample bank book lines</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Voucher</th><th>Particulars</th>
+            <th class="num">Deposit</th><th class="num">Withdrawal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>12-Jun</td><td>RV-088</td><td>UPI fees (tuition+exam)</td><td class="num">18,500.00</td><td class="num"></td></tr>
+          <tr><td>12-Jun</td><td>CV-012</td><td>Cash deposit</td><td class="num">1,25,000.00</td><td class="num"></td></tr>
+          <tr><td>15-Jun</td><td>PV-055</td><td>Electricity NEFT</td><td class="num"></td><td class="num">86,400.00</td></tr>
+          <tr><td>28-Jun</td><td>PV-090</td><td>Salary payout</td><td class="num"></td><td class="num">18,42,300.00</td></tr>
+        </tbody>
+      </table>
+      <h3>14.2 Why Bank Book ≠ Bank Statement</h3>
+      <ul>
+        <li><strong>Bank Book</strong> = what the college recorded in ERP.</li>
+        <li><strong>Bank Statement</strong> = what the bank recorded.</li>
+        <li>Differences are cleared in <strong>Bank Reconciliation</strong> (Chapter 21).</li>
+      </ul>
+    </section>
+
+    <!-- CH15 -->
+    <section class="chapter" id="ch15">
+      <div class="chapter-num">Chapter 15</div>
+      <h2>General Ledger</h2>
+      <p><strong>Menu:</strong> General Ledger</p>
+      <p>
+        Pick any ledger (e.g. Tuition Fees, Electricity, PF Payable) and a date range.
+        You see every debit/credit posting to that account — the full story of that bucket.
+      </p>
+      <h3>15.1 Sample — Tuition Fees ledger (June)</h3>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Voucher</th><th>Narration</th><th class="num">Debit</th><th class="num">Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>02-Jun</td><td>RV-010</td><td>Online fee batch</td><td class="num"></td><td class="num">2,40,000.00</td></tr>
+          <tr><td>12-Jun</td><td>RV-041</td><td>BA25-814 cash</td><td class="num"></td><td class="num">25,000.00</td></tr>
+          <tr><td>12-Jun</td><td>RV-088</td><td>UPI split receipt</td><td class="num"></td><td class="num">15,000.00</td></tr>
+          <tr><td>18-Jun</td><td>JV-051</td><td>Reclass from Admission</td><td class="num"></td><td class="num">5,000.00</td></tr>
+        </tbody>
+      </table>
+      <p>Period credit total feeds Profit &amp; Loss income for Tuition Fees.</p>
+      <h3>15.2 When to use GL vs Books</h3>
+      <ul>
+        <li>Investigating one income/expense head → General Ledger</li>
+        <li>Investigating cash position → Cash Book</li>
+        <li>Investigating one bank account → Bank Book</li>
+      </ul>
+    </section>
+
+    <!-- CH16 -->
+    <section class="chapter" id="ch16">
+      <div class="chapter-num">Chapter 16</div>
+      <h2>Fee GL Mappings &amp; auto-posting</h2>
+      <p><strong>Menu:</strong> Fee GL Mappings (Settings) · permission <span class="mono">accounts:manage</span></p>
+      <p>
+        This screen is the bridge between operational modules and accounts. If mappings are wrong,
+        fee money may sit in Fees but not appear correctly in income ledgers.
+      </p>
+
+      <h3>16.1 Settings switches</h3>
+      <ul>
+        <li><strong>autoPostFees</strong> — when ON, student fee payments create Receipt vouchers automatically.</li>
+        <li><strong>autoPostPayroll</strong> — when ON, payroll publish creates Journal; payroll paid creates Payment.</li>
+        <li>Default cash / bank / income ledgers for fallbacks.</li>
+      </ul>
+
+      <h3>16.2 Fee head → income ledger</h3>
+      <table>
+        <thead>
+          <tr><th>Fee head / source key</th><th>Maps to ledger</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>TUITION / SESSION-FEE / MONTHLY-FEE</td><td>TUITION-FEES</td></tr>
+          <tr><td>ADMISSION</td><td>ADM-FEES</td></tr>
+          <tr><td>EXAM</td><td>EXAM-FEES</td></tr>
+          <tr><td>HOSTEL</td><td>HOSTEL-FEES</td></tr>
+          <tr><td>LIBRARY</td><td>LIBRARY-FEES</td></tr>
+        </tbody>
+      </table>
+
+      <h3>16.3 Payment mode → debit ledger</h3>
+      <table>
+        <thead>
+          <tr><th>Payment mode</th><th>Debit ledger</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>CASH</td><td>Cash</td></tr>
+          <tr><td>UPI / NEFT / RTGS / CHEQUE / GATEWAY / ONLINE / …</td><td>Default bank (e.g. SBI-CA)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>16.4 End-to-end fee story (teach this to clients)</h3>
+      <ol>
+        <li>Student pays ₹15,000 tuition + ₹3,500 exam via UPI in Fees module.</li>
+        <li>Fees records student receipt and clears dues.</li>
+        <li>Bridge creates Receipt voucher: Dr SBI 18,500 / Cr Tuition 15,000 / Cr Exam 3,500.</li>
+        <li>Bank Book and income ledgers update; P&amp;L income rises.</li>
+      </ol>
+      <div class="callout">
+        Idempotency: the system logs each fee ledger entry so the same payment is not posted twice.
+      </div>
+
+      <h3>16.5 Payroll mapping</h3>
+      <p>Component codes like PF, PT, TDS map to liability ledgers. Gross maps to Salaries expense; net to Salary Payable.</p>
+    </section>
+
+    <!-- CH17 -->
+    <section class="chapter" id="ch17">
+      <div class="chapter-num">Chapter 17</div>
+      <h2>Vendors</h2>
+      <p><strong>Menu:</strong> Vendors</p>
+      <p>
+        Vendor master stores suppliers: stationery shops, electricians, software vendors, canteen
+        contractors, etc. Fields typically include code, name, GSTIN, contact, address.
+      </p>
+      <h3>17.1 Why vendors matter</h3>
+      <ul>
+        <li>Expenses can be linked to a vendor for tracking.</li>
+        <li>Audit can answer “How much did we pay Vendor X this year?”</li>
+        <li>Supports payable workflows as the college matures.</li>
+      </ul>
+      <p class="example-title">Sample vendors</p>
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Typical spend</th></tr></thead>
+        <tbody>
+          <tr><td>V-001</td><td>Tura Stationery Mart</td><td>Stationery</td></tr>
+          <tr><td>V-014</td><td>Meghalaya Power (MeECL)</td><td>Electricity</td></tr>
+          <tr><td>V-022</td><td>Northeast IT Solutions</td><td>Computers / AMC</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CH18 -->
+    <section class="chapter" id="ch18">
+      <div class="chapter-num">Chapter 18</div>
+      <h2>Expenses</h2>
+      <p><strong>Menu:</strong> Expenses</p>
+      <p>
+        The Expenses screen is an operational front-end for spends. Flow in OneCampus:
+      </p>
+      <ol>
+        <li>Create expense as <strong>DRAFT</strong> (amount, expense ledger, optional vendor/dept).</li>
+        <li><strong>Approve</strong> → system creates a Payment voucher and marks expense <strong>POSTED</strong>.</li>
+      </ol>
+      <p class="example-title">Example — Internet bill</p>
+      <ul>
+        <li>Expense No: EXP-2025-26-118</li>
+        <li>Vendor: Local ISP</li>
+        <li>Expense ledger: Internet</li>
+        <li>Amount: ₹8,900</li>
+        <li>On approve → PV debiting Internet, crediting Bank</li>
+      </ul>
+      <div class="callout">
+        Teaching point: Expenses module reduces typing errors by guiding non-accountants, while
+        still producing a proper Payment voucher in the books.
+      </div>
+    </section>
+
+    <!-- CH19 -->
+    <section class="chapter" id="ch19">
+      <div class="chapter-num">Chapter 19</div>
+      <h2>Budgets</h2>
+      <p><strong>Menu:</strong> Budgets</p>
+      <p>
+        A budget is a plan: “For FY 2025–26, Department of Science may spend up to ₹2,00,000 on
+        Laboratory Maintenance.” It is allocated per financial year + department + ledger.
+      </p>
+      <h3>19.1 Sample budget rows</h3>
+      <table>
+        <thead>
+          <tr><th>FY</th><th>Department</th><th>Ledger</th><th class="num">Allocated ₹</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>2025–26</td><td>Science</td><td>Maintenance</td><td class="num">2,00,000</td></tr>
+          <tr><td>2025–26</td><td>Arts</td><td>Stationery</td><td class="num">75,000</td></tr>
+          <tr><td>2025–26</td><td>Administration</td><td>Electricity</td><td class="num">12,00,000</td></tr>
+          <tr><td>2025–26</td><td>IT</td><td>Internet</td><td class="num">1,50,000</td></tr>
+        </tbody>
+      </table>
+      <h3>19.2 How to explain to management</h3>
+      <p>
+        Budget is the speed limit. Actual expenses (from posted vouchers) are the speedometer.
+        Comparing them shows overspending early — before year-end surprises.
+      </p>
+    </section>
+
+    <!-- CH20 -->
+    <section class="chapter" id="ch20">
+      <div class="chapter-num">Chapter 20</div>
+      <h2>Fixed Assets &amp; depreciation</h2>
+      <p><strong>Menu:</strong> Fixed Assets</p>
+      <p>
+        Fixed assets are long-life items: computers, furniture, projectors, buses, lab equipment.
+        They are not fully expensed on purchase day (usually); their cost is spread over useful life
+        as <strong>depreciation</strong>.
+      </p>
+
+      <h3>20.1 Asset register fields (conceptually)</h3>
+      <ul>
+        <li>Name, purchase date, cost, salvage value, useful life (months/years)</li>
+        <li>Method (OneCampus default: Straight Line)</li>
+        <li>Linked ledgers: Asset account, Accumulated Depreciation, Depreciation Expense</li>
+      </ul>
+
+      <p class="example-title">Example — Buy 20 computers for ₹12,00,000 on 01-May-2025</p>
+      <p>Payment voucher at purchase:</p>
+      <div class="voucher-box">
+        <table>
+          <thead><tr><th>Ledger</th><th>Dr / Cr</th><th class="num">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>FA-Computers</td><td>Debit</td><td class="num">12,00,000</td></tr>
+            <tr><td>SBI Current Account</td><td>Credit</td><td class="num">12,00,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Suppose useful life 4 years, salvage ₹0. Annual depreciation = 12,00,000 / 4 = 3,00,000.
+        Monthly ≈ 25,000. Running depreciation posts the Journal shown in Chapter 10.
+      </p>
+      <h3>20.2 Balance Sheet effect</h3>
+      <p>
+        Gross computers 12,00,000 minus Accumulated Depreciation (e.g. 25,000 after one month)
+        gives net book value 11,75,000 shown under Fixed Assets.
+      </p>
+    </section>
+
+    <!-- CH21 -->
+    <section class="chapter" id="ch21">
+      <div class="chapter-num">Chapter 21</div>
+      <h2>Bank Reconciliation</h2>
+      <p><strong>Menu:</strong> Bank Reconciliation</p>
+      <p>
+        Every month the accountant compares the Bank Book with the bank’s PDF/CSV statement.
+        Differences are normal for a few days; unresolved differences are dangerous.
+      </p>
+      <h3>21.1 Common differences</h3>
+      <table>
+        <thead><tr><th>Situation</th><th>In Bank Book?</th><th>In Bank Statement?</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Cheque issued but not yet cleared</td><td>Yes (payment)</td><td>Not yet</td><td>Timing — wait / track</td></tr>
+          <tr><td>Fee UPI received, voucher missing</td><td>No</td><td>Yes</td><td>Create Receipt / fix Fees bridge</td></tr>
+          <tr><td>Bank charges</td><td>Often missing</td><td>Yes</td><td>Payment/Journal for bank charges</td></tr>
+          <tr><td>Duplicate posting</td><td>Twice</td><td>Once</td><td>Correct via journal / cancel policy</td></tr>
+        </tbody>
+      </table>
+      <h3>21.2 OneCampus flow (conceptual)</h3>
+      <ol>
+        <li>Create reconciliation for a bank ledger and period.</li>
+        <li>Import / enter statement lines.</li>
+        <li>Auto-match where amounts/dates align with postings.</li>
+        <li>Manually match leftovers; investigate unmatched.</li>
+        <li>Mark reconciled when book and statement agree after adjustments.</li>
+      </ol>
+      <div class="callout warn">
+        Never “force” reconciliation by ignoring unmatched bank credits. Unrecorded fee income
+        is a classic fraud/control risk.
+      </div>
+    </section>
+
+    <!-- CH22 -->
+    <section class="chapter" id="ch22">
+      <div class="chapter-num">Chapter 22</div>
+      <h2>Financial Reports</h2>
+      <p><strong>Menu:</strong> Financial Reports</p>
+      <p>Three core reports every client meeting should mention:</p>
+
+      <h3>22.1 Trial Balance</h3>
+      <p>
+        A list of all ledgers with debit and credit totals for a period. If the books are posted
+        correctly, column totals match. It is the gateway report before P&amp;L and Balance Sheet.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Ledger</th><th class="num">Debit ₹</th><th class="num">Credit ₹</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cash</td><td class="num">57,250</td><td class="num"></td></tr>
+          <tr><td>SBI Current Account</td><td class="num">28,40,000</td><td class="num"></td></tr>
+          <tr><td>Tuition Fees</td><td class="num"></td><td class="num">42,10,000</td></tr>
+          <tr><td>Salaries</td><td class="num">22,00,000</td><td class="num"></td></tr>
+          <tr><td>Electricity</td><td class="num">86,400</td><td class="num"></td></tr>
+          <tr><td>Salary Payable</td><td class="num"></td><td class="num">18,42,300</td></tr>
+          <tr><td>…</td><td class="num">…</td><td class="num">…</td></tr>
+          <tr><td><strong>Total</strong></td><td class="num"><strong>XX</strong></td><td class="num"><strong>XX</strong></td></tr>
+        </tbody>
+      </table>
+
+      <h3>22.2 Profit &amp; Loss (Surplus / Deficit)</h3>
+      <p>
+        For non-profit colleges we often say <strong>Surplus</strong> (income &gt; expense) or
+        <strong>Deficit</strong> (expense &gt; income) instead of “profit”.
+      </p>
+      <div class="grid-2">
+        <div class="mini-card">
+          <strong>Income side</strong>
+          Tuition, Admission, Exam, Hostel, Grants, Donations…
+        </div>
+        <div class="mini-card">
+          <strong>Expense side</strong>
+          Salaries, Electricity, Internet, Stationery, Depreciation…
+        </div>
+      </div>
+      <p>Surplus / Deficit = Total Income − Total Expenses for the period.</p>
+
+      <h3>22.3 Balance Sheet</h3>
+      <p>Photograph of financial position on a date:</p>
+      <ul>
+        <li><strong>Assets</strong> — Cash, Bank, Fixed Assets (net of accum. dep.)</li>
+        <li><strong>Liabilities</strong> — Payables, statutory dues</li>
+        <li><strong>Capital / Accumulated Surplus</strong> — balancing figure including current surplus</li>
+      </ul>
+      <div class="rule">
+        Assets = Liabilities + Capital/Surplus<br />
+        (Always — if not, a posting is missing or misclassified.)
+      </div>
+
+      <h3>22.4 Exports</h3>
+      <p>OneCampus supports institutional PDF/XLSX export for Trial Balance, P&amp;L, and Balance Sheet for audit packs and governing body meetings.</p>
+    </section>
+
+    <!-- CH23 -->
+    <section class="chapter" id="ch23">
+      <div class="chapter-num">Chapter 23</div>
+      <h2>Audit Trail</h2>
+      <p><strong>Menu:</strong> Audit Trail</p>
+      <p>
+        Every sensitive accounting action should leave a footprint: who created/posted a voucher,
+        who changed a mapping, what the before/after values were. This protects the college and
+        the honest accountant.
+      </p>
+      <h3>23.1 What to show auditors</h3>
+      <ul>
+        <li>User identity and timestamp</li>
+        <li>Entity (voucher, expense, settings)</li>
+        <li>Action (CREATE, POST, UPDATE, …)</li>
+        <li>Before / after JSON snapshots where available</li>
+      </ul>
+      <div class="callout">
+        Client line: “Accounts is not only about balances; it is about accountability.”
+      </div>
+    </section>
+
+    <!-- CH24 -->
+    <section class="chapter" id="ch24">
+      <div class="chapter-num">Chapter 24</div>
+      <h2>Month-end &amp; year-end checklist</h2>
+      <h3>24.1 Month-end (do this every month)</h3>
+      <ol>
+        <li>Post all draft vouchers or deliberately carry them with reason.</li>
+        <li>Confirm fee auto-posting for the month (spot-check 5 receipts).</li>
+        <li>Confirm payroll Journal + Payment posted.</li>
+        <li>Run depreciation if assets are maintained in the module.</li>
+        <li>Complete bank reconciliation for each bank ledger.</li>
+        <li>Print/export Trial Balance; verify totals match.</li>
+        <li>Review P&amp;L vs budget for major heads.</li>
+        <li>Physical cash count vs Cash Book balance.</li>
+      </ol>
+      <h3>24.2 Year-end extras</h3>
+      <ol>
+        <li>Review outstanding payables and statutory remittances.</li>
+        <li>Verify fixed asset register vs physical assets.</li>
+        <li>Pass final adjustment journals.</li>
+        <li>Export full-year reports for auditors.</li>
+        <li>Create and activate next FY; restrict old FY posting as per policy.</li>
+      </ol>
+    </section>
+
+    <!-- CH25 -->
+    <section class="chapter" id="ch25">
+      <div class="chapter-num">Chapter 25</div>
+      <h2>Client FAQ &amp; common mistakes</h2>
+      <h3>Q1. Fees shows collection but Accounts income is low.</h3>
+      <p>Check Fee GL Mappings, autoPostFees flag, payment-mode mapping, and integration logs. Unmapped heads may fall to a default or fail silently until investigated.</p>
+
+      <h3>Q2. Can we edit a posted voucher?</h3>
+      <p>Posted entries are meant to be permanent. Corrections are usually done with a reversing/adjusting Journal (office policy). Drafts can be edited freely.</p>
+
+      <h3>Q3. Why is debit/credit confusing for office staff?</h3>
+      <p>Teach patterns, not theory: “Money in → Debit bank, Credit income.” Practice with 10 receipts and 10 payments.</p>
+
+      <h3>Q4. Is Contra an expense?</h3>
+      <p>No. Contra only moves money between cash and bank.</p>
+
+      <h3>Q5. Salary paid but Salaries expense looks double.</h3>
+      <p>Expense is booked on payroll <em>publish</em> (Journal). Payment only clears Salary Payable. If someone also debits Salaries on payment, expense is doubled — wrong.</p>
+
+      <h3>Q6. Trial Balance matches but Principal says reports are “wrong”.</h3>
+      <p>Matching TB only proves arithmetic balance. Misclassification (donation posted as tuition) still balances. Review ledger-wise with management.</p>
+
+      <h3>Common mistakes list</h3>
+      <ul>
+        <li>Using Receipt for cash deposit (should be Contra).</li>
+        <li>Posting personal student advances into income without policy.</li>
+        <li>Creating duplicate ledgers with similar names.</li>
+        <li>Leaving vouchers in DRAFT for weeks.</li>
+        <li>Ignoring bank charges on statement.</li>
+        <li>Not mapping new fee heads after fee structure changes.</li>
+      </ul>
+    </section>
+
+    <!-- CH26 -->
+    <section class="chapter" id="ch26">
+      <div class="chapter-num">Chapter 26</div>
+      <h2>Worked mini-case — one busy college day</h2>
+      <p><strong>Date:</strong> 12 June 2025 · <strong>FY:</strong> 2025–26 · Opening cash ₹45,000 · Opening SBI ₹25,00,000</p>
+
+      <h3>Events</h3>
+      <ol>
+        <li>3 students pay tuition ₹10,000 each by UPI (total ₹30,000).</li>
+        <li>1 student pays admission ₹5,000 cash.</li>
+        <li>Pay stationery vendor ₹4,200 cash.</li>
+        <li>Deposit ₹40,000 cash into SBI.</li>
+        <li>Receive alumni donation ₹50,000 in SBI.</li>
+        <li>Pay internet ₹8,900 by NEFT.</li>
+      </ol>
+
+      <h3>Vouchers you should expect</h3>
+      <table>
+        <thead><tr><th>#</th><th>Type</th><th>Entry</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Receipt (auto/manual)</td><td>Dr SBI 30,000 / Cr Tuition 30,000</td></tr>
+          <tr><td>2</td><td>Receipt</td><td>Dr Cash 5,000 / Cr Admission 5,000</td></tr>
+          <tr><td>3</td><td>Payment</td><td>Dr Stationery 4,200 / Cr Cash 4,200</td></tr>
+          <tr><td>4</td><td>Contra</td><td>Dr SBI 40,000 / Cr Cash 40,000</td></tr>
+          <tr><td>5</td><td>Receipt</td><td>Dr SBI 50,000 / Cr Donations 50,000</td></tr>
+          <tr><td>6</td><td>Payment</td><td>Dr Internet 8,900 / Cr SBI 8,900</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Closing positions (compute yourself, then check)</h3>
+      <p><strong>Cash:</strong> 45,000 + 5,000 − 4,200 − 40,000 = <strong>₹5,800</strong></p>
+      <p><strong>SBI:</strong> 25,00,000 + 30,000 + 40,000 + 50,000 − 8,900 = <strong>₹26,11,100</strong></p>
+      <p><strong>Day’s income:</strong> Tuition 30,000 + Admission 5,000 + Donations 50,000 = <strong>₹85,000</strong></p>
+      <p><strong>Day’s expense:</strong> Stationery 4,200 + Internet 8,900 = <strong>₹13,100</strong></p>
+      <div class="callout ok">
+        Study task: Without looking, redraw all six vouchers on paper. If you can do that, you can train a client.
+      </div>
+    </section>
+
+    <!-- CH27 -->
+    <section class="chapter" id="ch27">
+      <div class="chapter-num">Chapter 27</div>
+      <h2>Quick reference cheat sheets</h2>
+
+      <h3>27.1 Which voucher?</h3>
+      <table>
+        <thead><tr><th>If money…</th><th>Voucher</th></tr></thead>
+        <tbody>
+          <tr><td>Comes into cash/bank from outside</td><td>Receipt</td></tr>
+          <tr><td>Goes out of cash/bank to outside</td><td>Payment</td></tr>
+          <tr><td>Moves cash↔bank inside college</td><td>Contra</td></tr>
+          <tr><td>Needs booking without cash movement now</td><td>Journal</td></tr>
+          <tr><td>Starts the books</td><td>Opening</td></tr>
+        </tbody>
+      </table>
+
+      <h3>27.2 Screen ↔ question</h3>
+      <table>
+        <thead><tr><th>Question</th><th>Screen</th></tr></thead>
+        <tbody>
+          <tr><td>What is today’s cash?</td><td>Dashboard / Cash Book</td></tr>
+          <tr><td>Did June UPI fees hit SBI?</td><td>Bank Book + Fee mappings</td></tr>
+          <tr><td>How much electricity this year?</td><td>General Ledger (Electricity) / P&amp;L</td></tr>
+          <tr><td>Are we over budget on stationery?</td><td>Budgets vs Expenses/P&amp;L</td></tr>
+          <tr><td>Why bank statement differs?</td><td>Bank Reconciliation</td></tr>
+          <tr><td>Who posted this voucher?</td><td>Audit Trail</td></tr>
+        </tbody>
+      </table>
+
+      <h3>27.3 30-minute client demo script</h3>
+      <ol>
+        <li>Dashboard overview (2 min)</li>
+        <li>Show Chart of Accounts groups (3 min)</li>
+        <li>Create a sample Receipt and Payment in DRAFT, show debit=credit validation (8 min)</li>
+        <li>Post and open Cash/Bank Book (5 min)</li>
+        <li>Show Fee GL mapping and explain auto receipt (5 min)</li>
+        <li>Open Trial Balance + P&amp;L (5 min)</li>
+        <li>Q&amp;A on their current pain (bank recon / salary / fee heads) (remainder)</li>
+      </ol>
+    </section>
+
+    <!-- CH28 -->
+    <section class="chapter" id="ch28">
+      <div class="chapter-num">Chapter 28</div>
+      <h2>Master transaction catalog (40+ college events)</h2>
+      <p>
+        Use this as your desk reference. For each real-world event: which screen, which voucher,
+        and the debit/credit pattern. Amounts are examples only.
+      </p>
+
+      <h3>A. Student fee &amp; related receipts</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Tuition fee by cash</td><td>Fees → auto Accounts</td><td>Receipt</td><td>Cash</td><td>Tuition Fees</td></tr>
+          <tr><td>2</td><td>Tuition fee by UPI</td><td>Fees → auto</td><td>Receipt</td><td>Bank</td><td>Tuition Fees</td></tr>
+          <tr><td>3</td><td>Admission fee</td><td>Fees → auto</td><td>Receipt</td><td>Cash/Bank</td><td>Admission Fees</td></tr>
+          <tr><td>4</td><td>Exam fee</td><td>Fees → auto</td><td>Receipt</td><td>Cash/Bank</td><td>Exam Fees</td></tr>
+          <tr><td>5</td><td>Hostel fee</td><td>Fees → auto</td><td>Receipt</td><td>Cash/Bank</td><td>Hostel Fees</td></tr>
+          <tr><td>6</td><td>Library fee</td><td>Fees → auto</td><td>Receipt</td><td>Cash/Bank</td><td>Library Fees</td></tr>
+          <tr><td>7</td><td>Combined fee bill (multi-head)</td><td>Fees → auto</td><td>Receipt</td><td>Cash/Bank</td><td>Split across income ledgers</td></tr>
+          <tr><td>8</td><td>Late fee / fine</td><td>Fees + mapping</td><td>Receipt</td><td>Cash/Bank</td><td>Other Income / Fine ledger</td></tr>
+          <tr><td>9</td><td>Fee refund to student</td><td>Fees + Payment</td><td>Payment</td><td>Income (reduce) or Refund Exp.</td><td>Cash/Bank</td></tr>
+          <tr><td>10</td><td>Scholarship paid to student</td><td>Payment / Journal per policy</td><td>Payment or Journal</td><td>Scholarship Exp. / Grant</td><td>Bank / Payable</td></tr>
+        </tbody>
+      </table>
+
+      <h3>B. Other income</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>11</td><td>Alumni donation</td><td>Vouchers</td><td>Receipt</td><td>Bank</td><td>Donations</td></tr>
+          <tr><td>12</td><td>Government / UGC grant</td><td>Vouchers</td><td>Receipt</td><td>Bank</td><td>Grants</td></tr>
+          <tr><td>13</td><td>Hall rent / auditorium hire</td><td>Vouchers</td><td>Receipt</td><td>Cash/Bank</td><td>Other Income</td></tr>
+          <tr><td>14</td><td>Sale of old newspapers / scrap</td><td>Vouchers</td><td>Receipt</td><td>Cash</td><td>Other Income</td></tr>
+          <tr><td>15</td><td>Interest credited by bank</td><td>Vouchers / BRS adjust</td><td>Receipt</td><td>Bank</td><td>Interest Income*</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:10pt;color:var(--muted);">*Create Interest Income ledger if not present.</p>
+
+      <h3>C. Operating payments</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>16</td><td>Electricity bill</td><td>Expenses / Payment</td><td>Payment</td><td>Electricity</td><td>Bank</td></tr>
+          <tr><td>17</td><td>Internet / broadband</td><td>Expenses</td><td>Payment</td><td>Internet</td><td>Bank</td></tr>
+          <tr><td>18</td><td>Stationery cash purchase</td><td>Expenses</td><td>Payment</td><td>Stationery</td><td>Cash</td></tr>
+          <tr><td>19</td><td>Building maintenance</td><td>Expenses</td><td>Payment</td><td>Maintenance</td><td>Bank</td></tr>
+          <tr><td>20</td><td>Security agency monthly bill</td><td>Expenses</td><td>Payment</td><td>Security Exp.*</td><td>Bank</td></tr>
+          <tr><td>21</td><td>Travel / TA for staff</td><td>Expenses</td><td>Payment</td><td>Travel Exp.*</td><td>Cash/Bank</td></tr>
+          <tr><td>22</td><td>Printing of prospectus</td><td>Expenses</td><td>Payment</td><td>Printing Exp.*</td><td>Bank</td></tr>
+          <tr><td>23</td><td>Bank charges</td><td>Vouchers</td><td>Payment</td><td>Bank Charges*</td><td>Bank</td></tr>
+          <tr><td>24</td><td>Advance to vendor (later adjusted)</td><td>Payment + later Journal</td><td>Payment</td><td>Vendor Advance*</td><td>Bank</td></tr>
+        </tbody>
+      </table>
+
+      <h3>D. Payroll &amp; statutory</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>25</td><td>Salary published (accrual)</td><td>Payroll → auto</td><td>Journal</td><td>Salaries</td><td>PF/PT/TDS/Salary Payable</td></tr>
+          <tr><td>26</td><td>Net salary paid</td><td>Payroll paid → auto</td><td>Payment</td><td>Salary Payable</td><td>Bank</td></tr>
+          <tr><td>27</td><td>PF remitted to EPFO</td><td>Payment</td><td>Payment</td><td>PF Payable</td><td>Bank</td></tr>
+          <tr><td>28</td><td>Professional tax remitted</td><td>Payment</td><td>Payment</td><td>PT Payable</td><td>Bank</td></tr>
+          <tr><td>29</td><td>TDS remitted</td><td>Payment</td><td>Payment</td><td>TDS Payable</td><td>Bank</td></tr>
+          <tr><td>30</td><td>Guest lecturer honorarium</td><td>Payment</td><td>Payment</td><td>Honorarium Exp.*</td><td>Bank</td></tr>
+        </tbody>
+      </table>
+
+      <h3>E. Cash ↔ bank &amp; multi-bank</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>31</td><td>Deposit cash into SBI</td><td>Vouchers</td><td>Contra</td><td>SBI</td><td>Cash</td></tr>
+          <tr><td>32</td><td>Withdraw cash from SBI</td><td>Vouchers</td><td>Contra</td><td>Cash</td><td>SBI</td></tr>
+          <tr><td>33</td><td>Transfer SBI → BOB</td><td>Vouchers</td><td>Contra</td><td>BOB</td><td>SBI</td></tr>
+        </tbody>
+      </table>
+
+      <h3>F. Assets, depreciation, opening</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>34</td><td>Buy computers</td><td>Payment / Fixed Assets</td><td>Payment</td><td>FA-Computers</td><td>Bank</td></tr>
+          <tr><td>35</td><td>Buy furniture</td><td>Payment</td><td>Payment</td><td>FA-Furniture</td><td>Bank</td></tr>
+          <tr><td>36</td><td>Monthly depreciation</td><td>Fixed Assets run</td><td>Journal</td><td>Depreciation</td><td>Accum. Dep.</td></tr>
+          <tr><td>37</td><td>Opening cash/bank/assets</td><td>Opening voucher</td><td>Opening</td><td>Assets</td><td>Capital / liabilities</td></tr>
+        </tbody>
+      </table>
+
+      <h3>G. Corrections &amp; controls</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Event</th><th>Screen</th><th>Voucher</th><th>Pattern</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>38</td><td>Wrong income head used</td><td>Vouchers</td><td>Journal</td><td>Dr wrong income / Cr correct income</td></tr>
+          <tr><td>39</td><td>Expense posted to wrong dept ledger</td><td>Vouchers</td><td>Journal</td><td>Reclass between expense ledgers</td></tr>
+          <tr><td>40</td><td>Unrecorded bank credit found in BRS</td><td>BRS + Receipt</td><td>Receipt</td><td>Dr Bank / Cr correct income</td></tr>
+          <tr><td>41</td><td>Cheque issued, later cancelled</td><td>Policy + Journal/reverse</td><td>Journal</td><td>Reverse original payment effect</td></tr>
+          <tr><td>42</td><td>Student fee posted twice</td><td>Audit + correction</td><td>Journal</td><td>Reverse duplicate income &amp; bank</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        Rows marked * need a ledger created in Chart of Accounts before first use, then optionally
+        mapped if the event originates from Fees/Payroll.
+      </div>
+    </section>
+
+    <!-- CH29 -->
+    <section class="chapter" id="ch29">
+      <div class="chapter-num">Chapter 29</div>
+      <h2>Practice worksheets (fill by hand)</h2>
+      <p>Print these pages and write answers in pen. Check against Chapters 8–11 and 26.</p>
+
+      <h3>Worksheet 1 — Identify the voucher type</h3>
+      <table>
+        <thead><tr><th>#</th><th>Event</th><th>Your answer (R/P/J/C/O)</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Student pays exam fee by UPI</td><td></td></tr>
+          <tr><td>2</td><td>College pays electricity from SBI</td><td></td></tr>
+          <tr><td>3</td><td>Cash of ₹2 lakh deposited in bank</td><td></td></tr>
+          <tr><td>4</td><td>June salary accrual after payroll publish</td><td></td></tr>
+          <tr><td>5</td><td>Depreciation for furniture</td><td></td></tr>
+          <tr><td>6</td><td>Opening bank balance on go-live</td><td></td></tr>
+          <tr><td>7</td><td>Transfer from SBI to BOB</td><td></td></tr>
+          <tr><td>8</td><td>Donation received in bank</td><td></td></tr>
+        </tbody>
+      </table>
+      <p><strong>Answers:</strong> 1R 2P 3C 4J 5J 6O 7C 8R</p>
+
+      <h3>Worksheet 2 — Complete the missing side</h3>
+      <table>
+        <thead><tr><th>Given</th><th>Complete</th></tr></thead>
+        <tbody>
+          <tr><td>Dr Bank 10,000 / Cr ? (tuition)</td><td></td></tr>
+          <tr><td>Dr Electricity 50,000 / Cr ?</td><td></td></tr>
+          <tr><td>Dr Bank 80,000 / Cr Cash 80,000 — type?</td><td></td></tr>
+          <tr><td>Dr Salaries 5,00,000 / Cr Salary Payable 4,20,000 / Cr ? 80,000 (PF)</td><td></td></tr>
+          <tr><td>Dr Salary Payable 4,20,000 / Cr ?</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Worksheet 3 — Build a full receipt</h3>
+      <p>
+        Student pays ₹22,000: Tuition ₹16,000, Exam ₹4,000, Library ₹2,000, mode NEFT to SBI.
+        Draw the voucher lines below:
+      </p>
+      <table>
+        <thead><tr><th>Ledger</th><th>Dr/Cr</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Worksheet 4 — Explain to a Principal (write 5–7 lines)</h3>
+      <p><em>Prompt:</em> “Why do we need both Fees module and Accounts module?”</p>
+      <div class="voucher-box" style="min-height:120px;"></div>
+
+      <h3>Worksheet 5 — Spot the mistake</h3>
+      <p>Someone posted:</p>
+      <div class="voucher-box">
+        Receipt: Dr Cash 1,00,000 / Cr Tuition Fees 1,00,000<br />
+        <em>Narration: Cash deposited into SBI from counter collection</em>
+      </div>
+      <p>What is wrong? What should the entry be?</p>
+      <div class="voucher-box" style="min-height:80px;"></div>
+      <p><strong>Answer:</strong> This is not income. Use Contra: Dr SBI / Cr Cash. The wrong receipt inflates tuition income.</p>
+
+      <h3>Study plan (7 days)</h3>
+      <table>
+        <thead><tr><th>Day</th><th>Read</th><th>Do</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Ch 1–3</td><td>Draw the sidebar from memory</td></tr>
+          <tr><td>2</td><td>Ch 4–7</td><td>List 5 voucher types with one example each</td></tr>
+          <tr><td>3</td><td>Ch 8–12</td><td>Worksheet 1–3</td></tr>
+          <tr><td>4</td><td>Ch 13–16</td><td>Explain fee auto-post to a colleague</td></tr>
+          <tr><td>5</td><td>Ch 17–21</td><td>Walk Expenses → Payment → Bank Book path</td></tr>
+          <tr><td>6</td><td>Ch 22–25</td><td>Interpret a sample TB &amp; P&amp;L aloud</td></tr>
+          <tr><td>7</td><td>Ch 26–29</td><td>Redo mini-case without notes</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- GLOSSARY -->
+    <section class="chapter" id="glossary">
+      <div class="chapter-num">Appendix</div>
+      <h2>Glossary</h2>
+      <table>
+        <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Ledger</td><td>One account bucket (Cash, Tuition Fees, …)</td></tr>
+          <tr><td>Voucher</td><td>Document that records a balanced accounting event</td></tr>
+          <tr><td>Posting</td><td>Finalising a voucher into the books</td></tr>
+          <tr><td>Narration</td><td>Short English description of why the entry exists</td></tr>
+          <tr><td>FY</td><td>Financial Year (usually Apr–Mar in India)</td></tr>
+          <tr><td>Trial Balance</td><td>List of ledger totals; debits must equal credits</td></tr>
+          <tr><td>P&amp;L / Surplus</td><td>Income vs expenses for a period</td></tr>
+          <tr><td>Balance Sheet</td><td>Assets vs liabilities + capital on a date</td></tr>
+          <tr><td>Contra</td><td>Transfer between cash and bank</td></tr>
+          <tr><td>Depreciation</td><td>Spreading asset cost over useful life</td></tr>
+          <tr><td>Reconciliation</td><td>Matching two records (books vs bank)</td></tr>
+          <tr><td>GSTIN</td><td>Vendor tax ID (when applicable)</td></tr>
+          <tr><td>Idempotent posting</td><td>Same source event will not create duplicate vouchers</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Further practice (self-test)</h3>
+      <ol>
+        <li>Write the voucher for: college pays ₹1,20,000 TDS to government from SBI.</li>
+        <li>Write the voucher for: student pays hostel fee ₹8,000 by cheque.</li>
+        <li>Write the contra for: transfer ₹5,00,000 from SBI to BOB.</li>
+        <li>Explain to a Principal in 60 seconds what Trial Balance proves — and what it does not.</li>
+        <li>List five events that should never be entered as income.</li>
+      </ol>
+
+      <div class="footer-note">
+        <p>
+          <strong>BCL OneCampus ERP — Finance &amp; Accounts Study Guide v1.0</strong><br />
+          Prepared for internal learning and client training. Example figures are illustrative.
+          Always align live configuration (ledgers, mappings, FY) with the college’s finance policy
+          and statutory requirements. For product navigation, use Admin → Finance &amp; Accounts.
+        </p>
+        <p>
+          Print file: <span class="mono">docs/accounting/finance-accounts-study-guide.html</span> ·
+          Open in browser → Ctrl+P → Save as PDF for a bound printout.
+        </p>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

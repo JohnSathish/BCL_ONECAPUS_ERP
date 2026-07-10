@@ -151,7 +151,7 @@ export default function SubjectSectionsPage() {
   return (
     <DashboardShell
       title="Subject Sections"
-      description="Split compulsory papers (AEC, SEC, MDC, etc.) into classroom sections A, B, C — independent from the student's official class section."
+      subtitle="Split compulsory papers (AEC, SEC, MDC, etc.) into classroom sections A, B, C — independent from the student's official class section."
     >
       <div className="space-y-4">
         {message ? (

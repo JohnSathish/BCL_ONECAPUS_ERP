@@ -30,6 +30,7 @@ export default function TeachingSubjectGroupsPage() {
     useWorkspaceBoundShiftState();
   const [category, setCategory] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
   const [newCategory, setNewCategory] = useState('MAJOR');
@@ -58,7 +59,7 @@ export default function TeachingSubjectGroupsPage() {
   const groupsQ = useQuery({
     queryKey: ['teaching-subject-groups', params],
     queryFn: () => fetchTeachingSubjectGroups(params),
-    enabled: authReady,
+    enabled: authReady && Boolean(academicYearId),
   });
 
   const syncMut = useMutation({
@@ -69,30 +70,44 @@ export default function TeachingSubjectGroupsPage() {
         academicYearId: academicYearId,
         fyugpCategory: category || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError('');
+      setSuccess(`Auto-build done: ${result.created} created, ${result.updated} updated.`);
       void qc.invalidateQueries({ queryKey: ['teaching-subject-groups'] });
     },
-    onError: (e) => setError(apiErrorMessage(e, 'Sync failed')),
+    onError: (e) => {
+      setSuccess('');
+      setError(apiErrorMessage(e, 'Sync failed'));
+    },
   });
 
   const createMut = useMutation({
-    mutationFn: () =>
-      createTeachingSubjectGroup({
-        code,
-        title,
+    mutationFn: () => {
+      if (!academicYearId) {
+        return Promise.reject(
+          new Error('Academic year is still loading. Wait a moment and try again.'),
+        );
+      }
+      return createTeachingSubjectGroup({
+        code: code.trim(),
+        title: title.trim(),
         semesterNo,
         fyugpCategory: newCategory,
-        shiftId: effectiveShiftId,
-        academicYearId: academicYearId,
-      }),
-    onSuccess: () => {
+        shiftId: effectiveShiftId || undefined,
+        academicYearId,
+      });
+    },
+    onSuccess: (group) => {
       setCode('');
       setTitle('');
       setError('');
+      setSuccess(`Created ${group.code} — ${group.title} (Sem ${group.semesterNo}).`);
       void qc.invalidateQueries({ queryKey: ['teaching-subject-groups'] });
     },
-    onError: (e) => setError(apiErrorMessage(e, 'Create failed')),
+    onError: (e) => {
+      setSuccess('');
+      setError(apiErrorMessage(e, 'Create failed'));
+    },
   });
 
   const groups = groupsQ.data ?? [];
@@ -208,18 +223,28 @@ export default function TeachingSubjectGroupsPage() {
                 ))}
               </select>
             </div>
-            <div className="md:col-span-4">
+            <div className="md:col-span-4 flex flex-wrap items-center gap-3">
               <Button
-                disabled={createMut.isPending || !code.trim() || !title.trim()}
+                disabled={createMut.isPending || !code.trim() || !title.trim() || !academicYearId}
                 onClick={() => createMut.mutate()}
               >
-                Create group
+                {createMut.isPending ? 'Creating…' : 'Create group'}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Uses filter semester above (currently Sem {semesterNo}).
+                {!academicYearId ? ' Waiting for academic year…' : null}
+              </p>
             </div>
           </CardContent>
         </Card>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {success ? <p className="text-sm text-emerald-700">{success}</p> : null}
+        {groupsQ.isError ? (
+          <p className="text-sm text-destructive">
+            Could not load groups: {apiErrorMessage(groupsQ.error, 'List failed')}
+          </p>
+        ) : null}
 
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
@@ -234,10 +259,17 @@ export default function TeachingSubjectGroupsPage() {
               </tr>
             </thead>
             <tbody>
-              {groups.length === 0 ? (
+              {groupsQ.isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-6 text-muted-foreground">
-                    No subject groups yet. Run auto-build or create manually.
+                    Loading subject groups…
+                  </td>
+                </tr>
+              ) : groups.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-6 text-muted-foreground">
+                    No subject groups for Sem {semesterNo} yet. Click Create group, or run
+                    auto-build.
                   </td>
                 </tr>
               ) : (

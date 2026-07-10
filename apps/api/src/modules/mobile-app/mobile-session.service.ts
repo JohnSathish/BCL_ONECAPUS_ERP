@@ -19,10 +19,10 @@ export class MobileSessionService {
     return raw as SessionMetadata;
   }
 
-  async listSessions(user: JwtUser) {
+  async listSessions(user: JwtUser, currentDeviceId?: string) {
     const sessions = await this.prisma.refreshSession.findMany({
       where: { tenantId: user.tid, userId: user.sub, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       take: 20,
       select: {
         id: true,
@@ -33,9 +33,17 @@ export class MobileSessionService {
         updatedAt: true,
       },
     });
+    const deviceId = currentDeviceId?.trim() || '';
+    const matchedIndex = deviceId
+      ? sessions.findIndex(
+          (s) => this.parseMetadata(s.metadata).deviceId === deviceId,
+        )
+      : 0;
+    const currentIndex = matchedIndex >= 0 ? matchedIndex : 0;
     return {
       sessions: sessions.map((s, index) => {
         const meta = this.parseMetadata(s.metadata);
+        const isCurrent = index === currentIndex;
         return {
           id: s.id,
           userAgent: s.userAgent ?? 'Unknown',
@@ -45,9 +53,9 @@ export class MobileSessionService {
           appVersion: meta.appVersion ?? null,
           deviceLabel:
             meta.deviceLabel ??
-            (index === 0 ? 'Current session' : 'Previous session'),
+            (isCurrent ? 'Current session' : 'Previous session'),
           lastActiveAt: s.updatedAt.toISOString(),
-          isCurrent: index === 0,
+          isCurrent,
         };
       }),
     };

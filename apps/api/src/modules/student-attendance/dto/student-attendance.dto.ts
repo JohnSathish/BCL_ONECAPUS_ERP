@@ -155,3 +155,39 @@ export class AttendanceEligibilityQueryDto {
   @IsUUID()
   studentId?: string;
 }
+
+export class UpdateAttendancePolicyDto {
+  @IsOptional()
+  @IsIn(['FIRST_LAST', 'EVERY_PERIOD'])
+  attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
+
+  @IsOptional()
+  @Type(() => Number)
+  shortageThresholdPct?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  defaulterThresholdPct?: number;
+}
+
+export class AttendanceReportQueryDto extends AttendanceSessionQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  month?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  year?: number;
+
+  @IsOptional()
+  @IsUUID()
+  studentId?: string;
+
+  @IsOptional()
+  @IsIn(['json', 'xlsx', 'csv'])
+  format?: 'json' | 'xlsx' | 'csv';
+}

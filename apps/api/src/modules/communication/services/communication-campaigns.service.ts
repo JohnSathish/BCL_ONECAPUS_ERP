@@ -79,6 +79,7 @@ export class CommunicationCampaignsService {
           'EMAIL',
         ]) as Prisma.InputJsonValue,
         attachments: (dto.attachments ?? []) as Prisma.InputJsonValue,
+        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
         status: dto.scheduledAt ? 'SCHEDULED' : 'DRAFT',
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdById: user.sub,
@@ -102,23 +103,6 @@ export class CommunicationCampaignsService {
       );
     }
 
-    const recipients = await this.audience.resolve(
-      user.tid,
-      campaign.audienceType,
-      (campaign.audienceFilter ?? {}) as {
-        departmentIds?: string[];
-        programVersionIds?: string[];
-        userIds?: string[];
-        studentIds?: string[];
-        staffProfileIds?: string[];
-      },
-    );
-    if (!recipients.length) {
-      throw new BadRequestException(
-        'No recipients matched the selected audience',
-      );
-    }
-
     if (campaign.requiresApproval && campaign.approvalStatus !== 'APPROVED') {
       throw new BadRequestException(
         'Campaign requires approval before sending',
@@ -130,39 +114,78 @@ export class CommunicationCampaignsService {
       data: { status: 'SENDING' },
     });
 
-    await this.prisma.communicationRecipient.createMany({
-      data: recipients.map((r) => ({
-        tenantId: user.tid,
-        campaignId,
-        recipientType: r.recipientType,
-        userId: r.userId,
-        studentId: r.studentId,
-        staffProfileId: r.staffProfileId,
-        displayName: r.displayName,
-        email: r.email,
-        phone: r.phone,
-      })),
+    // Resolve audience + deliver in the worker so the HTTP request stays under the web timeout.
+    await this.queue.enqueueNotification({
+      jobType: 'campaign-prepare-and-deliver',
+      tenantId: user.tid,
+      campaignId,
     });
 
-    if (recipients.length > BATCH_SIZE) {
+    return { campaignId, recipientCount: 0, status: 'SENDING' };
+  }
+
+  /** Called by the notifications worker after send() enqueues prepare. */
+  async prepareAndDeliver(tenantId: string, campaignId: string) {
+    const campaign = await this.get(tenantId, campaignId);
+    if (campaign.status !== 'SENDING') return { skipped: true };
+
+    const existing = await this.prisma.communicationRecipient.count({
+      where: { tenantId, campaignId },
+    });
+    if (existing === 0) {
+      const recipients = await this.audience.resolve(
+        tenantId,
+        campaign.audienceType,
+        (campaign.audienceFilter ?? {}) as {
+          departmentIds?: string[];
+          programVersionIds?: string[];
+          userIds?: string[];
+          studentIds?: string[];
+          staffProfileIds?: string[];
+        },
+      );
+      if (!recipients.length) {
+        await this.prisma.communicationCampaign.update({
+          where: { id: campaignId },
+          data: {
+            status: 'FAILED',
+            metadata: {
+              ...(campaign.metadata as object),
+              failureReason: 'No recipients matched the selected audience',
+            },
+          },
+        });
+        return { recipientCount: 0, status: 'FAILED' };
+      }
+
       for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-        await this.queue.enqueueNotification({
-          jobType: 'campaign-deliver-batch',
-          tenantId: user.tid,
-          campaignId,
-          offset: i,
-          limit: BATCH_SIZE,
+        const chunk = recipients.slice(i, i + BATCH_SIZE);
+        await this.prisma.communicationRecipient.createMany({
+          data: chunk.map((r) => ({
+            tenantId,
+            campaignId,
+            recipientType: r.recipientType,
+            userId: r.userId,
+            studentId: r.studentId,
+            staffProfileId: r.staffProfileId,
+            displayName: r.displayName,
+            email: r.email,
+            phone: r.phone,
+          })),
         });
       }
-    } else {
-      await this.queue.enqueueNotification({
-        jobType: 'campaign-deliver',
-        tenantId: user.tid,
-        campaignId,
-      });
     }
 
-    return { campaignId, recipientCount: recipients.length, status: 'SENDING' };
+    await this.queue.enqueueNotification({
+      jobType: 'campaign-deliver',
+      tenantId,
+      campaignId,
+    });
+
+    const recipientCount = await this.prisma.communicationRecipient.count({
+      where: { tenantId, campaignId },
+    });
+    return { recipientCount, status: 'SENDING' };
   }
 
   async cancel(user: JwtUser, campaignId: string) {

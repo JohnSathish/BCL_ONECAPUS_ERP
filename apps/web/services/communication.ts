@@ -96,14 +96,18 @@ export const fetchCommunicationCampaigns = (status?: string) =>
     .then((res) => res.data);
 
 export const createCommunicationCampaign = (payload: Record<string, unknown>) =>
-  api.post<CommunicationCampaign>(`${base}/campaigns`, payload).then((res) => res.data);
+  api
+    .post<CommunicationCampaign>(`${base}/campaigns`, payload, { timeout: 60_000 })
+    .then((res) => res.data);
 
 export const previewCommunicationAudience = (payload: {
   audienceType: string;
   audienceFilter?: Record<string, unknown>;
 }) =>
   api
-    .post<ResolvedRecipient[]>(`${base}/campaigns/preview-audience`, payload)
+    .post<ResolvedRecipient[]>(`${base}/campaigns/preview-audience`, payload, {
+      timeout: 60_000,
+    })
     .then((res) => res.data);
 
 export const sendCommunicationCampaign = (id: string) =>
@@ -112,8 +116,26 @@ export const sendCommunicationCampaign = (id: string) =>
       campaignId: string;
       recipientCount: number;
       status: string;
-    }>(`${base}/campaigns/${id}/send`)
+    }>(`${base}/campaigns/${id}/send`, undefined, { timeout: 60_000 })
     .then((res) => res.data);
+
+export type CommunicationAttachment = {
+  type: 'image' | 'pdf';
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+};
+
+export const uploadCommunicationAttachment = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api
+    .post<CommunicationAttachment>(`${base}/attachments`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((res) => res.data);
+};
 
 export const cancelCommunicationCampaign = (id: string) =>
   api.post(`${base}/campaigns/${id}/cancel`).then((res) => res.data);

@@ -1,0 +1,20 @@
+# EAS upload ignore — replaces .gitignore for the build archive.
+# Intentionally allows google-services.json so FCM works on cloud builds.
+
+.expo/
+node_modules/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.env
+.env.local
+.env.production
+GoogleService-Info.plist
+*.apk
+*.aab
+onecampus-*.apk

@@ -5,6 +5,7 @@ const ACCESS_KEY = 'oc_access_token';
 const APP_TYPE_KEY = 'oc_app_type';
 const USER_SNAPSHOT_KEY = 'oc_user_snapshot';
 const LAST_LOGIN_KEY = 'oc_last_login_at';
+const REMEMBER_ME_KEY = 'oc_remember_me';
 
 export type StoredUserSnapshot = {
   permissions?: string[];
@@ -51,6 +52,17 @@ export async function getRefreshToken() {
   return SecureStore.getItemAsync(REFRESH_KEY);
 }
 
+export async function saveRememberMe(value: boolean) {
+  await SecureStore.setItemAsync(REMEMBER_ME_KEY, value ? '1' : '0');
+}
+
+export async function getRememberMe(): Promise<boolean | null> {
+  const raw = await SecureStore.getItemAsync(REMEMBER_ME_KEY);
+  if (raw === '1') return true;
+  if (raw === '0') return false;
+  return null;
+}
+
 export async function saveLastLoginAt(iso: string) {
   await SecureStore.setItemAsync(LAST_LOGIN_KEY, iso);
 }
@@ -65,4 +77,5 @@ export async function clearSession() {
   await SecureStore.deleteItemAsync(APP_TYPE_KEY);
   await SecureStore.deleteItemAsync(USER_SNAPSHOT_KEY);
   await SecureStore.deleteItemAsync(LAST_LOGIN_KEY);
+  await SecureStore.deleteItemAsync(REMEMBER_ME_KEY);
 }

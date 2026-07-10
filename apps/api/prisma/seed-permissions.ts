@@ -151,6 +151,18 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Limited student self profile update',
   },
   {
+    slug: 'students:profile-verify',
+    resource: 'students',
+    action: 'profile-verify',
+    description: 'Verify student profile update requests',
+  },
+  {
+    slug: 'students:profile-policy',
+    resource: 'students',
+    action: 'profile-policy',
+    description: 'Configure student profile update approval policy',
+  },
+  {
     slug: 'students:bulk-update',
     resource: 'students',
     action: 'bulk-update',
@@ -245,6 +257,36 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     resource: 'fees',
     action: 'cash:collect',
     description: 'Collect cash fee payments at the desk',
+  },
+  {
+    slug: 'payment-gateway:read',
+    resource: 'payment-gateway',
+    action: 'read',
+    description: 'View payment gateway configuration, logs, and health',
+  },
+  {
+    slug: 'payment-gateway:manage',
+    resource: 'payment-gateway',
+    action: 'manage',
+    description: 'Configure and activate institution payment gateways',
+  },
+  {
+    slug: 'accounts:read',
+    resource: 'accounts',
+    action: 'read',
+    description: 'View chart of accounts, vouchers, and books',
+  },
+  {
+    slug: 'accounts:manage',
+    resource: 'accounts',
+    action: 'manage',
+    description: 'Manage chart of accounts and draft vouchers',
+  },
+  {
+    slug: 'accounts:post',
+    resource: 'accounts',
+    action: 'post',
+    description: 'Post vouchers to the general ledger',
   },
   {
     slug: 'reports:read',

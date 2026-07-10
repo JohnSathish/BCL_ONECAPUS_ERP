@@ -384,6 +384,10 @@ function describeFilters(filters: AiIntentFilters): string[] {
   if (filters.missingAadhaar) lines.push('Missing Aadhaar');
   if (filters.missingPhoto) lines.push('Missing photo');
   if (filters.missingMobile) lines.push('Missing mobile');
+  if (filters.incompleteProfile) lines.push('Incomplete profile');
+  if (filters.missingClassXii) lines.push('Missing Class XII');
+  if (filters.pendingProfileVerification)
+    lines.push('Pending profile verification');
   return lines;
 }
 

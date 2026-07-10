@@ -298,6 +298,9 @@ async function main() {
     'academic-lifecycle:manage',
     'students:read',
     'students:manage',
+    'students:verify-documents',
+    'students:profile-verify',
+    'students:profile-policy',
     'students:bulk-update',
     'students:bulk-update:academic',
     'students:bulk-update:subjects',
@@ -366,6 +369,8 @@ async function main() {
     'students:read',
     'students:manage',
     'students:import',
+    'students:verify-documents',
+    'students:profile-verify',
     'students:bulk-update',
     'students:bulk-update:personal',
     'students:bulk-update:academic',
@@ -511,6 +516,11 @@ async function main() {
     'fees:read',
     'fees:manage',
     'fees:cash:collect',
+    'payment-gateway:read',
+    'payment-gateway:manage',
+    'accounts:read',
+    'accounts:manage',
+    'accounts:post',
     'reports:read',
     'notifications:read',
     'payroll:read',
@@ -611,6 +621,7 @@ async function main() {
     'official-documents:publish',
     'official-documents:archive',
     'official-documents:settings',
+    'accounts:read',
   ]);
   await upsertRole('vice-principal', 'Vice Principal', [
     'students:read',
@@ -636,6 +647,7 @@ async function main() {
     'official-documents:approve',
     'official-documents:publish',
     'official-documents:archive',
+    'accounts:read',
   ]);
   await upsertRole('erp-administrator', 'ERP Administrator', [
     'users:read',
@@ -663,6 +675,9 @@ async function main() {
     'official-documents:read',
     'official-documents:manage',
     'official-documents:settings',
+    'accounts:read',
+    'accounts:manage',
+    'accounts:post',
   ]);
 
   const adminRole = await prisma.role.findFirstOrThrow({
@@ -2540,7 +2555,7 @@ async function main() {
       name: 'Day Shift',
       sortOrder: 1,
       start: shiftTime(9, 45),
-      end: shiftTime(15, 30),
+      end: shiftTime(15, 0),
       status: 'ACTIVE' as const,
     },
     {
@@ -2548,7 +2563,7 @@ async function main() {
       name: 'Arts Shift II',
       sortOrder: 2,
       start: shiftTime(9, 45),
-      end: shiftTime(15, 30),
+      end: shiftTime(15, 0),
       status: 'INACTIVE' as const,
     },
     {

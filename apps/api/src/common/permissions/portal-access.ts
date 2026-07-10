@@ -95,6 +95,16 @@ export function isStudentOnlyUser(roles: string[]) {
   );
 }
 
+/** Faculty/staff without an explicit admin or shift workspace role. */
+export function shouldPreferStaffPortalHome(roles: string[]) {
+  return (
+    canAccessStaffPortal(roles) &&
+    !roles.some(
+      (role) => ADMIN_PORTAL_ROLES.has(role) || role.startsWith('shift-'),
+    )
+  );
+}
+
 export function resolveHomePath(roles: string[], permissions: string[] = []) {
   if (
     roles.includes('platform-admin') ||
@@ -111,6 +121,9 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
   }
   if (isStudentOnlyUser(roles)) {
     return '/student';
+  }
+  if (shouldPreferStaffPortalHome(roles)) {
+    return '/staff/dashboard';
   }
   if (canAccessAdminPortal(roles, permissions)) {
     return resolveDefaultAdminHome(permissions, roles);

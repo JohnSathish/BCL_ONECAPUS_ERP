@@ -24,6 +24,10 @@ import { CertificateVariableService } from './certificate-variable.service';
 import { CertificateDocumentService } from './certificate-document.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import {
+  evaluateProfileSoftGateFromPrisma,
+  roughProfileCompletionPercent,
+} from '../students/utils/profile-soft-gate.util';
+import {
   DBC_OFFICIAL_TEMPLATES,
   DBC_OFFICIAL_VARIABLE_KEYS,
 } from './templates/dbc-certificate.layout';
@@ -111,6 +115,23 @@ export class CertificatesService {
 
   async createMyRequest(user: JwtUser, dto: CertificateRequestDto) {
     const student = await this.resolveStudentRecord(user);
+    const percent = await roughProfileCompletionPercent(
+      this.prisma,
+      user.tid,
+      student.id,
+    );
+    const gate = await evaluateProfileSoftGateFromPrisma(
+      this.prisma,
+      user.tid,
+      student.id,
+      percent,
+    );
+    if (gate.blockCertificates) {
+      throw new BadRequestException(
+        gate.message ??
+          'Complete your student profile before requesting certificates.',
+      );
+    }
     return this.createRequest(user, { ...dto, studentId: student.id });
   }
 

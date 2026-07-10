@@ -74,6 +74,7 @@ export type AiActionKind =
   | 'search_applications'
   | 'search_subjects'
   | 'search_departments'
+  | 'profile_completion_summary'
   | 'generate_chart'
   | 'propose_action'
   | 'action_stub';
@@ -111,6 +112,9 @@ export type AiIntentFilters = {
   missingPhoto?: boolean;
   missingMobile?: boolean;
   missingAbcId?: boolean;
+  incompleteProfile?: boolean;
+  missingClassXii?: boolean;
+  pendingProfileVerification?: boolean;
 };
 
 export type AiActiveStudent = {

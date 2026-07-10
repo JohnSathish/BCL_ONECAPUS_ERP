@@ -1,6 +1,6 @@
-import { API_BASE, mobileHeaders } from '@/api/config';
+import { getApiBase, mobileHeadersAsync } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
-import { refreshAccessToken } from '@/auth/token-refresh';
+import { refreshAccessTokenString } from '@/auth/token-refresh';
 import { apiFetch } from '@/api/client';
 import type { FeeFinanceSettings, InitiatePaymentResponse, StudentFeeAccount } from '@/types/fees';
 import * as FileSystem from 'expo-file-system';
@@ -59,13 +59,16 @@ async function authorizedFetch(
   init?: RequestInit,
   retried = false,
 ): Promise<Response> {
-  const headers: Record<string, string> = mobileHeaders(init?.headers as Record<string, string>);
+  const [apiBase, headers] = await Promise.all([
+    getApiBase(),
+    mobileHeadersAsync(init?.headers as Record<string, string>),
+  ]);
   const token = await getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  const res = await fetch(`${apiBase}${path}`, { ...init, headers });
   if (res.status === 401 && !retried) {
-    const newToken = await refreshAccessToken();
+    const newToken = await refreshAccessTokenString();
     headers.Authorization = `Bearer ${newToken}`;
     return authorizedFetch(path, { ...init, headers }, true);
   }

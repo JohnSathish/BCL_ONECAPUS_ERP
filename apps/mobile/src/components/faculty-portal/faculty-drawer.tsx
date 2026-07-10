@@ -56,11 +56,26 @@ export function FacultyDrawer() {
     })).filter((section) => section.items.length > 0);
   }, [query]);
 
+  function badgeCount(item: (typeof FACULTY_DRAWER_SECTIONS)[number]['items'][number]) {
+    if (!item.badgeFrom || !home) return 0;
+    if (item.badgeFrom === 'notifications') return home.unreadNotificationCount ?? 0;
+    if (item.badgeFrom === 'attendancePending') {
+      return home.workloadSummary?.attendancePending ?? 0;
+    }
+    if (item.badgeFrom === 'marksPending') {
+      return home.workloadSummary?.marksPending ?? 0;
+    }
+    return 0;
+  }
+
   const name = home?.profile?.fullName ?? 'Faculty';
   const designation = home?.profile?.designation ?? 'Staff';
   const department = home?.profile?.department ?? 'Department';
   const classesToday = home?.workloadSummary?.classesToday ?? 0;
-  const pending = home?.workloadSummary?.attendancePending ?? 0;
+  const pending =
+    (home?.workloadSummary?.attendancePending ?? 0) +
+    (home?.workloadSummary?.marksPending ?? 0) +
+    (home?.unreadNotificationCount ?? 0);
 
   function navigate(href: string) {
     closeDrawer();
@@ -126,16 +141,24 @@ export function FacultyDrawer() {
             {filteredSections.map((section) => (
               <View key={section.id} style={styles.section}>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
-                {section.items.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    style={styles.menuItem}
-                    onPress={() => navigate(item.href)}
-                  >
-                    <Text style={styles.menuIcon}>{item.icon}</Text>
-                    <Text style={styles.menuLabel}>{item.label}</Text>
-                  </Pressable>
-                ))}
+                {section.items.map((item) => {
+                  const count = badgeCount(item);
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={styles.menuItem}
+                      onPress={() => navigate(item.href)}
+                    >
+                      <Text style={styles.menuIcon}>{item.icon}</Text>
+                      <Text style={styles.menuLabel}>{item.label}</Text>
+                      {count > 0 ? (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
               </View>
             ))}
           </ScrollView>
@@ -213,7 +236,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   menuIcon: { fontSize: 16, width: 22, textAlign: 'center' },
-  menuLabel: { fontSize: 14, fontWeight: '600', color: facultyTheme.text },
+  menuLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: facultyTheme.text },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: facultyTheme.urgent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   logoutBtn: {
     borderRadius: 10,
     backgroundColor: '#FEF2F2',

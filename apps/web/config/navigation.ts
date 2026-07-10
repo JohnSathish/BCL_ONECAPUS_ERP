@@ -17,6 +17,7 @@ import {
   GraduationCap,
   HelpCircle,
   Home,
+  Landmark,
   LayoutDashboard,
   Library,
   Mail,
@@ -247,6 +248,53 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Semester 5 Import',
             href: '/admin/students/subject-registration/semester-5-import',
             permissions: ['students:import', 'students:manage'],
+          },
+          {
+            label: 'Student Profile Verification',
+            href: '/admin/students/profile-verification',
+            permissions: [
+              'students:profile-verify',
+              'students:verify-documents',
+              'students:manage',
+            ],
+            activePattern: '^/admin/students/profile-verification(?:/.*)?$',
+          },
+          {
+            label: 'Pending Profile Updates',
+            href: '/admin/students/profile-verification/pending',
+            permissions: [
+              'students:profile-verify',
+              'students:verify-documents',
+              'students:manage',
+            ],
+          },
+          {
+            label: 'Class XII Verification',
+            href: '/admin/students/profile-verification/class-xii',
+            permissions: [
+              'students:profile-verify',
+              'students:verify-documents',
+              'students:manage',
+            ],
+          },
+          {
+            label: 'Profile Completion Dashboard',
+            href: '/admin/students/profile-verification/completion',
+            permissions: ['students:profile-verify', 'students:read', 'students:manage'],
+          },
+          {
+            label: 'Profile Update History',
+            href: '/admin/students/profile-verification/history',
+            permissions: ['students:profile-verify', 'students:read', 'students:manage'],
+          },
+          {
+            label: 'Document Verification',
+            href: '/admin/students/profile-verification/documents',
+            permissions: [
+              'students:verify-documents',
+              'students:profile-verify',
+              'students:manage',
+            ],
           },
           {
             label: 'Attendance',
@@ -1033,6 +1081,97 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    label: 'Finance & Accounts',
+    zone: 'scroll',
+    items: [
+      {
+        label: 'Finance & Accounts',
+        href: '/admin/accounts',
+        icon: Landmark,
+        module: 'accounts',
+        permissions: [...P.accounts],
+        activePattern: '^/admin/accounts(?:/.*)?$',
+        children: [
+          {
+            label: 'Accounts Dashboard',
+            href: '/admin/accounts',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Chart of Accounts',
+            href: '/admin/accounts/chart-of-accounts',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Vouchers',
+            href: '/admin/accounts/vouchers',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Cash Book',
+            href: '/admin/accounts/cash-book',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Bank Book',
+            href: '/admin/accounts/bank-book',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'General Ledger',
+            href: '/admin/accounts/ledger',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Financial Years',
+            href: '/admin/accounts/financial-years',
+            permissions: ['accounts:manage'],
+          },
+          {
+            label: 'Fee GL Mappings',
+            href: '/admin/accounts/settings',
+            permissions: ['accounts:manage'],
+          },
+          {
+            label: 'Vendors',
+            href: '/admin/accounts/vendors',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Expenses',
+            href: '/admin/accounts/expenses',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Budgets',
+            href: '/admin/accounts/budgets',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Fixed Assets',
+            href: '/admin/accounts/fixed-assets',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Bank Reconciliation',
+            href: '/admin/accounts/bank-reconciliation',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Financial Reports',
+            href: '/admin/accounts/reports',
+            permissions: [...P.accounts],
+          },
+          {
+            label: 'Audit Trail',
+            href: '/admin/accounts/audit-logs',
+            permissions: [...P.accounts],
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: 'Library',
     zone: 'scroll',
     items: [
@@ -1593,6 +1732,26 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['admissions:read', 'reports:read'],
           },
           {
+            label: 'Monthly Attendance',
+            href: '/admin/reports/attendance/monthly',
+            permissions: ['reports:read', ...P.studentAttendance],
+          },
+          {
+            label: 'Cumulative Attendance',
+            href: '/admin/reports/attendance/cumulative',
+            permissions: ['reports:read', ...P.studentAttendance],
+          },
+          {
+            label: 'Profile Completion Reports',
+            href: '/admin/students/profile-verification/completion',
+            permissions: ['students:profile-verify', 'students:read', 'students:export'],
+          },
+          {
+            label: 'Pending Profile Updates',
+            href: '/admin/students/profile-verification/pending',
+            permissions: ['students:profile-verify', 'students:manage'],
+          },
+          {
             label: 'Attendance Defaulters',
             href: '/admin/reports/attendance/defaulters',
             permissions: ['reports:read', ...P.studentAttendance],
@@ -1709,9 +1868,20 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],
           },
           {
+            label: 'Payment Gateway Management',
+            href: '/admin/administration/payment-gateway',
+            permissions: ['payment-gateway:read', 'payment-gateway:manage', 'fees:manage'],
+            activePattern: '^/admin/administration/payment-gateway(?:/.*)?$',
+          },
+          {
             label: 'Knowledge Base',
             href: '/admin/administration/knowledge-base',
             permissions: ['academic:read', 'academic:manage'],
+          },
+          {
+            label: 'Proposal Studio',
+            href: '/admin/proposals',
+            permissions: ['users:manage', 'official-documents:manage', 'official-documents:read'],
           },
           {
             label: 'Import / Export',
@@ -1855,6 +2025,7 @@ export const ROLE_NAV: Record<string, { label: string; href: string; icon: Lucid
   ],
   student: [
     { label: 'Dashboard', href: '/student', icon: LayoutDashboard },
+    { label: 'My Profile', href: '/student/my-profile', icon: User },
     { label: 'Results', href: '/student/results', icon: BarChart3 },
     { label: 'Fees', href: '/student/fees', icon: Wallet },
     { label: 'Certificates', href: '/student/certificates', icon: FileText },

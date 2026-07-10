@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react';
 import {
   Alert,
   Animated,
-  Image,
-  ImageBackground,
   Linking,
   Pressable,
   ScrollView,
@@ -17,15 +15,18 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/api/client';
 import { authTheme } from '@/components/auth/auth-theme';
+import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
   DEFAULT_PORTAL_STATS,
   DEFAULT_PORTAL_UPDATES,
   DON_BOSCO_QUOTE,
+  INSTITUTION_AFFILIATION_LINES,
   INSTITUTION_BADGES,
+  INSTITUTION_WELCOME_MESSAGE,
   NAAC_ACCREDITATION_LABEL,
-  PORTAL_AUDIENCE,
   PORTAL_TAGLINE,
   POWERED_BY,
+  POWERED_BY_TAGLINE,
   PRIVACY_POLICY_URL,
   PRODUCT_NAME,
   SUPPORT_EMAIL,
@@ -33,7 +34,8 @@ import {
   WELCOME_QUICK_ACCESS,
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { resolveCollegeLogoUri } from '@/utils/upload-asset-url';
+import { useSchoolConfig } from '@/hooks/use-school-config';
+import { InstitutionLogo } from '@/components/auth/institution-logo';
 
 const STICKY_BAR_HEIGHT = 72;
 
@@ -78,6 +80,7 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { config } = useBootstrap();
+  const { school } = useSchoolConfig();
 
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(24)).current;
@@ -89,7 +92,14 @@ export default function WelcomeScreen() {
   const updates = bootstrapUpdates.length > 0 ? bootstrapUpdates : [...DEFAULT_PORTAL_UPDATES];
   const notice = config?.maintenanceMessage?.trim() || null;
 
-  const logoUri = resolveCollegeLogoUri(config?.branding);
+  const institutionName =
+    config?.branding?.displayName?.trim() || school?.name || 'Your Institution';
+
+  useEffect(() => {
+    if (config?.maintenanceMode) {
+      router.replace('/(auth)/maintenance');
+    }
+  }, [config?.maintenanceMode, router]);
 
   const studentStat = formatStat(stats?.students ?? 0, DEFAULT_PORTAL_STATS.students);
   const facultyStat = formatStat(stats?.faculty ?? 0, DEFAULT_PORTAL_STATS.faculty);
@@ -148,13 +158,9 @@ export default function WelcomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <ImageBackground
-          source={require('../../assets/splash.png')}
-          style={styles.heroBg}
-          imageStyle={styles.heroBgImage}
-        >
+        <View style={styles.heroSection}>
           <LinearGradient
-            colors={['rgba(30,58,138,0.92)', 'rgba(37,99,235,0.88)', 'rgba(37,99,235,0.95)']}
+            colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
             style={[styles.heroOverlay, { paddingTop: insets.top + 16 }]}
           >
             <Animated.View
@@ -164,25 +170,33 @@ export default function WelcomeScreen() {
                 alignItems: 'center',
               }}
             >
+              <SchoolInstitutionChip light />
               <View style={styles.logoRing}>
-                {logoUri ? (
-                  <Image source={{ uri: logoUri }} style={styles.logoImage} />
-                ) : (
-                  <Image source={require('../../assets/icon.png')} style={styles.logoImage} />
-                )}
+                <InstitutionLogo branding={config?.branding} size={46} style={styles.logoImage} />
               </View>
-              <Text style={styles.collegeLine}>DON BOSCO COLLEGE</Text>
-              <Text style={styles.collegeCity}>TURA</Text>
+              <Text style={styles.welcomeMessage}>{INSTITUTION_WELCOME_MESSAGE}</Text>
+              <Text style={styles.collegeLine}>{institutionName.toUpperCase()}</Text>
+              {INSTITUTION_AFFILIATION_LINES.map((line) => (
+                <Text key={line} style={styles.affiliationLine}>
+                  {line}
+                </Text>
+              ))}
+              <View style={styles.roleRow}>
+                {['Student', 'Faculty', 'Parent', 'Staff'].map((role) => (
+                  <View key={role} style={styles.roleChip}>
+                    <Text style={styles.roleChipText}>{role}</Text>
+                  </View>
+                ))}
+              </View>
               <Text style={styles.product}>{PRODUCT_NAME}</Text>
               <Text style={styles.tagline}>{PORTAL_TAGLINE}</Text>
-              <Text style={styles.audience}>{PORTAL_AUDIENCE}</Text>
               <View style={styles.naacBadge}>
                 <Text style={styles.naacStars}>★★★★★</Text>
                 <Text style={styles.naacText}>{NAAC_ACCREDITATION_LABEL}</Text>
               </View>
             </Animated.View>
           </LinearGradient>
-        </ImageBackground>
+        </View>
 
         {/* Primary CTA — above the fold */}
         <View style={[styles.primaryCtaWrap, { marginTop: -32 }]}>
@@ -327,6 +341,7 @@ export default function WelcomeScreen() {
           </View>
           <Text style={[styles.version, { color: textMuted }]}>Version {APP_VERSION}</Text>
           <Text style={[styles.powered, { color: textMuted }]}>{POWERED_BY}</Text>
+          <Text style={[styles.poweredSub, { color: textMuted }]}>{POWERED_BY_TAGLINE}</Text>
         </Animated.View>
       </ScrollView>
 
@@ -374,8 +389,10 @@ function StatCard({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  heroBg: { width: '100%', minHeight: 300 },
-  heroBgImage: { opacity: 0.35 },
+  heroSection: {
+    overflow: 'hidden',
+    backgroundColor: '#1e3a8a',
+  },
   heroOverlay: {
     flex: 1,
     minHeight: 300,
@@ -395,21 +412,51 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   logoImage: { width: 72, height: 72, borderRadius: 36 },
+  welcomeMessage: {
+    color: 'rgba(219,234,254,0.95)',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
   collegeLine: {
     color: '#ffffff',
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.6,
     textAlign: 'center',
     marginTop: 2,
+    paddingHorizontal: 12,
+    lineHeight: 26,
   },
-  collegeCity: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 5,
+  affiliationLine: {
+    color: 'rgba(219,234,254,0.88)',
+    fontSize: 11,
+    fontWeight: '500',
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 15,
+    paddingHorizontal: 10,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  roleChip: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  roleChipText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   product: {
     color: '#dbeafe',
@@ -427,12 +474,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 8,
-  },
-  audience: {
-    color: '#bfdbfe',
-    fontSize: 12,
-    marginTop: 8,
-    textAlign: 'center',
   },
   naacBadge: {
     marginTop: 14,
@@ -622,4 +663,5 @@ const styles = StyleSheet.create({
   footerLink: { color: authTheme.primaryLight, fontSize: 13, fontWeight: '600' },
   version: { textAlign: 'center', fontSize: 11, marginTop: 8 },
   powered: { textAlign: 'center', fontSize: 11, marginTop: 4 },
+  poweredSub: { textAlign: 'center', fontSize: 10, marginTop: 2 },
 });

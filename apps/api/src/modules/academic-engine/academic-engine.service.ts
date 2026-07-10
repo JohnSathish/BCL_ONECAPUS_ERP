@@ -63,6 +63,10 @@ import type {
   CreateStudentMajorMinorOverrideDto,
   ResolveStudentMajorMinorOverrideQueryDto,
 } from './dto/major-minor-override.dto';
+import {
+  evaluateProfileSoftGateFromPrisma,
+  roughProfileCompletionPercent,
+} from '../students/utils/profile-soft-gate.util';
 
 @Injectable()
 export class AcademicEngineService {
@@ -646,6 +650,23 @@ export class AcademicEngineService {
       student.id,
     );
     this.registrationWorkflow.assertStudentSelfServiceAllowed(workflow);
+    const percent = await roughProfileCompletionPercent(
+      this.prisma,
+      tenantId,
+      student.id,
+    );
+    const gate = await evaluateProfileSoftGateFromPrisma(
+      this.prisma,
+      tenantId,
+      student.id,
+      percent,
+    );
+    if (gate.blockRegistration) {
+      throw new BadRequestException(
+        gate.message ??
+          'Complete your student profile before submitting registration.',
+      );
+    }
     const reg = await this.getRegistration(tenantId, registrationId);
     if (reg.studentId !== student.id)
       throw new NotFoundException('Registration not found');

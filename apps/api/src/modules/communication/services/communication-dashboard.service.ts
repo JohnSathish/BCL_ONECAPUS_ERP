@@ -189,7 +189,8 @@ export class CommunicationDashboardService {
           usedThisMonth: smsMonth,
         },
         push: {
-          ...channelHealth.push,
+          connected: this.fcm.isConfigured() && !this.fcm.isDemoMode(),
+          demoMode: this.fcm.isDemoMode(),
           activeDevices,
           deliveryRate:
             pushTotal > 0
@@ -204,12 +205,27 @@ export class CommunicationDashboardService {
     const smtpHost = this.config.get<string>('SMTP_HOST');
     const whatsappToken = this.config.get<string>('WHATSAPP_ACCESS_TOKEN');
 
-    const whatsappTemplates =
-      await this.prisma.communicationWhatsAppTemplate.count({
-        where: { tenantId, status: 'APPROVED' },
-      });
-
-    const queueStats = await this.queue.getNotificationQueueStats();
+    const [whatsappTemplates, activeDevices, messagesDelivered, queueStats] =
+      await Promise.all([
+        this.prisma.communicationWhatsAppTemplate.count({
+          where: { tenantId, status: 'APPROVED' },
+        }),
+        this.prisma.mobileDevice.count({
+          where: {
+            tenantId,
+            status: 'ACTIVE',
+            pushToken: { not: null },
+          },
+        }),
+        this.prisma.communicationDeliveryLog.count({
+          where: {
+            tenantId,
+            channel: 'WHATSAPP',
+            status: { in: ['SENT', 'DELIVERED'] },
+          },
+        }),
+        this.queue.getNotificationQueueStats(),
+      ]);
 
     return {
       email: {
@@ -225,18 +241,12 @@ export class CommunicationDashboardService {
       whatsapp: {
         connected: Boolean(whatsappToken),
         templatesApproved: whatsappTemplates,
-        messagesDelivered: await this.prisma.communicationDeliveryLog.count({
-          where: {
-            tenantId,
-            channel: 'WHATSAPP',
-            status: { in: ['SENT', 'DELIVERED'] },
-          },
-        }),
+        messagesDelivered,
       },
       push: {
-        connected: this.fcm.isConfigured(),
+        connected: this.fcm.isConfigured() && !this.fcm.isDemoMode(),
         demoMode: this.fcm.isDemoMode(),
-        activeDevices: 0,
+        activeDevices,
         deliveryRate: null as number | null,
       },
     };

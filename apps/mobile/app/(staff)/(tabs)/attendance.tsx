@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,22 +15,50 @@ import {
   fetchFacultyTodaySessions,
   type FacultyAttendanceSession,
 } from '@/services/faculty-attendance';
+import {
+  attendanceActionLabel,
+  attendanceMarkStateLabel,
+  formatSessionTimeRange,
+  getAttendanceMarkState,
+  sessionCountsLine,
+  sessionDisplaySubtitle,
+  sessionDisplayTitle,
+  type AttendanceMarkState,
+} from '@/utils/attendance-session';
 
-function sessionLabel(session: FacultyAttendanceSession) {
-  const course = session.course?.title ?? session.course?.code ?? 'Class';
-  const time =
-    session.startTime && session.endTime ? `${session.startTime} – ${session.endTime}` : 'Time TBD';
-  const room = session.location?.roomName ?? session.location?.roomCode;
-  return { course, time, room, section: session.section?.sectionCode };
-}
+const MARK_STATE_STYLES: Record<
+  AttendanceMarkState,
+  { badgeBg: string; badgeText: string; badgeBorder: string; cardBorder: string }
+> = {
+  pending: {
+    badgeBg: '#FEF3C7',
+    badgeText: '#92400E',
+    badgeBorder: '#FCD34D',
+    cardBorder: facultyTheme.border,
+  },
+  marked: {
+    badgeBg: '#D1FAE5',
+    badgeText: '#065F46',
+    badgeBorder: '#6EE7B7',
+    cardBorder: '#A7F3D0',
+  },
+  locked: {
+    badgeBg: '#FFEDD5',
+    badgeText: '#9A3412',
+    badgeBorder: '#FDBA74',
+    cardBorder: '#FED7AA',
+  },
+};
 
 export default function FacultyAttendanceScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sessions, setSessions] = useState<FacultyAttendanceSession[]>([]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const rows = await fetchFacultyTodaySessions();
       setSessions(rows);
@@ -38,6 +66,7 @@ export default function FacultyAttendanceScreen() {
       setSessions([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -45,16 +74,31 @@ export default function FacultyAttendanceScreen() {
     void load();
   }, [load]);
 
-  const pending = sessions.filter((s) => s.status === 'OPEN' || s.status === 'open').length;
+  const pending = sessions.filter((s) => getAttendanceMarkState(s) === 'pending').length;
+  const marked = sessions.filter((s) => getAttendanceMarkState(s) === 'marked').length;
+  const locked = sessions.filter((s) => getAttendanceMarkState(s) === 'locked').length;
 
   return (
     <FacultyScreenShell title="Attendance" subtitle="Mark & review class attendance">
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.summary}>
-          <Text style={styles.summaryValue}>{pending || sessions.length}</Text>
-          <Text style={styles.summaryLabel}>
-            {pending > 0 ? 'Sessions pending today' : 'Sessions scheduled today'}
-          </Text>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
+      >
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryCard, styles.summaryPending]}>
+            <Text style={[styles.summaryValue, styles.summaryPendingValue]}>{pending}</Text>
+            <Text style={styles.summaryLabel}>Pending</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryMarked]}>
+            <Text style={[styles.summaryValue, styles.summaryMarkedValue]}>{marked}</Text>
+            <Text style={styles.summaryLabel}>Marked</Text>
+          </View>
+          {locked > 0 ? (
+            <View style={[styles.summaryCard, styles.summaryLocked]}>
+              <Text style={[styles.summaryValue, styles.summaryLockedValue]}>{locked}</Text>
+              <Text style={styles.summaryLabel}>Locked</Text>
+            </View>
+          ) : null}
         </View>
 
         {loading ? (
@@ -63,27 +107,49 @@ export default function FacultyAttendanceScreen() {
           <Text style={styles.empty}>No attendance sessions for today.</Text>
         ) : (
           sessions.map((session) => {
-            const meta = sessionLabel(session);
-            const counts = session.counts;
+            const markState = getAttendanceMarkState(session);
+            const palette = MARK_STATE_STYLES[markState];
+            const countsLine = sessionCountsLine(session);
+
             return (
               <Pressable
                 key={session.id}
-                style={styles.card}
+                style={[styles.card, { borderColor: palette.cardBorder }]}
                 onPress={() => router.push(`/(staff)/mark-attendance/${session.id}` as never)}
               >
-                <Text style={styles.time}>{meta.time}</Text>
-                <Text style={styles.title}>{meta.course}</Text>
-                <Text style={styles.meta}>
-                  {meta.section ? `Section ${meta.section}` : ''}
-                  {meta.room ? ` · Room ${meta.room}` : ''}
-                </Text>
-                {counts ? (
-                  <Text style={styles.counts}>
-                    Present {counts.present ?? 0} · Absent {counts.absent ?? 0} · Total{' '}
-                    {counts.total ?? 0}
+                <View style={styles.cardHeader}>
+                  <Text style={styles.time}>
+                    {formatSessionTimeRange(session.startTime, session.endTime)}
                   </Text>
-                ) : null}
-                <Text style={styles.action}>Take attendance →</Text>
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: palette.badgeBg,
+                        borderColor: palette.badgeBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.badgeText, { color: palette.badgeText }]}>
+                      {attendanceMarkStateLabel(markState)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.title}>{sessionDisplayTitle(session)}</Text>
+                <Text style={styles.meta}>{sessionDisplaySubtitle(session)}</Text>
+
+                {countsLine ? <Text style={styles.counts}>{countsLine}</Text> : null}
+
+                <Text
+                  style={[
+                    styles.action,
+                    markState === 'marked' && styles.actionMarked,
+                    markState === 'locked' && styles.actionLocked,
+                  ]}
+                >
+                  {attendanceActionLabel(markState)}
+                </Text>
               </Pressable>
             );
           })
@@ -95,16 +161,32 @@ export default function FacultyAttendanceScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10, paddingBottom: 28 },
-  summary: {
-    backgroundColor: '#FEF2F2',
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  summaryCard: {
+    flex: 1,
     borderRadius: 14,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FECACA',
   },
-  summaryValue: { fontSize: 28, fontWeight: '800', color: facultyTheme.urgent },
-  summaryLabel: { fontSize: 12, color: facultyTheme.textMuted, marginTop: 4 },
+  summaryPending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  summaryMarked: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  summaryLocked: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  summaryValue: { fontSize: 24, fontWeight: '800' },
+  summaryPendingValue: { color: '#B45309' },
+  summaryMarkedValue: { color: '#047857' },
+  summaryLockedValue: { color: '#C2410C' },
+  summaryLabel: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2, fontWeight: '600' },
   empty: { fontSize: 13, color: facultyTheme.textMuted, marginTop: 12 },
   card: {
     backgroundColor: facultyTheme.surface,
@@ -112,11 +194,25 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 4,
     borderWidth: 1,
-    borderColor: facultyTheme.border,
   },
-  time: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  badge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+  time: { flex: 1, fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
   title: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
   meta: { fontSize: 12, color: facultyTheme.textMuted },
   counts: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2 },
   action: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight, marginTop: 6 },
+  actionMarked: { color: '#047857' },
+  actionLocked: { color: '#C2410C' },
 });

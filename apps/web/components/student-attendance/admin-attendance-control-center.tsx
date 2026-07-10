@@ -16,12 +16,14 @@ import {
 
 import { Button } from '@/components/ui/button';
 import {
+  fetchAttendancePolicy,
   fetchStudentAttendanceDashboard,
   fetchStudentAttendanceReport,
   fetchStudentAttendanceSessions,
   fetchStudentAttendanceSummaries,
   generateStudentAttendanceSessions,
   recalculateStudentAttendanceEligibility,
+  updateAttendancePolicy,
   updateStudentAttendanceSessionState,
   type StudentAttendanceSession,
 } from '@/services/student-attendance';
@@ -48,7 +50,25 @@ export function AdminAttendanceControlCenter() {
   });
   const report = useQuery({
     queryKey: ['student-attendance', 'report', reportType, date],
-    queryFn: () => fetchStudentAttendanceReport(reportType, { date }),
+    queryFn: () => {
+      if (reportType === 'monthly') {
+        const d = new Date(date);
+        return fetchStudentAttendanceReport('monthly', {
+          month: d.getMonth() + 1,
+          year: d.getFullYear(),
+        });
+      }
+      if (reportType === 'cumulative' || reportType === 'defaulters' || reportType === 'shortage') {
+        const d = new Date(date);
+        const from = `${d.getFullYear()}-01-01`;
+        return fetchStudentAttendanceReport(reportType, { from, to: date });
+      }
+      return fetchStudentAttendanceReport(reportType, { date });
+    },
+  });
+  const policyQ = useQuery({
+    queryKey: ['student-attendance', 'policy'],
+    queryFn: fetchAttendancePolicy,
   });
 
   const refreshAll = async () => {
@@ -57,8 +77,21 @@ export function AdminAttendanceControlCenter() {
 
   const generateMut = useMutation({
     mutationFn: () => generateStudentAttendanceSessions({ date }),
-    onSuccess: async (result: any) => {
-      setMessage(`Generated/opened ${result.created ?? 0} sessions from timetable.`);
+    onSuccess: async (result: {
+      created?: number;
+      removedDuplicates?: number;
+      deduped?: number;
+      countable?: number;
+      attendanceMode?: string;
+    }) => {
+      const removed = result.removedDuplicates ?? 0;
+      const created = result.created ?? 0;
+      const mode = result.attendanceMode ? ` (${result.attendanceMode})` : '';
+      setMessage(
+        removed > 0
+          ? `Opened ${created} sessions from published timetables${mode}. Removed ${removed} duplicate session(s).`
+          : `Generated/opened ${created} sessions from published timetables${mode}.`,
+      );
       await refreshAll();
     },
     onError: (error) => setMessage(apiErrorMessage(error, 'Could not generate sessions')),
@@ -71,6 +104,20 @@ export function AdminAttendanceControlCenter() {
       await refreshAll();
     },
     onError: (error) => setMessage(apiErrorMessage(error, 'Could not recalculate eligibility')),
+  });
+
+  const policyMut = useMutation({
+    mutationFn: (attendanceMode: 'FIRST_LAST' | 'EVERY_PERIOD') =>
+      updateAttendancePolicy({ attendanceMode }),
+    onSuccess: async (policy) => {
+      setMessage(
+        `Attendance mode set to ${
+          policy.attendanceMode === 'FIRST_LAST' ? 'First & Last Period' : 'Every Period'
+        }.`,
+      );
+      await refreshAll();
+    },
+    onError: (error) => setMessage(apiErrorMessage(error, 'Could not update policy')),
   });
 
   const stats = dashboard.data ?? {};
@@ -128,6 +175,27 @@ export function AdminAttendanceControlCenter() {
             {message}
           </p>
         ) : null}
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border/50 bg-background/60 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Attendance counting policy
+            </p>
+            <p className="text-sm text-muted-foreground">
+              DBC default is First &amp; Last period. Switch to Every Period when needed.
+            </p>
+          </div>
+          <select
+            value={policyQ.data?.attendanceMode ?? 'FIRST_LAST'}
+            disabled={policyMut.isPending || policyQ.isLoading}
+            onChange={(event) =>
+              policyMut.mutate(event.target.value as 'FIRST_LAST' | 'EVERY_PERIOD')
+            }
+            className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
+          >
+            <option value="FIRST_LAST">First &amp; Last Period</option>
+            <option value="EVERY_PERIOD">Every Period</option>
+          </select>
+        </div>
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -208,6 +276,8 @@ export function AdminAttendanceControlCenter() {
               className="h-9 rounded-lg border border-border bg-background px-2 text-xs"
             >
               <option value="unmarked">Unmarked Classes</option>
+              <option value="monthly">Monthly Report</option>
+              <option value="cumulative">Cumulative Report</option>
               <option value="shortage">Shortage List</option>
               <option value="defaulters">Defaulters</option>
               <option value="daily">Daily Attendance</option>
@@ -269,11 +339,10 @@ function SessionAdminRow({
   return (
     <tr className="border-t border-border/60">
       <td className="px-3 py-2">
-        <p className="font-medium">
-          {session.course?.code ?? '—'} · {session.course?.title ?? 'Class'}
-        </p>
+        <p className="font-medium">{session.displayTitle ?? session.course?.title ?? 'Class'}</p>
         <p className="text-xs text-muted-foreground">
-          Section {session.section?.sectionCode ?? '—'} · {session.sessionType}
+          {session.course?.code ?? '—'} · Section {session.section?.sectionCode ?? '—'} ·{' '}
+          {session.sessionType}
           {session.location
             ? ` · ${session.location.roomCode ?? ''} ${session.location.roomName ?? ''}`
             : ''}

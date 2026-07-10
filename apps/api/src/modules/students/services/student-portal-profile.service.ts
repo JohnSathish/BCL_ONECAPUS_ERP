@@ -10,12 +10,12 @@ import { IdCardsService } from '../../id-cards/id-cards.service';
 import type {
   StudentIdCardPrintRequestDto,
   StudentPortalChangeRequestDto,
-  StudentPortalChangeSection,
 } from '../dto/student-portal-profile.dto';
 import { StudentAssetsService } from './student-assets.service';
 import { StudentAbcService } from './student-abc.service';
 import { StudentPortalService } from './student-portal.service';
 import { StudentProfileService } from './student-profile.service';
+import { StudentProfileChangeRequestService } from './student-profile-change-request.service';
 
 const SNAPSHOT_LABELS: Record<string, string> = {
   MAJOR: 'Major',
@@ -47,6 +47,7 @@ export class StudentPortalProfileService {
     private readonly examinations: ExaminationsService,
     private readonly idCards: IdCardsService,
     private readonly abcService: StudentAbcService,
+    private readonly changeRequests: StudentProfileChangeRequestService,
   ) {}
 
   async getMyProfile(user: JwtUser) {
@@ -400,31 +401,17 @@ export class StudentPortalProfileService {
 
   async submitChangeRequest(user: JwtUser, dto: StudentPortalChangeRequestDto) {
     const student = await this.portal.resolveStudent(user);
-    this.assertEditableFields(dto.section, dto.changes);
+    const section = dto.section === 'parent' ? 'guardians' : dto.section;
 
-    const entry = await this.prisma.auditLog.create({
-      data: {
-        tenantId: user.tid,
-        userId: user.sub,
-        module: 'student_portal',
-        action: 'student.profile_change_request',
-        entityType: 'student',
-        entityId: student.id,
-        metadata: {
-          section: dto.section,
-          changes: dto.changes,
-          status: 'PENDING',
-          submittedAt: new Date().toISOString(),
-        },
-      },
-    });
+    const changes = Object.entries(dto.changes ?? {}).map(
+      ([fieldKey, newValue]) => ({
+        sectionKey: section,
+        fieldKey,
+        newValue,
+      }),
+    );
 
-    return {
-      id: entry.id,
-      section: dto.section,
-      status: 'PENDING' as const,
-      message: 'Your update request has been submitted for admin approval.',
-    };
+    return this.changeRequests.submitFieldChanges(user, student.id, changes);
   }
 
   async submitIdCardPrintRequest(
@@ -475,27 +462,21 @@ export class StudentPortalProfileService {
   }
 
   async listChangeRequests(tenantId: string, studentId: string) {
-    const rows = await this.prisma.auditLog.findMany({
-      where: {
-        tenantId,
-        entityType: 'student',
-        entityId: studentId,
-        action: 'student.profile_change_request',
-      },
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.changeRequests.listRequests(tenantId, {
+      studentId,
       take: 20,
     });
-
-    return rows.map((row) => {
-      const meta = (row.metadata ?? {}) as Record<string, unknown>;
-      return {
-        id: row.id,
-        section: String(meta.section ?? ''),
-        status: String(meta.status ?? 'PENDING'),
-        changes: meta.changes ?? {},
-        submittedAt: row.createdAt.toISOString(),
-      };
-    });
+    return rows.map((row: any) => ({
+      id: row.id,
+      section: row.items?.[0]?.sectionKey ?? '',
+      status: row.status,
+      changes: Object.fromEntries(
+        (row.items ?? []).map((item: any) => [item.fieldKey, item.newValue]),
+      ),
+      items: row.items,
+      submittedAt:
+        row.submittedAt?.toISOString?.() ?? row.createdAt?.toISOString?.(),
+    }));
   }
 
   async uploadDocument(
@@ -514,6 +495,13 @@ export class StudentPortalProfileService {
       'TRANSFER_CERTIFICATE',
       'MIGRATION_CERTIFICATE',
       'PASSPORT_PHOTO',
+      'CLASS_XII_MARKSHEET',
+      'CLASS_XII_PASSING',
+      'CHARACTER',
+      'INCOME',
+      'COMMUNITY',
+      'DISABILITY',
+      'OTHER',
     ]);
     const normalized = documentType.toUpperCase().replace(/\s+/g, '_');
     if (!allowed.has(normalized)) {
@@ -592,39 +580,6 @@ export class StudentPortalProfileService {
         };
       }),
     };
-  }
-
-  private assertEditableFields(
-    section: StudentPortalChangeSection,
-    changes: Record<string, string | null>,
-  ) {
-    const allowed: Record<StudentPortalChangeSection, Set<string>> = {
-      contact: new Set([
-        'mobileNumber',
-        'alternateMobile',
-        'personalEmail',
-        'currentAddressLine1',
-        'currentAddressLine2',
-        'currentCity',
-        'currentState',
-        'currentPinCode',
-        'emergencyContact',
-      ]),
-      parent: new Set([
-        'fatherName',
-        'motherName',
-        'guardianName',
-        'parentMobile',
-      ]),
-    };
-
-    for (const key of Object.keys(changes)) {
-      if (!allowed[section].has(key)) {
-        throw new BadRequestException(
-          `Field "${key}" cannot be updated by students.`,
-        );
-      }
-    }
   }
 
   private buildRequiredDocuments(

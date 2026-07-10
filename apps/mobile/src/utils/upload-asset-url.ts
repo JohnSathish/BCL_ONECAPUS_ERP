@@ -1,17 +1,45 @@
-import { API_BASE } from '@/api/config';
+import { Platform } from 'react-native';
+import { getApiBaseSync } from '@/auth/school-config';
 
-/** Remote fallback when tenant branding has no uploaded logo yet. */
-export const COLLEGE_LOGO_FALLBACK_URL =
-  process.env.EXPO_PUBLIC_COLLEGE_LOGO_URL ?? 'https://donboscocollege.ac.in/favicon.ico';
+/** Bundled PNG is used when tenant branding has no supported remote logo. */
+export const COLLEGE_LOGO_FALLBACK_URL = process.env.EXPO_PUBLIC_COLLEGE_LOGO_URL ?? '';
+
+/** RN Image does not reliably render ICO / favicon URLs on Android. */
+export function isSupportedRemoteImageUrl(url?: string | null): boolean {
+  if (!url?.trim()) return false;
+  const lower = url.trim().toLowerCase();
+  if (lower.endsWith('.ico')) return false;
+  if (lower.includes('favicon')) return false;
+  return lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('/');
+}
+
+/** Map API host for Android emulator (host machine via 10.0.2.2). */
+export function resolveApiOriginForDevice(apiBase: string): string {
+  let origin = apiBase.replace(/\/api\/?$/, '');
+  if (Platform.OS === 'android') {
+    origin = origin.replace(/^http:\/\/localhost(?=[:/]|$)/i, 'http://10.0.2.2');
+    origin = origin.replace(/^http:\/\/127\.0\.0\.1(?=[:/]|$)/, 'http://10.0.2.2');
+  }
+  return origin;
+}
 
 /** Turn stored `/uploads/...` paths into absolute URLs for React Native Image. */
 export function resolveUploadAssetUrl(path?: string | null): string | undefined {
   if (!path?.trim()) return undefined;
   const trimmed = path.trim();
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (!isSupportedRemoteImageUrl(trimmed)) return undefined;
+    if (Platform.OS === 'android') {
+      return trimmed
+        .replace(/^http:\/\/localhost(?=[:/]|$)/i, 'http://10.0.2.2')
+        .replace(/^http:\/\/127\.0\.0\.1(?=[:/]|$)/, 'http://10.0.2.2');
+    }
     return trimmed;
   }
-  const origin = API_BASE.replace(/\/api\/?$/, '');
+  const apiBase = getApiBaseSync();
+  if (!apiBase?.trim()) return undefined;
+  const origin = resolveApiOriginForDevice(apiBase);
+  if (!origin) return undefined;
   const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   if (normalized.startsWith('/uploads/')) {
     return `${origin}${normalized}`;
@@ -19,13 +47,16 @@ export function resolveUploadAssetUrl(path?: string | null): string | undefined 
   return `${origin}/uploads/${normalized.replace(/^\/+/, '')}`;
 }
 
-export function resolveCollegeLogoUri(branding?: {
-  logoUrl?: string | null;
-  splashImageUrl?: string | null;
-}): string {
-  return (
-    resolveUploadAssetUrl(branding?.logoUrl) ??
-    resolveUploadAssetUrl(branding?.splashImageUrl) ??
-    COLLEGE_LOGO_FALLBACK_URL
-  );
+export function resolveCollegeLogoUri(
+  branding?: { logoUrl?: string | null },
+  extraCandidates: Array<string | null | undefined> = [],
+): string | undefined {
+  const candidates = [branding?.logoUrl, ...extraCandidates, COLLEGE_LOGO_FALLBACK_URL];
+  for (const raw of candidates) {
+    const resolved = resolveUploadAssetUrl(raw);
+    if (resolved && isSupportedRemoteImageUrl(resolved)) {
+      return resolved;
+    }
+  }
+  return undefined;
 }

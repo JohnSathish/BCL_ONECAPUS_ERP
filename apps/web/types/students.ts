@@ -52,6 +52,7 @@ export type StudentDirectoryRow = {
   streamCode?: string | null;
   shift?: string | null;
   shiftCode?: string | null;
+  primaryShiftId?: string | null;
   batch?: string | null;
   admissionYear?: number | null;
   entrySession?: string | null;

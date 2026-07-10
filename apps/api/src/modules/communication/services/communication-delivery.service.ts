@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 import { PrismaService } from '../../../database/prisma.service';
+import { resolveUploadRoot } from '../../../common/uploads/upload-paths';
 import { CommunicationEmailService } from './communication-email.service';
 import { CommunicationSmsService } from './communication-sms.service';
 import { CommunicationTemplateRendererService } from './communication-template-renderer.service';
@@ -7,6 +10,11 @@ import { UserNotificationsService } from './user-notifications.service';
 import { FcmPushService } from './fcm-push.service';
 import { CommunicationWhatsAppService } from './communication-whatsapp.service';
 import { resolveNotificationLink } from '../utils/notification-link.util';
+import {
+  isPushCategoryEnabled,
+  resolvePushCategory,
+} from '../utils/push-preference.util';
+import type { CommunicationAttachment } from './communication-assets.service';
 
 @Injectable()
 export class CommunicationDeliveryService {
@@ -20,7 +28,59 @@ export class CommunicationDeliveryService {
     private readonly renderer: CommunicationTemplateRendererService,
     private readonly fcm: FcmPushService,
     private readonly whatsapp: CommunicationWhatsAppService,
+    private readonly config: ConfigService,
   ) {}
+
+  private parseAttachments(raw: unknown): CommunicationAttachment[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item) => {
+        const row = item as Partial<CommunicationAttachment>;
+        if (!row?.url || !row.type) return null;
+        return {
+          type: row.type === 'pdf' ? 'pdf' : 'image',
+          url: String(row.url),
+          name: String(row.name ?? 'attachment'),
+          mimeType: String(row.mimeType ?? ''),
+          size: Number(row.size ?? 0),
+        } satisfies CommunicationAttachment;
+      })
+      .filter((x): x is CommunicationAttachment => Boolean(x));
+  }
+
+  private toAbsoluteUrl(pathOrUrl: string): string {
+    if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+    const base = (
+      this.config.get<string>('APP_PUBLIC_URL') ??
+      this.config.get<string>('API_PUBLIC_URL') ??
+      'http://127.0.0.1:3001'
+    ).replace(/\/$/, '');
+    return `${base}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+  }
+
+  private attachmentDiskPath(url: string): string | null {
+    const marker = '/uploads/';
+    const idx = url.indexOf(marker);
+    if (idx < 0) return null;
+    return join(resolveUploadRoot(), url.slice(idx + marker.length));
+  }
+
+  private appendAttachmentHtml(
+    html: string | null | undefined,
+    attachments: CommunicationAttachment[],
+  ) {
+    if (!attachments.length) return html ?? undefined;
+    const links = attachments
+      .map((a) => {
+        const href = this.toAbsoluteUrl(a.url);
+        if (a.type === 'image') {
+          return `<p><img src="${href}" alt="${a.name}" style="max-width:100%;height:auto" /></p>`;
+        }
+        return `<p><a href="${href}">${a.name}</a> (PDF)</p>`;
+      })
+      .join('');
+    return `${html ?? ''}${links}`;
+  }
 
   async deliverCampaign(tenantId: string, campaignId: string) {
     return this.deliverCampaignBatch(tenantId, campaignId);
@@ -43,6 +103,9 @@ export class CommunicationDeliveryService {
     const channels = (campaign.channels as string[]) ?? ['IN_APP'];
     const metadata = (campaign.metadata ?? {}) as Record<string, unknown>;
     const variables = (metadata.variables ?? {}) as Record<string, string>;
+    const attachments = this.parseAttachments(campaign.attachments);
+    const imageAttachment = attachments.find((a) => a.type === 'image');
+    const pdfAttachment = attachments.find((a) => a.type === 'pdf');
     const rendered = this.renderer.renderAll(
       {
         subject: campaign.subject,
@@ -161,6 +224,46 @@ export class CommunicationDeliveryService {
             failedCount++;
             continue;
           }
+
+          const pushPref = await this.prisma.notificationPreference.findUnique({
+            where: {
+              tenantId_userId_channel: {
+                tenantId,
+                userId: recipient.userId,
+                channel: 'PUSH',
+              },
+            },
+          });
+          if (pushPref && !pushPref.enabled) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'SKIPPED',
+              errorMessage: 'User disabled PUSH notifications',
+            });
+            continue;
+          }
+
+          const category = resolvePushCategory({
+            triggerKey: String(metadata.trigger ?? ''),
+            entityType: String(metadata.entityType ?? ''),
+            messageType: String(metadata.messageType ?? ''),
+            subject,
+          });
+          if (!isPushCategoryEnabled(pushPref?.settings, category)) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'SKIPPED',
+              errorMessage: `User disabled PUSH category: ${category}`,
+            });
+            continue;
+          }
+
           const devices = await this.prisma.mobileDevice.findMany({
             where: {
               tenantId,
@@ -176,14 +279,25 @@ export class CommunicationDeliveryService {
           const result = await this.fcm.sendToTokens(tokens, {
             title: subject,
             body: bodyText ?? subject,
+            imageUrl: imageAttachment
+              ? this.toAbsoluteUrl(imageAttachment.url)
+              : undefined,
             data: {
               campaignId,
+              category,
               link:
                 resolveNotificationLink({
                   recipientType: recipient.recipientType,
                   triggerKey: String(metadata.trigger ?? ''),
                   entityType: String(metadata.entityType ?? ''),
                 }) ?? '',
+              imageUrl: imageAttachment
+                ? this.toAbsoluteUrl(imageAttachment.url)
+                : '',
+              pdfUrl: pdfAttachment
+                ? this.toAbsoluteUrl(pdfAttachment.url)
+                : '',
+              attachmentCount: String(attachments.length),
             },
           });
           await this.logDelivery({
@@ -228,11 +342,31 @@ export class CommunicationDeliveryService {
             : null;
           if (pref && !pref.enabled) continue;
 
+          const emailAttachments: Array<{
+            filename: string;
+            path: string;
+            contentType?: string;
+          }> = [];
+          for (const a of attachments) {
+            const path = this.attachmentDiskPath(a.url);
+            if (!path) continue;
+            emailAttachments.push({
+              filename: a.name,
+              path,
+              ...(a.mimeType ? { contentType: a.mimeType } : {}),
+            });
+          }
+
           const result = await this.email.send({
             to: recipient.email,
             subject,
-            html: bodyHtml ?? `<p>${bodyText ?? subject}</p>`,
+            html:
+              this.appendAttachmentHtml(
+                bodyHtml ?? `<p>${bodyText ?? subject}</p>`,
+                attachments,
+              ) ?? undefined,
             text: bodyText ?? undefined,
+            attachments: emailAttachments,
           });
 
           await this.logDelivery({
@@ -279,7 +413,13 @@ export class CommunicationDeliveryService {
             body: bodyText ?? bodyHtml?.replace(/<[^>]+>/g, ' ') ?? subject,
             link: notificationLink,
             campaignId,
-            metadata: { triggerKey, recipientType: recipient.recipientType },
+            metadata: {
+              triggerKey,
+              recipientType: recipient.recipientType,
+              attachments,
+              imageUrl: imageAttachment?.url ?? null,
+              pdfUrl: pdfAttachment?.url ?? null,
+            },
           });
 
           await this.logDelivery({

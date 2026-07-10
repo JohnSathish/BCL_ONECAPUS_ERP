@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AccommodationModule } from '../accommodation/accommodation.module';
+import { AccountingModule } from '../accounting/accounting.module';
 import { CommunicationModule } from '../communication/communication.module';
 
 import { LoansModule } from '../loans/loans.module';
@@ -66,7 +67,12 @@ import { StaffPfConfigService } from './services/staff-pf-config.service';
 import { SubstitutePayrollBridgeService } from './services/substitute-payroll-bridge.service';
 
 @Module({
-  imports: [AccommodationModule, CommunicationModule, LoansModule],
+  imports: [
+    AccommodationModule,
+    AccountingModule,
+    CommunicationModule,
+    LoansModule,
+  ],
 
   controllers: [
     PayrollController,

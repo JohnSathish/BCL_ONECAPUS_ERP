@@ -170,7 +170,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       !useDashboardUiStore.getState().sidebarCollapsed
     ) {
       setSidebarCollapsed(true);
-      compactSidebarAppliedForThemeId.current = theme.id;
+      compactSidebarAppliedForThemeId.current = theme.id ?? null;
     }
   }, [theme, tenantId, setStoreTheme, setSidebarCollapsed]);
 
@@ -262,8 +262,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [applyPresetMutate]);
 
   const importTheme = useCallback(
-    async (payload: Record<string, unknown>) => {
-      await importThemeMutate(payload);
+    async (payload: object) => {
+      await importThemeMutate(payload as Record<string, unknown>);
     },
     [importThemeMutate],
   );

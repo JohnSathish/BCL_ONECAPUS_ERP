@@ -53,6 +53,7 @@ import { StudentAttendanceModule } from './modules/student-attendance/student-at
 import { InfrastructureModule } from './modules/infrastructure/infrastructure.module';
 import { TimetableEngineModule } from './modules/timetable-engine/timetable-engine.module';
 import { FeesModule } from './modules/fees/fees.module';
+import { AccountingModule } from './modules/accounting/accounting.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { ExaminationsModule } from './modules/examinations/examinations.module';
 import { LmsModule } from './modules/lms/lms.module';
@@ -79,6 +80,8 @@ import { MarketingModule } from './modules/marketing/marketing.module';
 import { OfficialDocumentsModule } from './modules/official-documents/official-documents.module';
 import { AiAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
+import { ProposalsModule } from './modules/proposals/proposals.module';
+import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.module';
 
 @Module({
   imports: [
@@ -129,6 +132,8 @@ import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.mod
     StudentAttendanceModule,
     InfrastructureModule,
     FeesModule,
+    PaymentGatewayModule,
+    AccountingModule,
     ExaminationsModule,
     LmsModule,
     CommunicationModule,
@@ -157,6 +162,7 @@ import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.mod
     MarketingModule,
     BackupEngineModule,
     OfficialDocumentsModule,
+    ProposalsModule,
   ],
   controllers: [HealthController],
   providers: [

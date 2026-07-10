@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { sanitizeNotificationLink } from '../../../common/permissions/portal-access';
+import { DEFAULT_PUSH_CATEGORY_SETTINGS } from '../utils/push-preference.util';
 
 @Injectable()
 export class UserNotificationsService {
@@ -67,7 +68,7 @@ export class UserNotificationsService {
     });
   }
 
-  listInbox(
+  async listInbox(
     user: JwtUser,
     filter: 'all' | 'unread' | 'archived' = 'all',
     limit = 50,
@@ -84,11 +85,15 @@ export class UserNotificationsService {
     } else {
       where.archivedAt = null;
     }
-    return this.prisma.userNotification.findMany({
+    const rows = await this.prisma.userNotification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 100),
     });
+    return rows.map((row) => ({
+      ...row,
+      link: sanitizeNotificationLink(user.roles ?? [], row.link) ?? null,
+    }));
   }
 
   getPreferences(user: JwtUser) {
@@ -104,6 +109,14 @@ export class UserNotificationsService {
     enabled: boolean,
     settings?: Record<string, unknown>,
   ) {
+    const mergedSettings =
+      channel === 'PUSH'
+        ? {
+            ...DEFAULT_PUSH_CATEGORY_SETTINGS,
+            ...(settings ?? {}),
+          }
+        : (settings ?? {});
+
     return this.prisma.notificationPreference.upsert({
       where: {
         tenantId_userId_channel: {
@@ -117,9 +130,12 @@ export class UserNotificationsService {
         userId: user.sub,
         channel,
         enabled,
-        settings: (settings ?? {}) as Prisma.InputJsonValue,
+        settings: mergedSettings as Prisma.InputJsonValue,
       },
-      update: { enabled, settings: (settings ?? {}) as Prisma.InputJsonValue },
+      update: {
+        enabled,
+        settings: mergedSettings as Prisma.InputJsonValue,
+      },
     });
   }
 

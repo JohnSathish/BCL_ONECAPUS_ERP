@@ -1,14 +1,34 @@
 /** BCL OneCampus ERP — unified campus portal branding */
 export const COLLEGE_NAME = 'Don Bosco College Tura';
 export const PRODUCT_NAME = 'BCL OneCampus ERP';
-export const PORTAL_TAGLINE = 'NEP 2020 Ready Unified Campus Management Platform';
+export const APP_VERSION = '1.0.0';
+export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
+export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
+export const PORTAL_TAGLINE = 'Enterprise Campus Management System';
 export const PORTAL_AUDIENCE = 'Students • Faculty • Staff • Administration';
+export const SPLASH_AUDIENCE_LINE = 'Student • Faculty • Parent';
+export const SPLASH_PRODUCT_TAGLINE = 'Enterprise Campus Management System';
+export const SPLASH_MOTTO = 'Smart Campus. Better Future.';
+export const SPLASH_ROLES = [
+  { icon: '🎓', label: 'Student' },
+  { icon: '👔', label: 'Faculty' },
+  { icon: '👨‍👩‍👧', label: 'Parent' },
+  { icon: '💼', label: 'Staff' },
+] as const;
+export const POWERED_BY_TAGLINE = 'Your Technology Growth Partner';
+export const INSTITUTION_WELCOME_MESSAGE = 'Welcome to BCL OneCampus ERP';
 
 export const NAAC_ACCREDITATION_LABEL = "NAAC Re-accredited with Grade 'B'";
 
 export const NAAC_ACCREDITATION_SHORT = "Grade 'B'";
 
-export const INSTITUTION_AFFILIATION = "Affiliated to NEHU • NAAC Re-accredited with Grade 'B'";
+export const INSTITUTION_AFFILIATION_LINES = [
+  'Affiliated to the North Eastern Hill University (NEHU), Shillong – 793 002',
+  'Recognised by the University Grants Commission (UGC), New Delhi',
+  "Re-accredited with 'B' Grade by NAAC, Bangalore",
+] as const;
+
+export const INSTITUTION_AFFILIATION = INSTITUTION_AFFILIATION_LINES[0];
 
 export const INSTITUTION_BADGES = [
   'Established 1987',
@@ -143,13 +163,15 @@ export const SPLASH_TRUST_BADGES = [
   'NEP 2020 Ready',
 ] as const;
 
-export const SPLASH_DURATION_MS = 3400;
+export const SPLASH_DURATION_MS = 2400;
 
 export const PRIVACY_POLICY_URL =
-  process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://donboscocollege.ac.in/mobile-privacy.html';
+  process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html';
 
-export const SUPPORT_EMAIL =
-  process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@donboscocollege.ac.in';
+export const TERMS_URL =
+  process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://basecodelabs.com/terms-and-conditions.html';
+
+export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'contact@basecodelabs.com';
 
 export const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '9566363655';
 
@@ -169,6 +191,7 @@ export const LOGIN_TRUST_BADGES = [
 export const APP_DISPLAY_NAME = process.env.EXPO_PUBLIC_APP_NAME ?? PRODUCT_NAME;
 
 export const POWERED_BY = 'Powered by BaseCode Labs Pvt. Ltd.';
+export const BASECODE_WEBSITE_URL = 'https://www.basecodelabs.com';
 
 /** Cards implemented in mobile v1 — hide backend-enabled stubs until built. */
 export const MVP_STUDENT_CARDS = [

@@ -1,10 +1,14 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
+import { CommunicationCampaignsService } from '../services/communication-campaigns.service';
 import { CommunicationDeliveryService } from '../services/communication-delivery.service';
 
 @Processor('notifications')
 export class CommunicationNotificationProcessor extends WorkerHost {
-  constructor(private readonly delivery: CommunicationDeliveryService) {
+  constructor(
+    private readonly delivery: CommunicationDeliveryService,
+    private readonly campaigns: CommunicationCampaignsService,
+  ) {
     super();
   }
 
@@ -12,6 +16,12 @@ export class CommunicationNotificationProcessor extends WorkerHost {
     if (job.name !== 'send') return null;
 
     const jobType = job.data.jobType as string | undefined;
+    if (jobType === 'campaign-prepare-and-deliver') {
+      const tenantId = String(job.data.tenantId);
+      const campaignId = String(job.data.campaignId);
+      return this.campaigns.prepareAndDeliver(tenantId, campaignId);
+    }
+
     if (jobType === 'campaign-deliver') {
       const tenantId = String(job.data.tenantId);
       const campaignId = String(job.data.campaignId);

@@ -1,17 +1,46 @@
 import { useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { ensureDeviceId, hydrateAppType } from '@/api/config';
 import { PremiumSplashScreen } from '@/components/auth/premium-splash-screen';
+import { bootstrapSession } from '@/auth/bootstrap-session';
 import { SPLASH_DURATION_MS } from '@/constants/release';
+import { StatusBar } from 'expo-status-bar';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 
-export default function SplashScreen() {
+ExpoSplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+export default function AuthSplashScreen() {
   const router = useRouter();
 
   useEffect(() => {
+    void ExpoSplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     const timer = setTimeout(() => {
-      router.replace('/(auth)/welcome');
+      void (async () => {
+        if (cancelled) return;
+        try {
+          await hydrateAppType();
+          await ensureDeviceId();
+          const result = await bootstrapSession();
+          if (!cancelled) {
+            router.replace(result.href as never);
+          }
+        } catch {
+          if (!cancelled) {
+            router.replace('/(auth)/welcome');
+          }
+        }
+      })();
     }, SPLASH_DURATION_MS);
-    return () => clearTimeout(timer);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [router]);
 
   return (

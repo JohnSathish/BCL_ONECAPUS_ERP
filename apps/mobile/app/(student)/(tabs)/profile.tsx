@@ -5,7 +5,12 @@ import { StudentScreenShell } from '@/components/student-portal/student-screen-s
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
 import { studentTheme } from '@/components/student-portal/theme';
-import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, WHATSAPP_SUPPORT_URL } from '@/constants/release';
+import {
+  PRIVACY_POLICY_URL,
+  SUPPORT_EMAIL,
+  TERMS_URL,
+  WHATSAPP_SUPPORT_URL,
+} from '@/constants/release';
 import { logout } from '@/auth/logout';
 import { formatInr } from '@/utils/currency';
 
@@ -43,6 +48,15 @@ export default function StudentProfileScreen() {
 
         <View style={styles.links}>
           <LinkRow
+            label="Complete / update profile"
+            onPress={() => router.push('/(student)/complete-profile' as never)}
+          />
+          <LinkRow
+            label="Notification preferences"
+            onPress={() => router.push('/(student)/notification-preferences' as never)}
+          />
+          <LinkRow label="About app" onPress={() => router.push('/(student)/about' as never)} />
+          <LinkRow
             label="Change password"
             onPress={() => router.push('/(auth)/change-password' as never)}
           />
@@ -58,6 +72,7 @@ export default function StudentProfileScreen() {
             label="Privacy policy"
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
           />
+          <LinkRow label="Terms & conditions" onPress={() => void Linking.openURL(TERMS_URL)} />
         </View>
 
         <DeviceSessionsPanel
@@ -94,63 +109,42 @@ function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12, paddingBottom: 28 },
-  hero: {
-    backgroundColor: studentTheme.surface,
-    borderRadius: 18,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: studentTheme.border,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: studentTheme.primaryMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
-  name: { marginTop: 10, fontSize: 20, fontWeight: '700', color: studentTheme.text },
-  meta: { marginTop: 4, fontSize: 13, color: studentTheme.textMuted },
+  container: { padding: 16, gap: 8, paddingBottom: 32 },
+  hero: { alignItems: 'center', gap: 6, marginBottom: 8 },
+  name: { fontSize: 18, fontWeight: '800', color: studentTheme.text },
+  meta: { fontSize: 13, color: studentTheme.textMuted, fontWeight: '600' },
   card: {
     backgroundColor: studentTheme.surface,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: studentTheme.border,
-    gap: 10,
+    padding: 12,
+    gap: 8,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  rowLabel: { color: studentTheme.textMuted, fontSize: 13 },
-  rowValue: { color: studentTheme.text, fontWeight: '600', fontSize: 13 },
-  links: {
+  rowLabel: { fontSize: 12, color: studentTheme.textMuted, fontWeight: '600' },
+  rowValue: { fontSize: 12, fontWeight: '700', color: studentTheme.text, flexShrink: 1 },
+  links: { gap: 8, marginTop: 4 },
+  linkRow: {
     backgroundColor: studentTheme.surface,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: studentTheme.border,
-    overflow: 'hidden',
-  },
-  linkRow: {
+    padding: 14,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    alignItems: 'center',
   },
-  linkText: { fontSize: 14, color: studentTheme.text, fontWeight: '500' },
-  chevron: { fontSize: 20, color: studentTheme.textSubtle },
+  linkText: { fontSize: 14, fontWeight: '700', color: studentTheme.text },
+  chevron: { fontSize: 18, color: studentTheme.textMuted },
   logout: {
-    marginTop: 4,
-    borderRadius: 14,
-    backgroundColor: '#fef2f2',
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: '#FECACA',
     paddingVertical: 14,
     alignItems: 'center',
   },
-  logoutText: { color: studentTheme.danger, fontWeight: '700' },
+  logoutText: { color: '#DC2626', fontWeight: '700' },
 });

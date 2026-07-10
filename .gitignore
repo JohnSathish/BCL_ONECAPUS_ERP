@@ -11,6 +11,10 @@ out/
 .env
 .env.*.local
 
+# Firebase mobile client configs (secrets)
+apps/mobile/google-services.json
+apps/mobile/GoogleService-Info.plist
+
 # OS / IDE
 .DS_Store
 Thumbs.db

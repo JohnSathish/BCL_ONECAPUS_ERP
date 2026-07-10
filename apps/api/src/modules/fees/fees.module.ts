@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CourseDeliveryFeeService } from '../../common/services/course-delivery-fee.service';
+import { AccountingModule } from '../accounting/accounting.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { TenantsModule } from '../tenants/tenants.module';
@@ -34,14 +35,17 @@ import { StudentFeeSummaryService } from './services/student-fee-summary.service
 import { ExternalFeePaymentService } from './services/external-fee-payment.service';
 import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
 import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
+import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 
 @Module({
   imports: [
+    AccountingModule,
     CommunicationModule,
     LicensingModule,
     TenantsModule,
     CacheModule,
     StorageModule,
+    forwardRef(() => PaymentGatewayModule),
   ],
   controllers: [FeesController],
   providers: [
@@ -87,6 +91,7 @@ import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
     StudentFeeSummaryService,
     FeeReceiptPdfProcessor,
     FeeOrphanDemandService,
+    GatewayPaymentService,
   ],
 })
 export class FeesModule {}

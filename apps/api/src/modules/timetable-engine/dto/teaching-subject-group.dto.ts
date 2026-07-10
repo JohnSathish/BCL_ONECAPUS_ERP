@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsInt,
@@ -9,6 +10,7 @@ import {
 
 export class TeachingSubjectGroupQueryDto {
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   semesterNo?: number;
@@ -37,6 +39,7 @@ export class CreateTeachingSubjectGroupDto {
   @IsString()
   title!: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   semesterNo!: number;

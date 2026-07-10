@@ -28,6 +28,13 @@ export type CommunicationCampaign = {
   requiresApproval?: boolean;
   createdAt: string;
   metadata?: Record<string, unknown>;
+  attachments?: Array<{
+    type?: string;
+    url?: string;
+    name?: string;
+    mimeType?: string;
+    size?: number;
+  }>;
   template?: { id: string; name: string; code: string } | null;
   _count?: { recipients: number; deliveryLogs: number };
 };

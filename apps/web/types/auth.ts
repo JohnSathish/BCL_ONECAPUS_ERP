@@ -1,6 +1,7 @@
 export type AuthUser = {
   id: string;
   email: string;
+  displayName?: string;
   tenantId: string;
   tenantSlug: string;
   roles: string[];

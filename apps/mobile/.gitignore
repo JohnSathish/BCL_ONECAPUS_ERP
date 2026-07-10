@@ -5,3 +5,13 @@
 expo-env.d.ts
 .expo/
 # @end expo-cli
+
+# Firebase Android config (download from Console — see docs/firebase-setup.md)
+google-services.json
+GoogleService-Info.plist
+.env
+.env.local
+.env.production
+*.apk
+*.aab
+onecampus-*.apk

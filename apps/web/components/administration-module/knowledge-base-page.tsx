@@ -36,7 +36,9 @@ export function KnowledgeBasePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [regTitle, setRegTitle] = useState('');
-  const [regType, setRegType] = useState(REGULATION_UPLOAD_TYPES[0].value);
+  const [regType, setRegType] = useState<(typeof REGULATION_UPLOAD_TYPES)[number]['value']>(
+    REGULATION_UPLOAD_TYPES[0].value,
+  );
 
   const statusQ = useQuery({
     queryKey: ['knowledge-base-status'],
@@ -258,7 +260,9 @@ export function KnowledgeBasePage() {
             <label className="mb-1 block text-[11px] font-semibold text-slate-500">Category</label>
             <select
               value={regType}
-              onChange={(e) => setRegType(e.target.value)}
+              onChange={(e) =>
+                setRegType(e.target.value as (typeof REGULATION_UPLOAD_TYPES)[number]['value'])
+              }
               className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
             >
               {REGULATION_UPLOAD_TYPES.map((t) => (

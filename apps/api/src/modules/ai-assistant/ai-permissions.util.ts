@@ -10,7 +10,12 @@ export function userHasAnyPermission(
 }
 
 export const AI_PERMS = {
-  students: ['students:read', 'students:manage', 'reports:read'],
+  students: [
+    'students:read',
+    'students:manage',
+    'students:profile-verify',
+    'reports:read',
+  ],
   staff: ['staff:read', 'staff:manage', 'hr:read', 'hr:manage'],
   fees: ['fees:read', 'fees:manage', 'reports:read'],
   attendance: [

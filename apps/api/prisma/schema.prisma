@@ -37,6 +37,9 @@ model Tenant {
   staffEmployeeCodeTypePrefixes StaffEmployeeCodeTypePrefix[]
   securitySettings              TenantSecuritySettings?
   examinationSettings           TenantExaminationSettings?
+  attendancePolicy              TenantAttendancePolicy?
+  studentProfileUpdatePolicies  StudentProfileUpdatePolicy[]
+  studentProfileChangeRequests  StudentProfileChangeRequest[]
   impersonationSessions         ImpersonationSession[]
   permissionAuditLogs           PermissionAuditLog[]
   tenantLicense                 TenantLicense?
@@ -319,6 +322,8 @@ model User {
   studentsCreated                Student[]                   @relation("StudentCreatedBy")
   studentsModified               Student[]                   @relation("StudentModifiedBy")
   studentProfileAuditLogs        StudentProfileAuditLog[]    @relation("ProfileAuditActor")
+  profileChangesReviewed         StudentProfileChangeRequest[] @relation("ProfileChangeReviewedBy")
+  profileChangeItemsReviewed     StudentProfileChangeItem[]  @relation("ProfileChangeItemReviewedBy")
   academicChangeHistoryActed     AcademicChangeHistory[]     @relation("AcademicChangeActor")
   studentBulkUpdateBatches       StudentBulkUpdateBatch[]    @relation("BulkUpdateActor")
   staffBulkUpdateBatches         StaffBulkUpdateBatch[]      @relation("StaffBulkUpdateActor")
@@ -978,6 +983,24 @@ model TenantExaminationSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_examination_settings")
+  @@schema("platform")
+}
+
+/// Student attendance policy — First&Last (DBC default) vs Every Period (future).
+model TenantAttendancePolicy {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  /// FIRST_LAST | EVERY_PERIOD
+  attendanceMode        String   @default("FIRST_LAST") @map("attendance_mode")
+  shortageThresholdPct  Decimal  @default(75) @map("shortage_threshold_pct") @db.Decimal(5, 2)
+  defaulterThresholdPct Decimal  @default(60) @map("defaulter_threshold_pct") @db.Decimal(5, 2)
+  metadata              Json     @default("{}")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_attendance_policies")
   @@schema("platform")
 }
 
@@ -1988,6 +2011,7 @@ model Student {
   boardExams            StudentBoardExam[]
   cuetDetail            StudentCuetDetail?
   profileAuditLogs      StudentProfileAuditLog[]
+  profileChangeRequests StudentProfileChangeRequest[]
   bulkUpdateChanges     StudentBulkUpdateChange[]
   photoBulkChanges      StudentPhotoBulkChange[]
   rollNumberAuditLogs   StudentRollNumberAuditLog[]
@@ -2043,6 +2067,18 @@ model StudentProfile {
   admissionType        String?   @map("admission_type")
   admissionCategory    String?   @map("admission_category")
   homeSameAsTura       Boolean   @default(false) @map("home_same_as_tura")
+  /// Banking (student self-service + verification)
+  bankName             String?   @map("bank_name")
+  accountHolderName    String?   @map("account_holder_name")
+  accountNumber        String?   @map("account_number")
+  ifsc                 String?
+  branchName           String?   @map("branch_name")
+  /// Emergency contact (beyond guardian)
+  emergencyContactName String?   @map("emergency_contact_name")
+  emergencyContactRelation String? @map("emergency_contact_relation")
+  emergencyContactMobile String? @map("emergency_contact_mobile")
+  panNumber            String?   @map("pan_number")
+  alternateMobile      String?   @map("alternate_mobile")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -2138,9 +2174,13 @@ model StudentBoardExam {
   stream              String?
   registrationType    String?  @map("registration_type")
   totalMarks          Int?     @map("total_marks")
+  maximumMarks        Int?     @map("maximum_marks")
   percentage          Decimal? @db.Decimal(5, 2)
+  grade               String?
   division            String?
+  registrationNumber  String?  @map("registration_number")
   marksheetDocumentId String?  @unique @map("marksheet_document_id") @db.Uuid
+  verificationStatus  String   @default("DRAFT") @map("verification_status")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -2149,6 +2189,7 @@ model StudentBoardExam {
   subjectMarks      StudentBoardSubjectMark[]
 
   @@index([tenantId, studentId])
+  @@index([tenantId, verificationStatus])
   @@map("student_board_exams")
   @@schema("academic")
 }
@@ -2160,6 +2201,7 @@ model StudentBoardSubjectMark {
   subjectName   String   @map("subject_name")
   marksObtained Int?     @map("marks_obtained")
   maxMarks      Int?     @map("max_marks")
+  grade         String?
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -2168,6 +2210,82 @@ model StudentBoardSubjectMark {
 
   @@index([boardExamId])
   @@map("student_board_subject_marks")
+  @@schema("academic")
+}
+
+/// Tenant field-level policy for student self-service profile updates.
+model StudentProfileUpdatePolicy {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  sectionKey String   @map("section_key")
+  fieldKey   String   @map("field_key")
+  /// AUTO_APPROVE | APPROVAL_REQUIRED | VERIFICATION_REQUIRED | READ_ONLY
+  approvalMode String @default("APPROVAL_REQUIRED") @map("approval_mode")
+  mandatory  Boolean  @default(false)
+  enabled    Boolean  @default(true)
+  sortOrder  Int      @default(0) @map("sort_order")
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sectionKey, fieldKey])
+  @@index([tenantId, approvalMode])
+  @@map("student_profile_update_policies")
+  @@schema("academic")
+}
+
+/// Batch profile update submission from student portal / mobile.
+model StudentProfileChangeRequest {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  /// DRAFT | PENDING | PARTIALLY_APPROVED | APPROVED | REJECTED | NEEDS_INFO
+  status       String    @default("DRAFT")
+  submittedAt  DateTime? @map("submitted_at")
+  reviewedById String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at")
+  remarks      String?   @db.Text
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  reviewedBy User?                      @relation("ProfileChangeReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  items      StudentProfileChangeItem[]
+
+  @@index([tenantId, status, submittedAt])
+  @@index([tenantId, studentId, createdAt])
+  @@map("student_profile_change_requests")
+  @@schema("academic")
+}
+
+model StudentProfileChangeItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  requestId       String    @map("request_id") @db.Uuid
+  sectionKey      String    @map("section_key")
+  fieldKey        String    @map("field_key")
+  oldValue        String?   @map("old_value") @db.Text
+  newValue        String?   @map("new_value") @db.Text
+  /// PENDING | AUTO_APPROVED | APPROVED | REJECTED | NEEDS_INFO
+  approvalStatus  String    @default("PENDING") @map("approval_status")
+  autoApproved    Boolean   @default(false) @map("auto_approved")
+  reviewedById    String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewRemarks   String?   @map("review_remarks") @db.Text
+  appliedAt       DateTime? @map("applied_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  request    StudentProfileChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reviewedBy User?                       @relation("ProfileChangeItemReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, approvalStatus])
+  @@index([requestId])
+  @@map("student_profile_change_items")
   @@schema("academic")
 }
 
@@ -7034,6 +7152,110 @@ model PaymentGatewayLog {
   @@schema("finance")
 }
 
+model PaymentGatewayProvider {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  isAvailable Boolean  @default(true) @map("is_available")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenantGateways TenantPaymentGateway[]
+
+  @@map("payment_gateway_providers")
+  @@schema("finance")
+}
+
+model TenantPaymentGateway {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tenantId               String    @map("tenant_id") @db.Uuid
+  providerId             String    @map("provider_id") @db.Uuid
+  providerCode           String    @map("provider_code")
+  status                 String    @default("DISABLED")
+  mode                   String    @default("TEST")
+  isActive               Boolean   @default(false) @map("is_active")
+  merchantId             String?   @map("merchant_id")
+  apiKeyEncrypted        String?   @map("api_key_encrypted")
+  secretKeyEncrypted     String?   @map("secret_key_encrypted")
+  webhookSecretEncrypted String?   @map("webhook_secret_encrypted")
+  successUrl             String?   @map("success_url")
+  failureUrl             String?   @map("failure_url")
+  metadata               Json?
+  lastHealthAt           DateTime? @map("last_health_at")
+  lastHealthStatus       String?   @map("last_health_status")
+  configuredById         String?   @map("configured_by_id") @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  provider    PaymentGatewayProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  webhookLogs PaymentWebhookLog[]
+
+  @@unique([tenantId, providerCode])
+  @@index([tenantId, isActive])
+  @@map("tenant_payment_gateways")
+  @@schema("finance")
+}
+
+model TenantPaymentSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @unique @map("tenant_id") @db.Uuid
+  allowedModes             Json     @default("{\"upi\":true,\"creditCard\":true,\"debitCard\":true,\"netBanking\":true,\"wallet\":false}") @map("allowed_modes")
+  autoReceipt              Boolean  @default(true) @map("auto_receipt")
+  autoEmailReceipt         Boolean  @default(true) @map("auto_email_receipt")
+  autoSmsNotification      Boolean  @default(false) @map("auto_sms_notification")
+  autoWhatsappNotification Boolean  @default(false) @map("auto_whatsapp_notification")
+  retryFailedPayments      Boolean  @default(true) @map("retry_failed_payments")
+  paymentTimeoutMinutes    Int      @default(30) @map("payment_timeout_minutes")
+  preventDuplicatePayments Boolean  @default(true) @map("prevent_duplicate_payments")
+  metadata                 Json?
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_payment_settings")
+  @@schema("finance")
+}
+
+model PaymentWebhookLog {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  gatewayId          String?   @map("gateway_id") @db.Uuid
+  providerCode       String    @map("provider_code")
+  eventName          String    @map("event_name")
+  payload            Json
+  verificationStatus String    @map("verification_status")
+  processingStatus   String    @default("PENDING") @map("processing_status")
+  receivedAt         DateTime  @default(now()) @map("received_at")
+  processedAt        DateTime? @map("processed_at")
+  errorMessage       String?   @map("error_message")
+  replayedAt         DateTime? @map("replayed_at")
+  metadata           Json?
+
+  gateway TenantPaymentGateway? @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, providerCode, receivedAt])
+  @@index([tenantId, processingStatus])
+  @@map("payment_webhook_logs")
+  @@schema("finance")
+}
+
+model PaymentGatewayConfigAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  gatewayId String?  @map("gateway_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  before    Json?
+  after     Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("payment_gateway_config_audits")
+  @@schema("finance")
+}
+
 model FeeCollectionSession {
   id             String    @id @default(uuid()) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid
@@ -10243,6 +10465,525 @@ model SalaryArrearLine {
 
   @@index([salaryArrearBatchId])
   @@map("salary_arrear_lines")
+  @@schema("finance")
+}
+
+// ─── Institutional Accounting (double-entry GL) ────────────────────────────────
+
+model AccountingFinancialYear {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  label      String
+  startYear  Int      @map("start_year")
+  startDate  DateTime @map("start_date") @db.Date
+  endDate    DateTime @map("end_date") @db.Date
+  status     String   @default("OPEN")
+  isActive   Boolean  @default(false) @map("is_active")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  vouchers   AccountingVoucher[]
+  postings   AccountingLedgerPosting[]
+  sequences  AccountingVoucherSequence[]
+  expenses   AccountingExpense[]
+  budgets    AccountingBudget[]
+  depreciationEntries AccountingDepreciationEntry[]
+  bankReconciliations AccountingBankReconciliation[]
+
+  @@unique([tenantId, label])
+  @@unique([tenantId, startYear])
+  @@index([tenantId, isActive])
+  @@index([tenantId, status])
+  @@map("accounting_financial_years")
+  @@schema("finance")
+}
+
+model AccountingAccountGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  code      String
+  name      String
+  nature    String
+  sortOrder Int      @default(0) @map("sort_order")
+  isSystem  Boolean  @default(false) @map("is_system")
+  isActive  Boolean  @default(true) @map("is_active")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   AccountingAccountGroup?  @relation("AccountingGroupTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children AccountingAccountGroup[] @relation("AccountingGroupTree")
+  ledgers  AccountingLedgerAccount[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, nature, isActive])
+  @@index([tenantId, parentId])
+  @@map("accounting_account_groups")
+  @@schema("finance")
+}
+
+model AccountingLedgerAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  groupId        String   @map("group_id") @db.Uuid
+  code           String
+  name           String
+  ledgerType     String   @default("GENERAL") @map("ledger_type")
+  isCash         Boolean  @default(false) @map("is_cash")
+  isBank         Boolean  @default(false) @map("is_bank")
+  bankName       String?  @map("bank_name")
+  accountNumber  String?  @map("account_number")
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  currentBalance Decimal  @default(0) @map("current_balance") @db.Decimal(14, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  group              AccountingAccountGroup           @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  lines              AccountingVoucherLine[]
+  postings           AccountingLedgerPosting[]
+  feeHeadMappings    AccountingFeeHeadMapping[]
+  paymentModeMappings AccountingPaymentModeMapping[]
+  payrollComponentMappings AccountingPayrollComponentMapping[]
+  expenses           AccountingExpense[]
+  budgets            AccountingBudget[]
+  fixedAssetsAsAsset   AccountingFixedAsset[] @relation("FixedAssetLedger")
+  fixedAssetsAsAccum   AccountingFixedAsset[] @relation("AccumDepreciationLedger")
+  fixedAssetsAsExpense AccountingFixedAsset[] @relation("DepreciationExpenseLedger")
+  bankReconciliations  AccountingBankReconciliation[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, groupId, isActive])
+  @@index([tenantId, isCash, isBank])
+  @@map("accounting_ledger_accounts")
+  @@schema("finance")
+}
+
+model AccountingVoucherType {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  prefix    String
+  sortOrder Int      @default(0) @map("sort_order")
+  isSystem  Boolean  @default(false) @map("is_system")
+  isActive  Boolean  @default(true) @map("is_active")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vouchers  AccountingVoucher[]
+  sequences AccountingVoucherSequence[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("accounting_voucher_types")
+  @@schema("finance")
+}
+
+model AccountingVoucherSequence {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  voucherTypeId   String   @map("voucher_type_id") @db.Uuid
+  financialYearId String   @map("financial_year_id") @db.Uuid
+  currentNo       Int      @default(0) @map("current_no")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  voucherType   AccountingVoucherType   @relation(fields: [voucherTypeId], references: [id], onDelete: Cascade)
+  financialYear AccountingFinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, voucherTypeId, financialYearId])
+  @@map("accounting_voucher_sequences")
+  @@schema("finance")
+}
+
+model AccountingVoucher {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  financialYearId String    @map("financial_year_id") @db.Uuid
+  voucherTypeId   String    @map("voucher_type_id") @db.Uuid
+  voucherNo       String    @map("voucher_no")
+  voucherDate     DateTime  @map("voucher_date") @db.Date
+  status          String    @default("DRAFT")
+  narration       String?
+  referenceNo     String?   @map("reference_no")
+  chequeNo        String?   @map("cheque_no")
+  paymentMode     String?   @map("payment_mode")
+  totalAmount     Decimal   @default(0) @map("total_amount") @db.Decimal(14, 2)
+  createdById     String?   @map("created_by_id") @db.Uuid
+  postedById      String?   @map("posted_by_id") @db.Uuid
+  postedAt        DateTime? @map("posted_at")
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  financialYear AccountingFinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  voucherType   AccountingVoucherType   @relation(fields: [voucherTypeId], references: [id], onDelete: Restrict)
+  lines         AccountingVoucherLine[]
+  postings      AccountingLedgerPosting[]
+  integrationLogs AccountingIntegrationLog[]
+  expenses      AccountingExpense[]
+  depreciationEntries AccountingDepreciationEntry[]
+  bankStatementLines  AccountingBankStatementLine[]
+
+  @@unique([tenantId, voucherNo])
+  @@index([tenantId, financialYearId, voucherDate])
+  @@index([tenantId, voucherTypeId, status])
+  @@index([tenantId, status, voucherDate])
+  @@map("accounting_vouchers")
+  @@schema("finance")
+}
+
+model AccountingVoucherLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  voucherId       String   @map("voucher_id") @db.Uuid
+  ledgerAccountId String   @map("ledger_account_id") @db.Uuid
+  entryType       String   @map("entry_type")
+  amount          Decimal  @db.Decimal(14, 2)
+  narration       String?
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  voucher       AccountingVoucher       @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  ledgerAccount AccountingLedgerAccount @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+  postings      AccountingLedgerPosting[]
+
+  @@index([tenantId, voucherId])
+  @@index([tenantId, ledgerAccountId])
+  @@map("accounting_voucher_lines")
+  @@schema("finance")
+}
+
+model AccountingLedgerPosting {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  financialYearId String   @map("financial_year_id") @db.Uuid
+  voucherId       String   @map("voucher_id") @db.Uuid
+  voucherLineId   String   @map("voucher_line_id") @db.Uuid
+  ledgerAccountId String   @map("ledger_account_id") @db.Uuid
+  voucherDate     DateTime @map("voucher_date") @db.Date
+  entryType       String   @map("entry_type")
+  amount          Decimal  @db.Decimal(14, 2)
+  narration       String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  financialYear AccountingFinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  voucher       AccountingVoucher       @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucherLine   AccountingVoucherLine   @relation(fields: [voucherLineId], references: [id], onDelete: Cascade)
+  ledgerAccount AccountingLedgerAccount @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+  bankStatementLines AccountingBankStatementLine[]
+
+  @@index([tenantId, ledgerAccountId, voucherDate])
+  @@index([tenantId, financialYearId, voucherDate])
+  @@index([tenantId, voucherId])
+  @@map("accounting_ledger_postings")
+  @@schema("finance")
+}
+
+model AccountingAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  action     String
+  actorId    String?  @map("actor_id") @db.Uuid
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, entityType, entityId, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@map("accounting_audit_logs")
+  @@schema("finance")
+}
+
+model AccountingSettings {
+  id                         String   @id @default(uuid()) @db.Uuid
+  tenantId                   String   @unique @map("tenant_id") @db.Uuid
+  autoPostFees               Boolean  @default(true) @map("auto_post_fees")
+  autoPostPayroll            Boolean  @default(true) @map("auto_post_payroll")
+  defaultCashLedgerId        String?  @map("default_cash_ledger_id") @db.Uuid
+  defaultBankLedgerId        String?  @map("default_bank_ledger_id") @db.Uuid
+  defaultIncomeLedgerId      String?  @map("default_income_ledger_id") @db.Uuid
+  salaryExpenseLedgerId      String?  @map("salary_expense_ledger_id") @db.Uuid
+  salaryPayableLedgerId      String?  @map("salary_payable_ledger_id") @db.Uuid
+  payrollDeductionsLedgerId  String?  @map("payroll_deductions_ledger_id") @db.Uuid
+  metadata                   Json?
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("accounting_settings")
+  @@schema("finance")
+}
+
+model AccountingFeeHeadMapping {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  sourceKey       String   @map("source_key")
+  feeHeadId       String?  @map("fee_head_id") @db.Uuid
+  incomeLedgerId  String   @map("income_ledger_id") @db.Uuid
+  isActive        Boolean  @default(true) @map("is_active")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  incomeLedger AccountingLedgerAccount @relation(fields: [incomeLedgerId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, sourceKey])
+  @@index([tenantId, isActive])
+  @@map("accounting_fee_head_mappings")
+  @@schema("finance")
+}
+
+model AccountingPaymentModeMapping {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  paymentMode   String   @map("payment_mode")
+  debitLedgerId String   @map("debit_ledger_id") @db.Uuid
+  isActive      Boolean  @default(true) @map("is_active")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  debitLedger AccountingLedgerAccount @relation(fields: [debitLedgerId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, paymentMode])
+  @@index([tenantId, isActive])
+  @@map("accounting_payment_mode_mappings")
+  @@schema("finance")
+}
+
+model AccountingIntegrationLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  sourceModule String   @map("source_module")
+  sourceType   String   @map("source_type")
+  sourceId     String   @map("source_id") @db.Uuid
+  voucherId    String?  @map("voucher_id") @db.Uuid
+  status       String   @default("SUCCESS")
+  errorMessage String?  @map("error_message")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  voucher AccountingVoucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, sourceModule, sourceType, sourceId])
+  @@index([tenantId, status, createdAt])
+  @@map("accounting_integration_logs")
+  @@schema("finance")
+}
+
+model AccountingVendor {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  gstin       String?
+  contactName String?   @map("contact_name")
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean   @default(true) @map("is_active")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  expenses AccountingExpense[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("accounting_vendors")
+  @@schema("finance")
+}
+
+model AccountingExpense {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  expenseNo       String    @map("expense_no")
+  vendorId        String?   @map("vendor_id") @db.Uuid
+  ledgerAccountId String    @map("ledger_account_id") @db.Uuid
+  departmentId    String?   @map("department_id") @db.Uuid
+  financialYearId String?   @map("financial_year_id") @db.Uuid
+  expenseDate     DateTime  @map("expense_date") @db.Date
+  amount          Decimal   @db.Decimal(14, 2)
+  gstAmount       Decimal   @default(0) @map("gst_amount") @db.Decimal(14, 2)
+  status          String    @default("DRAFT")
+  description     String?
+  billNo          String?   @map("bill_no")
+  voucherId       String?   @map("voucher_id") @db.Uuid
+  createdById     String?   @map("created_by_id") @db.Uuid
+  approvedById    String?   @map("approved_by_id") @db.Uuid
+  approvedAt      DateTime? @map("approved_at")
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vendor        AccountingVendor?         @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  ledgerAccount AccountingLedgerAccount   @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+  financialYear AccountingFinancialYear?  @relation(fields: [financialYearId], references: [id], onDelete: SetNull)
+  voucher       AccountingVoucher?        @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, expenseNo])
+  @@index([tenantId, status, expenseDate])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, departmentId])
+  @@map("accounting_expenses")
+  @@schema("finance")
+}
+
+model AccountingBudget {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  financialYearId String   @map("financial_year_id") @db.Uuid
+  departmentId    String?  @map("department_id") @db.Uuid
+  ledgerAccountId String   @map("ledger_account_id") @db.Uuid
+  allocatedAmount Decimal  @map("allocated_amount") @db.Decimal(14, 2)
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  financialYear AccountingFinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  ledgerAccount AccountingLedgerAccount @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, financialYearId, departmentId, ledgerAccountId])
+  @@index([tenantId, financialYearId])
+  @@map("accounting_budgets")
+  @@schema("finance")
+}
+
+model AccountingPayrollComponentMapping {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  componentCode  String   @map("component_code")
+  ledgerAccountId String  @map("ledger_account_id") @db.Uuid
+  isActive       Boolean  @default(true) @map("is_active")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  ledgerAccount AccountingLedgerAccount @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, componentCode])
+  @@index([tenantId, isActive])
+  @@map("accounting_payroll_component_mappings")
+  @@schema("finance")
+}
+
+model AccountingFixedAsset {
+  id                        String   @id @default(uuid()) @db.Uuid
+  tenantId                  String   @map("tenant_id") @db.Uuid
+  code                      String
+  name                      String
+  category                  String
+  acquisitionDate           DateTime @map("acquisition_date") @db.Date
+  cost                      Decimal  @db.Decimal(14, 2)
+  salvageValue              Decimal  @default(0) @map("salvage_value") @db.Decimal(14, 2)
+  usefulLifeMonths          Int      @map("useful_life_months")
+  depreciationMethod        String   @default("STRAIGHT_LINE") @map("depreciation_method")
+  assetLedgerId             String   @map("asset_ledger_id") @db.Uuid
+  accumDepreciationLedgerId String   @map("accum_depreciation_ledger_id") @db.Uuid
+  expenseLedgerId           String   @map("expense_ledger_id") @db.Uuid
+  accumulatedDepreciation   Decimal  @default(0) @map("accumulated_depreciation") @db.Decimal(14, 2)
+  status                    String   @default("ACTIVE")
+  location                  String?
+  metadata                  Json?
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  assetLedger             AccountingLedgerAccount @relation("FixedAssetLedger", fields: [assetLedgerId], references: [id], onDelete: Restrict)
+  accumDepreciationLedger AccountingLedgerAccount @relation("AccumDepreciationLedger", fields: [accumDepreciationLedgerId], references: [id], onDelete: Restrict)
+  expenseLedger           AccountingLedgerAccount @relation("DepreciationExpenseLedger", fields: [expenseLedgerId], references: [id], onDelete: Restrict)
+  depreciationEntries       AccountingDepreciationEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status, category])
+  @@map("accounting_fixed_assets")
+  @@schema("finance")
+}
+
+model AccountingDepreciationEntry {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  assetId         String    @map("asset_id") @db.Uuid
+  financialYearId String    @map("financial_year_id") @db.Uuid
+  periodYear      Int       @map("period_year")
+  periodMonth     Int       @map("period_month")
+  amount          Decimal   @db.Decimal(14, 2)
+  status          String    @default("DRAFT")
+  voucherId       String?   @map("voucher_id") @db.Uuid
+  postedAt        DateTime? @map("posted_at")
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  asset         AccountingFixedAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  financialYear AccountingFinancialYear   @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  voucher       AccountingVoucher?        @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, assetId, periodYear, periodMonth])
+  @@index([tenantId, status, periodYear, periodMonth])
+  @@map("accounting_depreciation_entries")
+  @@schema("finance")
+}
+
+model AccountingBankReconciliation {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @map("tenant_id") @db.Uuid
+  ledgerAccountId         String    @map("ledger_account_id") @db.Uuid
+  financialYearId         String?   @map("financial_year_id") @db.Uuid
+  statementStartDate      DateTime  @map("statement_start_date") @db.Date
+  statementEndDate        DateTime  @map("statement_end_date") @db.Date
+  statementOpeningBalance Decimal   @map("statement_opening_balance") @db.Decimal(14, 2)
+  statementClosingBalance Decimal   @map("statement_closing_balance") @db.Decimal(14, 2)
+  bookOpeningBalance      Decimal   @default(0) @map("book_opening_balance") @db.Decimal(14, 2)
+  bookClosingBalance      Decimal   @default(0) @map("book_closing_balance") @db.Decimal(14, 2)
+  status                  String    @default("DRAFT")
+  createdById             String?   @map("created_by_id") @db.Uuid
+  reconciledById          String?   @map("reconciled_by_id") @db.Uuid
+  reconciledAt            DateTime? @map("reconciled_at")
+  metadata                Json?
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  ledgerAccount AccountingLedgerAccount      @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+  financialYear AccountingFinancialYear?     @relation(fields: [financialYearId], references: [id], onDelete: SetNull)
+  lines         AccountingBankStatementLine[]
+
+  @@index([tenantId, ledgerAccountId, status])
+  @@map("accounting_bank_reconciliations")
+  @@schema("finance")
+}
+
+model AccountingBankStatementLine {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  reconciliationId  String   @map("reconciliation_id") @db.Uuid
+  lineDate          DateTime @map("line_date") @db.Date
+  description       String?
+  referenceNo       String?  @map("reference_no")
+  debitAmount       Decimal  @default(0) @map("debit_amount") @db.Decimal(14, 2)
+  creditAmount      Decimal  @default(0) @map("credit_amount") @db.Decimal(14, 2)
+  matchStatus       String   @default("UNMATCHED") @map("match_status")
+  matchedPostingId  String?  @map("matched_posting_id") @db.Uuid
+  matchedVoucherId  String?  @map("matched_voucher_id") @db.Uuid
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  reconciliation AccountingBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  matchedPosting   AccountingLedgerPosting?     @relation(fields: [matchedPostingId], references: [id], onDelete: SetNull)
+  matchedVoucher   AccountingVoucher?           @relation(fields: [matchedVoucherId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, reconciliationId, matchStatus])
+  @@index([tenantId, lineDate])
+  @@map("accounting_bank_statement_lines")
   @@schema("finance")
 }
 

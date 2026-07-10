@@ -23,7 +23,7 @@ export function WorkspacePicker() {
   const branding = useInstitutionBranding();
   const { user, setWorkspaceKind } = useWorkspaceContext();
   const options = listSelectableWorkspaces(user);
-  const institutionLabel = branding.branding?.name ?? 'OneCampus ERP';
+  const institutionLabel = branding.branding?.displayName ?? 'OneCampus ERP';
 
   const enter = (kind: WorkspaceKind) => {
     setWorkspaceKind(kind);

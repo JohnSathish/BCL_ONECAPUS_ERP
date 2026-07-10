@@ -5,11 +5,19 @@ export type FacultyAttendanceSession = {
   sessionDate?: string;
   startTime?: string;
   endTime?: string;
+  periodNo?: number | null;
+  sessionType?: string;
   status?: string;
   course?: { code?: string; title?: string };
+  paperCourse?: { code?: string; title?: string };
+  subjectGroup?: { code?: string; title?: string };
+  displayTitle?: string;
+  displayHeader?: { title?: string; subtitle?: string; details?: string };
   section?: { sectionCode?: string };
   location?: { roomCode?: string; roomName?: string; campus?: string };
   counts?: { total?: number; present?: number; absent?: number; other?: number };
+  rosterSize?: number | null;
+  timetableLinked?: boolean;
 };
 
 export type AttendanceRosterStudent = {

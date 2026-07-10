@@ -12,6 +12,7 @@ import { StudentAttendanceService } from '../student-attendance/student-attendan
 import { CustomReportService } from '../student-reports/services/custom-report.service';
 import { StudentReportsQueryService } from '../student-reports/services/student-reports-query.service';
 import { StudentsService } from '../students/students.service';
+import { StudentProfileChangeRequestService } from '../students/services/student-profile-change-request.service';
 import { StaffService } from '../staff/staff.service';
 import { AI_PERMS, userHasAnyPermission } from './ai-permissions.util';
 import { KnowledgeQueryService } from '../knowledge-base/knowledge-query.service';
@@ -46,6 +47,7 @@ export class AiToolsService {
     private readonly customReports: CustomReportService,
     private readonly reportQueries: StudentReportsQueryService,
     private readonly students: StudentsService,
+    private readonly profileChanges: StudentProfileChangeRequestService,
     private readonly staff: StaffService,
     private readonly feeReports: FeeReportsService,
     private readonly feeSummaryService: StudentFeeSummaryService,
@@ -95,6 +97,8 @@ export class AiToolsService {
         return this.searchSubjects(user, intent.searchQuery ?? '');
       case 'search_departments':
         return this.searchDepartments(user, intent.searchQuery ?? '');
+      case 'profile_completion_summary':
+        return this.profileCompletionSummary(user, intent);
       case 'generate_student_report':
         return this.studentReport(user, intent);
       case 'generate_fee_report':
@@ -1822,6 +1826,122 @@ export class AiToolsService {
         rows,
         totalRows: departments.length,
       },
+    };
+  }
+
+  private async profileCompletionSummary(
+    user: JwtUser,
+    intent: ResolvedIntent,
+  ): Promise<ToolResult> {
+    this.assertPerm(user, AI_PERMS.students, 'profile completion');
+    const filters = intent.filters ?? {};
+    const dash = await this.profileChanges.completionDashboard(user.tid);
+    let rows = dash.students;
+
+    if (filters.incompleteProfile) {
+      rows = rows.filter((r) => r.percent < 100);
+    }
+    if (filters.missingAadhaar) {
+      rows = rows.filter((r) => r.missing.includes('Aadhaar Number'));
+    }
+    if (filters.missingClassXii) {
+      rows = rows.filter((r) => r.missing.includes('Class XII Marks'));
+    }
+    if (filters.pendingProfileVerification) {
+      const pending = await this.profileChanges.buildReport(
+        user.tid,
+        'pending-verification',
+      );
+      return {
+        answer: `${pending.rows.length} profile update request(s) are pending office verification. Average profile completion is ${dash.overallAverage}%.`,
+        source: 'live',
+        table: {
+          columns: [
+            { key: 'fullName', label: 'Student' },
+            { key: 'rollNumber', label: 'Roll' },
+            { key: 'status', label: 'Status' },
+            { key: 'itemCount', label: 'Fields' },
+          ],
+          rows: pending.rows.slice(0, 25).map((r) => ({
+            fullName: r.fullName ?? '—',
+            rollNumber: r.rollNumber ?? '—',
+            status: r.status ?? 'PENDING',
+            itemCount: r.itemCount ?? 0,
+          })),
+          totalRows: pending.rows.length,
+        },
+        links: [
+          {
+            label: 'Pending profile updates',
+            href: '/admin/students/profile-verification/pending',
+          },
+          {
+            label: 'Completion dashboard',
+            href: '/admin/students/profile-verification/completion',
+          },
+        ],
+        suggestedFollowUps: [
+          'List incomplete profiles',
+          'Students missing Class XII marks',
+          'Students missing Aadhaar',
+        ],
+      };
+    }
+
+    const focusLabel = filters.missingClassXii
+      ? 'missing Class XII marks'
+      : filters.missingAadhaar
+        ? 'missing Aadhaar'
+        : filters.incompleteProfile
+          ? 'with incomplete profiles'
+          : 'tracked for profile completion';
+
+    return {
+      answer: [
+        `Profile completion overview: average ${dash.overallAverage}%, ${dash.incompleteCount} incomplete of ${dash.students.length} students.`,
+        `Showing ${rows.length} student(s) ${focusLabel}.`,
+      ].join(' '),
+      source: 'live',
+      table: {
+        columns: [
+          { key: 'fullName', label: 'Student' },
+          { key: 'rollNumber', label: 'Roll' },
+          { key: 'department', label: 'Department' },
+          { key: 'percent', label: '%' },
+          { key: 'missing', label: 'Missing' },
+        ],
+        rows: rows.slice(0, 25).map((r) => ({
+          fullName: r.fullName,
+          rollNumber: r.rollNumber ?? '—',
+          department: r.department,
+          percent: r.percent,
+          missing: (r.missing ?? []).slice(0, 4).join(', ') || '—',
+        })),
+        totalRows: rows.length,
+      },
+      chart: {
+        title: 'Profile completion by department',
+        chartType: 'bar',
+        series: dash.departmentSummary.slice(0, 12).map((d) => ({
+          label: d.department,
+          value: d.averagePercent,
+        })),
+      },
+      links: [
+        {
+          label: 'Completion dashboard',
+          href: '/admin/students/profile-verification/completion',
+        },
+        {
+          label: 'Pending verification',
+          href: '/admin/students/profile-verification/pending',
+        },
+      ],
+      suggestedFollowUps: [
+        'Pending profile verification requests',
+        'Students missing Class XII marks',
+        'Export incomplete profiles',
+      ],
     };
   }
 

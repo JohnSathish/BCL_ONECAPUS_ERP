@@ -1,15 +1,18 @@
-import { API_BASE, getAppType, mobileHeaders, setAppType } from '@/api/config';
+import { getApiBase, getAppType, mobileHeadersAsync, setAppType } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
-import { refreshAccessToken } from '@/auth/token-refresh';
+import { refreshAccessTokenString } from '@/auth/token-refresh';
 
 export {
   APP_VERSION,
-  API_BASE,
-  TENANT_SLUG,
+  getApiBase,
+  getTenantSlug,
   getAppType,
   hydrateAppType,
   setAppType,
 } from '@/api/config';
+
+/** @deprecated Use getApiBase() */
+export { API_BASE, TENANT_SLUG } from '@/api/config';
 
 let authFailureHandler: (() => void) | null = null;
 
@@ -32,19 +35,23 @@ function parseError(data: unknown, fallback: string) {
 }
 
 async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
-  const headers: Record<string, string> = mobileHeaders(options.headers as Record<string, string>);
+  const [apiBase, headers] = await Promise.all([
+    getApiBase(),
+    mobileHeadersAsync(options.headers as Record<string, string>),
+  ]);
+
   if (!options.skipAuth) {
     const token = options.auth ?? (await getAccessToken());
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${apiBase}${path}`, { ...options, headers });
   const json = await res.json().catch(() => ({}));
   const data = (json as { data?: T })?.data ?? json;
 
   if (res.status === 401 && !options.skipAuth && !options._retried) {
     try {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessTokenString();
       return doFetch<T>(path, { ...options, auth: newToken, _retried: true });
     } catch {
       authFailureHandler?.();

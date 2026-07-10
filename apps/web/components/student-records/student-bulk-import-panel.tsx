@@ -132,7 +132,12 @@ export function StudentBulkImportPanel({ canImport, focusSemester }: Props) {
   const [previewPage, setPreviewPage] = useState(1);
   const [importMode, setImportMode] = useState<StudentImportMode>('CREATE');
   const [commitMode, setCommitMode] = useState<CommitMode>('VALID_ONLY');
-  const [commitResult, setCommitResult] = useState<{ successfulRows?: number } | null>(null);
+  const [commitResult, setCommitResult] = useState<{
+    successfulRows?: number;
+    failedRows?: number;
+    batchId?: string;
+    status?: string;
+  } | null>(null);
   const [commitProgress, setCommitProgress] = useState<StudentImportCommitProgress | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

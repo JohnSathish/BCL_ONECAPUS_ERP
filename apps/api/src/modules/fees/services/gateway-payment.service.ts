@@ -3,19 +3,34 @@ import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import type { GatewayPaymentDto } from '../dto/fees.dto';
 import {
-  createRazorpayOrder,
   fetchRazorpayOrderPayments,
   fetchRazorpayPaymentLink,
   isRazorpayConfigured,
-  verifyRazorpayPaymentSignature,
 } from '../../../common/payments/razorpay.util';
+import {
+  fetchCashfreeOrder,
+  fetchCashfreeOrderPayments,
+  isCashfreeConfigured,
+} from '../../../common/payments/cashfree.util';
+import {
+  isBilldeskConfigured,
+  retrieveBilldeskOrder,
+  toBilldeskCredentials,
+  verifyBilldeskWebhook,
+} from '../../../common/payments/billdesk.util';
+import {
+  isNttDataConfigured,
+  toNttDataCredentials,
+  trackNttDataTransaction,
+  verifyNttDataReturnPayload,
+} from '../../../common/payments/nttdata.util';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import { resolveCollectionModes } from '../constants/collection-modes.constants';
 import { FeeLedgerService } from './fee-ledger.service';
 import { PaymentCollectionService } from './payment-collection.service';
 import { QueueService } from '../../../shared/queue/queue.service';
 import { FeeReceiptNotificationService } from './fee-receipt-notification.service';
-import { verifyRazorpayWebhookSignature } from '../../../common/payments/razorpay.util';
+import { PaymentGatewayResolverService } from '../../payment-gateway/services/payment-gateway-resolver.service';
 
 @Injectable()
 export class GatewayPaymentService {
@@ -26,6 +41,7 @@ export class GatewayPaymentService {
     private readonly collections: PaymentCollectionService,
     private readonly queue: QueueService,
     private readonly receiptNotify: FeeReceiptNotificationService,
+    private readonly gatewayResolver: PaymentGatewayResolverService,
   ) {}
 
   private db() {
@@ -41,6 +57,9 @@ export class GatewayPaymentService {
       );
     }
 
+    const active = await this.gatewayResolver.requireActiveGateway(user.tid);
+    const provider = active.providerCode;
+
     const payment = await this.db().paymentTransaction.create({
       data: {
         tenantId: user.tid,
@@ -48,7 +67,7 @@ export class GatewayPaymentService {
         transactionNo: await this.nextTransactionNo(user.tid),
         paymentMode: 'ONLINE',
         paymentSource: 'ERP_GATEWAY',
-        provider: dto.provider,
+        provider,
         status: 'INITIATED',
         amount: dto.amount,
         unallocatedAmount: dto.amount,
@@ -56,44 +75,32 @@ export class GatewayPaymentService {
       },
     });
 
-    if (dto.provider === 'RAZORPAY' && process.env.RAZORPAY_KEY_ID) {
-      try {
-        const creds = {
-          keyId: process.env.RAZORPAY_KEY_ID!,
-          keySecret: process.env.RAZORPAY_KEY_SECRET!,
-          webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-        };
-        const order = await createRazorpayOrder(creds, {
-          amountPaise: Math.round(dto.amount * 100),
-          currency: 'INR',
-          receipt: payment.transactionNo,
-          notes: { studentId: dto.studentId, paymentId: payment.id },
-        });
-        await this.db().paymentTransaction.update({
-          where: { id: payment.id },
-          data: { providerOrderId: order.id },
-        });
-        return {
-          payment,
-          checkout: {
-            provider: 'RAZORPAY',
-            orderId: order.id,
-            amount: dto.amount,
-            currency: 'INR',
-            keyId: process.env.RAZORPAY_KEY_ID,
-            mode: 'LIVE',
-          },
-        };
-      } catch {
-        // fall through to mock
-      }
+    const checkout = await this.gatewayResolver.createCheckoutOrder(user.tid, {
+      amount: dto.amount,
+      currency: 'INR',
+      receipt: payment.transactionNo,
+      notes: { studentId: dto.studentId, paymentId: payment.id },
+    });
+
+    if (checkout.mode !== 'SAFE_MOCK' && checkout.orderId) {
+      await this.db().paymentTransaction.update({
+        where: { id: payment.id },
+        data: { providerOrderId: checkout.orderId },
+      });
+      return {
+        payment,
+        checkout: {
+          ...checkout,
+          paymentId: payment.id,
+        },
+      };
     }
 
     await this.db().paymentGatewayLog.create({
       data: {
         tenantId: user.tid,
         paymentId: payment.id,
-        provider: dto.provider,
+        provider,
         eventType: 'INITIATE',
         status: 'QUEUED',
         request: dto,
@@ -103,7 +110,7 @@ export class GatewayPaymentService {
     return {
       payment,
       checkout: {
-        provider: dto.provider,
+        provider,
         orderId: `MOCK-${payment.id}`,
         amount: dto.amount,
         currency: 'INR',
@@ -121,25 +128,22 @@ export class GatewayPaymentService {
       razorpay_signature: string;
     },
   ) {
-    const creds = {
-      keyId: process.env.RAZORPAY_KEY_ID ?? '',
-      keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
-    };
-    if (!creds.keyId || !creds.keySecret) {
-      throw new BadRequestException('Razorpay is not configured.');
-    }
-    const valid = verifyRazorpayPaymentSignature(
-      creds,
-      dto.razorpay_order_id,
-      dto.razorpay_payment_id,
-      dto.razorpay_signature,
-    );
-    if (!valid) throw new BadRequestException('Invalid payment signature.');
-
     const payment = await this.db().paymentTransaction.findFirst({
       where: { tenantId: user.tid, providerOrderId: dto.razorpay_order_id },
     });
     if (!payment) throw new BadRequestException('Payment record not found.');
+
+    const valid = await this.gatewayResolver.verifyPayment(
+      user.tid,
+      String(payment.provider ?? 'RAZORPAY'),
+      {
+        orderId: dto.razorpay_order_id,
+        paymentId: dto.razorpay_payment_id,
+        signature: dto.razorpay_signature,
+      },
+    );
+    if (!valid) throw new BadRequestException('Invalid payment signature.');
+
     if (payment.status === 'SUCCESS') {
       return { alreadyPaid: true, payment };
     }
@@ -277,6 +281,119 @@ export class GatewayPaymentService {
         });
       }
     }
+
+    if (provider === 'CASHFREE') {
+      const eventType = String(payload.type ?? '');
+      if (eventType === 'PAYMENT_SUCCESS_WEBHOOK') {
+        const data = payload.data as {
+          order?: { order_id?: string };
+          payment?: { cf_payment_id?: string };
+        };
+        const orderId = data.order?.order_id;
+        const paymentId = data.payment?.cf_payment_id;
+        if (orderId) {
+          const payment = await this.db().paymentTransaction.findFirst({
+            where: { tenantId, providerOrderId: orderId },
+          });
+          if (payment && payment.status !== 'SUCCESS') {
+            await this.completePayment(
+              tenantId,
+              payment,
+              String(paymentId ?? ''),
+            );
+          }
+        }
+      }
+      if (eventType === 'PAYMENT_FAILED_WEBHOOK') {
+        const data = payload.data as { order?: { order_id?: string } };
+        const orderId = data.order?.order_id;
+        if (orderId) {
+          const payment = await this.db().paymentTransaction.findFirst({
+            where: { tenantId, providerOrderId: orderId },
+          });
+          if (payment && payment.status === 'INITIATED') {
+            await this.db().paymentTransaction.update({
+              where: { id: payment.id },
+              data: { status: 'FAILED' },
+            });
+          }
+        }
+      }
+    }
+
+    if (provider === 'BILLDESK') {
+      const rawJws = String(payload._billdeskJws ?? '');
+      const creds = await this.gatewayResolver.resolveCredentials(
+        tenantId,
+        'BILLDESK',
+      );
+      const billdesk = creds ? toBilldeskCredentials(creds) : null;
+      const verified =
+        billdesk && rawJws
+          ? verifyBilldeskWebhook(billdesk, rawJws)
+          : { valid: false, payload: undefined };
+      const txn = verified.payload;
+      if (verified.valid && txn?.orderid) {
+        const success =
+          txn.transaction_error_type === 'success' ||
+          txn.auth_status === '0300';
+        const payment = await this.db().paymentTransaction.findFirst({
+          where: { tenantId, providerOrderId: txn.orderid },
+        });
+        if (payment && payment.status !== 'SUCCESS' && success) {
+          await this.completePayment(
+            tenantId,
+            payment,
+            String(txn.transactionid ?? ''),
+          );
+        } else if (payment && payment.status === 'INITIATED' && !success) {
+          await this.db().paymentTransaction.update({
+            where: { id: payment.id },
+            data: { status: 'FAILED' },
+          });
+        }
+      }
+    }
+
+    if (provider === 'NTT_DATA') {
+      const raw = String(payload._nttDataRaw ?? '');
+      const creds = await this.gatewayResolver.resolveCredentials(
+        tenantId,
+        'NTT_DATA',
+      );
+      const ntt = creds ? toNttDataCredentials(creds) : null;
+      if (ntt && raw) {
+        const enc = raw.includes('encData=')
+          ? decodeURIComponent(raw.split('encData=')[1]?.split('&')[0] ?? '')
+          : raw.trim();
+        const verified = enc ? verifyNttDataReturnPayload(ntt, enc) : null;
+        const orderId = String(
+          (verified?.payload as { merchTxnId?: string })?.merchTxnId ??
+            (
+              verified?.payload as {
+                payInstrument?: { merchDetails?: { merchTxnId?: string } };
+              }
+            )?.payInstrument?.merchDetails?.merchTxnId ??
+            '',
+        );
+        if (verified?.valid && orderId) {
+          const payment = await this.db().paymentTransaction.findFirst({
+            where: { tenantId, providerOrderId: orderId },
+          });
+          if (payment && payment.status !== 'SUCCESS') {
+            await this.completePayment(
+              tenantId,
+              payment,
+              String(
+                (verified.payload as { atomTxnId?: string }).atomTxnId ??
+                  `ntt-${Date.now()}`,
+              ),
+            );
+          }
+        }
+      }
+    }
+
     return { received: true };
   }
 
@@ -285,22 +402,20 @@ export class GatewayPaymentService {
     rawBody: string,
     signature: string | undefined,
     payload: Record<string, unknown>,
+    providerCode = 'RAZORPAY',
+    context?: { timestamp?: string },
   ) {
-    const creds = {
-      keyId: process.env.RAZORPAY_KEY_ID ?? '',
-      keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
-      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-    };
-    if (!creds.keyId || !creds.keySecret) {
-      throw new BadRequestException('Razorpay is not configured.');
-    }
-    if (
-      !signature ||
-      !verifyRazorpayWebhookSignature(creds, rawBody, signature)
-    ) {
+    const verified = await this.gatewayResolver.verifyWebhook(
+      tenantId,
+      providerCode,
+      rawBody,
+      signature,
+      context,
+    );
+    if (!verified) {
       throw new BadRequestException('Invalid webhook signature');
     }
-    return this.webhook(tenantId, 'RAZORPAY', payload);
+    return this.webhook(tenantId, providerCode.toUpperCase(), payload);
   }
 
   async syncStatus(user: JwtUser, provider: string, orderId: string) {
@@ -361,11 +476,12 @@ export class GatewayPaymentService {
       return { synced: true, request: updated, providerStatus: 'paid' };
     }
 
-    const creds = {
-      keyId: process.env.RAZORPAY_KEY_ID ?? '',
-      keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
-    };
-    if (!isRazorpayConfigured(creds)) {
+    const providerCode = String(payment.provider ?? 'RAZORPAY').toUpperCase();
+    const creds = await this.gatewayResolver.resolveCredentials(
+      user.tid,
+      providerCode,
+    );
+    if (!creds) {
       return { synced: false, request, providerStatus: 'NOT_CONFIGURED' };
     }
 
@@ -378,10 +494,152 @@ export class GatewayPaymentService {
 
     try {
       if (
+        providerCode === 'CASHFREE' &&
+        isCashfreeConfigured({
+          keyId: creds.keyId,
+          keySecret: creds.keySecret,
+          webhookSecret: creds.webhookSecret ?? undefined,
+          mode: creds.mode,
+        })
+      ) {
+        const order = await fetchCashfreeOrder(
+          {
+            keyId: creds.keyId,
+            keySecret: creds.keySecret,
+            webhookSecret: creds.webhookSecret ?? undefined,
+            mode: creds.mode,
+          },
+          providerRef,
+        );
+        if (order.order_status === 'PAID') {
+          const payments = await fetchCashfreeOrderPayments(
+            {
+              keyId: creds.keyId,
+              keySecret: creds.keySecret,
+              webhookSecret: creds.webhookSecret ?? undefined,
+              mode: creds.mode,
+            },
+            providerRef,
+          );
+          const success = payments.find((p) => p.payment_status === 'SUCCESS');
+          await this.completePayment(
+            user.tid,
+            payment,
+            success?.cf_payment_id ?? `cf-${providerRef}`,
+            request.generatedById ?? user.sub,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'paid' };
+        }
+        if (
+          order.order_status === 'EXPIRED' ||
+          order.order_status === 'TERMINATED'
+        ) {
+          await this.markPaymentRequestClosed(
+            user.tid,
+            request,
+            payment,
+            order.order_status.toLowerCase(),
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return {
+            synced: true,
+            request: updated,
+            providerStatus: order.order_status.toLowerCase(),
+          };
+        }
+        return { synced: false, request, providerStatus: order.order_status };
+      }
+
+      if (providerCode === 'BILLDESK') {
+        const billdesk = toBilldeskCredentials(creds);
+        if (!billdesk || !isBilldeskConfigured(billdesk)) {
+          return { synced: false, request, providerStatus: 'NOT_CONFIGURED' };
+        }
+        const order = await retrieveBilldeskOrder(billdesk, providerRef);
+        const status = String(
+          (order as { status?: string }).status ??
+            (order as { transaction_error_type?: string })
+              .transaction_error_type ??
+            '',
+        ).toLowerCase();
+        if (status === 'paid' || status === 'success' || status === '0300') {
+          await this.completePayment(
+            user.tid,
+            payment,
+            String(
+              (order as { transactionid?: string }).transactionid ??
+                `bd-${providerRef}`,
+            ),
+            request.generatedById ?? user.sub,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'paid' };
+        }
+        return { synced: false, request, providerStatus: status || 'pending' };
+      }
+
+      if (providerCode === 'NTT_DATA') {
+        const ntt = toNttDataCredentials(creds);
+        if (!ntt || !isNttDataConfigured(ntt)) {
+          return { synced: false, request, providerStatus: 'NOT_CONFIGURED' };
+        }
+        const status = await trackNttDataTransaction(ntt, {
+          merchTxnId: providerRef,
+          amount: Number(payment.amount),
+          txnDate: new Date().toISOString().slice(0, 10),
+        });
+        const code = String(
+          (status as { statusCode?: string }).statusCode ??
+            (status as { txnStatus?: string }).txnStatus ??
+            '',
+        ).toUpperCase();
+        if (code === 'OTS0000' || code === 'SUCCESS') {
+          await this.completePayment(
+            user.tid,
+            payment,
+            String(
+              (status as { atomTxnId?: string }).atomTxnId ??
+                `ntt-${providerRef}`,
+            ),
+            request.generatedById ?? user.sub,
+          );
+          const updated = await this.db().feePaymentRequest.findFirst({
+            where: { id: request.id },
+          });
+          return { synced: true, request: updated, providerStatus: 'paid' };
+        }
+        return { synced: false, request, providerStatus: code || 'pending' };
+      }
+
+      if (
+        !isRazorpayConfigured({
+          keyId: creds.keyId,
+          keySecret: creds.keySecret,
+          webhookSecret: creds.webhookSecret ?? undefined,
+        })
+      ) {
+        return { synced: false, request, providerStatus: 'NOT_CONFIGURED' };
+      }
+
+      if (
         providerRef.startsWith('plink_') ||
         request.channel === 'PAYMENT_LINK'
       ) {
-        const link = await fetchRazorpayPaymentLink(creds, providerRef);
+        const link = await fetchRazorpayPaymentLink(
+          {
+            keyId: creds.keyId,
+            keySecret: creds.keySecret,
+            webhookSecret: creds.webhookSecret ?? undefined,
+          },
+          providerRef,
+        );
         if (link.status === 'paid') {
           const providerPaymentId =
             link.payments?.find((p) => p.status === 'captured')?.payment_id ??
@@ -420,7 +678,11 @@ export class GatewayPaymentService {
 
       if (providerRef.startsWith('order_')) {
         const orderPayments = await fetchRazorpayOrderPayments(
-          creds,
+          {
+            keyId: creds.keyId,
+            keySecret: creds.keySecret,
+            webhookSecret: creds.webhookSecret ?? undefined,
+          },
           providerRef,
         );
         const captured = orderPayments.items?.find(
@@ -456,7 +718,14 @@ export class GatewayPaymentService {
           request.metadata as { paymentLinkProviderId?: string } | null
         )?.paymentLinkProviderId;
         if (linkId?.startsWith('plink_')) {
-          const link = await fetchRazorpayPaymentLink(creds, linkId);
+          const link = await fetchRazorpayPaymentLink(
+            {
+              keyId: creds.keyId,
+              keySecret: creds.keySecret,
+              webhookSecret: creds.webhookSecret ?? undefined,
+            },
+            linkId,
+          );
           if (link.status === 'paid') {
             const providerPaymentId =
               link.payments?.find((p) => p.status === 'captured')?.payment_id ??

@@ -3,8 +3,10 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
+  StreamableFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -18,13 +20,16 @@ import {
 } from '../../common/decorators/require-permissions.decorator';
 import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
 import { ShiftQueryInterceptor } from '../../common/interceptors/shift-query.interceptor';
+import { AttendancePolicyService } from './attendance-policy.service';
 import {
   AttendanceCorrectionDto,
   AttendanceEligibilityQueryDto,
+  AttendanceReportQueryDto,
   AttendanceSessionQueryDto,
   CreateExtraAttendanceSessionDto,
   GenerateAttendanceSessionsDto,
   MarkAttendanceDto,
+  UpdateAttendancePolicyDto,
 } from './dto/student-attendance.dto';
 import { StudentAttendanceService } from './student-attendance.service';
 
@@ -34,12 +39,34 @@ import { StudentAttendanceService } from './student-attendance.service';
 @UseInterceptors(ShiftQueryInterceptor)
 @Controller({ path: 'student-attendance', version: '1' })
 export class StudentAttendanceController {
-  constructor(private readonly service: StudentAttendanceService) {}
+  constructor(
+    private readonly service: StudentAttendanceService,
+    private readonly policy: AttendancePolicyService,
+  ) {}
 
   @Get('dashboard')
   @RequireAnyPermission('student-attendance:view', 'student-attendance:admin')
   dashboard(@CurrentUser() user: JwtUser) {
     return this.service.dashboard(user.tid);
+  }
+
+  @Get('policy')
+  @RequireAnyPermission(
+    'student-attendance:view',
+    'student-attendance:admin',
+    'student-attendance:manage',
+  )
+  getPolicy(@CurrentUser() user: JwtUser) {
+    return this.policy.getOrCreate(user.tid);
+  }
+
+  @Patch('policy')
+  @RequireAnyPermission('student-attendance:admin', 'student-attendance:manage')
+  updatePolicy(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: UpdateAttendancePolicyDto,
+  ) {
+    return this.policy.update(user.tid, dto);
   }
 
   @Get('sessions')
@@ -161,12 +188,37 @@ export class StudentAttendanceController {
 
   @Get('reports/:type')
   @RequireAnyPermission('student-attendance:view', 'student-attendance:reports')
-  reports(
+  async reports(
     @CurrentUser() user: JwtUser,
     @Param('type') type: string,
-    @Query() query: AttendanceSessionQueryDto,
+    @Query() query: AttendanceReportQueryDto,
   ) {
-    return this.service.reports(user.tid, type, query);
+    const result = await this.service.reports(user.tid, type, query);
+    if (
+      query.format === 'xlsx' &&
+      result &&
+      typeof result === 'object' &&
+      'buffer' in result
+    ) {
+      const payload = result as { buffer: Buffer; filename: string };
+      return new StreamableFile(payload.buffer, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        disposition: `attachment; filename="${payload.filename}"`,
+      });
+    }
+    if (
+      query.format === 'csv' &&
+      result &&
+      typeof result === 'object' &&
+      'csv' in result
+    ) {
+      const payload = result as { csv: string; filename: string };
+      return new StreamableFile(Buffer.from(payload.csv, 'utf8'), {
+        type: 'text/csv; charset=utf-8',
+        disposition: `attachment; filename="${payload.filename}"`,
+      });
+    }
+    return result;
   }
 
   @Get('portal/me')

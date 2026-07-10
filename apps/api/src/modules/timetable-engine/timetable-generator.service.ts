@@ -318,17 +318,19 @@ export class TimetableGeneratorService {
   }
 
   private buildInstitutionalDayShiftRows(tenantId: string, plan: any) {
+    // Don Bosco College Day Shift master grid (Arts / Science / Commerce share timings).
+    // Morning Shift uses buildGenericShiftRows / custom slotPolicy and is never affected here.
     const weekdayPeriods = [
-      [1, 'Period 1', '09:45', '10:30'],
-      [2, 'Period 2', '10:30', '11:15'],
-      [3, 'Period 3', '11:15', '12:00'],
-      [4, 'Period 4', '12:00', '12:45'],
-      [0, 'BREAK', '12:45', '13:15'],
-      [5, 'Period 5', '13:15', '14:00'],
-      [6, 'Period 6', '14:00', '14:45'],
-      [7, 'Period 7', '14:45', '15:30'],
+      [1, 'Period 1', '09:45', '10:40'],
+      [2, 'Period 2', '10:40', '11:25'],
+      [3, 'Period 3', '11:25', '12:10'],
+      [0, 'BREAK', '12:10', '12:40'],
+      [4, 'Period 4', '12:40', '13:25'],
+      [5, 'Period 5', '13:25', '14:10'],
+      [6, 'Period 6', '14:10', '15:00'],
     ] as const;
-    const saturdayPeriods = weekdayPeriods.slice(0, 4);
+    // Saturday: Periods 1–3 only (09:45–12:10)
+    const saturdayPeriods = weekdayPeriods.slice(0, 3);
     const rows: any[] = [];
     for (let day = 1; day <= 6; day += 1) {
       const source = day === 6 ? saturdayPeriods : weekdayPeriods;
@@ -350,8 +352,8 @@ export class TimetableGeneratorService {
           allowedCategories: isBreak ? [] : undefined,
           metadata: {
             policy: 'INSTITUTIONAL_DAY_SHIFT',
-            totalPeriods: day === 6 ? 4 : 7,
-            saturdayBlockedPeriods: day === 6 ? [5, 6, 7] : [],
+            totalPeriods: day === 6 ? 3 : 6,
+            saturdayBlockedPeriods: day === 6 ? [4, 5, 6] : [],
           },
         });
       }

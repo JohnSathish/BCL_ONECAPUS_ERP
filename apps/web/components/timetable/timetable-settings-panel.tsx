@@ -8,21 +8,21 @@ import { Input } from '@/components/ui/input';
 import { fetchSlotCategoryRules, saveSlotCategoryRules } from '@/services/timetable';
 
 const DAY_SHIFT_DEFAULTS = [
-  { dayOfWeek: 1, periodNo: 1, label: 'P1', startTime: '09:45', endTime: '10:30' },
-  { dayOfWeek: 1, periodNo: 2, label: 'P2', startTime: '10:30', endTime: '11:15' },
-  { dayOfWeek: 1, periodNo: 3, label: 'P3', startTime: '11:15', endTime: '12:00' },
-  { dayOfWeek: 1, periodNo: 4, label: 'P4', startTime: '12:00', endTime: '12:45' },
+  { dayOfWeek: 1, periodNo: 1, label: 'Period 1', startTime: '09:45', endTime: '10:40' },
+  { dayOfWeek: 1, periodNo: 2, label: 'Period 2', startTime: '10:40', endTime: '11:25' },
+  { dayOfWeek: 1, periodNo: 3, label: 'Period 3', startTime: '11:25', endTime: '12:10' },
   {
     dayOfWeek: 1,
     periodNo: 0,
-    label: 'Lunch',
-    startTime: '12:45',
-    endTime: '13:15',
+    label: 'Break',
+    startTime: '12:10',
+    endTime: '12:40',
+    isBreak: true,
     isLunch: true,
   },
-  { dayOfWeek: 1, periodNo: 5, label: 'P5', startTime: '13:15', endTime: '14:00' },
-  { dayOfWeek: 1, periodNo: 6, label: 'P6', startTime: '14:00', endTime: '14:45' },
-  { dayOfWeek: 1, periodNo: 7, label: 'P7', startTime: '14:45', endTime: '15:30' },
+  { dayOfWeek: 1, periodNo: 4, label: 'Period 4', startTime: '12:40', endTime: '13:25' },
+  { dayOfWeek: 1, periodNo: 5, label: 'Period 5', startTime: '13:25', endTime: '14:10' },
+  { dayOfWeek: 1, periodNo: 6, label: 'Period 6', startTime: '14:10', endTime: '15:00' },
 ];
 
 type SlotRuleRow = {
@@ -77,7 +77,10 @@ export function TimetableSettingsPanel({ planId }: { planId: string }) {
     const expanded: SlotRuleRow[] = [];
     for (let day = 1; day <= 6; day += 1) {
       for (const slot of DAY_SHIFT_DEFAULTS) {
-        if (day === 6 && (slot.periodNo ?? 0) > 4 && !slot.isLunch) continue;
+        // Saturday: Periods 1–3 only (no break / afternoon periods)
+        if (day === 6 && ((slot.periodNo ?? 0) === 0 || (slot.periodNo ?? 0) > 3)) {
+          continue;
+        }
         expanded.push({ ...slot, dayOfWeek: day });
       }
     }
@@ -103,8 +106,9 @@ export function TimetableSettingsPanel({ planId }: { planId: string }) {
       </CardHeader>
       <CardContent>
         <p className="mb-4 text-sm text-muted-foreground">
-          Day Shift: P1 09:45–10:30 through P7 14:45–15:30. Lunch 12:45–13:15. Saturday uses P1–P4
-          only (half-day ending 12:45).
+          Day Shift master (Arts / Science / Commerce): Period 1 09:45–10:40 through Period 6
+          14:10–15:00. Break 12:10–12:40. Saturday uses Periods 1–3 only (ending 12:10). Morning
+          Shift keeps its own independent template.
         </p>
         {!planId ? (
           <p className="text-sm text-muted-foreground">

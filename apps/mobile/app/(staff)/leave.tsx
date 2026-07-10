@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { DateField } from '@/components/ui/date-field';
@@ -79,6 +80,8 @@ function ApplicationRow({ application }: { application: LeaveApplication }) {
 
 export default function FacultyLeaveScreen() {
   const { refreshHome } = useFacultyPortal();
+  const { width } = useWindowDimensions();
+  const stackDates = width < 380;
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [summary, setSummary] = useState<LeaveSummary | null>(null);
@@ -158,7 +161,7 @@ export default function FacultyLeaveScreen() {
   return (
     <FacultyScreenShell title="Leave" subtitle="Apply & track leave requests">
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingHorizontal: stackDates ? 12 : 16 }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
         keyboardShouldPersistTaps="handled"
       >
@@ -202,33 +205,37 @@ export default function FacultyLeaveScreen() {
                 </ScrollView>
               )}
 
-              <View style={styles.dateRow}>
-                <DateField
-                  label="From"
-                  value={fromDate}
-                  onChange={(next) => {
-                    setFromDate(next);
-                    if (toDate && computeLeaveDays(next, toDate) === null) {
-                      setToDate('');
-                    }
-                  }}
-                  placeholder="Select start date"
-                  accentColor={facultyTheme.primaryLight}
-                  mutedColor={facultyTheme.textMuted}
-                  borderColor={facultyTheme.border}
-                  surfaceColor="#F9FAFB"
-                />
-                <DateField
-                  label="To"
-                  value={toDate}
-                  onChange={setToDate}
-                  placeholder="Select end date"
-                  minimumDate={fromDate ? new Date(fromDate) : undefined}
-                  accentColor={facultyTheme.primaryLight}
-                  mutedColor={facultyTheme.textMuted}
-                  borderColor={facultyTheme.border}
-                  surfaceColor="#F9FAFB"
-                />
+              <View style={[styles.dateRow, stackDates && styles.dateRowStacked]}>
+                <View style={stackDates ? styles.dateFieldFull : styles.dateFieldHalf}>
+                  <DateField
+                    label="From"
+                    value={fromDate}
+                    onChange={(next) => {
+                      setFromDate(next);
+                      if (toDate && computeLeaveDays(next, toDate) === null) {
+                        setToDate('');
+                      }
+                    }}
+                    placeholder="Select start date"
+                    accentColor={facultyTheme.primaryLight}
+                    mutedColor={facultyTheme.textMuted}
+                    borderColor={facultyTheme.border}
+                    surfaceColor="#F9FAFB"
+                  />
+                </View>
+                <View style={stackDates ? styles.dateFieldFull : styles.dateFieldHalf}>
+                  <DateField
+                    label="To"
+                    value={toDate}
+                    onChange={setToDate}
+                    placeholder="Select end date"
+                    minimumDate={fromDate ? new Date(fromDate) : undefined}
+                    accentColor={facultyTheme.primaryLight}
+                    mutedColor={facultyTheme.textMuted}
+                    borderColor={facultyTheme.border}
+                    surfaceColor="#F9FAFB"
+                  />
+                </View>
               </View>
 
               {dayCount != null ? (
@@ -276,7 +283,7 @@ export default function FacultyLeaveScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 14, paddingBottom: 28 },
+  container: { paddingVertical: 16, gap: 14, paddingBottom: 28 },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
   balanceCard: {
     backgroundColor: facultyTheme.surface,
@@ -286,9 +293,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: facultyTheme.border,
   },
-  balanceRow: { flexDirection: 'row', gap: 8 },
+  balanceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   balanceTile: {
     flex: 1,
+    minWidth: 88,
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 12,
@@ -321,8 +329,11 @@ const styles = StyleSheet.create({
   typeChipText: { fontSize: 13, fontWeight: '700', color: facultyTheme.text },
   typeChipCode: { fontSize: 10, color: facultyTheme.textMuted, marginTop: 2 },
   typeChipTextActive: { color: facultyTheme.primaryLight },
-  dateRow: { flexDirection: 'row', gap: 10 },
-  field: { flex: 1, gap: 4 },
+  dateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  dateRowStacked: { flexDirection: 'column' },
+  dateFieldHalf: { flex: 1, minWidth: 140 },
+  dateFieldFull: { width: '100%' },
+  field: { flex: 1, gap: 4, minWidth: 140 },
   label: { fontSize: 12, fontWeight: '700', color: facultyTheme.textMuted },
   input: {
     borderWidth: 1,

@@ -70,7 +70,7 @@ export function BarChartWidget({
           />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            formatter={(value: number | string) => [value, 'Students']}
+            formatter={(value) => [value ?? 0, 'Students']}
             labelFormatter={(label) => String(label)}
           />
           <Bar dataKey={dataKey} fill={color} radius={[0, 6, 6, 0]} maxBarSize={28} />

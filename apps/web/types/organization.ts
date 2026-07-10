@@ -61,6 +61,7 @@ export type AcademicYear = {
   name: string;
   startDate: string;
   endDate: string;
+  status?: string;
   semesters: Semester[];
 };
 

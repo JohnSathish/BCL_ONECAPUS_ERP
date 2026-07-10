@@ -1,22 +1,42 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock3, Loader2, Save, Search, Users } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  Lock,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  UserX,
+  Users,
+} from 'lucide-react';
 
+import { AttendanceStatusButtonBar } from '@/components/student-attendance/attendance-status-buttons';
 import { Button } from '@/components/ui/button';
+import {
+  ATTENDANCE_STATUS_MAP,
+  isExtendedAttendanceStatus,
+  summarizeAttendanceStatuses,
+  type AttendanceStatusCode,
+} from '@/components/student-attendance/attendance-status-config';
 import {
   fetchFacultyTodayAttendance,
   fetchStudentAttendanceRoster,
   markStudentAttendance,
+  type StudentAttendanceRoster,
   type StudentAttendanceRosterRow,
   type StudentAttendanceSession,
 } from '@/services/student-attendance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-const STATUS_OPTIONS = ['P', 'A', 'L', 'OD', 'ML', 'SPORTS', 'NSS', 'NCC', 'EXEMPTED'];
+type DraftEntry = { status: string; remarks?: string };
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export function FacultyAttendanceWorkspace() {
   const qc = useQueryClient();
@@ -25,8 +45,10 @@ export function FacultyAttendanceWorkspace() {
   const sessionParam = searchParams.get('sessionId');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [draft, setDraft] = useState<Record<string, { status: string; remarks?: string }>>({});
+  const [draft, setDraft] = useState<Record<string, DraftEntry>>({});
   const [message, setMessage] = useState('');
+  const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const sessions = useQuery({
     queryKey: ['student-attendance', 'faculty-today'],
@@ -60,10 +82,11 @@ export function FacultyAttendanceWorkspace() {
     enabled: Boolean(selected),
   });
 
+  const students = roster.data?.students ?? [];
+
   const rows = useMemo(() => {
-    const source = roster.data?.students ?? [];
     const needle = search.trim().toLowerCase();
-    return source.filter((student) => {
+    return students.filter((student) => {
       if (!needle) return true;
       return [
         student.fullName,
@@ -74,16 +97,128 @@ export function FacultyAttendanceWorkspace() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle));
     });
-  }, [roster.data, search]);
+  }, [students, search]);
 
-  const saveMut = useMutation({
-    mutationFn: async ({ lockAfterSave }: { lockAfterSave: boolean }) => {
-      if (!selected || !roster.data) return null;
-      const entries = roster.data.students.map((student) => ({
-        studentId: student.id,
-        status: draft[student.id]?.status ?? student.status ?? 'P',
-        remarks: draft[student.id]?.remarks ?? student.remarks,
+  const summary = useMemo(() => summarizeAttendanceStatuses(students, draft), [students, draft]);
+
+  const effectiveStatus = useCallback(
+    (student: StudentAttendanceRosterRow) => draft[student.id]?.status ?? student.status ?? 'P',
+    [draft],
+  );
+
+  const effectiveRemarks = useCallback(
+    (student: StudentAttendanceRosterRow) => draft[student.id]?.remarks ?? student.remarks ?? '',
+    [draft],
+  );
+
+  const patchRosterStudent = useCallback(
+    (studentId: string, patch: Partial<StudentAttendanceRosterRow>) => {
+      if (!selected) return;
+      qc.setQueryData<StudentAttendanceRoster>(
+        ['student-attendance', 'roster', selected],
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            students: current.students.map((student) =>
+              student.id === studentId ? { ...student, ...patch } : student,
+            ),
+          };
+        },
+      );
+    },
+    [qc, selected],
+  );
+
+  const saveEntry = useMutation({
+    mutationFn: async ({
+      studentId,
+      status,
+      remarks,
+      lockAfterSave = false,
+    }: {
+      studentId: string;
+      status: string;
+      remarks?: string;
+      lockAfterSave?: boolean;
+    }) => {
+      if (!selected) return null;
+      return markStudentAttendance(selected, {
+        mode: 'MANUAL',
+        lockAfterSave,
+        entries: [{ studentId, status, remarks }],
+      });
+    },
+    onMutate: ({ studentId }) => {
+      setSaveStates((prev) => ({ ...prev, [studentId]: 'saving' }));
+    },
+    onSuccess: (data, { studentId, status, remarks }) => {
+      patchRosterStudent(studentId, { status, remarks });
+      setDraft((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+      setSaveStates((prev) => ({ ...prev, [studentId]: 'saved' }));
+      window.setTimeout(() => {
+        setSaveStates((prev) =>
+          prev[studentId] === 'saved' ? { ...prev, [studentId]: 'idle' } : prev,
+        );
+      }, 1800);
+      if (data?.session) {
+        qc.setQueryData(['student-attendance', 'roster', selected], data);
+      }
+      void qc.invalidateQueries({ queryKey: ['student-attendance', 'faculty-today'] });
+    },
+    onError: (error, { studentId }) => {
+      setSaveStates((prev) => ({ ...prev, [studentId]: 'error' }));
+      setMessage(apiErrorMessage(error, 'Could not save attendance'));
+    },
+  });
+
+  const scheduleAutoSave = useCallback(
+    (studentId: string, status: string, remarks?: string) => {
+      if (saveTimers.current[studentId]) {
+        clearTimeout(saveTimers.current[studentId]);
+      }
+      saveTimers.current[studentId] = setTimeout(() => {
+        saveEntry.mutate({ studentId, status, remarks });
+      }, 350);
+    },
+    [saveEntry],
+  );
+
+  const updateStudent = useCallback(
+    (studentId: string, status: string, remarks?: string) => {
+      setDraft((prev) => ({
+        ...prev,
+        [studentId]: { status, remarks: remarks ?? prev[studentId]?.remarks },
       }));
+      scheduleAutoSave(studentId, status, remarks);
+    },
+    [scheduleAutoSave],
+  );
+
+  const updateRemarks = useCallback(
+    (studentId: string, status: string, remarks: string) => {
+      setDraft((prev) => ({
+        ...prev,
+        [studentId]: { status, remarks },
+      }));
+      scheduleAutoSave(studentId, status, remarks);
+    },
+    [scheduleAutoSave],
+  );
+
+  const bulkSaveMut = useMutation({
+    mutationFn: async ({
+      entries,
+      lockAfterSave,
+    }: {
+      entries: Array<{ studentId: string; status: string; remarks?: string }>;
+      lockAfterSave: boolean;
+    }) => {
+      if (!selected) return null;
       return markStudentAttendance(selected, {
         mode: 'ABSENTEES_ONLY',
         lockAfterSave,
@@ -101,13 +236,43 @@ export function FacultyAttendanceWorkspace() {
     onError: (error) => setMessage(apiErrorMessage(error, 'Could not save attendance')),
   });
 
+  const buildAllEntries = useCallback(
+    (status: string) =>
+      students.map((student) => ({
+        studentId: student.id,
+        status,
+        remarks: draft[student.id]?.remarks ?? student.remarks,
+      })),
+    [students, draft],
+  );
+
   const markAllPresent = () => {
-    const next: Record<string, { status: string; remarks?: string }> = {};
-    (roster.data?.students ?? []).forEach((student) => {
+    const next: Record<string, DraftEntry> = {};
+    students.forEach((student) => {
       next[student.id] = { status: 'P', remarks: draft[student.id]?.remarks };
     });
     setDraft(next);
+    bulkSaveMut.mutate({ entries: buildAllEntries('P'), lockAfterSave: false });
   };
+
+  const markAllAbsent = () => {
+    const next: Record<string, DraftEntry> = {};
+    students.forEach((student) => {
+      next[student.id] = { status: 'A', remarks: draft[student.id]?.remarks };
+    });
+    setDraft(next);
+    bulkSaveMut.mutate({ entries: buildAllEntries('A'), lockAfterSave: false });
+  };
+
+  const resetDraft = () => {
+    Object.values(saveTimers.current).forEach(clearTimeout);
+    saveTimers.current = {};
+    setDraft({});
+    setSaveStates({});
+    setMessage('');
+  };
+
+  const isLocked = roster.data?.session.status === 'LOCKED';
 
   return (
     <div className="space-y-4">
@@ -115,23 +280,23 @@ export function FacultyAttendanceWorkspace() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              Student Attendance
+              Attendance Entry
             </p>
-            <h1 className="mt-1 text-2xl font-bold">Today’s Classes</h1>
+            <h1 className="mt-1 text-2xl font-bold">Today&apos;s Classes</h1>
             <p className="text-sm text-muted-foreground">
-              Open a scheduled class, mark all present, then change only absentees or special
-              statuses.
+              Mark all present, then tap only exceptions. Changes save automatically.
             </p>
           </div>
           <Button onClick={() => sessions.refetch()} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
         <aside className="space-y-2">
-          {sessions.isLoading ? <LoadingCard label="Loading today’s timetable..." /> : null}
+          {sessions.isLoading ? <LoadingCard label="Loading today's timetable..." /> : null}
           {(sessions.data ?? []).map((session) => (
             <SessionCard
               key={session.id}
@@ -139,8 +304,7 @@ export function FacultyAttendanceWorkspace() {
               active={selected === session.id}
               onClick={() => {
                 setSelectedId(session.id);
-                setDraft({});
-                setMessage('');
+                resetDraft();
               }}
             />
           ))}
@@ -152,7 +316,7 @@ export function FacultyAttendanceWorkspace() {
           ) : null}
         </aside>
 
-        <main className="min-w-0 rounded-3xl border border-border/60 bg-card p-4 shadow-sm">
+        <main className="min-w-0 rounded-3xl border border-border/60 bg-card shadow-sm">
           {!selected ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
               Select a class to begin.
@@ -161,84 +325,171 @@ export function FacultyAttendanceWorkspace() {
             <LoadingCard label="Loading class roster..." />
           ) : roster.data ? (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    {roster.data.session.subjectGroup?.title ??
-                      roster.data.session.course?.title ??
-                      'Class roster'}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {roster.data.session.subjectGroup?.code ??
-                      roster.data.session.course?.code ??
-                      '—'}{' '}
-                    · Section {roster.data.session.section?.sectionCode ?? '—'} · Period{' '}
-                    {roster.data.session.periodNo ?? '—'} · {roster.data.session.sessionType}
-                    {roster.data.session.location
-                      ? ` · ${roster.data.session.location.roomCode ?? ''} ${roster.data.session.location.roomName ?? ''}`
-                      : ''}
-                  </p>
-                  {(roster.data.session.linkedPapers ?? []).length ? (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Rolls up to papers:{' '}
-                      {(roster.data.session.linkedPapers ?? [])
-                        .map((paper) => paper.code)
-                        .join(', ')}
+              <div className="sticky top-0 z-10 rounded-t-3xl border-b border-border/60 bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold">
+                      {roster.data.session.displayTitle ??
+                        roster.data.session.subjectGroup?.title ??
+                        roster.data.session.course?.title ??
+                        'Class roster'}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {roster.data.session.displayHeader?.subtitle
+                        ? `${roster.data.session.displayHeader.subtitle}${
+                            roster.data.session.displayHeader.details
+                              ? ` · ${roster.data.session.displayHeader.details}`
+                              : ''
+                          }`
+                        : `${
+                            roster.data.session.paperCourse?.code ??
+                            roster.data.session.subjectGroup?.code ??
+                            roster.data.session.course?.code ??
+                            '—'
+                          } · Section ${roster.data.session.section?.sectionCode ?? '—'} · Period ${
+                            roster.data.session.periodNo ?? '—'
+                          } · ${roster.data.session.sessionType}${
+                            roster.data.session.location
+                              ? ` · ${roster.data.session.location.roomCode ?? ''} ${roster.data.session.location.roomName ?? ''}`
+                              : ''
+                          }`}
                     </p>
-                  ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={markAllPresent}
+                      disabled={bulkSaveMut.isPending || isLocked}
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      {bulkSaveMut.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                      )}
+                      Mark All Present
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={markAllAbsent}
+                      disabled={bulkSaveMut.isPending || isLocked}
+                    >
+                      <UserX className="mr-2 h-4 w-4" />
+                      All Absent
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetDraft}
+                      disabled={!Object.keys(draft).length}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={markAllPresent}>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Quick Present
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => saveMut.mutate({ lockAfterSave: false })}
-                    disabled={saveMut.isPending}
-                  >
-                    {saveMut.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-4 w-4" />
-                    )}
-                    Save Attendance
-                  </Button>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <SummaryChip
+                    label="Present"
+                    value={summary.present}
+                    className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                  />
+                  <SummaryChip
+                    label="Absent"
+                    value={summary.absent}
+                    className="bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
+                  />
+                  <SummaryChip
+                    label="Leave"
+                    value={summary.leave}
+                    className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                  />
+                  <SummaryChip
+                    label="OD"
+                    value={summary.od}
+                    className="bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200"
+                  />
+                  {summary.other > 0 ? (
+                    <SummaryChip
+                      label="Other"
+                      value={summary.other}
+                      className="bg-muted text-muted-foreground"
+                    />
+                  ) : null}
+                  <span className="ml-auto self-center text-xs text-muted-foreground">
+                    {summary.total} students
+                    {isLocked ? ' · Locked' : ''}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-border/60 px-3 py-2">
+                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <input
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search name or roll number..."
+                      className="h-8 flex-1 bg-transparent text-sm outline-none"
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => saveMut.mutate({ lockAfterSave: true })}
-                    disabled={saveMut.isPending}
+                    onClick={() =>
+                      bulkSaveMut.mutate({
+                        entries: students.map((student) => ({
+                          studentId: student.id,
+                          status: effectiveStatus(student),
+                          remarks: effectiveRemarks(student) || undefined,
+                        })),
+                        lockAfterSave: true,
+                      })
+                    }
+                    disabled={bulkSaveMut.isPending || isLocked}
                   >
+                    {bulkSaveMut.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Lock className="mr-2 h-4 w-4" />
+                    )}
                     Save & Lock
                   </Button>
                 </div>
+
+                {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
               </div>
-              {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search roll number, admission number, or name..."
-                  className="h-8 flex-1 bg-transparent text-sm outline-none"
-                />
-              </div>
-              <div className="mt-4 max-h-[620px] overflow-auto rounded-2xl border border-border/60">
-                {rows.map((student) => (
-                  <StudentRow
+
+              <div className="max-h-[calc(100vh-14rem)] divide-y divide-border/60 overflow-y-auto">
+                {rows.map((student, index) => (
+                  <StudentAttendanceRow
                     key={student.id}
                     student={student}
-                    value={draft[student.id]?.status ?? student.status ?? 'P'}
-                    remarks={draft[student.id]?.remarks ?? student.remarks ?? ''}
-                    onChange={(status, remarks) =>
-                      setDraft((prev) => ({ ...prev, [student.id]: { status, remarks } }))
+                    index={index}
+                    status={effectiveStatus(student)}
+                    remarks={effectiveRemarks(student)}
+                    saveState={saveStates[student.id] ?? 'idle'}
+                    disabled={isLocked || bulkSaveMut.isPending}
+                    onStatusChange={(status) =>
+                      updateStudent(student.id, status, effectiveRemarks(student) || undefined)
+                    }
+                    onRemarksChange={(remarks) =>
+                      updateRemarks(student.id, effectiveStatus(student), remarks)
                     }
                   />
                 ))}
               </div>
+
+              {!rows.length ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  No students match your search.
+                </div>
+              ) : null}
             </>
           ) : null}
         </main>
@@ -247,10 +498,37 @@ export function FacultyAttendanceWorkspace() {
   );
 }
 
+function SummaryChip({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number;
+  className: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
+        className,
+      )}
+    >
+      {label}
+      <span className="tabular-nums">{value}</span>
+    </span>
+  );
+}
+
 function sessionDisplay(session: StudentAttendanceSession) {
-  const title = session.subjectGroup?.title ?? session.course?.title ?? 'Attendance session';
-  const code = session.subjectGroup?.code ?? session.course?.code ?? 'Class';
-  return { title, code };
+  const title =
+    session.displayTitle ??
+    session.subjectGroup?.title ??
+    session.course?.title ??
+    'Attendance session';
+  const groupCode = session.subjectGroup?.code ?? session.course?.code ?? 'Class';
+  const paperCode = session.paperCourse?.code;
+  return { title, groupCode, paperCode };
 }
 
 function SessionCard({
@@ -263,6 +541,10 @@ function SessionCard({
   onClick: () => void;
 }) {
   const label = sessionDisplay(session);
+  const rosterSize = session.rosterSize ?? null;
+  const markedCount = session.counts?.total ?? 0;
+  const absentCount = session.counts?.absent ?? 0;
+
   return (
     <button
       type="button"
@@ -277,71 +559,157 @@ function SessionCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{label.title}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{label.code}</p>
+          <p className="truncate text-[11px] font-medium text-primary">
+            {label.paperCode ? `${label.paperCode} · ` : ''}
+            Period {session.periodNo ?? '—'}
+            {label.paperCode ? '' : ` · ${label.groupCode}`}
+          </p>
           <p className="text-xs text-muted-foreground">
             Section {session.section?.sectionCode ?? '—'} · {session.sessionType}
             {session.location ? ` · ${session.location.roomCode ?? ''}` : ''}
           </p>
         </div>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{session.status}</span>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
+            session.status === 'LOCKED'
+              ? 'bg-amber-100 text-amber-800'
+              : session.status === 'MARKED'
+                ? 'bg-emerald-100 text-emerald-800'
+                : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {session.status}
+        </span>
       </div>
       <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
         <Clock3 className="h-3 w-3" />
-        Period {session.periodNo ?? '—'}
+        {session.timetableLinked ? 'Timetable linked' : 'Legacy session'}
+        {session.timetablePlanName ? ` · ${session.timetablePlanName}` : ''}
       </p>
       <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
         <Users className="h-3 w-3" />
-        {session.counts?.total ?? 0} marked · {session.counts?.absent ?? 0} absent
+        {rosterSize != null ? `${markedCount}/${rosterSize} marked` : `${markedCount} marked`}
+        {absentCount > 0 ? ` · ${absentCount} absent` : ''}
       </p>
     </button>
   );
 }
 
-function StudentRow({
+function StudentAttendanceRow({
   student,
-  value,
+  index,
+  status,
   remarks,
-  onChange,
+  saveState,
+  disabled,
+  onStatusChange,
+  onRemarksChange,
 }: {
   student: StudentAttendanceRosterRow;
-  value: string;
+  index: number;
+  status: string;
   remarks: string;
-  onChange: (status: string, remarks?: string) => void;
+  saveState: SaveState;
+  disabled: boolean;
+  onStatusChange: (status: string) => void;
+  onRemarksChange: (remarks: string) => void;
 }) {
+  const [remarkOpen, setRemarkOpen] = useState(Boolean(remarks));
+  const extendedActive = isExtendedAttendanceStatus(status);
+  const statusMeta = ATTENDANCE_STATUS_MAP[status as AttendanceStatusCode];
+  const rollLabel =
+    student.rollNumber ?? student.admissionNumber ?? student.enrollmentNumber ?? '—';
+
   return (
-    <div className="grid gap-2 border-b border-border/60 px-3 py-2 last:border-0 md:grid-cols-[1fr_220px_220px] md:items-center">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{student.fullName}</p>
-        <p className="text-[11px] text-muted-foreground">
-          Roll {student.rollNumber ?? '—'} · Adm{' '}
-          {student.admissionNumber ?? student.enrollmentNumber ?? '—'}
-        </p>
+    <div
+      className={cn(
+        'px-3 py-2 transition-colors sm:px-4',
+        index % 2 === 0 ? 'bg-card' : 'bg-muted/15',
+        status === 'A' && 'bg-rose-50/50 dark:bg-rose-950/15',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <StudentAvatar name={student.fullName} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-[13px] font-semibold leading-tight">{student.fullName}</p>
+              <SaveIndicator state={saveState} />
+            </div>
+            {extendedActive && statusMeta ? (
+              <p className="truncate text-[10px] font-medium text-primary">{statusMeta.label}</p>
+            ) : null}
+          </div>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">Roll: {rollLabel}</span>
       </div>
-      <div className="flex flex-wrap gap-1">
-        {STATUS_OPTIONS.map((status) => (
+
+      <div className="mt-1.5 flex w-full justify-end overflow-x-auto pb-0.5">
+        <AttendanceStatusButtonBar value={status} disabled={disabled} onChange={onStatusChange} />
+      </div>
+
+      <div className="mt-1 pl-10">
+        {remarkOpen ? (
+          <input
+            value={remarks}
+            disabled={disabled}
+            onChange={(event) => onRemarksChange(event.target.value)}
+            placeholder="Optional remark..."
+            className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-primary/50"
+          />
+        ) : (
           <button
-            key={status}
             type="button"
-            onClick={() => onChange(status, remarks)}
-            className={cn(
-              'rounded-full border px-2 py-1 text-[11px] font-semibold',
-              value === status
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background text-muted-foreground',
-            )}
+            disabled={disabled}
+            onClick={() => setRemarkOpen(true)}
+            className="text-[11px] font-medium text-primary hover:underline disabled:opacity-50"
           >
-            {status}
+            + Add remark
           </button>
-        ))}
+        )}
       </div>
-      <input
-        value={remarks}
-        onChange={(event) => onChange(value, event.target.value)}
-        placeholder="Remarks"
-        className="h-9 rounded-lg border border-border bg-background px-2 text-xs outline-none"
-      />
     </div>
   );
+}
+
+function StudentAvatar({ name }: { name: string }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+
+  return (
+    <div
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary"
+      aria-hidden
+    >
+      {initials || '?'}
+    </div>
+  );
+}
+
+function SaveIndicator({ state }: { state: SaveState }) {
+  if (state === 'idle') return null;
+  if (state === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Saving
+      </span>
+    );
+  }
+  if (state === 'saved') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+        <Save className="h-3 w-3" />
+        Saved
+      </span>
+    );
+  }
+  return <span className="text-[10px] font-medium text-rose-600">Save failed</span>;
 }
 
 function LoadingCard({ label }: { label: string }) {

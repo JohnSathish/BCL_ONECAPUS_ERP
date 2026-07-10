@@ -83,9 +83,7 @@ export function BulkUpdateResultStep({ batchId, result, onStartOver }: Props) {
 
       return batch;
     },
-    enabled:
-      Boolean(batchId) &&
-      (Boolean(displayResult?.async) || batchQuery.data?.status === 'PROCESSING'),
+    enabled: Boolean(batchId),
     refetchInterval: (query) =>
       query.state.data?.status === 'PROCESSING' || displayResult?.async ? 2000 : false,
   });

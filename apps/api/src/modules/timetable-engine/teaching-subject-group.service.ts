@@ -40,10 +40,16 @@ export class TeachingSubjectGroupService {
       where: {
         tenantId,
         deletedAt: null,
-        ...(query.semesterNo ? { semesterNo: query.semesterNo } : {}),
+        ...(query.semesterNo ? { semesterNo: Number(query.semesterNo) } : {}),
         ...(query.shiftId ? { shiftId: query.shiftId } : {}),
+        // Include rows with no academic year yet (manual creates before year resolved)
         ...(query.academicYearId
-          ? { academicYearId: query.academicYearId }
+          ? {
+              OR: [
+                { academicYearId: query.academicYearId },
+                { academicYearId: null },
+              ],
+            }
           : {}),
         ...(query.fyugpCategory
           ? { fyugpCategory: query.fyugpCategory.toUpperCase() }

@@ -183,6 +183,7 @@ export class AuthService {
               appVersion: options.meta?.appVersion,
               deviceId: options.meta?.deviceId,
               deviceLabel: options.meta?.deviceLabel,
+              rememberMe: Boolean(options.rememberMe),
             },
           },
         });
@@ -616,6 +617,12 @@ export class AuthService {
         roles,
       );
 
+      const sessionMeta = (activeSession.metadata ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const rememberMe = Boolean(sessionMeta.rememberMe);
+
       return this.issueTokens(
         activeSession.user,
         tenant.slug,
@@ -626,6 +633,7 @@ export class AuthService {
         {
           familyId: activeSession.familyId,
           previousSessionId: activeSession.id,
+          rememberMe,
           meta,
         },
       );
@@ -686,6 +694,10 @@ export class AuthService {
             {
               familyId: revokedSession.familyId,
               previousSessionId: revokedSession.replacedById ?? undefined,
+              rememberMe: Boolean(
+                (revokedSession.metadata as Record<string, unknown> | null)
+                  ?.rememberMe,
+              ),
               meta,
             },
           );

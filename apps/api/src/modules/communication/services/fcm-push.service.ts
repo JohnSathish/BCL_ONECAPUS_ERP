@@ -86,14 +86,19 @@ export class FcmPushService {
 
   async sendToTokens(
     tokens: string[],
-    payload: { title: string; body: string; data?: Record<string, string> },
+    payload: {
+      title: string;
+      body: string;
+      data?: Record<string, string>;
+      imageUrl?: string;
+    },
   ): Promise<FcmSendResult> {
     if (!tokens.length) {
       return { ok: false, provider: 'fcm', error: 'No push tokens' };
     }
     if (this.isDemoMode()) {
       this.logger.log(
-        `[FCM demo] Would send to ${tokens.length} device(s): "${payload.title}" — ${payload.body}`,
+        `[FCM demo] Would send to ${tokens.length} device(s): "${payload.title}" — ${payload.body}${payload.imageUrl ? ` [image=${payload.imageUrl}]` : ''}`,
       );
       return {
         ok: true,
@@ -109,9 +114,30 @@ export class FcmPushService {
       return { ok: false, provider: 'fcm', error: 'FCM auth failed' };
     }
     const projectId = this.config.getOrThrow<string>('FCM_PROJECT_ID');
+    const data: Record<string, string> = {};
+    for (const [key, value] of Object.entries(payload.data ?? {})) {
+      data[key] = value == null ? '' : String(value);
+    }
+    if (payload.imageUrl) {
+      data.imageUrl = payload.imageUrl;
+    }
     let lastRef: string | undefined;
     let failures = 0;
     for (const pushToken of tokens) {
+      const message: Record<string, unknown> = {
+        token: pushToken,
+        notification: {
+          title: payload.title,
+          body: payload.body,
+          ...(payload.imageUrl ? { image: payload.imageUrl } : {}),
+        },
+        data,
+      };
+      if (payload.imageUrl) {
+        message.android = {
+          notification: { image: payload.imageUrl },
+        };
+      }
       const res = await fetch(
         `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
         {
@@ -120,13 +146,7 @@ export class FcmPushService {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            message: {
-              token: pushToken,
-              notification: { title: payload.title, body: payload.body },
-              data: payload.data ?? {},
-            },
-          }),
+          body: JSON.stringify({ message }),
         },
       );
       const body = (await res.json()) as {

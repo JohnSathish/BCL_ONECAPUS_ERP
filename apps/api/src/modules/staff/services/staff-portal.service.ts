@@ -775,13 +775,55 @@ export class StaffPortalService {
   }
 
   async getTodaySchedule(tenantId: string, staffProfileId: string) {
+    const today = startOfDay(new Date());
     const dayOfWeek = new Date().getDay();
     const entries = await this.prisma.timetableEntry.findMany({
       where: { tenantId, staffProfileId, dayOfWeek },
       orderBy: { startTime: 'asc' },
     });
 
-    const results = [];
+    const attendanceSessions = await (
+      this.prisma as any
+    ).studentAttendanceSession.findMany({
+      where: {
+        tenantId,
+        primaryFacultyId: staffProfileId,
+        sessionDate: today,
+        deletedAt: null,
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    const results: Array<{
+      id: string;
+      startTime: string;
+      endTime: string;
+      subject: string;
+      semesterNo: number | null;
+      sectionCode: string | null;
+      classroom: string | null;
+      offeringSectionId: string | null;
+      status: string;
+    }> = [];
+    const seenSlotKeys = new Set<string>();
+
+    const pushSlot = (slot: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      subject: string;
+      semesterNo: number | null;
+      sectionCode: string | null;
+      classroom: string | null;
+      offeringSectionId: string | null;
+      status: string;
+    }) => {
+      const key = `${slot.startTime}:${slot.offeringSectionId ?? slot.subject}`;
+      if (seenSlotKeys.has(key)) return;
+      seenSlotKeys.add(key);
+      results.push(slot);
+    };
+
     for (const entry of entries) {
       let subject = 'Class';
       let sectionCode: string | null = null;
@@ -818,7 +860,7 @@ export class StaffPortalService {
         classroom = room?.name ?? room?.code ?? null;
       }
 
-      results.push({
+      pushSlot({
         id: entry.id,
         startTime: formatTime(entry.startTime),
         endTime: formatTime(entry.endTime),
@@ -831,7 +873,49 @@ export class StaffPortalService {
       });
     }
 
-    return results;
+    for (const session of attendanceSessions) {
+      let subject = 'Class session';
+      let sectionCode: string | null = null;
+      let classroom: string | null = null;
+
+      if (session.courseId) {
+        const course = await this.prisma.course.findFirst({
+          where: { id: session.courseId },
+          select: { code: true, title: true },
+        });
+        subject = course?.title ?? course?.code ?? subject;
+      }
+
+      if (session.offeringSectionId) {
+        const section = await this.prisma.offeringSection.findFirst({
+          where: { id: session.offeringSectionId },
+          select: { sectionCode: true },
+        });
+        sectionCode = section?.sectionCode ?? null;
+      }
+
+      if (session.classroomId) {
+        const room = await this.prisma.classroom.findFirst({
+          where: { id: session.classroomId },
+          select: { code: true, name: true },
+        });
+        classroom = room?.name ?? room?.code ?? null;
+      }
+
+      pushSlot({
+        id: session.id,
+        startTime: session.startTime ? formatTime(session.startTime) : '—',
+        endTime: session.endTime ? formatTime(session.endTime) : '—',
+        subject,
+        semesterNo: session.semesterNo ?? null,
+        sectionCode,
+        classroom,
+        offeringSectionId: session.offeringSectionId ?? null,
+        status: session.status ?? 'scheduled',
+      });
+    }
+
+    return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   async getTodayScheduleForUser(user: JwtUser) {
