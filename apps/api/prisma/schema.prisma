@@ -1763,6 +1763,8 @@ model Course {
   labRequired                Boolean   @default(false) @map("lab_required")
   requiresTimetableSlots     Boolean   @default(true) @map("requires_timetable_slots")
   hasPractical               Boolean   @default(false) @map("has_practical")
+  /// Optional override for exam fee paper type: THEORY_ONLY | THEORY_PRACTICAL
+  examPaperType              String?   @map("exam_paper_type")
   theoryCredits              Decimal   @default(0) @map("theory_credits") @db.Decimal(5, 2)
   practicalCredits           Decimal   @default(0) @map("practical_credits") @db.Decimal(5, 2)
   theoryHoursPerWeek         Int       @default(0) @map("theory_hours_per_week")
@@ -7043,6 +7045,254 @@ model FeeReceipt {
   @@unique([tenantId, receiptNo])
   @@index([tenantId, studentId, issuedAt])
   @@map("fee_receipts")
+  @@schema("finance")
+}
+
+/// NEHU Semester Examination Fee — session window (Odd/Even cycle).
+model ExamFeeSession {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  name                 String
+  academicYearId       String?   @map("academic_year_id") @db.Uuid
+  academicYearLabel    String?   @map("academic_year_label")
+  semesterCycle        String    @map("semester_cycle") // ODD | EVEN
+  applicableSemesters  Json      @default("[]") @map("applicable_semesters")
+  applicationStartDate DateTime? @map("application_start_date") @db.Date
+  applicationEndDate   DateTime? @map("application_end_date") @db.Date
+  lateFeeDate          DateTime? @map("late_fee_date") @db.Date
+  status               String    @default("DRAFT") // DRAFT | ACTIVE | CLOSED
+  metadata             Json      @default("{}")
+  createdById          String?   @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  applications ExamApplication[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, academicYearId])
+  @@map("exam_fee_sessions")
+  @@schema("finance")
+}
+
+/// Configurable examination fee schedule (never hardcode amounts in code).
+model ExamFeeMaster {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  academicYearId  String?   @map("academic_year_id") @db.Uuid
+  academicYearLabel String? @map("academic_year_label")
+  effectiveFrom   DateTime? @map("effective_from") @db.Date
+  effectiveTo     DateTime? @map("effective_to") @db.Date
+  isActive        Boolean   @default(true) @map("is_active")
+  metadata        Json      @default("{}")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  lines ExamFeeMasterLine[]
+
+  @@index([tenantId, isActive])
+  @@map("exam_fee_masters")
+  @@schema("finance")
+}
+
+model ExamFeeMasterLine {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  masterId  String   @map("master_id") @db.Uuid
+  headCode  String   @map("head_code")
+  headName  String   @map("head_name")
+  amount    Decimal  @db.Decimal(12, 2)
+  unit      String   @default("FLAT") // FLAT | PER_PAPER
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  master ExamFeeMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
+
+  @@unique([masterId, headCode])
+  @@index([tenantId, masterId])
+  @@map("exam_fee_master_lines")
+  @@schema("finance")
+}
+
+model ExamFeeSettings {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  receiptPrefix        String   @default("EXAM") @map("receipt_prefix")
+  allowedManualModes   Json     @default("[\"CASH\",\"UPI\",\"BANK_TRANSFER\",\"CHEQUE\",\"DD\"]") @map("allowed_manual_modes")
+  requireDeclaration   Boolean  @default(true) @map("require_declaration")
+  autoVerifyOnPayment  Boolean  @default(false) @map("auto_verify_on_payment")
+  metadata             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("exam_fee_settings")
+  @@schema("finance")
+}
+
+model ExamApplication {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  sessionId             String    @map("session_id") @db.Uuid
+  studentId             String    @map("student_id") @db.Uuid
+  applicationNo         String    @map("application_no")
+  currentSemesterNo     Int       @map("current_semester_no")
+  departmentId          String?   @map("department_id") @db.Uuid
+  departmentName        String?   @map("department_name")
+  status                String    @default("DRAFT")
+  /// DRAFT | SUBMITTED | AWAITING_PAYMENT | PAID | MANUAL_PAID | UNDER_VERIFICATION | APPROVED | REJECTED | CORRECTION_REQUESTED | CANCELLED
+  declarationAccepted   Boolean   @default(false) @map("declaration_accepted")
+  declarationAcceptedAt DateTime? @map("declaration_accepted_at")
+  currentSemesterFee    Decimal   @default(0) @map("current_semester_fee") @db.Decimal(12, 2)
+  backPaperFee          Decimal   @default(0) @map("back_paper_fee") @db.Decimal(12, 2)
+  processingFee         Decimal   @default(0) @map("processing_fee") @db.Decimal(12, 2)
+  lateFee               Decimal   @default(0) @map("late_fee") @db.Decimal(12, 2)
+  totalFee              Decimal   @default(0) @map("total_fee") @db.Decimal(12, 2)
+  feeBreakdown          Json      @default("{}") @map("fee_breakdown")
+  demandId              String?   @map("demand_id") @db.Uuid
+  submittedAt           DateTime? @map("submitted_at")
+  paidAt                DateTime? @map("paid_at")
+  verifiedAt            DateTime? @map("verified_at")
+  verifiedById          String?   @map("verified_by_id") @db.Uuid
+  remarks               String?
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  session         ExamFeeSession                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  currentSubjects ExamApplicationCurrentSubject[]
+  backPapers      ExamApplicationBackPaper[]
+  statusHistory   ExamApplicationStatusHistory[]
+  payments        ExamPayment[]
+  receipts        ExamReceipt[]
+
+  @@unique([tenantId, applicationNo])
+  @@unique([tenantId, sessionId, studentId])
+  @@index([tenantId, status])
+  @@index([tenantId, studentId])
+  @@index([tenantId, sessionId, status])
+  @@map("exam_applications")
+  @@schema("finance")
+}
+
+model ExamApplicationCurrentSubject {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  courseId      String?  @map("course_id") @db.Uuid
+  subjectCode   String   @map("subject_code")
+  subjectName   String   @map("subject_name")
+  examPaperType String   @map("exam_paper_type") // THEORY_ONLY | THEORY_PRACTICAL
+  amount        Decimal  @db.Decimal(12, 2)
+  sortOrder     Int      @default(0) @map("sort_order")
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, applicationId])
+  @@map("exam_application_current_subjects")
+  @@schema("finance")
+}
+
+model ExamApplicationBackPaper {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  applicationId    String   @map("application_id") @db.Uuid
+  semesterNo       Int      @map("semester_no")
+  subjectCode      String   @map("subject_code")
+  subjectName      String   @map("subject_name")
+  examPaperType    String   @map("exam_paper_type")
+  amount           Decimal  @db.Decimal(12, 2)
+  source           String   @default("MANUAL") // MANUAL | RESULT_IMPORT (V2)
+  externalResultRef String? @map("external_result_ref")
+  sortOrder        Int      @default(0) @map("sort_order")
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  application ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, applicationId])
+  @@map("exam_application_back_papers")
+  @@schema("finance")
+}
+
+model ExamApplicationStatusHistory {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  fromStatus    String?  @map("from_status")
+  toStatus      String   @map("to_status")
+  action        String
+  remarks       String?
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, applicationId, createdAt])
+  @@map("exam_application_status_history")
+  @@schema("finance")
+}
+
+model ExamPayment {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  applicationId        String    @map("application_id") @db.Uuid
+  studentId            String    @map("student_id") @db.Uuid
+  channel              String    // ONLINE | MANUAL
+  paymentMode          String    // CASH | UPI | BANK_TRANSFER | CHEQUE | DD | ONLINE
+  amount               Decimal   @db.Decimal(12, 2)
+  currency             String    @default("INR")
+  status               String    @default("PENDING")
+  paymentTransactionId String?   @map("payment_transaction_id") @db.Uuid
+  provider             String?
+  providerPaymentId    String?   @map("provider_payment_id")
+  externalReference    String?   @map("external_reference")
+  collectedById        String?   @map("collected_by_id") @db.Uuid
+  paidAt               DateTime? @map("paid_at")
+  remarks              String?
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  application ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  receipts    ExamReceipt[]
+
+  @@index([tenantId, applicationId])
+  @@index([tenantId, status])
+  @@index([tenantId, studentId])
+  @@map("exam_payments")
+  @@schema("finance")
+}
+
+model ExamReceipt {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  paymentId     String?  @map("payment_id") @db.Uuid
+  studentId     String   @map("student_id") @db.Uuid
+  receiptNo     String   @map("receipt_no")
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("INR")
+  status        String   @default("ISSUED")
+  issuedAt      DateTime @default(now()) @map("issued_at")
+  issuedById    String?  @map("issued_by_id") @db.Uuid
+  pdfPath       String?  @map("pdf_path")
+  qrPayload     String?  @map("qr_payload")
+  breakdown     Json     @default("{}")
+  metadata      Json     @default("{}")
+
+  application ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  payment     ExamPayment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, studentId, issuedAt])
+  @@index([tenantId, applicationId])
+  @@map("exam_receipts")
   @@schema("finance")
 }
 

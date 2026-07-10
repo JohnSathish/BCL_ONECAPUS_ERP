@@ -789,6 +789,30 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Examination reports and exports',
   },
   {
+    slug: 'exam-fees:read',
+    resource: 'exam-fees',
+    action: 'read',
+    description: 'View semester examination fee sessions and applications',
+  },
+  {
+    slug: 'exam-fees:manage',
+    resource: 'exam-fees',
+    action: 'manage',
+    description: 'Configure examination fee masters, sessions and settings',
+  },
+  {
+    slug: 'exam-fees:collect',
+    resource: 'exam-fees',
+    action: 'collect',
+    description: 'Collect examination fees manually',
+  },
+  {
+    slug: 'exam-fees:verify',
+    resource: 'exam-fees',
+    action: 'verify',
+    description: 'Verify and approve examination fee applications',
+  },
+  {
     slug: 'ia:view',
     resource: 'ia',
     action: 'view',

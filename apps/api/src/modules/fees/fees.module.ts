@@ -92,6 +92,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
     FeeReceiptPdfProcessor,
     FeeOrphanDemandService,
     GatewayPaymentService,
+    PaymentCollectionService,
   ],
 })
 export class FeesModule {}

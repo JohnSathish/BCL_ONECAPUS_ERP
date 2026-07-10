@@ -57,6 +57,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
     icon: '🎓',
     items: [
       {
+        id: 'exam-fees',
+        label: 'Examination Fees',
+        href: '/(student)/examination-fees',
+        keywords: ['exam fee', 'back paper', 'nehu'],
+      },
+      {
         id: 'hall-ticket',
         label: 'Hall Ticket',
         href: '/(student)/exam-schedule',

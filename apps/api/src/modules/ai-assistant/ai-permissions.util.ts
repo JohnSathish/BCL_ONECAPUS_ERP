@@ -18,6 +18,15 @@ export const AI_PERMS = {
   ],
   staff: ['staff:read', 'staff:manage', 'hr:read', 'hr:manage'],
   fees: ['fees:read', 'fees:manage', 'reports:read'],
+  examFees: [
+    'exam-fees:read',
+    'exam-fees:manage',
+    'exam-fees:verify',
+    'exam:view',
+    'exam:admin',
+    'fees:read',
+    'reports:read',
+  ],
   attendance: [
     'student-attendance:view',
     'student-attendance:reports',

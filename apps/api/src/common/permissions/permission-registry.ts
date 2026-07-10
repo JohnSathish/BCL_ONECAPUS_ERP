@@ -62,6 +62,10 @@ export const MODULE_PERMISSIONS = {
     'ia:view',
     'ia:manage',
     'ia:marks:enter',
+    'exam-fees:read',
+    'exam-fees:manage',
+    'exam-fees:collect',
+    'exam-fees:verify',
   ],
   certificates: [
     'certificates:read',
@@ -463,6 +467,14 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: [...MODULE_PERMISSIONS.studentAttendance],
   },
   {
+    prefix: '/admin/examination-fees',
+    permissions: [
+      ...MODULE_PERMISSIONS.examinations,
+      'exam-fees:read',
+      'exam-fees:manage',
+    ],
+  },
+  {
     prefix: '/admin/academics/examinations',
     permissions: [...MODULE_PERMISSIONS.examinations],
   },
@@ -594,13 +606,17 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
   {
     slug: 'examination-cell',
     name: 'Examination Cell',
-    description: 'Examination sessions, results, reports',
+    description: 'Examination sessions, semester exam fees, results, reports',
     permissions: [
       'exam:view',
       'exam:create',
       'exam:edit',
       'exam:admin',
       'exam:results',
+      'exam-fees:read',
+      'exam-fees:manage',
+      'exam-fees:collect',
+      'exam-fees:verify',
       'question-bank:read',
       'question-bank:manage',
       'reports:read',

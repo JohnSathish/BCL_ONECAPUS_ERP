@@ -77,7 +77,8 @@ export type AiActionKind =
   | 'profile_completion_summary'
   | 'generate_chart'
   | 'propose_action'
-  | 'action_stub';
+  | 'action_stub'
+  | 'exam_fee_query';
 
 export type AiPendingIntent = {
   action: AiActionKind;

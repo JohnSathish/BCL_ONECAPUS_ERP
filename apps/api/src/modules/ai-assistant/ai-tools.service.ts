@@ -8,6 +8,11 @@ import { AdmissionsService } from '../admissions/admissions.service';
 import { DashboardAnalyticsService } from '../dashboard-analytics/dashboard-analytics.service';
 import { FeeReportsService } from '../fees/services/fee-reports.service';
 import { StudentFeeSummaryService } from '../fees/services/student-fee-summary.service';
+import { ExamApplicationService } from '../examination-fees/services/exam-application.service';
+import { ExamDashboardService } from '../examination-fees/services/exam-dashboard.service';
+import { ExamReportService } from '../examination-fees/services/exam-report.service';
+import { ExamReceiptService } from '../examination-fees/services/exam-receipt.service';
+import { ExamVerificationService } from '../examination-fees/services/exam-verification.service';
 import { StudentAttendanceService } from '../student-attendance/student-attendance.service';
 import { CustomReportService } from '../student-reports/services/custom-report.service';
 import { StudentReportsQueryService } from '../student-reports/services/student-reports-query.service';
@@ -51,6 +56,11 @@ export class AiToolsService {
     private readonly staff: StaffService,
     private readonly feeReports: FeeReportsService,
     private readonly feeSummaryService: StudentFeeSummaryService,
+    private readonly examApplications: ExamApplicationService,
+    private readonly examDashboard: ExamDashboardService,
+    private readonly examReports: ExamReportService,
+    private readonly examReceipts: ExamReceiptService,
+    private readonly examVerification: ExamVerificationService,
     private readonly attendance: StudentAttendanceService,
     private readonly admissions: AdmissionsService,
     private readonly intents: HybridIntentResolver,
@@ -72,6 +82,8 @@ export class AiToolsService {
         return this.kpis(user);
       case 'fee_summary':
         return this.feeSummary(user);
+      case 'exam_fee_query':
+        return this.examFeeQuery(user, intent);
       case 'attendance_summary':
         return this.attendanceSummary(user);
       case 'lookup_student':
@@ -449,6 +461,223 @@ export class AiToolsService {
         "Show today's attendance summary",
       ],
     };
+  }
+
+  private async examFeeQuery(user: JwtUser, intent: ResolvedIntent) {
+    this.assertPerm(user, AI_PERMS.examFees, 'examination fee data');
+    const q = (intent.question ?? intent.searchQuery ?? '').toLowerCase();
+    const links = [
+      {
+        label: 'Exam fee dashboard',
+        href: '/admin/examination-fees',
+      },
+      {
+        label: 'Student exam fees',
+        href: '/student/examination-fees',
+      },
+    ];
+
+    if (/receipt/.test(q) && /roll/.test(q)) {
+      const rollMatch = q.match(
+        /\b([a-z]{1,6}\d{2}[-/]?\d{2,6}|[a-z0-9-]{4,})\b/i,
+      );
+      const roll = rollMatch?.[1];
+      if (!roll) {
+        return {
+          answer:
+            'Please include a roll number, e.g. “Generate receipt for Roll No BA25-101”.',
+          links,
+          source: 'live' as const,
+        };
+      }
+      const student = await this.db().student.findFirst({
+        where: {
+          tenantId: user.tid,
+          deletedAt: null,
+          OR: [
+            { rollNumber: { equals: roll, mode: 'insensitive' } },
+            { enrollmentNumber: { equals: roll, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true, rollNumber: true },
+      });
+      if (!student) {
+        return {
+          answer: `No student found for roll/enrollment “${roll}”.`,
+          links,
+          source: 'live' as const,
+        };
+      }
+      const receipt = await this.db().examReceipt.findFirst({
+        where: { tenantId: user.tid, studentId: student.id },
+        orderBy: { issuedAt: 'desc' },
+      });
+      if (!receipt) {
+        return {
+          answer: `No examination fee receipt found for ${roll}.`,
+          links,
+          source: 'live' as const,
+        };
+      }
+      return {
+        answer: `Latest examination receipt for ${roll}: ${receipt.receiptNo} · ${this.formatInr(Number(receipt.amount))} · status ${receipt.status}.`,
+        links: [
+          ...links,
+          {
+            label: 'Open receipts',
+            href: '/admin/examination-fees/receipts',
+          },
+        ],
+        source: 'live' as const,
+      };
+    }
+
+    if (/verif/.test(q) || /pending manual/.test(q)) {
+      const rows = await this.examVerification.listPending(user.tid);
+      return {
+        answer: `${rows.length} examination application(s) awaiting verification.`,
+        table: rows.length
+          ? {
+              columns: [
+                { key: 'applicationNo', label: 'Application' },
+                { key: 'departmentName', label: 'Department' },
+                { key: 'status', label: 'Status' },
+                { key: 'totalFee', label: 'Total' },
+              ],
+              rows: rows.slice(0, 25).map((r: any) => ({
+                applicationNo: r.applicationNo,
+                departmentName: r.departmentName ?? '—',
+                status: r.status,
+                totalFee: this.formatInr(Number(r.totalFee)),
+              })),
+              totalRows: rows.length,
+            }
+          : undefined,
+        links: [
+          ...links,
+          {
+            label: 'Fee verification',
+            href: '/admin/examination-fees/verification',
+          },
+        ],
+        source: 'live' as const,
+      };
+    }
+
+    if (/today/.test(q) && /collection/.test(q)) {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await this.examReports.dailyCollection(user.tid, {
+        from: today,
+        to: today,
+      });
+      const amount = rows.reduce(
+        (s: number, r: any) => s + Number(r.amount ?? 0),
+        0,
+      );
+      return {
+        answer: `Today’s examination fee collection is ${this.formatInr(amount)}.`,
+        links,
+        source: 'live' as const,
+      };
+    }
+
+    if (/department/.test(q)) {
+      const rows = await this.examReports.collectionByDepartment(user.tid, {});
+      return {
+        answer: `Department-wise examination fee collection (${rows.length} departments).`,
+        table: {
+          columns: [
+            { key: 'department', label: 'Department' },
+            { key: 'count', label: 'Paid apps' },
+            { key: 'amount', label: 'Amount' },
+          ],
+          rows: rows.map((r: any) => ({
+            department: r.department,
+            count: r.count,
+            amount: this.formatInr(Number(r.amount)),
+          })),
+          totalRows: rows.length,
+        },
+        links,
+        source: 'live' as const,
+      };
+    }
+
+    if (/back\s*paper|backlog/.test(q)) {
+      const rows = await this.examApplications.listBackPapersAdmin(user.tid);
+      return {
+        answer: `${rows.length} declared back paper(s) across examination applications.`,
+        table: rows.length
+          ? {
+              columns: [
+                { key: 'applicationNo', label: 'Application' },
+                { key: 'subjectCode', label: 'Code' },
+                { key: 'semesterNo', label: 'Sem' },
+                { key: 'amount', label: 'Fee' },
+              ],
+              rows: rows.slice(0, 25).map((r: any) => ({
+                applicationNo: r.application?.applicationNo ?? '—',
+                subjectCode: r.subjectCode,
+                semesterNo: r.semesterNo,
+                amount: this.formatInr(Number(r.amount)),
+              })),
+              totalRows: rows.length,
+            }
+          : undefined,
+        links: [
+          ...links,
+          {
+            label: 'Back papers',
+            href: '/admin/examination-fees/back-papers',
+          },
+        ],
+        source: 'live' as const,
+      };
+    }
+
+    if (
+      /unpaid|pending\s+payment|awaiting\s+payment|unpaid examination/.test(q)
+    ) {
+      const unpaid = await this.examReports.pendingPayments(user.tid, {});
+      return {
+        answer: `${unpaid.length} unpaid examination application(s).`,
+        table: unpaid.length
+          ? {
+              columns: [
+                { key: 'applicationNo', label: 'Application' },
+                { key: 'departmentName', label: 'Department' },
+                { key: 'status', label: 'Status' },
+                { key: 'totalFee', label: 'Total' },
+              ],
+              rows: unpaid.slice(0, 25).map((r: any) => ({
+                applicationNo: r.applicationNo,
+                departmentName: r.departmentName ?? '—',
+                status: r.status,
+                totalFee: this.formatInr(Number(r.totalFee)),
+              })),
+              totalRows: unpaid.length,
+            }
+          : undefined,
+        links,
+        source: 'live' as const,
+        suggestedFollowUps: [
+          'Show students with back papers',
+          "Show today's examination fee collection",
+          'Show pending manual verification',
+        ],
+      };
+    }
+
+    const dash = await this.examDashboard.summary(user.tid);
+    return {
+      answer: `Examination fee session “${dash.cards.currentSession}”: ${dash.cards.applicationsSubmitted} submitted, ${dash.cards.pendingPayments} pending payment, ${dash.cards.paidApplications} paid, collection ${this.formatInr(dash.cards.totalCollection)}.`,
+      links,
+      source: 'live' as const,
+    };
+  }
+
+  private db() {
+    return this.prisma as unknown as Record<string, any>;
   }
 
   private async feeSummary(user: JwtUser) {

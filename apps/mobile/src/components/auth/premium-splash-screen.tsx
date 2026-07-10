@@ -294,15 +294,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 10,
   },
   logo: {
-    width: 156,
-    height: 156,
+    width: 168,
+    height: 168,
+    backgroundColor: 'transparent',
   },
   productName: {
     color: '#FFFFFF',

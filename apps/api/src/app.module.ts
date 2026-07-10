@@ -56,6 +56,7 @@ import { FeesModule } from './modules/fees/fees.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { ExaminationsModule } from './modules/examinations/examinations.module';
+import { ExaminationFeesModule } from './modules/examination-fees/examination-fees.module';
 import { LmsModule } from './modules/lms/lms.module';
 import { CommunicationModule } from './modules/communication/communication.module';
 import { QuestionBankModule } from './modules/question-bank/question-bank.module';
@@ -135,6 +136,7 @@ import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.
     PaymentGatewayModule,
     AccountingModule,
     ExaminationsModule,
+    ExaminationFeesModule,
     LmsModule,
     CommunicationModule,
     CertificatesModule,

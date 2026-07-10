@@ -3,6 +3,7 @@ import { CacheModule } from '../../shared/cache/cache.module';
 import { AdmissionsModule } from '../admissions/admissions.module';
 import { DashboardAnalyticsModule } from '../dashboard-analytics/dashboard-analytics.module';
 import { FeesModule } from '../fees/fees.module';
+import { ExaminationFeesModule } from '../examination-fees/examination-fees.module';
 import { StaffModule } from '../staff/staff.module';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { StudentReportsModule } from '../student-reports/student-reports.module';
@@ -24,6 +25,7 @@ import { LlmIntentAdapter } from './intent/llm-intent.adapter';
     StaffModule,
     StudentReportsModule,
     FeesModule,
+    ExaminationFeesModule,
     StudentAttendanceModule,
     AdmissionsModule,
     KnowledgeBaseModule,

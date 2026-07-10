@@ -355,6 +355,16 @@ export class HybridIntentResolver {
       };
     }
 
+    if (this.isExamFee(lower)) {
+      return {
+        action: 'exam_fee_query',
+        filters,
+        question: q,
+        searchQuery: q,
+        confidence: 0.93,
+      };
+    }
+
     if (this.isFee(lower)) {
       return { action: 'fee_summary', filters, confidence: 0.9 };
     }
@@ -749,6 +759,18 @@ export class HybridIntentResolver {
     const token = m[1].toLowerCase();
     if (/^\d+$/.test(token)) return Number(token);
     return roman[token] ?? null;
+  }
+
+  private isExamFee(lower: string) {
+    return (
+      /\bexam(?:ination)?\s+fee\b|\bsemester\s+exam(?:ination)?\s+fee\b|\bback\s+papers?\b/.test(
+        lower,
+      ) ||
+      (/\bexam\b/.test(lower) &&
+        /\b(unpaid|pending|verification|collection|receipt|back\s*log)\b/.test(
+          lower,
+        ))
+    );
   }
 
   private isFee(lower: string) {

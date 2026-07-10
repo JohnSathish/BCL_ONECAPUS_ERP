@@ -40,6 +40,7 @@ export default function StudentLayout() {
         <Stack.Screen name="attendance" />
         <Stack.Screen name="timetable" />
         <Stack.Screen name="exam-schedule" />
+        <Stack.Screen name="examination-fees" />
         <Stack.Screen name="results" />
         <Stack.Screen name="leave" />
         <Stack.Screen name="library" />

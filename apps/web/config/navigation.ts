@@ -933,6 +933,76 @@ export const ADMIN_NAV: NavGroup[] = [
         ],
       },
       {
+        label: 'Semester Exam Fees',
+        icon: ClipboardList,
+        href: '/admin/examination-fees',
+        module: 'examinations',
+        permissions: [...P.examinations],
+        activePattern: '^/admin/examination-fees(?:/.*)?$',
+        children: [
+          {
+            label: 'Examination Dashboard',
+            href: '/admin/examination-fees',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Examination Fee Setup',
+            href: '/admin/examination-fees/setup',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Examination Fee Sessions',
+            href: '/admin/examination-fees/sessions',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Student Examination Application',
+            href: '/admin/examination-fees/applications',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Back Paper Selection',
+            href: '/admin/examination-fees/back-papers',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Payment Gateway',
+            href: '/admin/examination-fees/payments',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Manual Fee Collection',
+            href: '/admin/examination-fees/manual',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Fee Verification',
+            href: '/admin/examination-fees/verification',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Examination Reports',
+            href: '/admin/examination-fees/exam-reports',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Payment Reports',
+            href: '/admin/examination-fees/payment-reports',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Receipt Management',
+            href: '/admin/examination-fees/receipts',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Examination Settings',
+            href: '/admin/examination-fees/settings',
+            permissions: [...P.examinations],
+          },
+        ],
+      },
+      {
         label: 'Certificates',
         icon: Award,
         href: '/admin/certificates',
@@ -2036,6 +2106,7 @@ export const ROLE_NAV: Record<string, { label: string; href: string; icon: Lucid
     { label: 'Registration', href: '/student/registration', icon: ClipboardList },
     { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },
     { label: 'Examinations', href: '/student/examinations', icon: Ticket },
+    { label: 'Exam Fees', href: '/student/examination-fees', icon: ClipboardList },
     { label: 'Committee Notices', href: '/student/governance/notices', icon: Megaphone },
     { label: 'Committee Meetings', href: '/student/governance/meetings', icon: CalendarDays },
   ],
