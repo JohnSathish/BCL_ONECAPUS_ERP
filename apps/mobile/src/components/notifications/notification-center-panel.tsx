@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,7 +22,7 @@ import {
 } from '@/services/notifications';
 import {
   resolveMobileDeepLink,
-  fallbackNotificationCenter,
+  isGenericNotificationLink,
 } from '@/services/notification-deep-link';
 import { trackPushOpened } from '@/services/push-notifications';
 import type { UserNotification } from '@/types/notifications';
@@ -108,8 +109,18 @@ export function NotificationCenterPanel({
       }
     }
     void trackPushOpened(item.link ?? undefined);
+
     const href = resolveMobileDeepLink(item.link);
-    if (href) router.push(href as never);
+    const hrefStr = href ? String(href) : '';
+    const landsOnInbox =
+      !href || hrefStr.includes('/notifications') || isGenericNotificationLink(item.link);
+
+    // Campaign / generic links: show the message instead of a no-op navigate.
+    if (landsOnInbox) {
+      Alert.alert(item.title || 'Notification', item.body?.trim() || 'No additional details.');
+      return;
+    }
+    router.push(href as never);
   }
 
   async function onMarkAll() {
@@ -263,19 +274,11 @@ export function NotificationCenterPanel({
                     Delete
                   </Text>
                 </Pressable>
-                {item.link ? (
-                  <Pressable
-                    onPress={() => {
-                      const href =
-                        resolveMobileDeepLink(item.link) ?? fallbackNotificationCenter(role);
-                      router.push(href as never);
-                    }}
-                  >
-                    <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 12 }}>
-                      Open
-                    </Text>
-                  </Pressable>
-                ) : null}
+                <Pressable onPress={() => void onOpen(item)}>
+                  <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 12 }}>
+                    Open
+                  </Text>
+                </Pressable>
               </View>
             </View>
           );

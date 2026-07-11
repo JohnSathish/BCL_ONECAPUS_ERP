@@ -156,9 +156,22 @@ export function navigateFromPushLink(link?: string | null) {
     router.push(href as never);
     return;
   }
+  // No link on the push → open the inbox so the user can read it.
   void getStoredAppType().then((appType) => {
     router.push(fallbackNotificationCenter(appType === 'staff' ? 'staff' : 'student') as never);
   });
+}
+
+/**
+ * Clear a stale "last notification response" so cold starts do not keep
+ * replaying the previous push navigation into Alerts.
+ */
+export async function clearStalePushResponse() {
+  try {
+    await Notifications.clearLastNotificationResponseAsync();
+  } catch {
+    // ignore if native module unavailable
+  }
 }
 
 let responseSub: Notifications.Subscription | null = null;

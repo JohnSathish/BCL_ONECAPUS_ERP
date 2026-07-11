@@ -1,10 +1,6 @@
 import type { Href } from 'expo-router';
 
-/**
- * Map server notification links (web portal paths or custom scheme) to Expo Router hrefs.
- */
-export function resolveMobileDeepLink(link?: string | null): Href | null {
-  if (!link?.trim()) return null;
+function normalizePath(link: string): string {
   let path = link.trim();
 
   if (path.startsWith('onecampus://')) {
@@ -19,10 +15,38 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     // keep raw path
   }
 
+  if (!path.startsWith('/')) path = `/${path}`;
+  // strip trailing slash except root
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+  return path;
+}
+
+/**
+ * Map server notification links (web portal paths or custom scheme) to Expo Router hrefs.
+ */
+export function resolveMobileDeepLink(link?: string | null): Href | null {
+  if (!link?.trim()) return null;
+  const path = normalizePath(link);
   const lower = path.toLowerCase();
 
-  // Student
-  if (lower.includes('/student/fees') || lower.includes('fee')) {
+  // Exact student home — do not dump users on the Alerts tab
+  if (lower === '/student' || lower === '/student/dashboard' || lower === '/student/home') {
+    return '/(student)/(tabs)/index' as Href;
+  }
+
+  // Student — specific screens first
+  if (
+    lower.includes('/student/examination-fees') ||
+    lower.includes('/student/exam-fees') ||
+    lower.includes('examination-fee')
+  ) {
+    return '/(student)/examination-fees' as Href;
+  }
+  if (
+    lower.includes('/student/fees') ||
+    lower.includes('/student/fee') ||
+    /(^|\/)fees?(\/|$)/.test(lower)
+  ) {
     return '/(student)/(tabs)/fees' as Href;
   }
   if (
@@ -31,7 +55,11 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   ) {
     return '/(student)/attendance' as Href;
   }
-  if (lower.includes('/student/results') || lower.includes('result') || lower.includes('exam')) {
+  if (
+    lower.includes('/student/results') ||
+    lower.includes('/student/exams') ||
+    lower.includes('result')
+  ) {
     return '/(student)/results' as Href;
   }
   if (lower.includes('/student/timetable') || lower.includes('timetable')) {
@@ -41,20 +69,38 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('/student/library') || lower.includes('library')) {
     return '/(student)/library' as Href;
   }
-  if (lower.includes('/student/assignments') || lower.includes('assignment')) {
+  if (
+    lower.includes('/student/assignments') ||
+    lower.includes('/student/lms') ||
+    lower.includes('assignment')
+  ) {
     return '/(student)/assignments' as Href;
   }
   if (lower.includes('/student/leave')) {
     return '/(student)/leave' as Href;
   }
-  if (lower.includes('/student/certificates')) {
-    return '/(student)/(tabs)' as Href;
+  if (
+    lower.includes('/student/my-profile') ||
+    lower.includes('/student/profile') ||
+    lower.includes('/student/complete-profile')
+  ) {
+    return '/(student)/complete-profile' as Href;
   }
-  if (lower.includes('/student') && !lower.includes('/staff')) {
+  if (lower.includes('/student/notifications') || lower.includes('/student/alerts')) {
     return '/(student)/(tabs)/notifications' as Href;
+  }
+  if (lower.includes('/student/certificates')) {
+    return '/(student)/(tabs)/index' as Href;
+  }
+  // Remaining /student/* → Home (not Notifications)
+  if (lower.startsWith('/student') && !lower.includes('/staff')) {
+    return '/(student)/(tabs)/index' as Href;
   }
 
   // Staff / faculty
+  if (lower === '/staff' || lower === '/staff/dashboard' || lower === '/faculty') {
+    return '/(staff)/(tabs)/index' as Href;
+  }
   if (lower.includes('mark') || lower.includes('/marks')) {
     return '/(staff)/marks' as Href;
   }
@@ -64,15 +110,38 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('payroll') || lower.includes('payslip')) {
     return '/(staff)/payroll' as Href;
   }
-  if (lower.includes('/staff') || lower.includes('faculty')) {
+  if (lower.includes('/staff/notifications')) {
     return '/(staff)/notifications' as Href;
+  }
+  if (lower.includes('/staff') || lower.includes('faculty')) {
+    return '/(staff)/(tabs)/index' as Href;
   }
 
   return null;
+}
+
+/** True when the link has no useful in-app destination beyond Home / Alerts. */
+export function isGenericNotificationLink(link?: string | null): boolean {
+  if (!link?.trim()) return true;
+  const lower = normalizePath(link).toLowerCase();
+  return (
+    lower === '/student' ||
+    lower === '/student/dashboard' ||
+    lower === '/student/home' ||
+    lower === '/staff' ||
+    lower === '/staff/dashboard' ||
+    lower === '/faculty'
+  );
 }
 
 export function fallbackNotificationCenter(appType: 'student' | 'staff'): Href {
   return appType === 'staff'
     ? ('/(staff)/notifications' as Href)
     : ('/(student)/(tabs)/notifications' as Href);
+}
+
+export function fallbackHome(appType: 'student' | 'staff'): Href {
+  return appType === 'staff'
+    ? ('/(staff)/(tabs)/index' as Href)
+    : ('/(student)/(tabs)/index' as Href);
 }

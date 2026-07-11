@@ -47,7 +47,7 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
   if (isStudent && !isStaff && !isPrincipal && !isShiftAdmin && !isSuperAdmin) {
     return {
       persona: 'student',
-      href: '/(student)/(tabs)' as Href,
+      href: '/(student)/(tabs)/index' as Href,
       appType: 'student',
       title: 'Student Dashboard',
       subtitle: 'Attendance, academics, fees & more',

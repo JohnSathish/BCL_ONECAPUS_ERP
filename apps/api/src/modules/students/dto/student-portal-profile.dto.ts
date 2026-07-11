@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Allow,
   IsArray,
   IsBoolean,
   IsIn,
@@ -45,6 +46,9 @@ export class StudentProfileChangeItemDto {
   @IsString()
   fieldKey!: string;
 
+  /** Field values may be string, number, object, or null depending on section. */
+  @Allow()
+  @IsOptional()
   newValue?: unknown;
 }
 
