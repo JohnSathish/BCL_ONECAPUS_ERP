@@ -178,13 +178,14 @@ export class DemandScopeDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
-}
 
-export class GenerateDemandDto extends DemandScopeDto {
+  /** Accepted on preview+generate; preview ignores it, generate uses it. */
   @IsOptional()
   @IsBoolean()
   publish?: boolean;
 }
+
+export class GenerateDemandDto extends DemandScopeDto {}
 
 export class PublishDemandDto {
   @IsOptional()
