@@ -49,6 +49,11 @@ services:
       # The worker container uses PROCESS_BACKGROUND_JOBS=worker for backups + fee PDFs.
       PROCESS_BACKGROUND_JOBS: ${PROCESS_BACKGROUND_JOBS:-api}
       FEE_RECEIPT_PDF_ON_WORKER: ${FEE_RECEIPT_PDF_ON_WORKER:-true}
+      # Firebase Cloud Messaging (Push Center). Values come from /opt/nep-erp/.env
+      FCM_DEMO_MODE: ${FCM_DEMO_MODE:-false}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage
