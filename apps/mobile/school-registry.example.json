@@ -4,8 +4,9 @@
     "name": "Don Bosco College, Tura",
     "apiUrl": "https://erp.donboscocollege.ac.in/api",
     "tenantSlug": "demo",
+    "code": "DBCT",
     "region": "Meghalaya, India",
-    "keywords": ["don bosco", "dbc", "tura", "nehu"],
+    "keywords": ["don bosco", "dbc", "tura", "nehu", "dbct"],
     "privacyPolicyUrl": "https://donboscocollege.ac.in/mobile-privacy.html",
     "supportEmail": "principaldbct@gmail.com"
   }

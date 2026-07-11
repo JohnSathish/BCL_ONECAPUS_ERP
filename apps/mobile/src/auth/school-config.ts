@@ -19,6 +19,7 @@ export function normalizeSchoolConfig(input: SchoolConfig): SchoolConfig {
     id: input.id.trim(),
     name: input.name.trim(),
     tenantSlug: input.tenantSlug.trim().toLowerCase(),
+    code: input.code?.trim() || undefined,
     apiUrl: normalizeApiUrl(input.apiUrl),
   };
 }

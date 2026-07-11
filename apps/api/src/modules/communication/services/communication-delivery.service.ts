@@ -83,14 +83,87 @@ export class CommunicationDeliveryService {
   }
 
   async deliverCampaign(tenantId: string, campaignId: string) {
-    return this.deliverCampaignBatch(tenantId, campaignId);
+    const total = await this.prisma.communicationRecipient.count({
+      where: { tenantId, campaignId },
+    });
+    if (!total) {
+      const campaign = await this.prisma.communicationCampaign.findFirst({
+        where: { id: campaignId, tenantId },
+        select: { metadata: true },
+      });
+      await this.prisma.communicationCampaign.update({
+        where: { id: campaignId },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            ...((campaign?.metadata as object) ?? {}),
+            failureReason: 'No recipients to deliver',
+          },
+        },
+      });
+      return { sentCount: 0, failedCount: 0, recipientCount: 0 };
+    }
+
+    // Small batches keep BullMQ locks healthy on large “everyone” sends.
+    const limit = 40;
+    let offset = 0;
+    let sentCount = 0;
+    let failedCount = 0;
+    while (offset < total) {
+      const batch = await this.deliverCampaignBatch(
+        tenantId,
+        campaignId,
+        offset,
+        limit,
+        { finalize: false },
+      );
+      sentCount += batch?.sentCount ?? 0;
+      failedCount += batch?.failedCount ?? 0;
+      offset += limit;
+    }
+
+    const pushFailed = await this.prisma.communicationDeliveryLog.count({
+      where: { tenantId, campaignId, channel: 'PUSH', status: 'FAILED' },
+    });
+    const anySent = await this.prisma.communicationDeliveryLog.count({
+      where: {
+        tenantId,
+        campaignId,
+        status: { in: ['SENT', 'DELIVERED'] },
+      },
+    });
+
+    const campaign = await this.prisma.communicationCampaign.findFirst({
+      where: { id: campaignId, tenantId },
+      select: { metadata: true },
+    });
+
+    await this.prisma.communicationCampaign.update({
+      where: { id: campaignId },
+      data: {
+        status: anySent > 0 ? 'SENT' : 'FAILED',
+        sentAt: anySent > 0 ? new Date() : undefined,
+        metadata: {
+          ...((campaign?.metadata as object) ?? {}),
+          deliverySummary: {
+            sentCount,
+            failedCount,
+            pushFailed,
+            recipientCount: total,
+          },
+        },
+      },
+    });
+
+    return { sentCount, failedCount, recipientCount: total };
   }
 
   async deliverCampaignBatch(
     tenantId: string,
     campaignId: string,
     offset = 0,
-    limit = 5000,
+    limit = 40,
+    options?: { finalize?: boolean; recipientId?: string },
   ) {
     const campaign = await this.prisma.communicationCampaign.findFirst({
       where: { id: campaignId, tenantId },
@@ -130,9 +203,13 @@ export class CommunicationDeliveryService {
     );
 
     const recipients = await this.prisma.communicationRecipient.findMany({
-      where: { tenantId, campaignId },
-      skip: offset,
-      take: limit,
+      where: {
+        tenantId,
+        campaignId,
+        ...(options?.recipientId ? { id: options.recipientId } : {}),
+      },
+      skip: options?.recipientId ? 0 : offset,
+      take: options?.recipientId ? 1 : limit,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -251,6 +328,7 @@ export class CommunicationDeliveryService {
             entityType: String(metadata.entityType ?? ''),
             messageType: String(metadata.messageType ?? ''),
             subject,
+            category: String(metadata.pushCategory ?? metadata.category ?? ''),
           });
           if (!isPushCategoryEnabled(pushPref?.settings, category)) {
             await this.logDelivery({
@@ -271,7 +349,7 @@ export class CommunicationDeliveryService {
               status: 'ACTIVE',
               pushToken: { not: null },
             },
-            select: { pushToken: true },
+            select: { id: true, pushToken: true },
           });
           const tokens = devices
             .map((d) => d.pushToken)
@@ -300,6 +378,18 @@ export class CommunicationDeliveryService {
               attachmentCount: String(attachments.length),
             },
           });
+
+          if (result.invalidTokens?.length) {
+            await this.prisma.mobileDevice.updateMany({
+              where: {
+                tenantId,
+                userId: recipient.userId,
+                pushToken: { in: result.invalidTokens },
+              },
+              data: { pushToken: null },
+            });
+          }
+
           await this.logDelivery({
             tenantId,
             campaignId,
@@ -453,17 +543,21 @@ export class CommunicationDeliveryService {
       where: { tenantId, campaignId },
     });
     const isLastBatch = offset + recipients.length >= totalRecipients;
+    const shouldFinalize = options?.finalize !== false;
 
-    if (isLastBatch) {
+    if (shouldFinalize && isLastBatch) {
+      const anySent = await this.prisma.communicationDeliveryLog.count({
+        where: {
+          tenantId,
+          campaignId,
+          status: { in: ['SENT', 'DELIVERED'] },
+        },
+      });
       await this.prisma.communicationCampaign.update({
         where: { id: campaignId },
         data: {
-          status:
-            failedCount === recipients.length * channels.length &&
-            sentCount === 0
-              ? 'FAILED'
-              : 'SENT',
-          sentAt: new Date(),
+          status: anySent > 0 ? 'SENT' : 'FAILED',
+          sentAt: anySent > 0 ? new Date() : undefined,
         },
       });
     }

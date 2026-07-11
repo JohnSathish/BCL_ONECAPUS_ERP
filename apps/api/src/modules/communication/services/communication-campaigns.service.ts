@@ -64,6 +64,9 @@ export class CommunicationCampaignsService {
       bodyText = dto.bodyText ?? tpl.bodyText ?? undefined;
     }
 
+    const metadata = (dto.metadata ?? {}) as Record<string, unknown>;
+    const requiresApproval = Boolean(metadata.requiresApproval);
+
     return this.prisma.communicationCampaign.create({
       data: {
         tenantId: user.tid,
@@ -79,16 +82,26 @@ export class CommunicationCampaignsService {
           'EMAIL',
         ]) as Prisma.InputJsonValue,
         attachments: (dto.attachments ?? []) as Prisma.InputJsonValue,
-        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+        metadata: metadata as Prisma.InputJsonValue,
         status: dto.scheduledAt ? 'SCHEDULED' : 'DRAFT',
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdById: user.sub,
+        requiresApproval,
+        approvalStatus: requiresApproval ? 'PENDING_HOD' : 'NONE',
       },
     });
   }
 
   previewAudience(user: JwtUser, dto: PreviewAudienceDto) {
     return this.audience.resolve(
+      user.tid,
+      dto.audienceType,
+      dto.audienceFilter ?? {},
+    );
+  }
+
+  previewAudienceCount(user: JwtUser, dto: PreviewAudienceDto) {
+    return this.audience.count(
       user.tid,
       dto.audienceType,
       dto.audienceFilter ?? {},

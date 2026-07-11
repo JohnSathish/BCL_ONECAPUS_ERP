@@ -42,8 +42,13 @@ export const CHANNEL_OPTIONS = [
 
 export const AUDIENCE_OPTIONS = [
   { value: 'STUDENTS', label: 'Students' },
+  { value: 'TEACHING_STAFF', label: 'Teaching Staff' },
+  { value: 'NON_TEACHING_STAFF', label: 'Non-Teaching Staff' },
   { value: 'PARENTS', label: 'Parents / Guardians' },
-  { value: 'FACULTY', label: 'Faculty & Staff' },
+  { value: 'APPLICANTS', label: 'Applicants' },
+  { value: 'ALUMNI', label: 'Alumni' },
+  { value: 'ALL_USERS', label: 'All Users' },
+  { value: 'FACULTY', label: 'All Faculty & Staff' },
   { value: 'DEPARTMENTS', label: 'Departments' },
   { value: 'COMMITTEE', label: 'Committee Members' },
   { value: 'INDIVIDUAL', label: 'Individual Users' },

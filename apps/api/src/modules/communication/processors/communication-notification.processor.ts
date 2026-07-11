@@ -3,7 +3,11 @@ import { Job } from 'bullmq';
 import { CommunicationCampaignsService } from '../services/communication-campaigns.service';
 import { CommunicationDeliveryService } from '../services/communication-delivery.service';
 
-@Processor('notifications')
+/** Long lock — prepare + multi-batch FCM for college-wide broadcasts. */
+@Processor('notifications', {
+  lockDuration: 600_000,
+  stalledInterval: 120_000,
+})
 export class CommunicationNotificationProcessor extends WorkerHost {
   constructor(
     private readonly delivery: CommunicationDeliveryService,
@@ -32,7 +36,7 @@ export class CommunicationNotificationProcessor extends WorkerHost {
       const tenantId = String(job.data.tenantId);
       const campaignId = String(job.data.campaignId);
       const offset = Number(job.data.offset ?? 0);
-      const limit = Number(job.data.limit ?? 100);
+      const limit = Number(job.data.limit ?? 40);
       return this.delivery.deliverCampaignBatch(
         tenantId,
         campaignId,
@@ -44,7 +48,12 @@ export class CommunicationNotificationProcessor extends WorkerHost {
     if (jobType === 'campaign-deliver-retry') {
       const tenantId = String(job.data.tenantId);
       const campaignId = String(job.data.campaignId);
-      return this.delivery.deliverCampaignBatch(tenantId, campaignId, 0, 1);
+      const recipientId = job.data.recipientId
+        ? String(job.data.recipientId)
+        : undefined;
+      return this.delivery.deliverCampaignBatch(tenantId, campaignId, 0, 1, {
+        recipientId,
+      });
     }
 
     return this.delivery.processLegacyNotificationJob(job.data);

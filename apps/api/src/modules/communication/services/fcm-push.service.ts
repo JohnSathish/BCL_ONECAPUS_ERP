@@ -7,7 +7,19 @@ type FcmSendResult = {
   provider: string;
   providerRef?: string;
   error?: string;
+  /** Tokens FCM reported as permanently invalid — caller should deactivate. */
+  invalidTokens?: string[];
+  successCount?: number;
+  failureCount?: number;
 };
+
+const ANDROID_CHANNEL_ID = 'onecampus_default';
+
+function isExpoPushToken(token: string) {
+  return (
+    token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')
+  );
+}
 
 @Injectable()
 export class FcmPushService {
@@ -93,17 +105,34 @@ export class FcmPushService {
       imageUrl?: string;
     },
   ): Promise<FcmSendResult> {
-    if (!tokens.length) {
+    const unique = [...new Set(tokens.map((t) => t.trim()).filter(Boolean))];
+    const expoTokens = unique.filter(isExpoPushToken);
+    const fcmTokens = unique.filter((t) => !isExpoPushToken(t));
+
+    if (!unique.length) {
       return { ok: false, provider: 'fcm', error: 'No push tokens' };
     }
+
+    if (!fcmTokens.length && expoTokens.length) {
+      return {
+        ok: false,
+        provider: 'fcm',
+        error:
+          'Device registered Expo push token; rebuild the app with google-services.json for FCM',
+        invalidTokens: expoTokens,
+      };
+    }
+
     if (this.isDemoMode()) {
       this.logger.log(
-        `[FCM demo] Would send to ${tokens.length} device(s): "${payload.title}" — ${payload.body}${payload.imageUrl ? ` [image=${payload.imageUrl}]` : ''}`,
+        `[FCM demo] Would send to ${fcmTokens.length} device(s): "${payload.title}" — ${payload.body}${payload.imageUrl ? ` [image=${payload.imageUrl}]` : ''}`,
       );
       return {
         ok: true,
         provider: 'fcm-demo',
         providerRef: `demo-${Date.now()}`,
+        successCount: fcmTokens.length,
+        failureCount: 0,
       };
     }
     if (!this.isConfigured()) {
@@ -121,9 +150,13 @@ export class FcmPushService {
     if (payload.imageUrl) {
       data.imageUrl = payload.imageUrl;
     }
+
     let lastRef: string | undefined;
     let failures = 0;
-    for (const pushToken of tokens) {
+    let successes = 0;
+    const invalidTokens: string[] = [...expoTokens];
+
+    for (const pushToken of fcmTokens) {
       const message: Record<string, unknown> = {
         token: pushToken,
         notification: {
@@ -132,12 +165,23 @@ export class FcmPushService {
           ...(payload.imageUrl ? { image: payload.imageUrl } : {}),
         },
         data,
+        android: {
+          priority: 'HIGH',
+          notification: {
+            channelId: ANDROID_CHANNEL_ID,
+            ...(payload.imageUrl ? { image: payload.imageUrl } : {}),
+          },
+        },
+        apns: {
+          headers: { 'apns-priority': '10' },
+          payload: {
+            aps: {
+              sound: 'default',
+              'content-available': 1,
+            },
+          },
+        },
       };
-      if (payload.imageUrl) {
-        message.android = {
-          notification: { image: payload.imageUrl },
-        };
-      }
       const res = await fetch(
         `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
         {
@@ -151,20 +195,50 @@ export class FcmPushService {
       );
       const body = (await res.json()) as {
         name?: string;
-        error?: { message?: string };
+        error?: {
+          message?: string;
+          status?: string;
+          details?: Array<{ errorCode?: string }>;
+        };
       };
       if (!res.ok) {
         failures++;
-        this.logger.debug(
-          `FCM send failed: ${body.error?.message ?? res.status}`,
-        );
+        const errCode =
+          body.error?.details?.find((d) => d.errorCode)?.errorCode ??
+          body.error?.status ??
+          '';
+        const msg = body.error?.message ?? String(res.status);
+        this.logger.warn(`FCM send failed (${errCode || 'ERR'}): ${msg}`);
+        if (
+          /UNREGISTERED|INVALID_ARGUMENT|NOT_FOUND|SENDER_ID_MISMATCH/i.test(
+            `${errCode} ${msg}`,
+          )
+        ) {
+          invalidTokens.push(pushToken);
+        }
       } else {
+        successes++;
         lastRef = body.name;
       }
     }
-    if (failures === tokens.length) {
-      return { ok: false, provider: 'fcm', error: 'All FCM deliveries failed' };
+
+    if (successes === 0) {
+      return {
+        ok: false,
+        provider: 'fcm',
+        error: 'All FCM deliveries failed',
+        invalidTokens,
+        successCount: 0,
+        failureCount: failures,
+      };
     }
-    return { ok: true, provider: 'fcm', providerRef: lastRef };
+    return {
+      ok: true,
+      provider: 'fcm',
+      providerRef: lastRef,
+      invalidTokens: invalidTokens.length ? invalidTokens : undefined,
+      successCount: successes,
+      failureCount: failures,
+    };
   }
 }

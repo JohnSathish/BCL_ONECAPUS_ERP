@@ -24,28 +24,58 @@ export const DEFAULT_PUSH_CATEGORY_SETTINGS: Record<PushCategoryKey, boolean> =
     general: true,
   };
 
+const COMPOSE_MESSAGE_TYPES = new Set([
+  'push',
+  'in_app',
+  'email',
+  'sms',
+  'whatsapp',
+  'circular',
+  'notice',
+]);
+
 /** Map campaign / trigger metadata to a preference category. */
 export function resolvePushCategory(input: {
   triggerKey?: string;
   entityType?: string;
   messageType?: string;
   subject?: string;
+  /** Explicit category from system jobs — wins when valid. */
+  category?: string;
 }): PushCategoryKey {
-  const hay = [
-    input.triggerKey,
-    input.entityType,
-    input.messageType,
-    input.subject,
-  ]
+  const explicit = (input.category ?? '').toLowerCase().trim();
+  if ((PUSH_CATEGORY_KEYS as readonly string[]).includes(explicit)) {
+    return explicit as PushCategoryKey;
+  }
+
+  const messageType = (input.messageType ?? '').toLowerCase().trim();
+  const triggerKey = (input.triggerKey ?? '').trim();
+  const entityType = (input.entityType ?? '').trim();
+
+  // Manual Compose campaigns: do not sniff free-text subjects into fee/timetable
+  // (e.g. "class of 2026" → timetable SKIP). System triggers still categorize.
+  if (COMPOSE_MESSAGE_TYPES.has(messageType) && !triggerKey && !entityType) {
+    const subject = (input.subject ?? '').toLowerCase();
+    if (
+      /\b(holiday|circular|notice|announcement|vacation|closure)\b/.test(
+        subject,
+      )
+    ) {
+      return 'circulars';
+    }
+    return 'general';
+  }
+
+  const hay = [triggerKey, entityType, messageType, input.subject]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
 
   if (
     hay.includes('fee') ||
-    hay.includes('due') ||
     hay.includes('payment') ||
-    hay.includes('scholarship')
+    hay.includes('scholarship') ||
+    /\bdue\b/.test(hay)
   ) {
     return 'fee';
   }
@@ -66,8 +96,7 @@ export function resolvePushCategory(input: {
   if (
     hay.includes('timetable') ||
     hay.includes('schedule') ||
-    hay.includes('substitute') ||
-    hay.includes('class')
+    hay.includes('substitute')
   ) {
     return 'timetable';
   }

@@ -445,9 +445,23 @@ export function CommunicationWorkspace() {
                 ))}
               </div>
               {filteredCampaigns.map((c) => {
-                const trigger = (c.metadata as Record<string, unknown> | undefined)?.trigger as
-                  | string
-                  | undefined;
+                const meta = (c.metadata ?? {}) as Record<string, unknown>;
+                const trigger = meta.trigger as string | undefined;
+                const materialised = c._count?.recipients ?? 0;
+                const estimated =
+                  typeof meta.estimatedRecipients === 'number' ? meta.estimatedRecipients : null;
+                const failureReason =
+                  typeof meta.failureReason === 'string' ? meta.failureReason : null;
+                const recipientLabel =
+                  materialised > 0
+                    ? `${materialised} recipients`
+                    : ['DRAFT', 'SCHEDULED', 'SENDING'].includes(c.status) &&
+                        estimated != null &&
+                        estimated > 0
+                      ? `~${estimated} estimated`
+                      : materialised === 0 && c.status === 'FAILED'
+                        ? '0 recipients'
+                        : `${materialised} recipients`;
                 return (
                   <div
                     key={c.id}
@@ -463,8 +477,11 @@ export function CommunicationWorkspace() {
                         ) : null}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {c.audienceType} · {c.status} · {c._count?.recipients ?? 0} recipients
+                        {c.audienceType} · {c.status} · {recipientLabel}
                       </p>
+                      {failureReason ? (
+                        <p className="text-xs text-destructive">{failureReason}</p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">{c.subject}</p>
                     </div>
                     <div className="flex gap-2">

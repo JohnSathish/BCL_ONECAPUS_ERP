@@ -9,6 +9,7 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import type {
   ActivateLicenseKeyDto,
   CreateLicenseKeyDto,
+  IngestLicenseKeysDto,
 } from '../dto/licensing.dto';
 import { LICENSE_TYPE_LABELS } from '../licensing.types';
 import { LicenseAuditService } from './license-audit.service';
@@ -39,6 +40,11 @@ export class LicenseActivationKeyService {
     if (quantity < 1 || quantity > 50) {
       throw new BadRequestException('Quantity must be between 1 and 50');
     }
+    if (dto.activationKey && quantity !== 1) {
+      throw new BadRequestException(
+        'activationKey can only be used when quantity is 1',
+      );
+    }
 
     const plan =
       dto.subscriptionPlan ??
@@ -49,9 +55,24 @@ export class LicenseActivationKeyService {
 
     const created = [];
     for (let i = 0; i < quantity; i += 1) {
+      const activationKey = dto.activationKey
+        ? this.normalizeKey(dto.activationKey)
+        : await this.uniqueActivationKey();
+
+      if (dto.activationKey) {
+        const exists = await this.prisma.licenseActivationKey.findUnique({
+          where: { activationKey },
+        });
+        if (exists) {
+          throw new BadRequestException(
+            `Activation key already exists: ${activationKey}`,
+          );
+        }
+      }
+
       const row = await this.prisma.licenseActivationKey.create({
         data: {
-          activationKey: await this.uniqueActivationKey(),
+          activationKey,
           label: dto.label,
           licenseType: dto.licenseType,
           subscriptionPlan: plan,
@@ -71,6 +92,90 @@ export class LicenseActivationKeyService {
     }
 
     return { items: created, total: created.length };
+  }
+
+  async ingestKeys(dto: IngestLicenseKeysDto) {
+    if (!dto.items?.length) {
+      throw new BadRequestException('No keys to ingest');
+    }
+    if (dto.items.length > 50) {
+      throw new BadRequestException('Maximum 50 keys per ingest request');
+    }
+
+    const created = [];
+    const skipped = [];
+
+    for (const item of dto.items) {
+      const activationKey = this.normalizeKey(item.activationKey);
+      const existing = await this.prisma.licenseActivationKey.findUnique({
+        where: { activationKey },
+      });
+      if (existing) {
+        skipped.push({
+          activationKey,
+          reason: 'already_exists',
+          id: existing.id,
+          status: existing.status,
+        });
+        continue;
+      }
+
+      const plan =
+        item.subscriptionPlan ??
+        LICENSE_TYPE_LABELS[
+          item.licenseType as keyof typeof LICENSE_TYPE_LABELS
+        ] ??
+        item.licenseType;
+
+      const row = await this.prisma.licenseActivationKey.create({
+        data: {
+          activationKey,
+          label: item.label,
+          licenseType: item.licenseType,
+          subscriptionPlan: plan,
+          termDays: item.termDays,
+          gracePeriodDays: item.gracePeriodDays ?? 15,
+          maxStudents: item.maxStudents,
+          maxStaff: item.maxStaff,
+          storageLimitMb: item.storageLimitMb,
+          keyExpiresAt: item.keyExpiresAt
+            ? new Date(item.keyExpiresAt)
+            : undefined,
+          internalNotes:
+            item.internalNotes ??
+            'Ingested from BaseCode Labs website license sync',
+          status: 'PENDING',
+        },
+      });
+      created.push(row);
+    }
+
+    return {
+      created: created.length,
+      skipped: skipped.length,
+      items: created,
+      skippedItems: skipped,
+    };
+  }
+
+  async revokeByActivationKey(rawKey: string) {
+    const activationKey = this.normalizeKey(rawKey);
+    const key = await this.prisma.licenseActivationKey.findUnique({
+      where: { activationKey },
+    });
+    if (!key) throw new NotFoundException('Activation key not found');
+    if (key.status === 'REDEEMED') {
+      throw new BadRequestException(
+        'Redeemed keys cannot be revoked; suspend the tenant license instead',
+      );
+    }
+    if (key.status === 'REVOKED') {
+      return key;
+    }
+    return this.prisma.licenseActivationKey.update({
+      where: { id: key.id },
+      data: { status: 'REVOKED' },
+    });
   }
 
   async revokeKey(id: string) {

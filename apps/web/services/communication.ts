@@ -1,5 +1,7 @@
 import { api } from '@/services/api';
 import type {
+  AudienceCountResult,
+  AudienceContext,
   CommunicationAnalytics,
   CommunicationApproval,
   CommunicationAutomationRule,
@@ -109,6 +111,19 @@ export const previewCommunicationAudience = (payload: {
       timeout: 60_000,
     })
     .then((res) => res.data);
+
+export const previewCommunicationAudienceCount = (payload: {
+  audienceType: string;
+  audienceFilter?: Record<string, unknown>;
+}) =>
+  api
+    .post<AudienceCountResult>(`${base}/campaigns/preview-audience-count`, payload, {
+      timeout: 60_000,
+    })
+    .then((res) => res.data);
+
+export const fetchAudienceContext = () =>
+  api.get<AudienceContext>(`${base}/audience-context`).then((res) => res.data);
 
 export const sendCommunicationCampaign = (id: string) =>
   api

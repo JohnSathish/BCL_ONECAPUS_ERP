@@ -35,6 +35,7 @@ import {
 import { CommunicationAnalyticsService } from './services/communication-analytics.service';
 import { CommunicationApprovalService } from './services/communication-approval.service';
 import { CommunicationAudienceSegmentService } from './services/communication-audience-segment.service';
+import { CommunicationAudienceService } from './services/communication-audience.service';
 import { CommunicationAutomationService } from './services/communication-automation.service';
 import { CommunicationAssetsService } from './services/communication-assets.service';
 import { CommunicationCampaignsService } from './services/communication-campaigns.service';
@@ -59,6 +60,7 @@ export class CommunicationController {
     private readonly approvals: CommunicationApprovalService,
     private readonly automation: CommunicationAutomationService,
     private readonly segments: CommunicationAudienceSegmentService,
+    private readonly audience: CommunicationAudienceService,
     private readonly delivery: CommunicationDeliveryService,
     private readonly email: CommunicationEmailService,
     private readonly whatsapp: CommunicationWhatsAppService,
@@ -351,6 +353,21 @@ export class CommunicationController {
     @Body() dto: PreviewAudienceDto,
   ) {
     return this.campaigns.previewAudience(user, dto);
+  }
+
+  @Post('campaigns/preview-audience-count')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  previewAudienceCount(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: PreviewAudienceDto,
+  ) {
+    return this.campaigns.previewAudienceCount(user, dto);
+  }
+
+  @Get('audience-context')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  audienceContext(@CurrentUser() user: JwtUser) {
+    return this.audience.getAudienceContext(user.tid);
   }
 
   @Get('campaigns/:id')

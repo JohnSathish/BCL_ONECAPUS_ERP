@@ -4,22 +4,16 @@ const REGISTRY_URL =
   process.env.EXPO_PUBLIC_SCHOOL_REGISTRY_URL?.trim() ||
   'https://basecodelabs.com/onecampus-schools.json';
 
-const DEV_FALLBACK: SchoolRegistryEntry[] = [
-  {
-    id: 'local-dev',
-    name: 'Local development',
-    apiUrl: 'http://localhost:3001/api',
-    tenantSlug: 'demo',
-    region: 'Dev',
-    keywords: ['localhost', 'dev'],
-  },
+/** Built-in campuses when the remote registry is unreachable. */
+const FALLBACK_SCHOOLS: SchoolRegistryEntry[] = [
   {
     id: 'dbc-tura',
     name: 'Don Bosco College, Tura',
     apiUrl: 'https://erp.donboscocollege.ac.in/api',
     tenantSlug: 'demo',
+    code: 'DBCT',
     region: 'Meghalaya',
-    keywords: ['don bosco', 'dbc', 'tura'],
+    keywords: ['don bosco', 'dbc', 'tura', 'dbct'],
   },
 ];
 
@@ -31,19 +25,32 @@ function parseRegistryJson(raw: unknown): SchoolRegistryEntry[] {
       const r = row as SchoolRegistryEntry;
       return Boolean(r.id && r.name && r.apiUrl && r.tenantSlug);
     })
+    .filter((row) => {
+      const id = row.id.toLowerCase();
+      const name = row.name.toLowerCase();
+      // Never surface local/dev entries in release pickers.
+      if (id === 'local-dev' || id === 'localhost' || id.includes('local-dev')) return false;
+      if (name.includes('local development') || name === 'localhost') return false;
+      return true;
+    })
     .map((row) => ({
       ...row,
       apiUrl: row.apiUrl.trim().replace(/\/+$/, '').endsWith('/api')
         ? row.apiUrl.trim().replace(/\/+$/, '')
         : `${row.apiUrl.trim().replace(/\/+$/, '')}/api`,
       tenantSlug: row.tenantSlug.trim().toLowerCase(),
+      code: row.code?.trim() || undefined,
     }));
+}
+
+export function schoolDisplayCode(school: Pick<SchoolRegistryEntry, 'code' | 'tenantSlug'>) {
+  return (school.code || school.tenantSlug || '').toUpperCase();
 }
 
 export async function fetchSchoolRegistry(): Promise<SchoolRegistryEntry[]> {
   const merged = new Map<string, SchoolRegistryEntry>();
 
-  for (const row of DEV_FALLBACK) {
+  for (const row of FALLBACK_SCHOOLS) {
     merged.set(row.id, row);
   }
 
@@ -60,7 +67,8 @@ export async function fetchSchoolRegistry(): Promise<SchoolRegistryEntry[]> {
 
   try {
     const res = await fetch(REGISTRY_URL, { headers: { Accept: 'application/json' } });
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') ?? '';
+    if (res.ok && contentType.includes('json')) {
       const json = await res.json();
       const remote = parseRegistryJson(json);
       for (const row of remote) {
@@ -78,7 +86,7 @@ export function filterSchools(schools: SchoolRegistryEntry[], query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return schools;
   return schools.filter((s) => {
-    const hay = [s.name, s.region, s.tenantSlug, ...(s.keywords ?? [])]
+    const hay = [s.name, s.region, s.tenantSlug, s.code, ...(s.keywords ?? [])]
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
@@ -117,12 +125,14 @@ export function parseSchoolDeepLink(url: string): Partial<SchoolConfig> | null {
       parsed.searchParams.get('tenantSlug') ||
       parsed.searchParams.get('slug');
     const name = parsed.searchParams.get('name') || undefined;
+    const code = parsed.searchParams.get('code') || undefined;
     if (!api || !tenant) return null;
     return {
       id: tenant,
       name: name || tenant,
       apiUrl: api,
       tenantSlug: tenant,
+      code: code || undefined,
     };
   } catch {
     return null;

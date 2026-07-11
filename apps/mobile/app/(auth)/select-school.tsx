@@ -22,6 +22,7 @@ import {
   filterSchools,
   parseSchoolDeepLink,
   probeSchoolConnection,
+  schoolDisplayCode,
 } from '@/services/school-registry';
 import type { SchoolRegistryEntry } from '@/types/school';
 
@@ -135,7 +136,7 @@ export default function SelectSchoolScreen() {
                 >
                   <Text style={styles.cardTitle}>{school.name}</Text>
                   {school.region ? <Text style={styles.cardMeta}>{school.region}</Text> : null}
-                  <Text style={styles.cardCode}>Code: {school.tenantSlug}</Text>
+                  <Text style={styles.cardCode}>Code: {schoolDisplayCode(school)}</Text>
                 </Pressable>
               ))}
               {filtered.length === 0 ? (
@@ -170,7 +171,7 @@ export default function SelectSchoolScreen() {
               <TextInput
                 value={manualTenant}
                 onChangeText={setManualTenant}
-                placeholder="Tenant code (e.g. demo)"
+                placeholder="Tenant code (e.g. DBCT or demo)"
                 placeholderTextColor="#64748b"
                 autoCapitalize="none"
                 style={styles.manualInput}

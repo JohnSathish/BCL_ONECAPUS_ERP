@@ -115,6 +115,65 @@ export type ResolvedRecipient = {
   phone?: string;
 };
 
+export type AudienceFilter = {
+  departmentIds?: string[];
+  programVersionIds?: string[];
+  /** @deprecated Ignored — Academic Year is institutional, not a student filter. */
+  academicYearIds?: string[];
+  userIds?: string[];
+  studentIds?: string[];
+  excludeStudentIds?: string[];
+  staffProfileIds?: string[];
+  /** @deprecated Prefer semesterSequences (programme standing). */
+  semesterIds?: string[];
+  /** Current programme semester sequences (1–8) for the active ODD/EVEN cycle. */
+  semesterSequences?: number[];
+  sectionIds?: string[];
+  batchIds?: string[];
+  admissionBatchIds?: string[];
+  shiftIds?: string[];
+  gender?: string;
+  studentStatus?: string;
+  admissionCategory?: string;
+  residenceType?: string;
+  hosteller?: boolean;
+  dayScholar?: boolean;
+  attendanceBelowPct?: number;
+  attendanceAbovePct?: number;
+  feeDue?: boolean;
+  defaulters?: boolean;
+  feeStatus?: 'PAID' | 'PARTIAL' | 'PENDING' | 'OVERDUE' | 'DEFAULTERS';
+  rollNumberFrom?: string;
+  rollNumberTo?: string;
+  designationIds?: string[];
+  committeeIds?: string[];
+  teaching?: boolean;
+  nonTeaching?: boolean;
+  permanent?: boolean;
+  contract?: boolean;
+};
+
+export type AudienceCountResult = {
+  total: number;
+  byAudienceType: Record<string, number>;
+  withEmail?: number;
+  withPhone?: number;
+};
+
+export type AudienceContext = {
+  institutionId: string | null;
+  activeAcademicYear: { id: string; name: string; status: string } | null;
+  currentCycle: 'ODD' | 'EVEN';
+  currentSemesterSequences: number[];
+  admissionBatches: {
+    id: string;
+    batchCode: string;
+    admissionYear: number;
+    currentSemester: number;
+    label: string;
+  }[];
+};
+
 export type CommunicationRecipient = {
   id: string;
   displayName?: string | null;

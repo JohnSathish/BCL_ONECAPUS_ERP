@@ -31,7 +31,7 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
 
   // Exact student home — do not dump users on the Alerts tab
   if (lower === '/student' || lower === '/student/dashboard' || lower === '/student/home') {
-    return '/(student)/(tabs)/index' as Href;
+    return '/(student)/(tabs)' as Href;
   }
 
   // Student — specific screens first
@@ -90,16 +90,16 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(student)/(tabs)/notifications' as Href;
   }
   if (lower.includes('/student/certificates')) {
-    return '/(student)/(tabs)/index' as Href;
+    return '/(student)/(tabs)' as Href;
   }
   // Remaining /student/* → Home (not Notifications)
   if (lower.startsWith('/student') && !lower.includes('/staff')) {
-    return '/(student)/(tabs)/index' as Href;
+    return '/(student)/(tabs)' as Href;
   }
 
   // Staff / faculty
   if (lower === '/staff' || lower === '/staff/dashboard' || lower === '/faculty') {
-    return '/(staff)/(tabs)/index' as Href;
+    return '/(staff)/(tabs)' as Href;
   }
   if (lower.includes('mark') || lower.includes('/marks')) {
     return '/(staff)/marks' as Href;
@@ -114,7 +114,7 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(staff)/notifications' as Href;
   }
   if (lower.includes('/staff') || lower.includes('faculty')) {
-    return '/(staff)/(tabs)/index' as Href;
+    return '/(staff)/(tabs)' as Href;
   }
 
   return null;
@@ -141,7 +141,5 @@ export function fallbackNotificationCenter(appType: 'student' | 'staff'): Href {
 }
 
 export function fallbackHome(appType: 'student' | 'staff'): Href {
-  return appType === 'staff'
-    ? ('/(staff)/(tabs)/index' as Href)
-    : ('/(student)/(tabs)/index' as Href);
+  return appType === 'staff' ? ('/(staff)/(tabs)' as Href) : ('/(student)/(tabs)' as Href);
 }

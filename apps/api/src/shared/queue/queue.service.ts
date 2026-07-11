@@ -11,9 +11,17 @@ export class QueueService {
   ) {}
 
   enqueueNotification(payload: Record<string, unknown>) {
+    const isCampaignJob = String(payload.jobType ?? '').startsWith('campaign-');
     return this.notifications.add('send', payload, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 3000 },
+      ...(isCampaignJob
+        ? {
+            // College-wide prepares can take minutes; avoid stalled/lock loss.
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          }
+        : {}),
     });
   }
 

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -8,6 +9,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { LICENSE_TYPES } from '../licensing.types';
 
@@ -157,4 +159,66 @@ export class CreateLicenseKeyDto {
   @IsInt()
   @Min(1)
   quantity?: number;
+
+  /** Optional pre-generated key (e.g. from BaseCode Labs website). */
+  @IsOptional()
+  @IsString()
+  activationKey?: string;
+}
+
+export class IngestLicenseKeyItemDto {
+  @IsString()
+  activationKey!: string;
+
+  @IsIn([...LICENSE_TYPES])
+  licenseType!: string;
+
+  @IsOptional()
+  @IsString()
+  subscriptionPlan?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  termDays!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  gracePeriodDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maxStudents?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maxStaff?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  storageLimitMb?: number;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsOptional()
+  @IsDateString()
+  keyExpiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  internalNotes?: string;
+}
+
+export class IngestLicenseKeysDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IngestLicenseKeyItemDto)
+  items!: IngestLicenseKeyItemDto[];
 }
