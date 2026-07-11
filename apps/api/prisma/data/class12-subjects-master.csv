@@ -1,0 +1,179 @@
+boardCode,streamCode,subjectName,sortOrder
+MBOSE,ARTS,English,10
+MBOSE,ARTS,Alternative English,20
+MBOSE,ARTS,Garo (MIL),30
+MBOSE,ARTS,Elective Garo,40
+MBOSE,ARTS,Education,50
+MBOSE,ARTS,Economics,60
+MBOSE,ARTS,History,70
+MBOSE,ARTS,Political Science,80
+MBOSE,ARTS,Sociology,90
+MBOSE,ARTS,Geography,100
+MBOSE,ARTS,Philosophy,110
+MBOSE,ARTS,Psychology,120
+MBOSE,ARTS,Mathematics,130
+MBOSE,ARTS,Khasi (MIL),140
+MBOSE,ARTS,Mizo (MIL),150
+MBOSE,ARTS,Hindi (MIL),160
+MBOSE,ARTS,Bengali (MIL),170
+MBOSE,ARTS,Assamese (MIL),180
+MBOSE,ARTS,Nepali (MIL),190
+MBOSE,SCIENCE,English,10
+MBOSE,SCIENCE,Physics,20
+MBOSE,SCIENCE,Chemistry,30
+MBOSE,SCIENCE,Mathematics,40
+MBOSE,SCIENCE,Biology,50
+MBOSE,SCIENCE,Computer Science,60
+MBOSE,SCIENCE,Environmental Science,70
+MBOSE,SCIENCE,Khasi (MIL),80
+MBOSE,SCIENCE,Mizo (MIL),90
+MBOSE,SCIENCE,Hindi (MIL),100
+MBOSE,SCIENCE,Bengali (MIL),110
+MBOSE,SCIENCE,Assamese (MIL),120
+MBOSE,SCIENCE,Nepali (MIL),130
+MBOSE,COMMERCE,English,10
+MBOSE,COMMERCE,Accountancy,20
+MBOSE,COMMERCE,Business Studies,30
+MBOSE,COMMERCE,Economics,40
+MBOSE,COMMERCE,Mathematics,50
+MBOSE,COMMERCE,Computer Science,60
+MBOSE,COMMERCE,Entrepreneurship,70
+MBOSE,COMMERCE,Khasi (MIL),80
+MBOSE,COMMERCE,Mizo (MIL),90
+MBOSE,COMMERCE,Hindi (MIL),100
+MBOSE,COMMERCE,Bengali (MIL),110
+MBOSE,COMMERCE,Assamese (MIL),120
+MBOSE,COMMERCE,Nepali (MIL),130
+CBSE,ARTS,English Core,10
+CBSE,ARTS,English Elective,20
+CBSE,ARTS,History,30
+CBSE,ARTS,Political Science,40
+CBSE,ARTS,Geography,50
+CBSE,ARTS,Economics,60
+CBSE,ARTS,Sociology,70
+CBSE,ARTS,Psychology,80
+CBSE,ARTS,Philosophy,90
+CBSE,ARTS,Physical Education,100
+CBSE,ARTS,Fine Arts,110
+CBSE,ARTS,Home Science,120
+CBSE,ARTS,Mathematics,130
+CBSE,ARTS,Hindi,140
+CBSE,SCIENCE,English,10
+CBSE,SCIENCE,Physics,20
+CBSE,SCIENCE,Chemistry,30
+CBSE,SCIENCE,Mathematics,40
+CBSE,SCIENCE,Biology,50
+CBSE,SCIENCE,Computer Science,60
+CBSE,SCIENCE,Informatics Practices,70
+CBSE,SCIENCE,Physical Education,80
+CBSE,SCIENCE,Hindi,140
+CBSE,COMMERCE,English,10
+CBSE,COMMERCE,Accountancy,20
+CBSE,COMMERCE,Business Studies,30
+CBSE,COMMERCE,Economics,40
+CBSE,COMMERCE,Mathematics,50
+CBSE,COMMERCE,Applied Mathematics,60
+CBSE,COMMERCE,Informatics Practices,70
+CBSE,COMMERCE,Entrepreneurship,80
+CBSE,COMMERCE,Hindi,140
+ISC,ARTS,English,10
+ISC,ARTS,History,20
+ISC,ARTS,Political Science,30
+ISC,ARTS,Sociology,40
+ISC,ARTS,Psychology,50
+ISC,ARTS,Geography,60
+ISC,ARTS,Economics,70
+ISC,ARTS,Home Science,80
+ISC,ARTS,Environmental Science,90
+ISC,ARTS,Physical Education,100
+ISC,ARTS,Hindi,110
+ISC,SCIENCE,English,10
+ISC,SCIENCE,Physics,20
+ISC,SCIENCE,Chemistry,30
+ISC,SCIENCE,Mathematics,40
+ISC,SCIENCE,Biology,50
+ISC,SCIENCE,Computer Science,60
+ISC,SCIENCE,Environmental Science,70
+ISC,SCIENCE,Hindi,80
+ISC,COMMERCE,English,10
+ISC,COMMERCE,Accounts,20
+ISC,COMMERCE,Commerce,30
+ISC,COMMERCE,Economics,40
+ISC,COMMERCE,Mathematics,50
+ISC,COMMERCE,Computer Science,60
+ISC,COMMERCE,Business Studies,70
+ISC,COMMERCE,Hindi,80
+NIOS,Humanities / Arts Stream,Hindi,10
+NIOS,Humanities / Arts Stream,English,20
+NIOS,Humanities / Arts Stream,Sanskrit,30
+NIOS,Humanities / Arts Stream,Urdu,40
+NIOS,Humanities / Arts Stream,Bengali,50
+NIOS,Humanities / Arts Stream,Marathi,60
+NIOS,Humanities / Arts Stream,Telugu,70
+NIOS,Humanities / Arts Stream,Gujarati,80
+NIOS,Humanities / Arts Stream,Kannada,90
+NIOS,Humanities / Arts Stream,Punjabi,100
+NIOS,Humanities / Arts Stream,Tamil,110
+NIOS,Humanities / Arts Stream,Malayalam,120
+NIOS,Humanities / Arts Stream,Odia,130
+NIOS,Humanities / Arts Stream,History,140
+NIOS,Humanities / Arts Stream,Geography,150
+NIOS,Humanities / Arts Stream,Political Science,160
+NIOS,Humanities / Arts Stream,Sociology,170
+NIOS,Humanities / Arts Stream,Psychology,180
+NIOS,Humanities / Arts Stream,Home Science,190
+NIOS,Humanities / Arts Stream,Mass Communication,200
+NIOS,Humanities / Arts Stream,Painting,210
+NIOS,Humanities / Arts Stream,Data Entry Operations,220
+NIOS,Humanities / Arts Stream,Early Childhood Care & Education,230
+NIOS,Humanities / Arts Stream,Library & Information Science,240
+NIOS,Humanities / Arts Stream,Yog,250
+NIOS,Humanities / Arts Stream,Physical Education & Yoga,260
+NIOS,Humanities / Arts Stream,Military Studies,270
+NIOS,SCIENCE,Hindi,10
+NIOS,SCIENCE,English,20
+NIOS,SCIENCE,Sanskrit,30
+NIOS,SCIENCE,Urdu,40
+NIOS,SCIENCE,Bengali,50
+NIOS,SCIENCE,Marathi,60
+NIOS,SCIENCE,Telugu,70
+NIOS,SCIENCE,Gujarati,80
+NIOS,SCIENCE,Kannada,90
+NIOS,SCIENCE,Punjabi,100
+NIOS,SCIENCE,Tamil,110
+NIOS,SCIENCE,Malayalam,120
+NIOS,SCIENCE,Odia,130
+NIOS,SCIENCE,Physics,140
+NIOS,SCIENCE,Chemistry,150
+NIOS,SCIENCE,Biology,160
+NIOS,SCIENCE,Mathematics,170
+NIOS,SCIENCE,Computer Science,180
+NIOS,SCIENCE,Environmental Science,190
+NIOS,SCIENCE,Data Entry Operations,200
+NIOS,SCIENCE,Early Childhood Care & Education,210
+NIOS,SCIENCE,Library & Information Science,220
+NIOS,SCIENCE,Yog,230
+NIOS,SCIENCE,Physical Education & Yoga,240
+NIOS,SCIENCE,Military Studies,250
+NIOS,COMMERCE,Hindi,10
+NIOS,COMMERCE,English,20
+NIOS,COMMERCE,Sanskrit,30
+NIOS,COMMERCE,Urdu,40
+NIOS,COMMERCE,Bengali,50
+NIOS,COMMERCE,Marathi,60
+NIOS,COMMERCE,Telugu,70
+NIOS,COMMERCE,Gujarati,80
+NIOS,COMMERCE,Kannada,90
+NIOS,COMMERCE,Punjabi,100
+NIOS,COMMERCE,Tamil,110
+NIOS,COMMERCE,Malayalam,120
+NIOS,COMMERCE,Odia,130
+NIOS,COMMERCE,Accountancy,140
+NIOS,COMMERCE,Business Studies,150
+NIOS,COMMERCE,Economics,160
+NIOS,COMMERCE,Data Entry Operations,170
+NIOS,COMMERCE,Early Childhood Care & Education,180
+NIOS,COMMERCE,Library & Information Science,190
+NIOS,COMMERCE,Yog,200
+NIOS,COMMERCE,Physical Education & Yoga,210
+NIOS,COMMERCE,Military Studies,220

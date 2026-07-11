@@ -4,37 +4,33 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
   CreateQuestionPaperDto,
+  CreateShareLinkDto,
+  CurriculumCoursesQueryDto,
   QuestionBankSettingsDto,
   QuestionPaperQueryDto,
   UpdateQuestionPaperDto,
 } from '../dto/question-bank.dto';
+import { resolveExamCycleFromSemester } from '../utils/question-paper-file.util';
 import { QuestionBankAssetsService } from './question-bank-assets.service';
 import { QuestionBankAnalyticsService } from './question-bank-analytics.service';
 
 const DEFAULT_PAPER_TYPES = [
+  'THEORY',
+  'THEORY_PRACTICAL',
+  'PRACTICAL',
   'UNIVERSITY_EXAM',
   'END_SEMESTER',
   'MID_SEMESTER',
   'INTERNAL',
   'SUPPLEMENTARY',
-  'PRACTICAL',
 ];
 
-const DEFAULT_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/zip',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-];
+const DEFAULT_MIME_TYPES = ['application/pdf'];
 
 @Injectable()
 export class QuestionPapersService {
@@ -61,12 +57,18 @@ export class QuestionPapersService {
     keywords?: string[];
     paperType?: string;
     examYear?: number | null;
+    examinationType?: string | null;
+    subjectCategory?: string | null;
+    language?: string | null;
   }) {
     return [
       input.paperCode,
       input.paperName,
       input.paperType,
       input.examYear,
+      input.examinationType,
+      input.subjectCategory,
+      input.language,
       ...(input.keywords ?? []),
     ]
       .filter(Boolean)
@@ -81,7 +83,7 @@ export class QuestionPapersService {
     if (!row) {
       return {
         tenantId,
-        maxUploadMb: 25,
+        maxUploadMb: 20,
         allowedMimeTypes: DEFAULT_MIME_TYPES,
         allowedPaperTypes: DEFAULT_PAPER_TYPES,
         studentAccessEnabled: true,
@@ -101,7 +103,7 @@ export class QuestionPapersService {
       where: { tenantId: user.tid },
       create: {
         tenantId: user.tid,
-        maxUploadMb: dto.maxUploadMb ?? 25,
+        maxUploadMb: dto.maxUploadMb ?? 20,
         allowedMimeTypes: dto.allowedMimeTypes ?? DEFAULT_MIME_TYPES,
         allowedPaperTypes: dto.allowedPaperTypes ?? DEFAULT_PAPER_TYPES,
         studentAccessEnabled: dto.studentAccessEnabled ?? true,
@@ -123,6 +125,109 @@ export class QuestionPapersService {
     });
   }
 
+  async listCurriculumCourses(
+    tenantId: string,
+    query: CurriculumCoursesQueryDto,
+  ) {
+    const offerings = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        ...(query.programVersionId
+          ? { programVersionId: query.programVersionId }
+          : {}),
+        ...(query.semesterNo ? { semesterSequence: query.semesterNo } : {}),
+        ...(query.category
+          ? { category: { equals: query.category, mode: 'insensitive' } }
+          : {}),
+        course: {
+          deletedAt: null,
+          ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+          ...(query.q
+            ? {
+                OR: [
+                  { code: { contains: query.q, mode: 'insensitive' } },
+                  { title: { contains: query.q, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
+        },
+      },
+      include: {
+        course: {
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            credits: true,
+            departmentId: true,
+          },
+        },
+      },
+      take: 200,
+      orderBy: { course: { code: 'asc' } },
+    });
+
+    const byCourse = new Map<
+      string,
+      {
+        id: string;
+        code: string;
+        title: string;
+        credits: unknown;
+        departmentId: string | null;
+        category: string | null;
+        semesterNo: number | null;
+      }
+    >();
+    for (const row of offerings) {
+      if (!row.course || byCourse.has(row.course.id)) continue;
+      byCourse.set(row.course.id, {
+        id: row.course.id,
+        code: row.course.code,
+        title: row.course.title,
+        credits: row.course.credits,
+        departmentId: row.course.departmentId,
+        category: row.category,
+        semesterNo: row.semesterSequence,
+      });
+    }
+
+    if (byCourse.size === 0) {
+      const courses = await this.prisma.course.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+          ...(query.q
+            ? {
+                OR: [
+                  { code: { contains: query.q, mode: 'insensitive' } },
+                  { title: { contains: query.q, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          credits: true,
+          departmentId: true,
+        },
+        take: 100,
+        orderBy: { code: 'asc' },
+      });
+      return courses.map((c) => ({
+        ...c,
+        category: query.category ?? null,
+        semesterNo: query.semesterNo ?? null,
+      }));
+    }
+
+    return [...byCourse.values()];
+  }
+
   async list(user: JwtUser, query: QuestionPaperQueryDto, studentView = false) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -139,6 +244,14 @@ export class QuestionPapersService {
       ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.semesterNo ? { semesterNo: query.semesterNo } : {}),
       ...(query.paperType ? { paperType: query.paperType } : {}),
+      ...(query.examinationType
+        ? { examinationType: query.examinationType }
+        : {}),
+      ...(query.examCycle ? { examCycle: query.examCycle } : {}),
+      ...(query.subjectCategory
+        ? { subjectCategory: query.subjectCategory }
+        : {}),
+      ...(query.language ? { language: query.language } : {}),
       ...(query.examYear ? { examYear: query.examYear } : {}),
       ...(query.examMonth ? { examMonth: query.examMonth } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -193,7 +306,124 @@ export class QuestionPapersService {
       this.prisma.questionPaper.count({ where }),
     ]);
 
-    return { items, total, page, limit };
+    return {
+      items: await this.enrichPapers(user.tid, items),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  private async enrichPapers<
+    T extends {
+      id: string;
+      courseId: string | null;
+      departmentId: string | null;
+      programVersionId: string | null;
+      academicYearId: string | null;
+      uploadedById: string | null;
+      fileSizeBytes: number | null;
+    },
+  >(tenantId: string, items: T[]) {
+    if (!items.length) return items;
+
+    const courseIds = [
+      ...new Set(items.map((i) => i.courseId).filter(Boolean)),
+    ] as string[];
+    const deptIds = [
+      ...new Set(items.map((i) => i.departmentId).filter(Boolean)),
+    ] as string[];
+    const pvIds = [
+      ...new Set(items.map((i) => i.programVersionId).filter(Boolean)),
+    ] as string[];
+    const yearIds = [
+      ...new Set(items.map((i) => i.academicYearId).filter(Boolean)),
+    ] as string[];
+    const uploaderIds = [
+      ...new Set(items.map((i) => i.uploadedById).filter(Boolean)),
+    ] as string[];
+    const paperIds = items.map((i) => i.id);
+
+    const [courses, depts, versions, years, uploaders, downloads] =
+      await Promise.all([
+        courseIds.length
+          ? this.prisma.course.findMany({
+              where: { id: { in: courseIds } },
+              select: { id: true, code: true, title: true, credits: true },
+            })
+          : Promise.resolve([]),
+        deptIds.length
+          ? this.prisma.department.findMany({
+              where: { id: { in: deptIds } },
+              select: { id: true, code: true, name: true },
+            })
+          : Promise.resolve([]),
+        pvIds.length
+          ? this.prisma.programVersion.findMany({
+              where: { id: { in: pvIds } },
+              select: {
+                id: true,
+                program: { select: { code: true, name: true } },
+              },
+            })
+          : Promise.resolve([]),
+        yearIds.length
+          ? this.prisma.academicYear.findMany({
+              where: { id: { in: yearIds } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        uploaderIds.length
+          ? this.prisma.user.findMany({
+              where: { id: { in: uploaderIds }, tenantId },
+              select: { id: true, displayName: true, email: true },
+            })
+          : Promise.resolve([]),
+        this.prisma.questionPaperAccessLog.groupBy({
+          by: ['paperId'],
+          where: {
+            tenantId,
+            paperId: { in: paperIds },
+            action: 'DOWNLOAD',
+          },
+          _count: { paperId: true },
+        }),
+      ]);
+
+    const courseMap = new Map(courses.map((c) => [c.id, c]));
+    const deptMap = new Map(depts.map((d) => [d.id, d]));
+    const pvMap = new Map(versions.map((v) => [v.id, v]));
+    const yearMap = new Map(years.map((y) => [y.id, y]));
+    const userMap = new Map(uploaders.map((u) => [u.id, u]));
+    const downloadMap = new Map(
+      downloads.map((d) => [d.paperId, d._count.paperId]),
+    );
+
+    return items.map((item) => {
+      const course = item.courseId ? courseMap.get(item.courseId) : null;
+      const dept = item.departmentId ? deptMap.get(item.departmentId) : null;
+      const pv = item.programVersionId
+        ? pvMap.get(item.programVersionId)
+        : null;
+      const year = item.academicYearId
+        ? yearMap.get(item.academicYearId)
+        : null;
+      const uploader = item.uploadedById
+        ? userMap.get(item.uploadedById)
+        : null;
+      return {
+        ...item,
+        courseLabel: course ? `${course.code} — ${course.title}` : null,
+        courseCredits: course?.credits ?? null,
+        departmentName: dept?.name ?? null,
+        programmeName: pv?.program?.name ?? null,
+        programmeCode: pv?.program?.code ?? null,
+        academicYearName: year?.name ?? null,
+        uploadedByName:
+          uploader?.displayName?.trim() || uploader?.email || null,
+        downloadCount: downloadMap.get(item.id) ?? 0,
+      };
+    });
   }
 
   async getById(user: JwtUser, id: string, studentView = false) {
@@ -201,6 +431,7 @@ export class QuestionPapersService {
       where: { id, tenantId: user.tid, deletedAt: null },
       include: {
         approvals: { orderBy: { sequence: 'asc' } },
+        versions: { orderBy: { versionNo: 'desc' } },
       },
     });
     if (!paper) throw new NotFoundException('Paper not found');
@@ -229,7 +460,8 @@ export class QuestionPapersService {
         })
       : [];
 
-    return { ...paper, related };
+    const [enriched] = await this.enrichPapers(user.tid, [paper]);
+    return { ...enriched, related, versions: paper.versions };
   }
 
   async create(
@@ -245,39 +477,85 @@ export class QuestionPapersService {
         'Missing question-bank:contribute permission',
       );
 
-    let fileMeta: Partial<{
-      filePath: string;
-      fileName: string;
-      mimeType: string;
-      fileSizeBytes: number;
-    }> = {};
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('PDF file is required');
+    }
 
-    if (file?.buffer?.length) {
-      const settings = await this.getSettings(user.tid);
-      const course = dto.courseId
-        ? await this.prisma.course.findFirst({
-            where: { id: dto.courseId },
-            select: { code: true },
-          })
-        : null;
-      fileMeta = await this.assets.savePaperFile(user.tid, file, {
-        courseCode: course?.code ?? dto.paperCode,
-        examYear: dto.examYear,
-        maxUploadMb: settings.maxUploadMb,
-        allowedMimeTypes: settings.allowedMimeTypes as string[],
+    const settings = await this.getSettings(user.tid);
+    const course = dto.courseId
+      ? await this.prisma.course.findFirst({
+          where: { id: dto.courseId, tenantId: user.tid, deletedAt: null },
+          select: { id: true, code: true, title: true, departmentId: true },
+        })
+      : null;
+
+    const paperCode = course?.code ?? dto.paperCode;
+    const paperName = course?.title ?? dto.paperName;
+    if (!paperCode || !paperName) {
+      throw new BadRequestException(
+        'Course selection or paper code/title is required',
+      );
+    }
+    const departmentId = dto.departmentId ?? course?.departmentId ?? undefined;
+    const examCycle =
+      dto.examCycle ??
+      resolveExamCycleFromSemester(dto.semesterNo) ??
+      undefined;
+
+    const identity = await this.findIdentityMatch(user.tid, {
+      paperCode,
+      academicYearId: dto.academicYearId,
+      examYear: dto.examYear,
+      examMonth: dto.examMonth,
+      paperType: dto.paperType,
+    });
+
+    const fileMeta = await this.assets.savePaperFile(user.tid, file, {
+      courseCode: paperCode,
+      examYear: dto.examYear,
+      examCycle,
+      semesterNo: dto.semesterNo,
+      paperCode,
+      paperType: dto.paperType,
+      maxUploadMb: settings.maxUploadMb,
+      allowedMimeTypes: settings.allowedMimeTypes as string[],
+      pdfOnly: true,
+      canonicalName: true,
+    });
+
+    if (identity) {
+      return this.addVersion(user, identity.id, file, {
+        changeNote: 'Re-upload matched existing paper identity',
+        preSaved: fileMeta,
       });
     }
 
-    return this.createInternal(user, { ...dto, ...fileMeta, status: 'DRAFT' });
+    const universityName =
+      dto.universityName ?? (await this.resolveDefaultUniversity(user.tid));
+
+    return this.createInternal(user, {
+      ...dto,
+      paperCode,
+      paperName,
+      departmentId,
+      examCycle,
+      universityName,
+      preparedById: dto.preparedById ?? user.sub,
+      ...fileMeta,
+      status: 'DRAFT',
+    });
   }
 
   async createInternal(
     user: JwtUser,
     input: CreateQuestionPaperDto & {
+      paperCode: string;
+      paperName: string;
       filePath?: string;
       fileName?: string;
       mimeType?: string;
       fileSizeBytes?: number;
+      checksumSha256?: string;
       status?: string;
     },
   ) {
@@ -287,6 +565,9 @@ export class QuestionPapersService {
       keywords: input.keywords,
       paperType: input.paperType,
       examYear: input.examYear,
+      examinationType: input.examinationType,
+      subjectCategory: input.subjectCategory,
+      language: input.language,
     });
 
     const paper = await this.prisma.questionPaper.create({
@@ -299,9 +580,17 @@ export class QuestionPapersService {
         departmentId: input.departmentId,
         courseId: input.courseId,
         semesterNo: input.semesterNo,
-        examinationSession: input.examinationSession,
+        examinationSession: input.examinationSession ?? input.examinationType,
+        examinationType: input.examinationType,
+        examCycle: input.examCycle,
+        subjectCategory: input.subjectCategory,
+        language: input.language,
+        universityName: input.universityName,
+        preparedById: input.preparedById ?? user.sub,
+        verifiedById: input.verifiedById,
+        notes: input.notes,
         paperType: input.paperType,
-        paperCategory: input.paperCategory,
+        paperCategory: input.paperCategory ?? input.subjectCategory,
         examMonth: input.examMonth,
         examYear: input.examYear,
         durationMinutes: input.durationMinutes,
@@ -310,6 +599,8 @@ export class QuestionPapersService {
         fileName: input.fileName,
         mimeType: input.mimeType,
         fileSizeBytes: input.fileSizeBytes,
+        checksumSha256: input.checksumSha256,
+        currentVersionNo: 1,
         keywords: input.keywords ?? [],
         searchText,
         status: input.status ?? 'DRAFT',
@@ -317,8 +608,278 @@ export class QuestionPapersService {
       },
     });
 
+    if (input.filePath && input.fileName) {
+      await this.prisma.questionPaperVersion.create({
+        data: {
+          tenantId: user.tid,
+          paperId: paper.id,
+          versionNo: 1,
+          filePath: input.filePath,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          fileSizeBytes: input.fileSizeBytes,
+          checksumSha256: input.checksumSha256,
+          uploadedById: user.sub,
+          changeNote: 'Initial upload',
+        },
+      });
+    }
+
     await this.audit(user, 'paper.created', paper.id, { after: paper });
     return paper;
+  }
+
+  async addVersion(
+    user: JwtUser,
+    paperId: string,
+    file?: Express.Multer.File,
+    opts?: {
+      changeNote?: string;
+      preSaved?: {
+        filePath: string;
+        fileName: string;
+        mimeType: string;
+        fileSizeBytes: number;
+        checksumSha256: string;
+      };
+    },
+  ) {
+    const paper = await this.prisma.questionPaper.findFirst({
+      where: { id: paperId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!paper) throw new NotFoundException('Paper not found');
+
+    const isOwner = paper.uploadedById === user.sub;
+    const canManage = this.hasPermission(user, 'question-bank:manage');
+    if (!isOwner && !canManage) {
+      throw new ForbiddenException('You can only version your own papers');
+    }
+
+    let fileMeta = opts?.preSaved;
+    if (!fileMeta) {
+      if (!file?.buffer?.length) {
+        throw new BadRequestException('PDF file is required');
+      }
+      const settings = await this.getSettings(user.tid);
+      fileMeta = await this.assets.savePaperFile(user.tid, file, {
+        courseCode: paper.paperCode,
+        examYear: paper.examYear,
+        examCycle: paper.examCycle,
+        semesterNo: paper.semesterNo,
+        paperCode: paper.paperCode,
+        paperType: paper.paperType,
+        maxUploadMb: settings.maxUploadMb,
+        allowedMimeTypes: settings.allowedMimeTypes as string[],
+        pdfOnly: true,
+        canonicalName: true,
+      });
+    }
+
+    const nextVersion = (paper.currentVersionNo ?? 1) + 1;
+    const [version, updated] = await this.prisma.$transaction([
+      this.prisma.questionPaperVersion.create({
+        data: {
+          tenantId: user.tid,
+          paperId: paper.id,
+          versionNo: nextVersion,
+          filePath: fileMeta.filePath,
+          fileName: fileMeta.fileName,
+          mimeType: fileMeta.mimeType,
+          fileSizeBytes: fileMeta.fileSizeBytes,
+          checksumSha256: fileMeta.checksumSha256,
+          uploadedById: user.sub,
+          changeNote: opts?.changeNote ?? 'File replaced',
+        },
+      }),
+      this.prisma.questionPaper.update({
+        where: { id: paper.id },
+        data: {
+          filePath: fileMeta.filePath,
+          fileName: fileMeta.fileName,
+          mimeType: fileMeta.mimeType,
+          fileSizeBytes: fileMeta.fileSizeBytes,
+          checksumSha256: fileMeta.checksumSha256,
+          currentVersionNo: nextVersion,
+        },
+      }),
+    ]);
+
+    await this.audit(user, 'paper.versioned', paper.id, {
+      before: paper,
+      after: { version: nextVersion, versionId: version.id },
+    });
+    return { paper: updated, version };
+  }
+
+  async listVersions(user: JwtUser, paperId: string) {
+    await this.getById(user, paperId);
+    return this.prisma.questionPaperVersion.findMany({
+      where: { tenantId: user.tid, paperId },
+      orderBy: { versionNo: 'desc' },
+    });
+  }
+
+  async downloadVersion(
+    user: JwtUser,
+    paperId: string,
+    versionNo: number,
+    ipAddress?: string,
+  ) {
+    await this.getById(user, paperId, this.isStudent(user));
+    const version = await this.prisma.questionPaperVersion.findFirst({
+      where: { tenantId: user.tid, paperId, versionNo },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    await this.analytics.logAccess({
+      tenantId: user.tid,
+      paperId,
+      userId: user.sub,
+      action: 'DOWNLOAD',
+      ipAddress,
+    });
+    return this.assets.openDownloadStream(
+      user.tid,
+      version.filePath,
+      version.fileName,
+    );
+  }
+
+  async listShareLinks(user: JwtUser, paperId: string) {
+    await this.getById(user, paperId);
+    return this.prisma.questionPaperShareLink.findMany({
+      where: { tenantId: user.tid, paperId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async listUploaders(tenantId: string) {
+    const rows = await this.prisma.questionPaper.findMany({
+      where: { tenantId, deletedAt: null, uploadedById: { not: null } },
+      select: { uploadedById: true },
+      distinct: ['uploadedById'],
+    });
+    const ids = rows
+      .map((r) => r.uploadedById)
+      .filter((id): id is string => Boolean(id));
+    if (!ids.length) return [];
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, id: { in: ids } },
+      select: { id: true, displayName: true, email: true },
+      orderBy: { displayName: 'asc' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: u.displayName?.trim() || u.email || u.id,
+      email: u.email,
+    }));
+  }
+
+  async searchPeople(tenantId: string, q?: string) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        isActive: true,
+        ...(q?.trim()
+          ? {
+              OR: [
+                { displayName: { contains: q.trim(), mode: 'insensitive' } },
+                { email: { contains: q.trim(), mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      select: { id: true, displayName: true, email: true },
+      take: 40,
+      orderBy: { displayName: 'asc' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: u.displayName?.trim() || u.email || u.id,
+      email: u.email,
+    }));
+  }
+
+  async createShareLink(
+    user: JwtUser,
+    paperId: string,
+    dto: CreateShareLinkDto,
+  ) {
+    const paper = await this.getById(user, paperId);
+    const canShare =
+      this.hasPermission(user, 'question-bank:manage') ||
+      this.hasPermission(user, 'question-bank:publish') ||
+      paper.uploadedById === user.sub;
+    if (!canShare) throw new ForbiddenException('Cannot share this paper');
+    if (
+      paper.status !== 'PUBLISHED' &&
+      !this.hasPermission(user, 'question-bank:manage')
+    ) {
+      throw new BadRequestException('Only published papers can be shared');
+    }
+
+    const token = randomBytes(24).toString('hex');
+    const expiresAt =
+      dto.expiresInDays != null
+        ? new Date(Date.now() + dto.expiresInDays * 86400000)
+        : null;
+
+    const link = await this.prisma.questionPaperShareLink.create({
+      data: {
+        tenantId: user.tid,
+        paperId,
+        token,
+        expiresAt,
+        createdById: user.sub,
+      },
+    });
+    return link;
+  }
+
+  async revokeShareLink(user: JwtUser, shareId: string) {
+    const link = await this.prisma.questionPaperShareLink.findFirst({
+      where: { id: shareId, tenantId: user.tid },
+    });
+    if (!link) throw new NotFoundException('Share link not found');
+    const canManage =
+      this.hasPermission(user, 'question-bank:manage') ||
+      link.createdById === user.sub;
+    if (!canManage) throw new ForbiddenException('Cannot revoke this link');
+    return this.prisma.questionPaperShareLink.update({
+      where: { id: shareId },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async downloadByShareToken(token: string, ipAddress?: string) {
+    const link = await this.prisma.questionPaperShareLink.findFirst({
+      where: { token, revokedAt: null },
+      include: { paper: true },
+    });
+    if (!link?.paper || link.paper.deletedAt) {
+      throw new NotFoundException('Share link invalid');
+    }
+    if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Share link expired');
+    }
+    if (link.paper.status !== 'PUBLISHED') {
+      throw new ForbiddenException('Paper is not published');
+    }
+    if (!link.paper.filePath) throw new NotFoundException('No file attached');
+
+    await this.analytics.logAccess({
+      tenantId: link.tenantId,
+      paperId: link.paperId,
+      userId: link.createdById ?? undefined,
+      action: 'DOWNLOAD',
+      ipAddress,
+    });
+
+    return this.assets.openDownloadStream(
+      link.tenantId,
+      link.paper.filePath,
+      link.paper.fileName ?? undefined,
+    );
   }
 
   async update(
@@ -342,15 +903,9 @@ export class QuestionPapersService {
       );
     }
 
-    let fileMeta: Record<string, unknown> = {};
     if (file?.buffer?.length) {
-      const settings = await this.getSettings(user.tid);
-      const courseCode = dto.paperCode ?? paper.paperCode;
-      fileMeta = await this.assets.savePaperFile(user.tid, file, {
-        courseCode,
-        examYear: dto.examYear ?? paper.examYear ?? undefined,
-        maxUploadMb: settings.maxUploadMb,
-        allowedMimeTypes: settings.allowedMimeTypes as string[],
+      await this.addVersion(user, id, file, {
+        changeNote: 'File replaced via edit',
       });
     }
 
@@ -360,11 +915,19 @@ export class QuestionPapersService {
       keywords: dto.keywords ?? paper.keywords,
       paperType: dto.paperType ?? paper.paperType,
       examYear: dto.examYear ?? paper.examYear,
+      examinationType: dto.examinationType ?? paper.examinationType,
+      subjectCategory: dto.subjectCategory ?? paper.subjectCategory,
+      language: dto.language ?? paper.language,
     });
 
     const updated = await this.prisma.questionPaper.update({
       where: { id },
-      data: { ...dto, ...fileMeta, searchText },
+      data: {
+        ...dto,
+        examinationSession: dto.examinationSession ?? dto.examinationType,
+        paperCategory: dto.paperCategory ?? dto.subjectCategory,
+        searchText,
+      },
     });
     await this.audit(user, 'paper.updated', id, {
       before: paper,
@@ -412,9 +975,7 @@ export class QuestionPapersService {
     const paper = await this.getById(user, id, this.isStudent(user));
     if (!paper.filePath) throw new NotFoundException('No file attached');
     if (paper.mimeType !== 'application/pdf') {
-      throw new BadRequestException(
-        'Preview is only available for PDF files in Phase 1',
-      );
+      throw new BadRequestException('Preview is only available for PDF files');
     }
     await this.analytics.logAccess({
       tenantId: user.tid,
@@ -469,6 +1030,44 @@ export class QuestionPapersService {
       orderBy: { createdAt: 'desc' },
       take: 300,
     });
+  }
+
+  private async findIdentityMatch(
+    tenantId: string,
+    input: {
+      paperCode: string;
+      academicYearId?: string;
+      examYear?: number;
+      examMonth?: number;
+      paperType: string;
+    },
+  ) {
+    return this.prisma.questionPaper.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        paperCode: { equals: input.paperCode, mode: 'insensitive' },
+        paperType: input.paperType,
+        ...(input.academicYearId
+          ? { academicYearId: input.academicYearId }
+          : { academicYearId: null }),
+        ...(input.examYear != null
+          ? { examYear: input.examYear }
+          : { examYear: null }),
+        ...(input.examMonth != null
+          ? { examMonth: input.examMonth }
+          : { examMonth: null }),
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  private async resolveDefaultUniversity(tenantId: string) {
+    const branding = await this.prisma.tenantBranding.findFirst({
+      where: { tenantId },
+      select: { displayName: true },
+    });
+    return branding?.displayName ?? 'North Eastern Hill University (NEHU)';
   }
 
   private async resolveStudentScope(user: JwtUser) {

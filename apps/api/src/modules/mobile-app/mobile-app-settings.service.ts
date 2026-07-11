@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { CacheService } from '../../shared/cache/cache.service';
 import {
+  DEFAULT_MOBILE_FEATURE_FLAGS,
   DEFAULT_STAFF_DASHBOARD_CONFIG,
   DEFAULT_STUDENT_DASHBOARD_CONFIG,
   type MobileAppType,
@@ -49,6 +50,8 @@ export class MobileAppSettingsService {
           tenantId,
           studentDashboardConfig: DEFAULT_STUDENT_DASHBOARD_CONFIG,
           staffDashboardConfig: DEFAULT_STAFF_DASHBOARD_CONFIG,
+          featureFlags: DEFAULT_MOBILE_FEATURE_FLAGS,
+          configVersion: 1,
         },
       });
     }
@@ -63,27 +66,48 @@ export class MobileAppSettingsService {
 
   async updateSettings(tenantId: string, dto: UpdateMobileAppSettingsDto) {
     await this.ensureDefaults(tenantId);
+    const current = await this.getSettings(tenantId);
+    const data: Record<string, unknown> = {
+      configVersion: ((current as any).configVersion ?? 1) + 1,
+    };
+    if (dto.studentAppName !== undefined)
+      data.studentAppName = dto.studentAppName;
+    if (dto.staffAppName !== undefined) data.staffAppName = dto.staffAppName;
+    if (dto.studentMinVersion !== undefined)
+      data.studentMinVersion = dto.studentMinVersion;
+    if (dto.studentLatestVersion !== undefined)
+      data.studentLatestVersion = dto.studentLatestVersion;
+    if (dto.staffMinVersion !== undefined)
+      data.staffMinVersion = dto.staffMinVersion;
+    if (dto.staffLatestVersion !== undefined)
+      data.staffLatestVersion = dto.staffLatestVersion;
+    if (dto.studentMaintenanceMode !== undefined)
+      data.studentMaintenanceMode = dto.studentMaintenanceMode;
+    if (dto.staffMaintenanceMode !== undefined)
+      data.staffMaintenanceMode = dto.staffMaintenanceMode;
+    if (dto.maintenanceMessage !== undefined)
+      data.maintenanceMessage = dto.maintenanceMessage;
+    if (dto.studentForceUpdate !== undefined)
+      data.studentForceUpdate = dto.studentForceUpdate;
+    if (dto.staffForceUpdate !== undefined)
+      data.staffForceUpdate = dto.staffForceUpdate;
+    if (dto.forceUpdateMessage !== undefined)
+      data.forceUpdateMessage = dto.forceUpdateMessage;
+    if (dto.studentDashboardConfig !== undefined)
+      data.studentDashboardConfig = dto.studentDashboardConfig;
+    if (dto.staffDashboardConfig !== undefined)
+      data.staffDashboardConfig = dto.staffDashboardConfig;
+    if (dto.brandingOverrides !== undefined)
+      data.brandingOverrides = dto.brandingOverrides;
+    if (dto.playStoreUrl !== undefined) data.playStoreUrl = dto.playStoreUrl;
+    if (dto.apkDownloadUrl !== undefined)
+      data.apkDownloadUrl = dto.apkDownloadUrl;
+    if (dto.releaseNotes !== undefined) data.releaseNotes = dto.releaseNotes;
+    if (dto.featureFlags !== undefined) data.featureFlags = dto.featureFlags;
+
     const updated = await this.prisma.mobileAppSettings.update({
       where: { tenantId },
-      data: {
-        studentAppName: dto.studentAppName,
-        staffAppName: dto.staffAppName,
-        studentMinVersion: dto.studentMinVersion,
-        studentLatestVersion: dto.studentLatestVersion,
-        staffMinVersion: dto.staffMinVersion,
-        staffLatestVersion: dto.staffLatestVersion,
-        studentMaintenanceMode: dto.studentMaintenanceMode,
-        staffMaintenanceMode: dto.staffMaintenanceMode,
-        maintenanceMessage: dto.maintenanceMessage,
-        studentForceUpdate: dto.studentForceUpdate,
-        staffForceUpdate: dto.staffForceUpdate,
-        forceUpdateMessage: dto.forceUpdateMessage,
-        studentDashboardConfig: dto.studentDashboardConfig as
-          | object
-          | undefined,
-        staffDashboardConfig: dto.staffDashboardConfig as object | undefined,
-        brandingOverrides: dto.brandingOverrides as object | undefined,
-      },
+      data: data as any,
     });
     await this.cache.delByPrefix(`mobile-app:config:${tenantId}:`);
     return updated;
@@ -95,6 +119,34 @@ export class MobileAppSettingsService {
   ): Record<string, boolean> {
     const raw = (stored ?? {}) as Record<string, boolean>;
     return { ...defaults, ...raw };
+  }
+
+  mergeFeatureFlags(stored: unknown): Record<string, boolean> {
+    const raw = (stored ?? {}) as Record<string, boolean>;
+    return { ...DEFAULT_MOBILE_FEATURE_FLAGS, ...raw };
+  }
+
+  private versionBlock(settings: any, appType: MobileAppType) {
+    const isStudent = appType === 'STUDENT';
+    return {
+      minVersion: isStudent
+        ? settings.studentMinVersion
+        : settings.staffMinVersion,
+      latestVersion: isStudent
+        ? settings.studentLatestVersion
+        : settings.staffLatestVersion,
+      forceUpdate: isStudent
+        ? settings.studentForceUpdate
+        : settings.staffForceUpdate,
+      forceUpdateMessage:
+        settings.forceUpdateMessage ??
+        'A new version of BCL OneCampus is required to continue. Please update the application to access the latest features and security improvements.',
+      softUpdateMessage:
+        'A new version of BCL OneCampus is available. Update now to enjoy the latest features and improvements.',
+      playStoreUrl: settings.playStoreUrl ?? null,
+      apkDownloadUrl: settings.apkDownloadUrl ?? null,
+      releaseNotes: settings.releaseNotes ?? null,
+    };
   }
 
   async getBootstrapPayload(tenantId: string, appType: MobileAppType) {
@@ -139,26 +191,29 @@ export class MobileAppSettingsService {
         string
       >;
       const isStudent = appType === 'STUDENT';
+      const versions = this.versionBlock(settings, appType);
+      const featureFlags = this.mergeFeatureFlags(
+        (settings as any).featureFlags,
+      );
       return {
         appType,
         appName: isStudent ? settings.studentAppName : settings.staffAppName,
-        minVersion: isStudent
-          ? settings.studentMinVersion
-          : settings.staffMinVersion,
-        latestVersion: isStudent
-          ? settings.studentLatestVersion
-          : settings.staffLatestVersion,
+        configVersion: (settings as any).configVersion ?? 1,
+        ...versions,
         maintenanceMode: isStudent
           ? settings.studentMaintenanceMode
           : settings.staffMaintenanceMode,
-        maintenanceMessage: settings.maintenanceMessage,
-        forceUpdate: isStudent
-          ? settings.studentForceUpdate
-          : settings.staffForceUpdate,
-        forceUpdateMessage: settings.forceUpdateMessage,
+        maintenanceMessage:
+          settings.maintenanceMessage ??
+          'The system is currently undergoing scheduled maintenance. Please try again later.',
+        featureFlags,
+        menuVisibility: featureFlags,
         branding: {
           logoUrl: mobileBootstrapLogoUrl(overrides, branding?.logoUrl ?? null),
-          splashImageUrl: overrides.splashImageUrl ?? null,
+          splashImageUrl: overrides.splashImageUrl
+            ? (toPublicUploadUrl(overrides.splashImageUrl) ??
+              overrides.splashImageUrl)
+            : null,
           primaryColor:
             overrides.primaryColor ?? branding?.primaryColor ?? null,
           displayName: branding?.displayName ?? null,
@@ -185,8 +240,11 @@ export class MobileAppSettingsService {
   async getConfigPayload(tenantId: string, appType: MobileAppType) {
     const settings = await this.getSettings(tenantId);
     const isStudent = appType === 'STUDENT';
+    const featureFlags = this.mergeFeatureFlags((settings as any).featureFlags);
+    const versions = this.versionBlock(settings, appType);
     return {
       appType,
+      configVersion: (settings as any).configVersion ?? 1,
       dashboardCards: this.mergeDashboardConfig(
         isStudent
           ? settings.studentDashboardConfig
@@ -195,12 +253,17 @@ export class MobileAppSettingsService {
           ? DEFAULT_STUDENT_DASHBOARD_CONFIG
           : DEFAULT_STAFF_DASHBOARD_CONFIG,
       ),
+      featureFlags,
+      menuVisibility: featureFlags,
+      ...versions,
       versions: {
-        min: isStudent ? settings.studentMinVersion : settings.staffMinVersion,
-        latest: isStudent
-          ? settings.studentLatestVersion
-          : settings.staffLatestVersion,
+        min: versions.minVersion,
+        latest: versions.latestVersion,
       },
+      maintenanceMode: isStudent
+        ? settings.studentMaintenanceMode
+        : settings.staffMaintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
     };
   }
 
@@ -220,7 +283,7 @@ export class MobileAppSettingsService {
         statusCode: 503,
         message:
           settings.maintenanceMessage ??
-          'The app is under maintenance. Please try again later.',
+          'The system is currently undergoing scheduled maintenance. Please try again later.',
       };
     }
     const minVersion = isStudent
@@ -229,14 +292,17 @@ export class MobileAppSettingsService {
     const forceUpdate = isStudent
       ? settings.studentForceUpdate
       : settings.staffForceUpdate;
-    if (appVersion && forceUpdate && minVersion) {
+    if (appVersion && (forceUpdate || minVersion)) {
       if (isVersionBelow(appVersion, minVersion)) {
         return {
           blocked: true,
           statusCode: 426,
           message:
-            settings.forceUpdateMessage ?? 'Please update the app to continue.',
+            settings.forceUpdateMessage ??
+            'A new version of BCL OneCampus is required to continue. Please update the application to access the latest features and security improvements.',
           minVersion,
+          playStoreUrl: (settings as any).playStoreUrl,
+          apkDownloadUrl: (settings as any).apkDownloadUrl,
         };
       }
     }

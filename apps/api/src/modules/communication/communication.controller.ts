@@ -30,6 +30,8 @@ import {
   DeliveryLogQueryDto,
   NotificationPreferenceDto,
   PreviewAudienceDto,
+  PreviewCommunicationTemplateDto,
+  TestSendCommunicationTemplateDto,
   UpdateCommunicationTemplateDto,
 } from './dto/communication.dto';
 import { CommunicationAnalyticsService } from './services/communication-analytics.service';
@@ -306,6 +308,15 @@ export class CommunicationController {
     return this.templates.seedDefaults(user);
   }
 
+  @Post('templates/preview')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  previewTemplate(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: PreviewCommunicationTemplateDto,
+  ) {
+    return this.templates.preview(user.tid, dto);
+  }
+
   @Get('templates/:id')
   @RequireAnyPermission('communication:read', 'communication:manage')
   getTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
@@ -326,6 +337,31 @@ export class CommunicationController {
   @RequirePermissions('communication:manage')
   removeTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.templates.remove(user, id);
+  }
+
+  @Post('templates/:id/duplicate')
+  @RequirePermissions('communication:manage')
+  duplicateTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.templates.duplicate(user, id);
+  }
+
+  @Post('templates/:id/restore-default')
+  @RequirePermissions('communication:manage')
+  restoreTemplateDefault(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.templates.restoreDefault(user, id);
+  }
+
+  @Post('templates/:id/test-send')
+  @RequirePermissions('communication:manage')
+  testSendTemplate(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: TestSendCommunicationTemplateDto,
+  ) {
+    return this.templates.testSend(user, id, dto.toEmail);
   }
 
   @Get('campaigns')

@@ -1,17 +1,40 @@
 import { api } from '@/services/api';
 import type {
   BulkPreviewResponse,
+  CurriculumCourseOption,
   QuestionBankDashboard,
   QuestionBankSettings,
   QuestionPaper,
   QuestionPaperApproval,
   QuestionPaperListResponse,
+  QuestionPaperShareLink,
+  QuestionPaperVersion,
 } from '@/types/question-bank';
 
 const base = '/v1/question-bank';
 
 export const fetchQuestionBankDashboard = () =>
   api.get<QuestionBankDashboard>(`${base}/dashboard`).then((r) => r.data);
+
+export const fetchCurriculumCourses = (params?: Record<string, string | number | undefined>) =>
+  api.get<CurriculumCourseOption[]>(`${base}/curriculum/courses`, { params }).then((r) => r.data);
+
+export type QuestionBankPerson = {
+  id: string;
+  name: string;
+  email?: string | null;
+};
+
+export const fetchQuestionBankUploaders = () =>
+  api.get<QuestionBankPerson[]>(`${base}/uploaders`).then((r) => r.data);
+
+export const fetchQuestionBankPeople = (q?: string) =>
+  api
+    .get<QuestionBankPerson[]>(`${base}/people`, { params: { q: q || undefined } })
+    .then((r) => r.data);
+
+export const fetchPaperShareLinks = (paperId: string) =>
+  api.get<QuestionPaperShareLink[]>(`${base}/papers/${paperId}/shares`).then((r) => r.data);
 
 export const fetchQuestionPapers = (params?: Record<string, string | number | undefined>) =>
   api.get<QuestionPaperListResponse>(`${base}/papers`, { params }).then((r) => r.data);
@@ -20,7 +43,11 @@ export const fetchQuestionPaper = (id: string) =>
   api.get<QuestionPaper>(`${base}/papers/${id}`).then((r) => r.data);
 
 export const createQuestionPaper = (form: FormData) =>
-  api.post<QuestionPaper>(`${base}/papers`, form).then((r) => r.data);
+  api
+    .post<
+      QuestionPaper | { paper: QuestionPaper; version: QuestionPaperVersion }
+    >(`${base}/papers`, form)
+    .then((r) => r.data);
 
 export const updateQuestionPaper = (id: string, form: FormData) =>
   api.patch<QuestionPaper>(`${base}/papers/${id}`, form).then((r) => r.data);
@@ -47,8 +74,42 @@ export const fetchPendingQuestionApprovals = (roleSlug?: string) =>
 export const downloadQuestionPaper = (id: string) =>
   api.get<Blob>(`${base}/papers/${id}/download`, { responseType: 'blob' }).then((r) => r.data);
 
+export const previewQuestionPaperBlob = (id: string) =>
+  api.get<Blob>(`${base}/papers/${id}/preview`, { responseType: 'blob' }).then((r) => r.data);
+
 export const previewQuestionPaperUrl = (id: string) =>
   `${process.env.NEXT_PUBLIC_API_URL ?? ''}${base}/papers/${id}/preview`;
+
+export const fetchPaperVersions = (paperId: string) =>
+  api.get<QuestionPaperVersion[]>(`${base}/papers/${paperId}/versions`).then((r) => r.data);
+
+export const addPaperVersion = (paperId: string, form: FormData) =>
+  api
+    .post<{
+      paper: QuestionPaper;
+      version: QuestionPaperVersion;
+    }>(`${base}/papers/${paperId}/versions`, form)
+    .then((r) => r.data);
+
+export const downloadPaperVersion = (paperId: string, versionNo: number) =>
+  api
+    .get<Blob>(`${base}/papers/${paperId}/versions/${versionNo}/download`, {
+      responseType: 'blob',
+    })
+    .then((r) => r.data);
+
+export const createPaperShareLink = (paperId: string, expiresInDays?: number) =>
+  api
+    .post<QuestionPaperShareLink>(`${base}/papers/${paperId}/share`, {
+      expiresInDays,
+    })
+    .then((r) => r.data);
+
+export const revokePaperShareLink = (shareId: string) =>
+  api.delete(`${base}/shares/${shareId}`).then((r) => r.data);
+
+export const shareDownloadUrl = (token: string) =>
+  `${process.env.NEXT_PUBLIC_API_URL ?? ''}${base}/share/${token}/download`;
 
 export const fetchMyQuestionPapers = (params?: Record<string, string | number | undefined>) =>
   api.get<QuestionPaperListResponse>(`${base}/me/papers`, { params }).then((r) => r.data);
@@ -70,7 +131,7 @@ export const commitQuestionBankBulk = (rows: Record<string, unknown>[], zip?: Fi
   form.append('rows', JSON.stringify(rows));
   if (zip) form.append('zip', zip);
   return api
-    .post<{ imported: number; paperIds: string[] }>(`${base}/bulk/commit`, form)
+    .post<{ imported: number; versioned?: number; paperIds: string[] }>(`${base}/bulk/commit`, form)
     .then((r) => r.data);
 };
 

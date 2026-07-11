@@ -5,29 +5,28 @@ import {
 } from '@nestjs/common';
 import { createReadStream, existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { basename, extname, join, normalize, resolve } from 'path';
+import { basename, join, normalize, resolve } from 'path';
 import { randomUUID } from 'crypto';
-import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import {
+  buildCanonicalPaperFileName,
+  sha256Buffer,
+} from '../utils/question-paper-file.util';
 
-const DEFAULT_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/zip',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-];
+const PDF_MIME = 'application/pdf';
 
 @Injectable()
 export class QuestionBankAssetsService {
   private readonly uploadRoot = resolveTenantUploadRoot();
 
-  assertAllowedMime(mime: string, allowed: string[]) {
-    const list = allowed.length ? allowed : DEFAULT_MIME_TYPES;
+  assertAllowedMime(mime: string, allowed: string[], pdfOnly = false) {
+    if (pdfOnly) {
+      if (mime !== PDF_MIME) {
+        throw new BadRequestException('Only PDF files are allowed');
+      }
+      return;
+    }
+    const list = allowed.length ? allowed : [PDF_MIME];
     if (!list.includes(mime)) {
       throw new BadRequestException(`File type ${mime} is not allowed`);
     }
@@ -44,21 +43,31 @@ export class QuestionBankAssetsService {
     file: Express.Multer.File,
     opts: {
       courseCode?: string;
-      examYear?: number;
+      examYear?: number | null;
+      examCycle?: string | null;
+      semesterNo?: number | null;
+      paperCode: string;
+      paperType?: string | null;
       maxUploadMb: number;
       allowedMimeTypes: string[];
+      pdfOnly?: boolean;
+      canonicalName?: boolean;
     },
   ) {
-    this.assertAllowedMime(file.mimetype, opts.allowedMimeTypes);
+    this.assertAllowedMime(
+      file.mimetype,
+      opts.allowedMimeTypes,
+      opts.pdfOnly ?? true,
+    );
     this.assertFileSize(file.size, opts.maxUploadMb);
 
     const year = opts.examYear ?? new Date().getFullYear();
-    const courseSegment = (opts.courseCode ?? 'general').replace(
-      /[^a-zA-Z0-9_-]/g,
-      '_',
-    );
+    const courseSegment = (
+      opts.courseCode ??
+      opts.paperCode ??
+      'general'
+    ).replace(/[^a-zA-Z0-9_-]/g, '_');
     const paperId = randomUUID();
-    const ext = extname(file.originalname) || '';
     const dir = join(
       this.uploadRoot,
       tenantId,
@@ -68,15 +77,27 @@ export class QuestionBankAssetsService {
       paperId,
     );
     await mkdir(dir, { recursive: true });
-    const storedName = `${basename(file.originalname, ext).replace(/[^a-zA-Z0-9._-]/g, '_')}${ext}`;
+
+    const storedName = opts.canonicalName
+      ? buildCanonicalPaperFileName({
+          examYear: opts.examYear,
+          examCycle: opts.examCycle,
+          semesterNo: opts.semesterNo,
+          paperCode: opts.paperCode,
+          paperType: opts.paperType,
+        })
+      : `${basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
     const absPath = join(dir, storedName);
     await writeFile(absPath, file.buffer);
+    const checksumSha256 = sha256Buffer(file.buffer);
 
     return {
       filePath: `/uploads/tenants/${tenantId}/question-bank/${year}/${courseSegment}/${paperId}/${storedName}`,
-      fileName: file.originalname,
+      fileName: storedName,
       mimeType: file.mimetype,
       fileSizeBytes: file.size,
+      checksumSha256,
     };
   }
 
@@ -120,9 +141,10 @@ export class QuestionBankAssetsService {
     const absPath = join(dir, safeName);
     await writeFile(absPath, file.buffer);
     return {
-      path: absPath,
-      originalName: file.originalname,
-      buffer: file.buffer,
+      filePath: `/uploads/tenants/${tenantId}/question-bank/bulk/${userId}/${safeName}`,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      fileSizeBytes: file.size,
     };
   }
 }

@@ -38,6 +38,25 @@ const STAFF_CARDS = [
   'timetable',
 ] as const;
 
+const FEATURE_FLAGS = [
+  'attendance',
+  'examination',
+  'fees',
+  'library',
+  'assignments',
+  'results',
+  'idCard',
+  'communication',
+  'leave',
+  'bankSection',
+  'profileEdit',
+  'feedback',
+  'certificates',
+  'timetable',
+  'lms',
+  'notifications',
+] as const;
+
 function DashboardBuilder({
   title,
   cards,
@@ -102,10 +121,11 @@ export function MobileAppControlPanel() {
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Smartphone className="h-5 w-5" />
-          Mobile App Control
+          App Version & Mobile Config
         </h2>
         <p className="text-sm text-muted-foreground">
-          Configure student and staff apps, dashboard cards, maintenance gates, and view analytics.
+          Force/soft updates, maintenance, feature flags, and dashboard cards — without a new app
+          store release. Config version: {s.configVersion ?? 1}
         </p>
       </div>
 
@@ -262,6 +282,79 @@ export function MobileAppControlPanel() {
                   }
                 />
               </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Splash image URL override</Label>
+                <Input
+                  defaultValue={s.brandingOverrides?.splashImageUrl ?? ''}
+                  onBlur={(e) =>
+                    save({
+                      brandingOverrides: {
+                        ...s.brandingOverrides,
+                        splashImageUrl: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Distribution & release notes</CardTitle>
+              <CardDescription>
+                Play Store link for public installs; APK URL for internal distribution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Play Store URL</Label>
+                <Input
+                  defaultValue={s.playStoreUrl ?? ''}
+                  onBlur={(e) => save({ playStoreUrl: e.target.value || null })}
+                  placeholder="https://play.google.com/store/apps/details?id=…"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>APK / AAB download URL</Label>
+                <Input
+                  defaultValue={s.apkDownloadUrl ?? ''}
+                  onBlur={(e) => save({ apkDownloadUrl: e.target.value || null })}
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Release notes</Label>
+                <Input
+                  defaultValue={s.releaseNotes ?? ''}
+                  onBlur={(e) => save({ releaseNotes: e.target.value || null })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Feature flags (menu / modules)</CardTitle>
+              <CardDescription>
+                Hide modules in the mobile app without publishing a new build.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2">
+              {FEATURE_FLAGS.map((key) => {
+                const flags = (s.featureFlags ?? {}) as Record<string, boolean>;
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-lg border px-3 py-2"
+                  >
+                    <Label className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
+                    <Switch
+                      checked={flags[key] !== false}
+                      onCheckedChange={(v) => save({ featureFlags: { ...flags, [key]: v } })}
+                    />
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 

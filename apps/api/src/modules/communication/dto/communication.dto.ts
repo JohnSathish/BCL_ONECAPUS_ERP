@@ -115,6 +115,34 @@ export class UpdateCommunicationTemplateDto {
   isActive?: boolean;
 }
 
+export class PreviewCommunicationTemplateDto {
+  @IsOptional()
+  @IsUUID()
+  templateId?: string;
+
+  @IsOptional()
+  @IsString()
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  bodyHtml?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsObject()
+  sampleData?: Record<string, string>;
+}
+
+export class TestSendCommunicationTemplateDto {
+  @IsOptional()
+  @IsString()
+  toEmail?: string;
+}
+
 export class AudienceFilterDto {
   @IsOptional()
   @IsArray()

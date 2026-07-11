@@ -15,7 +15,11 @@ import { isWorkerOwnedExportJob } from './exports-queue.jobs';
  * Do not add other @Processor('exports') classes — CI enforces this rule.
  */
 @Injectable()
-@Processor('exports')
+@Processor('exports', {
+  lockDuration: 600_000,
+  stalledInterval: 120_000,
+  maxStalledCount: 2,
+})
 export class ExportsQueueProcessor extends WorkerHost implements OnModuleInit {
   private readonly logger = new Logger(ExportsQueueProcessor.name);
 

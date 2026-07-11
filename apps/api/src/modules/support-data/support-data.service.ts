@@ -44,12 +44,16 @@ export class SupportDataService {
     activeOnly?: string;
     campusId?: string;
     institutionId?: string;
+    boardType?: string;
+    category?: string;
   }): SupportDataListQuery {
     return {
       q: query.q,
       activeOnly: query.activeOnly !== 'false',
       campusId: query.campusId,
       institutionId: query.institutionId,
+      boardType: query.boardType,
+      category: query.category,
     };
   }
 
@@ -61,6 +65,8 @@ export class SupportDataService {
       activeOnly?: string;
       campusId?: string;
       institutionId?: string;
+      boardType?: string;
+      category?: string;
     },
   ): Promise<SupportDataRow[]> {
     const def = this.getCategory(category);

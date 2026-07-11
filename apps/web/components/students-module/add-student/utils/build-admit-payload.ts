@@ -94,7 +94,7 @@ export function buildAdmitFullPayload(draft: AddStudentDraft): AdmitStudentFullP
       : draft.localGuardian;
 
   return {
-    email: draft.email,
+    email: draft.email?.trim() || undefined,
     enrollmentNumber: draft.enrollmentNumber.trim() || draft.applicationNumber,
     applicationNumber: draft.applicationNumber || undefined,
     fullName: draft.fullName,

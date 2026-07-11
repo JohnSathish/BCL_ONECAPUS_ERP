@@ -4,7 +4,6 @@ import { ensureDeviceId, hydrateAppType } from '@/api/config';
 import { PremiumSplashScreen } from '@/components/auth/premium-splash-screen';
 import { bootstrapSession } from '@/auth/bootstrap-session';
 import { SPLASH_DURATION_MS } from '@/constants/release';
-import { clearStalePushResponse } from '@/services/push-notifications';
 import { StatusBar } from 'expo-status-bar';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 
@@ -27,8 +26,7 @@ export default function AuthSplashScreen() {
           await hydrateAppType();
           await ensureDeviceId();
           const result = await bootstrapSession();
-          // Avoid replaying an old push tap into Notifications on every cold start.
-          await clearStalePushResponse();
+          // Initial push tap is handled once in root layout via consumeInitialPushResponse.
           if (!cancelled) {
             router.replace(result.href as never);
           }

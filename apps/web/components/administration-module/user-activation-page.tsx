@@ -16,9 +16,11 @@ import {
   bulkResetPasswords,
   fetchActivationUsers,
   fetchRoles,
+  forcePortalUserPasswordReset,
   resetPortalUserPassword,
   sendUserCredentials,
   suspendPortalUser,
+  unlockPortalUserLogin,
 } from '@/services/administration';
 import type { PortalUserFilters, PortalUserRow } from '@/types/administration';
 
@@ -125,7 +127,18 @@ export function UserActivationPage() {
             refresh();
           }}
           onResetPassword={async (u) => {
-            await resetPortalUserPassword(u.id);
+            await resetPortalUserPassword(u.id, {
+              forceReset: true,
+              resetToRoll: u.hasStudentProfile,
+            });
+            refresh();
+          }}
+          onForcePasswordReset={async (u) => {
+            await forcePortalUserPasswordReset(u.id);
+            refresh();
+          }}
+          onUnlockLogin={async (u) => {
+            await unlockPortalUserLogin(u.id);
             refresh();
           }}
           onSendCredentials={async (u) => {

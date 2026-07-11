@@ -125,8 +125,7 @@ export const POLITICAL_SCIENCE_NEHU_PAPERS: PoliticalScienceNehuPaper[] = [
   },
   {
     code: formatNehuCourseCode('POL', 303),
-    title:
-      'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+    title: 'Internship',
     semester: 5,
     category: 'INTERNSHIP',
     credits: 4,

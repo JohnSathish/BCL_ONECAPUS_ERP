@@ -35,10 +35,16 @@ function parseError(data: unknown, fallback: string) {
 }
 
 async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const [apiBase, headers] = await Promise.all([
     getApiBase(),
     mobileHeadersAsync(options.headers as Record<string, string>),
   ]);
+
+  // Let fetch set multipart boundary — do not force application/json.
+  if (isFormData) {
+    delete headers['Content-Type'];
+  }
 
   if (!options.skipAuth) {
     const token = options.auth ?? (await getAccessToken());

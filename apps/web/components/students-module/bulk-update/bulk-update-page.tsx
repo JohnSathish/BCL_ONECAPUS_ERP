@@ -30,6 +30,7 @@ import {
 import { BulkUpdateResultStep } from '@/components/students-module/bulk-update/bulk-update-result-step';
 import { BulkUpdateScopeStep } from '@/components/students-module/bulk-update/bulk-update-scope-step';
 import { BulkUpdateSelectStep } from '@/components/students-module/bulk-update/bulk-update-select-step';
+import { DepartmentBackfillCard } from '@/components/students-module/bulk-update/department-backfill-card';
 import {
   BULK_UPDATE_STEPS,
   useBulkUpdateWizard,
@@ -367,6 +368,8 @@ export function BulkUpdatePage() {
           pendingOperations={pendingOperations}
           lastRun={lastRun}
         />
+
+        <DepartmentBackfillCard />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-5">

@@ -28,6 +28,17 @@ export class BoardSubjectAdapter {
         tenantId,
         deletedAt: null,
         ...(query.activeOnly !== false ? { isActive: true } : {}),
+        ...(query.boardType
+          ? {
+              boardType: {
+                equals: query.boardType.trim(),
+                mode: 'insensitive',
+              },
+            }
+          : {}),
+        ...(query.category
+          ? { category: { equals: query.category.trim(), mode: 'insensitive' } }
+          : {}),
         ...(q
           ? {
               OR: [

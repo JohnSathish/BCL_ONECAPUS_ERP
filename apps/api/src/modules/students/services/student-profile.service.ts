@@ -10,6 +10,7 @@ import { StudentProfileSectionsService } from './student-profile-sections.servic
 import { StudentDirectoryEnrichmentService } from './student-directory-enrichment.service';
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import type { UpdateStudentProfileDto } from '../dto/students.dto';
+import { isSyntheticStudentEmail } from '../student-credentials.util';
 
 const profileInclude = {
   masterProfile: true,
@@ -189,7 +190,16 @@ export class StudentProfileService {
       nationalId: student.masterProfile?.nationalId,
       maritalStatus: student.masterProfile?.maritalStatus,
       studentStatus: student.masterProfile?.studentStatus ?? 'STUDYING',
-      email: student.masterProfile?.email ?? student.user.email,
+      email: (() => {
+        const profileEmail = student.masterProfile?.email?.trim();
+        if (profileEmail && !isSyntheticStudentEmail(profileEmail)) {
+          return profileEmail;
+        }
+        const loginEmail = student.user.email?.trim();
+        return loginEmail && !isSyntheticStudentEmail(loginEmail)
+          ? loginEmail
+          : (profileEmail ?? null);
+      })(),
       departmentId: student.departmentId ?? student.department?.id ?? null,
       departmentName: student.department?.name ?? null,
       bloodGroupLookupId: student.masterProfile?.bloodGroupLookupId,

@@ -283,6 +283,12 @@ export const STUDENT_EDITABLE_SECTIONS = [
   'documents',
 ] as const;
 
+/** Temporarily hide Bank from student UIs until the college needs it. */
+export const BANK_SECTION_VISIBLE = false;
+
+export const DEFAULT_PROFILE_CLOSED_MESSAGE =
+  'The profile update period has ended. Please contact the College Office if you need to make any changes.';
+
 export const PROFILE_COMPLETION_CHECKS: Array<{
   key: string;
   label: string;

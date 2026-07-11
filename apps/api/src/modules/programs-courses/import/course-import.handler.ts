@@ -507,7 +507,7 @@ export class CourseImportHandler implements ImportModuleHandler<NormalizedCourse
           ],
           [
             'ECO-303',
-            'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+            'Internship',
             'INTERNSHIP',
             4,
             0,

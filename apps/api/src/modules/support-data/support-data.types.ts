@@ -47,6 +47,8 @@ export type SupportDataListQuery = {
   activeOnly?: boolean;
   campusId?: string;
   institutionId?: string;
+  boardType?: string;
+  category?: string;
 };
 
 export type SupportDataAdapter = {

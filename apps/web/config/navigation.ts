@@ -93,12 +93,12 @@ const OD = P.officialDocuments;
 const QUESTION_BANK_CHILDREN: NavChild[] = [
   { label: 'Dashboard', href: '/admin/academics/question-bank', permissions: [...QB] },
   {
-    label: 'Previous Year Papers',
+    label: 'Repository',
     href: '/admin/academics/question-bank/papers',
     permissions: [...QB],
   },
   {
-    label: 'Upload Center',
+    label: 'Upload',
     href: '/admin/academics/question-bank/upload',
     permissions: ['question-bank:contribute', 'question-bank:manage'],
   },
@@ -267,6 +267,12 @@ export const ADMIN_NAV: NavGroup[] = [
               'students:verify-documents',
               'students:manage',
             ],
+          },
+          {
+            label: 'Profile Update Policy',
+            href: '/admin/students/profile-verification/policy',
+            permissions: ['students:profile-policy', 'students:profile-verify', 'students:manage'],
+            activePattern: '^/admin/students/profile-verification/policy(?:/.*)?$',
           },
           {
             label: 'Class XII Verification',
@@ -775,7 +781,7 @@ export const ADMIN_NAV: NavGroup[] = [
         ],
       },
       {
-        label: 'Question Bank',
+        label: 'Question Paper Repository',
         href: '/admin/academics/question-bank',
         icon: HelpCircle,
         module: 'questionBank',
@@ -1429,6 +1435,11 @@ export const ADMIN_NAV: NavGroup[] = [
           { label: 'AQAR', href: '/admin/naac/aqar', permissions: ['naac-iqac:manage'] },
           { label: 'SSR', href: '/admin/naac/reports', permissions: ['naac-iqac:reports'] },
           { label: 'IQAC Activities', href: '/admin/naac/iqac', permissions: ['naac-iqac:read'] },
+          {
+            label: 'Student Feedback',
+            href: '/admin/naac/feedback',
+            permissions: ['naac-iqac:read', 'naac-iqac:manage', 'naac-iqac:collect'],
+          },
           { label: 'Compliance', href: '/admin/naac/dvv', permissions: ['naac-iqac:reports'] },
           { label: 'Settings', href: '/admin/naac/settings', permissions: ['naac-iqac:manage'] },
         ],
@@ -1933,7 +1944,7 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['tenant:manage'],
           },
           {
-            label: 'Mobile App Control',
+            label: 'App Version & Mobile Config',
             href: '/admin/administration/mobile-app',
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],
           },
@@ -2003,6 +2014,7 @@ export const STAFF_NAV: NavGroup[] = [
     items: [
       { label: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
       { label: 'Notifications', href: '/staff/notifications', icon: Bell },
+      { label: 'Feedback', href: '/staff/feedback', icon: MessageSquare },
       { label: 'My Calendar', href: '/staff/calendar', icon: CalendarDays },
     ],
   },
@@ -2019,7 +2031,7 @@ export const STAFF_NAV: NavGroup[] = [
           { label: 'LMS Workspace', href: '/staff/academic/lms' },
           { label: 'Lesson Plans', href: '/staff/academic/lms' },
           { label: 'Homework / Assignments', href: '/staff/academic/lms' },
-          { label: 'Question Bank', href: '/staff/academic/question-bank' },
+          { label: 'Question Paper Repository', href: '/staff/academic/question-bank' },
           { label: 'Internal Assessment', href: '/staff/academic/ia' },
           { label: 'Examinations (Legacy)', href: '/staff/academic/examinations' },
           { label: 'Student Lists', href: '/staff/academic/students' },
@@ -2082,31 +2094,58 @@ export const STAFF_NAV: NavGroup[] = [
   },
 ];
 
-export const ROLE_NAV: Record<string, { label: string; href: string; icon: LucideIcon }[]> = {
+export const ROLE_NAV: Record<
+  string,
+  {
+    label: string;
+    href?: string;
+    icon: LucideIcon;
+    children?: { label: string; href: string; activePattern?: string }[];
+  }[]
+> = {
   faculty: [
     { label: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
+    { label: 'Feedback', href: '/staff/feedback', icon: MessageSquare },
     { label: 'Attendance', href: '/staff/attendance', icon: ClipboardList },
     { label: 'Timetable', href: '/staff/academic/timetable', icon: BookOpen },
   ],
   staff: [
     { label: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
+    { label: 'Feedback', href: '/staff/feedback', icon: MessageSquare },
     { label: 'Attendance', href: '/staff/attendance', icon: ClipboardList },
     { label: 'Profile', href: '/staff/profile', icon: User },
   ],
   student: [
     { label: 'Dashboard', href: '/student', icon: LayoutDashboard },
+    { label: 'Notifications', href: '/student/notifications', icon: Bell },
     { label: 'My Profile', href: '/student/my-profile', icon: User },
     { label: 'Results', href: '/student/results', icon: BarChart3 },
-    { label: 'Fees', href: '/student/fees', icon: Wallet },
+    {
+      label: 'Fees',
+      href: '/student/fees',
+      icon: Wallet,
+      children: [
+        {
+          label: 'My Fee Account',
+          href: '/student/fees',
+          activePattern: '^/student/fees(?:/.*)?$',
+        },
+        {
+          label: 'Semester Exam Fees',
+          href: '/student/examination-fees',
+          activePattern: '^/student/examination-fees(?:/.*)?$',
+        },
+      ],
+    },
+    { label: 'Feedback', href: '/student/feedback', icon: MessageSquare },
     { label: 'Certificates', href: '/student/certificates', icon: FileText },
     { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
     { label: 'LMS', href: '/student/lms', icon: GraduationCap },
-    { label: 'Question Bank', href: '/student/question-bank', icon: HelpCircle },
+    { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Library', href: '/student/library', icon: Library },
     { label: 'Registration', href: '/student/registration', icon: ClipboardList },
     { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },
     { label: 'Examinations', href: '/student/examinations', icon: Ticket },
-    { label: 'Exam Fees', href: '/student/examination-fees', icon: ClipboardList },
     { label: 'Committee Notices', href: '/student/governance/notices', icon: Megaphone },
     { label: 'Committee Meetings', href: '/student/governance/meetings', icon: CalendarDays },
   ],

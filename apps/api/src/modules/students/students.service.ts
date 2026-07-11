@@ -28,6 +28,10 @@ import type {
 } from './dto/students.dto';
 import { StudentDirectoryEnrichmentService } from './services/student-directory-enrichment.service';
 import { StudentDisplaySettingsService } from '../administration/services/student-display-settings.service';
+import {
+  resolveStudentDefaultPassword,
+  resolveStudentPortalEmail,
+} from './student-credentials.util';
 import { StudentProfileService } from './services/student-profile.service';
 import { StudentSemesterResolverService } from './services/student-semester-resolver.service';
 import { StudentProfileSectionsService } from './services/student-profile-sections.service';
@@ -930,8 +934,19 @@ export class StudentsService {
       dto.programVersionId,
     );
 
+    const enrollmentNumber =
+      dto.enrollmentNumber?.trim() ||
+      dto.applicationNumber?.trim() ||
+      (await this.generateEnrollmentNumber(tenantId, batch.batchCode ?? 'ADM'));
+
+    const portalEmail = resolveStudentPortalEmail({
+      email: dto.email,
+      rollNumber: dto.rollNumber,
+      enrollmentNumber,
+    });
+
     const existingUser = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId, email: dto.email } },
+      where: { tenantId_email: { tenantId, email: portalEmail } },
       include: { student: true },
     });
     if (existingUser?.student && !existingUser.student.deletedAt) {
@@ -942,11 +957,6 @@ export class StudentsService {
     if (existingUser?.student?.deletedAt) {
       await this.purgeAdmissionAttempt(tenantId, existingUser.student.id);
     }
-
-    const enrollmentNumber =
-      dto.enrollmentNumber?.trim() ||
-      dto.applicationNumber?.trim() ||
-      (await this.generateEnrollmentNumber(tenantId, batch.batchCode ?? 'ADM'));
 
     const enrollmentTaken = await this.prisma.student.findFirst({
       where: {
@@ -991,12 +1001,20 @@ export class StudentsService {
       if (rfidTaken) throw new ConflictException('RFID number already in use');
     }
 
+    const defaultPassword = resolveStudentDefaultPassword({
+      password: dto.password,
+      rollNumber: dto.rollNumber,
+      enrollmentNumber,
+    });
+    const username = (dto.rollNumber ?? enrollmentNumber).trim();
+
     const { user: portalUser } = await this.provisioning.ensureUserWithRoles(
       tenantId,
-      dto.email,
+      portalEmail,
       ['student'],
       {
-        password: dto.password ?? 'Student@123',
+        password: defaultPassword,
+        username,
         userTypeForUsername: 'STUDENT',
         mustResetPassword: true,
         displayName: dto.fullName,
@@ -1029,7 +1047,7 @@ export class StudentsService {
 
     await this.profileService.createMasterProfile(tenantId, student.id, {
       fullName: dto.fullName,
-      email: dto.email,
+      email: dto.email?.trim() || undefined,
       gender: dto.gender,
       maritalStatus: dto.maritalStatus,
       dateOfBirth: dto.dateOfBirth,
@@ -1653,8 +1671,12 @@ export class StudentsService {
       tenantId,
       'student.create',
     );
+    const portalEmail = resolveStudentPortalEmail({
+      email: dto.email,
+      enrollmentNumber: dto.enrollmentNumber,
+    });
     const existingUser = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId, email: dto.email } },
+      where: { tenantId_email: { tenantId, email: portalEmail } },
       include: { student: true },
     });
     if (existingUser?.student && !existingUser.student.deletedAt) {
@@ -1678,7 +1700,13 @@ export class StudentsService {
       await this.assertProgramVersion(tenantId, dto.programVersionId);
     }
 
-    const passwordHash = await bcrypt.hash(dto.password ?? 'Student@123', 12);
+    const passwordHash = await bcrypt.hash(
+      resolveStudentDefaultPassword({
+        password: dto.password,
+        enrollmentNumber: dto.enrollmentNumber,
+      }),
+      12,
+    );
     const studentRole = await this.prisma.role.findFirst({
       where: { tenantId, slug: 'student' },
     });
@@ -1691,15 +1719,19 @@ export class StudentsService {
               passwordHash,
               isActive: true,
               deletedAt: null,
+              mustResetPassword: true,
+              username: dto.enrollmentNumber,
             },
           })
         : await tx.user.create({
             data: {
               tenantId,
-              email: dto.email,
+              email: portalEmail,
+              username: dto.enrollmentNumber,
               passwordHash,
               emailVerifiedAt: new Date(),
               isActive: true,
+              mustResetPassword: true,
             },
           });
 

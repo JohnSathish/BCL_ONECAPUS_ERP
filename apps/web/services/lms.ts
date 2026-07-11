@@ -1,5 +1,16 @@
 import { api } from './api';
 
+export type LmsWorkspaceContext = {
+  shiftCode: string | null;
+  shiftName: string | null;
+  sectionCode: string | null;
+  programmeCode: string | null;
+  programmeName: string | null;
+  category: string | null;
+  poolName: string | null;
+  offeringId: string;
+};
+
 export type LmsWorkspace = {
   id: string;
   title: string;
@@ -8,8 +19,33 @@ export type LmsWorkspace = {
   status: string;
   course: { code: string; title: string; credits: string | number };
   offeringSection?: { sectionCode: string } | null;
+  context?: LmsWorkspaceContext;
   _count?: { materials: number; announcements: number; lessonPlans: number };
 };
+
+/** Human-readable disambiguation for duplicate-looking workspace rows. */
+export function formatLmsWorkspaceMeta(ws: LmsWorkspace): string {
+  const ctx = ws.context;
+  const parts: string[] = [ws.workspaceType, `Sem ${ws.semesterNo}`];
+
+  const shift = ctx?.shiftName || ctx?.shiftCode;
+  if (shift) parts.push(shift);
+
+  if (ws.workspaceType === 'SECTION' && ctx?.sectionCode) {
+    parts.push(`Section ${ctx.sectionCode}`);
+  }
+
+  if (ctx?.programmeName || ctx?.programmeCode) {
+    parts.push(ctx.programmeName || ctx.programmeCode || '');
+  } else if (ctx?.poolName) {
+    parts.push(ctx.poolName);
+  } else if (ctx?.category) {
+    parts.push(`${ctx.category} pool`);
+  }
+
+  parts.push(`${ws._count?.materials ?? 0} materials`);
+  return parts.filter(Boolean).join(' · ');
+}
 
 export type LmsMaterial = {
   id: string;

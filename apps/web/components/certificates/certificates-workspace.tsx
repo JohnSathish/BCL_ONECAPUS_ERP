@@ -54,7 +54,6 @@ import {
   upsertCertificateSequence,
   uploadCertificateSignatureAsset,
   downloadCertificateIssue,
-  downloadMyCertificateIssue,
   fetchCertificateRegister,
 } from '@/services/certificates';
 import { fetchStudents, fetchLifecycleEvents } from '@/services/students';
@@ -413,7 +412,9 @@ export function CertificatesWorkspace({ page = 'dashboard', portal = 'admin' }: 
                   My Certificates
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                  Request certificates, track approval status, and download issued documents.
+                  Request certificates and track approval status. Issued certificates are collected
+                  from the office after the applicable certificate fee is paid (online download is
+                  disabled).
                   {myProfile.data?.fullName ? ` Signed in as ${myProfile.data.fullName}.` : ''}
                 </p>
               </>
@@ -574,7 +575,7 @@ export function CertificatesWorkspace({ page = 'dashboard', portal = 'admin' }: 
       {isStudentPortal ? (
         <>
           <StudentRequestsPanel requests={requestList} />
-          <StudentIssuesPanel issues={issueList} onDownload={downloadMyCertificateIssue} />
+          <StudentIssuesPanel issues={issueList} />
         </>
       ) : null}
       {activePage === 'requests' || activePage === 'workflow' ? (
@@ -1133,24 +1134,16 @@ function StudentRequestsPanel({ requests }: { requests: CertificateRequest[] }) 
 
 function StudentIssuesPanel({
   issues,
-  onDownload,
 }: {
   issues: CertificateIssue[];
-  onDownload: (issueId: string) => Promise<Blob>;
+  onDownload?: (issueId: string) => Promise<Blob>;
 }) {
-  const handleDownload = async (issueId: string, certificateNo: string) => {
-    const blob = await onDownload(issueId);
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    const ext = blob.type.includes('pdf') ? '.pdf' : '.html';
-    anchor.download = `${certificateNo.replace(/\//g, '-')}${ext}`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <Panel title="My Issued Certificates" icon={FileCheck2}>
+      <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        Certificate download is disabled. After your request is approved and the certificate fee is
+        paid, collect the certificate from the college office.
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         {issues.length === 0 ? (
           <p className="text-sm text-slate-500">No certificates issued yet.</p>
@@ -1162,14 +1155,9 @@ function StudentIssuesPanel({
                 {issue.category?.name} · {issue.status}
               </p>
               {issue.status === 'ISSUED' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => void handleDownload(issue.id, issue.certificateNo)}
-                >
-                  Download
-                </Button>
+                <p className="mt-3 text-xs font-medium text-slate-600">
+                  Status: Ready for office collection (after fee payment)
+                </p>
               ) : null}
             </div>
           ))

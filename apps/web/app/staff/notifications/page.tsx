@@ -1,36 +1,35 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+import { NotificationsCenter } from '@/components/communication/notifications/notifications-center';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { GlassCard } from '@/components/erp/glass-card';
 import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
-import { fetchNotifications } from '@/services/communication';
 
-export default function StaffNotificationsPage() {
+function StaffNotificationsInner() {
   useRequireStaffPortal();
-  const { data } = useQuery({
-    queryKey: ['communication', 'notifications', 'staff'],
-    queryFn: () => fetchNotifications(30),
-  });
+  const params = useSearchParams();
+  const id = params.get('id');
 
   return (
-    <DashboardShell role="staff" title="Notifications">
-      <div className="space-y-3">
-        {(data ?? []).map((n) => (
-          <GlassCard key={n.id} className="p-4">
-            <p className="font-medium">{n.title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{n.body}</p>
-            {n.link ? (
-              <Link href={n.link} className="mt-2 inline-block text-sm text-primary">
-                View
-              </Link>
-            ) : null}
-          </GlassCard>
-        ))}
-        {!data?.length ? <p className="text-sm text-muted-foreground">No notifications.</p> : null}
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">Notifications</h1>
+        <p className="text-sm text-muted-foreground">
+          Read the full message and open any attached images or PDFs.
+        </p>
       </div>
+      <NotificationsCenter initialId={id} inboxPath="/staff/notifications" />
+    </div>
+  );
+}
+
+export default function StaffNotificationsPage() {
+  return (
+    <DashboardShell role="staff" title="Notifications">
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+        <StaffNotificationsInner />
+      </Suspense>
     </DashboardShell>
   );
 }

@@ -36,8 +36,10 @@ import {
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
 import { InstitutionLogo } from '@/components/auth/institution-logo';
+import { getInstalledAppVersion, isVersionBelow } from '@/utils/app-version';
 
 const STICKY_BAR_HEIGHT = 72;
+let softUpdatePrompted = false;
 
 function formatStat(value: number, fallback: number) {
   const n = value > 0 ? value : fallback;
@@ -98,8 +100,38 @@ export default function WelcomeScreen() {
   useEffect(() => {
     if (config?.maintenanceMode) {
       router.replace('/(auth)/maintenance');
+      return;
     }
-  }, [config?.maintenanceMode, router]);
+    if (!config) return;
+    const installed = getInstalledAppVersion();
+    const belowMin = isVersionBelow(installed, config.minVersion);
+    const force = config.forceUpdate || belowMin;
+    if (force) {
+      router.replace('/(auth)/maintenance');
+      return;
+    }
+    if (!softUpdatePrompted && isVersionBelow(installed, config.latestVersion)) {
+      softUpdatePrompted = true;
+      const updateUrl =
+        config.playStoreUrl?.trim() ||
+        config.apkDownloadUrl?.trim() ||
+        'https://play.google.com/store/apps/details?id=com.basecodelabs.onecampus';
+      Alert.alert(
+        'Update available',
+        config.softUpdateMessage?.trim() ||
+          'A new version of BCL OneCampus is available. Update now to enjoy the latest features and improvements.',
+        [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Update Now',
+            onPress: () => {
+              void Linking.openURL(updateUrl);
+            },
+          },
+        ],
+      );
+    }
+  }, [config, router]);
 
   const studentStat = formatStat(stats?.students ?? 0, DEFAULT_PORTAL_STATS.students);
   const facultyStat = formatStat(stats?.faculty ?? 0, DEFAULT_PORTAL_STATS.faculty);

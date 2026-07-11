@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,11 +8,13 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import {
+  BANK_SECTION_VISIBLE,
   PORTAL_DOCUMENT_TYPES,
   PROFILE_COMPLETION_CHECKS,
   STUDENT_EDITABLE_SECTIONS,
 } from '../domain/profile-update-policy.defaults';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
+import { Class12SubjectsService } from './class12-subjects.service';
 
 function serializeValue(value: unknown): string | null {
   if (value == null || value === '') return null;
@@ -50,6 +53,7 @@ export class StudentProfileChangeRequestService {
     private readonly prisma: PrismaService,
     private readonly policy: StudentProfileUpdatePolicyService,
     private readonly notifications: UserNotificationsService,
+    private readonly class12Subjects: Class12SubjectsService,
   ) {}
 
   private db() {
@@ -85,7 +89,12 @@ export class StudentProfileChangeRequestService {
     );
 
     const missing: Array<{ key: string; label: string }> = [];
-    const checks = PROFILE_COMPLETION_CHECKS.map((check) => {
+    const window = await this.policy.getUpdateWindow(tenantId);
+    const bankVisible = BANK_SECTION_VISIBLE || window.bankSectionVisible;
+    const activeChecks = PROFILE_COMPLETION_CHECKS.filter(
+      (c) => c.key !== 'bank' || bankVisible,
+    );
+    const checks = activeChecks.map((check) => {
       let filled = false;
       switch (check.key) {
         case 'aadhaar':
@@ -309,48 +318,55 @@ export class StudentProfileChangeRequestService {
       'documents',
     ] as const;
 
-    const [sectionsArr, completion, softGate, changeRequests, lookups] =
-      await Promise.all([
-        Promise.all(
-          sectionKeys.map(async (key) => ({
-            key,
-            ...(await this.getSectionSnapshot(tenantId, studentId, key)),
-          })),
-        ),
-        this.getCompletion(tenantId, studentId),
-        this.evaluateSoftGate(tenantId, studentId),
-        this.listRequests(tenantId, {
-          studentId,
-          take: 20,
-        }).catch(() => []),
-        this.prisma.masterLookup.findMany({
-          where: {
-            tenantId,
-            lookupType: {
-              in: [
-                'BLOOD_GROUP',
-                'RELIGION',
-                'CATEGORY',
-                'NATIONALITY',
-                'GENDER',
-              ],
-            },
-            isActive: true,
+    const [
+      sectionsArr,
+      completion,
+      softGate,
+      profileUpdate,
+      changeRequests,
+      lookups,
+    ] = await Promise.all([
+      Promise.all(
+        sectionKeys.map(async (key) => ({
+          key,
+          ...(await this.getSectionSnapshot(tenantId, studentId, key)),
+        })),
+      ),
+      this.getCompletion(tenantId, studentId),
+      this.evaluateSoftGate(tenantId, studentId),
+      this.policy.evaluateProfileUpdateAccess(tenantId, studentId),
+      this.listRequests(tenantId, {
+        studentId,
+        take: 20,
+      }).catch(() => []),
+      this.prisma.masterLookup.findMany({
+        where: {
+          tenantId,
+          lookupType: {
+            in: [
+              'BLOOD_GROUP',
+              'RELIGION',
+              'CATEGORY',
+              'NATIONALITY',
+              'GENDER',
+            ],
           },
-          select: {
-            id: true,
-            label: true,
-            code: true,
-            lookupType: true,
-            sortOrder: true,
-          },
-          orderBy: [
-            { lookupType: 'asc' },
-            { sortOrder: 'asc' },
-            { label: 'asc' },
-          ],
-        }),
-      ]);
+          isActive: true,
+        },
+        select: {
+          id: true,
+          label: true,
+          code: true,
+          lookupType: true,
+          sortOrder: true,
+        },
+        orderBy: [
+          { lookupType: 'asc' },
+          { sortOrder: 'asc' },
+          { label: 'asc' },
+        ],
+      }),
+    ]);
 
     const sections: Record<string, unknown> = {};
     for (const row of sectionsArr) {
@@ -391,6 +407,10 @@ export class StudentProfileChangeRequestService {
       },
       sections,
       completion: { ...completion, softGate },
+      profileUpdate,
+      visibleSections: {
+        bank: Boolean(profileUpdate.bankSectionVisible || BANK_SECTION_VISIBLE),
+      },
       verificationStatus: latestRequest?.status ?? 'NOT_SUBMITTED',
       changeRequests,
       lookups: {
@@ -469,12 +489,24 @@ export class StudentProfileChangeRequestService {
       }>;
     },
   ) {
+    await this.assertStudentCanEditProfile(user.tid, studentId);
+
     const percentage =
       input.totalMarks != null &&
       input.maximumMarks != null &&
       input.maximumMarks > 0
         ? Math.round((input.totalMarks / input.maximumMarks) * 10000) / 100
         : null;
+
+    if (input.subjects) {
+      await this.class12Subjects.assertSubjectMarksValid(
+        user.tid,
+        input.boardName,
+        input.stream,
+        input.subjects,
+        { requireMinFive: true },
+      );
+    }
 
     const existing = await this.prisma.studentBoardExam.findFirst({
       where: { tenantId: user.tid, studentId },
@@ -554,6 +586,18 @@ export class StudentProfileChangeRequestService {
   ) {
     if (!changes.length) {
       throw new BadRequestException('No changes provided');
+    }
+
+    await this.assertStudentCanEditProfile(user.tid, studentId);
+
+    const window = await this.policy.getUpdateWindow(user.tid);
+    const bankVisible = BANK_SECTION_VISIBLE || window.bankSectionVisible;
+    for (const change of changes) {
+      if (change.sectionKey === 'bank' && !bankVisible) {
+        throw new BadRequestException(
+          'Bank details are not open for student update at this time.',
+        );
+      }
     }
 
     const snapshot = await this.getSectionSnapshot(
@@ -842,6 +886,20 @@ export class StudentProfileChangeRequestService {
         ? `Profile is ${completion.percent}% complete (minimum ${gates.minCompletionPercent}%). Please complete pending fields.`
         : null,
     };
+  }
+
+  async assertStudentCanEditProfile(tenantId: string, studentId: string) {
+    const access = await this.policy.evaluateProfileUpdateAccess(
+      tenantId,
+      studentId,
+    );
+    if (!access.canEdit) {
+      throw new ForbiddenException(
+        access.message ||
+          'The profile update period has ended. Please contact the College Office if you need to make any changes.',
+      );
+    }
+    return access;
   }
 
   private async refreshRequestStatus(

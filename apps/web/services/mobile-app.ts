@@ -18,6 +18,11 @@ export type MobileAppSettings = {
   studentDashboardConfig: Record<string, boolean>;
   staffDashboardConfig: Record<string, boolean>;
   brandingOverrides: Record<string, string>;
+  playStoreUrl?: string | null;
+  apkDownloadUrl?: string | null;
+  releaseNotes?: string | null;
+  featureFlags?: Record<string, boolean>;
+  configVersion?: number;
 };
 
 export async function fetchMobileAppSettings() {

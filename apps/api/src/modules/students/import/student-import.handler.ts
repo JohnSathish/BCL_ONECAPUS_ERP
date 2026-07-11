@@ -86,6 +86,10 @@ import {
   STUDENT_IMPORT_FIELD_REGISTRY,
 } from './student-import-field-registry';
 import { StudentImportProfileWriterService } from './student-import-profile-writer.service';
+import {
+  resolveStudentDefaultPassword,
+  resolveStudentPortalEmail,
+} from '../student-credentials.util';
 
 export type NormalizedStudentImportRow = {
   email: string;
@@ -358,7 +362,6 @@ type FyugpResolutionContext = {
 
 type StudentImportCommitCache = {
   studentRole: { id: string } | null;
-  defaultPasswordHash: string;
   shifts: Map<string, { id: string; campusId: string | null }>;
   batches: Map<
     string,
@@ -391,7 +394,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     },
     { key: 'rollNumber', header: 'Roll Number', required: false },
     { key: 'fullName', header: 'Full Name', required: true },
-    { key: 'email', header: 'Email', required: true },
+    { key: 'email', header: 'Email', required: false },
     { key: 'mobile', header: 'Mobile', required: false },
     { key: 'abcId', header: 'ABC_ID', required: false },
     { key: 'programme', header: 'Programme', required: true },
@@ -484,7 +487,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     ] = await Promise.all([
       this.prisma.programVersion.findMany({
         where: { tenantId, deletedAt: null, status: 'PUBLISHED' },
-        include: { program: { select: { code: true, name: true } } },
+        include: {
+          program: {
+            select: { code: true, name: true, departmentId: true },
+          },
+        },
       }),
       this.prisma.admissionBatch.findMany({
         where: { tenantId, deletedAt: null },
@@ -601,6 +608,15 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const deptByCode = new Map(
       departments.map((d) => [d.code.trim().toUpperCase(), d]),
     );
+    const deptById = new Map(departments.map((d) => [d.id, d]));
+    const pvDepartmentById = new Map<string, string>();
+    for (const pv of programVersions) {
+      const linkedDepartmentId = pv.program.departmentId;
+      if (!linkedDepartmentId) continue;
+      const linked = deptById.get(linkedDepartmentId);
+      if (!linked || !isAcademicDepartment(linked.departmentType)) continue;
+      pvDepartmentById.set(pv.id, linkedDepartmentId);
+    }
     const sessionByName = new Map(
       academicSessions.map((s) => [
         this.normalizeAcademicSession(s.name),
@@ -819,6 +835,8 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         streamByCode,
         shiftByCampusAndCode,
         deptByCode,
+        deptById,
+        pvDepartmentById,
         sessionByName,
         defaultCampusId: activeCampuses[0]?.id,
         regToStudent,
@@ -893,6 +911,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         string,
         { id: string; campusId: string | null; departmentType?: string | null }
       >;
+      deptById: Map<
+        string,
+        { id: string; campusId: string | null; departmentType?: string | null }
+      >;
+      pvDepartmentById: Map<string, string>;
       sessionByName: Map<string, string>;
       defaultCampusId?: string;
       regToStudent: Map<string, ExistingStudentRef>;
@@ -985,7 +1008,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         'Registration number is required (use Application Number if roll not assigned yet)',
       );
     if (!fullName) errors.push('Full name is required');
-    if (!email || !email.includes('@')) errors.push('Valid email is required');
+    if (email && !email.includes('@')) errors.push('Valid email is required');
+    if (!email && !rollNumber && !enrollmentNumber) {
+      errors.push(
+        'Email or roll/registration number is required for portal login',
+      );
+    }
     if (!programmeCode) errors.push('Programme code is required');
     if (!batchCode) errors.push('Batch code is required');
     if (!streamCode) errors.push('Stream code is required');
@@ -1033,11 +1061,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         ctx.fileRolls.add(rollKey);
       }
     }
-    if (email) {
-      const dbOwner = ctx.emailToStudentId.get(email);
-      const fileDup = ctx.fileEmails.has(email);
+    const portalEmail = resolveStudentPortalEmail({
+      email,
+      rollNumber,
+      enrollmentNumber,
+    });
+    if (portalEmail) {
+      const dbOwner = ctx.emailToStudentId.get(portalEmail);
+      const fileDup = ctx.fileEmails.has(portalEmail);
       if (fileDup) {
-        errors.push('Duplicate email');
+        errors.push('Duplicate email / login identity');
       } else if (dbOwner && dbOwner !== ownerId) {
         if (ctx.importMode === 'MERGE') {
           existingStudentId = existingStudentId ?? dbOwner;
@@ -1047,7 +1080,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           );
         }
       } else {
-        ctx.fileEmails.add(email);
+        ctx.fileEmails.add(portalEmail);
       }
     }
     if (aadhaar) {
@@ -1161,7 +1194,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       .trim()
       .toUpperCase();
     const department = deptCode ? ctx.deptByCode.get(deptCode) : undefined;
-    const departmentId = department?.id;
+    let departmentId = department?.id;
     if (deptCode && !departmentId) {
       errors.push(`Unknown department code: ${deptCode}`);
     } else if (department && !isAcademicDepartment(department.departmentType)) {
@@ -1169,7 +1202,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         `Department ${deptCode} is administrative and cannot be assigned to a student`,
       );
     }
-    const campusId = department?.campusId ?? ctx.defaultCampusId;
+    if (!departmentId && programVersionId) {
+      departmentId = ctx.pvDepartmentById.get(programVersionId);
+    }
+    const resolvedDepartment = departmentId
+      ? (department ?? ctx.deptById.get(departmentId))
+      : undefined;
+    const campusId = resolvedDepartment?.campusId ?? ctx.defaultCampusId;
     const shift =
       campusId && shiftCode
         ? ctx.shiftByCampusAndCode.get(`${campusId}:${shiftCode}`)
@@ -1423,7 +1462,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       streamId &&
       shift
         ? {
-            email,
+            email: portalEmail,
             enrollmentNumber,
             applicationNumber: applicationNumber || undefined,
             admissionNumber: admissionNumber || undefined,
@@ -1537,29 +1576,26 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const batchIds = [
       ...new Set(rows.map((row) => row.admissionBatchId).filter(Boolean)),
     ] as string[];
-    const [studentRole, defaultPasswordHash, shifts, batches] =
-      await Promise.all([
-        this.prisma.role.findFirst({
-          where: { tenantId, slug: 'student' },
-          select: { id: true },
-        }),
-        bcrypt.hash('Student@123', 12),
-        shiftIds.length
-          ? this.prisma.shift.findMany({
-              where: { tenantId, id: { in: shiftIds } },
-              select: { id: true, campusId: true },
-            })
-          : Promise.resolve([]),
-        batchIds.length
-          ? this.prisma.admissionBatch.findMany({
-              where: { tenantId, id: { in: batchIds } },
-              include: { entrySession: { select: { institutionId: true } } },
-            })
-          : Promise.resolve([]),
-      ]);
+    const [studentRole, shifts, batches] = await Promise.all([
+      this.prisma.role.findFirst({
+        where: { tenantId, slug: 'student' },
+        select: { id: true },
+      }),
+      shiftIds.length
+        ? this.prisma.shift.findMany({
+            where: { tenantId, id: { in: shiftIds } },
+            select: { id: true, campusId: true },
+          })
+        : Promise.resolve([]),
+      batchIds.length
+        ? this.prisma.admissionBatch.findMany({
+            where: { tenantId, id: { in: batchIds } },
+            include: { entrySession: { select: { institutionId: true } } },
+          })
+        : Promise.resolve([]),
+    ]);
     return {
       studentRole,
-      defaultPasswordHash,
       shifts: new Map(shifts.map((shift) => [shift.id, shift])),
       batches: new Map(batches.map((batch) => [batch.id, batch])),
       semesters: new Map(),
@@ -3994,7 +4030,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const existingUser = await this.prisma.user.findUnique({
       where: { tenantId_email: { tenantId, email: n.email } },
     });
-    const passwordHash = cache.defaultPasswordHash;
+    const defaultPassword = resolveStudentDefaultPassword({
+      rollNumber: n.rollNumber,
+      enrollmentNumber: n.enrollmentNumber,
+    });
+    const passwordHash = await bcrypt.hash(defaultPassword, 12);
+    const username = (n.rollNumber || n.enrollmentNumber).trim();
     const studentRole = cache.studentRole;
     const shift = n.shiftId ? cache.shifts.get(n.shiftId) : undefined;
     const batch = cache.batches.get(n.admissionBatchId);
@@ -4007,15 +4048,23 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       const user = existingUser
         ? await tx.user.update({
             where: { id: existingUser.id },
-            data: { passwordHash, isActive: true, deletedAt: null },
+            data: {
+              passwordHash,
+              isActive: true,
+              deletedAt: null,
+              mustResetPassword: true,
+              username,
+            },
           })
         : await tx.user.create({
             data: {
               tenantId,
               email: n.email,
+              username,
               passwordHash,
               emailVerifiedAt: new Date(),
               isActive: true,
+              mustResetPassword: true,
             },
           });
       if (studentRole) {
@@ -4058,7 +4107,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           tenantId,
           studentId: student.id,
           fullName: n.fullName,
-          email: n.email,
+          email: n.email.endsWith('@students.local') ? null : n.email,
           gender: n.gender,
           dateOfBirth: this.toValidDateOrNull(n.dateOfBirth),
           mobileNumber: n.mobileNumber,
@@ -4181,7 +4230,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       });
       const profileUpdates: Prisma.StudentProfileUpdateInput = {};
       if (n.fullName) profileUpdates.fullName = n.fullName;
-      if (n.email) profileUpdates.email = n.email;
+      if (n.email && !n.email.endsWith('@students.local')) {
+        profileUpdates.email = n.email;
+      }
       if (n.gender) profileUpdates.gender = n.gender;
       if (n.dateOfBirth) {
         const dob = this.toValidDateOrNull(n.dateOfBirth);
@@ -4214,7 +4265,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             tenantId,
             studentId,
             fullName: n.fullName,
-            email: n.email,
+            email: n.email.endsWith('@students.local') ? null : n.email,
             gender: n.gender,
             dateOfBirth: this.toValidDateOrNull(n.dateOfBirth),
             mobileNumber: n.mobileNumber,

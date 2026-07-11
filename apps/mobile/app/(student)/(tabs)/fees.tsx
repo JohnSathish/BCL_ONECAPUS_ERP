@@ -9,12 +9,19 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { completeFeeCheckout, isExpoGoClient } from '@/payments/checkout';
 import {
   downloadAndShareReceiptPdf,
   fetchMyFeeAccount,
   initiateMyFeePayment,
 } from '@/services/fees';
+import {
+  fetchExamFeeSessions,
+  fetchMyExamApplications,
+  type ExamApplication,
+  type ExamFeeSession,
+} from '@/services/examination-fees';
 import type {
   AdmissionCycleStatus,
   MonthlyTrackerMonth,
@@ -23,6 +30,7 @@ import type {
 } from '@/types/fees';
 import { formatInr } from '@/utils/currency';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
+import { studentTheme } from '@/components/student-portal/theme';
 
 function classifyPayable(item: PayableFeeItem) {
   const text = `${item.label} ${item.demandType ?? ''}`.toLowerCase();
@@ -32,6 +40,7 @@ function classifyPayable(item: PayableFeeItem) {
 }
 
 export default function StudentFeesScreen() {
+  const router = useRouter();
   const [account, setAccount] = useState<StudentFeeAccount | null>(null);
   const [onlineEnabled, setOnlineEnabled] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -40,6 +49,8 @@ export default function StudentFeesScreen() {
   const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const [activeExamSession, setActiveExamSession] = useState<ExamFeeSession | null>(null);
+  const [examApplication, setExamApplication] = useState<ExamApplication | null>(null);
 
   const payables = account?.payableItems ?? [];
   const allowAdvance = account?.studentPortal?.allowAdvanceMonthlyPayment ?? false;
@@ -71,10 +82,17 @@ export default function StudentFeesScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const acct = await fetchMyFeeAccount();
+      const [acct, sessions, examApps] = await Promise.all([
+        fetchMyFeeAccount(),
+        fetchExamFeeSessions().catch(() => [] as ExamFeeSession[]),
+        fetchMyExamApplications().catch(() => [] as ExamApplication[]),
+      ]);
       setAccount(acct);
       const portal = acct.studentPortal;
       setOnlineEnabled(Boolean(portal?.onlineEnabled) && portal?.mobileRazorpayEnabled !== false);
+      const active = sessions.find((s) => String(s.status).toUpperCase() === 'ACTIVE') ?? null;
+      setActiveExamSession(active);
+      setExamApplication(examApps[0] ?? null);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to load fees');
       setSuccess(false);
@@ -246,6 +264,27 @@ export default function StudentFeesScreen() {
               warn={account.monthlyFeeStatus?.status === 'PENDING'}
             />
           </View>
+
+          {activeExamSession ? (
+            <Pressable
+              style={styles.examFeeCard}
+              onPress={() => router.push('/(student)/examination-fees' as never)}
+            >
+              <View style={styles.examFeeCardBody}>
+                <Text style={styles.examFeeEyebrow}>Semester examination</Text>
+                <Text style={styles.examFeeTitle}>Semester exam fees</Text>
+                <Text style={styles.examFeeHint}>
+                  {activeExamSession.name
+                    ? `${activeExamSession.name} is open for payment.`
+                    : 'NEHU / college exam fee payment is open.'}
+                  {examApplication?.status
+                    ? ` · Your application: ${examApplication.status.replace(/_/g, ' ')}`
+                    : ''}
+                </Text>
+              </View>
+              <Text style={styles.examFeeCta}>Open →</Text>
+            </Pressable>
+          ) : null}
 
           {(account.admissionCycles?.length ?? 0) > 0 ? (
             <View style={styles.section}>
@@ -656,6 +695,27 @@ const styles = StyleSheet.create({
   },
   expoGoBannerTitle: { fontSize: 13, fontWeight: '700', color: '#92400e' },
   expoGoBannerText: { fontSize: 12, lineHeight: 17, color: '#78350f' },
+  examFeeCard: {
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  examFeeCardBody: { flex: 1, gap: 2 },
+  examFeeEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: studentTheme.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  examFeeTitle: { fontSize: 16, fontWeight: '700', color: studentTheme.text },
+  examFeeHint: { fontSize: 12, lineHeight: 17, color: studentTheme.textMuted, marginTop: 2 },
+  examFeeCta: { fontSize: 14, fontWeight: '700', color: studentTheme.primary },
   section: {
     borderWidth: 1,
     borderColor: '#dbeafe',

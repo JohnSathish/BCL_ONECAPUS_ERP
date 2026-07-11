@@ -199,6 +199,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
           label: item.label,
           href: item.href,
           icon: item.icon,
+          ...(item.children?.length ? { children: item.children } : {}),
         })),
       },
     ];

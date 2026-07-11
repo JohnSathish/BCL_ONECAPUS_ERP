@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, User } from 'lucide-react';
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, User } from 'lucide-react';
 import { CampusSwitcher } from '@/components/dashboard/campus-switcher';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { NotificationPanel } from '@/components/dashboard/notification-panel';
@@ -23,7 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout } from '@/services/auth';
@@ -157,24 +156,6 @@ export function EnterpriseTopbar({
             <LicenseStatusBadge />
           </div>
         ) : null}
-
-        <div
-          className={cn(
-            'relative hidden min-w-0 flex-1 lg:block xl:max-w-[320px]',
-            isAdminChrome && 'lg:max-w-[280px]',
-          )}
-        >
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            readOnly
-            onFocus={() =>
-              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
-            }
-            placeholder="Search students, staff, fees, reports…"
-            className="h-9 w-full min-w-0 cursor-pointer rounded-xl border-border/80 bg-card/60 pl-9 text-sm backdrop-blur"
-            aria-label="Open search"
-          />
-        </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           {portalRole === 'admin' ? <WorkspaceSwitcher /> : null}

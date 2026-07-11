@@ -1,6 +1,7 @@
 export type AuthUserPayload = {
   id: string;
   email: string;
+  displayName?: string;
   tenantId: string;
   tenantSlug: string;
   roles: string[];

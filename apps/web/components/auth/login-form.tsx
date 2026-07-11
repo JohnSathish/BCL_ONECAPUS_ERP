@@ -32,6 +32,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
   const setSession = useAuthStore((s) => s.setSession);
   const setPrefs = useAuthStore((s) => s.setPrefs);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [context, setContext] = useState<LoginContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
@@ -47,6 +48,13 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
     [],
   );
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('reset') === '1') {
+      setInfo('Password updated. Sign in with your new password.');
+    }
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -57,7 +65,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: isDemoLoginWorkspaceEnabled() ? 'admin@demo.edu' : '',
+      identifier: isDemoLoginWorkspaceEnabled() ? 'admin@demo.edu' : '',
       password: isDemoLoginWorkspaceEnabled() ? 'Admin@123' : '',
       rememberMe: false,
       challengeAnswer: '',
@@ -69,7 +77,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
 
   useEffect(() => {
     if (!isDemoLoginWorkspaceEnabled()) {
-      setValue('email', '');
+      setValue('identifier', '');
       setValue('password', '');
     }
   }, [setValue]);
@@ -139,8 +147,9 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         return;
       }
       try {
+        const trimmed = values.identifier.trim();
         const session = await login({
-          email: values.email,
+          ...(trimmed.includes('@') ? { email: trimmed.toLowerCase() } : { identifier: trimmed }),
           password: values.password,
           challengeToken: challenge.token,
           challengeAnswer: challengeAnswerNum,
@@ -150,6 +159,10 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         setPrefs({ rememberMe: values.rememberMe });
         useAuthStore.getState().setBootstrapping(false);
         tokenRefreshManager.scheduleProactiveRefresh(session);
+        if (session.user.mustResetPassword) {
+          window.location.assign('/change-password');
+          return;
+        }
         const destination =
           postLoginPath ?? resolveHomePath(session.user.roles, session.user.permissions ?? []);
         // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
@@ -210,7 +223,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
 
   const fillDemoCredentials = useCallback(
     (email: string, password: string) => {
-      setValue('email', email, { shouldValidate: true });
+      setValue('identifier', email, { shouldValidate: true });
       setValue('password', password, { shouldValidate: true });
       setError(null);
       setVerificationError(null);
@@ -247,6 +260,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
               errors={errors}
               isSubmitting={isSubmitting}
               formError={error}
+              formInfo={info}
               verificationError={verificationError}
               passwordValue={passwordValue}
               challengeAnswer={challengeAnswer}

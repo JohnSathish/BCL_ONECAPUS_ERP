@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -18,6 +19,11 @@ import { buildInstitutionalExcelReport } from '../../common/reports';
 import {
   BulkReviewProfileChangesDto,
   ProfileSoftGateSettingsDto,
+  ProfileUpdateWindowDto,
+  ReopenAllProfileUpdateDto,
+  ReopenStudentByRollDto,
+  ReopenStudentProfileUpdateDto,
+  RevokeStudentReopenByRollDto,
   ProfileVerificationQueryDto,
   ReviewProfileChangeDto,
   UpsertProfileUpdatePolicyDto,
@@ -180,6 +186,109 @@ export class StudentProfileVerificationController {
     @Body() dto: ProfileSoftGateSettingsDto,
   ) {
     return this.policy.updateSoftGates(user.tid, dto);
+  }
+
+  @Get('update-window')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  getUpdateWindow(@CurrentUser() user: JwtUser) {
+    return this.policy.getUpdateWindow(user.tid);
+  }
+
+  @Put('update-window')
+  @RequireAnyPermission('students:profile-policy', 'students:manage')
+  updateUpdateWindow(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ProfileUpdateWindowDto,
+  ) {
+    return this.policy.updateUpdateWindow(user.tid, dto);
+  }
+
+  @Post('reopen-all')
+  @RequireAnyPermission('students:profile-policy', 'students:manage')
+  reopenAll(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReopenAllProfileUpdateDto,
+  ) {
+    return this.policy.reopenAll(user.tid, dto);
+  }
+
+  @Post('reopen-student')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  reopenStudentByRoll(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReopenStudentByRollDto,
+  ) {
+    return this.policy.reopenStudentByRoll(
+      user.tid,
+      dto.rollNumber,
+      { reopenUntil: dto.reopenUntil, reason: dto.reason },
+      user.sub,
+    );
+  }
+
+  @Post('revoke-student-reopen')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  revokeStudentReopenByRoll(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: RevokeStudentReopenByRollDto,
+  ) {
+    return this.policy.revokeStudentReopenByRoll(
+      user.tid,
+      dto.rollNumber,
+      user.sub,
+    );
+  }
+
+  @Post('students/:studentId/reopen')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  reopenStudent(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Body() dto: ReopenStudentProfileUpdateDto,
+  ) {
+    return this.policy.reopenStudentByRoll(user.tid, studentId, dto, user.sub);
+  }
+
+  @Delete('students/:studentId/reopen')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  revokeStudentReopen(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.policy.revokeStudentReopenByRoll(user.tid, studentId, user.sub);
+  }
+
+  @Get('students/:studentId/update-access')
+  @RequireAnyPermission(
+    'students:profile-policy',
+    'students:profile-verify',
+    'students:manage',
+  )
+  studentUpdateAccess(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.policy.evaluateProfileUpdateAccess(user.tid, studentId);
   }
 
   @Post('items/:id/review')

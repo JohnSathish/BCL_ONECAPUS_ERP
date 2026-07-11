@@ -1,15 +1,23 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
-const MAX_FAILURES = 10;
+const MAX_FAILURES = 5;
 const WINDOW_MS = 15 * 60 * 1000;
-const LOCK_MS = 30 * 60 * 1000;
+const LOCK_MS = 15 * 60 * 1000;
+
+const LOCK_MESSAGE =
+  'Account locked due to too many failed attempts. Try again in 15 minutes or contact your administrator.';
+
 @Injectable()
 export class LoginAttemptService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeKey(value: string) {
+    return value.trim().toLowerCase();
+  }
+
   async assertNotLocked(tenantId: string, ipAddress: string, email: string) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = this.normalizeKey(email);
     const record = await this.prisma.loginAttempt.findUnique({
       where: {
         tenantId_ipAddress_email: {
@@ -21,15 +29,12 @@ export class LoginAttemptService {
     });
 
     if (record?.lockedUntil && record.lockedUntil > new Date()) {
-      throw new HttpException(
-        'Too many attempts. Try again in 30 minutes.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new HttpException(LOCK_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 
   async recordFailure(tenantId: string, ipAddress: string, email: string) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = this.normalizeKey(email);
     const now = new Date();
     const existing = await this.prisma.loginAttempt.findUnique({
       where: {
@@ -72,17 +77,59 @@ export class LoginAttemptService {
     });
 
     if (lockedUntil && lockedUntil > now) {
-      throw new HttpException(
-        'Too many attempts. Try again in 30 minutes.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new HttpException(LOCK_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 
   async resetOnSuccess(tenantId: string, ipAddress: string, email: string) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = this.normalizeKey(email);
     await this.prisma.loginAttempt.deleteMany({
       where: { tenantId, ipAddress, email: normalizedEmail },
     });
+  }
+
+  /** Clear lockouts for every identifier tied to a portal user (all IPs). */
+  async unlockForUser(tenantId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId, deletedAt: null },
+      select: {
+        email: true,
+        username: true,
+        student: {
+          select: {
+            rollNumber: true,
+            enrollmentNumber: true,
+            universityRollNumber: true,
+            admissionNumber: true,
+            applicationNumber: true,
+          },
+        },
+      },
+    });
+    if (!user) return { cleared: 0 };
+
+    const identifiers = [
+      user.email,
+      user.username,
+      user.student?.rollNumber,
+      user.student?.enrollmentNumber,
+      user.student?.universityRollNumber,
+      user.student?.admissionNumber,
+      user.student?.applicationNumber,
+    ]
+      .filter((v): v is string => Boolean(v?.trim()))
+      .map((v) => this.normalizeKey(v));
+
+    const unique = [...new Set(identifiers)];
+    if (!unique.length) return { cleared: 0 };
+
+    const result = await this.prisma.loginAttempt.deleteMany({
+      where: {
+        tenantId,
+        email: { in: unique },
+      },
+    });
+
+    return { cleared: result.count };
   }
 }

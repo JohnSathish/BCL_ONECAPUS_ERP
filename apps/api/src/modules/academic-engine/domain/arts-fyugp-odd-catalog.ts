@@ -59,8 +59,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Indian Economy',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -82,8 +81,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Inclusive Education I',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -105,8 +103,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Indian Writings in English',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -125,8 +122,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Rabindra Sahitya',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -148,8 +144,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Geography and Environment',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -171,8 +166,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Modern World (1815 to 1945 C.E.)',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -191,8 +185,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Philosophy of Value',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -214,8 +207,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Government and Politics in Northeast India',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -234,8 +226,7 @@ export const ARTS_FYUGP_DEPARTMENTS = [
       ],
       sem5Minor: 'Sociology of Environment',
       sem5MinorCode: '302',
-      internship:
-        'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+      internship: 'Internship',
       internshipCode: '303',
     },
   },
@@ -671,8 +662,7 @@ export const ARTS_ODD_PAPER_BASKET: ArtsPaperBasketRow[] = [
     creditsEach: 4,
     codePattern: '{DEPT}-303 or {DEPT}-304',
     exampleCode: 'ECO-303',
-    exampleTitle:
-      'Internship / Apprenticeship / Community Engagement and Service',
+    exampleTitle: 'Internship',
   },
 ];
 

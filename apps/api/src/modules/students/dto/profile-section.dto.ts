@@ -83,6 +83,7 @@ export class BoardSubjectMarkDto {
   @IsString() subjectName!: string;
   @IsOptional() @IsInt() marksObtained?: number;
   @IsOptional() @IsInt() maxMarks?: number;
+  @IsOptional() @IsString() grade?: string;
 }
 
 export class UpdateBoardExamSectionDto {

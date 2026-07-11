@@ -51,6 +51,11 @@ export default function StudentProfileScreen() {
             label="Complete / update profile"
             onPress={() => router.push('/(student)/complete-profile' as never)}
           />
+          <LinkRow label="Feedback" onPress={() => router.push('/(student)/feedback' as never)} />
+          <LinkRow
+            label="Certificates"
+            onPress={() => router.push('/(student)/certificates' as never)}
+          />
           <LinkRow
             label="Notification preferences"
             onPress={() => router.push('/(student)/notification-preferences' as never)}

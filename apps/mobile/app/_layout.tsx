@@ -5,8 +5,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthFailureRedirect } from '@/hooks/useAuthFailureRedirect';
 import {
   attachPushResponseListener,
+  consumeInitialPushResponse,
   detachPushResponseListener,
+  ensureAndroidDefaultChannel,
   refreshPushRegistrationIfLoggedIn,
+  requestPushPermissions,
 } from '@/services/push-notifications';
 
 export default function RootLayout() {
@@ -14,7 +17,10 @@ export default function RootLayout() {
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
+    void ensureAndroidDefaultChannel();
+    void requestPushPermissions();
     attachPushResponseListener();
+    void consumeInitialPushResponse();
     void refreshPushRegistrationIfLoggedIn();
 
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {

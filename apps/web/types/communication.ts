@@ -207,6 +207,8 @@ export type UserNotification = {
   dismissedAt?: string | null;
   archivedAt?: string | null;
   createdAt: string;
+  metadata?: Record<string, unknown> | null;
+  campaignId?: string | null;
 };
 
 export type CommunicationApproval = {

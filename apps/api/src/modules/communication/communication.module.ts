@@ -20,6 +20,7 @@ import { UserNotificationsService } from './services/user-notifications.service'
 import { CommunicationNotificationProcessor } from './processors/communication-notification.processor';
 import { FcmPushService } from './services/fcm-push.service';
 import { CommunicationAssetsService } from './services/communication-assets.service';
+import { BrandedEmailLayoutService } from './services/branded-email-layout.service';
 
 @Module({
   controllers: [CommunicationController],
@@ -39,6 +40,7 @@ import { CommunicationAssetsService } from './services/communication-assets.serv
     CommunicationSmsService,
     CommunicationWhatsAppService,
     CommunicationTemplateRendererService,
+    BrandedEmailLayoutService,
     CommunicationTriggerService,
     CommunicationSchedulerService,
     UserNotificationsService,
@@ -53,6 +55,7 @@ import { CommunicationAssetsService } from './services/communication-assets.serv
     CommunicationSmsService,
     CommunicationWhatsAppService,
     FcmPushService,
+    BrandedEmailLayoutService,
   ],
 })
 export class CommunicationModule {}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,8 +25,10 @@ import {
   resolveMobileDeepLink,
   isGenericNotificationLink,
 } from '@/services/notification-deep-link';
-import { trackPushOpened } from '@/services/push-notifications';
+import { openNotificationAttachment, trackPushOpened } from '@/services/push-notifications';
 import type { UserNotification } from '@/types/notifications';
+import { attachmentUrlsFromMeta } from '@/utils/notification-attachments';
+import { isSupportedRemoteImageUrl } from '@/utils/upload-asset-url';
 
 function formatWhen(iso: string) {
   const d = new Date(iso);
@@ -110,13 +113,55 @@ export function NotificationCenterPanel({
     }
     void trackPushOpened(item.link ?? undefined);
 
+    const { imageUrl, pdfUrl, files, all } = attachmentUrlsFromMeta(item);
+    if (pdfUrl) {
+      const opened = await openNotificationAttachment(pdfUrl, 'PDF attachment');
+      if (opened) return;
+    }
+    if (files[0]) {
+      const opened = await openNotificationAttachment(
+        files[0].url,
+        files[0].name ?? 'File attachment',
+      );
+      if (opened) return;
+    }
+
     const href = resolveMobileDeepLink(item.link);
     const hrefStr = href ? String(href) : '';
     const landsOnInbox =
       !href || hrefStr.includes('/notifications') || isGenericNotificationLink(item.link);
 
-    // Campaign / generic links: show the message instead of a no-op navigate.
+    // Campaign / generic links: show the message (and image if present).
     if (landsOnInbox) {
+      if (imageUrl && isSupportedRemoteImageUrl(imageUrl)) {
+        Alert.alert(item.title || 'Notification', item.body?.trim() || 'Attachment available.', [
+          { text: 'View image', onPress: () => void openNotificationAttachment(imageUrl, 'Image') },
+          ...(all.length > 1
+            ? [
+                {
+                  text: 'Open attachment',
+                  onPress: () =>
+                    void openNotificationAttachment(
+                      all.find((a) => a.type !== 'image')?.url ?? imageUrl,
+                      'Attachment',
+                    ),
+                },
+              ]
+            : []),
+          { text: 'OK' },
+        ]);
+        return;
+      }
+      if (all.length) {
+        Alert.alert(item.title || 'Notification', item.body?.trim() || 'Attachment available.', [
+          {
+            text: 'Open attachment',
+            onPress: () => void openNotificationAttachment(all[0].url, all[0].name ?? 'Attachment'),
+          },
+          { text: 'OK' },
+        ]);
+        return;
+      }
       Alert.alert(item.title || 'Notification', item.body?.trim() || 'No additional details.');
       return;
     }
@@ -228,6 +273,7 @@ export function NotificationCenterPanel({
             item.metadata && typeof item.metadata === 'object'
               ? String((item.metadata as Record<string, unknown>).category ?? '')
               : '';
+          const { imageUrl, pdfUrl, files, all } = attachmentUrlsFromMeta(item);
           return (
             <View
               key={item.id}
@@ -253,10 +299,32 @@ export function NotificationCenterPanel({
                     {item.body}
                   </Text>
                 ) : null}
+                {imageUrl && isSupportedRemoteImageUrl(imageUrl) ? (
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.attachmentImage}
+                    resizeMode="cover"
+                  />
+                ) : null}
+                {pdfUrl ? (
+                  <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>
+                    PDF attachment — tap to open
+                  </Text>
+                ) : null}
+                {files.map((f) => (
+                  <Text
+                    key={f.url}
+                    style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}
+                  >
+                    {f.name ?? 'File'} — tap to open
+                  </Text>
+                ))}
+                {!pdfUrl && !files.length && all.some((a) => a.type === 'file') ? null : null}
                 <Text style={[styles.when, { color: theme.textSubtle ?? theme.textMuted }]}>
                   {formatWhen(item.createdAt)}
                   {category ? ` · ${category}` : ''}
                   {item.type ? ` · ${item.type}` : ''}
+                  {all.length ? ` · ${all.length} attachment${all.length === 1 ? '' : 's'}` : ''}
                 </Text>
               </Pressable>
               <View style={styles.actions}>
@@ -315,6 +383,13 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   title: { flex: 1, fontSize: 14, fontWeight: '800' },
   body: { fontSize: 13, lineHeight: 18 },
+  attachmentImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+    marginTop: 4,
+  },
   when: { fontSize: 11 },
   dot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   actions: { flexDirection: 'row', gap: 16, marginTop: 2 },

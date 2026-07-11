@@ -57,8 +57,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated) return;
+    if (!session?.user?.mustResetPassword) return;
+    if (
+      pathname === '/change-password' ||
+      pathname === '/login' ||
+      pathname === '/forgot-password' ||
+      pathname.startsWith('/admissions-portal')
+    ) {
+      return;
+    }
+    router.replace('/change-password');
+  }, [hasHydrated, pathname, router, session?.user?.mustResetPassword]);
 
-    if (pathname === '/login') {
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    if (
+      pathname === '/login' ||
+      pathname === '/change-password' ||
+      pathname === '/forgot-password'
+    ) {
       initialBootstrapDoneRef.current = false;
       setBootstrapping(false);
       return;

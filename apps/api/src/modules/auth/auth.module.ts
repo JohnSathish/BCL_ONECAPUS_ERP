@@ -38,6 +38,6 @@ import { StepUpController } from './step-up.controller';
     MfaService,
     StepUpService,
   ],
-  exports: [AuthService, MfaService, StepUpService],
+  exports: [AuthService, MfaService, StepUpService, LoginAttemptService],
 })
 export class AuthModule {}

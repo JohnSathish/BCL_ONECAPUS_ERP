@@ -14,7 +14,12 @@ import {
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { withApiStartupRetry } from '@/lib/http/wait-for-api';
-import { fetchLmsAdminDashboard, fetchLmsWorkspaces, provisionLmsWorkspaces } from '@/services/lms';
+import {
+  fetchLmsAdminDashboard,
+  fetchLmsWorkspaces,
+  formatLmsWorkspaceMeta,
+  provisionLmsWorkspaces,
+} from '@/services/lms';
 import { cn } from '@/utils/cn';
 
 export function LmsAdminDashboard() {
@@ -92,15 +97,15 @@ export function LmsAdminDashboard() {
             <Link
               key={ws.id}
               href={`/admin/academics/lms/workspaces/${ws.id}`}
-              className="flex items-center justify-between rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40"
+              className="rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40"
             >
-              <span>
+              <div className="flex items-start justify-between gap-2">
                 <span className="font-medium">{ws.title}</span>
-                <span className="ml-2 text-xs text-muted-foreground">Sem {ws.semesterNo}</span>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {ws._count?.materials ?? 0} materials
-              </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {ws._count?.materials ?? 0} materials
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{formatLmsWorkspaceMeta(ws)}</p>
             </Link>
           ))}
           {!workspaces.data?.data?.length ? (

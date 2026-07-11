@@ -28,8 +28,9 @@ export const STUDENT_IMPORT_MODES = ['CREATE', 'MERGE'] as const;
 export type StudentImportMode = (typeof STUDENT_IMPORT_MODES)[number];
 
 export class CreateStudentDto {
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
 
   @IsString()
   @MinLength(2)
@@ -45,7 +46,7 @@ export class CreateStudentDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MinLength(1)
   password?: string;
 }
 
@@ -97,8 +98,9 @@ export class EnrollFromApplicationDto {
 }
 
 export class AdmitStudentDto {
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
 
   @IsOptional()
   @IsString()

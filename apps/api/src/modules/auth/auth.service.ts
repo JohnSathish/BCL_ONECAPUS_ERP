@@ -118,7 +118,13 @@ export class AuthService {
   }
 
   private buildUserPayload(
-    user: { id: string; email: string; tenantId: string },
+    user: {
+      id: string;
+      email: string;
+      tenantId: string;
+      mustResetPassword?: boolean | null;
+      displayName?: string | null;
+    },
     tenantSlug: string,
     roles: string[],
     permissions: string[],
@@ -129,6 +135,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      displayName: user.displayName ?? undefined,
       tenantId: user.tenantId,
       tenantSlug,
       roles,
@@ -140,11 +147,18 @@ export class AuthService {
       impersonatedBy: impersonation?.adminUserId,
       impersonationSessionId: impersonation?.sessionId,
       isImpersonating: !!impersonation,
+      mustResetPassword: user.mustResetPassword ?? false,
     };
   }
 
   private async issueTokens(
-    user: { id: string; email: string; tenantId: string },
+    user: {
+      id: string;
+      email: string;
+      tenantId: string;
+      mustResetPassword?: boolean | null;
+      displayName?: string | null;
+    },
     tenantSlug: string,
     roles: string[],
     permissions: string[],
@@ -338,6 +352,17 @@ export class AuthService {
     }
 
     const key = trimmed.toUpperCase();
+    const byUsername = await this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        username: { equals: trimmed, mode: 'insensitive' },
+        deletedAt: null,
+        isActive: true,
+      },
+      include,
+    });
+    if (byUsername) return byUsername;
+
     const student = await this.prisma.student.findFirst({
       where: {
         tenantId,
@@ -554,13 +579,7 @@ export class AuthService {
       },
     });
 
-    return {
-      ...session,
-      user: {
-        ...session.user,
-        mustResetPassword: user.mustResetPassword ?? false,
-      },
-    };
+    return session;
   }
 
   async refresh(

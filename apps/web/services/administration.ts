@@ -59,10 +59,20 @@ export async function suspendPortalUser(id: string) {
 
 export async function resetPortalUserPassword(
   id: string,
-  payload?: { newPassword?: string; forceReset?: boolean },
+  payload?: { newPassword?: string; forceReset?: boolean; resetToRoll?: boolean },
 ) {
   const { data } = await api.post(`/v1/admin/users/${id}/reset-password`, payload ?? {});
   return data as { success: boolean; generatedPassword?: string };
+}
+
+export async function forcePortalUserPasswordReset(id: string) {
+  const { data } = await api.post(`/v1/admin/users/${id}/force-password-reset`);
+  return data as { success: boolean };
+}
+
+export async function unlockPortalUserLogin(id: string) {
+  const { data } = await api.post(`/v1/admin/users/${id}/unlock-login`);
+  return data as { success: boolean; clearedAttempts?: number };
 }
 
 export async function bulkActivateUsers(userIds: string[]) {

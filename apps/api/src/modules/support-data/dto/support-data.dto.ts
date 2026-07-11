@@ -27,6 +27,14 @@ export class SupportDataListQueryDto {
   @IsOptional()
   @IsUUID()
   institutionId?: string;
+
+  @IsOptional()
+  @IsString()
+  boardType?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
 
 export class SupportDataCreateDto {

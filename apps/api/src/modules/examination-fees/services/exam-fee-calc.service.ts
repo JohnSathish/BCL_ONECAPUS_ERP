@@ -66,7 +66,7 @@ export class ExamFeeCalcService {
       where: { id: studentId, tenantId, deletedAt: null },
       include: {
         department: { select: { id: true, name: true } },
-        user: { select: { fullName: true, email: true } },
+        user: { select: { displayName: true, email: true } },
         academicStanding: {
           select: { currentSemesterSequence: true },
         },

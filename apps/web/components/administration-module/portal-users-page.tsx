@@ -25,10 +25,12 @@ import {
   fetchPortalUsers,
   fetchRoles,
   fetchUserSummary,
+  forcePortalUserPasswordReset,
   impersonateUser,
   resetPortalUserPassword,
   sendUserCredentials,
   suspendPortalUser,
+  unlockPortalUserLogin,
   updatePortalUser,
 } from '@/services/administration';
 import { storeAdminSessionBackup } from '@/components/administration-module/impersonation-banner';
@@ -202,8 +204,30 @@ export function PortalUsersPage() {
                 invalidate();
               }}
               onResetPassword={async (u) => {
-                const res = await resetPortalUserPassword(u.id);
+                const useRoll = u.hasStudentProfile
+                  ? window.confirm(
+                      'Reset this student password to their college roll number?\n\nOK = roll number (recommended)\nCancel = generate a random password',
+                    )
+                  : false;
+                const res = await resetPortalUserPassword(
+                  u.id,
+                  u.hasStudentProfile
+                    ? { forceReset: true, resetToRoll: useRoll }
+                    : { forceReset: true },
+                );
                 alert(`New password: ${res.generatedPassword ?? '(see audit log)'}`);
+              }}
+              onForcePasswordReset={async (u) => {
+                await forcePortalUserPasswordReset(u.id);
+                alert('User must change password on next login.');
+                invalidate();
+              }}
+              onUnlockLogin={async (u) => {
+                const res = await unlockPortalUserLogin(u.id);
+                alert(
+                  `Account unlocked. Cleared ${res.clearedAttempts ?? 0} failed attempt record(s).`,
+                );
+                invalidate();
               }}
               onSendCredentials={async (u) => {
                 const res = await sendUserCredentials(u.id);

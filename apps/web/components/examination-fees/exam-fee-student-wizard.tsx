@@ -277,8 +277,7 @@ export function ExamFeeStudentWizard({
                           </div>
                           <Button
                             type="button"
-                            className="sm:col-span-2"
-                            variant="secondary"
+                            className="sm:col-span-2 bg-emerald-600 text-white hover:bg-emerald-700"
                             onClick={async () => {
                               setError(null);
                               try {
@@ -319,13 +318,20 @@ export function ExamFeeStudentWizard({
 
                 {step === 2 ? (
                   <div className="space-y-4">
-                    <Card className="shadow-none">
+                    <Card className="border-amber-200 bg-amber-50/80 shadow-none">
                       <CardContent className="space-y-3 p-4">
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm font-medium text-amber-950">
                           Review the fee summary, then confirm your declaration before payment.
                         </p>
-                        <div className="flex items-start justify-between gap-3 rounded-xl border p-3">
-                          <div className="text-sm">
+                        <div
+                          className={cn(
+                            'flex items-start justify-between gap-3 rounded-xl border p-3',
+                            declaration
+                              ? 'border-emerald-300 bg-emerald-50'
+                              : 'border-amber-300 bg-white',
+                          )}
+                        >
+                          <div className="text-sm text-amber-950">
                             I declare that all selected backlog papers are correct. I understand
                             that incorrect subject selection may lead to rejection by the
                             university.
@@ -361,7 +367,11 @@ export function ExamFeeStudentWizard({
                         </Button>
                       ) : (
                         <Button onClick={() => setStep(3)}>
-                          Proceed to payment
+                          {['PAID', 'MANUAL_PAID', 'UNDER_VERIFICATION', 'APPROVED'].includes(
+                            String(app.status).toUpperCase(),
+                          ) || (app.receipts?.length ?? 0) > 0
+                            ? 'View payment & receipt'
+                            : 'Proceed to payment'}
                           <ChevronRight className="ml-1 h-4 w-4" />
                         </Button>
                       )}
@@ -386,11 +396,51 @@ export function ExamFeeStudentWizard({
                         {paying ? 'Opening payment…' : `Pay ${money(app.totalFee)} securely`}
                       </Button>
                     ) : (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                        Application status: <strong>{app.status}</strong>
+                      <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-950">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {['PAID', 'MANUAL_PAID', 'UNDER_VERIFICATION', 'APPROVED'].includes(
+                                String(app.status).toUpperCase(),
+                              )
+                                ? 'Payment received'
+                                : 'Application updated'}
+                            </p>
+                            <p>
+                              Status: <strong>{String(app.status).replace(/_/g, ' ')}</strong>
+                              {['UNDER_VERIFICATION', 'APPROVED'].includes(
+                                String(app.status).toUpperCase(),
+                              )
+                                ? ' — your payment is being verified by the college.'
+                                : null}
+                            </p>
+                            <p className="text-emerald-800">
+                              Amount paid: <strong>{money(app.totalFee)}</strong>
+                            </p>
+                          </div>
+                        </div>
+                        {(app.receipts ?? [])[0] ? (
+                          <Button
+                            className="w-full bg-emerald-700 text-white hover:bg-emerald-800"
+                            onClick={async () => {
+                              const res = await api.get(examReceiptPdfUrl(app.receipts[0].id), {
+                                responseType: 'blob',
+                              });
+                              window.open(URL.createObjectURL(res.data), '_blank');
+                            }}
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Download receipt PDF
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-emerald-800">
+                            Receipt will appear here once it has been generated.
+                          </p>
+                        )}
                       </div>
                     )}
-                    {(app.receipts ?? [])[0] ? (
+                    {app.status === 'AWAITING_PAYMENT' && (app.receipts ?? [])[0] ? (
                       <Button
                         variant="outline"
                         onClick={async () => {
@@ -404,10 +454,12 @@ export function ExamFeeStudentWizard({
                         Download / reprint receipt
                       </Button>
                     ) : null}
-                    <Button variant="ghost" onClick={() => setStep(2)}>
-                      <ChevronLeft className="mr-1 h-4 w-4" />
-                      Back
-                    </Button>
+                    {app.status === 'AWAITING_PAYMENT' ? (
+                      <Button variant="ghost" onClick={() => setStep(2)}>
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

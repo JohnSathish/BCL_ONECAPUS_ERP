@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  identifier: z
+    .string()
+    .min(2, 'Enter your college roll number or email')
+    .max(120, 'Identifier is too long'),
+  password: z.string().min(1, 'Enter your password'),
   rememberMe: z.boolean().optional(),
   challengeAnswer: z
     .string()

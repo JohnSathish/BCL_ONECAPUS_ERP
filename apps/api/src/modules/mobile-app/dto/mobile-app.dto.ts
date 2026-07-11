@@ -72,6 +72,22 @@ export class UpdateMobileAppSettingsDto {
   @IsOptional()
   @IsObject()
   brandingOverrides?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  playStoreUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  apkDownloadUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  releaseNotes?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  featureFlags?: Record<string, boolean>;
 }
 
 export class RegisterDeviceDto {

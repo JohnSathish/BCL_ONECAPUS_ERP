@@ -5,7 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Megaphone } from 'lucide-react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
-import { fetchLmsMyDashboard, fetchLmsMyWorkspaces, type LmsWorkspace } from '@/services/lms';
+import {
+  fetchLmsMyDashboard,
+  fetchLmsMyWorkspaces,
+  formatLmsWorkspaceMeta,
+  type LmsWorkspace,
+} from '@/services/lms';
 import { LmsWorkspaceShell } from '@/components/lms-module/lms-workspace-shell';
 
 type Props = {
@@ -86,15 +91,22 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
             <Link
               key={ws.id}
               href={`${role === 'student' ? '/student/lms' : '/staff/academic/lms'}/${ws.id}`}
-              className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
+              className="rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
             >
-              <span className="flex items-center gap-2 font-medium">
-                <BookOpen className="h-4 w-4 text-primary" />
-                {ws.title}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {ws._count?.materials ?? 0} notes
-              </span>
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-2 font-medium">
+                  <BookOpen className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate">{ws.title}</span>
+                </span>
+                {ws.workspaceType === 'POOL' ? (
+                  <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Shared
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                {formatLmsWorkspaceMeta(ws)}
+              </p>
             </Link>
           ))}
           {!list.length ? (

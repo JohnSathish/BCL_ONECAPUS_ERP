@@ -36,7 +36,7 @@ describe('admission validation', () => {
     const draft = createEmptyDraft();
     const errors = validateStepFields('basic', draft);
     expect(errors.fullName).toBeTruthy();
-    expect(errors.email).toBeTruthy();
+    expect(errors.email).toBeUndefined();
     expect(errors.mobileNumber).toBeTruthy();
     expect(errors.enrollmentNumber).toBeUndefined();
     expect(firstStepError(errors)).toBeTruthy();

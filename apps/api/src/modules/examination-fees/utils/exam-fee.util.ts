@@ -48,3 +48,23 @@ export function toNumber(value: unknown): number {
 export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
+
+const ROMAN_SEMESTERS = [
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+] as const;
+
+/** Display semester as Roman numeral (e.g. 3 → "III"). */
+export function toRomanSemester(semesterNo: unknown): string {
+  const n = Number(semesterNo);
+  if (!Number.isFinite(n) || n < 1) return '—';
+  return ROMAN_SEMESTERS[Math.floor(n) - 1] ?? String(Math.floor(n));
+}

@@ -40,6 +40,7 @@ model Tenant {
   attendancePolicy              TenantAttendancePolicy?
   studentProfileUpdatePolicies  StudentProfileUpdatePolicy[]
   studentProfileChangeRequests  StudentProfileChangeRequest[]
+  studentProfileUpdateReopens   StudentProfileUpdateReopen[]
   impersonationSessions         ImpersonationSession[]
   permissionAuditLogs           PermissionAuditLog[]
   tenantLicense                 TenantLicense?
@@ -564,6 +565,11 @@ model MobileAppSettings {
   studentDashboardConfig Json     @default("{}") @map("student_dashboard_config")
   staffDashboardConfig   Json     @default("{}") @map("staff_dashboard_config")
   brandingOverrides      Json     @default("{}") @map("branding_overrides")
+  playStoreUrl           String?  @map("play_store_url")
+  apkDownloadUrl         String?  @map("apk_download_url")
+  releaseNotes           String?  @map("release_notes") @db.Text
+  featureFlags           Json     @default("{}") @map("feature_flags")
+  configVersion          Int      @default(1) @map("config_version")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
@@ -2014,6 +2020,7 @@ model Student {
   cuetDetail            StudentCuetDetail?
   profileAuditLogs      StudentProfileAuditLog[]
   profileChangeRequests StudentProfileChangeRequest[]
+  profileUpdateReopens  StudentProfileUpdateReopen[]
   bulkUpdateChanges     StudentBulkUpdateChange[]
   photoBulkChanges      StudentPhotoBulkChange[]
   rollNumberAuditLogs   StudentRollNumberAuditLog[]
@@ -2235,6 +2242,27 @@ model StudentProfileUpdatePolicy {
   @@unique([tenantId, sectionKey, fieldKey])
   @@index([tenantId, approvalMode])
   @@map("student_profile_update_policies")
+  @@schema("academic")
+}
+
+/// Temporary reopen of student profile editing after the tenant update window closes.
+model StudentProfileUpdateReopen {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  reopenUntil DateTime  @map("reopen_until") @db.Date
+  reason      String?
+  createdById String?   @map("created_by_id") @db.Uuid
+  revokedAt   DateTime? @map("revoked_at")
+  revokedById String?   @map("revoked_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@map("student_profile_update_reopens")
   @@schema("academic")
 }
 
@@ -8383,6 +8411,14 @@ model QuestionPaper {
   courseId           String?   @map("course_id") @db.Uuid
   semesterNo         Int?      @map("semester_no")
   examinationSession String?   @map("examination_session")
+  examinationType    String?   @map("examination_type")
+  examCycle          String?   @map("exam_cycle")
+  subjectCategory    String?   @map("subject_category")
+  language           String?   @map("language")
+  universityName     String?   @map("university_name")
+  preparedById       String?   @map("prepared_by_id") @db.Uuid
+  verifiedById       String?   @map("verified_by_id") @db.Uuid
+  notes              String?   @db.Text
   paperType          String    @map("paper_type")
   paperCategory      String?   @map("paper_category")
   examMonth          Int?      @map("exam_month")
@@ -8394,6 +8430,8 @@ model QuestionPaper {
   mimeType           String?   @map("mime_type")
   fileSizeBytes      Int?      @map("file_size_bytes")
   previewPath        String?   @map("preview_path")
+  checksumSha256     String?   @map("checksum_sha256")
+  currentVersionNo   Int       @default(1) @map("current_version_no")
   status             String    @default("DRAFT")
   keywords           String[]  @default([])
   searchText         String?   @map("search_text")
@@ -8409,13 +8447,57 @@ model QuestionPaper {
   bookmarks   QuestionPaperBookmark[]
   accessLogs  QuestionPaperAccessLog[]
   auditLogs   QuestionBankAuditLog[]
+  versions    QuestionPaperVersion[]
+  shareLinks  QuestionPaperShareLink[]
 
   @@index([tenantId, courseId, examYear])
   @@index([tenantId, status])
   @@index([tenantId, paperType])
   @@index([tenantId, departmentId])
   @@index([tenantId, paperCode])
+  @@index([tenantId, examinationType])
+  @@index([tenantId, examCycle])
+  @@index([tenantId, language])
   @@map("question_papers")
+  @@schema("academic")
+}
+
+model QuestionPaperVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  paperId        String   @map("paper_id") @db.Uuid
+  versionNo      Int      @map("version_no")
+  filePath       String   @map("file_path")
+  fileName       String   @map("file_name")
+  mimeType       String?  @map("mime_type")
+  fileSizeBytes  Int?     @map("file_size_bytes")
+  checksumSha256 String?  @map("checksum_sha256")
+  uploadedById   String?  @map("uploaded_by_id") @db.Uuid
+  changeNote     String?  @map("change_note") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  paper QuestionPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([paperId, versionNo])
+  @@index([tenantId, paperId])
+  @@map("question_paper_versions")
+  @@schema("academic")
+}
+
+model QuestionPaperShareLink {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  paperId     String    @map("paper_id") @db.Uuid
+  token       String    @unique
+  expiresAt   DateTime? @map("expires_at")
+  createdById String?   @map("created_by_id") @db.Uuid
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  paper QuestionPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, paperId])
+  @@map("question_paper_share_links")
   @@schema("academic")
 }
 
@@ -9688,6 +9770,99 @@ model NaacReadinessSnapshot {
   @@unique([tenantId, academicYear])
   @@index([tenantId, computedAt])
   @@map("naac_readiness_snapshots")
+  @@schema("naac")
+}
+
+/// Student Feedback & Survey (IQAC) — Phase 1 institutional SSS
+model FeedbackCampaign {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  title           String
+  description     String?
+  instructions    String?
+  audience        String    @default("STUDENT") // STUDENT | TEACHER | ALUMNI | EMPLOYER | PARENT | STAFF
+  academicYear    String    @map("academic_year")
+  enabled         Boolean   @default(false)
+  startsAt        DateTime? @map("starts_at") @db.Date
+  endsAt          DateTime? @map("ends_at") @db.Date
+  status          String    @default("DRAFT") // DRAFT | PUBLISHED | CLOSED
+  createdById     String?   @map("created_by_id") @db.Uuid
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  questions FeedbackQuestion[]
+  responses FeedbackResponse[]
+
+  @@index([tenantId, audience, enabled])
+  @@index([tenantId, academicYear])
+  @@index([tenantId, status])
+  @@map("feedback_campaigns")
+  @@schema("naac")
+}
+
+model FeedbackQuestion {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  sortOrder  Int      @default(0) @map("sort_order")
+  prompt     String
+  category   String   @default("OVERALL") // CURRICULUM | TEACHING | FACULTY | INFRASTRUCTURE | ...
+  required   Boolean  @default(true)
+  /// LIKERT_5 — Excellent(5) … Poor(1)
+  questionType String @default("LIKERT_5") @map("question_type")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  campaign FeedbackCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  answers  FeedbackAnswer[]
+
+  @@index([tenantId, campaignId, sortOrder])
+  @@map("feedback_questions")
+  @@schema("naac")
+}
+
+model FeedbackResponse {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  campaignId         String   @map("campaign_id") @db.Uuid
+  /// Trackable for admin; omit from anonymous report aggregates. Null for teacher/alumni.
+  studentId          String?  @map("student_id") @db.Uuid
+  respondentUserId   String?  @map("respondent_user_id") @db.Uuid
+  departmentId       String?  @map("department_id") @db.Uuid
+  programmeHint      String?  @map("programme_hint")
+  semesterNo         Int?     @map("semester_no")
+  submittedAt        DateTime @default(now()) @map("submitted_at")
+  metadata           Json     @default("{}")
+
+  campaign FeedbackCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  answers  FeedbackAnswer[]
+
+  /// Partial uniques are enforced in SQL migration (student_id / respondent_user_id not null).
+  @@index([tenantId, campaignId, submittedAt])
+  @@index([tenantId, studentId])
+  @@index([tenantId, respondentUserId])
+  @@map("feedback_responses")
+  @@schema("naac")
+}
+
+model FeedbackAnswer {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  responseId String   @map("response_id") @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  /// 5=Excellent … 1=Poor
+  rating     Int
+  ratingLabel String  @map("rating_label")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  response FeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question FeedbackQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, questionId])
+  @@index([tenantId, questionId, rating])
+  @@map("feedback_answers")
   @@schema("naac")
 }
 

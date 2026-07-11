@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,6 +29,8 @@ import type {
 } from '../dto/profile-section.dto';
 import { AcademicChangeHistoryService } from '../academic-change-history/academic-change-history.service';
 import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
+import { Class12SubjectsService } from './class12-subjects.service';
+import { isSyntheticStudentEmail } from '../student-credentials.util';
 
 const extendedProfileInclude = {
   masterProfile: true,
@@ -76,6 +79,7 @@ export class StudentProfileSectionsService {
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
     private readonly abcService: StudentAbcService,
     private readonly academicChangeHistory: AcademicChangeHistoryService,
+    private readonly class12Subjects: Class12SubjectsService,
   ) {}
 
   async getSection(tenantId: string, studentId: string, sectionKey: string) {
@@ -322,7 +326,16 @@ export class StudentProfileSectionsService {
           universityRegistrationNumber: student.universityRegistrationNumber,
           rollNumber: student.rollNumber,
           fullName: student.masterProfile?.fullName,
-          email: student.masterProfile?.email ?? student.user.email,
+          email: (() => {
+            const profileEmail = student.masterProfile?.email?.trim();
+            if (profileEmail && !isSyntheticStudentEmail(profileEmail)) {
+              return profileEmail;
+            }
+            const loginEmail = student.user.email?.trim();
+            return loginEmail && !isSyntheticStudentEmail(loginEmail)
+              ? loginEmail
+              : profileEmail || null;
+          })(),
           mobileNumber: student.masterProfile?.mobileNumber,
           dateOfBirth: student.masterProfile?.dateOfBirth,
           gender: student.masterProfile?.gender,
@@ -541,6 +554,15 @@ export class StudentProfileSectionsService {
       ? await this.loadAcademicLabels(tenantId, studentId)
       : null;
 
+    const contactEmail =
+      dto.email === undefined
+        ? undefined
+        : (() => {
+            const normalized = dto.email.trim().toLowerCase();
+            if (!normalized || isSyntheticStudentEmail(normalized)) return null;
+            return normalized;
+          })();
+
     await this.prisma.$transaction(async (tx) => {
       await tx.student.update({
         where: { id: studentId },
@@ -577,16 +599,8 @@ export class StudentProfileSectionsService {
         },
       });
 
-      if (dto.email) {
-        const student = await tx.student.findUnique({
-          where: { id: studentId },
-        });
-        if (student) {
-          await tx.user.update({
-            where: { id: student.userId },
-            data: { email: dto.email },
-          });
-        }
+      if (contactEmail !== undefined) {
+        await this.syncStudentLoginEmail(tx, tenantId, studentId, contactEmail);
       }
 
       const profile = await tx.studentProfile.findUnique({
@@ -594,7 +608,7 @@ export class StudentProfileSectionsService {
       });
       const profileData = {
         ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
-        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(contactEmail !== undefined ? { email: contactEmail } : {}),
         ...(dto.mobileNumber !== undefined
           ? { mobileNumber: dto.mobileNumber }
           : {}),
@@ -626,7 +640,7 @@ export class StudentProfileSectionsService {
             tenantId,
             studentId,
             fullName: dto.fullName,
-            email: dto.email,
+            email: contactEmail ?? null,
             ...profileData,
           },
         });
@@ -714,6 +728,72 @@ export class StudentProfileSectionsService {
       ? `${student.primaryShift.code} — ${student.primaryShift.name}`
       : null;
     return { programmeLabel, departmentLabel, shiftLabel };
+  }
+
+  /**
+   * Contact email lives on StudentProfile. Login identity (User.email) is updated
+   * only when the address is free — otherwise roll/synthetic login is preserved
+   * so profile saves do not fail with a generic unique-constraint 500.
+   */
+  private async syncStudentLoginEmail(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    studentId: string,
+    contactEmail: string | null,
+  ) {
+    if (!contactEmail) return;
+
+    const student = await tx.student.findUnique({
+      where: { id: studentId },
+      select: {
+        userId: true,
+        user: { select: { id: true, email: true } },
+      },
+    });
+    if (!student?.user) return;
+
+    const currentLogin = student.user.email.trim().toLowerCase();
+    if (currentLogin === contactEmail) return;
+
+    const taken = await tx.user.findFirst({
+      where: {
+        tenantId,
+        email: { equals: contactEmail, mode: 'insensitive' },
+        deletedAt: null,
+        NOT: { id: student.userId },
+      },
+      select: { id: true },
+    });
+
+    if (taken) {
+      // Keep existing login (often @students.local). Contact email still saves on profile.
+      if (!isSyntheticStudentEmail(currentLogin)) {
+        throw new ConflictException(
+          'This email is already used by another account. Update was blocked to protect the existing login email.',
+        );
+      }
+      return;
+    }
+
+    try {
+      await tx.user.update({
+        where: { id: student.userId },
+        data: { email: contactEmail },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        if (!isSyntheticStudentEmail(currentLogin)) {
+          throw new ConflictException(
+            'This email is already used by another account.',
+          );
+        }
+        return;
+      }
+      throw error;
+    }
   }
 
   private normalizeOptionalUuid(value?: string | null) {
@@ -912,9 +992,16 @@ export class StudentProfileSectionsService {
       await this.assertBoardNameExists(tenantId, dto.boardName);
     }
     if (dto.subjectMarks?.length) {
-      await this.assertBoardSubjectsExist(
+      const namedMarks = dto.subjectMarks.filter((m) =>
+        String(m.subjectName ?? '').trim(),
+      );
+      // Autosave may send partial rows; only fully validate when 5+ subjects present.
+      await this.class12Subjects.assertSubjectMarksValid(
         tenantId,
-        dto.subjectMarks.map((mark) => mark.subjectName),
+        dto.boardName ?? exam.boardName,
+        dto.stream ?? exam.stream,
+        namedMarks,
+        { requireMinFive: namedMarks.length >= 5 },
       );
     }
 
@@ -965,6 +1052,7 @@ export class StudentProfileSectionsService {
             subjectName: m.subjectName,
             marksObtained: m.marksObtained,
             maxMarks: m.maxMarks,
+            grade: m.grade ?? null,
             sortOrder: i,
           })),
         });

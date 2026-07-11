@@ -157,19 +157,34 @@ export class FcmPushService {
     const invalidTokens: string[] = [...expoTokens];
 
     for (const pushToken of fcmTokens) {
+      const publicImage =
+        payload.imageUrl && /^https?:\/\//i.test(payload.imageUrl)
+          ? payload.imageUrl
+          : undefined;
+      if (payload.imageUrl && !publicImage) {
+        this.logger.warn(
+          `Skipping FCM image — URL is not absolute http(s): ${payload.imageUrl}`,
+        );
+      }
+
       const message: Record<string, unknown> = {
         token: pushToken,
         notification: {
           title: payload.title,
           body: payload.body,
-          ...(payload.imageUrl ? { image: payload.imageUrl } : {}),
+          ...(publicImage ? { image: publicImage } : {}),
         },
         data,
         android: {
           priority: 'HIGH',
           notification: {
             channelId: ANDROID_CHANNEL_ID,
-            ...(payload.imageUrl ? { image: payload.imageUrl } : {}),
+            sound: 'default',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+            visibility: 'PUBLIC',
+            notificationCount: 1,
+            ...(publicImage ? { image: publicImage } : {}),
           },
         },
         apns: {
@@ -177,9 +192,11 @@ export class FcmPushService {
           payload: {
             aps: {
               sound: 'default',
+              'mutable-content': 1,
               'content-available': 1,
             },
           },
+          ...(publicImage ? { fcm_options: { image: publicImage } } : {}),
         },
       };
       const res = await fetch(

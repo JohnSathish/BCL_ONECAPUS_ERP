@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
@@ -13,12 +14,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
-import { sanitizeNotificationLink } from '@/lib/permissions/portal-access';
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
   markAllNotificationsRead,
-  markNotificationRead,
 } from '@/services/communication';
 import { cn } from '@/utils/cn';
 
@@ -31,11 +30,30 @@ function formatTime(value: string) {
   return date.toLocaleDateString();
 }
 
+function inboxPathForRoles(roles: string[]) {
+  const lower = roles.map((r) => r.toLowerCase());
+  if (lower.some((r) => r.includes('student'))) return '/student/notifications';
+  if (
+    lower.some(
+      (r) =>
+        r.includes('staff') ||
+        r.includes('faculty') ||
+        r.includes('teacher') ||
+        r.includes('admin') ||
+        r.includes('principal'),
+    )
+  ) {
+    return '/staff/notifications';
+  }
+  return '/student/notifications';
+}
+
 export function NotificationPanel() {
   const authReady = useAuthQueryEnabled();
   const { session } = useAuth();
   const router = useRouter();
   const roles = session?.user.roles ?? [];
+  const inboxPath = inboxPathForRoles(roles);
   const queryClient = useQueryClient();
 
   const unreadQuery = useQuery({
@@ -53,13 +71,6 @@ export function NotificationPanel() {
     retry: false,
   });
 
-  const markRead = useMutation({
-    mutationFn: markNotificationRead,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-  });
-
   const markAll = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
@@ -70,14 +81,8 @@ export function NotificationPanel() {
   const unread = unreadQuery.data?.count ?? 0;
   const notifications = notificationsQuery.data ?? [];
 
-  const handleNotificationClick = (notification: {
-    id: string;
-    readAt?: string | null;
-    link?: string | null;
-  }) => {
-    if (!notification.readAt) markRead.mutate(notification.id);
-    const safeLink = sanitizeNotificationLink(roles, notification.link);
-    if (safeLink) router.push(safeLink);
+  const openInbox = (id?: string) => {
+    router.push(id ? `${inboxPath}?id=${encodeURIComponent(id)}` : inboxPath);
   };
 
   return (
@@ -116,7 +121,7 @@ export function NotificationPanel() {
               <DropdownMenuItem
                 key={n.id}
                 className="flex cursor-pointer flex-col items-start gap-1 rounded-xl p-3"
-                onClick={() => handleNotificationClick(n)}
+                onClick={() => openInbox(n.id)}
               >
                 <div className="w-full">
                   <NotificationRow notification={n} />
@@ -130,6 +135,15 @@ export function NotificationPanel() {
             ) : null}
           </div>
         </ScrollArea>
+        <DropdownMenuSeparator />
+        <div className="p-2">
+          <Link
+            href={inboxPath}
+            className="block rounded-lg px-3 py-2 text-center text-sm font-medium text-primary hover:bg-muted/60"
+          >
+            View all notifications
+          </Link>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

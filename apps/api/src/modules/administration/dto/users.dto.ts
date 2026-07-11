@@ -154,10 +154,15 @@ export class BulkUserActionDto {
 export class ResetPasswordDto {
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MinLength(4)
   newPassword?: string;
 
   @IsOptional()
   @IsBoolean()
   forceReset?: boolean;
+
+  /** When true (and no newPassword), reset student password to college roll number. */
+  @IsOptional()
+  @IsBoolean()
+  resetToRoll?: boolean;
 }

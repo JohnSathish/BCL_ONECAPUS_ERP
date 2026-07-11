@@ -239,7 +239,7 @@ export default function LoginScreen() {
           <View style={[styles.surface, { backgroundColor: surface }]}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Username</Text>
             <Text style={[styles.supportsLine, { color: colors.textMuted }]}>
-              Supports: Email · Roll No. · Employee ID · Mobile
+              Supports: Roll No. · Email · Employee ID · Mobile
             </Text>
             <View
               style={[
@@ -250,7 +250,7 @@ export default function LoginScreen() {
               <TextInput
                 value={identifier}
                 onChangeText={setIdentifier}
-                placeholder="College email, roll no., or employee ID"
+                placeholder="College roll number (e.g. BC24-021)"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 keyboardType="email-address"

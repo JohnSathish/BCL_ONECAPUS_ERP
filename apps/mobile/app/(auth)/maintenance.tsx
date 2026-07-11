@@ -1,14 +1,21 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { APP_VERSION } from '@/api/client';
+import { getInstalledAppVersion } from '@/utils/app-version';
 
 export default function MaintenanceScreen() {
   const { config, retry } = useBootstrap();
-  const isForceUpdate = config?.forceUpdate ?? false;
+  const appVersion = getInstalledAppVersion();
+  const belowMin = isVersionBelow(appVersion, config?.minVersion ?? '0.0.0');
+  const isForceUpdate = Boolean(config?.forceUpdate) || belowMin;
   const message =
-    config?.forceUpdateMessage ??
+    (isForceUpdate ? config?.forceUpdateMessage : config?.maintenanceMessage) ??
     config?.maintenanceMessage ??
-    'The app is temporarily unavailable. Please try again later.';
+    'The system is currently undergoing scheduled maintenance. Please try again later.';
+
+  const updateUrl =
+    config?.playStoreUrl?.trim() ||
+    config?.apkDownloadUrl?.trim() ||
+    'https://play.google.com/store/apps/details?id=com.basecodelabs.onecampus';
 
   return (
     <View style={styles.container}>
@@ -16,22 +23,25 @@ export default function MaintenanceScreen() {
       <Text style={styles.message}>{message}</Text>
       {isForceUpdate ? (
         <Text style={styles.version}>
-          Your version: {APP_VERSION} · Required: {config?.minVersion ?? '—'}
+          Your version: {appVersion} · Required: {config?.minVersion ?? '—'}
         </Text>
       ) : null}
-      <Pressable style={styles.btn} onPress={retry}>
-        <Text style={styles.btnText}>Try again</Text>
-      </Pressable>
+      {!isForceUpdate ? (
+        <Pressable style={styles.btn} onPress={retry}>
+          <Text style={styles.btnText}>Try again</Text>
+        </Pressable>
+      ) : null}
       {isForceUpdate ? (
+        <Pressable style={styles.btn} onPress={() => void Linking.openURL(updateUrl)}>
+          <Text style={styles.btnText}>Update Now</Text>
+        </Pressable>
+      ) : null}
+      {isForceUpdate && config?.apkDownloadUrl ? (
         <Pressable
           style={styles.linkBtn}
-          onPress={() =>
-            void Linking.openURL(
-              'https://play.google.com/store/apps/details?id=com.basecodelabs.onecampus',
-            )
-          }
+          onPress={() => void Linking.openURL(config.apkDownloadUrl!)}
         >
-          <Text style={styles.linkText}>Update on Google Play</Text>
+          <Text style={styles.linkText}>Download latest APK</Text>
         </Pressable>
       ) : null}
     </View>

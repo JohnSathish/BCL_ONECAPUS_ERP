@@ -15,7 +15,11 @@ const abcIdRegex = /^[A-Za-z0-9]+$/;
 
 export const basicStepSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name is required. Minimum 2 characters.'),
-  email: z.string().trim().email('Enter a valid email address.'),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || z.string().email().safeParse(v).success, 'Enter a valid email address.'),
   enrollmentNumber: z
     .string()
     .optional()

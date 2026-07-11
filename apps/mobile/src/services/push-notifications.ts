@@ -1,7 +1,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
@@ -10,6 +10,7 @@ import {
   resolveMobileDeepLink,
   fallbackNotificationCenter,
 } from '@/services/notification-deep-link';
+import { getNotificationAttachments } from '@/utils/notification-attachments';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -40,6 +41,7 @@ export async function ensureAndroidDefaultChannel() {
     sound: 'default',
     enableVibrate: true,
     showBadge: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
 }
 
@@ -170,6 +172,57 @@ export function extractLinkFromNotification(
   return typeof link === 'string' && link.trim() ? link.trim() : undefined;
 }
 
+export function extractAttachmentUrls(content: Notifications.NotificationContent): {
+  imageUrl?: string;
+  pdfUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+} {
+  const data = (content.data ?? {}) as Record<string, unknown>;
+  let attachmentsMeta: Record<string, unknown> = {
+    imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : data.image,
+    pdfUrl: typeof data.pdfUrl === 'string' ? data.pdfUrl : data.pdf,
+    fileUrl: typeof data.fileUrl === 'string' ? data.fileUrl : undefined,
+    fileName: typeof data.fileName === 'string' ? data.fileName : undefined,
+  };
+  if (typeof data.attachments === 'string' && data.attachments.trim()) {
+    try {
+      const parsed = JSON.parse(data.attachments) as unknown;
+      if (Array.isArray(parsed)) {
+        attachmentsMeta = { ...attachmentsMeta, attachments: parsed };
+      }
+    } catch {
+      // ignore malformed payload
+    }
+  } else if (Array.isArray(data.attachments)) {
+    attachmentsMeta = { ...attachmentsMeta, attachments: data.attachments };
+  }
+
+  const all = getNotificationAttachments({ metadata: attachmentsMeta });
+  return {
+    imageUrl: all.find((a) => a.type === 'image')?.url,
+    pdfUrl: all.find((a) => a.type === 'pdf')?.url,
+    fileUrl: all.find((a) => a.type === 'file')?.url,
+    fileName: all.find((a) => a.type === 'file')?.name,
+  };
+}
+
+export async function openNotificationAttachment(url?: string | null, label = 'Attachment') {
+  if (!url?.trim()) return false;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert(label, 'Unable to open this attachment on the device.');
+      return false;
+    }
+    await Linking.openURL(url);
+    return true;
+  } catch {
+    Alert.alert(label, 'Unable to open this attachment.');
+    return false;
+  }
+}
+
 export async function trackPushOpened(link?: string) {
   try {
     const appTypeRaw = await getStoredAppType();
@@ -203,6 +256,34 @@ export function navigateFromPushLink(link?: string | null) {
   });
 }
 
+function handleNotificationResponse(response: Notifications.NotificationResponse) {
+  const content = response.notification.request.content;
+  const link = extractLinkFromNotification(content);
+  const { imageUrl, pdfUrl, fileUrl, fileName } = extractAttachmentUrls(content);
+  void trackPushOpened(link);
+
+  // Prefer opening attached media when present (PDF / file / image).
+  if (pdfUrl) {
+    void openNotificationAttachment(pdfUrl, 'PDF attachment').then((opened) => {
+      if (!opened) navigateFromPushLink(link);
+    });
+    return;
+  }
+  if (fileUrl) {
+    void openNotificationAttachment(fileUrl, fileName ?? 'File attachment').then((opened) => {
+      if (!opened) navigateFromPushLink(link);
+    });
+    return;
+  }
+  if (imageUrl && !link) {
+    void openNotificationAttachment(imageUrl, 'Image attachment').then((opened) => {
+      if (!opened) navigateFromPushLink(link);
+    });
+    return;
+  }
+  navigateFromPushLink(link);
+}
+
 /**
  * Clear a stale "last notification response" so cold starts do not keep
  * replaying the previous push navigation into Alerts.
@@ -215,18 +296,41 @@ export async function clearStalePushResponse() {
   }
 }
 
+/**
+ * Handle a notification that launched the app from a killed state, then clear it.
+ */
+export async function consumeInitialPushResponse() {
+  try {
+    const last = await Notifications.getLastNotificationResponseAsync();
+    if (last) {
+      handleNotificationResponse(last);
+      await clearStalePushResponse();
+    }
+  } catch {
+    // ignore
+  }
+}
+
 let responseSub: Notifications.Subscription | null = null;
+let receivedSub: Notifications.Subscription | null = null;
 
 export function attachPushResponseListener() {
-  if (responseSub) return;
-  responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const link = extractLinkFromNotification(response.notification.request.content);
-    void trackPushOpened(link);
-    navigateFromPushLink(link);
-  });
+  if (!responseSub) {
+    responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationResponse(response);
+    });
+  }
+  // Keep foreground arrivals visible in the system shade / banners.
+  if (!receivedSub) {
+    receivedSub = Notifications.addNotificationReceivedListener(() => {
+      // Handler above already shows alert/banner/list; listener kept for future analytics.
+    });
+  }
 }
 
 export function detachPushResponseListener() {
   responseSub?.remove();
   responseSub = null;
+  receivedSub?.remove();
+  receivedSub = null;
 }

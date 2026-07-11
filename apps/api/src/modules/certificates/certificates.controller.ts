@@ -117,13 +117,8 @@ export class CertificatesController {
   @Get('me/issues/:id/download')
   @RequirePermissions('certificates:self')
   async downloadMyIssue(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    const doc = await this.service.getMyIssueDocumentStream(user, id);
-
-    return new StreamableFile(doc.stream, {
-      type: doc.mimeType,
-
-      disposition: `attachment; filename="${doc.filename}"`,
-    });
+    // Throws BadRequestException — student downloads are disabled (fee / office collection).
+    await this.service.getMyIssueDocumentStream(user, id);
   }
 
   @Get('dashboard')

@@ -23,12 +23,14 @@ export function resolveApiOriginForDevice(apiBase: string): string {
   return origin;
 }
 
-/** Turn stored `/uploads/...` paths into absolute URLs for React Native Image. */
+/** Turn stored `/uploads/...` paths into absolute URLs for React Native. */
 export function resolveUploadAssetUrl(path?: string | null): string | undefined {
   if (!path?.trim()) return undefined;
   const trimmed = path.trim();
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    if (!isSupportedRemoteImageUrl(trimmed)) return undefined;
+    // Reject favicon/ICO only — PDFs and other files must remain openable.
+    const lower = trimmed.toLowerCase();
+    if (lower.endsWith('.ico') || lower.includes('favicon')) return undefined;
     if (Platform.OS === 'android') {
       return trimmed
         .replace(/^http:\/\/localhost(?=[:/]|$)/i, 'http://10.0.2.2')

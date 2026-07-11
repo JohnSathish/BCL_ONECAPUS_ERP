@@ -18,6 +18,7 @@ import {
 import type { StudentProfile } from '@/types/students';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { formatCourseDisplayTitle } from '@/utils/format-course-title';
 
 type EnrollmentRow = StudentProfile['sectionEnrollments'][number];
 
@@ -352,7 +353,7 @@ function CategorizedRegistration({
                 <li key={`${course.code}-${index}`}>
                   • <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
                   {' — '}
-                  {course.title}
+                  {formatCourseDisplayTitle(course.title)}
                 </li>
               );
             })
@@ -374,7 +375,7 @@ function CategorizedRegistration({
                 const course = rowCourse(row);
                 return (
                   <li key={`${category}-${course.code}-${index}`}>
-                    • {course.title}
+                    • {formatCourseDisplayTitle(course.title)}
                     <span className="ml-1 font-mono text-xs text-muted-foreground">
                       ({course.code})
                     </span>

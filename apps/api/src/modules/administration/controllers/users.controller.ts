@@ -104,6 +104,18 @@ export class UsersController {
     return this.users.resetPassword(user.tid, id, user.sub, dto);
   }
 
+  @Post(':id/force-password-reset')
+  @RequirePermissions('users:manage')
+  forcePasswordReset(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.users.forcePasswordReset(user.tid, id, user.sub);
+  }
+
+  @Post(':id/unlock-login')
+  @RequirePermissions('users:manage')
+  unlockLogin(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.users.unlockLogin(user.tid, id, user.sub);
+  }
+
   @Post('bulk/reset-password')
   @RequirePermissions('users:manage')
   bulkReset(@CurrentUser() user: JwtUser, @Body() dto: BulkResetPasswordDto) {

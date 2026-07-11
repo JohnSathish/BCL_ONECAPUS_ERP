@@ -3,7 +3,7 @@ import { QuestionBankWorkspace } from '@/components/question-bank/question-bank-
 
 export default function QuestionBankDashboardPage() {
   return (
-    <DashboardShell role="admin" title="Question Bank">
+    <DashboardShell role="admin" title="Question Paper Repository">
       <QuestionBankWorkspace page="dashboard" portal="admin" />
     </DashboardShell>
   );

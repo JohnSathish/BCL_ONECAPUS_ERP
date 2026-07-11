@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StudentDrawer } from '@/components/student-portal/student-drawer';
 import { StudentPortalProvider } from '@/components/student-portal/student-portal-context';
 import { getAccessToken, getRefreshToken } from '@/auth/session';
+import { SyncGuardProvider } from '@/state/sync-guard';
 
 export default function StudentLayout() {
   const router = useRouter();
@@ -33,22 +34,24 @@ export default function StudentLayout() {
   }
 
   return (
-    <StudentPortalProvider>
-      <StudentDrawer />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="attendance" />
-        <Stack.Screen name="timetable" />
-        <Stack.Screen name="exam-schedule" />
-        <Stack.Screen name="examination-fees" />
-        <Stack.Screen name="results" />
-        <Stack.Screen name="leave" />
-        <Stack.Screen name="library" />
-        <Stack.Screen name="assignments" />
-        <Stack.Screen name="complete-profile" />
-        <Stack.Screen name="notification-preferences" />
-        <Stack.Screen name="about" />
-      </Stack>
-    </StudentPortalProvider>
+    <SyncGuardProvider>
+      <StudentPortalProvider>
+        <StudentDrawer />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="attendance" />
+          <Stack.Screen name="timetable" />
+          <Stack.Screen name="exam-schedule" />
+          <Stack.Screen name="examination-fees" />
+          <Stack.Screen name="results" />
+          <Stack.Screen name="leave" />
+          <Stack.Screen name="library" />
+          <Stack.Screen name="assignments" />
+          <Stack.Screen name="complete-profile" />
+          <Stack.Screen name="notification-preferences" />
+          <Stack.Screen name="about" />
+        </Stack>
+      </StudentPortalProvider>
+    </SyncGuardProvider>
   );
 }

@@ -91,9 +91,10 @@ export function StepBasic({
               <AdmissionFormField
                 label="Email"
                 fieldKey="email"
-                required
+                optional
                 error={errors.email}
-                success={fieldSuccess('email', 3) && draft.email.includes('@')}
+                success={Boolean(draft.email.trim()) && draft.email.includes('@')}
+                hint="Optional. Students log in with college roll number."
               >
                 <input
                   type="email"
@@ -101,7 +102,7 @@ export function StepBasic({
                   value={draft.email}
                   onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
                   autoComplete="email"
-                  placeholder="student@example.com"
+                  placeholder="Optional personal email"
                 />
               </AdmissionFormField>
               <AdmissionFormField label="Application No." fieldKey="applicationNumber">

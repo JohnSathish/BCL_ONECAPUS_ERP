@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { LmsSettingsService } from './lms-settings.service';
+import {
+  enrichLmsWorkspaceRow,
+  lmsWorkspaceListInclude,
+} from '../utils/lms-workspace-list.util';
 
 const POOL_CATEGORIES = new Set(['MDC', 'AEC', 'SEC', 'VAC', 'VTC']);
 
@@ -179,6 +183,35 @@ export class LmsWorkspaceService {
                   code: { contains: query.q, mode: 'insensitive' as const },
                 },
               },
+              {
+                course: {
+                  title: { contains: query.q, mode: 'insensitive' as const },
+                },
+              },
+              {
+                shift: {
+                  name: { contains: query.q, mode: 'insensitive' as const },
+                },
+              },
+              {
+                courseOffering: {
+                  programVersion: {
+                    program: {
+                      name: { contains: query.q, mode: 'insensitive' as const },
+                    },
+                  },
+                },
+              },
+              {
+                courseOffering: {
+                  categoryPool: {
+                    poolName: {
+                      contains: query.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -188,13 +221,7 @@ export class LmsWorkspaceService {
       this.prisma.lmsWorkspace.count({ where }),
       this.prisma.lmsWorkspace.findMany({
         where,
-        include: {
-          course: { select: { code: true, title: true, credits: true } },
-          offeringSection: { select: { sectionCode: true } },
-          _count: {
-            select: { materials: true, announcements: true, lessonPlans: true },
-          },
-        },
+        include: lmsWorkspaceListInclude,
         orderBy: [{ semesterNo: 'asc' }, { title: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
@@ -202,7 +229,7 @@ export class LmsWorkspaceService {
     ]);
 
     return {
-      data,
+      data: data.map((row) => enrichLmsWorkspaceRow(row)),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
     };
   }

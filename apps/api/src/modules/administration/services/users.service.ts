@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { LoginAttemptService } from '../../auth/login-attempt.service';
 import { AdminAuditHelper } from '../admin-audit.helper';
 import type {
   BulkResetPasswordDto,
@@ -21,6 +22,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly provisioning: UserProvisioningService,
     private readonly audit: AdminAuditHelper,
+    private readonly loginAttempts: LoginAttemptService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -359,13 +361,67 @@ export class UsersService {
     tenantId: string,
     id: string,
     actorUserId: string,
-    options: { newPassword?: string; forceReset?: boolean } = {},
+    options: {
+      newPassword?: string;
+      forceReset?: boolean;
+      resetToRoll?: boolean;
+    } = {},
   ) {
     const result = await this.provisioning.resetPassword(tenantId, id, {
       ...options,
       actorUserId,
     });
     return { success: true, generatedPassword: result.plainPassword };
+  }
+
+  async forcePasswordReset(tenantId: string, id: string, actorUserId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, deletedAt: null },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { mustResetPassword: true },
+    });
+    await this.prisma.refreshSession.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await this.audit.log({
+      tenantId,
+      userId: actorUserId,
+      module: 'administration',
+      action: 'user.force_password_reset',
+      entityType: 'user',
+      entityId: id,
+    });
+    return { success: true };
+  }
+
+  async unlockLogin(tenantId: string, id: string, actorUserId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, deletedAt: null },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const { cleared } = await this.loginAttempts.unlockForUser(tenantId, id);
+    if (user.accountStatus === 'locked' || user.accountStatus === 'blocked') {
+      await this.prisma.user.update({
+        where: { id },
+        data: { accountStatus: 'active', isActive: true },
+      });
+    }
+    await this.audit.log({
+      tenantId,
+      userId: actorUserId,
+      module: 'administration',
+      action: 'user.unlock_login',
+      entityType: 'user',
+      entityId: id,
+      metadata: { clearedAttempts: cleared },
+    });
+    return { success: true, clearedAttempts: cleared };
   }
 
   async bulkResetPassword(

@@ -13,16 +13,20 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout } from '@/auth/logout';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
-import { DRAWER_MENU_SECTIONS } from './drawer-menu';
+import { DRAWER_MENU_SECTIONS, filterDrawerByFeatureFlags } from './drawer-menu';
 import { useStudentPortal } from './student-portal-context';
 import { studentTheme } from './theme';
 import { formatInr } from '@/utils/currency';
+import { fetchExamFeeSessions } from '@/services/examination-fees';
+import { useMobileConfig } from '@/hooks/useMobileConfig';
 
 export function StudentDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { drawerOpen, closeDrawer, expandedSectionId, toggleSection, home } = useStudentPortal();
+  const { featureFlags } = useMobileConfig();
   const [query, setQuery] = useState('');
+  const [examFeesEnabled, setExamFeesEnabled] = useState(false);
   const slide = useRef(new Animated.Value(-studentTheme.drawerWidth)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
 
@@ -32,6 +36,11 @@ export function StudentDrawer() {
         Animated.timing(slide, { toValue: 0, duration: 260, useNativeDriver: true }),
         Animated.timing(backdrop, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
+      void fetchExamFeeSessions()
+        .then((sessions) => {
+          setExamFeesEnabled(sessions.some((s) => String(s.status).toUpperCase() === 'ACTIVE'));
+        })
+        .catch(() => setExamFeesEnabled(false));
       return;
     }
     Animated.parallel([
@@ -46,16 +55,21 @@ export function StudentDrawer() {
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return DRAWER_MENU_SECTIONS;
-    return DRAWER_MENU_SECTIONS.map((section) => ({
-      ...section,
-      items: section.items.filter(
-        (item) =>
-          item.label.toLowerCase().includes(q) ||
-          item.keywords?.some((keyword) => keyword.includes(q)),
-      ),
-    })).filter((section) => section.items.length > 0);
-  }, [query]);
+    const flagged = filterDrawerByFeatureFlags(DRAWER_MENU_SECTIONS, featureFlags);
+    return flagged
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          if (item.id === 'exam-fees' && !examFeesEnabled) return false;
+          if (!q) return true;
+          return (
+            item.label.toLowerCase().includes(q) ||
+            item.keywords?.some((keyword) => keyword.includes(q))
+          );
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [query, examFeesEnabled, featureFlags]);
 
   const studentName = home?.profile?.displayFullName ?? 'Student';
   const program = home?.profile?.programName ?? home?.profile?.programLabel ?? 'Program';

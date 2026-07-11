@@ -19,6 +19,8 @@ export class CommunicationEmailService {
       content?: Buffer;
       contentType?: string;
     }>;
+    fromName?: string | null;
+    replyTo?: string | null;
   }): Promise<{
     ok: boolean;
     provider: string;
@@ -55,7 +57,10 @@ export class CommunicationEmailService {
         'SMTP_FROM',
         'noreply@demo.edu',
       );
-      const fromName = this.config.get<string>('SMTP_FROM_NAME');
+      const fromName =
+        input.fromName?.trim() ||
+        this.config.get<string>('SMTP_FROM_NAME') ||
+        undefined;
       const from = fromName ? `"${fromName}" <${fromAddress}>` : fromAddress;
       const info = await transport.sendMail({
         from,
@@ -64,6 +69,7 @@ export class CommunicationEmailService {
         html: input.html,
         text: input.text ?? input.html?.replace(/<[^>]+>/g, ' '),
         attachments: input.attachments,
+        ...(input.replyTo?.trim() ? { replyTo: input.replyTo.trim() } : {}),
       });
 
       return { ok: true, provider: 'smtp', providerRef: info.messageId };

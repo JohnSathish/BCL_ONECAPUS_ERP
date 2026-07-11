@@ -197,6 +197,8 @@ export class UserProvisioningService {
             displayName: options.displayName ?? user.displayName,
             phone: options.phone ?? user.phone,
             username: options.username ?? user.username,
+            mustResetPassword:
+              options.mustResetPassword ?? user.mustResetPassword,
           },
         });
       }
@@ -240,11 +242,20 @@ export class UserProvisioningService {
     options: {
       forceReset?: boolean;
       newPassword?: string;
+      resetToRoll?: boolean;
       actorUserId?: string;
     } = {},
   ) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, tenantId, deletedAt: null },
+      include: {
+        student: {
+          select: {
+            rollNumber: true,
+            enrollmentNumber: true,
+          },
+        },
+      },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -253,14 +264,28 @@ export class UserProvisioningService {
     });
     const historyCount = settings?.passwordHistoryCount ?? 5;
 
-    const plainPassword = options.newPassword ?? this.generatePassword();
-    if (options.newPassword) {
+    let plainPassword = options.newPassword?.trim();
+    let skipPolicy = false;
+
+    if (plainPassword) {
       await this.passwordPolicy.validateForUser(
         tenantId,
         userId,
         plainPassword,
       );
+    } else {
+      const roll =
+        user.student?.rollNumber?.trim() ||
+        user.student?.enrollmentNumber?.trim() ||
+        null;
+      if (roll && (options.resetToRoll || Boolean(user.student))) {
+        plainPassword = roll;
+        skipPolicy = true;
+      } else {
+        plainPassword = this.generatePassword();
+      }
     }
+
     const passwordHash = await bcrypt.hash(plainPassword, 12);
 
     const history = await this.prisma.passwordHistory.findMany({
@@ -294,6 +319,10 @@ export class UserProvisioningService {
           where: { id: { in: allHistory.map((h) => h.id) } },
         });
       }
+      await tx.refreshSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     });
 
     await this.audit.log({
@@ -303,6 +332,9 @@ export class UserProvisioningService {
       action: 'user.password_reset',
       entityType: 'user',
       entityId: userId,
+      metadata: {
+        resetToRoll: Boolean(options.resetToRoll) || skipPolicy,
+      },
     });
 
     return { plainPassword };

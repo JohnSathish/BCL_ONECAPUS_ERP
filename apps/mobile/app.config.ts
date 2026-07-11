@@ -57,7 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 7,
+    versionCode: 8,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -88,6 +88,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         defaultChannel: 'onecampus_default',
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow OneCampus to access photos for passport photo upload.',
+      },
+    ],
+    'expo-document-picker',
     'expo-router',
     'expo-secure-store',
     'expo-asset',

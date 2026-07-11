@@ -6,6 +6,7 @@ import { resolveUploadRoot } from '../../../common/uploads/upload-paths';
 import { CommunicationEmailService } from './communication-email.service';
 import { CommunicationSmsService } from './communication-sms.service';
 import { CommunicationTemplateRendererService } from './communication-template-renderer.service';
+import { BrandedEmailLayoutService } from './branded-email-layout.service';
 import { UserNotificationsService } from './user-notifications.service';
 import { FcmPushService } from './fcm-push.service';
 import { CommunicationWhatsAppService } from './communication-whatsapp.service';
@@ -26,6 +27,7 @@ export class CommunicationDeliveryService {
     private readonly sms: CommunicationSmsService,
     private readonly notifications: UserNotificationsService,
     private readonly renderer: CommunicationTemplateRendererService,
+    private readonly brandedLayout: BrandedEmailLayoutService,
     private readonly fcm: FcmPushService,
     private readonly whatsapp: CommunicationWhatsAppService,
     private readonly config: ConfigService,
@@ -53,9 +55,16 @@ export class CommunicationDeliveryService {
     const base = (
       this.config.get<string>('APP_PUBLIC_URL') ??
       this.config.get<string>('API_PUBLIC_URL') ??
+      this.config.get<string>('WEB_ORIGIN') ??
       'http://127.0.0.1:3001'
     ).replace(/\/$/, '');
-    return `${base}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+    const absolute = `${base}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(absolute)) {
+      this.logger.warn(
+        `Attachment URL resolves to localhost (${absolute}). Set APP_PUBLIC_URL to a public HTTPS origin so FCM can fetch images.`,
+      );
+    }
+    return absolute;
   }
 
   private attachmentDiskPath(url: string): string | null {
@@ -176,6 +185,9 @@ export class CommunicationDeliveryService {
     const channels = (campaign.channels as string[]) ?? ['IN_APP'];
     const metadata = (campaign.metadata ?? {}) as Record<string, unknown>;
     const variables = (metadata.variables ?? {}) as Record<string, string>;
+    const brandingCtx = await this.brandedLayout.resolveContext(tenantId);
+    const brandingVars = this.brandedLayout.brandingVariables(brandingCtx);
+    const mergedVariables = { ...brandingVars, ...variables };
     const attachments = this.parseAttachments(campaign.attachments);
     const imageAttachment = attachments.find((a) => a.type === 'image');
     const pdfAttachment = attachments.find((a) => a.type === 'pdf');
@@ -185,7 +197,7 @@ export class CommunicationDeliveryService {
         bodyHtml: campaign.bodyHtml,
         bodyText: campaign.bodyText,
       },
-      variables,
+      mergedVariables,
     );
     const subject = this.coalesceRendered(
       rendered.subject,
@@ -375,6 +387,25 @@ export class CommunicationDeliveryService {
               pdfUrl: pdfAttachment
                 ? this.toAbsoluteUrl(pdfAttachment.url)
                 : '',
+              fileUrl: (() => {
+                const other = attachments.find(
+                  (a) => a.type !== 'image' && a.type !== 'pdf',
+                );
+                return other ? this.toAbsoluteUrl(other.url) : '';
+              })(),
+              fileName: (() => {
+                const other = attachments.find(
+                  (a) => a.type !== 'image' && a.type !== 'pdf',
+                );
+                return other?.name ?? '';
+              })(),
+              attachments: JSON.stringify(
+                attachments.map((a) => ({
+                  type: a.type,
+                  url: this.toAbsoluteUrl(a.url),
+                  name: a.name ?? null,
+                })),
+              ),
               attachmentCount: String(attachments.length),
             },
           });
@@ -447,16 +478,25 @@ export class CommunicationDeliveryService {
             });
           }
 
+          const rawHtml =
+            this.appendAttachmentHtml(
+              bodyHtml ?? `<p>${bodyText ?? subject}</p>`,
+              attachments,
+            ) ?? `<p>${bodyText ?? subject}</p>`;
+          const brandedHtml = this.brandedLayout.wrap({
+            title: subject,
+            bodyHtml: rawHtml,
+            ctx: brandingCtx,
+          });
+
           const result = await this.email.send({
             to: recipient.email,
             subject,
-            html:
-              this.appendAttachmentHtml(
-                bodyHtml ?? `<p>${bodyText ?? subject}</p>`,
-                attachments,
-              ) ?? undefined,
+            html: brandedHtml,
             text: bodyText ?? undefined,
             attachments: emailAttachments,
+            fromName: brandingCtx.senderName ?? brandingCtx.institutionName,
+            replyTo: brandingCtx.replyEmail,
           });
 
           await this.logDelivery({
@@ -506,9 +546,16 @@ export class CommunicationDeliveryService {
             metadata: {
               triggerKey,
               recipientType: recipient.recipientType,
-              attachments,
-              imageUrl: imageAttachment?.url ?? null,
-              pdfUrl: pdfAttachment?.url ?? null,
+              attachments: attachments.map((a) => ({
+                ...a,
+                url: this.toAbsoluteUrl(a.url),
+              })),
+              imageUrl: imageAttachment
+                ? this.toAbsoluteUrl(imageAttachment.url)
+                : null,
+              pdfUrl: pdfAttachment
+                ? this.toAbsoluteUrl(pdfAttachment.url)
+                : null,
             },
           });
 

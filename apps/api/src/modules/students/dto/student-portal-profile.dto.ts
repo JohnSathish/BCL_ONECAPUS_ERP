@@ -4,13 +4,16 @@ import {
   Allow,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { PORTAL_DOCUMENT_TYPES } from '../domain/profile-update-policy.defaults';
@@ -202,6 +205,67 @@ export class ProfileSoftGateSettingsDto {
   @IsOptional()
   @IsBoolean()
   softBlockCertificates?: boolean;
+}
+
+export class ProfileUpdateWindowDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  closedMessage?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  bankSectionVisible?: boolean;
+}
+
+export class ReopenAllProfileUpdateDto {
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string | null;
+
+  @IsDateString()
+  endsAt!: string;
+}
+
+export class ReopenStudentProfileUpdateDto {
+  @IsDateString()
+  reopenUntil!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class ReopenStudentByRollDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  rollNumber!: string;
+
+  @IsDateString()
+  reopenUntil!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class RevokeStudentReopenByRollDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  rollNumber!: string;
 }
 
 export class UpsertProfileUpdatePolicyDto {

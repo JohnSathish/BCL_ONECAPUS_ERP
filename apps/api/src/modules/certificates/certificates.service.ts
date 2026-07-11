@@ -144,13 +144,9 @@ export class CertificatesService {
   }
 
   async getMyIssueDocumentStream(user: JwtUser, issueId: string) {
-    const student = await this.resolveStudentRecord(user);
-    const issue = await this.getIssue(user.tid, issueId);
-    if (issue.studentId !== student.id)
-      throw new ForbiddenException(
-        'You can only download your own certificates',
-      );
-    return this.getIssueDocumentStream(user.tid, issueId);
+    throw new BadRequestException(
+      'Certificate download is disabled for students. Pay the certificate fee and collect the document from the college office.',
+    );
   }
 
   async dashboard(tenantId: string) {

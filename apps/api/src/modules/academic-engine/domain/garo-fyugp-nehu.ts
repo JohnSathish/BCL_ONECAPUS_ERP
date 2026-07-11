@@ -124,8 +124,7 @@ export const GARO_NEHU_PAPERS: GaroNehuPaper[] = [
   },
   {
     code: formatNehuCourseCode('GAR', 303),
-    title:
-      'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+    title: 'Internship',
     semester: 5,
     category: 'INTERNSHIP',
     credits: 4,

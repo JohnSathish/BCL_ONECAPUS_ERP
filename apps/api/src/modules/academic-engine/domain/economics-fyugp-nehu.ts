@@ -141,8 +141,7 @@ export const ECONOMICS_NEHU_PAPERS: EconomicsNehuPaper[] = [
   },
   {
     code: 'ECO-303',
-    title:
-      'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+    title: 'Internship',
     semester: 5,
     category: 'INTERNSHIP',
     credits: 4,

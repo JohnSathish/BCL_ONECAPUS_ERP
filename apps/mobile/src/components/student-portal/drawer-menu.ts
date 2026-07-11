@@ -57,12 +57,6 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
     icon: '🎓',
     items: [
       {
-        id: 'exam-fees',
-        label: 'Examination Fees',
-        href: '/(student)/examination-fees',
-        keywords: ['exam fee', 'back paper', 'nehu'],
-      },
-      {
         id: 'hall-ticket',
         label: 'Hall Ticket',
         href: '/(student)/exam-schedule',
@@ -100,10 +94,41 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         keywords: ['pay', 'due', 'payment'],
       },
       {
+        id: 'exam-fees',
+        label: 'Semester Exam Fees',
+        href: '/(student)/examination-fees',
+        keywords: ['exam fee', 'back paper', 'nehu'],
+      },
+      {
         id: 'receipts',
         label: 'Receipts',
         href: '/(student)/(tabs)/fees',
         keywords: ['download', 'receipt'],
+      },
+    ],
+  },
+  {
+    id: 'services',
+    title: 'Services',
+    icon: '🧾',
+    items: [
+      {
+        id: 'feedback',
+        label: 'Feedback',
+        href: '/(student)/feedback',
+        keywords: ['survey', 'naac', 'sss', 'rating'],
+      },
+      {
+        id: 'certificates',
+        label: 'Certificates',
+        href: '/(student)/certificates',
+        keywords: ['bonafide', 'tc', 'character'],
+      },
+      {
+        id: 'registration-web',
+        label: 'Course Registration',
+        href: '/(student)/registration-web',
+        keywords: ['subject', 'elective', 'fyugp'],
       },
     ],
   },
@@ -115,9 +140,9 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
       { id: 'library', label: 'Library', href: '/(student)/library', keywords: ['books'] },
       {
         id: 'notices',
-        label: 'Notices',
+        label: 'Alerts',
         href: '/(student)/(tabs)/notifications',
-        keywords: ['announcement'],
+        keywords: ['announcement', 'notification'],
       },
       {
         id: 'leave',
@@ -141,6 +166,42 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
     ],
   },
 ];
+
+/** Maps drawer item ids → remote featureFlags keys. Missing key = always visible. */
+export const DRAWER_ITEM_FEATURE_FLAGS: Record<string, string> = {
+  attendance: 'attendance',
+  timetable: 'timetable',
+  assignments: 'assignments',
+  'hall-ticket': 'examination',
+  results: 'results',
+  'internal-marks': 'examination',
+  'exam-schedule': 'examination',
+  fees: 'fees',
+  'exam-fees': 'fees',
+  receipts: 'fees',
+  feedback: 'feedback',
+  certificates: 'certificates',
+  library: 'library',
+  notices: 'notifications',
+  leave: 'leave',
+};
+
+export function filterDrawerByFeatureFlags(
+  sections: DrawerMenuSection[],
+  flags: Record<string, boolean> | undefined,
+): DrawerMenuSection[] {
+  if (!flags || Object.keys(flags).length === 0) return sections;
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        const flagKey = DRAWER_ITEM_FEATURE_FLAGS[item.id];
+        if (!flagKey) return true;
+        return flags[flagKey] !== false;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+}
 
 export type QuickAction = {
   id: string;

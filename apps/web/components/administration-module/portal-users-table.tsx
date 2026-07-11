@@ -5,12 +5,14 @@ import { useRef } from 'react';
 import {
   Eye,
   KeyRound,
+  LockKeyhole,
   LogIn,
   Mail,
   MoreHorizontal,
   Pencil,
   ShieldCheck,
   ShieldOff,
+  Unlock,
 } from 'lucide-react';
 import type { PortalUserRow } from '@/types/administration';
 import { AdminGlassCard } from './ui/admin-shell';
@@ -35,6 +37,8 @@ type Props = {
   onActivate: (row: PortalUserRow) => void;
   onSuspend: (row: PortalUserRow) => void;
   onResetPassword: (row: PortalUserRow) => void;
+  onForcePasswordReset: (row: PortalUserRow) => void;
+  onUnlockLogin: (row: PortalUserRow) => void;
   onSendCredentials: (row: PortalUserRow) => void;
   onImpersonate: (row: PortalUserRow) => void;
   canManage: boolean;
@@ -51,6 +55,8 @@ export function PortalUsersTable({
   onActivate,
   onSuspend,
   onResetPassword,
+  onForcePasswordReset,
+  onUnlockLogin,
   onSendCredentials,
   onImpersonate,
   canManage,
@@ -165,6 +171,12 @@ export function PortalUsersTable({
                             )}
                             <DropdownMenuItem onClick={() => onResetPassword(row)}>
                               <KeyRound className="mr-2 h-4 w-4" /> Reset password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onForcePasswordReset(row)}>
+                              <LockKeyhole className="mr-2 h-4 w-4" /> Force password change
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onUnlockLogin(row)}>
+                              <Unlock className="mr-2 h-4 w-4" /> Unlock account
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onSendCredentials(row)}>
                               <Mail className="mr-2 h-4 w-4" /> Send credentials

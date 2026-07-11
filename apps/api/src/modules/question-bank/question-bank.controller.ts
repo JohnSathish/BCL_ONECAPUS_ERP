@@ -24,13 +24,17 @@ import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import { extractClientIp } from '../../common/utils/request-host';
 import {
+  AddPaperVersionDto,
   CreateQuestionPaperDto,
+  CreateShareLinkDto,
+  CurriculumCoursesQueryDto,
   QuestionBankSettingsDto,
   QuestionPaperApprovalDto,
   QuestionPaperQueryDto,
@@ -81,6 +85,27 @@ export class QuestionBankController {
   @RequireAnyPermission(...QB_READ)
   dashboard(@CurrentUser() user: JwtUser) {
     return this.analytics.dashboard(user.tid);
+  }
+
+  @Get('uploaders')
+  @RequireAnyPermission(...QB_READ)
+  uploaders(@CurrentUser() user: JwtUser) {
+    return this.papers.listUploaders(user.tid);
+  }
+
+  @Get('people')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  people(@CurrentUser() user: JwtUser, @Query('q') q?: string) {
+    return this.papers.searchPeople(user.tid, q);
+  }
+
+  @Get('curriculum/courses')
+  @RequireAnyPermission(...QB_DOWNLOAD)
+  curriculumCourses(
+    @CurrentUser() user: JwtUser,
+    @Query() query: CurriculumCoursesQueryDto,
+  ) {
+    return this.papers.listCurriculumCourses(user.tid, query);
   }
 
   @Get('papers')
@@ -155,6 +180,82 @@ export class QuestionBankController {
     @Query('roleSlug') roleSlug?: string,
   ) {
     return this.workflow.listPendingApprovals(user.tid, roleSlug);
+  }
+
+  @Get('papers/:id/versions')
+  @RequireAnyPermission(...QB_DOWNLOAD)
+  listVersions(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.papers.listVersions(user, id);
+  }
+
+  @Post('papers/:id/versions')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  addVersion(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddPaperVersionDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.papers.addVersion(user, id, file, {
+      changeNote: dto.changeNote,
+    });
+  }
+
+  @Get('papers/:id/versions/:versionNo/download')
+  @RequireAnyPermission(...QB_DOWNLOAD)
+  async downloadVersion(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('versionNo') versionNo: string,
+    @Req() req: Request,
+  ) {
+    const { stream, fileName } = await this.papers.downloadVersion(
+      user,
+      id,
+      Number(versionNo),
+      extractClientIp(req),
+    );
+    return new StreamableFile(stream, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${fileName}"`,
+    });
+  }
+
+  @Get('papers/:id/shares')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  listShares(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.papers.listShareLinks(user, id);
+  }
+
+  @Post('papers/:id/share')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  createShare(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CreateShareLinkDto,
+  ) {
+    return this.papers.createShareLink(user, id, dto);
+  }
+
+  @Delete('shares/:id')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  revokeShare(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.papers.revokeShareLink(user, id);
+  }
+
+  @Public()
+  @Get('share/:token/download')
+  async downloadShare(@Param('token') token: string, @Req() req: Request) {
+    const { stream, fileName } = await this.papers.downloadByShareToken(
+      token,
+      extractClientIp(req),
+    );
+    return new StreamableFile(stream, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 
   @Get('papers/:id/download')

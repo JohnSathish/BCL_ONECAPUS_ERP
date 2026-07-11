@@ -7,6 +7,10 @@ import { CommunicationDeliveryService } from '../services/communication-delivery
 @Processor('notifications', {
   lockDuration: 600_000,
   stalledInterval: 120_000,
+  maxStalledCount: 2,
+  // Keep renewing while long FCM/email batches run; default half-lock can still
+  // race when the event loop is busy delivering thousands of pushes.
+  lockRenewTime: 30_000,
 })
 export class CommunicationNotificationProcessor extends WorkerHost {
   constructor(

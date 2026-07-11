@@ -12,6 +12,7 @@ export type AuthUser = {
   impersonatedBy?: string;
   impersonationSessionId?: string;
   isImpersonating?: boolean;
+  mustResetPassword?: boolean;
 };
 
 export type AuthSession = {
@@ -22,7 +23,8 @@ export type AuthSession = {
 };
 
 export type LoginPayload = {
-  email: string;
+  email?: string;
+  identifier?: string;
   password: string;
   challengeToken: string;
   challengeAnswer: number;

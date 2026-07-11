@@ -201,7 +201,7 @@ export type MasterLookup = {
 };
 
 export type AdmitStudentPayload = {
-  email: string;
+  email?: string;
   enrollmentNumber: string;
   applicationNumber?: string;
   fullName: string;

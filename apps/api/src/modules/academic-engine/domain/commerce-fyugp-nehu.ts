@@ -83,8 +83,7 @@ export const COMMERCE_NEHU_PAPERS: CommerceNehuPaper[] = [
   }),
   {
     code: formatNehuCourseCode('COM', 303),
-    title:
-      'Internship / Apprenticeship / Community Engagement and Service / Field Based Learning or Minor Project',
+    title: 'Internship',
     semester: 5,
     category: 'INTERNSHIP',
     deliveryKind: INT,

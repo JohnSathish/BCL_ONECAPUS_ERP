@@ -5,6 +5,8 @@ import { Check, Download, Loader2, Printer, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
 import {
   bulkReviewProfileRequests,
   exportProfileVerificationReport,
@@ -13,13 +15,19 @@ import {
   fetchProfileCompletionDashboard,
   fetchProfileSoftGates,
   fetchProfileUpdatePolicy,
+  fetchProfileUpdateWindow,
   fetchProfileVerificationHistory,
   fetchProfileVerificationPending,
+  reopenAllProfileUpdate,
+  reopenStudentProfileUpdate,
+  revokeStudentProfileUpdate,
   reviewProfileRequest,
   updateProfileSoftGates,
   updateProfileUpdatePolicy,
+  updateProfileUpdateWindow,
   type ProfileChangeRequest,
   type ProfileSoftGate,
+  type ProfileUpdateWindowSettings,
 } from '@/services/student-profile-verification';
 import { verifyStudentDocument } from '@/services/students';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -66,6 +74,12 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
     queryKey: ['profile-verification', 'soft-gates'],
     queryFn: fetchProfileSoftGates,
     enabled: mode === 'policy',
+  });
+
+  const updateWindowQ = useQuery({
+    queryKey: ['profile-verification', 'update-window'],
+    queryFn: fetchProfileUpdateWindow,
+    enabled: mode === 'policy' || mode === 'pending',
   });
 
   const reviewMut = useMutation({
@@ -128,6 +142,26 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
       await qc.invalidateQueries({ queryKey: ['profile-verification', 'soft-gates'] });
     },
     onError: (e) => setMessage(apiErrorMessage(e, 'Soft gate save failed')),
+  });
+
+  const updateWindowMut = useMutation({
+    mutationFn: (payload: Partial<ProfileUpdateWindowSettings>) =>
+      updateProfileUpdateWindow(payload),
+    onSuccess: async () => {
+      setMessage('Profile update window saved');
+      await qc.invalidateQueries({ queryKey: ['profile-verification', 'update-window'] });
+    },
+    onError: (e) => setMessage(apiErrorMessage(e, 'Update window save failed')),
+  });
+
+  const reopenAllMut = useMutation({
+    mutationFn: (payload: { startsAt?: string | null; endsAt: string }) =>
+      reopenAllProfileUpdate(payload),
+    onSuccess: async () => {
+      setMessage('Profile update window reopened for all students');
+      await qc.invalidateQueries({ queryKey: ['profile-verification', 'update-window'] });
+    },
+    onError: (e) => setMessage(apiErrorMessage(e, 'Reopen all failed')),
   });
 
   const title =
@@ -373,6 +407,13 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
 
       {mode === 'policy' && (
         <div className="space-y-4">
+          <UpdateWindowPanel
+            window={updateWindowQ.data}
+            loading={updateWindowQ.isLoading}
+            saving={updateWindowMut.isPending || reopenAllMut.isPending}
+            onSave={(payload) => updateWindowMut.mutate(payload)}
+            onReopenAll={(payload) => reopenAllMut.mutate(payload)}
+          />
           <SoftGatesPanel
             gates={softGatesQ.data}
             loading={softGatesQ.isLoading}
@@ -428,6 +469,189 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
         </div>
       )}
     </div>
+  );
+}
+
+function UpdateWindowPanel({
+  window,
+  loading,
+  saving,
+  onSave,
+  onReopenAll,
+}: {
+  window?: ProfileUpdateWindowSettings;
+  loading: boolean;
+  saving: boolean;
+  onSave: (payload: Partial<ProfileUpdateWindowSettings>) => void;
+  onReopenAll: (payload: { startsAt?: string | null; endsAt: string }) => void;
+}) {
+  const [draft, setDraft] = useState<Partial<ProfileUpdateWindowSettings> | null>(null);
+  const [reopenEndsAt, setReopenEndsAt] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
+  const [studentUntil, setStudentUntil] = useState('');
+  const [studentMsg, setStudentMsg] = useState('');
+  const value = draft ??
+    window ?? {
+      enabled: false,
+      startsAt: '',
+      endsAt: '',
+      closedMessage:
+        'The profile update period has ended. Please contact the College Office if you need to make any changes.',
+      bankSectionVisible: false,
+    };
+
+  return (
+    <>
+      {loading && !window ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading update window…
+        </p>
+      ) : null}
+      {!(loading && !window) ? (
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+          <div>
+            <h2 className="text-sm font-semibold">Profile update window</h2>
+            <p className="text-xs text-muted-foreground">
+              When enabled, students may edit their profile only between the start and end dates.
+              Outside the window the profile is read-only unless you reopen for a student or for
+              all.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(value.enabled)}
+              onChange={(e) => setDraft({ ...value, enabled: e.target.checked })}
+            />
+            Enable date window (gate student edits)
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <p className="text-xs font-medium">Start date</p>
+              <DateInput
+                value={value.startsAt ?? ''}
+                onChange={(v) => setDraft({ ...value, startsAt: v || null })}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium">End date</p>
+              <DateInput
+                value={value.endsAt ?? ''}
+                onChange={(v) => setDraft({ ...value, endsAt: v || null })}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-medium">Closed message</p>
+            <Input
+              value={value.closedMessage ?? ''}
+              onChange={(e) => setDraft({ ...value, closedMessage: e.target.value })}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(value.bankSectionVisible)}
+              onChange={(e) => setDraft({ ...value, bankSectionVisible: e.target.checked })}
+            />
+            Show Bank Account Details to students (currently hidden by default)
+          </label>
+          <Button
+            size="sm"
+            disabled={saving}
+            onClick={() =>
+              onSave({
+                enabled: Boolean(value.enabled),
+                startsAt: value.startsAt || null,
+                endsAt: value.endsAt || null,
+                closedMessage: value.closedMessage,
+                bankSectionVisible: Boolean(value.bankSectionVisible),
+              })
+            }
+          >
+            {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Save update window
+          </Button>
+
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
+              Reopen for all students
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-1">
+                <p className="text-xs">New end date</p>
+                <DateInput value={reopenEndsAt} onChange={setReopenEndsAt} />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!reopenEndsAt || saving}
+                onClick={() => onReopenAll({ endsAt: reopenEndsAt })}
+              >
+                Reopen all
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
+              Reopen for one student
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Enter the student&apos;s roll number (e.g. BA25-016). Enrollment number also works.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Input
+                placeholder="Roll number (e.g. BA25-016)"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
+              />
+              <DateInput value={studentUntil} onChange={setStudentUntil} />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!rollNumber.trim() || !studentUntil}
+                onClick={async () => {
+                  try {
+                    const res = await reopenStudentProfileUpdate(rollNumber.trim(), {
+                      reopenUntil: studentUntil,
+                    });
+                    const name = (res as any)?.student?.name;
+                    const roll = (res as any)?.student?.rollNumber ?? rollNumber.trim();
+                    setStudentMsg(
+                      name
+                        ? `Reopened until ${studentUntil} for ${name} (${roll})`
+                        : `Reopened until ${studentUntil} for ${roll}`,
+                    );
+                  } catch (e) {
+                    setStudentMsg(apiErrorMessage(e, 'Reopen failed'));
+                  }
+                }}
+              >
+                Reopen student
+              </Button>
+            </div>
+            {rollNumber.trim() ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await revokeStudentProfileUpdate(rollNumber.trim());
+                    setStudentMsg(`Reopen revoked for ${rollNumber.trim()}`);
+                  } catch (e) {
+                    setStudentMsg(apiErrorMessage(e, 'Revoke failed'));
+                  }
+                }}
+              >
+                Revoke reopen
+              </Button>
+            ) : null}
+            {studentMsg ? <p className="text-xs text-muted-foreground">{studentMsg}</p> : null}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

@@ -57,6 +57,25 @@ function money(n: unknown) {
   })}`;
 }
 
+/** After payment / verification, keep students on the Payment step (receipt), not Declare. */
+function resolveStudentExamWizardStep(app: any | null): number {
+  if (!app) return 0;
+  const status = String(app.status ?? '').toUpperCase();
+  const paidOrDone = [
+    'PAID',
+    'MANUAL_PAID',
+    'UNDER_VERIFICATION',
+    'APPROVED',
+    'REJECTED',
+    'CANCELLED',
+  ].includes(status);
+  if (paidOrDone || (app.receipts?.length ?? 0) > 0) return 3;
+  if (status === 'AWAITING_PAYMENT' || status === 'SUBMITTED') return 3;
+  if (app.declarationAccepted) return 2;
+  if ((app.backPapers?.length ?? 0) > 0) return 1;
+  return 0;
+}
+
 function toDateInput(value?: string | Date | null) {
   if (!value) return '';
   const d = new Date(value);
@@ -225,10 +244,7 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
         setSessions(sess);
         const current = Array.isArray(mine) && mine.length ? mine[0] : null;
         setStudentApp(current);
-        if (current?.status === 'AWAITING_PAYMENT') setWizardStep(3);
-        else if (current?.declarationAccepted) setWizardStep(2);
-        else if ((current?.backPapers?.length ?? 0) > 0) setWizardStep(1);
-        else setWizardStep(0);
+        setWizardStep(resolveStudentExamWizardStep(current));
       }
     } catch (e: any) {
       const msg =
@@ -303,6 +319,7 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
       sessionStorage.removeItem('examFeePendingPayment');
       setHasPendingRedirectPayment(false);
       setStudentApp(completed.application);
+      setWizardStep(3);
       await reload();
     } catch (e: any) {
       const msg = e?.message ?? 'Payment failed';
@@ -330,6 +347,7 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
       sessionStorage.removeItem('examFeePendingPayment');
       setHasPendingRedirectPayment(false);
       setStudentApp(completed.application);
+      setWizardStep(3);
       await reload();
     } catch (e: any) {
       setError(e?.message ?? 'Could not verify redirected payment yet.');

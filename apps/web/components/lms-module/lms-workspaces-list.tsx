@@ -9,7 +9,7 @@ import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/er
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { withApiStartupRetry } from '@/lib/http/wait-for-api';
-import { fetchLmsWorkspaces } from '@/services/lms';
+import { fetchLmsWorkspaces, formatLmsWorkspaceMeta } from '@/services/lms';
 import { isApiUnavailableError } from '@/utils/api-error';
 
 export function LmsWorkspacesList() {
@@ -79,9 +79,16 @@ export function LmsWorkspacesList() {
                   href={`/admin/academics/lms/workspaces/${ws.id}`}
                   className="block rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
                 >
-                  <p className="font-medium">{ws.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ws.workspaceType} · Sem {ws.semesterNo} · {ws._count?.materials ?? 0} materials
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{ws.title}</p>
+                    {ws.workspaceType === 'POOL' ? (
+                      <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                        Prefer for shared materials
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatLmsWorkspaceMeta(ws)}
                   </p>
                 </Link>
               ))

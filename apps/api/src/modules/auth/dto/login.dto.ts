@@ -19,8 +19,9 @@ export class LoginDto {
   @MinLength(2)
   identifier?: string;
 
+  /** May be a short college roll number on first login. */
   @IsString()
-  @MinLength(8)
+  @MinLength(1)
   password!: string;
 
   @IsString()

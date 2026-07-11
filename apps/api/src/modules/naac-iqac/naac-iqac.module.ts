@@ -4,6 +4,7 @@ import { CommunicationModule } from '../communication/communication.module';
 import { GovernanceModule } from '../governance/governance.module';
 import { NaacIqacController } from './naac-iqac.controller';
 import { NaacIqacPortalController } from './naac-iqac-portal.controller';
+import { FeedbackSurveyController } from './feedback-survey.controller';
 import {
   NaacAchievementService,
   NaacMouService,
@@ -23,10 +24,15 @@ import { NaacEvidenceService } from './services/naac-evidence.service';
 import { NaacIntegrationService } from './services/naac-integration.service';
 import { NaacReportService } from './services/naac-report.service';
 import { NaacVaultService } from './services/naac-vault.service';
+import { FeedbackSurveyService } from './services/feedback-survey.service';
 
 @Module({
   imports: [StorageModule, GovernanceModule, CommunicationModule],
-  controllers: [NaacIqacController, NaacIqacPortalController],
+  controllers: [
+    NaacIqacController,
+    NaacIqacPortalController,
+    FeedbackSurveyController,
+  ],
   providers: [
     NaacDashboardService,
     NaacCriteriaService,
@@ -43,8 +49,9 @@ import { NaacVaultService } from './services/naac-vault.service';
     NaacSettingsService,
     NaacDvvService,
     NaacReportService,
+    FeedbackSurveyService,
   ],
-  exports: [NaacEvidenceService, NaacDashboardService],
+  exports: [NaacEvidenceService, NaacDashboardService, FeedbackSurveyService],
 })
 export class NaacIqacModule {}
 // NIMS Phase 1 — NAAC & IQAC institutional compliance platform

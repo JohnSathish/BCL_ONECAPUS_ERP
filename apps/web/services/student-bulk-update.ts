@@ -300,3 +300,41 @@ export function formatFieldValue(value: unknown): string {
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
+
+export type DepartmentBackfillPreview = {
+  eligible: number;
+  missingProgramme: number;
+  programmeHasNoDepartment: number;
+  departmentNotAcademic: number;
+  alreadyHasDepartment: number;
+  sample: {
+    studentId: string;
+    fullName: string | null;
+    rollNumber: string | null;
+    enrollmentNumber: string;
+    programme: string | null;
+    targetDepartment: string;
+  }[];
+};
+
+export type DepartmentBackfillResult = {
+  updated: number;
+  eligible: number;
+  skipped: number;
+  missingProgramme: number;
+  programmeHasNoDepartment: number;
+  departmentNotAcademic: number;
+  alreadyHasDepartment: number;
+  errors: number;
+  errorSamples: { studentId: string; message: string }[];
+};
+
+export async function previewDepartmentBackfillFromProgramme() {
+  const { data } = await api.get('/v1/students/departments/backfill-from-programme/preview');
+  return data as DepartmentBackfillPreview;
+}
+
+export async function applyDepartmentBackfillFromProgramme() {
+  const { data } = await api.post('/v1/students/departments/backfill-from-programme');
+  return data as DepartmentBackfillResult;
+}

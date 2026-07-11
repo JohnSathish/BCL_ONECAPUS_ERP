@@ -79,6 +79,8 @@ export type ProfileBootstrap = {
   };
   sections: Record<string, any>;
   completion: ProfileCompletion;
+  profileUpdate?: ProfileUpdateWindowAccess;
+  visibleSections?: { bank?: boolean };
   verificationStatus: string;
   changeRequests: ProfileChangeRequest[];
   lookups: {
@@ -227,6 +229,26 @@ export async function reviewProfileItem(
   return data;
 }
 
+export type ProfileUpdateWindowAccess = {
+  enabled: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  closedMessage: string;
+  bankSectionVisible?: boolean;
+  windowOpen?: boolean;
+  canEdit: boolean;
+  reopenUntil?: string | null;
+  message?: string | null;
+};
+
+export type ProfileUpdateWindowSettings = {
+  enabled: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  closedMessage: string;
+  bankSectionVisible?: boolean;
+};
+
 export async function fetchProfileSoftGates() {
   const { data } = await api.get<ProfileSoftGate>('/v1/students/profile-verification/soft-gates');
   return data;
@@ -237,6 +259,47 @@ export async function updateProfileSoftGates(payload: Partial<ProfileSoftGate>) 
     '/v1/students/profile-verification/soft-gates',
     payload,
   );
+  return data;
+}
+
+export async function fetchProfileUpdateWindow() {
+  const { data } = await api.get<ProfileUpdateWindowSettings>(
+    '/v1/students/profile-verification/update-window',
+  );
+  return data;
+}
+
+export async function updateProfileUpdateWindow(payload: Partial<ProfileUpdateWindowSettings>) {
+  const { data } = await api.put<ProfileUpdateWindowSettings>(
+    '/v1/students/profile-verification/update-window',
+    payload,
+  );
+  return data;
+}
+
+export async function reopenAllProfileUpdate(payload: {
+  startsAt?: string | null;
+  endsAt: string;
+}) {
+  const { data } = await api.post('/v1/students/profile-verification/reopen-all', payload);
+  return data as ProfileUpdateWindowSettings;
+}
+
+export async function reopenStudentProfileUpdate(
+  rollNumber: string,
+  payload: { reopenUntil: string; reason?: string },
+) {
+  const { data } = await api.post('/v1/students/profile-verification/reopen-student', {
+    rollNumber,
+    ...payload,
+  });
+  return data;
+}
+
+export async function revokeStudentProfileUpdate(rollNumber: string) {
+  const { data } = await api.post('/v1/students/profile-verification/revoke-student-reopen', {
+    rollNumber,
+  });
   return data;
 }
 

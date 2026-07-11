@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Loader2, Lock, Mail, Shield } from 'lucide-react';
+import { Loader2, Lock, Shield, UserRound } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
@@ -29,6 +29,7 @@ type Props = {
   errors: FieldErrors<LoginFormValues>;
   isSubmitting: boolean;
   formError: string | null;
+  formInfo?: string | null;
   verificationError?: string | null;
   passwordValue: string;
   challengeAnswer: string;
@@ -66,6 +67,7 @@ export function LoginAuthCard({
   errors,
   isSubmitting,
   formError,
+  formInfo,
   verificationError,
   passwordValue,
   challengeAnswer,
@@ -109,7 +111,7 @@ export function LoginAuthCard({
             Sign in to your portal
           </p>
           <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-            Enter your credentials to access your campus workspace
+            Students: use your college roll number. Staff: use your work email.
           </p>
         </motion.div>
       ) : null}
@@ -119,13 +121,13 @@ export function LoginAuthCard({
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
             <motion.div className="space-y-3" {...fadeUp(0.22, animate)}>
               <LoginField
-                id="email"
-                label="Work email"
-                icon={Mail}
-                type="email"
-                autoComplete="email"
+                id="identifier"
+                label="College roll number or email"
+                icon={UserRound}
+                type="text"
+                autoComplete="username"
                 disabled={isSubmitting || !context}
-                error={errors.email?.message}
+                error={errors.identifier?.message}
                 register={register}
               />
               <LoginField
@@ -140,15 +142,23 @@ export function LoginAuthCard({
                 passwordValue={passwordValue}
               />
 
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  className="rounded border-border"
-                  disabled={isSubmitting || !context}
-                  {...register('rememberMe')}
-                />
-                Remember me for 30 days
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border"
+                    disabled={isSubmitting || !context}
+                    {...register('rememberMe')}
+                  />
+                  Remember me for 30 days
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
 
               <LoginHumanVerification
                 challenge={challenge}
@@ -160,6 +170,15 @@ export function LoginAuthCard({
                 onRefresh={onRefreshChallenge}
               />
             </motion.div>
+
+            {formInfo && !formError ? (
+              <p
+                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700"
+                role="status"
+              >
+                {formInfo}
+              </p>
+            ) : null}
 
             {formError ? (
               <p

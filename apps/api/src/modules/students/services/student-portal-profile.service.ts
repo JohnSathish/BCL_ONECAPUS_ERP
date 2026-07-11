@@ -485,6 +485,7 @@ export class StudentPortalProfileService {
     file: Express.Multer.File,
   ) {
     const student = await this.portal.resolveStudent(user);
+    await this.changeRequests.assertStudentCanEditProfile(user.tid, student.id);
     const allowed = new Set([
       'AADHAAR',
       'PAN',

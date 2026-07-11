@@ -92,6 +92,37 @@ export const updateCommunicationTemplate = (id: string, payload: Partial<Communi
 export const deleteCommunicationTemplate = (id: string) =>
   api.delete(`${base}/templates/${id}`).then((res) => res.data);
 
+export const previewCommunicationTemplate = (payload: {
+  templateId?: string;
+  subject?: string;
+  bodyHtml?: string;
+  title?: string;
+  sampleData?: Record<string, string>;
+}) =>
+  api
+    .post<{
+      subject: string;
+      html: string;
+      bodyHtml: string;
+      variables: Record<string, string>;
+    }>(`${base}/templates/preview`, payload)
+    .then((res) => res.data);
+
+export const duplicateCommunicationTemplate = (id: string) =>
+  api.post<CommunicationTemplate>(`${base}/templates/${id}/duplicate`).then((res) => res.data);
+
+export const restoreCommunicationTemplateDefault = (id: string) =>
+  api
+    .post<CommunicationTemplate>(`${base}/templates/${id}/restore-default`)
+    .then((res) => res.data);
+
+export const testSendCommunicationTemplate = (id: string, toEmail?: string) =>
+  api
+    .post<{ ok: boolean; to: string; provider: string }>(`${base}/templates/${id}/test-send`, {
+      toEmail,
+    })
+    .then((res) => res.data);
+
 export const fetchCommunicationCampaigns = (status?: string) =>
   api
     .get<CommunicationCampaign[]>(`${base}/campaigns`, { params: status ? { status } : undefined })

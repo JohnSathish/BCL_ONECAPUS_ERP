@@ -28,6 +28,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "import:class12-subjects": "tsx scripts/import-class12-subjects-master.ts",
+    "shorten:internship-titles": "tsx scripts/shorten-internship-course-titles.ts",
     "production:purge-demo": "tsx scripts/production-purge-demo.ts",
     "production:purge-applicants": "tsx scripts/purge-demo-applicants.ts",
     "verify:odd-semester": "ts-node --transpile-only scripts/verify-odd-semester-config.ts",

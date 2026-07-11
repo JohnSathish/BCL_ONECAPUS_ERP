@@ -21,15 +21,27 @@ export const COMM_CENTER_NAV = [
 ] as const;
 
 export const MESSAGE_VARIABLES = [
-  { key: 'StudentName', label: 'Student Name' },
-  { key: 'Department', label: 'Department' },
-  { key: 'Semester', label: 'Semester' },
-  { key: 'RollNumber', label: 'Roll Number' },
-  { key: 'OutstandingFee', label: 'Outstanding Fee' },
-  { key: 'Attendance', label: 'Attendance %' },
-  { key: 'DueDate', label: 'Due Date' },
-  { key: 'LibraryFine', label: 'Library Fine' },
-  { key: 'ParentName', label: 'Parent Name' },
+  { key: 'student_name', label: 'Student Name' },
+  { key: 'staff_name', label: 'Staff Name' },
+  { key: 'parent_name', label: 'Parent Name' },
+  { key: 'roll_number', label: 'Roll Number' },
+  { key: 'admission_number', label: 'Admission Number' },
+  { key: 'department', label: 'Department' },
+  { key: 'programme', label: 'Programme' },
+  { key: 'semester', label: 'Semester' },
+  { key: 'academic_year', label: 'Academic Year' },
+  { key: 'fee_amount', label: 'Fee Amount' },
+  { key: 'receipt_number', label: 'Receipt Number' },
+  { key: 'payment_date', label: 'Payment Date' },
+  { key: 'examination_name', label: 'Examination Name' },
+  { key: 'otp', label: 'OTP' },
+  { key: 'login_url', label: 'Login URL' },
+  { key: 'attendance_percent', label: 'Attendance %' },
+  { key: 'due_date', label: 'Due Date' },
+  { key: 'library_fine', label: 'Library Fine' },
+  { key: 'institution_name', label: 'Institution Name' },
+  { key: 'application_number', label: 'Application Number' },
+  { key: 'program_name', label: 'Programme Name' },
 ] as const;
 
 export const CHANNEL_OPTIONS = [

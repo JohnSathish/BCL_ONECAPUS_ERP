@@ -25,7 +25,9 @@ import {
 } from '@/services/students';
 import { fetchAcademicDepartments } from '@/services/organization';
 import { fetchAcademicSubjects } from '@/services/academic-engine';
-import { fetchBoardNames, fetchBoardSubjects } from '@/services/support-data';
+import { fetchBoardNames } from '@/services/support-data';
+import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
+import { normalizeClass12Stream } from '@/services/class12-subjects';
 import type { StudentProfile } from '@/types/students';
 import type { ProfileSectionKey } from '@/types/student-profile';
 import { DateInput } from '@/components/ui/date-input';
@@ -34,6 +36,7 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { fetchStudentRollShiftHistory } from '@/services/roll-number';
 import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
+import { formatCourseDisplayTitle } from '@/utils/format-course-title';
 
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
 
@@ -119,6 +122,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
   const savePayload = useMemo(
     () => ({
       ...form,
+      email: form.email.trim() || undefined,
       departmentId: form.departmentId || undefined,
     }),
     [form],
@@ -145,13 +149,15 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     : photoMut.isPending
       ? 'Uploading photo…'
       : photoMessage || (saving ? 'Saving…' : message);
+  const footerIsError =
+    photoMut.isError || Boolean(message && message !== 'Saved' && !message.startsWith('Saving'));
 
   return (
     <SectionCard
       title="Basic Information"
       description="Identity, contact, and enrollment identifiers"
       footer={footerMessage}
-      footerClassName={photoMut.isError ? 'text-destructive' : undefined}
+      footerClassName={footerIsError ? 'text-destructive' : undefined}
     >
       <div className="mb-4">
         <StudentPhotoUpload
@@ -189,7 +195,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
               <input
                 className={inputClass}
                 disabled={!canEdit}
-                type="text"
+                type={key === 'email' ? 'email' : 'text'}
                 value={form[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
               />
@@ -799,7 +805,7 @@ function CurrentSemesterRegistrationCard({
                     {paper.courseCode}
                   </span>
                   {' — '}
-                  {paper.courseTitle}
+                  {formatCourseDisplayTitle(paper.courseTitle)}
                 </li>
               ))
             ) : (
@@ -818,7 +824,7 @@ function CurrentSemesterRegistrationCard({
               <ul className="mt-1 space-y-1 text-sm">
                 {rows.map((paper) => (
                   <li key={`${category}-${paper.courseCode}-${paper.registrationId}`}>
-                    • {paper.courseTitle}
+                    • {formatCourseDisplayTitle(paper.courseTitle)}
                     <span className="ml-1 font-mono text-xs text-muted-foreground">
                       ({paper.courseCode})
                     </span>
@@ -854,7 +860,7 @@ export function BoardExamSection({
     schoolName: exam?.schoolName ?? '',
     boardRollNumber: exam?.boardRollNumber ?? '',
     examYear: exam?.examYear ?? undefined,
-    stream: exam?.stream ?? '',
+    stream: normalizeClass12Stream(exam?.stream ?? ''),
     registrationType: exam?.registrationType ?? '',
     division: exam?.division ?? '',
     subjectMarks:
@@ -862,6 +868,7 @@ export function BoardExamSection({
         subjectName: m.subjectName,
         marksObtained: m.marksObtained ?? undefined,
         maxMarks: m.maxMarks ?? undefined,
+        grade: (m as { grade?: string }).grade ?? '',
       })) ?? emptyBoardExamSubjectRows(),
   });
   const { message, saving } = useDebouncedSave(
@@ -870,37 +877,19 @@ export function BoardExamSection({
     sanitizeBoardExamPayload(form),
     canEdit,
   );
-  const subjectsQuery = useQuery({
-    queryKey: ['support-data', 'board-subjects', 'board-exam'],
-    queryFn: () => fetchBoardSubjects({ activeOnly: true }),
-  });
   const boardNamesQ = useQuery({
     queryKey: ['support-data', 'board-names', 'board-exam'],
     queryFn: () => fetchBoardNames({ activeOnly: true }),
   });
 
+  const boardOptions = (boardNamesQ.data ?? []).map((board) => ({
+    value: board.label,
+    label: `${board.label} (${board.code})`,
+  }));
+
   return (
     <SectionCard title="Board Examination (Class XII)" footer={saving ? 'Saving…' : message}>
       <FieldGrid>
-        <Field label="Board Name">
-          <select
-            className={inputClass}
-            disabled={!canEdit}
-            value={form.boardName}
-            onChange={(e) => setForm((f) => ({ ...f, boardName: e.target.value }))}
-          >
-            <option value="">Select board</option>
-            {(boardNamesQ.data ?? []).map((board) => (
-              <option key={board.id} value={board.label}>
-                {board.label} ({board.code})
-              </option>
-            ))}
-            {form.boardName &&
-            !(boardNamesQ.data ?? []).some((board) => board.label === form.boardName) ? (
-              <option value={form.boardName}>{form.boardName}</option>
-            ) : null}
-          </select>
-        </Field>
         <Field label="School">
           <input
             className={inputClass}
@@ -931,74 +920,24 @@ export function BoardExamSection({
             }
           />
         </Field>
-        <Field label="Stream">
-          <input
-            className={inputClass}
-            disabled={!canEdit}
-            value={form.stream}
-            onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}
-          />
-        </Field>
       </FieldGrid>
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Subject marks (min 5)</p>
-        {form.subjectMarks.map((m, idx) => (
-          <div key={idx} className="grid grid-cols-3 gap-2">
-            <select
-              className={inputClass}
-              disabled={!canEdit}
-              value={m.subjectName}
-              onChange={(e) => {
-                const next = [...form.subjectMarks];
-                next[idx] = { ...next[idx], subjectName: e.target.value };
-                setForm((f) => ({ ...f, subjectMarks: next }));
-              }}
-            >
-              <option value="">Select subject</option>
-              {(subjectsQuery.data ?? []).map((subject) => (
-                <option key={subject.id} value={`${subject.label} (${subject.code})`}>
-                  {subject.label} ({subject.code})
-                </option>
-              ))}
-              {m.subjectName &&
-              !(subjectsQuery.data ?? []).some(
-                (s) => `${s.label} (${s.code})` === m.subjectName || s.label === m.subjectName,
-              ) ? (
-                <option value={m.subjectName}>{m.subjectName}</option>
-              ) : null}
-            </select>
-            <input
-              className={inputClass}
-              disabled={!canEdit}
-              type="number"
-              placeholder="Obtained"
-              value={m.marksObtained ?? ''}
-              onChange={(e) => {
-                const next = [...form.subjectMarks];
-                next[idx] = {
-                  ...next[idx],
-                  marksObtained: e.target.value ? Number(e.target.value) : undefined,
-                };
-                setForm((f) => ({ ...f, subjectMarks: next }));
-              }}
-            />
-            <input
-              className={inputClass}
-              disabled={!canEdit}
-              type="number"
-              placeholder="Max"
-              value={m.maxMarks ?? ''}
-              onChange={(e) => {
-                const next = [...form.subjectMarks];
-                next[idx] = {
-                  ...next[idx],
-                  maxMarks: e.target.value ? Number(e.target.value) : undefined,
-                };
-                setForm((f) => ({ ...f, subjectMarks: next }));
-              }}
-            />
-          </div>
-        ))}
+      <div className="mt-4">
+        <ClassXiiSubjectMarksEditor
+          boardName={form.boardName}
+          stream={form.stream}
+          subjectMarks={form.subjectMarks}
+          boardOptions={
+            form.boardName && !boardOptions.some((b) => b.value === form.boardName)
+              ? [...boardOptions, { value: form.boardName, label: form.boardName }]
+              : boardOptions
+          }
+          showBoardSelect
+          disabled={!canEdit}
+          inputClassName={inputClass}
+          onBoardChange={(boardName) => setForm((f) => ({ ...f, boardName }))}
+          onStreamChange={(stream) => setForm((f) => ({ ...f, stream }))}
+          onSubjectMarksChange={(subjectMarks) => setForm((f) => ({ ...f, subjectMarks }))}
+        />
       </div>
     </SectionCard>
   );

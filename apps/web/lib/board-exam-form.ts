@@ -2,6 +2,7 @@ export type BoardExamSubjectMarkForm = {
   subjectName: string;
   marksObtained?: number;
   maxMarks?: number;
+  grade?: string;
 };
 
 export type BoardExamFormValues = {

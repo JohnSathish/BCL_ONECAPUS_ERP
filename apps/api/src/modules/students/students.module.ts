@@ -39,6 +39,7 @@ import { StudentSemesterResolverService } from './services/student-semester-reso
 import { RollNumberService } from './services/roll-number.service';
 import { RollShiftRangeService } from './services/roll-shift-range.service';
 import { StudentAbcService } from './services/student-abc.service';
+import { StudentDepartmentBackfillService } from './services/student-department-backfill.service';
 import { StudentsController } from './students.controller';
 import { StudentPortalController } from './student-portal.controller';
 import { StudentsService } from './students.service';
@@ -50,6 +51,8 @@ import { AcademicChangeHistoryModule } from './academic-change-history/academic-
 import { StudentProfileUpdatePolicyService } from './services/student-profile-update-policy.service';
 import { StudentProfileChangeRequestService } from './services/student-profile-change-request.service';
 import { StudentProfileVerificationController } from './student-profile-verification.controller';
+import { Class12SubjectsController } from './controllers/class12-subjects.controller';
+import { Class12SubjectsService } from './services/class12-subjects.service';
 
 @Module({
   imports: [
@@ -76,6 +79,7 @@ import { StudentProfileVerificationController } from './student-profile-verifica
     StudentPhotoBulkController,
     StudentBulkUpdateController,
     StudentsController,
+    Class12SubjectsController,
   ],
   providers: [
     StudentsService,
@@ -84,6 +88,7 @@ import { StudentProfileVerificationController } from './student-profile-verifica
     StudentPortalProfileService,
     StudentProfileUpdatePolicyService,
     StudentProfileChangeRequestService,
+    Class12SubjectsService,
     StudentLeaveService,
     StudentProfileService,
     StudentDirectoryEnrichmentService,
@@ -93,6 +98,7 @@ import { StudentProfileVerificationController } from './student-profile-verifica
     RollNumberService,
     RollShiftRangeService,
     StudentAbcService,
+    StudentDepartmentBackfillService,
     StudentAssetsService,
     StudentImportHandler,
     StudentImportProfileWriterService,

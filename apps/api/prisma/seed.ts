@@ -3741,16 +3741,16 @@ const BACKUP_NOTIFICATION_TEMPLATES = [
   {
     code: 'BACKUP_SUCCESS',
     name: 'Backup Completed Successfully',
-    subject: 'Backup completed â€” {{institution_name}}',
+    subject: 'Backup completed - {{institution_name}}',
     bodyHtml:
-      '<p>Backup <strong>{{backup_type}}</strong> completed successfully at {{completed_at}}.</p><p>Size: {{size_bytes}} Â· Run ID: {{run_id}}</p>',
+      '<p>Backup <strong>{{backup_type}}</strong> completed successfully at {{completed_at}}.</p><p>Size: {{size_bytes}} · Run ID: {{run_id}}</p>',
     bodyText:
       'Backup {{backup_type}} completed at {{completed_at}}. Size: {{size_bytes}}. Run: {{run_id}}',
   },
   {
     code: 'BACKUP_FAILED',
     name: 'Backup Failed',
-    subject: 'Backup failed â€” {{institution_name}}',
+    subject: 'Backup failed - {{institution_name}}',
     bodyHtml:
       '<p>Backup <strong>{{backup_type}}</strong> failed at {{completed_at}}.</p><p>Error: {{error_message}}</p><p>Run ID: {{run_id}}</p>',
     bodyText:
@@ -3769,7 +3769,7 @@ async function seedBackupNotificationTemplates(
         tenantId,
         code: tpl.code,
         name: tpl.name,
-        category: 'GENERAL',
+        category: 'ADMIN',
         subject: tpl.subject,
         bodyHtml: tpl.bodyHtml,
         bodyText: tpl.bodyText,
@@ -3786,6 +3786,7 @@ async function seedBackupNotificationTemplates(
       },
       update: {
         name: tpl.name,
+        category: 'ADMIN',
         subject: tpl.subject,
         bodyHtml: tpl.bodyHtml,
         bodyText: tpl.bodyText,

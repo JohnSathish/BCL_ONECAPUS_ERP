@@ -1,8 +1,15 @@
 import { getDeviceId } from '@/auth/device';
 import { getApiBase, getTenantSlug } from '@/auth/school-config';
 import { getStoredAppType, type StoredAppType } from '@/auth/session';
+import { getInstalledAppVersion } from '@/utils/app-version';
 
-export const APP_VERSION = '1.0.0';
+/** Prefer getInstalledAppVersion() — this mirrors expo config at call time. */
+export function getAppVersion() {
+  return getInstalledAppVersion();
+}
+
+/** @deprecated Prefer getAppVersion() */
+export const APP_VERSION = getInstalledAppVersion();
 
 /** @deprecated Use getApiBase() — kept for legacy imports during migration */
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
@@ -45,7 +52,7 @@ export async function mobileHeadersAsync(
     'X-Tenant-Slug': tenantSlug,
     'X-Client-Type': 'mobile',
     'X-App-Type': appType,
-    'X-App-Version': APP_VERSION,
+    'X-App-Version': getInstalledAppVersion(),
     'X-Device-Id': deviceId,
     ...extra,
   };
@@ -58,7 +65,7 @@ export function mobileHeaders(extra?: Record<string, string>) {
     'X-Tenant-Slug': TENANT_SLUG,
     'X-Client-Type': 'mobile',
     'X-App-Type': appType,
-    'X-App-Version': APP_VERSION,
+    'X-App-Version': getInstalledAppVersion(),
     ...(cachedDeviceId ? { 'X-Device-Id': cachedDeviceId } : {}),
     ...extra,
   };

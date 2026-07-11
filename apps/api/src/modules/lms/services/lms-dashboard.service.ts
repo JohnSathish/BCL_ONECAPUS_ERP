@@ -1,9 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { ENROLLED_LINE_STATUSES } from '../constants/lms.constants';
 import { LmsAccessService } from './lms-access.service';
 import { LmsAssignmentsService } from './lms-assignments.service';
+import {
+  enrichLmsWorkspaceRow,
+  lmsWorkspaceListInclude,
+} from '../utils/lms-workspace-list.util';
+
+const myWorkspaceInclude = {
+  ...lmsWorkspaceListInclude,
+  _count: {
+    select: {
+      materials: { where: { status: 'PUBLISHED' as const, deletedAt: null } },
+      announcements: true,
+      lessonPlans: true,
+    },
+  },
+} satisfies Prisma.LmsWorkspaceInclude;
 
 @Injectable()
 export class LmsDashboardService {
@@ -12,6 +28,19 @@ export class LmsDashboardService {
     private readonly access: LmsAccessService,
     private readonly assignments: LmsAssignmentsService,
   ) {}
+
+  private async findEnrichedWorkspaces(
+    where: Prisma.LmsWorkspaceWhereInput,
+    take?: number,
+  ) {
+    const rows = await this.prisma.lmsWorkspace.findMany({
+      where,
+      include: myWorkspaceInclude,
+      ...(take ? { take } : {}),
+      orderBy: { title: 'asc' },
+    });
+    return rows.map((row) => enrichLmsWorkspaceRow(row));
+  }
 
   async adminDashboard(tenantId: string) {
     const [
@@ -65,21 +94,11 @@ export class LmsDashboardService {
 
   async myWorkspaces(user: JwtUser) {
     if (this.access.hasAdminLms(user)) {
-      const result = await this.prisma.lmsWorkspace.findMany({
-        where: { tenantId: user.tid, deletedAt: null, status: 'ACTIVE' },
-        include: {
-          course: { select: { code: true, title: true } },
-          offeringSection: { select: { sectionCode: true } },
-          _count: {
-            select: {
-              materials: { where: { status: 'PUBLISHED', deletedAt: null } },
-            },
-          },
-        },
-        take: 50,
-        orderBy: { title: 'asc' },
-      });
-      return { role: 'admin', workspaces: result };
+      const workspaces = await this.findEnrichedWorkspaces(
+        { tenantId: user.tid, deletedAt: null, status: 'ACTIVE' },
+        50,
+      );
+      return { role: 'admin', workspaces };
     }
 
     const staffId = await this.access.getStaffProfileId(user);
@@ -97,30 +116,19 @@ export class LmsDashboardService {
       const sectionIds = assignments.map((a) => a.offeringSectionId);
       const offeringIds = [
         ...new Set(assignments.map((a) => a.courseOfferingId).filter(Boolean)),
-      ];
+      ] as string[];
 
-      const workspaces = await this.prisma.lmsWorkspace.findMany({
-        where: {
-          tenantId: user.tid,
-          deletedAt: null,
-          status: 'ACTIVE',
-          OR: [
-            { offeringSectionId: { in: sectionIds } },
-            {
-              workspaceType: 'POOL',
-              courseOfferingId: { in: offeringIds as string[] },
-            },
-          ],
-        },
-        include: {
-          course: { select: { code: true, title: true } },
-          offeringSection: { select: { sectionCode: true } },
-          _count: {
-            select: {
-              materials: { where: { status: 'PUBLISHED', deletedAt: null } },
-            },
+      const workspaces = await this.findEnrichedWorkspaces({
+        tenantId: user.tid,
+        deletedAt: null,
+        status: 'ACTIVE',
+        OR: [
+          { offeringSectionId: { in: sectionIds } },
+          {
+            workspaceType: 'POOL',
+            courseOfferingId: { in: offeringIds },
           },
-        },
+        ],
       });
 
       return { role: 'faculty', workspaces };
@@ -143,25 +151,14 @@ export class LmsDashboardService {
       .filter(Boolean) as string[];
     const offeringIds = [...new Set(lines.map((l) => l.offeringId))];
 
-    const workspaces = await this.prisma.lmsWorkspace.findMany({
-      where: {
-        tenantId: user.tid,
-        deletedAt: null,
-        status: 'ACTIVE',
-        OR: [
-          { offeringSectionId: { in: sectionIds } },
-          { workspaceType: 'POOL', courseOfferingId: { in: offeringIds } },
-        ],
-      },
-      include: {
-        course: { select: { code: true, title: true } },
-        offeringSection: { select: { sectionCode: true } },
-        _count: {
-          select: {
-            materials: { where: { status: 'PUBLISHED', deletedAt: null } },
-          },
-        },
-      },
+    const workspaces = await this.findEnrichedWorkspaces({
+      tenantId: user.tid,
+      deletedAt: null,
+      status: 'ACTIVE',
+      OR: [
+        { offeringSectionId: { in: sectionIds } },
+        { workspaceType: 'POOL', courseOfferingId: { in: offeringIds } },
+      ],
     });
 
     const bookmarks = await this.prisma.lmsMaterialBookmark.count({
@@ -230,7 +227,7 @@ export class LmsDashboardService {
       cards: {
         myCourses: my.workspaces.length,
         notesAvailable: my.workspaces.reduce(
-          (n, w) => n + w._count.materials,
+          (n, w) => n + (w._count?.materials ?? 0),
           0,
         ),
         assignmentsDue,

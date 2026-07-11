@@ -5,7 +5,7 @@ import { QuestionBankWorkspace } from '@/components/question-bank/question-bank-
 
 export default function StaffQuestionBankPage() {
   return (
-    <DashboardShell role="staff" title="Question Bank">
+    <DashboardShell role="staff" title="Question Paper Repository">
       <div className="space-y-8">
         <QuestionBankWorkspace page="upload" portal="staff" />
         <QuestionBankWorkspace page="faculty" portal="staff" />

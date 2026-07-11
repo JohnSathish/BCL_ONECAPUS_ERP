@@ -27,11 +27,13 @@ import {
   upsertMyClassXii,
   type ProfileBootstrap,
 } from '@/services/student-profile-verification';
+import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
+import { normalizeClass12Stream } from '@/services/class12-subjects';
 import { api } from '@/services/api';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-const WIZARD_STEPS = [
+const ALL_WIZARD_STEPS = [
   { key: 'personal', label: 'Personal', href: '/student/my-profile/personal', icon: UserRound },
   { key: 'contact', label: 'Contact', href: '/student/my-profile/contact' },
   { key: 'guardians', label: 'Parent', href: '/student/my-profile/guardians' },
@@ -114,6 +116,23 @@ export function MyProfileWorkspace({ section }: { section: SectionKey }) {
 
   const bootstrap = bootstrapQ.data;
 
+  const wizardSteps = useMemo(() => {
+    const bankVisible = Boolean(bootstrap?.visibleSections?.bank);
+    return ALL_WIZARD_STEPS.filter((s) => s.key !== 'bank' || bankVisible);
+  }, [bootstrap?.visibleSections?.bank]);
+
+  const canEditProfile = bootstrap?.profileUpdate?.canEdit !== false;
+  const profileClosedMessage =
+    bootstrap?.profileUpdate?.message ||
+    'The profile update period has ended. Please contact the College Office if you need to make any changes.';
+
+  useEffect(() => {
+    if (!bootstrap) return;
+    if (section === 'bank' && !bootstrap.visibleSections?.bank) {
+      router.replace('/student/my-profile/emergency');
+    }
+  }, [bootstrap, section, router]);
+
   useEffect(() => {
     dirtyRef.current = dirty;
   }, [dirty]);
@@ -173,14 +192,22 @@ export function MyProfileWorkspace({ section }: { section: SectionKey }) {
     );
   }
 
-  const stepIndex = WIZARD_STEPS.findIndex((s) => s.key === section);
+  const stepIndex = wizardSteps.findIndex((s) => s.key === section);
   const activeStep = stepIndex >= 0 ? stepIndex : 0;
 
   return (
     <div className="space-y-4 pb-24">
       <ProfileHeroCard bootstrap={bootstrap} onJump={(href) => router.push(href)} />
 
+      {!canEditProfile ? (
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{profileClosedMessage}</p>
+        </div>
+      ) : null}
+
       <Stepper
+        steps={wizardSteps}
         activeKey={section === 'dashboard' || section === 'status' ? 'personal' : section}
         pathname={pathname}
         completion={bootstrap.completion}
@@ -277,15 +304,15 @@ export function MyProfileWorkspace({ section }: { section: SectionKey }) {
           <Button
             variant="outline"
             disabled={activeStep === 0}
-            onClick={() => router.push(WIZARD_STEPS[Math.max(0, activeStep - 1)].href)}
+            onClick={() => router.push(wizardSteps[Math.max(0, activeStep - 1)].href)}
           >
             <ChevronLeft className="mr-1 h-4 w-4" /> Previous
           </Button>
           <Button
             variant="outline"
-            disabled={activeStep >= WIZARD_STEPS.length - 1}
+            disabled={activeStep >= wizardSteps.length - 1}
             onClick={() =>
-              router.push(WIZARD_STEPS[Math.min(WIZARD_STEPS.length - 1, activeStep + 1)].href)
+              router.push(wizardSteps[Math.min(wizardSteps.length - 1, activeStep + 1)].href)
             }
           >
             Next <ChevronRight className="ml-1 h-4 w-4" />
@@ -370,10 +397,12 @@ function ProfileHeroCard({
 }
 
 function Stepper({
+  steps,
   activeKey,
   pathname,
   completion,
 }: {
+  steps: readonly { key: string; label: string; href: string }[];
   activeKey: string;
   pathname: string;
   completion: ProfileBootstrap['completion'];
@@ -381,7 +410,7 @@ function Stepper({
   const missingKeys = new Set((completion.missing ?? []).map((m) => m.key));
   return (
     <nav className="flex gap-2 overflow-x-auto rounded-2xl border border-border bg-card p-2">
-      {WIZARD_STEPS.map((step, idx) => {
+      {steps.map((step, idx) => {
         const active = pathname === step.href || activeKey === step.key;
         const sectionMissing =
           (step.key === 'personal' && (missingKeys.has('aadhaar') || missingKeys.has('dob'))) ||
@@ -487,19 +516,21 @@ function StickyBar({
   onSubmit,
   submitting,
   draftLabel = 'Save Draft',
+  disabled,
 }: {
   onDraft: () => void;
   onSubmit: () => void;
   submitting?: boolean;
   draftLabel?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mt-4 md:rounded-2xl md:border md:bg-card md:p-3 md:backdrop-blur-none">
       <div className="mx-auto flex max-w-5xl flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={onDraft}>
+        <Button type="button" variant="outline" onClick={onDraft} disabled={disabled}>
           <Save className="mr-1 h-4 w-4" /> {draftLabel}
         </Button>
-        <Button type="button" onClick={onSubmit} disabled={submitting}>
+        <Button type="button" onClick={onSubmit} disabled={submitting || disabled}>
           {submitting ? (
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
           ) : (
@@ -780,6 +811,7 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
         </Field>
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'personal', form })}
         onSubmit={() => mut.mutate()}
@@ -847,6 +879,7 @@ function ContactForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShell
         </Field>
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'contact', form })}
         onSubmit={() => mut.mutate()}
@@ -910,6 +943,7 @@ function GuardiansForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShe
         {editor('Guardian (optional)', guardian, setGuardian)}
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'guardians', father, mother, guardian })}
         onSubmit={() => mut.mutate()}
@@ -994,6 +1028,7 @@ function AddressForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShell
         {block('Permanent / Home', permanent, setPermanent, sameAsCurrent)}
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'address', current, permanent })}
         onSubmit={() => mut.mutate()}
@@ -1010,24 +1045,33 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     boardRollNumber: String(exam?.boardRollNumber ?? ''),
     registrationNumber: String(exam?.registrationNumber ?? ''),
     examYear: exam?.examYear != null ? String(exam.examYear) : '',
-    stream: String(exam?.stream ?? ''),
+    stream: normalizeClass12Stream(String(exam?.stream ?? '')),
     totalMarks: exam?.totalMarks != null ? String(exam.totalMarks) : '',
     maximumMarks: exam?.maximumMarks != null ? String(exam.maximumMarks) : '',
     grade: String(exam?.grade ?? ''),
     division: String(exam?.division ?? ''),
   });
   const [subjects, setSubjects] = useState<
-    Array<{ subjectName: string; marksObtained: string; maxMarks: string; grade: string }>
+    Array<{
+      subjectName: string;
+      marksObtained?: number | null;
+      maxMarks?: number | null;
+      grade?: string | null;
+    }>
   >(
-    (exam?.subjectMarks ?? []).map((s: any) => ({
-      subjectName: s.subjectName ?? '',
-      marksObtained: s.marksObtained != null ? String(s.marksObtained) : '',
-      maxMarks: s.maxMarks != null ? String(s.maxMarks) : '100',
-      grade: s.grade ?? '',
-    })),
-  );
-  const [boardCustom, setBoardCustom] = useState(
-    form.boardName && !bootstrap.staticOptions.board.includes(form.boardName),
+    (exam?.subjectMarks ?? []).length
+      ? (exam?.subjectMarks ?? []).map((s: any) => ({
+          subjectName: s.subjectName ?? '',
+          marksObtained: s.marksObtained ?? undefined,
+          maxMarks: s.maxMarks ?? 100,
+          grade: s.grade ?? '',
+        }))
+      : Array.from({ length: 5 }, () => ({
+          subjectName: '',
+          marksObtained: undefined,
+          maxMarks: 100,
+          grade: '',
+        })),
   );
 
   const percent = useMemo(
@@ -1042,8 +1086,16 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
   }, [percent, form.grade]);
 
   const mut = useMutation({
-    mutationFn: () =>
-      upsertMyClassXii({
+    mutationFn: () => {
+      const named = subjects.filter((s) => s.subjectName.trim());
+      if (named.length < 5) {
+        throw new Error('Enter at least 5 Class XII subjects');
+      }
+      const names = named.map((s) => s.subjectName.trim().toLowerCase());
+      if (new Set(names).size !== names.length) {
+        throw new Error('Duplicate subjects are not allowed');
+      }
+      return upsertMyClassXii({
         boardName: form.boardName || null,
         schoolName: form.schoolName || null,
         boardRollNumber: form.boardRollNumber || null,
@@ -1054,15 +1106,14 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
         maximumMarks: form.maximumMarks ? Number(form.maximumMarks) : null,
         grade: form.grade || null,
         division: form.division || null,
-        subjects: subjects
-          .filter((s) => s.subjectName.trim())
-          .map((s) => ({
-            subjectName: s.subjectName,
-            marksObtained: s.marksObtained ? Number(s.marksObtained) : null,
-            maxMarks: s.maxMarks ? Number(s.maxMarks) : null,
-            grade: s.grade || null,
-          })),
-      }),
+        subjects: named.map((s) => ({
+          subjectName: s.subjectName,
+          marksObtained: s.marksObtained ?? null,
+          maxMarks: s.maxMarks ?? null,
+          grade: s.grade || null,
+        })),
+      });
+    },
     onSuccess: async () => {
       onDone('Class XII details saved for verification');
       await refresh();
@@ -1075,36 +1126,13 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     onDirty();
   };
 
+  const boardOptions = [
+    ...(bootstrap.staticOptions.board ?? []).map((b) => ({ value: b, label: b })),
+  ];
+
   return (
     <SectionCard title="Class XII Academic Details" subtitle="Board exam and subject marks">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Board / Council" required>
-          <SelectBox
-            value={boardCustom ? 'Others' : form.boardName}
-            onChange={(v) => {
-              if (v === 'Others') {
-                setBoardCustom(true);
-                set('boardName', '');
-              } else {
-                setBoardCustom(false);
-                set('boardName', v);
-              }
-            }}
-            options={bootstrap.staticOptions.board.map((b) => ({ value: b, label: b }))}
-          />
-        </Field>
-        {boardCustom ? (
-          <Field label="Custom Board Name">
-            <Input value={form.boardName} onChange={(e) => set('boardName', e.target.value)} />
-          </Field>
-        ) : null}
-        <Field label="Stream" required>
-          <SelectBox
-            value={form.stream}
-            onChange={(v) => set('stream', v)}
-            options={bootstrap.staticOptions.stream}
-          />
-        </Field>
         <Field label="Year of Passing" required>
           <SelectBox
             value={form.examYear}
@@ -1155,99 +1183,30 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
         </Field>
       </div>
 
-      <div className="mt-6 overflow-auto rounded-xl border border-border">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">Subject</th>
-              <th className="px-3 py-2">Marks</th>
-              <th className="px-3 py-2">Maximum</th>
-              <th className="px-3 py-2">Grade</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {subjects.map((row, idx) => (
-              <tr key={idx} className="border-t border-border">
-                <td className="px-2 py-1">
-                  <Input
-                    value={row.subjectName}
-                    onChange={(e) => {
-                      const next = [...subjects];
-                      next[idx] = { ...row, subjectName: e.target.value };
-                      setSubjects(next);
-                      onDirty();
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <Input
-                    value={row.marksObtained}
-                    onChange={(e) => {
-                      const next = [...subjects];
-                      next[idx] = { ...row, marksObtained: e.target.value.replace(/\D/g, '') };
-                      setSubjects(next);
-                      onDirty();
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <Input
-                    value={row.maxMarks}
-                    onChange={(e) => {
-                      const next = [...subjects];
-                      next[idx] = { ...row, maxMarks: e.target.value.replace(/\D/g, '') };
-                      setSubjects(next);
-                      onDirty();
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <Input
-                    value={row.grade}
-                    onChange={(e) => {
-                      const next = [...subjects];
-                      next[idx] = { ...row, grade: e.target.value };
-                      setSubjects(next);
-                      onDirty();
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSubjects(subjects.filter((_, i) => i !== idx));
-                      onDirty();
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-6">
+        <ClassXiiSubjectMarksEditor
+          boardName={form.boardName}
+          stream={form.stream}
+          subjectMarks={subjects}
+          boardOptions={boardOptions}
+          showBoardSelect
+          onBoardChange={(boardName) => {
+            setForm((p) => ({ ...p, boardName }));
+            onDirty();
+          }}
+          onStreamChange={(stream) => {
+            setForm((p) => ({ ...p, stream }));
+            onDirty();
+          }}
+          onSubjectMarksChange={(rows) => {
+            setSubjects(rows);
+            onDirty();
+          }}
+        />
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-2"
-        onClick={() => {
-          setSubjects([
-            ...subjects,
-            { subjectName: '', marksObtained: '', maxMarks: '100', grade: '' },
-          ]);
-          onDirty();
-        }}
-      >
-        Add Row
-      </Button>
 
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'class_xii', form, subjects })}
         onSubmit={() => mut.mutate()}
@@ -1299,6 +1258,7 @@ function BankForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShellPro
         ))}
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'bank', form })}
         onSubmit={() => mut.mutate()}
@@ -1352,6 +1312,7 @@ function EmergencyForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShe
         </Field>
       </div>
       <StickyBar
+        disabled={bootstrap.profileUpdate?.canEdit === false}
         submitting={mut.isPending}
         onDraft={() => onDraft({ section: 'emergency', form })}
         onSubmit={() => mut.mutate()}

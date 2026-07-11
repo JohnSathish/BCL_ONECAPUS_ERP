@@ -79,6 +79,7 @@ import { StudentsService } from './students.service';
 import { AcademicChangeHistoryService } from './academic-change-history/academic-change-history.service';
 import { ListAcademicChangeHistoryQueryDto } from './dto/academic-change-history.dto';
 import { extractClientIp } from '../../common/utils/request-host';
+import { StudentDepartmentBackfillService } from './services/student-department-backfill.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -99,6 +100,7 @@ export class StudentsController {
     private readonly studentImport: StudentImportService,
     private readonly migrationStatusService: MigrationStatusService,
     private readonly academicChangeHistory: AcademicChangeHistoryService,
+    private readonly departmentBackfill: StudentDepartmentBackfillService,
   ) {}
 
   @Get('summary')
@@ -109,6 +111,24 @@ export class StudentsController {
   @Get('summary/enhanced')
   enhancedSummary(@CurrentUser() user: JwtUser) {
     return this.students.getEnhancedSummary(user.tid);
+  }
+
+  @Get('departments/backfill-from-programme/preview')
+  @RequireAnyPermission('students:bulk-update', 'students:manage')
+  previewDepartmentBackfill(@CurrentUser() user: JwtUser) {
+    return this.departmentBackfill.preview(user.tid);
+  }
+
+  @Post('departments/backfill-from-programme')
+  @RequireAnyPermission('students:bulk-update', 'students:manage')
+  applyDepartmentBackfill(@CurrentUser() user: JwtUser, @Req() req: Request) {
+    const ua = req.headers['user-agent'];
+    return this.departmentBackfill.apply(user, {
+      actorId: user.sub,
+      ipAddress: extractClientIp(req),
+      userAgent: Array.isArray(ua) ? ua[0] : ua,
+      reason: 'Backfill department from programme-linked academic department',
+    });
   }
 
   @Get('abc/coverage')

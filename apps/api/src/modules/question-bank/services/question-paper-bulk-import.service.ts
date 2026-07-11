@@ -7,21 +7,11 @@ import {
 } from '../../../common/import/excel.util';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { resolveExamCycleFromSemester } from '../utils/question-paper-file.util';
 import { QuestionBankAssetsService } from './question-bank-assets.service';
 import { QuestionPapersService } from './question-papers.service';
 
-const PAPER_EXTENSIONS = new Set([
-  '.pdf',
-  '.doc',
-  '.docx',
-  '.ppt',
-  '.pptx',
-  '.zip',
-  '.jpg',
-  '.jpeg',
-  '.png',
-  '.webp',
-]);
+const PAPER_EXTENSIONS = new Set(['.pdf']);
 
 export type BulkPreviewRow = {
   rowNumber: number;
@@ -55,7 +45,7 @@ export class QuestionPaperBulkImportService {
     const [courses, departments, academicYears] = await Promise.all([
       this.prisma.course.findMany({
         where: { tenantId: user.tid, deletedAt: null },
-        select: { id: true, code: true, title: true },
+        select: { id: true, code: true, title: true, departmentId: true },
       }),
       this.prisma.department.findMany({
         where: { tenantId: user.tid, deletedAt: null },
@@ -95,8 +85,23 @@ export class QuestionPaperBulkImportService {
           raw.academicYear ?? raw.academicyear ?? '',
         ).trim();
         const paperType = String(
-          raw.paperType ?? raw.papertype ?? 'UNIVERSITY_EXAM',
+          raw.paperType ?? raw.papertype ?? 'THEORY',
         ).trim();
+        const examinationType =
+          String(raw.examinationType ?? raw.examinationtype ?? '').trim() ||
+          undefined;
+        const examCycle =
+          String(raw.examCycle ?? raw.examcycle ?? '').trim() ||
+          resolveExamCycleFromSemester(semester) ||
+          undefined;
+        const subjectCategory =
+          String(raw.subjectCategory ?? raw.subjectcategory ?? '').trim() ||
+          undefined;
+        const language = String(raw.language ?? '').trim() || undefined;
+        const universityName =
+          String(raw.universityName ?? raw.universityname ?? '').trim() ||
+          undefined;
+        const notes = String(raw.notes ?? '').trim() || undefined;
         const examYear = Number(raw.examYear ?? raw.examyear ?? 0) || undefined;
         const examMonth =
           Number(raw.examMonth ?? raw.exammonth ?? 0) || undefined;
@@ -108,6 +113,9 @@ export class QuestionPaperBulkImportService {
         if (!paperCode) errors.push('paperCode is required');
         if (!subject) errors.push('subject is required');
         if (!fileName) errors.push('fileName is required');
+        if (fileName && !fileName.toLowerCase().endsWith('.pdf')) {
+          errors.push('fileName must be a PDF');
+        }
 
         const course = paperCode
           ? courseByCode.get(paperCode.toLowerCase())
@@ -115,7 +123,8 @@ export class QuestionPaperBulkImportService {
         if (paperCode && !course)
           errors.push(`Unknown course code: ${paperCode}`);
 
-        let departmentId: string | undefined;
+        let departmentId: string | undefined =
+          course?.departmentId ?? undefined;
         if (department) {
           const dept =
             deptByName.get(department.toLowerCase()) ??
@@ -136,13 +145,19 @@ export class QuestionPaperBulkImportService {
           errors.push(`No matching file in ZIP: ${fileName}`);
 
         const normalized = {
-          paperCode,
-          paperName: subject,
+          paperCode: course?.code ?? paperCode,
+          paperName: course?.title ?? subject,
           courseId: course?.id,
           departmentId,
           academicYearId,
           semesterNo: semester,
           paperType,
+          examinationType,
+          examCycle,
+          subjectCategory,
+          language,
+          universityName,
+          notes,
           examYear,
           examMonth,
           fileName,
@@ -180,8 +195,8 @@ export class QuestionPaperBulkImportService {
     const zipEntries = zipFile?.buffer?.length
       ? await this.expandZip(zipFile.buffer)
       : new Map<string, Express.Multer.File>();
-    const settings = await this.papers.getSettings(user.tid);
     const created: string[] = [];
+    const versioned: string[] = [];
 
     for (const row of rows) {
       const fileName = String(row.fileName ?? '');
@@ -189,43 +204,54 @@ export class QuestionPaperBulkImportService {
       if (!zipEntry)
         throw new BadRequestException(`Missing file for row: ${fileName}`);
 
-      const course = row.courseId
-        ? await this.prisma.course.findFirst({
-            where: { id: String(row.courseId) },
-            select: { code: true },
-          })
-        : null;
+      const result = await this.papers.create(
+        user,
+        {
+          paperCode: String(row.paperCode),
+          paperName: String(row.paperName),
+          courseId: row.courseId ? String(row.courseId) : undefined,
+          departmentId: row.departmentId ? String(row.departmentId) : undefined,
+          academicYearId: row.academicYearId
+            ? String(row.academicYearId)
+            : undefined,
+          semesterNo: row.semesterNo ? Number(row.semesterNo) : undefined,
+          paperType: String(row.paperType ?? 'THEORY'),
+          examinationType: row.examinationType
+            ? String(row.examinationType)
+            : undefined,
+          examCycle: row.examCycle ? String(row.examCycle) : undefined,
+          subjectCategory: row.subjectCategory
+            ? String(row.subjectCategory)
+            : undefined,
+          language: row.language ? String(row.language) : undefined,
+          universityName: row.universityName
+            ? String(row.universityName)
+            : undefined,
+          notes: row.notes ? String(row.notes) : undefined,
+          examYear: row.examYear ? Number(row.examYear) : undefined,
+          examMonth: row.examMonth ? Number(row.examMonth) : undefined,
+          maxMarks: row.maxMarks ? Number(row.maxMarks) : undefined,
+          durationMinutes: row.durationMinutes
+            ? Number(row.durationMinutes)
+            : undefined,
+        },
+        zipEntry,
+      );
 
-      const saved = await this.assets.savePaperFile(user.tid, zipEntry, {
-        courseCode: course?.code ?? String(row.paperCode ?? 'general'),
-        examYear: Number(row.examYear) || undefined,
-        maxUploadMb: settings.maxUploadMb,
-        allowedMimeTypes: settings.allowedMimeTypes as string[],
-      });
-
-      const paper = await this.papers.createInternal(user, {
-        paperCode: String(row.paperCode),
-        paperName: String(row.paperName),
-        courseId: row.courseId ? String(row.courseId) : undefined,
-        departmentId: row.departmentId ? String(row.departmentId) : undefined,
-        academicYearId: row.academicYearId
-          ? String(row.academicYearId)
-          : undefined,
-        semesterNo: row.semesterNo ? Number(row.semesterNo) : undefined,
-        paperType: String(row.paperType ?? 'UNIVERSITY_EXAM'),
-        examYear: row.examYear ? Number(row.examYear) : undefined,
-        examMonth: row.examMonth ? Number(row.examMonth) : undefined,
-        maxMarks: row.maxMarks ? Number(row.maxMarks) : undefined,
-        durationMinutes: row.durationMinutes
-          ? Number(row.durationMinutes)
-          : undefined,
-        ...saved,
-        status: 'DRAFT',
-      });
-      created.push(paper.id);
+      if ('version' in result && result.version) {
+        versioned.push(result.paper.id);
+      } else if ('id' in result) {
+        created.push(result.id);
+      } else if ('paper' in result && result.paper?.id) {
+        versioned.push(result.paper.id);
+      }
     }
 
-    return { imported: created.length, paperIds: created };
+    return {
+      imported: created.length,
+      versioned: versioned.length,
+      paperIds: [...created, ...versioned],
+    };
   }
 
   async buildTemplateWorkbook() {
@@ -239,11 +265,17 @@ export class QuestionPaperBulkImportService {
           'semester',
           'academicYear',
           'paperType',
+          'examinationType',
+          'examCycle',
+          'subjectCategory',
+          'language',
+          'universityName',
           'examYear',
           'examMonth',
           'fileName',
           'maxMarks',
           'durationMinutes',
+          'notes',
         ],
         rows: [
           [
@@ -252,12 +284,18 @@ export class QuestionPaperBulkImportService {
             'Chemistry',
             '3',
             '2024-25',
+            'THEORY',
             'UNIVERSITY_EXAM',
+            'ODD',
+            'MAJOR',
+            'EN',
+            'NEHU',
             '2024',
             '11',
             'CHE251_2024.pdf',
             '70',
             '180',
+            '',
           ],
         ],
       },
@@ -281,7 +319,7 @@ export class QuestionPaperBulkImportService {
         fieldname: 'file',
         originalname: name,
         encoding: '7bit',
-        mimetype: this.mimeFromExt(ext),
+        mimetype: 'application/pdf',
         size: fileBuffer.length,
         buffer: fileBuffer,
         stream: null as any,
@@ -291,23 +329,5 @@ export class QuestionPaperBulkImportService {
       });
     }
     return out;
-  }
-
-  private mimeFromExt(ext: string) {
-    const map: Record<string, string> = {
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx':
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.ppt': 'application/vnd.ms-powerpoint',
-      '.pptx':
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-      '.zip': 'application/zip',
-    };
-    return map[ext] ?? 'application/octet-stream';
   }
 }
