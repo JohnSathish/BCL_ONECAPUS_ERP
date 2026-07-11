@@ -95,6 +95,8 @@ export type PaymentCheckout = {
   keyId?: string;
   mode: 'LIVE' | 'SAFE_MOCK';
   paymentId?: string;
+  checkoutUrl?: string;
+  paymentSessionId?: string;
 };
 
 export type InitiatePaymentResponse = {

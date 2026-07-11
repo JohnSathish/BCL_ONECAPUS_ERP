@@ -2,10 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { openRazorpayCheckout } from '@/lib/razorpay-checkout';
+import { ExamFeeReportPanel } from '@/components/examination-fees/exam-fee-report-panel';
+import { ExamFeeStudentWizard } from '@/components/examination-fees/exam-fee-student-wizard';
+import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { runExamFeeCheckout } from '@/lib/exam-fee-checkout';
 import { api } from '@/services/api';
 import {
-  addExamBackPaper,
   collectExamManualPayment,
   completeExamOnlinePayment,
   createExamFeeMaster,
@@ -23,10 +28,7 @@ import {
   fetchExamVerification,
   fetchMyExamApplications,
   initiateExamOnlinePayment,
-  removeExamBackPaper,
   seedExamFeeMasters,
-  startExamApplication,
-  submitExamApplication,
   updateExamFeeMaster,
   updateExamFeeSession,
   updateExamFeeSettings,
@@ -162,11 +164,12 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
   const [wizardStep, setWizardStep] = useState(0);
   const [declaration, setDeclaration] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [backForm, setBackForm] = useState({
-    semesterNo: 1,
-    subjectCode: '',
-    subjectName: '',
-    examPaperType: 'THEORY_ONLY',
+  const [hasPendingRedirectPayment, setHasPendingRedirectPayment] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [sessionDatesEdit, setSessionDatesEdit] = useState({
+    applicationStartDate: '',
+    applicationEndDate: '',
+    lateFeeDate: '',
   });
   const [manualForm, setManualForm] = useState({
     applicationId: '',
@@ -238,8 +241,20 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    try {
+      setHasPendingRedirectPayment(Boolean(sessionStorage.getItem('examFeePendingPayment')));
+    } catch {
+      setHasPendingRedirectPayment(false);
+    }
+  }, [page, studentApp?.id, studentApp?.status]);
+
   async function payOnline(app: any) {
-    if (!window.confirm(`Proceed to pay ${money(app.totalFee)} for examination fees?`)) {
+    if (
+      !window.confirm(
+        `Proceed to pay ${money(app.totalFee)} for examination fees via the active payment gateway?`,
+      )
+    ) {
       return;
     }
     setPaying(true);
@@ -247,38 +262,69 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
     try {
       const initiated = await initiateExamOnlinePayment(app.id);
       const checkout = initiated.checkout;
-      if (checkout?.mode === 'SAFE_MOCK' && checkout.paymentId) {
-        const completed = await completeExamOnlinePayment(app.id, {
-          paymentTransactionId: checkout.paymentTransactionId ?? checkout.paymentId,
-        });
-        setStudentApp(completed.application);
-        await reload();
+      const paymentTransactionId = checkout.paymentTransactionId ?? checkout.paymentId;
+      if (paymentTransactionId) {
+        sessionStorage.setItem(
+          'examFeePendingPayment',
+          JSON.stringify({
+            applicationId: app.id,
+            paymentTransactionId,
+          }),
+        );
+        setHasPendingRedirectPayment(true);
+      }
+
+      const result = await runExamFeeCheckout(checkout, {
+        amountFallback: Number(app.totalFee),
+      });
+
+      if (result.kind === 'redirected') {
         return;
       }
-      if (!checkout?.keyId || !checkout?.orderId) {
-        throw new Error(
-          'Online payment is not configured. Activate a gateway under Administration → Payment Gateway.',
-        );
-      }
-      await openRazorpayCheckout({
-        keyId: checkout.keyId,
-        orderId: checkout.orderId,
-        amount: Number(checkout.amount ?? app.totalFee),
-        currency: checkout.currency ?? 'INR',
-        name: 'Examination Fee',
-        description: `Exam fee ${app.applicationNo}`,
-        onSuccess: async (response) => {
-          const completed = await completeExamOnlinePayment(app.id, {
-            paymentTransactionId: checkout.paymentTransactionId ?? checkout.paymentId,
-            ...response,
-          });
-          setStudentApp(completed.application);
-          await reload();
-        },
+
+      const completed = await completeExamOnlinePayment(app.id, {
+        paymentTransactionId: result.paymentTransactionId,
+        ...(result.kind === 'verified'
+          ? {
+              razorpay_order_id: result.razorpay_order_id,
+              razorpay_payment_id: result.razorpay_payment_id,
+              razorpay_signature: result.razorpay_signature,
+            }
+          : {}),
       });
+      sessionStorage.removeItem('examFeePendingPayment');
+      setHasPendingRedirectPayment(false);
+      setStudentApp(completed.application);
+      await reload();
     } catch (e: any) {
       const msg = e?.message ?? 'Payment failed';
       if (msg !== 'Payment cancelled') setError(msg);
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  async function verifyPendingRedirectPayment() {
+    const raw = sessionStorage.getItem('examFeePendingPayment');
+    if (!raw || !studentApp) return;
+    try {
+      const pending = JSON.parse(raw) as {
+        applicationId: string;
+        paymentTransactionId?: string;
+      };
+      if (pending.applicationId !== studentApp.id || !pending.paymentTransactionId) {
+        return;
+      }
+      setPaying(true);
+      const completed = await completeExamOnlinePayment(studentApp.id, {
+        paymentTransactionId: pending.paymentTransactionId,
+      });
+      sessionStorage.removeItem('examFeePendingPayment');
+      setHasPendingRedirectPayment(false);
+      setStudentApp(completed.application);
+      await reload();
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not verify redirected payment yet.');
     } finally {
       setPaying(false);
     }
@@ -674,31 +720,83 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
                     <button
                       type="button"
                       className="rounded border px-2 py-1 text-xs"
-                      onClick={async () => {
-                        const start =
-                          window.prompt(
-                            'Application start (YYYY-MM-DD)',
-                            toDateInput(s.applicationStartDate),
-                          ) ?? undefined;
-                        const end =
-                          window.prompt(
-                            'Application end (YYYY-MM-DD)',
-                            toDateInput(s.applicationEndDate),
-                          ) ?? undefined;
-                        const late =
-                          window.prompt('Late fee date (YYYY-MM-DD)', toDateInput(s.lateFeeDate)) ??
-                          undefined;
-                        await updateExamFeeSession(s.id, {
-                          applicationStartDate: start || null,
-                          applicationEndDate: end || null,
-                          lateFeeDate: late || null,
-                        } as any);
-                        await reload();
+                      onClick={() => {
+                        setEditingSessionId(s.id);
+                        setSessionDatesEdit({
+                          applicationStartDate: toDateInput(s.applicationStartDate),
+                          applicationEndDate: toDateInput(s.applicationEndDate),
+                          lateFeeDate: toDateInput(s.lateFeeDate),
+                        });
                       }}
                     >
                       Edit dates
                     </button>
                   </div>
+                  {editingSessionId === s.id ? (
+                    <div className="mt-3 space-y-3 rounded-lg border bg-slate-50 p-3">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <Label>Application start</Label>
+                          <DateInput
+                            value={sessionDatesEdit.applicationStartDate}
+                            onChange={(iso) =>
+                              setSessionDatesEdit((d) => ({
+                                ...d,
+                                applicationStartDate: iso,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Application end</Label>
+                          <DateInput
+                            value={sessionDatesEdit.applicationEndDate}
+                            onChange={(iso) =>
+                              setSessionDatesEdit((d) => ({
+                                ...d,
+                                applicationEndDate: iso,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Late fee date</Label>
+                          <DateInput
+                            value={sessionDatesEdit.lateFeeDate}
+                            onChange={(iso) =>
+                              setSessionDatesEdit((d) => ({
+                                ...d,
+                                lateFeeDate: iso,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            await updateExamFeeSession(s.id, {
+                              applicationStartDate: sessionDatesEdit.applicationStartDate || null,
+                              applicationEndDate: sessionDatesEdit.applicationEndDate || null,
+                              lateFeeDate: sessionDatesEdit.lateFeeDate || null,
+                            } as any);
+                            setEditingSessionId(null);
+                            await reload();
+                          }}
+                        >
+                          Save dates
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingSessionId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -926,8 +1024,8 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
       ) : null}
 
       {page === 'exam-reports' ? (
-        <Section title="Examination Reports">
-          <div className="mb-4 flex flex-wrap gap-2">
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
             {REPORT_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -939,10 +1037,12 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
               </button>
             ))}
           </div>
-          <pre className="overflow-auto rounded-xl bg-slate-50 p-3 text-xs">
-            {JSON.stringify(reportRows, null, 2)}
-          </pre>
-        </Section>
+          <ExamFeeReportPanel
+            title={REPORT_TABS.find((t) => t.id === reportTab)?.label ?? 'Examination report'}
+            tabLabel={REPORT_TABS.find((t) => t.id === reportTab)?.label ?? reportTab}
+            rows={reportRows}
+          />
+        </div>
       ) : null}
 
       {page === 'payment-reports' ? (
@@ -1058,311 +1158,32 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
       ) : null}
 
       {page === 'student' ? (
-        <StudentWizard
-          sessions={sessions}
-          app={studentApp}
-          setApp={setStudentApp}
-          step={wizardStep}
-          setStep={setWizardStep}
-          declaration={declaration}
-          setDeclaration={setDeclaration}
-          backForm={backForm}
-          setBackForm={setBackForm}
-          paying={paying}
-          onPay={payOnline}
-          onReload={reload}
-          activeSessionId={activeSessionId}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function StudentWizard(props: {
-  sessions: any[];
-  app: any;
-  setApp: (v: any) => void;
-  step: number;
-  setStep: (n: number) => void;
-  declaration: boolean;
-  setDeclaration: (v: boolean) => void;
-  backForm: any;
-  setBackForm: (v: any) => void;
-  paying: boolean;
-  onPay: (app: any) => Promise<void>;
-  onReload: () => Promise<void>;
-  activeSessionId?: string;
-}) {
-  const steps = ['Current subjects', 'Back papers', 'Summary', 'Payment'];
-  const app = props.app;
-  const active = props.sessions.find((s) => s.status === 'ACTIVE');
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-      <div className="space-y-4">
-        <Section title="Semester Examination Application">
-          <div className="mb-4 flex flex-wrap gap-2">
-            {steps.map((label, idx) => (
-              <div
-                key={label}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${props.step === idx ? 'bg-blue-700 text-white' : props.step > idx ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
+        <div className="space-y-3">
+          {hasPendingRedirectPayment && studentApp?.status === 'AWAITING_PAYMENT' ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <span>If you finished payment on BillDesk/Cashfree, confirm it here.</span>
+              <Button
+                size="sm"
+                disabled={paying}
+                onClick={() => void verifyPendingRedirectPayment()}
               >
-                {idx + 1}. {label}
-              </div>
-            ))}
-          </div>
-
-          {!app ? (
-            <button
-              type="button"
-              disabled={!active}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm text-white disabled:opacity-50"
-              onClick={async () => {
-                const created = await startExamApplication(active.id);
-                props.setApp(created);
-                props.setStep(0);
-              }}
-            >
-              {active ? `Apply for ${active.name}` : 'No active examination session'}
-            </button>
-          ) : (
-            <div className="space-y-4 text-sm">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <div className="font-semibold">{app.applicationNo}</div>
-                <div className="text-slate-600">
-                  Semester {app.currentSemesterNo} · {app.departmentName} · {app.status}
-                </div>
-              </div>
-
-              {props.step === 0 ? (
-                <div>
-                  <h3 className="mb-2 font-semibold">Current Subjects (auto from registration)</h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {(app.currentSubjects ?? []).map((s: any) => (
-                      <div key={s.id ?? s.subjectCode} className="rounded-xl border p-3">
-                        <div className="font-medium">
-                          {s.subjectCode} · {s.subjectName}
-                        </div>
-                        <div className="text-slate-500">
-                          {s.examPaperType === 'THEORY_PRACTICAL' ? 'Theory + Practical' : 'Theory'}{' '}
-                          · {money(s.amount)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-4 rounded-lg bg-blue-700 px-4 py-2 text-white"
-                    onClick={() => props.setStep(1)}
-                  >
-                    Continue to back papers
-                  </button>
-                </div>
-              ) : null}
-
-              {props.step === 1 ? (
-                <div>
-                  <h3 className="mb-2 font-semibold">Back Papers</h3>
-                  <div className="mb-3 space-y-2">
-                    {(app.backPapers ?? []).map((p: any) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between rounded-xl border px-3 py-2"
-                      >
-                        <span>
-                          Sem {p.semesterNo} · {p.subjectCode} · {money(p.amount)}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-red-600"
-                          onClick={async () => {
-                            const updated = await removeExamBackPaper(app.id, p.id);
-                            props.setApp(updated);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid gap-2 rounded-xl border p-3 sm:grid-cols-2">
-                    <input
-                      className="rounded border px-2 py-1"
-                      type="number"
-                      value={props.backForm.semesterNo}
-                      onChange={(e) =>
-                        props.setBackForm({ ...props.backForm, semesterNo: Number(e.target.value) })
-                      }
-                      placeholder="Semester"
-                    />
-                    <select
-                      className="rounded border px-2 py-1"
-                      value={props.backForm.examPaperType}
-                      onChange={(e) =>
-                        props.setBackForm({ ...props.backForm, examPaperType: e.target.value })
-                      }
-                    >
-                      <option value="THEORY_ONLY">Theory Only</option>
-                      <option value="THEORY_PRACTICAL">Theory + Practical</option>
-                    </select>
-                    <input
-                      className="rounded border px-2 py-1"
-                      placeholder="Subject code"
-                      value={props.backForm.subjectCode}
-                      onChange={(e) =>
-                        props.setBackForm({ ...props.backForm, subjectCode: e.target.value })
-                      }
-                    />
-                    <input
-                      className="rounded border px-2 py-1"
-                      placeholder="Subject name"
-                      value={props.backForm.subjectName}
-                      onChange={(e) =>
-                        props.setBackForm({ ...props.backForm, subjectName: e.target.value })
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="rounded bg-slate-900 px-3 py-2 text-white sm:col-span-2"
-                      onClick={async () => {
-                        const updated = await addExamBackPaper(app.id, props.backForm);
-                        props.setApp(updated);
-                      }}
-                    >
-                      Add Back Paper
-                    </button>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded border px-4 py-2"
-                      onClick={() => props.setStep(0)}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-blue-700 px-4 py-2 text-white"
-                      onClick={() => props.setStep(2)}
-                    >
-                      Continue to summary
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {props.step === 2 ? (
-                <div className="space-y-3 rounded-xl border p-3">
-                  <p>Review fee summary on the right, then declare and submit.</p>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={props.declaration}
-                      onChange={(e) => props.setDeclaration(e.target.checked)}
-                    />
-                    <span>
-                      I declare that all selected backlog papers are correct. I understand that
-                      incorrect subject selection may lead to rejection by the university.
-                    </span>
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded border px-4 py-2"
-                      onClick={() => props.setStep(1)}
-                    >
-                      Back
-                    </button>
-                    {['DRAFT', 'CORRECTION_REQUESTED'].includes(app.status) ? (
-                      <button
-                        type="button"
-                        className="rounded-lg bg-blue-700 px-4 py-2 text-white"
-                        onClick={async () => {
-                          const updated = await submitExamApplication(app.id, props.declaration);
-                          props.setApp(updated);
-                          props.setStep(3);
-                        }}
-                      >
-                        Submit application
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="rounded-lg bg-blue-700 px-4 py-2 text-white"
-                        onClick={() => props.setStep(3)}
-                      >
-                        Proceed to payment
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {props.step === 3 ? (
-                <div className="space-y-3">
-                  {app.status === 'AWAITING_PAYMENT' ? (
-                    <button
-                      type="button"
-                      disabled={props.paying}
-                      className="sticky bottom-4 w-full rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white shadow-lg disabled:opacity-60"
-                      onClick={() => props.onPay(app)}
-                    >
-                      {props.paying ? 'Processing…' : `Proceed to Payment · ${money(app.totalFee)}`}
-                    </button>
-                  ) : (
-                    <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800">
-                      Status: {app.status}
-                    </div>
-                  )}
-                  {(app.receipts ?? []).length ? (
-                    <button
-                      type="button"
-                      className="text-blue-700 underline"
-                      onClick={async () => {
-                        const res = await api.get(examReceiptPdfUrl(app.receipts[0].id), {
-                          responseType: 'blob',
-                        });
-                        window.open(URL.createObjectURL(res.data), '_blank');
-                      }}
-                    >
-                      Download / reprint receipt
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+                Verify payment
+              </Button>
             </div>
-          )}
-        </Section>
-      </div>
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4">
-        <h3 className="font-semibold text-slate-900">Fee Summary</h3>
-        {app ? (
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt>Current Semester</dt>
-              <dd>{money(app.currentSemesterFee)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Back Papers</dt>
-              <dd>{money(app.backPaperFee)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Processing</dt>
-              <dd>{money(app.processingFee)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Late Fee</dt>
-              <dd>{money(app.lateFee)}</dd>
-            </div>
-            <div className="flex justify-between border-t pt-2 text-base font-semibold">
-              <dt>Total</dt>
-              <dd>{money(app.totalFee)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">Start an application to see fees.</p>
-        )}
-      </aside>
+          ) : null}
+          <ExamFeeStudentWizard
+            sessions={sessions}
+            app={studentApp}
+            setApp={setStudentApp}
+            step={wizardStep}
+            setStep={setWizardStep}
+            declaration={declaration}
+            setDeclaration={setDeclaration}
+            paying={paying}
+            onPay={payOnline}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

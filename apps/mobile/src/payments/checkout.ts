@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Alert, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import type { PaymentCheckout } from '@/types/fees';
 import { pollPaymentStatus, simulateFeePayment, verifyFeePayment } from '@/services/fees';
 
@@ -69,6 +69,19 @@ export async function completeFeeCheckout(checkout: PaymentCheckout): Promise<Ch
       success: true,
       receiptNo: res.receipt?.receiptNo,
       message: `Payment successful${res.receipt?.receiptNo ? ` — receipt ${res.receipt.receiptNo}` : ''}.`,
+    };
+  }
+
+  if (checkout.checkoutUrl) {
+    const canOpen = await Linking.canOpenURL(checkout.checkoutUrl);
+    if (!canOpen) {
+      throw new Error('Unable to open the payment gateway page.');
+    }
+    await Linking.openURL(checkout.checkoutUrl);
+    return {
+      success: false,
+      message:
+        'Opened the payment gateway. After you finish paying, return here and tap Check status / Verify.',
     };
   }
 

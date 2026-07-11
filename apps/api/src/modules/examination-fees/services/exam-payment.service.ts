@@ -165,7 +165,7 @@ export class ExamPaymentService {
     },
   ) {
     const app = await this.applications.get(user.tid, applicationId);
-    const txn = await this.db().paymentTransaction.findFirst({
+    let txn = await this.db().paymentTransaction.findFirst({
       where: { id: body.paymentTransactionId, tenantId: user.tid },
     });
     if (!txn) throw new NotFoundException('Payment transaction not found');
@@ -181,8 +181,29 @@ export class ExamPaymentService {
           razorpay_payment_id: body.razorpay_payment_id,
           razorpay_signature: body.razorpay_signature,
         });
-      } else {
+      } else if (
+        String(txn.providerOrderId ?? '').startsWith('MOCK-') ||
+        String(txn.provider ?? '').toUpperCase() === 'SAFE_MOCK'
+      ) {
         await this.gateway.simulateMockPayment(user, txn.id);
+      } else {
+        const synced = await this.gateway.reconcilePaymentTransaction(
+          user,
+          txn.id,
+        );
+        if (!synced.synced) {
+          throw new BadRequestException(
+            `Payment is not confirmed yet (${synced.providerStatus}). Finish checkout at the gateway, then tap Verify payment.`,
+          );
+        }
+      }
+      txn = await this.db().paymentTransaction.findFirst({
+        where: { id: body.paymentTransactionId, tenantId: user.tid },
+      });
+      if (!txn || txn.status !== 'SUCCESS') {
+        throw new BadRequestException(
+          'Payment is not confirmed yet. Finish checkout at the gateway, then try again.',
+        );
       }
     }
 

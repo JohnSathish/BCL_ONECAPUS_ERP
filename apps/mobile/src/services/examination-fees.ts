@@ -99,6 +99,8 @@ export function initiateExamOnlinePayment(id: string) {
       paymentId?: string;
       paymentTransactionId?: string;
       provider?: string;
+      checkoutUrl?: string;
+      paymentSessionId?: string;
     };
     payment: { id: string };
   }>(`/v1/examination-fees/applications/${id}/payments/online`, {

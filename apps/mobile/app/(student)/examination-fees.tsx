@@ -117,6 +117,8 @@ export default function ExaminationFeesScreen() {
         amount: Number(checkout.amount),
         currency: checkout.currency ?? 'INR',
         paymentId: checkout.paymentId,
+        checkoutUrl: checkout.checkoutUrl,
+        paymentSessionId: checkout.paymentSessionId,
       });
       if (result.success) {
         const done = await completeExamOnlinePayment(app.id, {
@@ -124,6 +126,30 @@ export default function ExaminationFeesScreen() {
         });
         setApp(done.application);
         Alert.alert('Paid', result.message);
+      } else if (checkout.checkoutUrl) {
+        Alert.alert('Complete payment in browser', result.message, [
+          { text: 'OK', style: 'cancel' },
+          {
+            text: 'Verify payment',
+            onPress: async () => {
+              try {
+                const done = await completeExamOnlinePayment(app.id, {
+                  paymentTransactionId: checkout.paymentTransactionId ?? checkout.paymentId,
+                });
+                setApp(done.application);
+                Alert.alert('Paid', 'Examination fee payment confirmed.');
+                await load();
+              } catch (err) {
+                Alert.alert(
+                  'Not confirmed yet',
+                  err instanceof Error
+                    ? err.message
+                    : 'Finish payment at the gateway, then try Verify again.',
+                );
+              }
+            },
+          },
+        ]);
       } else {
         Alert.alert('Payment', result.message);
       }

@@ -184,6 +184,174 @@ export class GatewayPaymentService {
     );
   }
 
+  /**
+   * Poll the active gateway for an initiated payment (exam fees / redirect returns).
+   * Does not require a FeePaymentRequest row.
+   */
+  async reconcilePaymentTransaction(user: JwtUser, paymentId: string) {
+    const payment = await this.db().paymentTransaction.findFirst({
+      where: { id: paymentId, tenantId: user.tid },
+    });
+    if (!payment) throw new BadRequestException('Payment not found.');
+    if (payment.status === 'SUCCESS') {
+      return { synced: true, payment, providerStatus: 'paid' as const };
+    }
+
+    const providerRef = String(payment.providerOrderId ?? '').trim();
+    if (!providerRef || providerRef.startsWith('MOCK-')) {
+      return {
+        synced: false,
+        payment,
+        providerStatus: 'NO_PROVIDER_REF' as const,
+      };
+    }
+
+    const providerCode = String(payment.provider ?? 'RAZORPAY').toUpperCase();
+    const creds = await this.gatewayResolver.resolveCredentials(
+      user.tid,
+      providerCode,
+    );
+    if (!creds) {
+      return {
+        synced: false,
+        payment,
+        providerStatus: 'NOT_CONFIGURED' as const,
+      };
+    }
+
+    try {
+      if (
+        providerCode === 'CASHFREE' &&
+        isCashfreeConfigured({
+          keyId: creds.keyId,
+          keySecret: creds.keySecret,
+          webhookSecret: creds.webhookSecret ?? undefined,
+          mode: creds.mode,
+        })
+      ) {
+        const order = await fetchCashfreeOrder(
+          {
+            keyId: creds.keyId,
+            keySecret: creds.keySecret,
+            webhookSecret: creds.webhookSecret ?? undefined,
+            mode: creds.mode,
+          },
+          providerRef,
+        );
+        if (order.order_status === 'PAID') {
+          const payments = await fetchCashfreeOrderPayments(
+            {
+              keyId: creds.keyId,
+              keySecret: creds.keySecret,
+              webhookSecret: creds.webhookSecret ?? undefined,
+              mode: creds.mode,
+            },
+            providerRef,
+          );
+          const success = payments.find((p) => p.payment_status === 'SUCCESS');
+          const result = await this.completePayment(
+            user.tid,
+            payment,
+            success?.cf_payment_id ?? `cf-${providerRef}`,
+            user.sub,
+          );
+          return {
+            synced: true,
+            payment: result.payment,
+            providerStatus: 'paid' as const,
+          };
+        }
+        return {
+          synced: false,
+          payment,
+          providerStatus: order.order_status,
+        };
+      }
+
+      if (providerCode === 'BILLDESK') {
+        const billdesk = toBilldeskCredentials(creds);
+        if (!billdesk || !isBilldeskConfigured(billdesk)) {
+          return {
+            synced: false,
+            payment,
+            providerStatus: 'NOT_CONFIGURED' as const,
+          };
+        }
+        const order = await retrieveBilldeskOrder(billdesk, providerRef);
+        const status = String(
+          (order as { status?: string }).status ??
+            (order as { transaction_error_type?: string })
+              .transaction_error_type ??
+            '',
+        ).toLowerCase();
+        if (status === 'paid' || status === 'success' || status === '0300') {
+          const result = await this.completePayment(
+            user.tid,
+            payment,
+            String(
+              (order as { transactionid?: string }).transactionid ??
+                `bd-${providerRef}`,
+            ),
+            user.sub,
+          );
+          return {
+            synced: true,
+            payment: result.payment,
+            providerStatus: 'paid' as const,
+          };
+        }
+        return {
+          synced: false,
+          payment,
+          providerStatus: status || 'pending',
+        };
+      }
+
+      if (
+        providerRef.startsWith('order_') &&
+        isRazorpayConfigured({
+          keyId: creds.keyId,
+          keySecret: creds.keySecret,
+          webhookSecret: creds.webhookSecret ?? undefined,
+        })
+      ) {
+        const orderPayments = await fetchRazorpayOrderPayments(
+          {
+            keyId: creds.keyId,
+            keySecret: creds.keySecret,
+            webhookSecret: creds.webhookSecret ?? undefined,
+          },
+          providerRef,
+        );
+        const captured = orderPayments.items?.find(
+          (p) => p.status === 'captured',
+        );
+        if (captured) {
+          const result = await this.completePayment(
+            user.tid,
+            payment,
+            captured.id,
+            user.sub,
+          );
+          return {
+            synced: true,
+            payment: result.payment,
+            providerStatus: 'paid' as const,
+          };
+        }
+        return { synced: false, payment, providerStatus: 'pending' as const };
+      }
+    } catch (err) {
+      return {
+        synced: false,
+        payment,
+        providerStatus: err instanceof Error ? err.message : 'SYNC_FAILED',
+      };
+    }
+
+    return { synced: false, payment, providerStatus: 'UNSUPPORTED' as const };
+  }
+
   async webhook(
     tenantId: string,
     provider: string,
