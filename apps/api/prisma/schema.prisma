@@ -7243,9 +7243,9 @@ model ExamPayment {
   tenantId             String    @map("tenant_id") @db.Uuid
   applicationId        String    @map("application_id") @db.Uuid
   studentId            String    @map("student_id") @db.Uuid
-  channel              String    // ONLINE | MANUAL
-  paymentMode          String    // CASH | UPI | BANK_TRANSFER | CHEQUE | DD | ONLINE
-  amount               Decimal   @db.Decimal(12, 2)
+  channel              String // ONLINE | MANUAL
+  paymentMode          String @map("payment_mode") // CASH | UPI | BANK_TRANSFER | CHEQUE | DD | ONLINE
+  amount               Decimal @db.Decimal(12, 2)
   currency             String    @default("INR")
   status               String    @default("PENDING")
   paymentTransactionId String?   @map("payment_transaction_id") @db.Uuid
