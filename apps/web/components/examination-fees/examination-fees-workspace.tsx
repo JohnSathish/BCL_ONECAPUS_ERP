@@ -231,7 +231,15 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
         else setWizardStep(0);
       }
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Failed to load');
+      const msg =
+        e?.detail ??
+        e?.message ??
+        (Array.isArray(e?.response?.data?.message)
+          ? e.response.data.message.join(', ')
+          : e?.response?.data?.message) ??
+        e?.response?.data?.detail ??
+        'Failed to load examination fees';
+      setError(typeof msg === 'string' ? msg : 'Failed to load examination fees');
     } finally {
       setLoading(false);
     }

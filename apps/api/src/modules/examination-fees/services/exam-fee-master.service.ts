@@ -10,6 +10,10 @@ import type {
   CreateExamFeeMasterDto,
   UpdateExamFeeMasterDto,
 } from '../dto/examination-fees.dto';
+import {
+  requireExamFeeDelegate,
+  rethrowExamFeeError,
+} from '../utils/exam-fee-prisma.util';
 
 @Injectable()
 export class ExamFeeMasterService {
@@ -19,140 +23,193 @@ export class ExamFeeMasterService {
     return this.prisma as unknown as Record<string, any>;
   }
 
-  list(tenantId: string) {
-    return this.db().examFeeMaster.findMany({
-      where: { tenantId },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
-      orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
-    });
+  private masters() {
+    return requireExamFeeDelegate(this.db().examFeeMaster, 'examFeeMaster');
+  }
+
+  private lines() {
+    return requireExamFeeDelegate(
+      this.db().examFeeMasterLine,
+      'examFeeMasterLine',
+    );
+  }
+
+  async list(tenantId: string) {
+    try {
+      return await this.masters().findMany({
+        where: { tenantId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+        orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
+      });
+    } catch (error) {
+      rethrowExamFeeError(error);
+    }
   }
 
   async get(tenantId: string, id: string) {
-    const row = await this.db().examFeeMaster.findFirst({
-      where: { id, tenantId },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
-    });
-    if (!row) throw new NotFoundException('Exam fee master not found');
-    return row;
+    try {
+      const row = await this.masters().findFirst({
+        where: { id, tenantId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+      if (!row) throw new NotFoundException('Exam fee master not found');
+      return row;
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      rethrowExamFeeError(error);
+    }
   }
 
   async create(user: JwtUser, dto: CreateExamFeeMasterDto) {
-    const lines = dto.lines?.length
-      ? dto.lines
-      : DEFAULT_EXAM_FEE_HEADS.map((h) => ({
-          headCode: h.headCode,
-          headName: h.headName,
-          amount: h.amount,
-          unit: h.unit,
-          sortOrder: h.sortOrder,
-          isActive: true,
-        }));
+    try {
+      const lines = dto.lines?.length
+        ? dto.lines
+        : DEFAULT_EXAM_FEE_HEADS.map((h) => ({
+            headCode: h.headCode,
+            headName: h.headName,
+            amount: h.amount,
+            unit: h.unit,
+            sortOrder: h.sortOrder,
+            isActive: true,
+          }));
 
-    if (dto.isActive !== false) {
-      await this.db().examFeeMaster.updateMany({
-        where: { tenantId: user.tid, isActive: true },
-        data: { isActive: false },
-      });
-    }
+      if (dto.isActive !== false) {
+        await this.masters().updateMany({
+          where: { tenantId: user.tid, isActive: true },
+          data: { isActive: false },
+        });
+      }
 
-    return this.db().examFeeMaster.create({
-      data: {
-        tenantId: user.tid,
-        name: dto.name,
-        academicYearId: dto.academicYearId ?? null,
-        academicYearLabel: dto.academicYearLabel ?? null,
-        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
-        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
-        isActive: dto.isActive ?? true,
-        createdById: user.sub,
-        lines: {
-          create: lines.map((line, index) => ({
-            tenantId: user.tid,
-            headCode: line.headCode,
-            headName: line.headName,
-            amount: line.amount,
-            unit: line.unit,
-            sortOrder: line.sortOrder ?? index * 10,
-            isActive: line.isActive ?? true,
-          })),
+      return await this.masters().create({
+        data: {
+          tenantId: user.tid,
+          name: dto.name,
+          academicYearId: dto.academicYearId ?? null,
+          academicYearLabel: dto.academicYearLabel ?? null,
+          effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
+          effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+          isActive: dto.isActive ?? true,
+          createdById: user.sub,
+          lines: {
+            create: lines.map((line, index) => ({
+              tenantId: user.tid,
+              headCode: line.headCode,
+              headName: line.headName,
+              amount: line.amount,
+              unit: line.unit,
+              sortOrder: line.sortOrder ?? index * 10,
+              isActive: line.isActive ?? true,
+            })),
+          },
         },
-      },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
-    });
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+    } catch (error) {
+      rethrowExamFeeError(error);
+    }
   }
 
   async update(user: JwtUser, id: string, dto: UpdateExamFeeMasterDto) {
-    await this.get(user.tid, id);
-    if (dto.isActive === true) {
-      await this.db().examFeeMaster.updateMany({
-        where: { tenantId: user.tid, isActive: true, NOT: { id } },
-        data: { isActive: false },
-      });
-    }
+    try {
+      await this.get(user.tid, id);
+      if (dto.isActive === true) {
+        await this.masters().updateMany({
+          where: { tenantId: user.tid, isActive: true, NOT: { id } },
+          data: { isActive: false },
+        });
+      }
 
-    if (dto.lines) {
-      await this.db().examFeeMasterLine.deleteMany({
-        where: { masterId: id, tenantId: user.tid },
-      });
-    }
+      if (dto.lines) {
+        await this.lines().deleteMany({
+          where: { masterId: id, tenantId: user.tid },
+        });
+      }
 
-    return this.db().examFeeMaster.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        academicYearId: dto.academicYearId ?? null,
-        academicYearLabel: dto.academicYearLabel ?? null,
-        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
-        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
-        isActive: dto.isActive ?? undefined,
-        ...(dto.lines
-          ? {
-              lines: {
-                create: dto.lines.map((line, index) => ({
-                  tenantId: user.tid,
-                  headCode: line.headCode,
-                  headName: line.headName,
-                  amount: line.amount,
-                  unit: line.unit,
-                  sortOrder: line.sortOrder ?? index * 10,
-                  isActive: line.isActive ?? true,
-                })),
-              },
-            }
-          : {}),
-      },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
-    });
+      return await this.masters().update({
+        where: { id },
+        data: {
+          ...(dto.name != null ? { name: dto.name } : {}),
+          ...(dto.academicYearId !== undefined
+            ? { academicYearId: dto.academicYearId ?? null }
+            : {}),
+          ...(dto.academicYearLabel !== undefined
+            ? { academicYearLabel: dto.academicYearLabel ?? null }
+            : {}),
+          ...(dto.effectiveFrom !== undefined
+            ? {
+                effectiveFrom: dto.effectiveFrom
+                  ? new Date(dto.effectiveFrom)
+                  : null,
+              }
+            : {}),
+          ...(dto.effectiveTo !== undefined
+            ? {
+                effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+              }
+            : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.lines
+            ? {
+                lines: {
+                  create: dto.lines.map((line, index) => ({
+                    tenantId: user.tid,
+                    headCode: line.headCode,
+                    headName: line.headName,
+                    amount: line.amount,
+                    unit: line.unit,
+                    sortOrder: line.sortOrder ?? index * 10,
+                    isActive: line.isActive ?? true,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      if (error instanceof BadRequestException) throw error;
+      rethrowExamFeeError(error);
+    }
   }
 
   async getActiveMaster(tenantId: string) {
-    const master = await this.db().examFeeMaster.findFirst({
-      where: { tenantId, isActive: true },
-      include: {
-        lines: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    if (!master) {
-      throw new BadRequestException(
-        'No active Examination Fee Master configured. Set up fees under Examination Fee Setup.',
-      );
+    try {
+      const master = await this.masters().findFirst({
+        where: { tenantId, isActive: true },
+        include: {
+          lines: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (!master) {
+        throw new BadRequestException(
+          'No active Examination Fee Master configured. Set up fees under Examination Fee Setup.',
+        );
+      }
+      return master;
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      rethrowExamFeeError(error);
     }
-    return master;
   }
 
   async seedDefaults(user: JwtUser) {
-    const existing = await this.db().examFeeMaster.count({
-      where: { tenantId: user.tid },
-    });
-    if (existing > 0) {
-      return this.list(user.tid);
+    try {
+      const existing = await this.masters().count({
+        where: { tenantId: user.tid },
+      });
+      if (existing > 0) {
+        return this.list(user.tid);
+      }
+      return [
+        await this.create(user, {
+          name: 'NEHU Semester Examination Fee Schedule',
+          isActive: true,
+        }),
+      ];
+    } catch (error) {
+      rethrowExamFeeError(error);
     }
-    return [
-      await this.create(user, {
-        name: 'NEHU Semester Examination Fee Schedule',
-        isActive: true,
-      }),
-    ];
   }
 }

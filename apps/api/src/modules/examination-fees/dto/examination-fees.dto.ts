@@ -22,6 +22,7 @@ export class ExamFeeMasterLineDto {
   @IsString()
   headName!: string;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   amount!: number;
@@ -30,6 +31,7 @@ export class ExamFeeMasterLineDto {
   unit!: 'FLAT' | 'PER_PAPER';
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   sortOrder?: number;
 
@@ -69,7 +71,37 @@ export class CreateExamFeeMasterDto {
   lines?: ExamFeeMasterLineDto[];
 }
 
-export class UpdateExamFeeMasterDto extends CreateExamFeeMasterDto {}
+export class UpdateExamFeeMasterDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
+  academicYearLabel?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveTo?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExamFeeMasterLineDto)
+  lines?: ExamFeeMasterLineDto[];
+}
 
 export class CreateExamFeeSessionDto {
   @IsString()
@@ -88,6 +120,7 @@ export class CreateExamFeeSessionDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @Type(() => Number)
   @IsInt({ each: true })
   applicableSemesters!: number[];
 

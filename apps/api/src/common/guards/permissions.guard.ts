@@ -99,7 +99,13 @@ export class PermissionsGuard implements CanActivate {
     if (requiredAny?.length) {
       const hasAny = requiredAny.some((p) => permissions.has(p));
 
-      if (!hasAny) {
+      if (
+        !hasAny &&
+        !(
+          isSuperAdmin(user.roles ?? []) ||
+          (user.roles ?? []).includes('college-admin')
+        )
+      ) {
         void this.logDenied(
           user,
           request,

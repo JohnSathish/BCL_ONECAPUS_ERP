@@ -47,6 +47,12 @@ echo "Starting data services…"
 echo "Applying database migrations…"
 bash scripts/deploy/vps-migrate.sh
 
+echo "Granting examination fee permissions (idempotent)…"
+"${COMPOSE[@]}" run --rm \
+  -e DATABASE_URL="${DATABASE_URL}" \
+  api npx --yes tsx scripts/grant-exam-fees-permissions.ts \
+  || echo "WARN: exam-fees permission grant skipped (script missing in image until rebuild)."
+
 echo "Starting API and waiting until healthy…"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
 

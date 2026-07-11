@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { examFeePrismaMessage } from '../../modules/examination-fees/utils/exam-fee-prisma.util';
 
 @Catch()
 export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
@@ -27,10 +28,15 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    const prismaHint =
+      exception instanceof HttpException
+        ? null
+        : examFeePrismaMessage(exception);
+
     const message =
       exception instanceof HttpException
         ? exception.message
-        : 'An unexpected error occurred';
+        : (prismaHint ?? 'An unexpected error occurred');
 
     const body =
       exception instanceof HttpException
@@ -38,11 +44,12 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         : undefined;
 
     const detail =
-      typeof body?.message === 'string'
+      prismaHint ??
+      (typeof body?.message === 'string'
         ? body.message
         : Array.isArray(body?.message)
           ? (body.message as string[]).join(', ')
-          : message;
+          : message);
 
     const fieldErrors =
       body &&
