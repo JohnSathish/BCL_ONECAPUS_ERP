@@ -2,6 +2,8 @@
 
 import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
 
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
+
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 
 import {
@@ -57,6 +59,14 @@ export function StaffDashboardPage() {
   return (
     <DashboardShell role="staff" title="Staff Dashboard">
       <ErpWorkspace className="space-y-4">
+        {dashboardQ.isError ? (
+          <QueryErrorPanel
+            title="Unable to load staff dashboard"
+            error={dashboardQ.error}
+            onRetry={() => void dashboardQ.refetch()}
+            isRetrying={dashboardQ.isFetching}
+          />
+        ) : null}
         <StaffMobileDashboard data={data} loading={loading} />
 
         <div className="hidden space-y-4 md:block">

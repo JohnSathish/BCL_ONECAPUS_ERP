@@ -1,6 +1,7 @@
 'use client';
 
 import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { StudentDashboardHeader } from '@/components/student-portal/dashboard/student-dashboard-header';
 import { StudentQuickStats } from '@/components/student-portal/dashboard/student-quick-stats';
@@ -22,7 +23,14 @@ import { cn } from '@/utils/cn';
 
 export function StudentDashboardPage() {
   useRequireAuth();
-  const { data: shell, isLoading: shellLoading } = useStudentDashboard();
+  const {
+    data: shell,
+    isLoading: shellLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useStudentDashboard();
   const compact = useStudentPortalPreferencesStore((s) => s.compact);
 
   const attendanceQ = useStudentDashboardWidget('attendance');
@@ -52,6 +60,14 @@ export function StudentDashboardPage() {
   return (
     <DashboardShell role="student" title="Student Dashboard">
       <ErpWorkspace className={cn('space-y-4', compact && 'space-y-3')}>
+        {isError ? (
+          <QueryErrorPanel
+            title="Unable to load student dashboard"
+            error={error}
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
+        ) : null}
         <StudentDashboardHeader data={shellWithTimetable} loading={shellLoading} />
         <StudentQuickStats data={shell} loading={shellLoading} />
         <AcademicSnapshotWidget chips={shell?.academicChips} loading={shellLoading} />

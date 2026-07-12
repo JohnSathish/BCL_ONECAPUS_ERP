@@ -33,7 +33,7 @@ export default function LibraryDeskLoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <LoginForm hardRedirect />
+      <LoginForm hardRedirect postLoginPath="/library-desk" />
     </div>
   );
 }
