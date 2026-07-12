@@ -20,14 +20,26 @@ export function buildAdminNavContext(session?: {
   };
 }
 
-function childVisible(child: NavChild, ctx: AdminNavContext): boolean {
+function childVisible(
+  child: NavChild,
+  ctx: AdminNavContext,
+  parentPermissions?: string[],
+  parentRequireAll?: string[],
+): boolean {
   if (child.requireAllPermissions?.length) {
     return hasAllListedPermissions(ctx.permissions, ctx.roles, child.requireAllPermissions);
   }
   if (child.permissions?.length) {
     return hasAnyListedPermission(ctx.permissions, ctx.roles, child.permissions);
   }
-  return true;
+  // Inherit parent permissions — never allow-by-default for bare children.
+  if (parentRequireAll?.length) {
+    return hasAllListedPermissions(ctx.permissions, ctx.roles, parentRequireAll);
+  }
+  if (parentPermissions?.length) {
+    return hasAnyListedPermission(ctx.permissions, ctx.roles, parentPermissions);
+  }
+  return isSuperAdmin(ctx.roles);
 }
 
 function filterNavItem(item: NavItem, ctx: AdminNavContext): NavItem | null {
@@ -48,7 +60,9 @@ function filterNavItem(item: NavItem, ctx: AdminNavContext): NavItem | null {
   if (!itemAllowed && !item.children?.length) return null;
 
   if (item.children?.length) {
-    const children = item.children.filter((child) => childVisible(child, ctx));
+    const children = item.children.filter((child) =>
+      childVisible(child, ctx, item.permissions, item.requireAllPermissions),
+    );
     if (children.length === 0) return null;
     if (!itemAllowed) return null;
     return { ...item, children };

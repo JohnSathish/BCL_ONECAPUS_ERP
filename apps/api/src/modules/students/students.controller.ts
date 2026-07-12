@@ -104,11 +104,13 @@ export class StudentsController {
   ) {}
 
   @Get('summary')
+  @RequireAnyPermission('students:read', 'students:manage')
   summary(@CurrentUser() user: JwtUser) {
     return this.students.getSummary(user.tid);
   }
 
   @Get('summary/enhanced')
+  @RequireAnyPermission('students:read', 'students:manage')
   enhancedSummary(@CurrentUser() user: JwtUser) {
     return this.students.getEnhancedSummary(user.tid);
   }
@@ -878,6 +880,11 @@ export class StudentsController {
   }
 
   @Post('from-application/:applicationId')
+  @RequireAnyPermission(
+    'students:manage',
+    'admissions:manage',
+    'admissions:enroll',
+  )
   enrollFromApplication(
     @CurrentUser() user: JwtUser,
     @Param('applicationId') applicationId: string,
@@ -943,6 +950,7 @@ export class StudentsController {
   }
 
   @Get(':id/profile/sections/:sectionKey')
+  @RequireAnyPermission('students:read', 'students:manage')
   getProfileSection(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -1002,6 +1010,7 @@ export class StudentsController {
   }
 
   @Get(':id/profile')
+  @RequireAnyPermission('students:read', 'students:manage')
   getProfile(
     @CurrentUser() user: JwtUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -1019,6 +1028,7 @@ export class StudentsController {
   }
 
   @Get(':id/semester-registrations')
+  @RequireAnyPermission('students:read', 'students:manage')
   getSemesterRegistrations(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -1098,6 +1108,7 @@ export class StudentsController {
   }
 
   @Get(':id')
+  @RequireAnyPermission('students:read', 'students:manage')
   getOne(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.students.getOne(user, id);
   }

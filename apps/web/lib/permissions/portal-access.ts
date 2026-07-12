@@ -156,7 +156,20 @@ export function canAccessPath(roles: string[], path: string, permissions: string
   if (path.startsWith('/admissions-portal')) {
     return canAccessApplicantPortal(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
-  return true;
+  // Auth / public app paths only — deny unknown relative links (notification sanitization).
+  const publicPrefixes = [
+    '/login',
+    '/forgot-password',
+    '/change-password',
+    '/access-denied',
+    '/verify',
+    '/request-demo',
+    '/careers-portal',
+    '/kiosk',
+  ];
+  return publicPrefixes.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`),
+  );
 }
 
 export function sanitizeNotificationLink(

@@ -46,6 +46,11 @@ export const PRINCIPAL_DESK_ROLES = new Set([
 
 export const PARENT_PORTAL_ROLES = new Set(['parent']);
 
+export const APPLICANT_PORTAL_ROLES = new Set([
+  'applicant',
+  'admissions-applicant',
+]);
+
 export function canAccessLibraryDesk(
   roles: string[],
   permissions: string[] = [],
@@ -60,6 +65,14 @@ export function canAccessPrincipalDesk(
 ) {
   if (roles.some((role) => PRINCIPAL_DESK_ROLES.has(role))) return true;
   return permissions.includes('principal-desk:access');
+}
+
+export function canAccessApplicantPortal(
+  roles: string[],
+  permissions: string[] = [],
+) {
+  if (roles.some((role) => APPLICANT_PORTAL_ROLES.has(role))) return true;
+  return permissions.includes('admissions:portal:self');
 }
 
 export const PLATFORM_PORTAL_ROLES = new Set(['platform-admin']);
@@ -182,7 +195,29 @@ export function canAccessPath(
       canAccessAdminPortal(roles, permissions)
     );
   }
-  return true;
+  if (path.startsWith('/admissions-portal')) {
+    return (
+      canAccessApplicantPortal(roles, permissions) ||
+      canAccessAdminPortal(roles, permissions)
+    );
+  }
+  // Auth / public app paths only — deny unknown relative links (notification sanitization).
+  const publicPrefixes = [
+    '/login',
+    '/forgot-password',
+    '/change-password',
+    '/access-denied',
+    '/verify',
+    '/request-demo',
+    '/careers-portal',
+    '/kiosk',
+  ];
+  return publicPrefixes.some(
+    (prefix) =>
+      path === prefix ||
+      path.startsWith(`${prefix}/`) ||
+      path.startsWith(`${prefix}?`),
+  );
 }
 
 export function sanitizeNotificationLink(

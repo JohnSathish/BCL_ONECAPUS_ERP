@@ -281,7 +281,22 @@ export class CommunicationController {
     @Res() res: Response,
   ) {
     await this.delivery.trackClick(logId);
-    return res.redirect(url || '/');
+    const target = this.safeRedirectUrl(url);
+    return res.redirect(target);
+  }
+
+  /** Only allow same-app relative paths — blocks open redirects. */
+  private safeRedirectUrl(raw?: string): string {
+    const value = String(raw ?? '').trim();
+    if (
+      !value.startsWith('/') ||
+      value.startsWith('//') ||
+      value.includes('://')
+    ) {
+      return '/';
+    }
+    if (value.length > 2048) return '/';
+    return value;
   }
 
   @Get('templates')
