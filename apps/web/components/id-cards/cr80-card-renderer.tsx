@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import type { IdCardElement } from '@/types/id-card-template';
 import type { IdCardFieldKey, IdCardLayoutV1 } from '@/types/id-card-template';
 import type { IdCardModel } from '@/types/id-card';
@@ -13,6 +14,11 @@ import { backgroundForSide } from './id-card-background-utils';
 import { IdCardBackgroundLayerView } from './id-card-background-layer';
 import { idCardFieldOverflow } from './id-card-field-overflow';
 import type { IdCardBackgroundLayer } from '@/types/id-card-template';
+import {
+  snapToAlignmentGuides,
+  type AlignmentGuideLine,
+  type GuideBox,
+} from './id-card-alignment-guides';
 
 type Props = {
   model: IdCardModel;
@@ -40,6 +46,8 @@ type Props = {
   onBackgroundChange?: (
     patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
   ) => void;
+  /** Palette field drop at cursor (mm coords relative to card). */
+  onPaletteDrop?: (fieldKey: string, xMm: number, yMm: number) => void;
 };
 
 const cardStyle = {
@@ -48,6 +56,8 @@ const cardStyle = {
   maxWidth: `${CR80_WIDTH_MM}mm`,
   maxHeight: `${CR80_HEIGHT_MM}mm`,
 };
+
+const PALETTE_MIME = 'application/x-id-card-field';
 
 export function Cr80CardRenderer({
   model,
@@ -70,6 +80,7 @@ export function Cr80CardRenderer({
   backgroundSelected,
   onSelectBackground,
   onBackgroundChange,
+  onPaletteDrop,
 }: Props) {
   const primary = model.institution.primaryColor;
   const accent = model.institution.accentColor;
@@ -81,6 +92,19 @@ export function Cr80CardRenderer({
   const background = backgroundForSide(resolved, side);
   const stylePreset = resolved.meta?.stylePreset;
   const designZoom = designMode ? zoom : 1;
+  const [guides, setGuides] = useState<AlignmentGuideLine[]>([]);
+
+  const siblingBoxes = useMemo(() => {
+    return elements
+      .filter((el) => el.type === 'field' && el.style?.visible !== false)
+      .map((el): GuideBox & { id: string } => ({
+        id: el.id,
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+      }));
+  }, [elements]);
 
   const renderElement = (element: IdCardElement) => {
     if (element.type !== 'field' || !element.fieldKey || element.style?.visible === false)
@@ -90,6 +114,7 @@ export function Cr80CardRenderer({
       photoShape: element.style?.photoShape,
       signatureUrl,
       side,
+      fontSize: element.style?.fontSize,
     });
     if (!content) return null;
 
@@ -166,14 +191,33 @@ export function Cr80CardRenderer({
         bounds="parent"
         disableDragging={locked}
         enableResizing={!locked}
+        onDrag={(_e, d) => {
+          const rawX = screenPxToMm(d.x, designZoom);
+          const rawY = screenPxToMm(d.y, designZoom);
+          const siblings = siblingBoxes.filter((s) => s.id !== element.id);
+          const snapped = snapToAlignmentGuides(
+            { x: rawX, y: rawY, width: element.width, height: element.height },
+            siblings,
+          );
+          setGuides(snapped.guides);
+        }}
         onDragStop={(_e, d) => {
+          const rawX = screenPxToMm(d.x, designZoom);
+          const rawY = screenPxToMm(d.y, designZoom);
+          const siblings = siblingBoxes.filter((s) => s.id !== element.id);
+          const aligned = snapToAlignmentGuides(
+            { x: rawX, y: rawY, width: element.width, height: element.height },
+            siblings,
+          );
+          setGuides([]);
           onElementChange(element.id, {
-            x: snapMm(screenPxToMm(d.x, designZoom), CR80_GRID_MM, snapToGrid),
-            y: snapMm(screenPxToMm(d.y, designZoom), CR80_GRID_MM, snapToGrid),
+            x: snapMm(aligned.x, CR80_GRID_MM, snapToGrid),
+            y: snapMm(aligned.y, CR80_GRID_MM, snapToGrid),
           });
           onSelectElement?.(element.id);
         }}
         onResizeStop={(_e, _dir, ref, _delta, position) => {
+          setGuides([]);
           onElementChange(element.id, {
             x: snapMm(screenPxToMm(position.x, designZoom), CR80_GRID_MM, snapToGrid),
             y: snapMm(screenPxToMm(position.y, designZoom), CR80_GRID_MM, snapToGrid),
@@ -187,6 +231,29 @@ export function Cr80CardRenderer({
         {box}
       </Rnd>
     );
+  };
+
+  const handlePaletteDragOver = (e: React.DragEvent) => {
+    if (!designMode || !onPaletteDrop) return;
+    if (
+      e.dataTransfer.types.includes(PALETTE_MIME) ||
+      e.dataTransfer.types.includes('text/plain')
+    ) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handlePaletteDrop = (e: React.DragEvent) => {
+    if (!designMode || !onPaletteDrop) return;
+    const fieldKey = e.dataTransfer.getData(PALETTE_MIME) || e.dataTransfer.getData('text/plain');
+    if (!fieldKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const xMm = screenPxToMm(e.clientX - rect.left, designZoom);
+    const yMm = screenPxToMm(e.clientY - rect.top, designZoom);
+    onPaletteDrop(fieldKey, xMm, yMm);
   };
 
   return (
@@ -212,6 +279,8 @@ export function Cr80CardRenderer({
         ['--id-accent' as string]: accent,
       }}
       onClick={designMode ? () => onSelectElement?.(null) : undefined}
+      onDragOver={handlePaletteDragOver}
+      onDrop={handlePaletteDrop}
     >
       {showPrintArea && designMode ? (
         <div
@@ -250,6 +319,29 @@ export function Cr80CardRenderer({
       {[...elements]
         .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
         .map((element) => renderElement(element))}
+      {designMode && guides.length > 0
+        ? guides.map((g) =>
+            g.orientation === 'v' ? (
+              <div
+                key={`v-${g.position}`}
+                className="pointer-events-none absolute top-0 z-[100] w-px bg-sky-500"
+                style={{
+                  left: mmToScreenPx(g.position, designZoom),
+                  height: mmToScreenPx(CR80_HEIGHT_MM, designZoom),
+                }}
+              />
+            ) : (
+              <div
+                key={`h-${g.position}`}
+                className="pointer-events-none absolute left-0 z-[100] h-px bg-sky-500"
+                style={{
+                  top: mmToScreenPx(g.position, designZoom),
+                  width: mmToScreenPx(CR80_WIDTH_MM, designZoom),
+                }}
+              />
+            ),
+          )
+        : null}
     </div>
   );
 }
@@ -261,3 +353,5 @@ export function Cr80CardFront(props: Omit<Props, 'side'>) {
 export function Cr80CardBack(props: Omit<Props, 'side'>) {
   return <Cr80CardRenderer {...props} side="back" />;
 }
+
+export { PALETTE_MIME };

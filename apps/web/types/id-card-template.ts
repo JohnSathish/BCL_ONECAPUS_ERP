@@ -41,6 +41,8 @@ export type IdCardLayoutMeta = {
     | 'elite'
     | 'pursuit-excellence'
     | 'pursuit-staff';
+  /** Bump when library seed should refresh tenant copies of this layout. */
+  layoutRevision?: number;
   /** blank = built-in designer; background-upload = Photoshop/Canva workflow */
   creationMethod?: 'blank' | 'background-upload';
   /** Reserved for future PSD import pipeline */

@@ -117,6 +117,40 @@ export class AuthService {
     return this.permissionResolver.resolveForUser(userId, roles);
   }
 
+  /**
+   * Persist + return mustResetPassword when the account is still on a temporary
+   * password (explicit flag, default Student@123, or roll/enrollment as password).
+   */
+  private async ensureMustResetPassword(
+    userId: string,
+    input: { mustResetPassword?: boolean | null; password: string },
+  ): Promise<boolean> {
+    if (input.mustResetPassword) return true;
+
+    const password = input.password;
+    let force = password === 'Student@123';
+
+    if (!force) {
+      const student = await this.prisma.student.findFirst({
+        where: { userId, deletedAt: null },
+        select: { rollNumber: true, enrollmentNumber: true },
+      });
+      const roll = student?.rollNumber?.trim();
+      const enroll = student?.enrollmentNumber?.trim();
+      force = Boolean(
+        (roll && password === roll) || (enroll && password === enroll),
+      );
+    }
+
+    if (!force) return false;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mustResetPassword: true },
+    });
+    return true;
+  }
+
   private buildUserPayload(
     user: {
       id: string;
@@ -514,6 +548,13 @@ export class AuthService {
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
 
+    // Force change when still on a known temporary / first-login password.
+    const mustResetPassword = await this.ensureMustResetPassword(user.id, {
+      mustResetPassword: user.mustResetPassword,
+      password,
+    });
+    const userForSession = { ...user, mustResetPassword };
+
     const roles = user.roles.map((r) => r.role.slug);
     const mfaRequired =
       user.mfaEnabled ||
@@ -533,7 +574,7 @@ export class AuthService {
         refreshToken: '',
         refreshMaxAgeSeconds: 0,
         user: this.buildUserPayload(
-          user,
+          userForSession,
           tenant.slug,
           roles,
           [],
@@ -558,7 +599,7 @@ export class AuthService {
     const resolved = await this.resolveUserPermissions(user.id, roles);
     const shiftScope = await this.resolveShiftScope(user.id, roles);
     const session = await this.issueTokens(
-      user,
+      userForSession,
       tenant.slug,
       roles,
       resolved.permissions,

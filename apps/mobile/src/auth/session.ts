@@ -12,6 +12,7 @@ export type StoredUserSnapshot = {
   roles?: string[];
   shiftIds?: string[];
   allShifts?: boolean;
+  mustResetPassword?: boolean;
 };
 
 export type StoredAppType = 'student' | 'staff';

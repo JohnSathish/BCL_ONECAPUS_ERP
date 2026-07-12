@@ -27,6 +27,16 @@ type LoginFormProps = {
   hardRedirect?: boolean;
 };
 
+function resolveSafeNextPath(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const path = raw.trim();
+  // Only same-origin relative paths — block open redirects.
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
+    return undefined;
+  }
+  return path;
+}
+
 export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProps) {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
@@ -40,6 +50,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const [challengeLoading, setChallengeLoading] = useState(true);
   const [apiWaiting, setApiWaiting] = useState(false);
+  const [queryNextPath, setQueryNextPath] = useState<string | undefined>();
 
   const startupRetryOptions = useMemo<ApiStartupRetryOptions>(
     () => ({
@@ -50,9 +61,11 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (new URLSearchParams(window.location.search).get('reset') === '1') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === '1') {
       setInfo('Password updated. Sign in with your new password.');
     }
+    setQueryNextPath(resolveSafeNextPath(params.get('next')));
   }, []);
 
   const {
@@ -164,7 +177,9 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
           return;
         }
         const destination =
-          postLoginPath ?? resolveHomePath(session.user.roles, session.user.permissions ?? []);
+          postLoginPath ??
+          queryNextPath ??
+          resolveHomePath(session.user.roles, session.user.permissions ?? []);
         // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
         window.location.assign(destination);
       } catch (err) {
@@ -214,6 +229,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
       hardRedirect,
       loadChallenge,
       postLoginPath,
+      queryNextPath,
       resetField,
       router,
       setSession,

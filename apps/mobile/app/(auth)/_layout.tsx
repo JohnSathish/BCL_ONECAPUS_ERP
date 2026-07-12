@@ -15,7 +15,10 @@ export default function AuthLayout() {
       <Stack.Screen name="login" />
       <Stack.Screen name="guest" />
       <Stack.Screen name="forgot-password" />
-      <Stack.Screen name="change-password" />
+      <Stack.Screen
+        name="change-password"
+        options={{ gestureEnabled: false, headerBackVisible: false }}
+      />
       <Stack.Screen name="maintenance" />
     </Stack>
   );

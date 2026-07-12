@@ -140,13 +140,30 @@ export class IdCardsService {
     await this.ensureLibraryTemplates(tenantId);
   }
 
-  /** Seed v1 gallery templates for new tenants; never overwrite existing rows. */
+  /** Seed v1 gallery templates for new tenants; refresh Pursuit layout when revision bumps. */
   private async ensureLibraryTemplates(tenantId: string) {
     for (const seed of LIBRARY_TEMPLATE_SEEDS) {
       const existing = await this.db().idCardTemplate.findFirst({
         where: { tenantId, code: seed.code },
       });
-      if (existing) continue;
+
+      if (existing) {
+        if (seed.code === 'dbc-pursuit-excellence') {
+          const seedRev =
+            (seed.layout as { meta?: { layoutRevision?: number } })?.meta
+              ?.layoutRevision ?? 0;
+          const existingRev =
+            (existing.layout as { meta?: { layoutRevision?: number } } | null)
+              ?.meta?.layoutRevision ?? 0;
+          if (existingRev < seedRev) {
+            await this.db().idCardTemplate.update({
+              where: { id: existing.id },
+              data: { layout: seed.layout },
+            });
+          }
+        }
+        continue;
+      }
 
       const hasDefaultForType = await this.db().idCardTemplate.findFirst({
         where: { tenantId, holderType: seed.holderType, isDefault: true },

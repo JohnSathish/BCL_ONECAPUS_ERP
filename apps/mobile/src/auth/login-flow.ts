@@ -73,33 +73,44 @@ export async function performLogin(input: {
   }
 
   await saveSession(session.accessToken, session.refreshToken);
-  await saveUserSnapshot(session.user);
+  await saveUserSnapshot({
+    permissions: session.user.permissions,
+    roles: session.user.roles,
+    shiftIds: session.user.shiftIds,
+    allShifts: session.user.allShifts,
+    mustResetPassword: session.user.mustResetPassword ?? false,
+  });
   await saveRememberMe(input.rememberMe ?? false);
   await saveLastLoginAt(new Date().toISOString());
   setAppType(route.appType);
   await saveAppType(route.appType);
 
-  const appType = route.appType === 'student' ? 'STUDENT' : 'STAFF';
-  try {
-    await registerDeviceWithPush(appType);
-  } catch {
+  const mustResetPassword = session.user.mustResetPassword ?? false;
+
+  // Skip push registration until the temporary password is changed.
+  if (!mustResetPassword) {
+    const appType = route.appType === 'student' ? 'STUDENT' : 'STAFF';
     try {
-      const deviceId = await getDeviceId();
-      await apiFetch('/v1/mobile-app/devices/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          deviceId,
-          appType,
-          platform: Platform.OS === 'ios' ? 'ios' : 'android',
-        }),
-      });
+      await registerDeviceWithPush(appType);
     } catch {
-      // Device registration must not block login
+      try {
+        const deviceId = await getDeviceId();
+        await apiFetch('/v1/mobile-app/devices/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            deviceId,
+            appType,
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+          }),
+        });
+      } catch {
+        // Device registration must not block login
+      }
     }
   }
 
   return {
     route,
-    mustResetPassword: session.user.mustResetPassword ?? false,
+    mustResetPassword,
   };
 }

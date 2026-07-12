@@ -1,4 +1,6 @@
 /** Don Bosco College — Pursuit of Excellence student ID visual system */
+import { PURSUIT_TYPE_SCALE, scalePursuitType, type IdCardTypeScale } from './id-card-typography';
+
 export const PE_NAVY = '#001B44';
 export const PE_RED = '#8B1538';
 export const PE_RED_BRIGHT = '#A50021';
@@ -31,7 +33,7 @@ export function pursuitBackFooterSvg() {
 
 export function pursuitCenterWatermarkHtml(text: string) {
   return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;">
-    <p style="margin:0;font-size:10pt;font-weight:900;text-transform:uppercase;text-align:center;color:${PE_NAVY};opacity:0.045;letter-spacing:0.1em;line-height:1.15;max-width:92%;">${text}</p>
+    <p style="margin:0;font-size:10pt;font-weight:900;text-transform:uppercase;text-align:center;color:${PE_NAVY};opacity:0.04;letter-spacing:0.1em;line-height:1.15;max-width:92%;">${text}</p>
   </div>`;
 }
 
@@ -73,10 +75,10 @@ export function pursuitVerificationPath(
 
 export function pursuitPhotoBorderStyle() {
   return {
-    borderWidth: '0.3mm',
+    borderWidth: '0.35mm',
     borderStyle: 'solid' as const,
     borderColor: PE_NAVY,
-    borderRadius: '1.6mm',
+    borderRadius: '1.8mm',
   };
 }
 
@@ -94,17 +96,25 @@ export function pursuitQrFrameCss() {
   return `border:${s.border};border-radius:${s.borderRadius};background:${s.background};padding:${s.padding};box-sizing:border-box;`;
 }
 
-export function pursuitGridRowHtml(label: string, value: string) {
-  return `<div style="display:flex;align-items:baseline;gap:2mm;width:100%;line-height:1.15;margin-bottom:0.6mm;">
-    <span style="flex:0 0 16mm;font-size:3.6pt;font-weight:700;color:#64748b;">${label}</span>
-    <span style="flex:1;font-size:4.4pt;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${value}</span>
+export function pursuitGridRowHtml(
+  label: string,
+  value: string,
+  typeScale: IdCardTypeScale = PURSUIT_TYPE_SCALE,
+) {
+  return `<div style="display:flex;align-items:baseline;gap:2mm;width:100%;line-height:1.2;margin-bottom:0.7mm;">
+    <span style="flex:0 0 15mm;font-size:${typeScale.label};font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">${label}</span>
+    <span style="flex:1;font-size:${typeScale.value};font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${value}</span>
   </div>`;
 }
 
-export function pursuitContactLineHtml(icon: string, text: string) {
-  return `<div style="display:flex;align-items:flex-start;gap:1.2mm;margin-bottom:0.9mm;line-height:1.2;">
-    <span style="flex:0 0 3.6mm;width:3.6mm;height:3.6mm;border-radius:50%;background:${PE_NAVY};display:inline-flex;align-items:center;justify-content:center;font-size:2.4pt;color:#fff;">${icon}</span>
-    <span style="flex:1;font-size:3.2pt;font-weight:600;color:#1e293b;">${text}</span>
+export function pursuitContactLineHtml(
+  icon: string,
+  text: string,
+  typeScale: IdCardTypeScale = PURSUIT_TYPE_SCALE,
+) {
+  return `<div style="display:flex;align-items:flex-start;gap:1.4mm;margin-bottom:1mm;line-height:1.25;">
+    <span style="flex:0 0 4mm;width:4mm;height:4mm;border-radius:50%;background:${PE_NAVY};display:inline-flex;align-items:center;justify-content:center;font-size:2.8pt;color:#fff;">${icon}</span>
+    <span style="flex:1;font-size:${typeScale.contact};font-weight:600;color:#1e293b;">${text}</span>
   </div>`;
 }
 
@@ -129,49 +139,53 @@ export function formatPursuitValidUntilDate(validTo?: string | null, validToLabe
   return validToLabel?.replace(/^VALID\s+UP\s+TO\s+/i, '') ?? '';
 }
 
-export function pursuitValidityHtml(dateLabel: string) {
+export function pursuitValidityHtml(
+  dateLabel: string,
+  typeScale: IdCardTypeScale = PURSUIT_TYPE_SCALE,
+) {
   return `<div style="width:100%;display:flex;justify-content:center;">
-    <div style="display:inline-block;padding:0.8mm 3.5mm;border-radius:999px;background:${PE_RED_BRIGHT};color:#fff;text-align:center;line-height:1.15;">
-      <p style="margin:0;font-size:2.8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;">Valid Until</p>
-      <p style="margin:0.3mm 0 0;font-size:4.6pt;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;">${dateLabel}</p>
+    <div style="display:inline-block;padding:1mm 4mm;border-radius:999px;background:${PE_RED_BRIGHT};color:#fff;text-align:center;line-height:1.15;box-shadow:0 0.3mm 0.8mm rgba(139,21,56,0.25);">
+      <p style="margin:0;font-size:${typeScale.validityCaption};font-weight:700;text-transform:uppercase;letter-spacing:0.14em;">Valid Until</p>
+      <p style="margin:0.4mm 0 0;font-size:${typeScale.validityDate};font-weight:900;text-transform:uppercase;letter-spacing:0.06em;">${dateLabel}</p>
     </div>
   </div>`;
 }
 
-export function pursuitVerificationUrlHtml(code: string) {
+export function pursuitVerificationUrlHtml(
+  code: string,
+  typeScale: IdCardTypeScale = PURSUIT_TYPE_SCALE,
+) {
   const slug = code.replace(/\s+/g, '');
-  return `<div style="width:100%;text-align:center;line-height:1.25;">
-    <p style="margin:0;font-size:2.8pt;font-weight:600;color:#64748b;">Verify:</p>
-    <p style="margin:0.2mm 0 0;font-size:3.1pt;font-weight:700;color:${PE_NAVY};word-break:break-all;">id.dbctura.ac.in/verify/${slug}</p>
+  return `<div style="width:100%;text-align:center;line-height:1.3;">
+    <p style="margin:0;font-size:${typeScale.fine};font-weight:600;color:#64748b;">Verify</p>
+    <p style="margin:0.3mm 0 0;font-size:${typeScale.fine};font-weight:700;color:${PE_NAVY};word-break:break-all;">id.dbctura.ac.in/verify/${slug}</p>
   </div>`;
 }
 
 export function pursuitHologramPlaceholderHtml() {
-  return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;border:0.25mm dashed rgba(0,27,68,0.35);border-radius:0.8mm;background:linear-gradient(135deg,rgba(255,255,255,0.7),rgba(241,245,249,0.9));">
-    <p style="margin:0;font-size:2.2pt;font-weight:800;text-transform:uppercase;text-align:center;color:rgba(0,27,68,0.55);letter-spacing:0.06em;line-height:1.2;">Security<br/>Hologram</p>
+  return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;border:0.25mm dashed rgba(0,27,68,0.28);border-radius:0.8mm;background:linear-gradient(135deg,rgba(255,255,255,0.75),rgba(241,245,249,0.92));">
+    <p style="margin:0;font-size:3pt;font-weight:800;text-transform:uppercase;text-align:center;color:rgba(0,27,68,0.5);letter-spacing:0.06em;line-height:1.2;">Security<br/>Hologram</p>
   </div>`;
 }
 
-export function pursuitTermsHtml() {
+export function pursuitTermsHtml(typeScale: IdCardTypeScale = PURSUIT_TYPE_SCALE) {
   const items = [
-    'Card is non-transferable',
-    'Carry card at all times',
-    'Lost card must be reported immediately',
-    'College reserves the right to confiscate misuse',
+    'Non-transferable — carry at all times',
+    'Report loss immediately',
+    'Misuse may lead to confiscation',
   ];
   return `<div style="width:100%;">
-    <p style="margin:0 0 0.8mm;font-size:3.2pt;font-weight:900;text-transform:uppercase;color:${PE_NAVY};letter-spacing:0.08em;">Important</p>
-    <ul style="margin:0;padding-left:2.5mm;font-size:2.8pt;color:#334155;line-height:1.35;list-style-type:disc;">
-      ${items.map((t) => `<li style="margin-bottom:0.3mm;">${t}</li>`).join('')}
+    <p style="margin:0 0 0.9mm;font-size:${typeScale.termsTitle};font-weight:900;text-transform:uppercase;color:${PE_NAVY};letter-spacing:0.08em;">Important</p>
+    <ul style="margin:0;padding-left:3mm;font-size:${typeScale.fine};color:#334155;line-height:1.4;list-style-type:disc;">
+      ${items.map((t) => `<li style="margin-bottom:0.45mm;">${t}</li>`).join('')}
     </ul>
   </div>`;
 }
 
 export const PURSUIT_TERMS = [
-  'Card is non-transferable',
-  'Carry card at all times',
-  'Lost card must be reported immediately',
-  'College reserves the right to confiscate misuse',
+  'Non-transferable — carry at all times',
+  'Report loss immediately',
+  'Misuse may lead to confiscation',
 ];
 
 export function institutionContactLines(model: {
@@ -191,6 +205,10 @@ export function institutionContactLines(model: {
   if (inst.website) lines.push({ icon: '⌁', text: inst.website });
   if (inst.email) lines.push({ icon: '✉', text: inst.email });
   return lines;
+}
+
+export function resolvePursuitTypeScale(fontSizeOverride?: number | null) {
+  return scalePursuitType(fontSizeOverride);
 }
 
 /** @deprecated Use pursuitGridRowHtml */

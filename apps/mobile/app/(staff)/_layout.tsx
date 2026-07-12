@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { FacultyDrawer } from '@/components/faculty-portal/faculty-drawer';
 import { FacultyPortalProvider } from '@/components/faculty-portal/faculty-portal-context';
+import { CHANGE_PASSWORD_HREF, getMustResetPassword } from '@/auth/password-reset-guard';
 import { getAccessToken, getRefreshToken } from '@/auth/session';
 
 export default function StaffLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -17,12 +19,16 @@ export default function StaffLayout() {
         router.replace('/(auth)/login');
         return;
       }
+      if (await getMustResetPassword()) {
+        router.replace(CHANGE_PASSWORD_HREF);
+        return;
+      }
       if (!cancelled) setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, pathname]);
 
   if (!ready) {
     return (

@@ -51,6 +51,7 @@ export default function StudentFeesScreen() {
   const [success, setSuccess] = useState(false);
   const [activeExamSession, setActiveExamSession] = useState<ExamFeeSession | null>(null);
   const [examApplication, setExamApplication] = useState<ExamApplication | null>(null);
+  const [examSessionsLoaded, setExamSessionsLoaded] = useState(false);
 
   const payables = account?.payableItems ?? [];
   const allowAdvance = account?.studentPortal?.allowAdvanceMonthlyPayment ?? false;
@@ -93,6 +94,7 @@ export default function StudentFeesScreen() {
       const active = sessions.find((s) => String(s.status).toUpperCase() === 'ACTIVE') ?? null;
       setActiveExamSession(active);
       setExamApplication(examApps[0] ?? null);
+      setExamSessionsLoaded(true);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to load fees');
       setSuccess(false);
@@ -265,7 +267,7 @@ export default function StudentFeesScreen() {
             />
           </View>
 
-          {activeExamSession ? (
+          {examSessionsLoaded ? (
             <Pressable
               style={styles.examFeeCard}
               onPress={() => router.push('/(student)/examination-fees' as never)}
@@ -274,9 +276,11 @@ export default function StudentFeesScreen() {
                 <Text style={styles.examFeeEyebrow}>Semester examination</Text>
                 <Text style={styles.examFeeTitle}>Semester exam fees</Text>
                 <Text style={styles.examFeeHint}>
-                  {activeExamSession.name
-                    ? `${activeExamSession.name} is open for payment.`
-                    : 'NEHU / college exam fee payment is open.'}
+                  {activeExamSession
+                    ? activeExamSession.name
+                      ? `${activeExamSession.name} is open for payment.`
+                      : 'NEHU / college exam fee payment is open.'
+                    : 'Open to check exam fee sessions, apply, and pay when a session is active.'}
                   {examApplication?.status
                     ? ` · Your application: ${examApplication.status.replace(/_/g, ' ')}`
                     : ''}

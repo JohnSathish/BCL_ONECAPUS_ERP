@@ -35,11 +35,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Cr80CardBack, Cr80CardFront } from '@/components/id-cards/cr80-card-renderer';
+import {
+  Cr80CardBack,
+  Cr80CardFront,
+  PALETTE_MIME,
+} from '@/components/id-cards/cr80-card-renderer';
 import {
   cardCanvasSizePx,
+  CR80_GRID_MM,
   DEFAULT_EVOLIS_FEED,
   DEFAULT_PRINT_CALIBRATION,
+  snapMm,
   TEMPLATE_CATEGORIES,
   ZOOM_PRESETS,
   type DesignerViewMode,
@@ -98,18 +104,24 @@ function newElement(
   fieldKey: string,
   side: 'front' | 'back',
   layout: IdCardLayoutV1,
+  at?: { x: number; y: number },
 ): IdCardElement {
   const existing = side === 'front' ? layout.front : layout.back;
-  const y =
+  const width = fieldKey === 'holderAddress' ? 48 : fieldKey === 'photo' ? 30 : 46;
+  const height =
+    fieldKey === 'holderAddress' ? 9 : fieldKey === 'photo' ? 28 : fieldKey === 'qr' ? 14 : 8;
+  const fallbackY =
     existing.length > 0 ? Math.min(75, Math.max(...existing.map((e) => e.y + e.height)) + 2) : 10;
+  const x = at ? Math.max(0, Math.min(CR80_WIDTH_MM - width, at.x - width / 2)) : 4;
+  const y = at ? Math.max(0, Math.min(CR80_HEIGHT_MM - height, at.y - height / 2)) : fallbackY;
   return {
     id: `${fieldKey}-${Date.now()}`,
     type: 'field',
     fieldKey,
-    x: 4,
+    x,
     y,
-    width: 46,
-    height: 8,
+    width,
+    height,
     zIndex: existing.length + 1,
     style: { visible: true, align: 'center' },
   };
@@ -135,7 +147,7 @@ export const FIELD_LABELS: Record<string, string> = {
   gender: 'Gender',
   fatherName: 'Father Name',
   motherName: 'Mother Name',
-  holderAddress: 'Address',
+  holderAddress: 'Student address',
   bloodGroup: 'Blood Group',
   qr: 'QR Code',
   barcode: 'Barcode',
@@ -147,7 +159,7 @@ export const FIELD_LABELS: Record<string, string> = {
   memberId: 'Member ID',
   validityFooter: 'Footer',
   verificationInfo: 'Verification',
-  address: 'College (Back)',
+  address: 'College address',
   terms: 'Terms',
   principalSignature: 'Principal Signature',
   footerBand: 'Footer Band',
@@ -377,12 +389,27 @@ export function IdCardDesignerStudio() {
     [selectedBackground, backgroundSideSelected, selectedElement, updateSelected, updateBackground],
   );
 
-  const addField = (fieldKey: string) => {
+  const addField = (fieldKey: string, at?: { x: number; y: number }) => {
     const cardSide = viewMode === 'both' ? selectedSide : side;
-    const el = newElement(fieldKey, cardSide, layout);
+    const el = newElement(fieldKey, cardSide, layout, at);
+    if (at) {
+      el.x = snapMm(el.x, CR80_GRID_MM, snapToGrid);
+      el.y = snapMm(el.y, CR80_GRID_MM, snapToGrid);
+    }
     updateElementsForSide(cardSide, [...(cardSide === 'front' ? layout.front : layout.back), el]);
     setSelectedElementId(el.id);
   };
+
+  const addFieldAtCursor = useCallback(
+    (fieldKey: string, xMm: number, yMm: number, dropSide: 'front' | 'back') => {
+      const el = newElement(fieldKey, dropSide, layout, { x: xMm, y: yMm });
+      el.x = snapMm(el.x, CR80_GRID_MM, snapToGrid);
+      el.y = snapMm(el.y, CR80_GRID_MM, snapToGrid);
+      updateElementsForSide(dropSide, [...(dropSide === 'front' ? layout.front : layout.back), el]);
+      setSelectedElementId(el.id);
+    },
+    [layout, snapToGrid, updateElementsForSide],
+  );
 
   const removeSelected = useCallback(() => {
     if (backgroundSideSelected) {
@@ -572,6 +599,8 @@ export function IdCardDesignerStudio() {
     onBackgroundChange: (
       patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
     ) => updateBackground('front', patch),
+    onPaletteDrop: (fieldKey: string, xMm: number, yMm: number) =>
+      addFieldAtCursor(fieldKey, xMm, yMm, 'front'),
   };
 
   const backCanvasProps = {
@@ -583,6 +612,8 @@ export function IdCardDesignerStudio() {
     onBackgroundChange: (
       patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
     ) => updateBackground('back', patch),
+    onPaletteDrop: (fieldKey: string, xMm: number, yMm: number) =>
+      addFieldAtCursor(fieldKey, xMm, yMm, 'back'),
   };
 
   return (
@@ -878,8 +909,14 @@ export function IdCardDesignerStudio() {
                     <button
                       key={key}
                       type="button"
-                      className="flex w-full items-center rounded-md border border-border px-2 py-1.5 text-left hover:bg-muted"
+                      draggable
+                      className="flex w-full cursor-grab items-center rounded-md border border-border px-2 py-1.5 text-left active:cursor-grabbing hover:bg-muted"
                       onClick={() => addField(key)}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(PALETTE_MIME, key);
+                        e.dataTransfer.setData('text/plain', key);
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
                     >
                       + {FIELD_LABELS[key] ?? key}
                     </button>
@@ -889,6 +926,9 @@ export function IdCardDesignerStudio() {
                       No matching components.
                     </p>
                   ) : null}
+                  <p className="pt-1 text-[10px] text-muted-foreground">
+                    Drag onto the card or click to add.
+                  </p>
                 </div>
               </div>
             )}
@@ -1148,7 +1188,7 @@ export function IdCardDesignerStudio() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-[10px] uppercase">Font size (px)</Label>
+                  <Label className="text-[10px] uppercase">Font size (pt)</Label>
                   <Input
                     type="number"
                     className="h-8"

@@ -12,6 +12,7 @@ import {
   formatCollegeAddress,
   isBlank,
   qrImageUrl,
+  renderFieldHtml,
   studentHolder,
   type FieldRenderOptions,
 } from './id-card-field-content';
@@ -36,6 +37,7 @@ import {
   pursuitVerificationPath,
   pursuitWatermarkText,
 } from './id-card-pursuit-excellence';
+import { PURSUIT_TYPE_SCALE_PX, scaleToPx, scalePursuitType } from './id-card-typography';
 
 function isStaff(model: IdCardModel): model is StaffIdCardModel {
   return model.cardType === 'staff';
@@ -45,12 +47,29 @@ function isStudent(model: IdCardModel): model is StudentIdCardModel {
   return model.cardType === 'student';
 }
 
-function PursuitGridRow({ label, value }: { label: string; value: string | null | undefined }) {
+function PursuitGridRow({
+  label,
+  value,
+  fontSize,
+}: {
+  label: string;
+  value: string | null | undefined;
+  fontSize?: number | null;
+}) {
   if (isBlank(value)) return null;
+  const px = scaleToPx(scalePursuitType(fontSize));
   return (
-    <div className="mb-[0.6mm] flex w-full items-baseline gap-[2mm] leading-[1.15]">
-      <span className="w-[16mm] shrink-0 text-[3.6px] font-bold text-slate-500">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-[4.4px] font-extrabold text-slate-900">
+    <div className="mb-[0.7mm] flex w-full items-baseline gap-[2mm] leading-[1.2]">
+      <span
+        className="w-[15mm] shrink-0 font-bold uppercase tracking-wide text-slate-500"
+        style={{ fontSize: px.label }}
+      >
+        {label}
+      </span>
+      <span
+        className="min-w-0 flex-1 truncate font-extrabold text-slate-900"
+        style={{ fontSize: px.value }}
+      >
         {value}
       </span>
     </div>
@@ -61,23 +80,30 @@ function LabelValueRow({
   label,
   value,
   multiline,
+  fontSize,
 }: {
   label: string;
   value: string | null | undefined;
   multiline?: boolean;
+  fontSize?: number | null;
 }) {
   if (isBlank(value)) return null;
+  const px = fontSize != null ? scaleToPx(scalePursuitType(fontSize)) : PURSUIT_TYPE_SCALE_PX;
   return (
-    <div className="flex w-full gap-[1.2mm] leading-[1.15]">
-      <span className="w-[16mm] shrink-0 text-[3.8px] font-bold uppercase tracking-wide text-slate-500">
+    <div className="flex w-full gap-[1.2mm] leading-[1.25]">
+      <span
+        className="w-[16mm] shrink-0 font-bold uppercase tracking-wide text-slate-500"
+        style={{ fontSize: px.label }}
+      >
         {label}
       </span>
       <span
         className={
           multiline
-            ? 'min-w-0 flex-1 text-[5.2px] font-bold leading-snug text-slate-900'
-            : 'min-w-0 flex-1 truncate text-[5.2px] font-bold text-slate-900'
+            ? 'min-w-0 flex-1 whitespace-pre-wrap break-words font-bold leading-snug text-slate-900'
+            : 'min-w-0 flex-1 truncate font-bold text-slate-900'
         }
+        style={{ fontSize: multiline ? px.address : px.value }}
       >
         {value}
       </span>
@@ -115,7 +141,7 @@ export function renderIdCardField(
   primary: string,
   options: FieldRenderOptions = {},
 ): React.ReactNode {
-  const { stylePreset, photoShape, signatureUrl, side } = options;
+  const { stylePreset, photoShape, signatureUrl, side, fontSize } = options;
   const { institution, verification, validity } = model;
   const student = studentHolder(model);
   const displayName = student?.displayFullName ?? model.holder.fullName;
@@ -132,12 +158,30 @@ export function renderIdCardField(
       photoShape,
       signatureUrl,
       side,
+      fontSize,
     });
     if (html !== null) {
       return html ? (
         <div className="h-full w-full" dangerouslySetInnerHTML={{ __html: html }} />
       ) : null;
     }
+  }
+
+  // Pursuit Excellence: share print HTML for preview ↔ PDF parity (incl. fontSize).
+  if (isPursuitExcellence(stylePreset)) {
+    const html = renderFieldHtml(fieldKey, {
+      model,
+      primary,
+      accent,
+      stylePreset,
+      photoShape,
+      signatureUrl,
+      side,
+      fontSize,
+    });
+    return html ? (
+      <div className="h-full w-full" dangerouslySetInnerHTML={{ __html: html }} />
+    ) : null;
   }
 
   switch (fieldKey) {

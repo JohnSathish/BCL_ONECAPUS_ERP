@@ -32,6 +32,14 @@ export class Class12SubjectsService {
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
+    // Subjects seeded as boardType GENERAL are shared across all boards.
+    const uniqueAliases = [
+      ...new Set(
+        [...boardAliases, 'GENERAL', 'ALL', 'COMMON']
+          .map((a) => a.trim())
+          .filter(Boolean),
+      ),
+    ];
 
     const rows = await this.prisma.supportBoardSubject.findMany({
       where: {
@@ -39,7 +47,7 @@ export class Class12SubjectsService {
         isActive: true,
         deletedAt: null,
         category: { equals: streamCode, mode: 'insensitive' },
-        OR: boardAliases.map((alias) => ({
+        OR: uniqueAliases.map((alias) => ({
           boardType: { equals: alias, mode: 'insensitive' as const },
         })),
       },
@@ -66,7 +74,7 @@ export class Class12SubjectsService {
     tenantId: string,
     boardRaw: string,
   ): Promise<string[]> {
-    const aliases = new Set<string>([boardRaw]);
+    const aliases = new Set<string>([boardRaw, 'GENERAL', 'ALL', 'COMMON']);
     const lookup = await this.prisma.masterLookup.findFirst({
       where: {
         tenantId,

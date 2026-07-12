@@ -28,6 +28,7 @@ function fieldHtml(
   photoShape?: 'square' | 'circle',
   signatureUrl?: string | null,
   side?: 'front' | 'back',
+  fontSize?: number | null,
 ): string {
   return renderFieldHtml(fieldKey, {
     model,
@@ -37,6 +38,7 @@ function fieldHtml(
     photoShape,
     signatureUrl,
     side,
+    fontSize,
   });
 }
 
@@ -72,10 +74,25 @@ function sideHtml(
         el.style?.photoShape,
         signatureUrl,
         side,
+        el.style?.fontSize,
       );
       if (!html) return '';
       const overflow = idCardFieldOverflow(el.fieldKey);
-      return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.width}mm;height:${el.height}mm;overflow:${overflow};z-index:${el.zIndex ?? 1};text-align:${el.style?.align ?? 'center'};">${html}</div>`;
+      const styleBits = [
+        `position:absolute`,
+        `left:${el.x}mm`,
+        `top:${el.y}mm`,
+        `width:${el.width}mm`,
+        `height:${el.height}mm`,
+        `overflow:${overflow}`,
+        `z-index:${el.zIndex ?? 1}`,
+        `text-align:${el.style?.align ?? 'center'}`,
+      ];
+      if (el.style?.fontWeight) styleBits.push(`font-weight:${el.style.fontWeight}`);
+      if (el.style?.color) styleBits.push(`color:${el.style.color}`);
+      if (el.style?.backgroundColor) styleBits.push(`background-color:${el.style.backgroundColor}`);
+      if (el.style?.opacity != null) styleBits.push(`opacity:${el.style.opacity}`);
+      return `<div style="${styleBits.join(';')};">${html}</div>`;
     })
     .join('');
 

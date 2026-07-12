@@ -14,6 +14,8 @@ const VISIBLE_OVERFLOW_KEYS = new Set<IdCardFieldKey>([
   'roleLabel',
   'name',
   'collegeAddress',
+  'holderAddress',
+  'address',
   'barcode',
   'employeeId',
   'designation',

@@ -24,6 +24,8 @@ type FetchOptions = RequestInit & {
   auth?: string;
   skipAuth?: boolean;
   _retried?: boolean;
+  /** Request timeout in ms (default 20s). */
+  timeoutMs?: number;
 };
 
 function parseError(data: unknown, fallback: string) {
@@ -36,13 +38,14 @@ function parseError(data: unknown, fallback: string) {
 
 async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const method = (options.method ?? 'GET').toUpperCase();
   const [apiBase, headers] = await Promise.all([
     getApiBase(),
     mobileHeadersAsync(options.headers as Record<string, string>),
   ]);
 
-  // Let fetch set multipart boundary — do not force application/json.
-  if (isFormData) {
+  // GET/HEAD must not force Content-Type — some WAFs reject it and RN has no body.
+  if (method === 'GET' || method === 'HEAD' || isFormData) {
     delete headers['Content-Type'];
   }
 
@@ -51,8 +54,46 @@ async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${apiBase}${path}`, { ...options, headers });
-  const json = await res.json().catch(() => ({}));
+  const base = apiBase.replace(/\/+$/, '');
+  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+
+  const timeoutMs = options.timeoutMs ?? 20_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal ?? controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'AbortError' || /aborted/i.test(err.message))) {
+      throw Object.assign(new Error('Request timed out. Check your connection and try again.'), {
+        status: 408,
+      });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const rawText = await res.text().catch(() => '');
+  let json: unknown = {};
+  if (rawText) {
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      if (!res.ok) {
+        const err = new Error(res.statusText || 'Request failed') as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      throw new Error('Server returned a non-JSON response. Check the institution API URL.');
+    }
+  }
+
   const data = (json as { data?: T })?.data ?? json;
 
   if (res.status === 401 && !options.skipAuth && !options._retried) {

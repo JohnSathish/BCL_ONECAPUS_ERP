@@ -186,7 +186,18 @@ export default function ExaminationFeesScreen() {
         }
       >
         {message ? <Text style={styles.error}>{message}</Text> : null}
-        <Text style={styles.session}>{sessionName || 'Examination fee'}</Text>
+        <Text style={styles.session}>{sessionName || 'Semester examination fees'}</Text>
+
+        {!activeSessionId && !app ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>No active exam fee session</Text>
+            <Text style={styles.rowMeta}>
+              When the college opens semester / NEHU exam fee payment, you can start your
+              application and pay from this screen. Pull to refresh, or check Notices for the
+              opening date.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.steps}>
           {STEPS.map((label, idx) => (
@@ -198,11 +209,11 @@ export default function ExaminationFeesScreen() {
           ))}
         </View>
 
-        {!app ? (
+        {!app && activeSessionId ? (
           <Pressable style={styles.primaryBtn} onPress={() => void onStart()} disabled={busy}>
             <Text style={styles.primaryBtnText}>{busy ? 'Starting…' : 'Start application'}</Text>
           </Pressable>
-        ) : (
+        ) : app ? (
           <>
             <Text style={styles.meta}>
               {app.applicationNo} · Sem {app.currentSemesterNo} · {app.status}
@@ -376,7 +387,7 @@ export default function ExaminationFeesScreen() {
               <Text style={styles.total}>Total: {formatInr(Number(app.totalFee))}</Text>
             </View>
           </>
-        )}
+        ) : null}
       </ScrollView>
     </StudentScreenShell>
   );

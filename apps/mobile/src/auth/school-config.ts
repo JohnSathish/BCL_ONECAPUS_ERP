@@ -74,12 +74,17 @@ export async function ensureSchoolConfigFromEnv(): Promise<SchoolConfig | null> 
 export async function getApiBase(): Promise<string> {
   const config = await getSchoolConfig();
   if (config?.apiUrl) return config.apiUrl;
-  return process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3001/api';
+  return (
+    process.env.EXPO_PUBLIC_API_URL?.trim() ||
+    // Release APKs without a selected school previously fell back to localhost and
+    // broke Secure Verification / login on physical devices.
+    'https://erp.donboscocollege.ac.in/api'
+  );
 }
 
 export function getApiBaseSync(): string {
   if (cached?.apiUrl) return cached.apiUrl;
-  return process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:3001/api';
+  return process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.donboscocollege.ac.in/api';
 }
 
 export async function getTenantSlug(): Promise<string> {

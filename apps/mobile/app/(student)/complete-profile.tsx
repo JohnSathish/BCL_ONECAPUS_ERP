@@ -180,6 +180,19 @@ export default function CompleteProfileScreen() {
       .then((rows) => {
         if (cancelled) return;
         setSubjectOptions(rows);
+        if (!rows.length) {
+          setMessage(
+            'No Class XII subjects found for this Board and Stream. Contact the office if the subject master is empty.',
+          );
+        } else {
+          setMessage((prev) =>
+            prev.startsWith('Could not load Class XII') ||
+            prev.startsWith('No Class XII subjects') ||
+            prev.startsWith('Class XII subjects API')
+              ? ''
+              : prev,
+          );
+        }
         const allowed = new Set(rows.map((r) => r.subjectName));
         setSubjects((prev) =>
           prev.map((row) =>
@@ -187,10 +200,19 @@ export default function CompleteProfileScreen() {
           ),
         );
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setSubjectOptions([]);
-          setMessage('Could not load Class XII subjects for this Board and Stream');
+          const status =
+            err && typeof err === 'object' && 'status' in err
+              ? Number((err as { status?: number }).status)
+              : undefined;
+          const detail = err instanceof Error ? err.message : '';
+          setMessage(
+            status === 404 || detail.toLowerCase().includes('not found')
+              ? 'Class XII subjects API is unavailable on the server. Ask IT to deploy the latest ERP update.'
+              : detail || 'Could not load Class XII subjects for this Board and Stream',
+          );
         }
       })
       .finally(() => {

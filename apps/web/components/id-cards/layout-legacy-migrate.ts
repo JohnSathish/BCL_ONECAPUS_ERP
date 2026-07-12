@@ -12,16 +12,20 @@ function isLayoutV1(layout: IdCardLayoutInput): layout is IdCardLayoutV1 {
   );
 }
 
-/** Keep uploaded backgrounds; always use latest element positions from the built-in library. */
+/** Refresh library layouts when seed revision is ahead; preserve tenant/designer edits otherwise. */
 function upgradeBuiltinLibraryLayout(stored: IdCardLayoutV1): IdCardLayoutV1 {
   const code = libraryCodeFromLayout(stored) ?? stored.meta?.libraryCode;
   if (!code) return stored;
   const latest = getBuiltinTemplateLayout(code);
   if (!latest) return stored;
 
+  const storedRev = stored.meta?.layoutRevision ?? 0;
+  const latestRev = latest.meta?.layoutRevision ?? 0;
+  if (storedRev >= latestRev) return stored;
+
   return {
     version: 1,
-    meta: { ...latest.meta, ...stored.meta, libraryCode: code },
+    meta: { ...latest.meta, ...stored.meta, libraryCode: code, layoutRevision: latestRev },
     frontBackground: stored.frontBackground ?? latest.frontBackground ?? null,
     backBackground: stored.backBackground ?? latest.backBackground ?? null,
     front: latest.front,

@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BCL OneCampus ERP — Enterprise User Manual &amp; Administration Guide</title>
+<meta name="author" content="BaseCode Labs Pvt. Ltd." />
+<meta name="description" content="Enterprise User Manual and Administration Guide for BCL OneCampus ERP" />
+<style>
+:root {
+  --navy: #0b1f3a;
+  --navy-2: #123056;
+  --maroon: #8b1538;
+  --gold: #c5a028;
+  --ink: #1e293b;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --paper: #ffffff;
+  --soft: #f8fafc;
+  --sky: #e8eef7;
+  --radius: 10px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  font: 11pt/1.55 var(--sans);
+  background: #0f172a;
+}
+a { color: var(--navy-2); }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 1rem; top: 1rem; background: #fff; padding: .5rem 1rem; z-index: 99; }
+.app-shell { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; height: 100vh; overflow: auto;
+  background: linear-gradient(180deg, var(--navy), #071525);
+  color: #e2e8f0; padding: 1.25rem 1rem 2rem;
+}
+.sidebar .brand { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+.sidebar .brand img { width: 42px; height: 42px; object-fit: contain; background: #fff; border-radius: 8px; }
+.sidebar h1 { font-size: .95rem; margin: 0; color: #fff; }
+.sidebar p { margin: .15rem 0 0; font-size: .7rem; color: #94a3b8; }
+.sidebar .tools { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+.sidebar button, .toolbar button {
+  border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06);
+  color: #fff; border-radius: 999px; padding: .35rem .7rem; font-size: .72rem; cursor: pointer;
+}
+.sidebar button:hover { background: rgba(255,255,255,.14); }
+#toc-nav { font-size: .72rem; }
+#toc-nav a { color: #cbd5e1; text-decoration: none; display: block; padding: .22rem .35rem; border-radius: 6px; }
+#toc-nav a:hover, #toc-nav a.active { background: rgba(197,160,40,.18); color: #fff; }
+#toc-nav .l2 { padding-left: .85rem; opacity: .9; }
+.main { background: #334155; }
+.doc {
+  max-width: 920px; margin: 0 auto; background: var(--paper);
+  box-shadow: 0 25px 60px rgba(0,0,0,.35);
+}
+.page-chrome {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: .55rem 1.25rem; border-bottom: 1px solid var(--line);
+  font-size: .68rem; color: var(--muted); background: var(--soft);
+}
+.page-chrome .left { display: flex; align-items: center; gap: .5rem; }
+.page-chrome img { height: 22px; width: auto; }
+.page-footer {
+  display: flex; justify-content: space-between; gap: 1rem;
+  padding: .55rem 1.25rem; border-top: 1px solid var(--line);
+  font-size: .65rem; color: var(--muted); background: var(--soft);
+}
+.content-pad { padding: 1.5rem 2rem 2.5rem; }
+.cover, .back-cover, .inside-cover {
+  min-height: 100vh; padding: 2.5rem; position: relative;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(197,160,40,.25), transparent 55%),
+    radial-gradient(900px 500px at 110% 20%, rgba(139,21,56,.28), transparent 50%),
+    linear-gradient(155deg, #071525 0%, #0b1f3a 45%, #123056 100%);
+  color: #f8fafc;
+  page-break-after: always;
+}
+.cover-logos { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.cover-logos img { height: 64px; background: #fff; border-radius: 12px; padding: .35rem .55rem; }
+.cover-hero { margin-top: 18vh; max-width: 34rem; }
+.cover-hero .eyebrow { letter-spacing: .18em; text-transform: uppercase; font-size: .75rem; color: var(--gold); }
+.cover-hero h1 { font: 700 2.6rem/1.1 var(--serif); margin: .6rem 0; }
+.cover-hero .tag { font-size: 1.15rem; color: #cbd5e1; }
+.cover-meta {
+  margin-top: 3rem; display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1.5rem;
+  max-width: 32rem; font-size: .9rem;
+}
+.cover-meta span { display: block; color: #94a3b8; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+.cover-bottom { position: absolute; left: 2.5rem; right: 2.5rem; bottom: 2rem; display: flex; justify-content: space-between; font-size: .8rem; color: #94a3b8; }
+.inside-cover { background: var(--paper); color: var(--ink); }
+.inside-cover h2 { font-family: var(--serif); color: var(--navy); }
+.meta-box { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.25rem; background: var(--soft); margin: 1rem 0; }
+.version-table td, .version-table th { padding: .45rem .6rem; border-bottom: 1px solid var(--line); text-align: left; font-size: .9rem; }
+.chapter { page-break-before: always; padding-top: .5rem; }
+.chapter-head { border-bottom: 3px solid var(--navy); margin-bottom: 1.25rem; padding-bottom: .75rem; }
+.chapter-kicker { margin: 0; text-transform: uppercase; letter-spacing: .14em; font-size: .7rem; color: var(--maroon); font-weight: 700; }
+.chapter-head h2 { font: 700 1.7rem/1.2 var(--serif); color: var(--navy); margin: .25rem 0; }
+.chapter-sub { margin: 0; color: var(--muted); }
+h3 { color: var(--navy-2); font-size: 1.1rem; margin-top: 1.6rem; border-left: 4px solid var(--gold); padding-left: .6rem; }
+h4 { margin-bottom: .35rem; color: var(--navy); }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 1rem 0; }
+.info-grid > div { background: var(--soft); border: 1px solid var(--line); border-radius: var(--radius); padding: .75rem .9rem; }
+.nav-path { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: .75rem 1rem; background: var(--sky); border-radius: var(--radius); font-weight: 600; font-size: .9rem; }
+.nav-sep { color: var(--maroon); font-weight: 700; }
+.table-wrap { overflow-x: auto; margin: .75rem 0 1rem; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th, td { border: 1px solid var(--line); padding: .45rem .55rem; vertical-align: top; }
+th { background: var(--navy); color: #fff; font-weight: 600; }
+tr:nth-child(even) td { background: #f8fafc; }
+.steps { padding-left: 1.2rem; }
+.steps li { margin: .45rem 0; }
+.flow { display: flex; flex-direction: column; align-items: center; gap: .35rem; margin: 1rem 0; }
+.flow-node {
+  min-width: 12rem; text-align: center; padding: .55rem 1rem; border-radius: 999px;
+  background: linear-gradient(135deg, var(--navy), var(--navy-2)); color: #fff; font-weight: 600; font-size: .85rem;
+  box-shadow: 0 6px 16px rgba(11,31,58,.18);
+}
+.flow-arrow { color: var(--maroon); font-size: 1.1rem; font-weight: 700; }
+ul.check { padding-left: 1.1rem; }
+ul.check li { margin: .35rem 0; }
+.faq dt { font-weight: 700; margin-top: .75rem; color: var(--navy); }
+.faq dd { margin: .25rem 0 .5rem; color: #334155; }
+.callout { border-radius: var(--radius); padding: .85rem 1rem; margin: .75rem 0; border: 1px solid var(--line); }
+.callout.tip { background: #f0fdf4; border-color: #bbf7d0; }
+.callout.warn { background: #fff7ed; border-color: #fed7aa; }
+.callout.danger { background: #fef2f2; border-color: #fecaca; }
+.note { color: var(--muted); font-size: .9rem; }
+.shot { margin: 1rem 0 1.25rem; }
+.shot-frame {
+  border: 2px dashed #94a3b8; background: repeating-linear-gradient(-45deg, #f8fafc, #f8fafc 10px, #eef2ff 10px, #eef2ff 20px);
+  min-height: 160px; display: grid; place-items: center; color: var(--muted); font-weight: 600; border-radius: var(--radius);
+}
+.shot figcaption { font-size: .78rem; color: var(--muted); margin-top: .35rem; }
+.toc-page ol { columns: 2; column-gap: 2rem; }
+.toc-page li { break-inside: avoid; margin: .25rem 0; }
+.toc-page a { text-decoration: none; }
+.back-cover .center { text-align: center; margin-top: 18vh; }
+.back-cover h2 { font: 700 2rem/1.15 var(--serif); }
+.qr-ph {
+  width: 120px; height: 120px; margin: 1.25rem auto; border: 2px dashed rgba(255,255,255,.45);
+  display: grid; place-items: center; font-size: .7rem; color: #cbd5e1;
+}
+.kbd { font-family: var(--mono); font-size: .8rem; background: #e2e8f0; padding: .1rem .35rem; border-radius: 4px; }
+@media (max-width: 960px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; }
+  .info-grid, .cover-meta, .toc-page ol { grid-template-columns: 1fr; columns: 1; }
+}
+@media print {
+  body { background: #fff; }
+  .app-shell { display: block; }
+  .sidebar, .no-print { display: none !important; }
+  .main { background: #fff; }
+  .doc { max-width: none; box-shadow: none; }
+  .cover, .inside-cover, .back-cover, .chapter { break-after: page; page-break-after: always; }
+  a { color: inherit; text-decoration: none; }
+  .shot-frame { min-height: 120px; }
+  @page { size: A4; margin: 14mm 12mm 16mm; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#document-root">Skip to document</a>
+<div class="app-shell">
+  <aside class="sidebar no-print" aria-label="Manual navigation">
+    <div class="brand">
+      <img src="bcl-logo.png" alt="BaseCode Labs" />
+      <div>
+        <h1>BCL OneCampus ERP</h1>
+        <p>User Manual DOC-2026.07</p>
+      </div>
+    </div>
+    <div class="tools">
+      <button type="button" id="btn-print">Print / PDF</button>
+      <button type="button" id="btn-top">Top</button>
+    </div>
+    <nav id="toc-nav" aria-label="Table of contents"></nav>
+  </aside>
+  <div class="main">
+    <div class="doc" id="document-root">
+
+      <!-- COVER -->
+      <section class="cover" id="cover">
+        <div class="cover-logos">
+          <img src="bcl-logo.png" alt="BaseCode Labs Pvt. Ltd." />
+          <img src="onecampus-logo.png" alt="BCL OneCampus ERP" />
+        </div>
+        <div class="cover-hero">
+          <p class="eyebrow">Official Product Documentation</p>
+          <h1>BCL OneCampus ERP<br/>Enterprise User Manual &amp; Administration Guide</h1>
+          <p class="tag">Complete Campus Management System</p>
+        </div>
+        <div class="cover-meta">
+          <div><span>Product version</span><strong>1.0.0</strong></div>
+          <div><span>Document version</span><strong>DOC-2026.07</strong></div>
+          <div><span>Release date</span><strong>12 July 2026</strong></div>
+          <div><span>Company</span><strong>BaseCode Labs Pvt. Ltd.</strong></div>
+          <div><span>Website</span><strong>https://basecodelabs.com</strong></div>
+          <div><span>Email</span><strong>contact@basecodelabs.com</strong></div>
+          <div><span>Phone</span><strong>+91 95663 63655</strong></div>
+          <div><span>Classification</span><strong>Confidential — Licensed Customers</strong></div>
+        </div>
+        <div class="cover-bottom">
+          <span>© 2026 BaseCode Labs Pvt. Ltd. All rights reserved.</span>
+          <span>Printed from HTML · A4</span>
+        </div>
+      </section>
+
+      <!-- INSIDE COVER -->
+      <section class="inside-cover content-pad" id="inside-cover">
+        <div class="page-chrome">
+          <div class="left"><img src="bcl-logo.png" alt="" /><strong>BaseCode Labs Pvt. Ltd.</strong></div>
+          <div>BCL OneCampus ERP · DOC-2026.07</div>
+        </div>
+        <h2>Inside cover</h2>
+        <div class="meta-box">
+          <p><strong>Copyright notice.</strong> © 2026 BaseCode Labs Pvt. Ltd. All rights reserved. No part of this publication may be reproduced or distributed outside licensed customer institutions without prior written consent of BaseCode Labs Pvt. Ltd.</p>
+          <p><strong>Confidentiality.</strong> This manual contains proprietary product information. Distribute only to authorized staff of licensed colleges.</p>
+          <p><strong>Disclaimer.</strong> Screens, labels, and workflows may vary by license edition, feature flags, and tenant configuration. Screenshots are illustrative placeholders until replaced with your production captures.</p>
+        </div>
+        <h3>Document version history</h3>
+        <table class="version-table">
+          <thead><tr><th>Version</th><th>Date</th><th>Author</th><th>Changes</th></tr></thead>
+          <tbody>
+            <tr><td>DOC-2026.07</td><td>12 July 2026</td><td>BaseCode Labs Product Documentation</td><td>Initial enterprise HTML manual covering all major OneCampus modules, role guides, and appendices.</td></tr>
+          </tbody>
+        </table>
+        <h3>Prepared by</h3>
+        <p>Product Documentation Team · BaseCode Labs Pvt. Ltd.</p>
+        <h3>Company &amp; support</h3>
+        <p>Website: <a href="https://basecodelabs.com">https://basecodelabs.com</a><br/>
+        Email: <a href="mailto:contact@basecodelabs.com">contact@basecodelabs.com</a><br/>
+        Licensing: <a href="mailto:licensing@basecodelabs.com">licensing@basecodelabs.com</a><br/>
+        Phone: +91 95663 63655</p>
+        <div class="page-footer">
+          <span>© 2026 BaseCode Labs Pvt. Ltd. All rights reserved.</span>
+          <span class="pg"></span>
+        </div>
+      </section>
+
+      <!-- TOC -->
+      <section class="content-pad toc-page chapter" id="toc">
+        <div class="page-chrome">
+          <div class="left"><img src="bcl-logo.png" alt="" /><strong>BCL OneCampus ERP</strong></div>
+          <div>Table of Contents · DOC-2026.07</div>
+        </div>
+        <header class="chapter-head"><p class="chapter-kicker">Contents</p><h2>Table of Contents</h2></header>
+        <ol id="toc-list"></ol>
+        <div class="page-footer"><span>© 2026 BaseCode Labs Pvt. Ltd. All rights reserved.</span><span class="pg"></span></div>
+      </section>
+
+      <div class="content-pad" id="body-chapters">
+        
+<article class="chapter" id="ch-intro">
+  <header class="chapter-head"><p class="chapter-kicker">Part I</p><h2>Introduction</h2>
+  <p class="chapter-sub">Welcome to BCL OneCampus ERP</p></header>
+  <p><strong>BCL OneCampus ERP</strong> is an enterprise campus management platform by <strong>BaseCode Labs Pvt. Ltd.</strong>. It unifies admissions, academics (NEP/FYUGP), attendance, examinations, fees &amp; accounts, HR &amp; payroll, library, communication, governance/NAAC, identity cards, inventory, transport, and mobile apps into one licensed tenant.</p>
+  <h3>Who this manual is for</h3>
+  <ul>
+    <li>College administrators and ERP administrators</li>
+    <li>Admission, academic, examination, accounts, HR, and library officers</li>
+    <li>Faculty and HODs using the Staff Portal / mobile app</li>
+    <li>Students and applicants using web and mobile portals</li>
+    <li>Principals using Principal Desk</li>
+  </ul>
+  <h3>Document conventions</h3>
+  <ul>
+    <li><span class="kbd">Bold</span> menu paths show navigation.</li>
+    <li>Screenshot frames marked <em>[Insert … Screenshot]</em> are reserved for your institution’s visuals.</li>
+    <li>Field tables list Mandatory = Yes/No/Recommended/System.</li>
+  </ul>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Product architecture / portal map Screenshot]</div>
+  <figcaption>Figure — Product architecture / portal map. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  <div class="callout tip"><strong>Support.</strong> contact@basecodelabs.com · +91 95663 63655 · https://basecodelabs.com</div>
+</article>
+
+<article class="chapter" id="ch-requirements">
+  <header class="chapter-head"><p class="chapter-kicker">Part I</p><h2>System Requirements</h2></header>
+  <h3>Server / SaaS</h3>
+  <p>Institutions typically receive a hosted tenant URL from BaseCode Labs. On-premise deployments follow the contracted infrastructure schedule.</p>
+  <h3>Administrator &amp; staff workstations</h3>
+  <div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>OS</td><td>Windows 10/11, macOS 12+, or current Linux LTS</td><td>Yes</td><td>Windows 11</td></tr>
+<tr><td>Browser</td><td>Chrome, Edge, or Firefox (latest 2 versions)</td><td>Yes</td><td>Chrome 125+</td></tr>
+<tr><td>Display</td><td>1366×768 minimum; 1920×1080 recommended</td><td>Yes</td><td>1080p</td></tr>
+<tr><td>Network</td><td>Stable broadband; HTTPS required</td><td>Yes</td><td>20 Mbps+ shared</td></tr>
+<tr><td>PDF / print</td><td>System PDF printer for exports</td><td>Recommended</td><td>Microsoft Print to PDF</td></tr>
+</tbody></table></div>
+  <h3>Mobile</h3>
+  <p>Android device meeting current Play Store policy for <strong>BCL OneCampus ERP</strong> (package <code>edu.onecampus.mobile</code>). iOS availability depends on your rollout plan. Push notifications require Firebase configuration by the administrator.</p>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Supported browsers matrix Screenshot]</div>
+  <figcaption>Figure — Supported browsers matrix. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+</article>
+
+<article class="chapter" id="ch-getting-started">
+  <header class="chapter-head"><p class="chapter-kicker">Part I</p><h2>Getting Started</h2></header>
+  <h3>Portals at a glance</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Portal</th><th>Typical URL path</th><th>Primary users</th></tr></thead>
+    <tbody>
+      <tr><td>Admin</td><td>/admin</td><td>College / academic / accounts admins</td></tr>
+      <tr><td>Staff / Faculty</td><td>/staff</td><td>Teaching &amp; non-teaching staff</td></tr>
+      <tr><td>Student</td><td>/student</td><td>Enrolled students</td></tr>
+      <tr><td>Principal Desk</td><td>/principal-desk</td><td>Principal, VP, ERP Admin</td></tr>
+      <tr><td>Admissions Portal</td><td>/admissions-portal</td><td>Applicants</td></tr>
+      <tr><td>Library Desk</td><td>/library-desk</td><td>Library operators</td></tr>
+      <tr><td>Careers Portal</td><td>/careers-portal</td><td>Job applicants</td></tr>
+      <tr><td>Mobile app</td><td>Play Store / APK</td><td>Students &amp; staff</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Login procedure</h3>
+  <ol class="steps"><li><strong>Step 1.</strong> Open your institution’s OneCampus URL.</li><li><strong>Step 2.</strong> Select the correct institution/school if prompted (multi-tenant / mobile).</li><li><strong>Step 3.</strong> Enter username/email and password.</li><li><strong>Step 4.</strong> Complete first-login password change if required.</li><li><strong>Step 5.</strong> Land on the portal home determined by your role.</li></ol>
+  <div class="nav-path"><span>Browser</span><span class="nav-sep">→</span><span>Login</span><span class="nav-sep">→</span><span>Role-based home</span></div>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Login screen Screenshot]</div>
+  <figcaption>Figure — Login screen. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  <div class="callout warn"><strong>Security.</strong> Never share passwords. Use Security &amp; Sessions to revoke lost-device sessions.</div>
+</article>
+
+        
+<article class="chapter" id="ch-dashboard">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Dashboard &amp; Analytics</h2>
+    <p class="chapter-sub">Operations command center for institutional visibility</p>
+  </header>
+
+  <section id="ch-dashboard-overview">
+    <h3>Overview</h3>
+    <p>The Admin Dashboard is the operational home page of BCL OneCampus ERP. It consolidates student, academic, fee, attendance, and licensing signals so leadership and administrators can act without navigating every module first.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Provide at-a-glance KPIs, alerts, quick actions, and OneCampus AI assistance for campus operations.</p></div>
+      <div><h4>Business use case</h4><p>A registrar opens the day with pending admissions, fee defaulters, and attendance anomalies; a principal reviews institutional health from Principal Desk.</p></div>
+      <div><h4>Primary users</h4><p>College Admin, Academic Admin, Principal, Vice Principal, ERP Administrator</p></div>
+      <div><h4>Why it exists</h4><p>Enterprise campuses need a single pane of glass for NEP-era multi-shift, multi-programme operations.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-dashboard-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Admin portal</span><span class="nav-sep">→</span><span>Dashboard</span><span class="nav-sep">→</span><span>/admin</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-dashboard-screen">
+    <h3>Screen overview</h3>
+    <p>The dashboard typically includes KPI cards, alert banners (license, payments), quick links, recent activity, and the OneCampus AI Assistant (Ctrl+K command palette). Use <strong>Analytics</strong> for deeper charts where enabled.</p><ul><li><strong>KPI cards</strong> — students, admissions, fees, attendance</li><li><strong>Alerts</strong> — license expiry, payment failures, pending approvals</li><li><strong>Quick actions</strong> — add student, collect fees, open reports</li><li><strong>Command palette</strong> — search menus, students, and ask OneCampus AI</li></ul>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Admin Dashboard Screenshot]</div>
+  <figcaption>Figure — Admin Dashboard. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-dashboard-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Date range filter</td><td>Scopes KPI widgets to a period</td><td>No</td><td>Current academic session</td></tr>
+<tr><td>Campus / Shift filter</td><td>Limits data to a campus or shift</td><td>No</td><td>Morning Shift</td></tr>
+<tr><td>Search (Ctrl+K)</td><td>Global search and AI assistant</td><td>No</td><td>Show fee defaulters</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-dashboard-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Starting your day on the dashboard</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Sign in with an administrator account and land on <em>Dashboard</em>.</li><li><strong>Step 2.</strong> Review license and payment alert banners; resolve critical items first.</li><li><strong>Step 3.</strong> Open pending queues (admissions, profile verification, fee collection) from quick links.</li><li><strong>Step 4.</strong> Use Ctrl+K to search a student, report, or ask OneCampus AI a natural-language question.</li><li><strong>Step 5.</strong> Drill into Analytics or Reports for board-ready summaries.</li></ol>
+  </section>
+
+  <section id="ch-dashboard-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Login</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Dashboard KPIs</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Alert triage</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Module deep-dive</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Reports / AI</div></div></section>
+
+  <section id="ch-dashboard-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Treat dashboard alerts as an operations queue, not optional notices.</li><li>Do not share admin sessions; use named users for auditability.</li><li>Validate KPI filters against the active academic session before sharing numbers with leadership.</li></ul>
+  </section>
+
+  <section id="ch-dashboard-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Blank KPIs</td><td>Wrong academic session or missing permissions</td><td>Switch session in settings; confirm role permissions</td></tr><tr><td>AI returns no answer</td><td>Knowledge base not synced</td><td>Sync catalog from Administration → Knowledge Base</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-dashboard-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Who can see Analytics?</dt><dd>Users with analytics/report permissions. Some analytics tiles may show as Coming soon depending on edition.</dd><dt>Can I customize the dashboard layout?</dt><dd>Institution branding and theme are managed in Theme Studio; KPI visibility follows role permissions.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-dashboard-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Export key daily numbers via Reports Hub for archival minutes of meetings.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-institution">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Institution Setup &amp; Organization</h2>
+    <p class="chapter-sub">Legal entity, campuses, branding, and infrastructure masters</p>
+  </header>
+
+  <section id="ch-institution-overview">
+    <h3>Overview</h3>
+    <p>Institution Setup establishes the organizational identity of the college inside OneCampus: display name, campuses, branding, academic structure foundations, and physical infrastructure (buildings, rooms, labs).</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Configure the tenant so every document, ID card, fee receipt, and portal reflects the correct institution.</p></div>
+      <div><h4>Business use case</h4><p>A new college goes live: create organization profile, upload logo, define campuses/shifts, map buildings and rooms.</p></div>
+      <div><h4>Primary users</h4><p>Institution Admin, ERP Administrator, College Admin</p></div>
+      <div><h4>Why it exists</h4><p>All downstream modules (fees, ID cards, certificates, NAAC evidence) inherit institution masters.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-institution-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Administration / Settings</span><span class="nav-sep">→</span><span>Organization</span><span class="nav-sep">→</span><span>/admin/organization</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-institution-screen">
+    <h3>Screen overview</h3>
+    <p>Organization settings cover legal name, address, contact, affiliation lines, logo, and theme colors. Infrastructure submenu manages Buildings → Floors → Rooms / Labs / Shared halls and room calendars.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Organization settings Screenshot]</div>
+  <figcaption>Figure — Organization settings. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-institution-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Institution display name</td><td>Name shown on portals and documents</td><td>Yes</td><td>Don Bosco College, Tura</td></tr>
+<tr><td>Short name</td><td>Compact label for cards and headers</td><td>Yes</td><td>DBC Tura</td></tr>
+<tr><td>Primary / accent color</td><td>Brand colors for UI and print</td><td>Yes</td><td>#001B44 / #8B1538</td></tr>
+<tr><td>Logo</td><td>Institution emblem (PNG/SVG recommended)</td><td>Recommended</td><td>college-logo.png</td></tr>
+<tr><td>Affiliation line</td><td>Printed on ID cards and certificates</td><td>Recommended</td><td>Affiliated to NEHU</td></tr>
+<tr><td>Campus name</td><td>Multi-campus label if applicable</td><td>No</td><td>Main Campus</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-institution-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Configuring institution identity</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open <em>Settings → Organization</em> (or Theme Studio for branding).</li><li><strong>Step 2.</strong> Enter legal and display names, address, phone, email, and website.</li><li><strong>Step 3.</strong> Upload logo and set primary/accent colors; preview login and student portal.</li><li><strong>Step 4.</strong> Define campuses if multi-campus; configure shifts under Academics → Shift Management.</li><li><strong>Step 5.</strong> Under Infrastructure, create buildings, floors, and rooms used by timetable and inventory.</li><li><strong>Step 6.</strong> Save and verify appearance on login, ID card designer, and fee receipts.</li></ol>
+  </section>
+
+  <section id="ch-institution-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Organization profile</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Branding &amp; theme</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Campuses &amp; shifts</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Infrastructure masters</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Verify on portals</div></div></section>
+
+  <section id="ch-institution-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Keep affiliation and accreditation text accurate for NAAC and printed credentials.</li><li>Use high-resolution logos with transparent backgrounds for ID cards.</li><li>Never change institution short codes mid-session without impact analysis on roll numbers and receipts.</li></ul>
+  </section>
+
+  <section id="ch-institution-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Logo missing on login</td><td>Asset URL blocked or 404</td><td>Re-upload via Theme Studio; confirm public URL</td></tr><tr><td>Wrong colors on ID cards</td><td>Template uses hardcoded colors</td><td>Update template brand colors or Theme Studio</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-institution-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Can one tenant run multiple campuses?</dt><dd>Yes. Use campus masters and filters; confirm license covers multi-campus if required.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-institution-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> After branding changes, regenerate sample ID cards and certificates to validate print fidelity.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-users">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>User Management, Roles &amp; Permissions</h2>
+    <p class="chapter-sub">Identity, access control, and portal routing</p>
+  </header>
+
+  <section id="ch-users-overview">
+    <h3>Overview</h3>
+    <p>User Management controls who can sign in, which portal they receive (Admin, Staff, Student, Principal Desk, Library Desk, Applicant), and which modules they may access via roles and fine-grained permissions.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Enforce least-privilege access across college, academic, finance, and library workspaces.</p></div>
+      <div><h4>Business use case</h4><p>Create a faculty user linked to a staff record; assign Faculty workspace template; grant marks-entry permission for one department.</p></div>
+      <div><h4>Primary users</h4><p>ERP Administrator, College Admin, Institution Admin</p></div>
+      <div><h4>Why it exists</h4><p>Auditability and data protection require named accounts and role-based access, not shared passwords.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-users-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Administration</span><span class="nav-sep">→</span><span>Portal Users / Roles &amp; Permissions</span><span class="nav-sep">→</span><span>/admin/administration</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-users-screen">
+    <h3>Screen overview</h3>
+    <p>Key screens: Portal Users, Roles & Permissions, User Permissions, User Activation, Security & Sessions, Audit Logs. Workspace templates (Faculty, HOD, Accounts, Library, Front Office, Examination Cell, Principal) accelerate role setup.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Roles &amp; Permissions Screenshot]</div>
+  <figcaption>Figure — Roles &amp; Permissions. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-users-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Username / email</td><td>Login identifier</td><td>Yes</td><td>faculty.education@college.edu</td></tr>
+<tr><td>Role</td><td>Primary portal role</td><td>Yes</td><td>faculty</td></tr>
+<tr><td>Linked staff / student</td><td>Binds portal to ERP person record</td><td>Recommended</td><td>Staff EMP-015</td></tr>
+<tr><td>Status</td><td>Active / inactive</td><td>Yes</td><td>Active</td></tr>
+<tr><td>Permission overrides</td><td>Extra allow/deny beyond role</td><td>No</td><td>fees.collect</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-users-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Creating a portal user</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open <em>Administration → Portal Users</em> and choose Add User.</li><li><strong>Step 2.</strong> Enter identity details and select the primary role (e.g., faculty, accountant, librarian).</li><li><strong>Step 3.</strong> Link the user to the corresponding Staff or Student master record.</li><li><strong>Step 4.</strong> Apply a workspace template or customize permissions in Roles & Permissions.</li><li><strong>Step 5.</strong> Activate the account and share temporary credentials via secure channel.</li><li><strong>Step 6.</strong> Ask the user to change password on first login; verify portal landing page.</li></ol>
+  </section>
+
+  <section id="ch-users-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Create user</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Assign role</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Link person record</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Set permissions</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Activate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">First login</div></div></section>
+
+  <section id="ch-users-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Disable accounts on resignation the same day HR closes employment.</li><li>Prefer role templates over one-off permission sprawl.</li><li>Review Security & Sessions regularly for concurrent or suspicious logins.</li></ul>
+  </section>
+
+  <section id="ch-users-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>User lands on Access Denied</td><td>Missing portal role mapping</td><td>Assign correct role in portal-access set</td></tr><tr><td>Faculty cannot mark attendance</td><td>Permission not in role</td><td>Grant attendance entry permission</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-users-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Difference between staff and faculty roles?</dt><dd>Both use the Staff portal; faculty typically includes teaching, marks, and LMS permissions.</dd><dt>What is platform-admin?</dt><dd>BaseCode Labs platform operators managing licenses across tenants — not a college role.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-users-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> All sensitive actions are written to Audit Logs — retain per institutional policy.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-academic">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Academic Management</h2>
+    <p class="chapter-sub">Programmes, curriculum engine, courses, subjects, sessions, and shifts</p>
+  </header>
+
+  <section id="ch-academic-overview">
+    <h3>Overview</h3>
+    <p>Academic Management is the structural backbone for NEP / FYUGP delivery: programmes, curriculum versions, course/subject masters, subject mapping, academic sessions (years/semesters), and shift configuration (Morning/Evening).</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Define what is taught, when, and under which programme rules so attendance, timetable, fees, and exams stay consistent.</p></div>
+      <div><h4>Business use case</h4><p>Launch FYUGP BA with Major/Minor/MDC/AEC/SEC/VAC baskets; activate Semester III for 2026–27 Morning shift.</p></div>
+      <div><h4>Primary users</h4><p>Academic Admin, HOD, Shift Admin, College Admin</p></div>
+      <div><h4>Why it exists</h4><p>Without clean academic masters, promotion, exam fees, and subject registration fail.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-academic-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Academics</span><span class="nav-sep">→</span><span>Programmes / Curriculum / Sessions / Shifts</span><span class="nav-sep">→</span><span>/admin/programs</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-academic-screen">
+    <h3>Screen overview</h3>
+    <p>Sub-modules include Programmes, Curriculum (Academic Engine), Course Master, Subject Sections, Subject Mapping, Academic Sessions (lifecycle), and Shift Management. Use filters by programme, semester, and shift on list screens; Export for NAAC evidence.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Curriculum / Academic Engine Screenshot]</div>
+  <figcaption>Figure — Curriculum / Academic Engine. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-academic-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Programme code / name</td><td>Official programme identity</td><td>Yes</td><td>BA-ECO / B.A. Economics</td></tr>
+<tr><td>Curriculum version</td><td>Rule set for a cohort</td><td>Yes</td><td>FYUGP-2024</td></tr>
+<tr><td>Course / subject code</td><td>Paper identity</td><td>Yes</td><td>EDN-DSC-301</td></tr>
+<tr><td>Category</td><td>Major, Minor, MDC, AEC, SEC, VAC, VTC…</td><td>Yes</td><td>MDC</td></tr>
+<tr><td>Credits</td><td>Credit load</td><td>Yes</td><td>4</td></tr>
+<tr><td>Academic session</td><td>Year / semester window</td><td>Yes</td><td>2026–27 Odd</td></tr>
+<tr><td>Shift</td><td>Delivery window</td><td>Yes</td><td>Morning</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-academic-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Activating a semester for teaching</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Confirm programme and curriculum version for the cohort under Curriculum.</li><li><strong>Step 2.</strong> Open Academic Sessions and create/activate the target session and semester.</li><li><strong>Step 3.</strong> Ensure subjects are mapped for the semester (Subject Mapping / Course Master).</li><li><strong>Step 4.</strong> Configure or verify Shift Management for Morning/Evening offerings.</li><li><strong>Step 5.</strong> Publish subject sections and teaching allocations before timetable generation.</li><li><strong>Step 6.</strong> Notify faculty via Communication and open student subject registration if required.</li></ol>
+  </section>
+
+  <section id="ch-academic-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Programme master</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Curriculum version</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Subject mapping</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Session activation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Shift offerings</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Timetable / registration</div></div></section>
+
+  <section id="ch-academic-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Never edit a published curriculum in place — create a new version for the next cohort.</li><li>Lock subject codes once examination fees or university submission has started.</li><li>Align shift configuration with fee plans and attendance periods.</li></ul>
+  </section>
+
+  <section id="ch-academic-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Students cannot register subjects</td><td>Session inactive or mapping missing</td><td>Activate session; complete subject mapping</td></tr><tr><td>Wrong paper on hall ticket</td><td>Incorrect subject mapping</td><td>Correct mapping and regenerate cards</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-academic-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>What is the Academic Engine?</dt><dd>Curriculum management for structured FYUGP baskets and versioned programme rules.</dd><dt>Can two shifts share the same subject code?</dt><dd>Yes via offerings/sections; keep teaching allocation distinct per shift.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-academic-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Export curriculum and session snapshots before university inspection visits.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-admission">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Admission Management</h2>
+    <p class="chapter-sub">Intakes, applications, merit, fees, and admitted students</p>
+  </header>
+
+  <section id="ch-admission-overview">
+    <h3>Overview</h3>
+    <p>Admission Management covers the full applicant journey: intakes and cycles, online applications, document and payment verification, merit/selection, admission fee verification, and conversion to admitted students in the Student Directory.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Run transparent, auditable admissions aligned to published cycles and fee structures.</p></div>
+      <div><h4>Business use case</h4><p>Open UG admission cycle 2026; verify documents and fees; publish merit; confirm admitted list.</p></div>
+      <div><h4>Primary users</h4><p>Admission Admin, Front Office, Accounts, Applicants (portal)</p></div>
+      <div><h4>Why it exists</h4><p>Admissions generate the student master; errors cascade into fees, roll numbers, and exams.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-admission-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Student Lifecycle</span><span class="nav-sep">→</span><span>Admissions</span><span class="nav-sep">→</span><span>/admin/admissions</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-admission-screen">
+    <h3>Screen overview</h3>
+    <p>Control center plus Applications, Documents, Payments, Admission Fees, Merit & Selection, Admitted Students, Intakes, Cycles & Settings, Analytics, Archive. Applicant self-service lives under Admissions Portal.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Admissions Control Center Screenshot]</div>
+  <figcaption>Figure — Admissions Control Center. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-admission-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Intake / cycle</td><td>Admission window</td><td>Yes</td><td>UG-2026 Round 1</td></tr>
+<tr><td>Applicant name</td><td>As per ID proof</td><td>Yes</td><td>Rikchakam Ch Marak</td></tr>
+<tr><td>Programme applied</td><td>Chosen programme</td><td>Yes</td><td>B.A. Economics</td></tr>
+<tr><td>Application status</td><td>Workflow state</td><td>System</td><td>Under verification</td></tr>
+<tr><td>Documents</td><td>Uploaded proofs</td><td>Yes</td><td>Marksheet, photo, ID</td></tr>
+<tr><td>Application fee payment</td><td>Gateway or manual</td><td>Yes</td><td>Paid – UPI</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-admission-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Processing an application to admission</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Ensure Intake and Cycle are open under Cycles & Settings with fee structure linked.</li><li><strong>Step 2.</strong> Applicant submits form in Admissions Portal; staff open Applications queue.</li><li><strong>Step 3.</strong> Verify documents; mark deficiencies with remarks for resubmission.</li><li><strong>Step 4.</strong> Verify application/admission fee payments.</li><li><strong>Step 5.</strong> Run Merit & Selection per published rules; generate selection lists.</li><li><strong>Step 6.</strong> Confirm admitted students; complete roll number / RFID steps as per policy.</li><li><strong>Step 7.</strong> Archive closed cycles; retain analytics for reporting.</li></ol>
+  </section>
+
+  <section id="ch-admission-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Intake open</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Application</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Document verification</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Fee payment</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Merit &amp; selection</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Admission confirmation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Student ID / ERP record</div></div></section>
+
+  <section id="ch-admission-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Publish cycle dates and fee heads before accepting applications.</li><li>Reject duplicate applications with the same ID proof.</li><li>Keep merit criteria versioned for grievance redressal.</li></ul>
+  </section>
+
+  <section id="ch-admission-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Payment verified but status stuck</td><td>Webhook delay</td><td>Manual verify in Payments; refresh status</td></tr><tr><td>Applicant cannot upload documents</td><td>File type/size limit</td><td>Convert to PDF under size limit</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-admission-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Where do applicants log in?</dt><dd>Admissions Portal (/admissions-portal), separate from student portal until admission is confirmed.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-admission-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Use Admission Analytics for seat fill and demographic reports for governance.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-students">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Student Management</h2>
+    <p class="chapter-sub">Directory, profiles, promotion, RFID/ABC ID, and verification</p>
+  </header>
+
+  <section id="ch-students-overview">
+    <h3>Overview</h3>
+    <p>Student Management maintains the lifelong student record: directory, profile verification workflows, subject registration, semester imports, promotion, certificates linkage, attendance/fees shortcuts, and RFID / ABC ID mapping.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Keep a single authoritative student master for academics, finance, exams, and identity cards.</p></div>
+      <div><h4>Business use case</h4><p>Promote Semester II to III; verify Class XII documents; map RFID for campus access and library.</p></div>
+      <div><h4>Primary users</h4><p>Academic Admin, Registrar, Front Office, Examination Cell</p></div>
+      <div><h4>Why it exists</h4><p>Duplicate or incomplete profiles break attendance, fees, and NAAC student data.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-students-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Student Lifecycle</span><span class="nav-sep">→</span><span>Students</span><span class="nav-sep">→</span><span>/admin/students</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-students-screen">
+    <h3>Screen overview</h3>
+    <p>Directory with search/filters/export; Add Student; Subject Registration; Semester imports; Profile Verification suite (pending, policy, Class XII, completion, history, documents); RFID/ABC ID; Promotion; Bulk Import/Export; Audit Logs.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Student Directory Screenshot]</div>
+  <figcaption>Figure — Student Directory. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-students-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Registration / Roll number</td><td>Unique academic identity</td><td>Yes</td><td>REG2026048</td></tr>
+<tr><td>Full name</td><td>Official name</td><td>Yes</td><td>Rikchakam Ch Marak</td></tr>
+<tr><td>Programme / Department</td><td>Academic placement</td><td>Yes</td><td>B.A. Economics / Education</td></tr>
+<tr><td>Shift</td><td>Morning / Evening</td><td>Yes</td><td>Morning</td></tr>
+<tr><td>Photo</td><td>ID and portal photo</td><td>Recommended</td><td>passport photo</td></tr>
+<tr><td>RFID / ABC ID</td><td>Physical / national ID mapping</td><td>As required</td><td>RFID-00001234</td></tr>
+<tr><td>Holder address</td><td>Residential address for ID card back</td><td>Recommended</td><td>Village, District, PIN</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-students-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Creating a student record</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Prefer admission conversion when available; otherwise open Add Student.</li><li><strong>Step 2.</strong> Enter identity, programme, session, shift, and contact details.</li><li><strong>Step 3.</strong> Upload photo and required documents; set profile verification policy status.</li><li><strong>Step 4.</strong> Assign roll/registration numbers per Roll Number Settings.</li><li><strong>Step 5.</strong> Map RFID/ABC ID if campus access or library requires it.</li><li><strong>Step 6.</strong> Verify the student can log in to the Student Portal / mobile app.</li></ol>
+  </section>
+
+  <section id="ch-students-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Admission / Add Student</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Profile completion</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Verification</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Subject registration</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Promotion</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Exit / alumni</div></div></section>
+
+  <section id="ch-students-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Search before create to avoid duplicate roll numbers.</li><li>Require photo before ID card production.</li><li>Run Profile Completion Dashboard weekly during admission season.</li></ul>
+  </section>
+
+  <section id="ch-students-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Duplicate roll number</td><td>Manual collision</td><td>Use generation service; merge duplicates carefully</td></tr><tr><td>Promotion blocked</td><td>Fees or attendance shortage</td><td>Clear dues or apply approved exception</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-students-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>What is profile verification?</dt><dd>Workflow ensuring personal, guardian, bank, Class XII, and document data meet institutional policy before locking.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-students-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Bulk Import supports semester onboarding; always dry-run on a small CSV first.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-staff">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Staff Management</h2>
+    <p class="chapter-sub">Staff directory, teaching assignments, and portal users</p>
+  </header>
+
+  <section id="ch-staff-overview">
+    <h3>Overview</h3>
+    <p>Staff Management maintains teaching and non-teaching employee masters, bulk import/update, teaching assignments, portal user linkage, reports, roles, and audit history.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Single staff master for HR, timetable, attendance, payroll, and ID cards.</p></div>
+      <div><h4>Business use case</h4><p>Onboard a new Assistant Professor; assign subjects; enable Staff Portal login.</p></div>
+      <div><h4>Primary users</h4><p>HR, Academic Admin, College Admin</p></div>
+      <div><h4>Why it exists</h4><p>Teaching allocation and payroll depend on accurate staff identity and department.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-staff-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Staff &amp; HR</span><span class="nav-sep">→</span><span>Staff</span><span class="nav-sep">→</span><span>/admin/staff</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-staff-screen">
+    <h3>Screen overview</h3>
+    <p>Directory, Add Staff, Bulk Import/Update, Teaching Assignments, Portal Users, Reports, Roles, Audit Logs.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Staff Directory Screenshot]</div>
+  <figcaption>Figure — Staff Directory. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-staff-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Employee ID</td><td>Institution staff code</td><td>Yes</td><td>DBCST2024015</td></tr>
+<tr><td>Name</td><td>Official name</td><td>Yes</td><td>Fr. Albert D'Souza</td></tr>
+<tr><td>Designation / Department</td><td>Positioning</td><td>Yes</td><td>Assistant Professor / Education</td></tr>
+<tr><td>Employment type</td><td>Teaching / non-teaching</td><td>Yes</td><td>Teaching</td></tr>
+<tr><td>Joining date</td><td>Date of joining</td><td>Yes</td><td>2024-01-15</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-staff-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Onboarding teaching staff</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Create staff record with employee ID, designation, and department.</li><li><strong>Step 2.</strong> Complete employment details used by HR and ID cards.</li><li><strong>Step 3.</strong> Create linked portal user with faculty/staff role.</li><li><strong>Step 4.</strong> Assign teaching load under Teaching Assignments / Timetable allocation.</li><li><strong>Step 5.</strong> Issue staff ID card from Identity module when ready.</li></ol>
+  </section>
+
+  <section id="ch-staff-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Staff master</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Portal user</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Teaching assignment</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Attendance &amp; payroll</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">ID card</div></div></section>
+
+  <section id="ch-staff-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Keep employee IDs immutable after first payslip.</li><li>Sync designation changes with HR Salary Structures.</li></ul>
+  </section>
+
+  <section id="ch-staff-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Staff missing in timetable pickers</td><td>Inactive or wrong department</td><td>Activate record; fix department</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-staff-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Is Staff the same as HR?</dt><dd>Staff is the operational master; HR adds leave, payroll, recruitment, and compliance processes.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-staff-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Use Bulk Update for department-wide designation changes with audit review.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-attendance">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Attendance Management</h2>
+    <p class="chapter-sub">Student attendance and staff biometric attendance</p>
+  </header>
+
+  <section id="ch-attendance-overview">
+    <h3>Overview</h3>
+    <p>Attendance covers student class attendance (academics) and staff attendance with biometric device integration, live dashboards, daily/monthly registers, and audit.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Capture presence for academic eligibility, payroll, and compliance reporting.</p></div>
+      <div><h4>Business use case</h4><p>Faculty marks period attendance; HR pulls biometric logs and processes monthly register.</p></div>
+      <div><h4>Primary users</h4><p>Faculty, Academic Admin, HR, Shift Attendance Manager</p></div>
+      <div><h4>Why it exists</h4><p>Defaulters, exam eligibility, and salary deductions rely on trusted attendance.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-attendance-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Academics / Staff</span><span class="nav-sep">→</span><span>Student Attendance or Staff Attendance</span><span class="nav-sep">→</span><span>/admin/academics/attendance</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-attendance-screen">
+    <h3>Screen overview</h3>
+    <p>Student attendance: class/subject filters, mark sheet, bulk save, defaulter views. Staff attendance: Live, Pull Logs, Process, Daily/Monthly Register, Biometric Devices, Settings, Audit.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Student Attendance marking Screenshot]</div>
+  <figcaption>Figure — Student Attendance marking. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-attendance-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Date / period</td><td>Session being marked</td><td>Yes</td><td>11 Jul 2026 / Period 2</td></tr>
+<tr><td>Subject / class</td><td>Teaching context</td><td>Yes</td><td>EDN-DSC-301 Sec A</td></tr>
+<tr><td>Status</td><td>Present / Absent / Late / On duty</td><td>Yes</td><td>Present</td></tr>
+<tr><td>Device (staff)</td><td>Biometric source</td><td>If used</td><td>Main Gate Device</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-attendance-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Marking student attendance</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Student Attendance and select date, shift, subject/section.</li><li><strong>Step 2.</strong> Load the student list; mark absentees (or present-all then adjust).</li><li><strong>Step 3.</strong> Save; correct within institutional edit window if needed.</li><li><strong>Step 4.</strong> Review defaulters before examinations.</li></ol>
+  </section>
+
+  <section id="ch-attendance-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Select class</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Mark attendance</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Save</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Defaulter review</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Eligibility / reports</div></div></section>
+
+  <section id="ch-attendance-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Mark within the same teaching day.</li><li>Reconcile biometric staff logs before payroll lock.</li></ul>
+  </section>
+
+  <section id="ch-attendance-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Students missing from list</td><td>Subject registration incomplete</td><td>Complete registration / section mapping</td></tr><tr><td>Biometric pull empty</td><td>Device offline</td><td>Check device settings and network</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-attendance-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Can students see their attendance?</dt><dd>Yes via Student Portal and mobile My Academics → Attendance.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-attendance-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Export Monthly Attendance for NAAC and university inspections.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-timetable">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Timetable Management</h2>
+    <p class="chapter-sub">Plans, allocation, generation, conflicts, and publish</p>
+  </header>
+
+  <section id="ch-timetable-overview">
+    <h3>Overview</h3>
+    <p>The Timetable Engine manages plans, subject groups, teaching allocation, bulk import/export, validation, generation, conflict resolution, draft review, publish, and reports.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Produce conflict-free weekly schedules for students and faculty across shifts.</p></div>
+      <div><h4>Business use case</h4><p>Generate Odd Semester 2026 Morning timetable; resolve room clashes; publish to portals.</p></div>
+      <div><h4>Primary users</h4><p>Academic Admin, Shift Academic Coordinator, HOD</p></div>
+      <div><h4>Why it exists</h4><p>Published timetables drive attendance periods, room booking, and faculty load.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-timetable-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Academic Operations</span><span class="nav-sep">→</span><span>Timetable</span><span class="nav-sep">→</span><span>/admin/academics/timetable</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-timetable-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Plans, Subject Groups, Teaching Allocation, Import/Export, Validation Center, Generation Engine, Conflict Resolution, Draft Review, Publish, Reports, Settings.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Timetable Generation Engine Screenshot]</div>
+  <figcaption>Figure — Timetable Generation Engine. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-timetable-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Timetable plan</td><td>Named schedule version</td><td>Yes</td><td>FYUGP Odd 2026 Morning</td></tr>
+<tr><td>Teaching allocation</td><td>Faculty–subject–section link</td><td>Yes</td><td>Fr. Albert → EDN-301</td></tr>
+<tr><td>Room</td><td>Venue</td><td>Yes</td><td>LH-12</td></tr>
+<tr><td>Slot</td><td>Day and period</td><td>Yes</td><td>Mon P2</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-timetable-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Publishing a timetable</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Create a Timetable Plan for the session and shift.</li><li><strong>Step 2.</strong> Complete Teaching Allocation and room availability.</li><li><strong>Step 3.</strong> Run Validation Center; fix missing allocations.</li><li><strong>Step 4.</strong> Generate draft; resolve conflicts (faculty, room, batch).</li><li><strong>Step 5.</strong> Review draft with HODs; Publish to student/staff portals and mobile.</li></ol>
+  </section>
+
+  <section id="ch-timetable-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Plan</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Allocation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Validate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Generate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Resolve conflicts</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Publish</div></div></section>
+
+  <section id="ch-timetable-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Keep a draft plan until HODs sign off.</li><li>Do not edit published slots without notifying Communication Center.</li></ul>
+  </section>
+
+  <section id="ch-timetable-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Faculty double-booked</td><td>Conflict unresolved</td><td>Use Conflict Resolution before publish</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-timetable-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Do students get push notifications on publish?</dt><dd>Configure Communication / Firebase; optional campaign after publish.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-timetable-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Archive published plans each semester for audit.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-exam">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Examination Management</h2>
+    <p class="chapter-sub">Internal assessment, admit cards, marks, and university submission</p>
+  </header>
+
+  <section id="ch-exam-overview">
+    <h3>Overview</h3>
+    <p>Examinations manage IA exams, IA timetable, admit cards (when enabled), mark entry, defaulters, analytics, reports, NEHU/university submission, plus a dedicated Semester Exam Fees module.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Conduct fair internal assessment and collect/submit marks with fee compliance.</p></div>
+      <div><h4>Business use case</h4><p>Schedule IA-1; generate admit cards; enter marks; submit university files; collect semester exam fees including back papers.</p></div>
+      <div><h4>Primary users</h4><p>Examination Cell, Faculty, Academic Admin, Accounts</p></div>
+      <div><h4>Why it exists</h4><p>Results, hall tickets, and university compliance require controlled exam workflows.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-exam-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Examination</span><span class="nav-sep">→</span><span>Examinations / Semester Exam Fees</span><span class="nav-sep">→</span><span>/admin/academics/examinations</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-exam-screen">
+    <h3>Screen overview</h3>
+    <p>IA Dashboard, exams, timetable, admit cards, mark entry, defaulters, analytics, university submission, settings. Exam Fees: fee setup, sessions, student application, back papers, gateway/manual collection, verification, receipts.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert IA Mark Entry Screenshot]</div>
+  <figcaption>Figure — IA Mark Entry. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-exam-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Exam name</td><td>IA / test identity</td><td>Yes</td><td>IA-1 Odd 2026</td></tr>
+<tr><td>Max marks</td><td>Paper maximum</td><td>Yes</td><td>20</td></tr>
+<tr><td>Marks obtained</td><td>Student score</td><td>Yes</td><td>16</td></tr>
+<tr><td>Exam fee session</td><td>Fee window</td><td>Yes</td><td>NEHU Sem Exam Dec 2026</td></tr>
+<tr><td>Back paper selection</td><td>Arrear papers</td><td>If applicable</td><td>EDN-201</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-exam-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Running an IA cycle</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Create IA exam and timetable; notify faculty and students.</li><li><strong>Step 2.</strong> Generate admit cards if feature-enabled and eligibility passed.</li><li><strong>Step 3.</strong> Open Mark Entry for faculty/exam cell; lock after deadline.</li><li><strong>Step 4.</strong> Review defaulters and analytics; publish results to student portal.</li><li><strong>Step 5.</strong> Prepare university submission package as configured for NEHU.</li></ol>
+  </section>
+
+  <section id="ch-exam-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Exam setup</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Timetable</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Eligibility &amp; fees</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Admit card</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Conduct</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Mark entry</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Results / submission</div></div></section>
+
+  <section id="ch-exam-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Freeze subject mapping before admit card generation.</li><li>Reconcile exam fee payments before hall ticket release.</li></ul>
+  </section>
+
+  <section id="ch-exam-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Admit card missing subject</td><td>Registration mismatch</td><td>Fix subject registration and regenerate</td></tr><tr><td>Payment success but application unpaid</td><td>Gateway callback delay</td><td>Verify in Fee Verification</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-exam-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Where do students pay semester exam fees?</dt><dd>Student Portal / mobile → Semester Exam Fees, or Accounts Manual Fee Collection.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-exam-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Keep university submission exports immutable after dispatch.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-qbank">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Question Paper Repository</h2>
+    <p class="chapter-sub">Upload, approval, faculty workspace, and student access</p>
+  </header>
+
+  <section id="ch-qbank-overview">
+    <h3>Overview</h3>
+    <p>Question Paper Repository (Question Bank) stores moderated question papers with upload wizard, faculty workspace, approval workflow, student access controls, analytics, and reports.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Centralize quality-assured papers for teaching and assessment preparation.</p></div>
+      <div><h4>Business use case</h4><p>Faculty uploads IA set; HOD verifies; students access past papers when published.</p></div>
+      <div><h4>Primary users</h4><p>Faculty, HOD, Examination Cell, Academic Admin</p></div>
+      <div><h4>Why it exists</h4><p>Avoids unmanaged shared drives and preserves version history for audits.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-qbank-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Academic Operations</span><span class="nav-sep">→</span><span>Question Paper Repository</span><span class="nav-sep">→</span><span>/admin/academics/question-bank</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-qbank-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Repository grid, Upload, Faculty Workspace, Approval Workflow, Student Access, Reports, Settings. Filters include course, uploaded by, verified by.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Question Paper Repository grid Screenshot]</div>
+  <figcaption>Figure — Question Paper Repository grid. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-qbank-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Title</td><td>Paper title</td><td>Yes</td><td>IA-1 DSC Core Set A</td></tr>
+<tr><td>Course / subject</td><td>Linked paper</td><td>Yes</td><td>EDN-DSC-301</td></tr>
+<tr><td>File</td><td>PDF upload</td><td>Yes</td><td>ia1-set-a.pdf</td></tr>
+<tr><td>Visibility</td><td>Faculty only / students</td><td>Yes</td><td>Students after approval</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-qbank-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Uploading and approving a paper</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Upload wizard; select course and metadata.</li><li><strong>Step 2.</strong> Upload PDF; set verified-by if required by policy.</li><li><strong>Step 3.</strong> Submit to Approval Workflow; HOD/exam cell approves.</li><li><strong>Step 4.</strong> Publish to Student Access as per schedule.</li></ol>
+  </section>
+
+  <section id="ch-qbank-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Upload</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Metadata</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Approval</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Publish</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Student access</div></div></section>
+
+  <section id="ch-qbank-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Use clear naming: Programme_Semester_Paper_Set_Date.</li><li>Revoke share links when papers are superseded.</li></ul>
+  </section>
+
+  <section id="ch-qbank-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Student cannot see paper</td><td>Not approved or visibility off</td><td>Approve and enable student access</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-qbank-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Is this the same as Library Question Papers?</dt><dd>Related but separate: Repository is academic workflow; Library may host digital archives.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-qbank-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Track Uploaded By / Verified By for NAAC documentation.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-fees">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Fee Management</h2>
+    <p class="chapter-sub">Structures, demands, collection, scholarships, and defaulters</p>
+  </header>
+
+  <section id="ch-fees-overview">
+    <h3>Overview</h3>
+    <p>Fee Management handles fee structures, monthly plans, demand generation, collection center, finance setup, external payments, scholarships & concessions, student ledgers, defaulter intelligence, day closing, cash register, and renewal.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Collect institutional fees accurately with full ledger and cashier controls.</p></div>
+      <div><h4>Business use case</h4><p>Generate semester fee demand; collect via gateway/cash; apply scholarship; close day cash register.</p></div>
+      <div><h4>Primary users</h4><p>Accountant, Accounts Staff, Front Office (limited), College Admin</p></div>
+      <div><h4>Why it exists</h4><p>Fee integrity underpins admission confirmation, exam eligibility, and financial statements.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-fees-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Fee Management</span><span class="nav-sep">→</span><span>/admin/fees</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-fees-screen">
+    <h3>Screen overview</h3>
+    <p>Fee Dashboard, Structure, Monthly Plans, Demand Generator, Collection Center, Finance Setup, External Payment Entry, Scholarships, Ledger Explorer, Defaulters, Reports, Settings, Fee Heads, Cycles, Admission Fee Structure, Day Closing, Cash Register, Renewal Center.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Fee Collection Center Screenshot]</div>
+  <figcaption>Figure — Fee Collection Center. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-fees-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Fee head</td><td>Charge component</td><td>Yes</td><td>Tuition</td></tr>
+<tr><td>Amount</td><td>Payable amount</td><td>Yes</td><td>15000</td></tr>
+<tr><td>Demand period</td><td>Billing window</td><td>Yes</td><td>Odd Sem 2026</td></tr>
+<tr><td>Concession / scholarship</td><td>Waiver applied</td><td>No</td><td>Merit 25%</td></tr>
+<tr><td>Payment mode</td><td>Cash/UPI/Gateway/Bank</td><td>Yes</td><td>UPI</td></tr>
+<tr><td>Receipt number</td><td>System receipt</td><td>System</td><td>FEE-2026-00421</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-fees-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Collecting a student fee</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Confirm fee structure and demands are published for the session.</li><li><strong>Step 2.</strong> Open Collection Center; search student by roll/registration.</li><li><strong>Step 3.</strong> Select outstanding demands; apply approved concessions if any.</li><li><strong>Step 4.</strong> Accept payment (gateway or manual); print/download receipt.</li><li><strong>Step 5.</strong> At day end, run Day Closing / Cash Register reconciliation.</li></ol>
+  </section>
+
+  <section id="ch-fees-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Fee structure</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Demand generation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Student notification</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Collection</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Receipt</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Day closing</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Reports / GL</div></div></section>
+
+  <section id="ch-fees-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Never edit posted receipts — use reversal/adjustment per policy.</li><li>Verify fee structure before publishing to student app Pay now.</li><li>Reconcile gateway settlements daily.</li></ul>
+  </section>
+
+  <section id="ch-fees-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Double demand</td><td>Demand generated twice</td><td>Cancel duplicate demand; audit ledger</td></tr><tr><td>Gateway paid, ledger unpaid</td><td>Callback failure</td><td>External Payment Entry / verification tools</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-fees-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>How do scholarships work?</dt><dd>Configure in Scholarships & Concessions and apply to eligible student demands before collection.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-fees-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Map fee heads to GL accounts under Finance for statutory reports.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-accounts">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Finance &amp; Accounts</h2>
+    <p class="chapter-sub">Chart of accounts, vouchers, books, assets, and audit trail</p>
+  </header>
+
+  <section id="ch-accounts-overview">
+    <h3>Overview</h3>
+    <p>Finance & Accounts provides double-entry style campus accounting: chart of accounts, vouchers, cash/bank books, general ledger, financial years, fee GL mappings, vendors, expenses, budgets, fixed assets, bank reconciliation, reports, and audit trail.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Produce reliable financial books integrated with fee collections.</p></div>
+      <div><h4>Business use case</h4><p>Post fee receipts to GL; reconcile bank; generate financial reports for auditors.</p></div>
+      <div><h4>Primary users</h4><p>Accountant, College Admin</p></div>
+      <div><h4>Why it exists</h4><p>Institutions need auditable books beyond fee registers.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-accounts-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Finance &amp; Accounts</span><span class="nav-sep">→</span><span>/admin/accounts</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-accounts-screen">
+    <h3>Screen overview</h3>
+    <p>Accounts Dashboard and submenus for COA, vouchers, cash/bank book, GL, FY, fee mappings, vendors, expenses, budgets, fixed assets, BRS, reports, audit trail.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Accounts Dashboard Screenshot]</div>
+  <figcaption>Figure — Accounts Dashboard. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-accounts-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Account code</td><td>GL account</td><td>Yes</td><td>1001-Cash</td></tr>
+<tr><td>Voucher type</td><td>Payment/Receipt/Journal</td><td>Yes</td><td>Receipt</td></tr>
+<tr><td>Financial year</td><td>Books year</td><td>Yes</td><td>FY 2026-27</td></tr>
+<tr><td>Narration</td><td>Description</td><td>Yes</td><td>Tuition collection 11 Jul</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-accounts-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Closing a financial day</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Ensure fee day closing is complete.</li><li><strong>Step 2.</strong> Post or review automatic fee GL mappings.</li><li><strong>Step 3.</strong> Reconcile cash and bank books.</li><li><strong>Step 4.</strong> Lock period if policy requires; export reports.</li></ol>
+  </section>
+
+  <section id="ch-accounts-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Transactions</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Vouchers</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Books</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Reconciliation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Reports</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Audit</div></div></section>
+
+  <section id="ch-accounts-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Separate duties: collector vs accountant where staffing allows.</li><li>Never delete posted vouchers — reverse.</li></ul>
+  </section>
+
+  <section id="ch-accounts-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Imbalanced voucher</td><td>Debit ≠ credit</td><td>Correct lines before save</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-accounts-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Relation to Fee Management?</dt><dd>Fees operationally collect money; Accounts books it via mappings and vouchers.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-accounts-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Retain Audit Trail exports with annual financial statements.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-comms">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Communication Center</h2>
+    <p class="chapter-sub">Notifications, campaigns, email, SMS, WhatsApp, and push</p>
+  </header>
+
+  <section id="ch-comms-overview">
+    <h3>Overview</h3>
+    <p>Communication Center composes multi-channel messages: in-app notifications, campaigns, templates, audience builder, analytics, and settings that connect email, SMS, WhatsApp, and Firebase push for mobile.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Reach students, staff, and applicants with audited, templated communications.</p></div>
+      <div><h4>Business use case</h4><p>Send fee due reminder campaign to Morning shift Sem III via push + SMS.</p></div>
+      <div><h4>Primary users</h4><p>College Admin, Front Office, Academic Admin</p></div>
+      <div><h4>Why it exists</h4><p>Fragmented messaging causes missed deadlines and compliance risk.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-comms-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Communication</span><span class="nav-sep">→</span><span>/admin/communication</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-comms-screen">
+    <h3>Screen overview</h3>
+    <p>Notifications inbox management, Compose, Campaigns, Templates, Audience Builder, Analytics, Settings (provider keys, Firebase, email SMTP).</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Compose Campaign Screenshot]</div>
+  <figcaption>Figure — Compose Campaign. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-comms-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Channel</td><td>Push / Email / SMS / WhatsApp / In-app</td><td>Yes</td><td>Push + In-app</td></tr>
+<tr><td>Audience</td><td>Role, programme, shift filters</td><td>Yes</td><td>Students · Sem III · Morning</td></tr>
+<tr><td>Template</td><td>Approved message body</td><td>Recommended</td><td>FEE_DUE_REMINDER</td></tr>
+<tr><td>Schedule</td><td>Send now / later</td><td>No</td><td>Tomorrow 09:00</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-comms-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Sending a campaign</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Create or select an approved Template.</li><li><strong>Step 2.</strong> Build Audience with precise filters; preview count.</li><li><strong>Step 3.</strong> Compose message; attach files if channel supports.</li><li><strong>Step 4.</strong> Send test to admin device; then schedule or send.</li><li><strong>Step 5.</strong> Monitor Analytics for delivery/open failures.</li></ol>
+  </section>
+
+  <section id="ch-comms-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Template</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Audience</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Compose</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Test</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Send</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Analytics</div></div></section>
+
+  <section id="ch-comms-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Respect quiet hours for SMS/WhatsApp.</li><li>Never send passwords in clear text.</li><li>Keep Firebase and SMTP credentials in Settings only — not in templates.</li></ul>
+  </section>
+
+  <section id="ch-comms-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Push not received</td><td>Firebase not configured / app outdated</td><td>Check Mobile Config &amp; FCM; ask user to update app</td></tr><tr><td>Email bounce</td><td>Invalid address</td><td>Correct student email in profile</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-comms-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Where are Firebase settings?</dt><dd>Administration → App Version & Mobile Config / Communication Settings as deployed for your tenant.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-comms-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Log campaigns for grievance and NAAC student support evidence.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-library">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Library (Smart Library)</h2>
+    <p class="chapter-sub">Catalog, circulation, fines, digital library, and desk operations</p>
+  </header>
+
+  <section id="ch-library-overview">
+    <h3>Overview</h3>
+    <p>Smart Library covers cataloguing, accession, circulation, members, reservations, fines, incidents, visitors, digital library, question papers archive, research repository, analytics, NAAC reports, and Library Desk kiosk operations.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Manage physical and digital library operations with member integration to students/staff.</p></div>
+      <div><h4>Business use case</h4><p>Accession new books; issue to student RFID; collect fine; publish digital resources.</p></div>
+      <div><h4>Primary users</h4><p>Librarian, Library Operator</p></div>
+      <div><h4>Why it exists</h4><p>Library services are accreditation-critical and high-volume daily operations.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-library-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Library</span><span class="nav-sep">→</span><span>/admin/library</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-library-screen">
+    <h3>Screen overview</h3>
+    <p>Library Dashboard, Entry System, Catalog, Accession, Circulation Desk, Members, Reservations, Fines, Incidents, Visitors, Digital Library, Question Papers, Research Repository, Search, Analytics, Reports, NAAC Reports, Settings. Operators may use Library Desk shell.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Circulation Desk Screenshot]</div>
+  <figcaption>Figure — Circulation Desk. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-library-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Accession number</td><td>Unique copy ID</td><td>Yes</td><td>ACC-45821</td></tr>
+<tr><td>ISBN / Title</td><td>Bibliographic identity</td><td>Yes</td><td>Introduction to…</td></tr>
+<tr><td>Member</td><td>Student/staff library member</td><td>Yes</td><td>REG2026048</td></tr>
+<tr><td>Due date</td><td>Return deadline</td><td>System/policy</td><td>25 Jul 2026</td></tr>
+<tr><td>Fine</td><td>Overdue charge</td><td>If due</td><td>₹20</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-library-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Issuing a book</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Circulation Desk; scan/search member (RFID or ID).</li><li><strong>Step 2.</strong> Scan accession number; confirm loan rules.</li><li><strong>Step 3.</strong> Issue; print/display due date.</li><li><strong>Step 4.</strong> On return, collect fine if applicable and close loan.</li></ol>
+  </section>
+
+  <section id="ch-library-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Member check</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Scan item</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Issue</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Return</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Fine / clearance</div></div></section>
+
+  <section id="ch-library-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Link members to ERP student/staff IDs — avoid orphan cards.</li><li>Run NAAC library reports each semester.</li></ul>
+  </section>
+
+  <section id="ch-library-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Member not found</td><td>Not enrolled as library member</td><td>Create member from student/staff</td></tr><tr><td>Item already issued</td><td>Prior loan open</td><td>Force return or locate copy</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-library-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Can students see loans online?</dt><dd>Yes via Student Portal → Library (where enabled).</dd>
+    </dl>
+  </section>
+
+  <section id="ch-library-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Secure Library Desk terminals; use library-operator role for kiosks.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-hr">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>HR, Payroll &amp; Leave</h2>
+    <p class="chapter-sub">Employment lifecycle, leave, payroll, PF/NPS, and appraisal</p>
+  </header>
+
+  <section id="ch-hr-overview">
+    <h3>Overview</h3>
+    <p>HR spans staff directory integration, departments/designations, attendance, leave, substitutes, recruitment (with Careers Portal), appointment orders, joining, probation, salary components/structures/assignments, revisions, increments, payroll runs, loans, accommodation, PF/CPF/NPS, pension, payslips, documents, appraisal, faculty workload, reports, and settings.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Operate the full employee lifecycle and statutory payroll processes.</p></div>
+      <div><h4>Business use case</h4><p>Approve faculty leave; run monthly payroll; publish payslips to Staff Portal/mobile.</p></div>
+      <div><h4>Primary users</h4><p>HR, Accountant, Principal (approvals)</p></div>
+      <div><h4>Why it exists</h4><p>Payroll and leave compliance protect the institution and employees.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-hr-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Staff &amp; HR</span><span class="nav-sep">→</span><span>Human Resources</span><span class="nav-sep">→</span><span>/admin/hr</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-hr-screen">
+    <h3>Screen overview</h3>
+    <p>HR Dashboard and full HR submenu tree including Leave, Payroll Runs, Payslips, Recruitment, and Settings. Staff view leave/payslips in Staff Portal.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Payroll Runs Screenshot]</div>
+  <figcaption>Figure — Payroll Runs. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-hr-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Pay structure</td><td>Salary template</td><td>Yes</td><td>Assistant Professor Structure</td></tr>
+<tr><td>Pay period</td><td>Month</td><td>Yes</td><td>June 2026</td></tr>
+<tr><td>Leave type</td><td>CL/EL/ML…</td><td>Yes</td><td>Casual Leave</td></tr>
+<tr><td>Leave dates</td><td>From–to</td><td>Yes</td><td>14–15 Jul 2026</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-hr-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Running monthly payroll</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Freeze attendance and approved leave for the period.</li><li><strong>Step 2.</strong> Verify pay assignments and revisions.</li><li><strong>Step 3.</strong> Create Payroll Run; review exceptions (LOP, loans).</li><li><strong>Step 4.</strong> Process and publish payslips; notify staff.</li><li><strong>Step 5.</strong> Export statutory reports as required.</li></ol>
+  </section>
+
+  <section id="ch-hr-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Attendance &amp; leave lock</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Pay inputs</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Payroll run</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Review</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Payslips</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Statutory filing</div></div></section>
+
+  <section id="ch-hr-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Separate HR master edits from payroll processing users when possible.</li><li>Keep appointment orders in Documents with digital copies.</li></ul>
+  </section>
+
+  <section id="ch-hr-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Payslip missing</td><td>Employee not in pay assignment</td><td>Assign structure before run</td></tr><tr><td>Leave approval stuck</td><td>Approver not mapped</td><td>Configure leave workflow / Principal Desk</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-hr-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Where do applicants apply for jobs?</dt><dd>Public Careers Portal (/careers-portal), managed under HR Recruitment.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-hr-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Coordinate staff ID card reissue when designation changes.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-idcards">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Identity &amp; ID Cards</h2>
+    <p class="chapter-sub">Templates, designer, production, RFID, and print queue</p>
+  </header>
+
+  <section id="ch-idcards-overview">
+    <h3>Overview</h3>
+    <p>Identity & ID Cards provides template gallery, CR80 card designer, student/staff production centers, bulk generation, verification reports, print queue, RFID mapping, reissue, verification portal, reports, and settings — including Pursuit of Excellence branded layouts.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Produce secure, printable student and staff identity cards bound to ERP data.</p></div>
+      <div><h4>Business use case</h4><p>Select Pursuit Excellence template; generate semester batch; print via Evolis; map RFID.</p></div>
+      <div><h4>Primary users</h4><p>ERP Administrator, Front Office, Academic Admin</p></div>
+      <div><h4>Why it exists</h4><p>Campus access, library, and examinations rely on trusted photo ID.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-idcards-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Staff &amp; HR / Identity</span><span class="nav-sep">→</span><span>ID Cards</span><span class="nav-sep">→</span><span>/admin/id-cards</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-idcards-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Template Gallery, Card Designer, Student/Staff Production, Bulk Generation, Verification Report, Print Queue, RFID Mapping, Reissue, Verification Portal, Reports, Settings.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert ID Card Designer Screenshot]</div>
+  <figcaption>Figure — ID Card Designer. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-idcards-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Template</td><td>Layout preset</td><td>Yes</td><td>DBC Pursuit of Excellence</td></tr>
+<tr><td>Holder</td><td>Student/staff</td><td>Yes</td><td>REG2026048</td></tr>
+<tr><td>Photo</td><td>Portrait</td><td>Yes</td><td>Profile photo</td></tr>
+<tr><td>Validity</td><td>Valid until</td><td>Yes</td><td>31 Dec 2029</td></tr>
+<tr><td>RFID</td><td>Card chip number</td><td>As required</td><td>RFID-00001234</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-idcards-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Producing student ID cards</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Ensure photos and addresses are verified in Student profiles.</li><li><strong>Step 2.</strong> Select template in Gallery / Designer; set as default if needed.</li><li><strong>Step 3.</strong> Open ID Card Production; filter by programme/shift; preview front/back.</li><li><strong>Step 4.</strong> Enqueue print jobs; process Print Queue on the card printer.</li><li><strong>Step 5.</strong> Map RFID numbers; run Verification Report for audit.</li></ol>
+  </section>
+
+  <section id="ch-idcards-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Verify data</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Template</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Preview</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Generate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Print</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">RFID map</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Issue</div></div></section>
+
+  <section id="ch-idcards-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Put student address on the card back; keep college address distinct.</li><li>Reissue lost cards via Card Reissue — do not clone silently.</li><li>Test print one card before bulk runs.</li></ul>
+  </section>
+
+  <section id="ch-idcards-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Blank photo</td><td>Missing profile photo</td><td>Upload photo then regenerate</td></tr><tr><td>Print misaligned</td><td>Calibration / Evolis feed</td><td>Adjust print calibration in designer settings</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-idcards-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Can students download a soft copy?</dt><dd>Student Portal → ID Card where enabled; physical PVC remains authoritative.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-idcards-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Keep principal signature URL configured in ID Card Settings.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-inventory">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Inventory &amp; Assets</h2>
+    <p class="chapter-sub">Stores, stock, issue/return, purchase orders, and fixed assets</p>
+  </header>
+
+  <section id="ch-inventory-overview">
+    <h3>Overview</h3>
+    <p>Inventory manages stores, items & stock, issue & return, vendors, purchase orders, barcode labels, requisitions, and restock suggestions. Fixed assets are also tracked under Finance & Accounts.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Control consumables and equipment across departments and labs.</p></div>
+      <div><h4>Business use case</h4><p>Raise PO for lab chemicals; issue to department; track low stock.</p></div>
+      <div><h4>Primary users</h4><p>Store Keeper, Accountant, Lab in-charge</p></div>
+      <div><h4>Why it exists</h4><p>Prevents stockouts and leakage; supports audit of institutional assets.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-inventory-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Campus Operations</span><span class="nav-sep">→</span><span>Inventory</span><span class="nav-sep">→</span><span>/admin/inventory</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-inventory-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Stores, Items & Stock, Issue & Return, Vendors, Purchase Orders, Barcode Labels, Requisitions, Restock Suggestions. Fixed Assets under Accounts.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Inventory Stock list Screenshot]</div>
+  <figcaption>Figure — Inventory Stock list. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-inventory-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Item code / name</td><td>SKU identity</td><td>Yes</td><td>CHEM-HCL-01</td></tr>
+<tr><td>Store</td><td>Warehouse location</td><td>Yes</td><td>Science Store</td></tr>
+<tr><td>Quantity</td><td>On-hand</td><td>Yes</td><td>12</td></tr>
+<tr><td>Reorder level</td><td>Restock trigger</td><td>Recommended</td><td>5</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-inventory-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Issuing stock to a department</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Ensure item exists with sufficient quantity.</li><li><strong>Step 2.</strong> Create Issue against department/requester.</li><li><strong>Step 3.</strong> Print barcode labels if required for assets.</li><li><strong>Step 4.</strong> Record returns when applicable.</li></ol>
+  </section>
+
+  <section id="ch-inventory-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Requisition</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Approval</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">PO / stock</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Issue</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Return / asset register</div></div></section>
+
+  <section id="ch-inventory-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Do physical verification quarterly.</li><li>Separate consumables from capitalized fixed assets.</li></ul>
+  </section>
+
+  <section id="ch-inventory-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Negative stock</td><td>Issue without receipt</td><td>Post GRN/receipt first</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-inventory-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Where are buildings/rooms managed?</dt><dd>Infrastructure module under Campus Operations — inventory references locations.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-inventory-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Use Restock Suggestions before semester start.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-campus-ops">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Campus Operations</h2>
+    <p class="chapter-sub">In-Out (CAMS), infrastructure, front office, and transport</p>
+  </header>
+
+  <section id="ch-campus-ops-overview">
+    <h3>Overview</h3>
+    <p>Campus Operations groups In-Out Management (CAMS live dashboard and access points), Infrastructure (buildings/rooms), Front Office (enquiries, gate pass, kiosk, complaints), and Transport (routes, vehicles, assignments).</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Run day-to-day campus logistics and visitor/student movement controls.</p></div>
+      <div><h4>Business use case</h4><p>Issue gate pass; monitor RFID access live; assign bus routes.</p></div>
+      <div><h4>Primary users</h4><p>Front Office, Transport Coordinator, Security (CAMS), Admin</p></div>
+      <div><h4>Why it exists</h4><p>Safety, hospitality, and logistics need integrated desks.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-campus-ops-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Campus Operations</span><span class="nav-sep">→</span><span>CAMS / Infrastructure / Front Office / Transport</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-campus-ops-screen">
+    <h3>Screen overview</h3>
+    <p>Each submodule has its own dashboard. Front Office handles Enquiries, Gate Pass, Kiosk Desk, Complaints. Transport manages Routes & Stops, Vehicles, Assignments, Capacity Alerts.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert CAMS Live Dashboard Screenshot]</div>
+  <figcaption>Figure — CAMS Live Dashboard. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-campus-ops-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Access point</td><td>Gate/reader</td><td>Yes</td><td>Main Gate</td></tr>
+<tr><td>Gate pass validity</td><td>Time window</td><td>Yes</td><td>2 hours</td></tr>
+<tr><td>Route</td><td>Bus path</td><td>Yes</td><td>Tura Town Route A</td></tr>
+<tr><td>Vehicle</td><td>Bus/van</td><td>Yes</td><td>ML-08-XXXX</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-campus-ops-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Issuing a gate pass</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Front Office → Gate Pass.</li><li><strong>Step 2.</strong> Select student/staff/visitor; enter purpose and return time.</li><li><strong>Step 3.</strong> Approve per policy; print or show QR if enabled.</li><li><strong>Step 4.</strong> Monitor return; close pass.</li></ol>
+  </section>
+
+  <section id="ch-campus-ops-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Request</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Verify identity</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Issue pass</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Exit/entry log</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Close</div></div></section>
+
+  <section id="ch-campus-ops-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Keep kiosk accounts locked to front-office-desk role.</li><li>Review transport capacity alerts before adding assignments.</li></ul>
+  </section>
+
+  <section id="ch-campus-ops-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>RFID not logging</td><td>Unmapped RFID or offline point</td><td>Map RFID in Students; check access point</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-campus-ops-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Is Hostel a full module?</dt><dd>Hosteller flags exist on students; a full hostel module may appear in future editions. Use attributes and reports meanwhile.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-campus-ops-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Integrate CAMS events with incident logs when investigating discipline cases.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-governance">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Governance, NAAC &amp; Official Documents</h2>
+    <p class="chapter-sub">Committees, IQAC/NAAC evidence, notices, and e-sign documents</p>
+  </header>
+
+  <section id="ch-governance-overview">
+    <h3>Overview</h3>
+    <p>Governance manages committees, members, meetings, ATR, notices, and documents. IQAC/NAAC covers criteria, evidence vault, AQAR/SSR, activities, feedback, and compliance. Official Documents manages notices, circulars, office orders, archive, templates, and digital signatures. Principal Desk offers leadership command views.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Support institutional governance and accreditation readiness.</p></div>
+      <div><h4>Business use case</h4><p>Schedule IQAC meeting; attach evidence to Criterion 2; publish office order with e-sign.</p></div>
+      <div><h4>Primary users</h4><p>Principal, IQAC coordinator, Registrar, Committee members</p></div>
+      <div><h4>Why it exists</h4><p>Accreditation and statutory governance require structured evidence trails.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-governance-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Governance / IQAC-NAAC / Official Documents / Principal Desk</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-governance-screen">
+    <h3>Screen overview</h3>
+    <p>Separate dashboards for Governance, NAAC, Official Documents, and Principal Desk (student lookup, fee monitor, leave approvals, institutional health, NAAC readiness).</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert NAAC Evidence Repository Screenshot]</div>
+  <figcaption>Figure — NAAC Evidence Repository. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-governance-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Committee</td><td>Body name</td><td>Yes</td><td>IQAC</td></tr>
+<tr><td>Meeting date</td><td>Scheduled meeting</td><td>Yes</td><td>20 Jul 2026</td></tr>
+<tr><td>Criterion / metric</td><td>NAAC mapping</td><td>Yes</td><td>2.3.1</td></tr>
+<tr><td>Document type</td><td>Notice/Circular/Order</td><td>Yes</td><td>Office Order</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-governance-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Publishing an office order</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Create document from Official Documents templates.</li><li><strong>Step 2.</strong> Route for digital signature / approval.</li><li><strong>Step 3.</strong> Publish to audience (staff/students) via Communication if needed.</li><li><strong>Step 4.</strong> Archive with searchable metadata.</li></ol>
+  </section>
+
+  <section id="ch-governance-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Draft</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Approve / e-sign</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Publish</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Acknowledge</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Archive / NAAC link</div></div></section>
+
+  <section id="ch-governance-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Tag every evidence file to a NAAC metric on upload.</li><li>Keep ATR linked to meeting minutes.</li></ul>
+  </section>
+
+  <section id="ch-governance-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Members missing meeting</td><td>Wrong committee membership</td><td>Update Committee Members</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-governance-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Who uses Principal Desk?</dt><dd>Principal, Vice Principal, and ERP Administrator roles for cross-module oversight.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-governance-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Export NAAC readiness snapshots before peer team visits.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-reports">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Reports &amp; Analytics</h2>
+    <p class="chapter-sub">Reports Hub, builders, and operational intelligence</p>
+  </header>
+
+  <section id="ch-reports-overview">
+    <h3>Overview</h3>
+    <p>Reports Hub consolidates student, admission, academic, demographic, department, contact, government, attendance, examination, fee, and certificate reports, plus Export Center, Student Master, Subject Registration reports, Report Builder, and compliance packs. Analytics deep-dives may be edition-dependent.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Deliver decision-ready and statutory outputs without spreadsheet sprawl.</p></div>
+      <div><h4>Business use case</h4><p>Export fee outstanding and attendance defaulters for Principal review.</p></div>
+      <div><h4>Primary users</h4><p>All privileged roles with report permissions</p></div>
+      <div><h4>Why it exists</h4><p>Leadership and regulators expect consistent, reproducible figures.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-reports-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Analytics / Reports</span><span class="nav-sep">→</span><span>/admin/reports</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-reports-screen">
+    <h3>Screen overview</h3>
+    <p>Categorized report cards, filters (session, programme, shift, date), Export (Excel/PDF/CSV), and saved report builder definitions where enabled.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Reports Hub Screenshot]</div>
+  <figcaption>Figure — Reports Hub. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-reports-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Report type</td><td>Catalog selection</td><td>Yes</td><td>Fee Outstanding</td></tr>
+<tr><td>Filters</td><td>Session/programme/shift</td><td>Recommended</td><td>Odd 2026 / All / Morning</td></tr>
+<tr><td>Export format</td><td>PDF/Excel/CSV</td><td>Yes</td><td>Excel</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-reports-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Running a filtered export</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Reports Hub; choose the report card.</li><li><strong>Step 2.</strong> Set academic session and demographic filters.</li><li><strong>Step 3.</strong> Preview row counts; Export.</li><li><strong>Step 4.</strong> Store exports in controlled folders per retention policy.</li></ol>
+  </section>
+
+  <section id="ch-reports-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Select report</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Filter</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Preview</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Export</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Distribute / archive</div></div></section>
+
+  <section id="ch-reports-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Always note filter criteria in email when sharing numbers.</li><li>Prefer Report Builder for recurring custom extracts.</li></ul>
+  </section>
+
+  <section id="ch-reports-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Empty export</td><td>Filters too narrow or no permission</td><td>Widen filters; check role</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-reports-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Can faculty run admin reports?</dt><dd>Only if granted; otherwise use Staff Portal department reports.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-reports-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Pair monthly exports with Day Closing and attendance registers.</div>
+  </section>
+</article>
+
+<article class="chapter" id="ch-settings">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>System Administration &amp; Security</h2>
+    <p class="chapter-sub">License, theme, mobile config, gateways, backup, and audit</p>
+  </header>
+
+  <section id="ch-settings-overview">
+    <h3>Overview</h3>
+    <p>System Administration covers portal users (see earlier), roll number settings, shift transfer, security & sessions, audit logs, license management, Theme Studio, App Version & Mobile Config, Payment Gateway Management, Knowledge Base, Proposal Studio, Import/Export, and Backup & DR (schedule, repository, restore).</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Keep the tenant secure, licensed, branded, integrable, and recoverable.</p></div>
+      <div><h4>Business use case</h4><p>Activate license key; configure Razorpay/Cashfree; set Firebase; schedule nightly backup.</p></div>
+      <div><h4>Primary users</h4><p>ERP Administrator, Institution Admin, Platform Admin (licenses)</p></div>
+      <div><h4>Why it exists</h4><p>Operational resilience and compliance depend on these controls.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-settings-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Administration</span><span class="nav-sep">→</span><span>License / Theme / Mobile / Gateway / Backup</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-settings-screen">
+    <h3>Screen overview</h3>
+    <p>Administration dashboard lists all system tools. License page shows subscription and activation key entry. Backup & DR Center manages schedules and restores. Payment Gateway Management configures providers for fees and admissions.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert License &amp; Backup Center Screenshot]</div>
+  <figcaption>Figure — License &amp; Backup Center. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-settings-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Activation key</td><td>BCLK-… license key</td><td>Yes for activate</td><td>BCLK-XXXX-…</td></tr>
+<tr><td>SMTP / FCM keys</td><td>Email and push providers</td><td>As used</td><td>(secure vault)</td></tr>
+<tr><td>Gateway credentials</td><td>Merchant keys</td><td>As used</td><td>(secure vault)</td></tr>
+<tr><td>Backup schedule</td><td>Cron/frequency</td><td>Recommended</td><td>Daily 02:00</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-settings-procedure">
+    <h3>Step-by-step procedure</h3>
+    <h4>Activating a license and verifying mobile push</h4>
+    <ol class="steps"><li><strong>Step 1.</strong> Open Administration → License; enter activation key from BaseCode Labs.</li><li><strong>Step 2.</strong> Confirm modules unlocked match your agreement.</li><li><strong>Step 3.</strong> Configure Payment Gateway and test a sandbox payment.</li><li><strong>Step 4.</strong> Configure App Version & Mobile Config and Firebase for push.</li><li><strong>Step 5.</strong> Schedule Backup; perform a test restore in non-production if available.</li><li><strong>Step 6.</strong> Review Audit Logs and Security & Sessions policies.</li></ol>
+  </section>
+
+  <section id="ch-settings-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">License activate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Branding</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Gateways &amp; Firebase</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Backup schedule</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Security review</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Go-live checklist</div></div></section>
+
+  <section id="ch-settings-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Store API secrets outside screenshots and manuals.</li><li>Test restore quarterly.</li><li>Rotate admin passwords and revoke unused sessions.</li></ul>
+  </section>
+
+  <section id="ch-settings-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>License alert banner</td><td>Expiry approaching/expired</td><td>Contact licensing@basecodelabs.com</td></tr><tr><td>Backup failed</td><td>Storage credentials/permissions</td><td>Fix repository settings; rerun</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-settings-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Who manages platform licenses?</dt><dd>BaseCode Labs Platform Admin (/platform); colleges activate keys locally.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-settings-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Document your gateway and Firebase owners in an internal runbook.</div>
+  </section>
+</article>
+        
+<article class="chapter" id="ch-lms">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Learning Management (LMS)</h2>
+    <p class="chapter-sub">Subject workspaces, materials, assignments, quizzes, discussions</p>
+  </header>
+
+  <section id="ch-lms-overview">
+    <h3>Overview</h3>
+    <p>LMS provides subject workspaces for learning materials, assignments, quizzes, discussions, lesson plans, and settings — available to faculty and students on web and mobile.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Digitize teaching content and continuous assessment artefacts.</p></div>
+      <div><h4>Business use case</h4><p>Faculty uploads week-2 notes and an assignment; students submit before deadline.</p></div>
+      <div><h4>Primary users</h4><p>Faculty, Students, Academic Admin</p></div>
+      <div><h4>Why it exists</h4><p>Centralizes teaching artefacts for audit and student access.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-lms-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Academic Operations</span><span class="nav-sep">→</span><span>LMS</span><span class="nav-sep">→</span><span>/admin/academics/lms</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-lms-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Subject Workspaces, Materials, Assignments, Quizzes, Discussions, Lesson Plans, Settings. Student portal mirrors enrolled subjects.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Learning Management (LMS) main screen Screenshot]</div>
+  <figcaption>Figure — Learning Management (LMS) main screen. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-lms-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Workspace</td><td>Subject LMS space</td><td>Yes</td><td>EDN-DSC-301</td></tr>
+<tr><td>Material title</td><td>Resource name</td><td>Yes</td><td>Unit 2 Notes</td></tr>
+<tr><td>Assignment due</td><td>Deadline</td><td>Yes</td><td>20 Jul 2026 23:59</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-lms-procedure">
+    <h3>Step-by-step procedure</h3>
+    
+    <ol class="steps"><li><strong>Step 1.</strong> Open LMS → Subject Workspace for your paper.</li><li><strong>Step 2.</strong> Upload materials or create assignment/quiz.</li><li><strong>Step 3.</strong> Publish visibility to enrolled students.</li><li><strong>Step 4.</strong> Grade submissions and release feedback.</li></ol>
+  </section>
+
+  <section id="ch-lms-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Workspace</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Content</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Publish</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Submissions</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Grading</div></div></section>
+
+  <section id="ch-lms-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Use clear week-wise folders.</li><li>Align deadlines with timetable weeks.</li></ul>
+  </section>
+
+  <section id="ch-lms-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Students cannot see content</td><td>Not published or not enrolled</td><td>Publish; verify registration</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-lms-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Are lesson plans mandatory?</dt><dd>Policy-dependent; recommended for NAAC teaching plans.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-lms-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Export assignment analytics for departmental reviews.</div>
+  </section>
+</article>
+        
+<article class="chapter" id="ch-certificates">
+  <header class="chapter-head">
+    <p class="chapter-kicker">Chapter</p>
+    <h2>Certificates</h2>
+    <p class="chapter-sub">Templates, generation, bulk issue, verification</p>
+  </header>
+
+  <section id="ch-certificates-overview">
+    <h3>Overview</h3>
+    <p>Certificates module covers templates, generator, requests, bulk issue, verification, approval workflow, analytics, audit logs, and settings for bonafide and related credentials.</p>
+    <div class="info-grid">
+      <div><h4>Purpose</h4><p>Issue verifiable institutional certificates with audit trail.</p></div>
+      <div><h4>Business use case</h4><p>Bulk issue bonafide certificates for scholarship applications.</p></div>
+      <div><h4>Primary users</h4><p>Registrar, Academic Admin, Front Office</p></div>
+      <div><h4>Why it exists</h4><p>Reduces forged paper credentials via verification portal.</p></div>
+    </div>
+  </section>
+
+  <section id="ch-certificates-nav">
+    <h3>Menu navigation</h3>
+    <div class="nav-path"><span>Examination / Certificates</span><span class="nav-sep">→</span><span>/admin/certificates</span></div>
+    <p class="note">Access requires the appropriate role permission. Menu items may be hidden if your license or role does not include this module.</p>
+  </section>
+
+  <section id="ch-certificates-screen">
+    <h3>Screen overview</h3>
+    <p>Dashboard, Templates, Generator, Requests, Bulk Issue, Verification, Approvals, Analytics, Audit, Settings.</p>
+    <figure class="shot">
+  <div class="shot-frame">[Insert Certificates main screen Screenshot]</div>
+  <figcaption>Figure — Certificates main screen. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  </section>
+
+  <section id="ch-certificates-fields"><h3>Field description</h3><div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Template</td><td>Certificate layout</td><td>Yes</td><td>Bonafide</td></tr>
+<tr><td>Student</td><td>Recipient</td><td>Yes</td><td>REG2026048</td></tr>
+<tr><td>Verification code</td><td>Public verify token</td><td>System</td><td>auto</td></tr>
+</tbody></table></div></section>
+
+  <section id="ch-certificates-procedure">
+    <h3>Step-by-step procedure</h3>
+    
+    <ol class="steps"><li><strong>Step 1.</strong> Select template; preview merge fields.</li><li><strong>Step 2.</strong> Generate for one student or bulk cohort.</li><li><strong>Step 3.</strong> Approve if workflow enabled; publish/download.</li><li><strong>Step 4.</strong> Share verification link as needed.</li></ol>
+  </section>
+
+  <section id="ch-certificates-flow"><h3>Workflow diagram</h3><div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Request</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Generate</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Approve</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Issue</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Verify</div></div></section>
+
+  <section id="ch-certificates-practices">
+    <h3>Best practices</h3>
+    <ul class="check"><li>Lock templates after academic council approval.</li></ul>
+  </section>
+
+  <section id="ch-certificates-errors">
+    <h3>Common errors</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Error / symptom</th><th>Likely cause</th><th>Resolution</th></tr></thead>
+      <tbody>
+      <tr><td>Wrong name on certificate</td><td>Profile name outdated</td><td>Update profile then regenerate</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="ch-certificates-faq">
+    <h3>Frequently asked questions</h3>
+    <dl class="faq">
+      <dt>Public verification URL?</dt><dd>Use Certificates → Verification / public verify routes as configured.</dd>
+    </dl>
+  </section>
+
+  <section id="ch-certificates-notes">
+    <h3>Administrator notes</h3>
+    <div class="callout tip"><strong>Tip.</strong> Retain audit logs with issued serials.</div>
+  </section>
+</article>
+        <article class="chapter" id="ch-admin-guide">
+  <header class="chapter-head"><p class="chapter-kicker">Role guide</p><h2>Administrator Guide</h2></header>
+  
+  <p>This section is the recommended go-live and operations checklist for ERP Administrators and Institution Admins.</p>
+  <h3>Go-live sequence</h3>
+  <div class="flow" role="img" aria-label="Process flow"><div class="flow-node">License activation</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Organization &amp; branding</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Academic year / sessions</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Shifts</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Users &amp; roles</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Fee &amp; gateway</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Communication / Firebase</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Backup schedule</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Pilot users</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Production cutover</div></div>
+  <h3>Academic year &amp; semester activation</h3>
+  <p>Create the academic session under <strong>Academics → Academic Sessions</strong>, activate the semester, and align fee cycles and timetable plans to the same session codes.</p>
+  <h3>Shift configuration</h3>
+  <p>Configure Morning/Evening (or custom) shifts under <strong>Shift Management</strong>. Teaching allocation, attendance, and fee plans should reference the same shift masters.</p>
+  <h3>Payment gateway</h3>
+  <p>Open <strong>Administration → Payment Gateway Management</strong>. Enter merchant credentials, enable Fee / Admission / Exam Fee channels as licensed, and run a ₹1 test where supported.</p>
+  <h3>Email, SMS, WhatsApp, Firebase</h3>
+  <p>Configure providers in Communication Settings and Mobile Config. Send a test push to a staff device before student campaigns.</p>
+  <h3>Backup &amp; restore</h3>
+  <p>Use <strong>Backup &amp; DR Center</strong> to schedule backups, verify repository connectivity, and document restore owners.</p>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Administrator go-live checklist worksheet Screenshot]</div>
+  <figcaption>Figure — Administrator go-live checklist worksheet. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  <div class="callout tip"><strong>Note.</strong> Custom tenant-edited ID card layouts are preserved; library defaults refresh when <em>layoutRevision</em> advances — use Reset to library when you intentionally want the latest Pursuit Excellence layout.</div>
+
+</article>
+        <article class="chapter" id="ch-student-guide">
+  <header class="chapter-head"><p class="chapter-kicker">Role guide</p><h2>Student Guide</h2></header>
+  
+  <p>Students use the <strong>Student Portal</strong> (web) and <strong>BCL OneCampus</strong> mobile app.</p>
+  <h3>Typical student journey</h3>
+  <div class="flow" role="img" aria-label="Process flow"><div class="flow-node">Login</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Complete profile</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Timetable</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Attendance</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">LMS / fees</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Exams</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Results</div></div>
+  <h3>Key screens</h3>
+  <ul>
+    <li><strong>Dashboard</strong> — notices and shortcuts</li>
+    <li><strong>My Profile</strong> — personal, contact, guardians, documents, Class XII, submit for verification</li>
+    <li><strong>Attendance / Timetable / LMS</strong> — academics</li>
+    <li><strong>Fees / Semester Exam Fees</strong> — pay and download receipts</li>
+    <li><strong>Examinations / Results / Hall ticket</strong> — as published</li>
+    <li><strong>Library, Certificates, Feedback, ID Card, Support</strong></li>
+  </ul>
+  <ol class="steps"><li><strong>Step 1.</strong> Install the mobile app or open the student portal URL.</li><li><strong>Step 2.</strong> Sign in with credentials issued by the college.</li><li><strong>Step 3.</strong> Complete My Profile and submit for verification.</li><li><strong>Step 4.</strong> Check Timetable and Attendance weekly.</li><li><strong>Step 5.</strong> Pay fees from Fees or Exam Fees before deadlines.</li><li><strong>Step 6.</strong> Enable notifications for alerts from the Communication Center.</li></ol>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Student mobile home Screenshot]</div>
+  <figcaption>Figure — Student mobile home. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+
+</article>
+        <article class="chapter" id="ch-faculty-guide">
+  <header class="chapter-head"><p class="chapter-kicker">Role guide</p><h2>Faculty Guide</h2></header>
+  
+  <p>Faculty use the <strong>Staff Portal</strong> and mobile faculty workspace.</p>
+  <h3>Daily teaching loop</h3>
+  <div class="flow" role="img" aria-label="Process flow"><div class="flow-node">My Subjects</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Timetable</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Attendance entry</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">LMS / assignments</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Marks / IA</div><div class="flow-arrow" aria-hidden="true">↓</div><div class="flow-node">Leave if needed</div></div>
+  <h3>Capabilities</h3>
+  <ul>
+    <li>My Subjects, Teaching Load, Timetable</li>
+    <li>LMS workspace, lesson plans, homework</li>
+    <li>Question Paper Repository uploads</li>
+    <li>Attendance entry and student lists</li>
+    <li>Internal assessment / marks entry</li>
+    <li>Leave applications; payslips under Salary</li>
+    <li>Department notices and committee memberships</li>
+  </ul>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Faculty attendance entry Screenshot]</div>
+  <figcaption>Figure — Faculty attendance entry. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+  <div class="callout tip"><strong>Tip.</strong> Mark attendance the same day; locked periods may require academic admin unlock.</div>
+
+</article>
+        <article class="chapter" id="ch-mobile-guide">
+  <header class="chapter-head"><p class="chapter-kicker">Role guide</p><h2>Mobile Application Guide</h2></header>
+  
+  <h3>Installation</h3>
+  <p>Install <strong>BCL OneCampus ERP</strong> from the institution’s Play Store listing or the APK provided by BaseCode Labs / your admin. Accept notification permission for alerts.</p>
+  <h3>Student tabs</h3>
+  <p>Home · My Academics · Fees · Alerts · Profile</p>
+  <h3>Faculty tabs</h3>
+  <p>Home · Academics · Attendance · Students · Profile</p>
+  <h3>Offline behaviour</h3>
+  <p>Some screens cache recent data; posting attendance or payments requires connectivity. If offline, the app shows a retry state — do not assume server success until confirmed.</p>
+  <h3>Troubleshooting</h3>
+  <ul>
+    <li>Update to the latest version from Administration’s published version code.</li>
+    <li>Clear app cache only after admin advice.</li>
+    <li>Re-login after password reset on web.</li>
+  </ul>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Mobile login / select school Screenshot]</div>
+  <figcaption>Figure — Mobile login / select school. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+
+</article>
+        
+<article class="chapter" id="ch-troubleshooting">
+  <header class="chapter-head"><p class="chapter-kicker">Support</p><h2>Troubleshooting Guide</h2></header>
+  <h3>Login problems</h3>
+  <ul>
+    <li>Confirm portal (Admin vs Student vs Staff).</li>
+    <li>Use Forgot Password; check spam for reset mail.</li>
+    <li>Ask admin to verify User Activation and role mapping.</li>
+  </ul>
+  <h3>Password reset</h3>
+  <p>Web login → Forgot Password → open email link → set new password → sign in on mobile again.</p>
+  <h3>Payment failure</h3>
+  <ul>
+    <li>Do not pay twice immediately — wait for gateway callback.</li>
+    <li>Accounts can confirm via Fee Verification / External Payment Entry.</li>
+    <li>Keep UTR/UPI reference for reconciliation.</li>
+  </ul>
+  <h3>Notification issues</h3>
+  <ul>
+    <li>Enable OS notifications; confirm Firebase configured.</li>
+    <li>Ensure the user is in the campaign audience.</li>
+  </ul>
+  <h3>Attendance issues</h3>
+  <ul>
+    <li>Students missing: check subject registration/section.</li>
+    <li>Staff biometric empty: device connectivity and pull logs.</li>
+  </ul>
+  <h3>Mobile app issues</h3>
+  <ul>
+    <li>Wrong school selected on multi-tenant login.</li>
+    <li>Force update if App Version policy requires it.</li>
+  </ul>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Error / access denied example Screenshot]</div>
+  <figcaption>Figure — Error / access denied example. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+</article>
+
+        
+<article class="chapter" id="ch-faq">
+  <header class="chapter-head"><p class="chapter-kicker">Support</p><h2>Frequently Asked Questions</h2></header>
+  <dl class="faq">
+    <dt>Is OneCampus NEP / FYUGP ready?</dt>
+    <dd>Yes. Curriculum baskets (Major, Minor, MDC, AEC, SEC, VAC, VTC) and session/shift models support FYUGP operations.</dd>
+    <dt>Can we customize ID cards?</dt>
+    <dd>Yes via Template Gallery and Card Designer. Default Pursuit of Excellence layouts can be refreshed by library revision.</dd>
+    <dt>How is licensing enforced?</dt>
+    <dd>Administration → License shows status; activate keys from BaseCode Labs. Banners appear before expiry.</dd>
+    <dt>Where do I configure Pay now on mobile?</dt>
+    <dd>Fee Settings and Payment Gateway Management control student app payment behaviour.</dd>
+    <dt>What if Analytics shows Coming soon?</dt>
+    <dd>Use Reports Hub; advanced analytics tiles depend on edition/feature flags.</dd>
+    <dt>Is there a parent portal?</dt>
+    <dd>A parent role stub exists; full parent portal availability depends on your contracted edition.</dd>
+    <dt>How do we get training?</dt>
+    <dd>Contact contact@basecodelabs.com or +91 95663 63655 for onboarding packages.</dd>
+  </dl>
+</article>
+
+        
+<article class="chapter" id="ch-glossary">
+  <header class="chapter-head"><p class="chapter-kicker">Reference</p><h2>Glossary</h2></header>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Academic Year / Session</strong></td><td>Institutional teaching year or named session window in OneCampus</td></tr><tr><td><strong>Semester</strong></td><td>Odd/Even instructional term within a programme</td></tr><tr><td><strong>Programme</strong></td><td>Award pathway such as B.A. Economics</td></tr><tr><td><strong>Curriculum</strong></td><td>Versioned rule set of courses and baskets for a cohort</td></tr><tr><td><strong>CBCS</strong></td><td>Choice Based Credit System</td></tr><tr><td><strong>FYUGP</strong></td><td>Four Year Undergraduate Programme under NEP</td></tr><tr><td><strong>MDC</strong></td><td>Multidisciplinary Course</td></tr><tr><td><strong>AEC</strong></td><td>Ability Enhancement Course</td></tr><tr><td><strong>SEC</strong></td><td>Skill Enhancement Course</td></tr><tr><td><strong>VAC</strong></td><td>Value Added Course</td></tr><tr><td><strong>VTC</strong></td><td>Vocational / skill track course as configured</td></tr><tr><td><strong>Batch / Section</strong></td><td>Teaching group under a subject offering</td></tr><tr><td><strong>Shift</strong></td><td>Morning/Evening delivery window</td></tr><tr><td><strong>Demand</strong></td><td>Fee charge raised against a student ledger</td></tr><tr><td><strong>IA</strong></td><td>Internal Assessment</td></tr><tr><td><strong>RFID</strong></td><td>Radio frequency identity mapped to student/staff</td></tr><tr><td><strong>ABC ID</strong></td><td>Academic Bank of Credits identity where used</td></tr><tr><td><strong>ATR</strong></td><td>Action Taken Report for committee meetings</td></tr><tr><td><strong>AQAR / SSR</strong></td><td>NAAC annual quality / self-study report artefacts</td></tr><tr><td><strong>Tenant</strong></td><td>Isolated college instance of OneCampus</td></tr><tr><td><strong>CR80</strong></td><td>Standard PVC ID card size used by the designer</td></tr>
+    </tbody>
+  </table></div>
+</article>
+
+        
+<article class="chapter" id="ch-appendix">
+  <header class="chapter-head"><p class="chapter-kicker">Reference</p><h2>Appendix</h2></header>
+  <h3>Keyboard shortcuts</h3>
+  <div class="table-wrap"><table class="fields">
+<thead><tr><th>Field</th><th>Description</th><th>Mandatory</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Ctrl + K</td><td>Command palette / OneCampus AI</td><td>No</td><td>Admin web</td></tr>
+<tr><td>Browser Ctrl + P</td><td>Print / Save as PDF this manual</td><td>No</td><td>Any</td></tr>
+</tbody></table></div>
+  <h3>Browser compatibility</h3>
+  <p>Chrome, Edge, Firefox — latest two major versions. Safari supported for general browsing; print CSS validated primarily on Chromium.</p>
+  <h3>Mobile requirements</h3>
+  <p>Android as published on Play Store for BCL OneCampus ERP; notification permission recommended; storage for offline cache optional.</p>
+  <h3>Role matrix (summary)</h3>
+  <p>Seeded roles include college-admin, institution-admin, academic-admin, admission-admin, faculty, staff, student, accountant, librarian, library-operator, examination-cell, registrar, principal, vice-principal, erp-administrator, shift-* coordinators, front-office-desk, transport-coordinator, store-keeper, applicant, platform-admin, and others. Exact permissions are configured per tenant.</p>
+  <figure class="shot">
+  <div class="shot-frame">[Insert Permission matrix export Screenshot]</div>
+  <figcaption>Figure — Permission matrix export. Replace this placeholder with a production screenshot.</figcaption>
+</figure>
+</article>
+
+      </div>
+
+      <!-- BACK COVER -->
+      <section class="back-cover" id="back-cover">
+        <div class="center">
+          <img src="bcl-logo.png" alt="BaseCode Labs" style="height:72px;background:#fff;border-radius:12px;padding:.4rem .6rem;" />
+          <h2>BaseCode Labs Pvt. Ltd.</h2>
+          <p style="color:var(--gold);letter-spacing:.12em;text-transform:uppercase;font-size:.8rem;">Your Technology Growth Partner</p>
+          <p style="max-width:28rem;margin:1rem auto;color:#cbd5e1;">BCL OneCampus ERP — Complete Campus Management System</p>
+          <div class="qr-ph">[QR Code<br/>Website]</div>
+          <p>
+            Website: https://basecodelabs.com<br/>
+            Email: contact@basecodelabs.com<br/>
+            Phone: +91 95663 63655
+          </p>
+          <p style="margin-top:2rem;color:#94a3b8;font-size:.85rem;">
+            Document DOC-2026.07 · Product 1.0.0 · 12 July 2026<br/>
+            © 2026 BaseCode Labs Pvt. Ltd. All rights reserved.
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const tocNav = document.getElementById('toc-nav');
+  const tocList = document.getElementById('toc-list');
+  const chapters = [...document.querySelectorAll('#body-chapters .chapter, #toc')];
+  const heads = [...document.querySelectorAll('#body-chapters h2, #cover, #inside-cover, #toc h2, #back-cover')];
+
+  function addToc(href, label, level) {
+    const a = document.createElement('a');
+    a.href = href; a.textContent = label; if (level === 2) a.className = 'l2';
+    tocNav.appendChild(a);
+    if (tocList && level === 1) {
+      const li = document.createElement('li');
+      const la = document.createElement('a');
+      la.href = href; la.textContent = label;
+      li.appendChild(la); tocList.appendChild(li);
+    }
+  }
+
+  addToc('#cover', 'Cover', 1);
+  addToc('#inside-cover', 'Inside cover', 1);
+  addToc('#toc', 'Table of contents', 1);
+
+  document.querySelectorAll('#body-chapters .chapter').forEach((ch) => {
+    const h2 = ch.querySelector('h2');
+    if (!h2) return;
+    if (!ch.id) ch.id = 'sec-' + Math.random().toString(36).slice(2, 8);
+    addToc('#' + ch.id, h2.textContent.trim(), 1);
+    ch.querySelectorAll('h3').forEach((h3, idx) => {
+      if (!h3.id) h3.id = ch.id + '-s' + idx;
+      addToc('#' + h3.id, h3.textContent.trim(), 2);
+    });
+  });
+  addToc('#back-cover', 'Back cover', 1);
+
+  // Wrap chapters with chrome for print identity
+  document.querySelectorAll('#body-chapters .chapter').forEach((ch) => {
+    const chrome = document.createElement('div');
+    chrome.className = 'page-chrome';
+    chrome.innerHTML = '<div class="left"><img src="bcl-logo.png" alt="" /><strong>BCL OneCampus ERP</strong></div><div>DOC-2026.07 · BaseCode Labs Pvt. Ltd.</div>';
+    ch.insertBefore(chrome, ch.firstChild);
+    const foot = document.createElement('div');
+    foot.className = 'page-footer';
+    foot.innerHTML = '<span>© 2026 BaseCode Labs Pvt. Ltd. All rights reserved.</span><span class="pg"></span>';
+    ch.appendChild(foot);
+  });
+
+  document.getElementById('btn-print').addEventListener('click', () => window.print());
+  document.getElementById('btn-top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+})();
+</script>
+</body>
+</html>

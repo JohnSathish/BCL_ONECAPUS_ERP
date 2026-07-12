@@ -12,7 +12,7 @@ export function getAppVersion() {
 export const APP_VERSION = getInstalledAppVersion();
 
 /** @deprecated Use getApiBase() — kept for legacy imports during migration */
-export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://erp.donboscocollege.ac.in/api';
 
 /** @deprecated Use getTenantSlug() */
 export const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'demo';

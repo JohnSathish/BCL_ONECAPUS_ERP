@@ -1,4 +1,5 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { getApiBaseSync } from '@/auth/school-config';
 
 /** Resolve college web portal origin from the active API base URL. */
@@ -23,6 +24,38 @@ export function webPortalPath(path: string): string {
   return `${origin}${p}`;
 }
 
-export async function openWebPortal(path: string) {
-  await Linking.openURL(webPortalPath(path));
+/**
+ * Open a web portal path.
+ * - By default uses an ephemeral browser session so the device browser's ERP cookies
+ *   are NOT reused (avoids silent SSO into the full student dashboard).
+ * - Routes through /login?next=… so the user must authenticate in that session.
+ */
+export async function openWebPortal(
+  path: string,
+  options?: { requireLogin?: boolean; ephemeral?: boolean },
+) {
+  const requireLogin = options?.requireLogin !== false;
+  const ephemeral = options?.ephemeral !== false;
+  const target = path.startsWith('/') ? path : `/${path}`;
+  const url = requireLogin
+    ? webPortalPath(`/login?next=${encodeURIComponent(target)}`)
+    : webPortalPath(target);
+
+  try {
+    if (ephemeral) {
+      await WebBrowser.openBrowserAsync(url, {
+        preferEphemeralSession: true,
+        showTitle: true,
+        enableBarCollapsing: true,
+        ...(Platform.OS === 'ios'
+          ? { dismissButtonStyle: 'close' as const }
+          : { showInRecents: false }),
+      });
+      return;
+    }
+  } catch {
+    // Fall through to system browser
+  }
+
+  await Linking.openURL(url);
 }

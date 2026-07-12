@@ -21,6 +21,7 @@ import {
   pursuitVerificationPath,
   pursuitVerificationUrlHtml,
   pursuitWatermarkText,
+  resolvePursuitTypeScale,
 } from './id-card-pursuit-excellence';
 import { renderBarcodePrintHtml } from './build-barcode-svg';
 import { renderPursuitStaffFieldHtml } from './id-card-pursuit-staff-fields';
@@ -30,12 +31,15 @@ import {
   cleanInstitutionLocation,
   isAcademicSessionText,
 } from './id-card-programme-utils';
+import type { IdCardTypeScale } from './id-card-typography';
 
 export type FieldRenderOptions = {
   stylePreset?: IdCardLayoutMeta['stylePreset'];
   photoShape?: 'square' | 'circle';
   signatureUrl?: string | null;
   side?: 'front' | 'back';
+  /** Designer element style.fontSize (pt) — scales Pursuit type when set. */
+  fontSize?: number | null;
 };
 
 export type FieldRenderCtx = {
@@ -126,13 +130,17 @@ export function labelValueHtml(
   label: string,
   value: string | null | undefined,
   _primary: string,
-  opts?: { multiline?: boolean },
+  opts?: { multiline?: boolean; typeScale?: IdCardTypeScale },
 ) {
   if (isBlank(value)) return '';
   const text = value!.trim();
-  return `<div style="display:flex;gap:1.2mm;align-items:baseline;line-height:1.15;width:100%;">
-    <span style="flex:0 0 16mm;font-size:3.8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">${escHtml(label)}</span>
-    <span style="flex:1;font-size:5.2pt;font-weight:700;color:#0f172a;${opts?.multiline ? '' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">${escHtml(text)}</span>
+  const labelSize = opts?.typeScale?.label ?? '3.8pt';
+  const valueSize = opts?.multiline
+    ? (opts?.typeScale?.address ?? opts?.typeScale?.value ?? '5.2pt')
+    : (opts?.typeScale?.value ?? '5.2pt');
+  return `<div style="display:flex;gap:1.2mm;align-items:baseline;line-height:1.25;width:100%;">
+    <span style="flex:0 0 16mm;font-size:${labelSize};font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">${escHtml(label)}</span>
+    <span style="flex:1;font-size:${valueSize};font-weight:700;color:#0f172a;${opts?.multiline ? 'white-space:pre-wrap;word-break:break-word;' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">${escHtml(text)}</span>
   </div>`;
 }
 
@@ -150,7 +158,7 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     if (staffHtml !== null) return staffHtml;
   }
 
-  const { model, primary, accent, stylePreset, photoShape, signatureUrl, side } = ctx;
+  const { model, primary, accent, stylePreset, photoShape, signatureUrl, side, fontSize } = ctx;
   const inst = model.institution;
   const student = studentHolder(model);
   const holder = model.holder;
@@ -159,6 +167,8 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
   const affil = affiliationLine(model);
   const accredit = accreditationLine(model);
   const v = model.validity;
+  const pe = isPursuitExcellence(stylePreset);
+  const ts = pe ? resolvePursuitTypeScale(fontSize) : null;
 
   switch (fieldKey) {
     case 'headerBand':
@@ -183,26 +193,26 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#fff;padding:0.6mm;box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,0.12);"><img src="${escHtml(inst.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" /></div>`
         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#fff;font-size:6pt;font-weight:800;color:${primary};">${escHtml(inst.shortName?.slice(0, 3) ?? 'DBC')}</div>`;
     case 'collegeName':
-      if (isPursuitExcellence(stylePreset) && side === 'back') {
+      if (pe && side === 'back') {
         return `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-          <p style="margin:0;font-size:6pt;font-weight:900;text-transform:uppercase;color:${PE_NAVY};text-align:center;">${escHtml(inst.displayName)}</p>
+          <p style="margin:0;font-size:${ts!.header};font-weight:900;text-transform:uppercase;color:${PE_NAVY};text-align:center;">${escHtml(inst.displayName)}</p>
           <div style="margin-top:0.8mm;display:flex;width:70%;align-items:center;gap:1mm;">
-            <span style="flex:1;height:0.3mm;background:${PE_NAVY};"></span><span style="color:${PE_NAVY};font-size:4pt;">★</span><span style="flex:1;height:0.3mm;background:${PE_NAVY};"></span>
+            <span style="flex:1;height:0.3mm;background:${PE_NAVY};"></span><span style="color:${PE_NAVY};font-size:${ts!.headerSub};">★</span><span style="flex:1;height:0.3mm;background:${PE_NAVY};"></span>
           </div>
         </div>`;
       }
-      if (isPursuitExcellence(stylePreset)) {
+      if (pe) {
         return `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 0.5mm;">
-          <p style="margin:0;font-size:6.2pt;font-weight:900;text-transform:uppercase;color:#fff;text-align:center;line-height:1.05;">${escHtml(inst.displayName)}</p>
-          <p style="margin:0.4mm 0 0;font-size:2.8pt;font-weight:600;text-transform:uppercase;letter-spacing:0.18em;color:rgba(255,255,255,0.95);text-align:center;">— Pursuit of Excellence —</p>
+          <p style="margin:0;font-size:${ts!.header};font-weight:900;text-transform:uppercase;color:#fff;text-align:center;line-height:1.05;">${escHtml(inst.displayName)}</p>
+          <p style="margin:0.4mm 0 0;font-size:${ts!.headerSub};font-weight:600;text-transform:uppercase;letter-spacing:0.18em;color:rgba(255,255,255,0.95);text-align:center;">— Pursuit of Excellence —</p>
         </div>`;
       }
       return `<p style="margin:0;font-size:7pt;font-weight:900;text-transform:uppercase;color:#ffffff;line-height:1.05;letter-spacing:0.04em;text-align:center;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${escHtml(inst.displayName)}</p>`;
     case 'collegeAddress':
-      if (isPursuitExcellence(stylePreset) && side !== 'back') {
+      if (pe && side !== 'back') {
         const line = pursuitFrontAddressLine(collegeAddr);
         return line
-          ? `<p style="margin:0;font-size:3.6pt;font-weight:500;color:rgba(255,255,255,0.95);line-height:1.25;text-align:center;">${escHtml(line)}</p>`
+          ? `<p style="margin:0;font-size:${ts!.headerSub};font-weight:500;color:rgba(255,255,255,0.95);line-height:1.25;text-align:center;">${escHtml(line)}</p>`
           : '';
       }
       return collegeAddr
@@ -232,31 +242,31 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       return `<div style="width:100%;height:100%;${border}background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:12pt;font-weight:800;color:${primary};">${escHtml(name.charAt(0))}</div>`;
     }
     case 'name':
-      return isPursuitExcellence(stylePreset)
-        ? `<p style="margin:0;font-size:9pt;font-weight:900;text-transform:uppercase;color:${PE_NAVY};line-height:1.05;letter-spacing:0.035em;text-align:center;">${escHtml(name)}</p>`
+      return pe
+        ? `<p style="margin:0;font-size:${ts!.name};font-weight:900;text-transform:uppercase;color:${PE_NAVY};line-height:1.05;letter-spacing:0.035em;text-align:center;">${escHtml(name)}</p>`
         : `<p style="margin:0;font-size:7.5pt;font-weight:900;text-transform:uppercase;color:${primary};line-height:1.05;letter-spacing:0.035em;text-align:center;">${escHtml(name)}</p>`;
     case 'roleLabel':
-      return isPursuitExcellence(stylePreset)
-        ? `<p style="margin:0;font-size:5.5pt;font-weight:700;text-transform:uppercase;color:${PE_NAVY};text-align:center;letter-spacing:0.16em;">${escHtml(holder.roleLabel)}</p>`
+      return pe
+        ? `<p style="margin:0;font-size:${ts!.role};font-weight:700;text-transform:uppercase;color:${PE_NAVY};text-align:center;letter-spacing:0.16em;">${escHtml(holder.roleLabel)}</p>`
         : `<p style="margin:0;font-size:4pt;font-weight:700;text-transform:uppercase;color:${accent};text-align:center;letter-spacing:0.14em;">${escHtml(holder.roleLabel)}</p>`;
     case 'registrationNumber':
       return student
-        ? isPursuitExcellence(stylePreset)
-          ? pursuitGridRowHtml('Reg No', (student.registrationNumber ?? student.rollNumber)!)
+        ? pe
+          ? pursuitGridRowHtml('Reg No', (student.registrationNumber ?? student.rollNumber)!, ts!)
           : labelValueHtml('Reg No', student.registrationNumber ?? student.rollNumber, primary)
         : '';
     case 'rollNumber':
       return student ? labelValueHtml('Roll No', student.rollNumber, primary) : '';
     case 'department':
-      return isPursuitExcellence(stylePreset) && !isBlank(holder.department)
-        ? pursuitGridRowHtml('Department', holder.department!)
+      return pe && !isBlank(holder.department)
+        ? pursuitGridRowHtml('Department', holder.department!, ts!)
         : labelValueHtml('Department', holder.department, primary);
     case 'programme':
       if (student) {
-        if (isPursuitExcellence(stylePreset)) {
+        if (pe) {
           if (side !== 'back') return '';
           const prog = displayProgramme(student);
-          return !isBlank(prog) ? pursuitGridRowHtml('Programme', prog!) : '';
+          return !isBlank(prog) ? pursuitGridRowHtml('Programme', prog!, ts!) : '';
         }
         return labelValueHtml('Programme', displayProgramme(student) ?? '', primary);
       }
@@ -266,18 +276,18 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       return '';
     case 'gender':
       return student
-        ? isPursuitExcellence(stylePreset) && !isBlank(student.gender)
-          ? pursuitGridRowHtml('Gender', formatDisplayGender(student.gender))
+        ? pe && !isBlank(student.gender)
+          ? pursuitGridRowHtml('Gender', formatDisplayGender(student.gender), ts!)
           : labelValueHtml('Gender', formatDisplayGender(student.gender) || student.gender, primary)
         : '';
     case 'bloodGroup':
-      if (isPursuitExcellence(stylePreset)) return '';
+      if (pe) return '';
       return labelValueHtml('Blood Group', holder.bloodGroup, primary);
     case 'validity': {
       const dateLabel = formatPursuitValidUntilDate(v.validTo, v.validToLabel);
       if (!dateLabel && !v.validToLabel) return '';
-      return isPursuitExcellence(stylePreset)
-        ? pursuitValidityHtml(escHtml(dateLabel || v.validToLabel!))
+      return pe
+        ? pursuitValidityHtml(escHtml(dateLabel || v.validToLabel!), ts!)
         : v.validToLabel
           ? `<div style="width:100%;display:flex;justify-content:center;"><span style="display:inline-block;padding:0.8mm 2.5mm;border-radius:999px;background:${primary};color:#fff;font-size:4.5pt;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;">${escHtml(v.validToLabel)}</span></div>`
           : '';
@@ -304,8 +314,8 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     case 'rfidNumber': {
       const rfid = holder.rfidNumber;
       if (isBlank(rfid)) return '';
-      return isPursuitExcellence(stylePreset)
-        ? pursuitGridRowHtml('RFID', rfid!)
+      return pe
+        ? pursuitGridRowHtml('RFID', rfid!, ts!)
         : `<div style="width:100%;text-align:center;border:0.3mm dashed ${primary};border-radius:1mm;padding:1mm;background:#f8fafc;">
         <p style="margin:0;font-size:3.2pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:0.08em;">RFID</p>
         <p style="margin:0.5mm 0 0;font-size:6pt;font-weight:900;font-family:monospace;color:${primary};">${escHtml(rfid!)}</p>
@@ -323,17 +333,17 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         (model.branding as { principalSignatureUrl?: string | null } | undefined)
           ?.principalSignatureUrl ??
         null;
-      const pe = isPursuitExcellence(stylePreset);
-      const align = pe ? 'align-items:flex-end;' : 'align-items:center;';
+      const peSig = pe;
+      const align = peSig ? 'align-items:flex-end;' : 'align-items:center;';
       if (url) {
         return `<div style="width:100%;height:100%;display:flex;flex-direction:column;${align}justify-content:flex-end;">
           <img src="${escHtml(url)}" alt="" style="max-width:90%;max-height:70%;object-fit:contain;" />
-          <p style="margin:0.5mm 0 0;font-size:3.2pt;font-weight:700;color:${PE_NAVY};border-top:0.3mm solid rgba(0,27,68,0.25);padding-top:0.5mm;width:80%;text-align:center;">${pe ? 'Principal' : 'Authorized Signatory'}</p>
+          <p style="margin:0.5mm 0 0;font-size:${peSig ? ts!.fine : '3.2pt'};font-weight:700;color:${PE_NAVY};border-top:0.3mm solid rgba(0,27,68,0.25);padding-top:0.5mm;width:80%;text-align:center;">${peSig ? 'Principal' : 'Authorized Signatory'}</p>
         </div>`;
       }
       return `<div style="width:100%;height:100%;display:flex;flex-direction:column;${align}justify-content:flex-end;">
         <p style="margin:0;font-size:8pt;font-style:italic;color:#94a3b8;">Signature</p>
-        <p style="margin:0.5mm 0 0;font-size:3.2pt;font-weight:700;color:${PE_NAVY};border-top:0.3mm solid rgba(0,27,68,0.25);padding-top:0.5mm;width:80%;text-align:center;">${pe ? 'Principal' : 'Authorized Signatory'}</p>
+        <p style="margin:0.5mm 0 0;font-size:${peSig ? ts!.fine : '3.2pt'};font-weight:700;color:${PE_NAVY};border-top:0.3mm solid rgba(0,27,68,0.25);padding-top:0.5mm;width:80%;text-align:center;">${peSig ? 'Principal' : 'Authorized Signatory'}</p>
       </div>`;
     }
     case 'fatherName':
@@ -342,10 +352,13 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       return student ? labelValueHtml('Mother', student.motherName, primary) : '';
     case 'holderAddress':
       return student
-        ? labelValueHtml('Address', student.holderAddress, primary, { multiline: true })
+        ? labelValueHtml('Address', student.holderAddress, primary, {
+            multiline: true,
+            typeScale: ts ?? undefined,
+          })
         : '';
     case 'emergencyContact':
-      if (isPursuitExcellence(stylePreset)) {
+      if (pe) {
         const ec =
           student && !isBlank(student.emergencyContact)
             ? student.emergencyContact!
@@ -353,7 +366,7 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
                 !isBlank((model.holder as StaffIdCardModel['holder']).emergencyContact)
               ? (model.holder as StaffIdCardModel['holder']).emergencyContact!
               : null;
-        return ec ? pursuitGridRowHtml('Emergency', ec) : '';
+        return ec ? pursuitGridRowHtml('Emergency', ec, ts!) : '';
       }
       return student && !isBlank(student.emergencyContact)
         ? labelValueHtml('Emergency', student.emergencyContact!, primary)
@@ -368,7 +381,7 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     case 'qr': {
       if (!model.verification.qrPayload) return '';
       const qrImg = `<img src="${qrImageUrl(model.verification.qrPayload)}" alt="QR" style="width:100%;height:100%;object-fit:contain;display:block;" />`;
-      if (isPursuitExcellence(stylePreset)) {
+      if (pe) {
         return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
           <div style="width:88%;height:88%;${pursuitQrFrameCss()}">${qrImg}</div>
         </div>`;
@@ -380,13 +393,13 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         ? renderBarcodePrintHtml(model.verification.barcodeValue)
         : '';
     case 'verificationInfo': {
-      if (isPursuitExcellence(stylePreset)) {
+      if (pe) {
         const code = pursuitVerificationPath(
           model.verification.qrPayload ?? model.verification.barcodeValue,
           student?.registrationNumber ?? student?.rollNumber,
         );
         if (isBlank(code)) return '';
-        return pursuitVerificationUrlHtml(escHtml(code));
+        return pursuitVerificationUrlHtml(escHtml(code), ts!);
       }
       const code = model.verification.qrPayload ?? model.verification.barcodeValue;
       if (isBlank(code)) return '';
@@ -397,15 +410,17 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     }
     case 'address': {
       const line = formatCollegeAddress(inst);
-      return line ? labelValueHtml('College', line, primary, { multiline: true }) : '';
+      return line
+        ? labelValueHtml('College', line, primary, { multiline: true, typeScale: ts ?? undefined })
+        : '';
     }
     case 'contact':
       return institutionContactLines(model)
-        .map((line) => pursuitContactLineHtml(line.icon, escHtml(line.text)))
+        .map((line) => pursuitContactLineHtml(line.icon, escHtml(line.text), ts ?? undefined))
         .join('');
     case 'terms':
-      if (isPursuitExcellence(stylePreset)) {
-        return pursuitTermsHtml();
+      if (pe) {
+        return pursuitTermsHtml(ts!);
       }
       return `<ul style="margin:0;padding-left:2.5mm;font-size:3.2pt;color:#475569;line-height:1.3;">
         <li>Property of ${escHtml(inst.displayName)}.</li>
@@ -415,9 +430,9 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     case 'validityFooter':
       return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${primary};color:#fff;font-size:3.8pt;font-weight:700;">${escHtml(v.validToLabel)}</div>`;
     case 'subtitle': {
-      if (isPursuitExcellence(stylePreset) && !isBlank(holder.department)) {
+      if (pe && !isBlank(holder.department)) {
         const line = pursuitDepartmentSubtitle(holder.department!);
-        return `<p style="margin:0;font-size:6pt;font-weight:600;color:#475569;text-align:center;line-height:1.2;">${escHtml(line)}</p>`;
+        return `<p style="margin:0;font-size:${ts!.subtitle};font-weight:600;color:#475569;text-align:center;line-height:1.2;">${escHtml(line)}</p>`;
       }
       const subtitle = student?.subtitle;
       return !isBlank(subtitle)
@@ -425,7 +440,7 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         : '';
     }
     case 'securityHologram':
-      return isPursuitExcellence(stylePreset) ? pursuitHologramPlaceholderHtml() : '';
+      return pe ? pursuitHologramPlaceholderHtml() : '';
     default:
       return '';
   }

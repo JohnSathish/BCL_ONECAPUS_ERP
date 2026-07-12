@@ -31,7 +31,8 @@ export const SAMPLE_STUDENT_ID_CARD: StudentIdCardModel = {
     gender: 'Male',
     fatherName: 'Bablu Ch Marak',
     motherName: 'Tina T Sangma',
-    holderAddress: 'Daren Agal, West Garo Hills, Meghalaya',
+    holderAddress:
+      'House No. 42, Daren Agal Village, P.O. Tura Bazar, West Garo Hills District, Meghalaya — 794002',
     bloodGroup: 'O+',
     rfidNumber: 'RFID-00001234',
     emergencyContact: '+91 98765 43210',
