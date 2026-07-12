@@ -1,8 +1,22 @@
 import { api } from '@/services/api';
+import type {
+  FeedbackAnswerValue,
+  FeedbackQuestionDto,
+} from '@/components/feedback/feedback-question-types';
 
 const base = '/v1/feedback';
 
 export type FeedbackScaleItem = { rating: number; label: string };
+
+export type FeedbackSubmitAnswer = {
+  questionId: string;
+  rating?: number;
+  valueText?: string;
+  valueNumber?: number;
+  valueBool?: boolean;
+  valueDate?: string;
+  valueJson?: unknown;
+} & Partial<FeedbackAnswerValue>;
 
 export async function fetchFeedbackScale() {
   const { data } = await api.get(`${base}/scale`);
@@ -33,21 +47,14 @@ export async function fetchMyFeedbackCampaigns(audience?: string) {
       questionCount: number;
       canSubmit: boolean;
       closedReason?: string | null;
-      questions?: Array<{
-        id: string;
-        prompt: string;
-        category: string;
-        required: boolean;
-        sortOrder: number;
-        questionType?: string;
-      }>;
+      questions?: FeedbackQuestionDto[];
     }>;
   };
 }
 
 export async function submitMyFeedback(
   campaignId: string,
-  answers: Array<{ questionId: string; rating: number }>,
+  answers: Array<Record<string, unknown>> | FeedbackSubmitAnswer[],
 ) {
   const { data } = await api.post(`${base}/me/campaigns/${campaignId}/submit`, { answers });
   return data;
@@ -101,4 +108,22 @@ export async function fetchFeedbackResponses(id: string) {
 export async function fetchFeedbackAnalytics(id: string) {
   const { data } = await api.get(`${base}/campaigns/${id}/analytics`);
   return data;
+}
+
+export async function downloadFeedbackExportXlsx(id: string) {
+  const { downloadBlob, filenameFromContentDisposition } = await import('@/utils/download-blob');
+  const res = await api.get(`${base}/campaigns/${id}/export.xlsx`, { responseType: 'blob' });
+  const filename =
+    filenameFromContentDisposition(res.headers?.['content-disposition']) ||
+    `feedback-export-${id}.xlsx`;
+  downloadBlob(res.data as Blob, filename);
+}
+
+export async function downloadFeedbackExportPdf(id: string) {
+  const { downloadBlob, filenameFromContentDisposition } = await import('@/utils/download-blob');
+  const res = await api.get(`${base}/campaigns/${id}/export.pdf`, { responseType: 'blob' });
+  const filename =
+    filenameFromContentDisposition(res.headers?.['content-disposition']) ||
+    `feedback-export-${id}.pdf`;
+  downloadBlob(res.data as Blob, filename);
 }

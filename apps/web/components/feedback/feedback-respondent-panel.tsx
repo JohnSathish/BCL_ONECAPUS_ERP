@@ -6,10 +6,16 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FeedbackQuestionField } from '@/components/feedback/feedback-question-field';
+import {
+  answerToPayload,
+  isQuestionVisible,
+  type FeedbackAnswerValue,
+  type FeedbackQuestionDto,
+} from '@/components/feedback/feedback-question-types';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchMyFeedbackCampaigns, submitMyFeedback } from '@/services/feedback';
 import { apiErrorMessage } from '@/utils/api-error';
-import { cn } from '@/utils/cn';
 
 function groupByCategory<T extends { category: string; sortOrder: number }>(questions: T[]) {
   const map = new Map<string, T[]>();
@@ -19,6 +25,21 @@ function groupByCategory<T extends { category: string; sortOrder: number }>(ques
     map.get(key)!.push(q);
   }
   return [...map.entries()];
+}
+
+function hasAnswer(value: FeedbackAnswerValue | undefined): boolean {
+  if (!value) return false;
+  if (value.rating != null) return true;
+  if (value.valueBool != null) return true;
+  if (value.valueNumber != null && !Number.isNaN(value.valueNumber)) return true;
+  if (value.valueText != null && String(value.valueText).trim() !== '') return true;
+  if (value.valueDate != null && String(value.valueDate).trim() !== '') return true;
+  if (Array.isArray(value.valueJson) && value.valueJson.length > 0) return true;
+  if (value.valueJson && typeof value.valueJson === 'object' && !Array.isArray(value.valueJson)) {
+    const url = (value.valueJson as { url?: string }).url;
+    return Boolean(url && String(url).trim());
+  }
+  return false;
 }
 
 export function FeedbackRespondentPanel({
@@ -33,7 +54,7 @@ export function FeedbackRespondentPanel({
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, FeedbackAnswerValue>>({});
   const [error, setError] = useState('');
   const [doneMsg, setDoneMsg] = useState('');
 
@@ -48,17 +69,25 @@ export function FeedbackRespondentPanel({
     [listQ.data, activeId],
   );
 
-  const scale = listQ.data?.scale ?? [];
-  const sections = useMemo(() => groupByCategory(active?.questions ?? []), [active?.questions]);
+  const visibleQuestions = useMemo(() => {
+    const qs = (active?.questions ?? []) as FeedbackQuestionDto[];
+    return qs.filter((q) => isQuestionVisible(q, answers));
+  }, [active?.questions, answers]);
+
+  const sections = useMemo(() => groupByCategory(visibleQuestions), [visibleQuestions]);
 
   const submitMut = useMutation({
     mutationFn: () => {
       if (!active) throw new Error('Select a form');
-      const payload: Array<{ questionId: string; rating: number }> = [];
-      for (const q of active.questions ?? []) {
-        const rating = answers[q.id];
-        if (q.required && !rating) throw new Error(`Please answer: ${q.prompt}`);
-        if (rating) payload.push({ questionId: q.id, rating });
+      const payload: Array<Record<string, unknown>> = [];
+      for (const q of visibleQuestions) {
+        const value = answers[q.id];
+        if (q.required && !hasAnswer(value)) {
+          throw new Error(`Please answer: ${q.prompt}`);
+        }
+        if (hasAnswer(value)) {
+          payload.push(answerToPayload(q.id, value!));
+        }
       }
       if (!payload.length) throw new Error('Please answer at least one question.');
       return submitMyFeedback(active.id, payload);
@@ -145,7 +174,7 @@ export function FeedbackRespondentPanel({
         ) : null}
       </div>
 
-      {active?.canSubmit && active.questions?.length ? (
+      {active?.canSubmit && visibleQuestions.length ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{active.title}</CardTitle>
@@ -160,32 +189,18 @@ export function FeedbackRespondentPanel({
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {category.replace(/_/g, ' ')}
                 </p>
-                {questions.map((q, idx) => (
-                  <div key={q.id} className="space-y-2 rounded-xl border p-3">
-                    <p className="text-sm font-medium">
-                      {idx + 1}. {q.prompt}
-                      {q.required ? <span className="text-red-600"> *</span> : null}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {scale.map((s) => {
-                        const selected = answers[q.id] === s.rating;
-                        return (
-                          <button
-                            key={s.rating}
-                            type="button"
-                            onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: s.rating }))}
-                            className={cn(
-                              'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                              selected
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-background hover:bg-muted',
-                            )}
-                          >
-                            {s.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                {questions.map((q) => (
+                  <div key={q.id} className="rounded-xl border p-3">
+                    <FeedbackQuestionField
+                      question={q}
+                      value={answers[q.id]}
+                      onChange={(next) =>
+                        setAnswers((prev) => ({
+                          ...prev,
+                          [q.id]: next,
+                        }))
+                      }
+                    />
                   </div>
                 ))}
               </div>

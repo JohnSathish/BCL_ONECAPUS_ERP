@@ -9,13 +9,64 @@ export const FEEDBACK_AUDIENCES = [
 
 export type FeedbackAudience = (typeof FEEDBACK_AUDIENCES)[number];
 
+export const FEEDBACK_QUESTION_TYPES = [
+  'LIKERT_5',
+  'single_choice',
+  'multi_choice',
+  'dropdown',
+  'short_text',
+  'long_text',
+  'integer',
+  'decimal',
+  'rating',
+  'yes_no',
+  'true_false',
+  'date',
+  'time',
+  'datetime',
+  'file_upload',
+] as const;
+
+export type FeedbackQuestionType = (typeof FEEDBACK_QUESTION_TYPES)[number];
+
+export const FEEDBACK_QUESTION_TYPE_LABELS: Record<
+  FeedbackQuestionType,
+  string
+> = {
+  LIKERT_5: 'Likert scale (Excellent–Poor)',
+  single_choice: 'Single choice (radio)',
+  multi_choice: 'Multiple choice (checkbox)',
+  dropdown: 'Dropdown list',
+  short_text: 'Short text answer',
+  long_text: 'Long text / paragraph',
+  integer: 'Numeric (integer)',
+  decimal: 'Decimal number',
+  rating: 'Rating scale',
+  yes_no: 'Yes / No',
+  true_false: 'True / False',
+  date: 'Date',
+  time: 'Time',
+  datetime: 'Date & time',
+  file_upload: 'File upload',
+};
+
 /** 5 = Excellent … 1 = Poor (matches IQAC / NAAC common scale) */
 export const FEEDBACK_LIKERT_5 = [
-  { rating: 5, label: 'Excellent' },
-  { rating: 4, label: 'Very Good' },
-  { rating: 3, label: 'Good' },
-  { rating: 2, label: 'Average' },
-  { rating: 1, label: 'Poor' },
+  { rating: 5, label: 'Excellent', value: '5' },
+  { rating: 4, label: 'Very Good', value: '4' },
+  { rating: 3, label: 'Good', value: '3' },
+  { rating: 2, label: 'Average', value: '2' },
+  { rating: 1, label: 'Poor', value: '1' },
+] as const;
+
+export const FEEDBACK_YES_NO_OPTIONS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+] as const;
+
+export const FEEDBACK_TRUE_FALSE_OPTIONS = [
+  { value: 'true', label: 'True' },
+  { value: 'false', label: 'False' },
 ] as const;
 
 export const FEEDBACK_CATEGORIES = [
@@ -36,10 +87,74 @@ export const FEEDBACK_CATEGORIES = [
   'OVERALL',
 ] as const;
 
+export type FeedbackOption = { value: string; label: string };
+
+export type FeedbackValidation = {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  accept?: string[];
+  maxFiles?: number;
+};
+
+export type FeedbackShowIf = {
+  questionId: string;
+  op: 'eq' | 'neq' | 'in';
+  value: string | string[] | number | boolean;
+};
+
+export type FeedbackConditionalLogic = {
+  showIf?: FeedbackShowIf;
+};
+
 export function ratingLabel(rating: number): string {
   return (
     FEEDBACK_LIKERT_5.find((r) => r.rating === rating)?.label ?? String(rating)
   );
+}
+
+export function defaultOptionsForType(type: string): FeedbackOption[] {
+  if (type === 'LIKERT_5') {
+    return FEEDBACK_LIKERT_5.map((r) => ({
+      value: String(r.rating),
+      label: r.label,
+    }));
+  }
+  if (type === 'yes_no') {
+    return FEEDBACK_YES_NO_OPTIONS.map((o) => ({ ...o }));
+  }
+  if (type === 'true_false') {
+    return FEEDBACK_TRUE_FALSE_OPTIONS.map((o) => ({ ...o }));
+  }
+  if (type === 'rating') {
+    return Array.from({ length: 5 }, (_, i) => {
+      const n = i + 1;
+      return { value: String(n), label: String(n) };
+    });
+  }
+  return [];
+}
+
+export function isObjectiveType(type: string): boolean {
+  return [
+    'LIKERT_5',
+    'single_choice',
+    'multi_choice',
+    'dropdown',
+    'rating',
+    'yes_no',
+    'true_false',
+  ].includes(type);
+}
+
+export function isNumericType(type: string): boolean {
+  return ['integer', 'decimal', 'rating', 'LIKERT_5'].includes(type);
+}
+
+export function isTextType(type: string): boolean {
+  return ['short_text', 'long_text'].includes(type);
 }
 
 export function startOfDay(d: Date): Date {
@@ -72,6 +187,7 @@ export type FeedbackSeedQuestion = {
   category: string;
   prompt: string;
   required?: boolean;
+  questionType?: FeedbackQuestionType;
 };
 
 export const STUDENT_FEEDBACK_SEED: FeedbackSeedQuestion[] = [
@@ -238,4 +354,65 @@ export function seedQuestionsForAudience(
   if (audience === 'TEACHER') return TEACHER_FEEDBACK_SEED;
   if (audience === 'ALUMNI') return ALUMNI_FEEDBACK_SEED;
   return STUDENT_FEEDBACK_SEED;
+}
+
+/** Normalize answer value for conditional showIf comparison */
+export function answerComparableValue(answer: {
+  rating?: number | null;
+  ratingLabel?: string | null;
+  valueText?: string | null;
+  valueNumber?: number | string | null;
+  valueBool?: boolean | null;
+  valueDate?: Date | string | null;
+  valueJson?: unknown;
+}): string | string[] | null {
+  if (answer.rating != null) return String(answer.rating);
+  if (answer.valueBool != null) return answer.valueBool ? 'true' : 'false';
+  if (answer.valueNumber != null && answer.valueNumber !== '') {
+    return String(answer.valueNumber);
+  }
+  if (answer.valueText != null && answer.valueText !== '')
+    return answer.valueText;
+  if (answer.valueDate != null) {
+    return typeof answer.valueDate === 'string'
+      ? answer.valueDate
+      : answer.valueDate.toISOString();
+  }
+  if (Array.isArray(answer.valueJson)) {
+    return answer.valueJson.map(String);
+  }
+  if (answer.valueJson && typeof answer.valueJson === 'object') {
+    const v = (answer.valueJson as { value?: unknown }).value;
+    if (v != null) return String(v);
+  }
+  if (answer.ratingLabel) return answer.ratingLabel;
+  return null;
+}
+
+export function evaluateShowIf(
+  showIf: FeedbackShowIf | undefined,
+  answersByQuestionId: Map<string, ReturnType<typeof answerComparableValue>>,
+): boolean {
+  if (!showIf?.questionId) return true;
+  const actual = answersByQuestionId.get(showIf.questionId);
+  if (actual == null) return false;
+  const expected = showIf.value;
+  const op = showIf.op ?? 'eq';
+
+  if (op === 'in') {
+    const list = Array.isArray(expected)
+      ? expected.map(String)
+      : [String(expected)];
+    if (Array.isArray(actual))
+      return actual.some((a) => list.includes(String(a)));
+    return list.includes(String(actual));
+  }
+
+  const actualStr = Array.isArray(actual) ? actual.join(',') : String(actual);
+  const expectedStr = Array.isArray(expected)
+    ? expected.map(String).join(',')
+    : String(expected);
+
+  if (op === 'neq') return actualStr !== expectedStr;
+  return actualStr === expectedStr;
 }

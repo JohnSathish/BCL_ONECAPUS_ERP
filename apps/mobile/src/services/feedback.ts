@@ -2,6 +2,23 @@ import { apiFetch } from '@/api/client';
 
 export type FeedbackScaleItem = { rating: number; label: string };
 
+export type FeedbackOption = { value: string; label: string };
+
+export type FeedbackCampaignQuestion = {
+  id: string;
+  prompt: string;
+  description?: string | null;
+  helpText?: string | null;
+  placeholder?: string | null;
+  category: string;
+  required: boolean;
+  sortOrder: number;
+  questionType?: string;
+  options?: FeedbackOption[] | unknown;
+  validation?: unknown;
+  conditionalLogic?: unknown;
+};
+
 export type FeedbackCampaignItem = {
   id: string;
   title: string;
@@ -18,13 +35,7 @@ export type FeedbackCampaignItem = {
   questionCount: number;
   canSubmit: boolean;
   closedReason?: string | null;
-  questions?: Array<{
-    id: string;
-    prompt: string;
-    category: string;
-    required: boolean;
-    sortOrder: number;
-  }>;
+  questions?: FeedbackCampaignQuestion[];
 };
 
 export function fetchMyFeedbackCampaigns() {
@@ -33,10 +44,7 @@ export function fetchMyFeedbackCampaigns() {
   );
 }
 
-export function submitMyFeedback(
-  campaignId: string,
-  answers: Array<{ questionId: string; rating: number }>,
-) {
+export function submitMyFeedback(campaignId: string, answers: Array<Record<string, unknown>>) {
   return apiFetch(`/v1/feedback/me/campaigns/${campaignId}/submit`, {
     method: 'POST',
     body: JSON.stringify({ answers }),

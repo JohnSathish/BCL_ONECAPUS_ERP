@@ -9807,10 +9807,17 @@ model FeedbackQuestion {
   campaignId String   @map("campaign_id") @db.Uuid
   sortOrder  Int      @default(0) @map("sort_order")
   prompt     String
+  description String?
+  helpText    String?  @map("help_text")
+  placeholder String?
+  defaultValue Json?   @map("default_value")
   category   String   @default("OVERALL") // CURRICULUM | TEACHING | FACULTY | INFRASTRUCTURE | ...
   required   Boolean  @default(true)
-  /// LIKERT_5 — Excellent(5) … Poor(1)
+  /// LIKERT_5 | single_choice | multi_choice | dropdown | short_text | long_text | integer | decimal | rating | yes_no | true_false | date | time | datetime | file_upload
   questionType String @default("LIKERT_5") @map("question_type")
+  options          Json @default("[]")
+  validation       Json @default("{}")
+  conditionalLogic Json @default("{}") @map("conditional_logic")
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -9852,9 +9859,14 @@ model FeedbackAnswer {
   tenantId   String   @map("tenant_id") @db.Uuid
   responseId String   @map("response_id") @db.Uuid
   questionId String   @map("question_id") @db.Uuid
-  /// 5=Excellent … 1=Poor
-  rating     Int
-  ratingLabel String  @map("rating_label")
+  /// Likert / rating numeric (nullable for non-scale types)
+  rating     Int?
+  ratingLabel String? @map("rating_label")
+  valueText   String?  @map("value_text")
+  valueNumber Decimal? @map("value_number") @db.Decimal(18, 6)
+  valueBool   Boolean? @map("value_bool")
+  valueDate   DateTime? @map("value_date")
+  valueJson   Json?    @map("value_json")
   createdAt  DateTime @default(now()) @map("created_at")
 
   response FeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)

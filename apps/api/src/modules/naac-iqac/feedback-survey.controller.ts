@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
@@ -130,5 +132,40 @@ export class FeedbackSurveyController {
   @RequireAnyPermission(...NIQ_REPORTS, ...NIQ_READ)
   analytics(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.feedback.analytics(user.tid, id);
+  }
+
+  @Get('campaigns/:id/export.xlsx')
+  @RequireAnyPermission(...NIQ_REPORTS, ...NIQ_READ)
+  async exportXlsx(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const buf = await this.feedback.exportXlsx(user.tid, id);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="feedback-${id}.xlsx"`,
+    );
+    res.send(buf);
+  }
+
+  @Get('campaigns/:id/export.pdf')
+  @RequireAnyPermission(...NIQ_REPORTS, ...NIQ_READ)
+  async exportPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const buf = await this.feedback.exportPdf(user.tid, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="feedback-${id}.pdf"`,
+    );
+    res.send(buf);
   }
 }
