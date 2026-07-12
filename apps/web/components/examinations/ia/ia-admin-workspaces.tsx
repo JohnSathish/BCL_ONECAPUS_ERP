@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   actOnIaApproval,
   createIaPaper,
@@ -63,6 +64,21 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export function IaDashboardWorkspace() {
   const dashboard = useQuery({ queryKey: ['ia', 'dashboard'], queryFn: fetchIaAdminDashboard });
   const summary = dashboard.data?.summary ?? {};
+
+  if (dashboard.isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading IA dashboard…</p>;
+  }
+
+  if (dashboard.isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load IA dashboard"
+        error={dashboard.error}
+        onRetry={() => void dashboard.refetch()}
+        isRetrying={dashboard.isFetching}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

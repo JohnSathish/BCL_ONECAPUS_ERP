@@ -22,6 +22,7 @@ import {
 } from '@/components/dashboard/command-center-ui';
 import { ChannelStatusCards } from '@/components/communication/mission-control/channel-status-cards';
 import { LiveActivityFeed } from '@/components/communication/mission-control/live-activity-feed';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchCommunicationDashboard } from '@/services/communication';
 import { cn } from '@/utils/cn';
@@ -77,7 +78,7 @@ function KpiCard({
 
 export function CommMissionDashboard() {
   const enabled = useAuthQueryEnabled();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['communication', 'dashboard'],
     queryFn: fetchCommunicationDashboard,
     enabled,
@@ -86,6 +87,17 @@ export function CommMissionDashboard() {
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading mission control…</p>;
+  }
+
+  if (isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load communication dashboard"
+        error={error}
+        onRetry={() => void refetch()}
+        isRetrying={isFetching}
+      />
+    );
   }
 
   return (

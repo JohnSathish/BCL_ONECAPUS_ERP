@@ -7,6 +7,7 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { DataTable } from '@/components/erp/data-table';
 import { PageTabs } from '@/components/erp/page-tabs';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -251,18 +252,27 @@ export default function AcademicEnginePage() {
         </div>
 
         {tab === 'overview' ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>NEP-2020 Academic Intelligence</CardTitle>
-              <CardDescription>FYUGP · CBCS · Semesters 1–3 (Phase 1)</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat label="Students" value={summary.data?.students} />
-              <Stat label="Registrations" value={summary.data?.registrations} />
-              <Stat label="Waitlisted lines" value={summary.data?.waitlisted} />
-              <Stat label="NEP offerings" value={summary.data?.offerings} />
-            </CardContent>
-          </Card>
+          summary.isError ? (
+            <QueryErrorPanel
+              title="Unable to load academic engine overview"
+              error={summary.error}
+              onRetry={() => void summary.refetch()}
+              isRetrying={summary.isFetching}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>NEP-2020 Academic Intelligence</CardTitle>
+                <CardDescription>FYUGP · CBCS · Semesters 1–3 (Phase 1)</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat label="Students" value={summary.data?.students} />
+                <Stat label="Registrations" value={summary.data?.registrations} />
+                <Stat label="Waitlisted lines" value={summary.data?.waitlisted} />
+                <Stat label="NEP offerings" value={summary.data?.offerings} />
+              </CardContent>
+            </Card>
+          )
         ) : null}
 
         {tab === 'shift-curriculum' ? <ShiftCurriculumShell /> : null}

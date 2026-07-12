@@ -22,6 +22,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   collectFee,
   createFeeStructure,
@@ -169,6 +170,14 @@ export function FeesWorkspace({
 
   return (
     <div className="space-y-5">
+      {dashboardQ.isError ? (
+        <QueryErrorPanel
+          title="Unable to load fee dashboard"
+          error={dashboardQ.error}
+          onRetry={() => void dashboardQ.refetch()}
+          isRetrying={dashboardQ.isFetching}
+        />
+      ) : null}
       <FeesHero dashboard={dashboardQ.data} loading={dashboardQ.isLoading} portal={portal} />
       <StatusMessage
         message={message}

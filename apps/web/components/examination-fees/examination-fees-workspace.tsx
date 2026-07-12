@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExamFeeReportPanel } from '@/components/examination-fees/exam-fee-report-panel';
 import { ExamFeeStudentWizard } from '@/components/examination-fees/exam-fee-student-wizard';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
@@ -363,9 +364,16 @@ export function ExaminationFeesWorkspace({ page }: { page: ExamFeePage }) {
   return (
     <div className="space-y-5 p-1">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
+        <QueryErrorPanel title="Examination fees" message={error} onRetry={() => void reload()} />
+      ) : null}
+
+      {page === 'dashboard' && !dashboard && !error ? (
+        <p
+          className="rounded-xl border border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground"
+          role="status"
+        >
+          No examination fee dashboard data yet. Create a session to get started.
+        </p>
       ) : null}
 
       {page === 'dashboard' && dashboard ? (

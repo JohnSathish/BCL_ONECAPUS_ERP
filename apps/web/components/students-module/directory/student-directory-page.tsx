@@ -24,6 +24,7 @@ import {
 } from '@/components/students-module/directory/ui/directory-skeleton';
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useShiftScope } from '@/hooks/use-shift-scope';
 import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -494,12 +495,32 @@ export function StudentDirectoryPage() {
         />
 
         <div className="flex min-h-0 flex-1 flex-col">
-          {students.isLoading ? (
+          {!perms.canRead ? (
+            <QueryErrorPanel
+              title="Access denied"
+              message="You do not have permission to view the student directory."
+            />
+          ) : students.isLoading ? (
             <DirectoryTableSkeleton rows={10} className="min-h-0 flex-1" />
           ) : students.isError ? (
-            <p className="py-8 text-center text-sm text-danger">
-              {apiErrorMessage(students.error, 'Failed to load students')}
-            </p>
+            <div className="px-4 py-6">
+              <QueryErrorPanel
+                error={students.error}
+                onRetry={() => void students.refetch()}
+                isRetrying={students.isFetching}
+              />
+            </div>
+          ) : displayRows.length === 0 ? (
+            <div
+              className="flex min-h-[240px] flex-col items-center justify-center gap-2 px-6 text-center"
+              role="status"
+            >
+              <p className="text-sm font-medium text-foreground">No students match these filters</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Try clearing search or advanced filters, or add a student if this programme has no
+                records yet.
+              </p>
+            </div>
           ) : (
             <>
               <DirectoryTable

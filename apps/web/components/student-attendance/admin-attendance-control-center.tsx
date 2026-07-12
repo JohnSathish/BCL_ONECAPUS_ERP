@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   fetchAttendancePolicy,
   fetchStudentAttendanceDashboard,
@@ -129,6 +130,17 @@ export function AdminAttendanceControlCenter() {
 
   return (
     <div className="space-y-5">
+      {dashboard.isError || sessions.isError ? (
+        <QueryErrorPanel
+          title="Unable to load attendance control center"
+          error={dashboard.error ?? sessions.error}
+          onRetry={() => {
+            void dashboard.refetch();
+            void sessions.refetch();
+          }}
+          isRetrying={dashboard.isFetching || sessions.isFetching}
+        />
+      ) : null}
       <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
