@@ -27,6 +27,39 @@ export class UpdateSecuritySettingsDto {
   @IsOptional()
   @IsBoolean()
   mfaEnforced?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowBiometricLogin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowQrLogin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowRfidLogin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireUppercase?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireLowercase?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireNumber?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireSpecial?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxConcurrentSessions?: number | null;
 }
 
 export class ListSessionsQueryDto {

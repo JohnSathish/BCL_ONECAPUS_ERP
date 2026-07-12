@@ -24,6 +24,11 @@ export type LoginContextDto = {
   showPoweredBy: boolean;
   brandingEnabled: boolean;
   poweredBy: 'BCL OneCampus ERP';
+  loginMethods: {
+    allowBiometricLogin: boolean;
+    allowQrLogin: boolean;
+    allowRfidLogin: boolean;
+  };
 };
 
 @Injectable()
@@ -103,6 +108,7 @@ export class TenantResolutionService {
         tenant: {
           include: {
             branding: true,
+            securitySettings: true,
             institutions: {
               where: { deletedAt: null },
               take: 1,
@@ -143,6 +149,8 @@ export class TenantResolutionService {
     const loginBackgroundStyle =
       bgStyle === 'solid' || bgStyle === 'mesh' ? bgStyle : 'gradient';
 
+    const security = tenant.securitySettings;
+
     return {
       tenantSlug: tenant.slug,
       institution: {
@@ -165,6 +173,11 @@ export class TenantResolutionService {
       showPoweredBy: branding?.showPoweredBy ?? true,
       brandingEnabled: branding?.brandingEnabled ?? true,
       poweredBy: 'BCL OneCampus ERP',
+      loginMethods: {
+        allowBiometricLogin: security?.allowBiometricLogin ?? true,
+        allowQrLogin: security?.allowQrLogin ?? false,
+        allowRfidLogin: security?.allowRfidLogin ?? false,
+      },
     };
   }
 }

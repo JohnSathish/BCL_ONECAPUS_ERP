@@ -77,6 +77,21 @@ export class LoginAttemptService {
     });
 
     if (lockedUntil && lockedUntil > now) {
+      try {
+        await this.prisma.authLoginEvent.create({
+          data: {
+            tenantId,
+            identifier: normalizedEmail,
+            method: 'password',
+            outcome: 'lockout',
+            reason: 'max_failures',
+            ipAddress,
+            metadata: { failedCount },
+          },
+        });
+      } catch {
+        // ignore
+      }
       throw new HttpException(LOCK_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
   }

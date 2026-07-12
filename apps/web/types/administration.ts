@@ -80,6 +80,14 @@ export type SecuritySettings = {
   forceResetOnFirstLogin: boolean;
   sessionTimeoutMinutes: number;
   mfaEnforced: boolean;
+  allowBiometricLogin: boolean;
+  allowQrLogin: boolean;
+  allowRfidLogin: boolean;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumber: boolean;
+  requireSpecial: boolean;
+  maxConcurrentSessions: number | null;
 };
 
 export type ActiveSessionRow = {

@@ -114,3 +114,22 @@ export async function revokeAllSessions() {
   const { data } = await api.post('/v1/auth/sessions/revoke-all');
   return data as { success: boolean };
 }
+
+export type QrLoginIssueResponse = {
+  token: string;
+  expiresAt: string;
+  payload: {
+    type: string;
+    v: number;
+    token: string;
+    expiresAt: string;
+  };
+  qrDataUrl?: string | null;
+};
+
+export async function issueStudentLoginQr(deviceHint?: string) {
+  const { data } = await api.post<QrLoginIssueResponse>('/v1/auth/qr/issue', {
+    deviceHint,
+  });
+  return data;
+}

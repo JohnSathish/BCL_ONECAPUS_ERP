@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -16,14 +16,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/api/client';
+import { fetchAuthLoginContext, type AuthLoginMethods } from '@/auth/auth-context';
+import {
+  authenticateWithBiometrics,
+  canUseBiometrics,
+  isBiometricEnrolled,
+  setBiometricEnrolled,
+} from '@/auth/biometric';
 import {
   getSemesterLabel,
   getTimeGreeting,
   looksLikeCapsLock,
   useIdentifierHint,
 } from '@/auth/identifier-hint';
-import { performLogin } from '@/auth/login-flow';
-import { authColors, authTheme } from '@/components/auth/auth-theme';
+import { completeSessionFromTokens, performLogin } from '@/auth/login-flow';
+import { getUserSnapshot } from '@/auth/session';
+import { refreshAccessToken } from '@/auth/token-refresh';
+import { authColors } from '@/components/auth/auth-theme';
 import { CaptchaWidget, type Challenge } from '@/components/auth/captcha-widget';
 import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
@@ -39,13 +48,6 @@ import {
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { InstitutionLogo } from '@/components/auth/institution-logo';
-
-const MORE_LOGIN_OPTIONS = [
-  { label: 'Scan Student QR', id: 'qr' },
-  { label: 'Scan College RFID', id: 'rfid' },
-  { label: 'Biometric Login', id: 'bio' },
-  { label: 'Microsoft / Google SSO', id: 'sso' },
-] as const;
 
 const NEWS_ICONS = ['📢', '🎓', '📅', '💰', '🏆', '📝'] as const;
 
@@ -65,8 +67,9 @@ function campusShortName() {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ reason?: string }>();
+  const params = useLocalSearchParams<{ reason?: string; unlock?: string }>();
   const sessionExpired = params.reason === 'session_expired';
+  const unlockParam = params.unlock === '1' || params.unlock === 'true';
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = authColors(scheme);
@@ -81,6 +84,17 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
+  const [loginMethods, setLoginMethods] = useState<AuthLoginMethods>({
+    allowBiometricLogin: true,
+    allowQrLogin: false,
+    allowRfidLogin: false,
+  });
+  const [enrolled, setEnrolled] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [methodsReady, setMethodsReady] = useState(false);
+  const [showOtherMethods, setShowOtherMethods] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const unlockAttempted = useRef(false);
 
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -90,6 +104,11 @@ export default function LoginScreen() {
   const identifierHint = useIdentifierHint(identifier);
   const capsWarning = looksLikeCapsLock(password);
   const offline = !config && !!bootstrapError;
+
+  const preferBiometric =
+    loginMethods.allowBiometricLogin && enrolled && bioAvailable && !sessionExpired;
+  const unlockMode = (unlockParam || preferBiometric) && preferBiometric;
+  const showPasswordForm = !unlockMode || showOtherMethods;
 
   const stats = config?.portalHighlights?.stats;
   const bootstrapUpdates = config?.portalHighlights?.updates ?? [];
@@ -129,6 +148,141 @@ export default function LoginScreen() {
     return () => clearInterval(timer);
   }, [newsFade, newsItems.length]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [ctx, isEnrolled, capability] = await Promise.all([
+        fetchAuthLoginContext(),
+        isBiometricEnrolled(),
+        canUseBiometrics(),
+      ]);
+      if (cancelled) return;
+      setLoginMethods(ctx.loginMethods);
+      setEnrolled(isEnrolled);
+      setBioAvailable(capability.available);
+      if (!ctx.loginMethods.allowBiometricLogin || !isEnrolled || !capability.available) {
+        setShowOtherMethods(true);
+      }
+      setMethodsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const finishLogin = useCallback(
+    (result: Awaited<ReturnType<typeof performLogin>>) => {
+      if (result.mustResetPassword) {
+        router.replace('/(auth)/change-password');
+        return;
+      }
+      router.replace(result.route.href as never);
+    },
+    [router],
+  );
+
+  const offerBiometricEnroll = useCallback(
+    (result: Awaited<ReturnType<typeof performLogin>>) => {
+      if (!loginMethods.allowBiometricLogin || !bioAvailable || enrolled) {
+        finishLogin(result);
+        return;
+      }
+      Alert.alert(
+        'Enable fingerprint / Face ID?',
+        'Use biometrics to unlock the app next time. Your password is not stored.',
+        [
+          {
+            text: 'Not now',
+            style: 'cancel',
+            onPress: () => finishLogin(result),
+          },
+          {
+            text: 'Enable',
+            onPress: () => {
+              void (async () => {
+                const auth = await authenticateWithBiometrics(
+                  'Confirm biometrics to enable unlock',
+                );
+                if (auth.ok) {
+                  await setBiometricEnrolled(true);
+                  setEnrolled(true);
+                }
+                finishLogin(result);
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [bioAvailable, enrolled, finishLogin, loginMethods.allowBiometricLogin],
+  );
+
+  const onBiometricUnlock = useCallback(async () => {
+    if (bioBusy || offline) return;
+    setBioBusy(true);
+    setError(null);
+    try {
+      const auth = await authenticateWithBiometrics('Unlock campus portal');
+      if (!auth.ok) {
+        if (auth.reason === 'fall_back' || auth.reason === 'unavailable') {
+          setShowOtherMethods(true);
+          setError(
+            auth.reason === 'fall_back'
+              ? 'Too many biometric attempts. Sign in with password.'
+              : 'Biometrics unavailable. Sign in with password.',
+          );
+        } else if (auth.reason === 'failed') {
+          setError('Biometric unlock failed. Try again or use another method.');
+        }
+        return;
+      }
+
+      const session = await refreshAccessToken({ unlockMethod: 'biometric_unlock' });
+      const snapshot = session.user ?? (await getUserSnapshot());
+      const result = await completeSessionFromTokens({
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        user: snapshot,
+        registerDevice: true,
+      });
+      finishLogin(result);
+    } catch (e) {
+      setShowOtherMethods(true);
+      setError(e instanceof Error ? e.message : 'Session unlock failed. Sign in with password.');
+    } finally {
+      setBioBusy(false);
+    }
+  }, [bioBusy, finishLogin, offline]);
+
+  useEffect(() => {
+    if (!methodsReady || !unlockParam || unlockAttempted.current || offline) return;
+    unlockAttempted.current = true;
+    if (unlockMode) {
+      void onBiometricUnlock();
+      return;
+    }
+    // Enrolled cold-start routed here, but biometrics unavailable / tenant disabled —
+    // fall back to silent refresh of the existing session.
+    void (async () => {
+      setBioBusy(true);
+      try {
+        const session = await refreshAccessToken();
+        const snapshot = session.user ?? (await getUserSnapshot());
+        const result = await completeSessionFromTokens({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          user: snapshot,
+        });
+        finishLogin(result);
+      } catch (e) {
+        setShowOtherMethods(true);
+        setError(e instanceof Error ? e.message : 'Session expired. Sign in with password.');
+      } finally {
+        setBioBusy(false);
+      }
+    })();
+  }, [methodsReady, unlockParam, unlockMode, offline, onBiometricUnlock, finishLogin]);
+
   async function onLogin() {
     if (!challenge) {
       setError('Complete the security check first.');
@@ -144,27 +298,12 @@ export default function LoginScreen() {
         challengeAnswer: Number(captchaAnswer),
         rememberMe,
       });
-      if (result.mustResetPassword) {
-        router.replace('/(auth)/change-password');
-        return;
-      }
-      router.replace(result.route.href as never);
+      offerBiometricEnroll(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
     } finally {
       setLoading(false);
     }
-  }
-
-  function onMoreLoginOptions() {
-    Alert.alert('More Login Options', 'Choose an alternative sign-in method.', [
-      ...MORE_LOGIN_OPTIONS.map((opt) => ({
-        text: opt.label,
-        onPress: () =>
-          Alert.alert(opt.label, `${opt.label} will be available in a future campus app release.`),
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
   }
 
   const currentNews = newsItems[newsIndex % newsItems.length];
@@ -177,7 +316,6 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Compact header */}
         <LinearGradient
           colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
           style={[styles.header, { paddingTop: insets.top + 12 }]}
@@ -235,99 +373,173 @@ export default function LoginScreen() {
         ) : null}
 
         <Animated.View style={[styles.content, { opacity: fadeIn }]}>
-          {/* Unified login surface */}
           <View style={[styles.surface, { backgroundColor: surface }]}>
-            <Text style={[styles.fieldLabel, { color: colors.text }]}>Username</Text>
-            <Text style={[styles.supportsLine, { color: colors.textMuted }]}>
-              Supports: Roll No. · Email · Employee ID · Mobile
-            </Text>
-            <View
-              style={[
-                styles.inputRow,
-                { borderColor: colors.border, backgroundColor: colors.inputBg },
-              ]}
-            >
-              <TextInput
-                value={identifier}
-                onChangeText={setIdentifier}
-                placeholder="College roll number (e.g. BC24-021)"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={[styles.input, { color: colors.text }]}
-              />
-            </View>
-
-            {identifierHint ? (
-              <Text style={[styles.roleHint, { color: identifierHint.tone }]}>
-                {identifierHint.icon} {identifierHint.label}
-              </Text>
+            {unlockMode ? (
+              <>
+                <Text style={[styles.unlockTitle, { color: colors.text }]}>
+                  Unlock with biometrics
+                </Text>
+                <Text style={[styles.unlockSub, { color: colors.textMuted }]}>
+                  Confirm fingerprint or Face ID to continue your campus session.
+                </Text>
+                <Pressable
+                  style={[styles.bioBtnWrap, (bioBusy || offline) && styles.loginBtnDisabled]}
+                  onPress={() => void onBiometricUnlock()}
+                  disabled={bioBusy || offline}
+                >
+                  <LinearGradient
+                    colors={['#2563eb', '#1d4ed8', '#1e40af']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.loginBtn}
+                  >
+                    <Text style={styles.loginBtnTitle}>
+                      {bioBusy ? 'Unlocking…' : 'Sign in with biometrics'}
+                    </Text>
+                    <Text style={styles.loginBtnSub}>Device unlock · Session refresh</Text>
+                  </LinearGradient>
+                </Pressable>
+                <Pressable
+                  onPress={() => setShowOtherMethods((v) => !v)}
+                  style={styles.moreOptions}
+                >
+                  <Text style={styles.moreOptionsText}>
+                    {showOtherMethods ? 'Hide other sign-in options' : 'Other ways to sign in'}
+                  </Text>
+                </Pressable>
+              </>
             ) : null}
 
-            <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>Password</Text>
-            <View
-              style={[
-                styles.inputRow,
-                { borderColor: colors.border, backgroundColor: colors.inputBg },
-              ]}
-            >
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter your password"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                style={[styles.input, { color: colors.text }]}
-              />
-              <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
-                <Text style={styles.toggle}>{showPassword ? 'Hide' : '👁 Show'}</Text>
-              </Pressable>
-            </View>
-            {capsWarning ? <Text style={styles.capsWarning}>⚠ Caps Lock may be ON</Text> : null}
-
-            <View style={styles.row}>
-              <Pressable style={styles.rememberRow} onPress={() => setRememberMe((v) => !v)}>
-                <View style={[styles.checkbox, rememberMe && styles.checkboxOn]} />
-                <Text style={[styles.rememberText, { color: colors.text }]}>Remember me</Text>
-              </Pressable>
-              <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
-                <Text style={styles.forgot}>Forgot Password?</Text>
-              </Pressable>
-            </View>
-
-            <CaptchaWidget
-              scheme={scheme}
-              answer={captchaAnswer}
-              onAnswerChange={setCaptchaAnswer}
-              onChallenge={setChallenge}
-            />
-
-            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-              <Pressable
-                style={[styles.loginBtnWrap, (loading || offline) && styles.loginBtnDisabled]}
-                onPress={() => void onLogin()}
-                disabled={loading || offline}
-              >
-                <LinearGradient
-                  colors={['#2563eb', '#1d4ed8', '#1e40af']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.loginBtn}
-                >
-                  <Text style={styles.loginBtnTitle}>
-                    {loading ? 'Signing in…' : 'Secure Sign In'}
+            {showPasswordForm ? (
+              <>
+                {unlockMode ? (
+                  <Text style={[styles.altMethodsLabel, { color: colors.textMuted }]}>
+                    Username & password
                   </Text>
-                  <Text style={styles.loginBtnSub}>{LOGIN_ACCESS_SUBTITLE}</Text>
-                </LinearGradient>
-              </Pressable>
-            </Animated.View>
+                ) : null}
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Username</Text>
+                <Text style={[styles.supportsLine, { color: colors.textMuted }]}>
+                  Supports: Roll No. · Email · Employee ID · Mobile
+                </Text>
+                <View
+                  style={[
+                    styles.inputRow,
+                    { borderColor: colors.border, backgroundColor: colors.inputBg },
+                  ]}
+                >
+                  <TextInput
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    placeholder="College roll number (e.g. BC24-021)"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    style={[styles.input, { color: colors.text }]}
+                  />
+                </View>
+
+                {identifierHint ? (
+                  <Text style={[styles.roleHint, { color: identifierHint.tone }]}>
+                    {identifierHint.icon} {identifierHint.label}
+                  </Text>
+                ) : null}
+
+                <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>
+                  Password
+                </Text>
+                <View
+                  style={[
+                    styles.inputRow,
+                    { borderColor: colors.border, backgroundColor: colors.inputBg },
+                  ]}
+                >
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    style={[styles.input, { color: colors.text }]}
+                  />
+                  <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                    <Text style={styles.toggle}>{showPassword ? 'Hide' : '👁 Show'}</Text>
+                  </Pressable>
+                </View>
+                {capsWarning ? <Text style={styles.capsWarning}>⚠ Caps Lock may be ON</Text> : null}
+
+                <View style={styles.row}>
+                  <Pressable style={styles.rememberRow} onPress={() => setRememberMe((v) => !v)}>
+                    <View style={[styles.checkbox, rememberMe && styles.checkboxOn]} />
+                    <Text style={[styles.rememberText, { color: colors.text }]}>Remember me</Text>
+                  </Pressable>
+                  <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
+                    <Text style={styles.forgot}>Forgot Password?</Text>
+                  </Pressable>
+                </View>
+
+                <CaptchaWidget
+                  scheme={scheme}
+                  answer={captchaAnswer}
+                  onAnswerChange={setCaptchaAnswer}
+                  onChallenge={setChallenge}
+                />
+
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <Pressable
+                    style={[styles.loginBtnWrap, (loading || offline) && styles.loginBtnDisabled]}
+                    onPress={() => void onLogin()}
+                    disabled={loading || offline}
+                  >
+                    <LinearGradient
+                      colors={['#2563eb', '#1d4ed8', '#1e40af']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.loginBtn}
+                    >
+                      <Text style={styles.loginBtnTitle}>
+                        {loading ? 'Signing in…' : 'Secure Sign In'}
+                      </Text>
+                      <Text style={styles.loginBtnSub}>{LOGIN_ACCESS_SUBTITLE}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Animated.View>
+              </>
+            ) : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Pressable onPress={onMoreLoginOptions} style={styles.moreOptions}>
-              <Text style={styles.moreOptionsText}>More login options</Text>
-            </Pressable>
+            {(loginMethods.allowQrLogin || loginMethods.allowRfidLogin) &&
+            (showPasswordForm || !unlockMode) ? (
+              <View style={styles.altMethodRow}>
+                {loginMethods.allowQrLogin ? (
+                  <Pressable
+                    style={styles.altMethodBtn}
+                    onPress={() => router.push('/(auth)/qr-login' as never)}
+                  >
+                    <Text style={styles.altMethodBtnText}>Scan Student QR</Text>
+                  </Pressable>
+                ) : null}
+                {loginMethods.allowRfidLogin ? (
+                  <Pressable
+                    style={styles.altMethodBtn}
+                    onPress={() => router.push('/(auth)/rfid-login' as never)}
+                  >
+                    <Text style={styles.altMethodBtnText}>Scan College RFID</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {!unlockMode && preferBiometric ? (
+              <Pressable
+                onPress={() => void onBiometricUnlock()}
+                style={styles.moreOptions}
+                disabled={bioBusy || offline}
+              >
+                <Text style={styles.moreOptionsText}>Sign in with biometrics</Text>
+              </Pressable>
+            ) : null}
 
             <View style={styles.trustLine}>
               <Text style={styles.trustItem}>NEP 2020</Text>
@@ -340,7 +552,6 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Campus news carousel */}
           <Animated.View
             style={[styles.newsCarousel, { backgroundColor: surface, opacity: newsFade }]}
           >
@@ -370,7 +581,6 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          {/* Today's updates — compact cards */}
           <Text style={[styles.sectionLabel, { color: colors.text }]}>Today's Updates</Text>
           <ScrollView
             horizontal
@@ -390,7 +600,6 @@ export default function LoginScreen() {
             ))}
           </ScrollView>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <Text style={[styles.footerHeading, { color: colors.text }]}>Need Help?</Text>
             <View style={styles.footerRow}>
@@ -445,7 +654,6 @@ const styles = StyleSheet.create({
   },
   greetingLine: { color: '#fff', fontSize: 16, fontWeight: '800' },
   greetingWelcome: { color: '#bfdbfe', fontSize: 12, marginTop: 4 },
-  greetingProduct: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
   metaLine: { color: '#93c5fd', fontSize: 11, fontWeight: '600', marginTop: 8 },
   offlineStrip: {
     backgroundColor: '#fef2f2',
@@ -501,6 +709,19 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
+  unlockTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  unlockSub: { fontSize: 12, textAlign: 'center', marginBottom: 4 },
+  bioBtnWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 4,
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  altMethodsLabel: { fontSize: 12, fontWeight: '700', marginTop: 8 },
   fieldLabel: { fontSize: 14, fontWeight: '700' },
   supportsLine: { fontSize: 11, marginTop: -4, marginBottom: 2 },
   inputRow: {
@@ -549,6 +770,16 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', textAlign: 'center', fontSize: 13 },
   moreOptions: { alignItems: 'center', paddingVertical: 4 },
   moreOptionsText: { color: '#64748b', fontSize: 12, fontWeight: '600' },
+  altMethodRow: { gap: 8, marginTop: 4 },
+  altMethodBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: 'rgba(37,99,235,0.06)',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  altMethodBtnText: { color: '#1d4ed8', fontSize: 13, fontWeight: '700' },
   trustLine: {
     flexDirection: 'row',
     flexWrap: 'wrap',

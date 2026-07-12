@@ -94,6 +94,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission: 'Allow the campus app to access photos for passport photo upload.',
       },
     ],
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'Allow the campus app to scan login QR codes.',
+        recordAudioAndroid: false,
+      },
+    ],
     'expo-document-picker',
     'expo-router',
     'expo-secure-store',

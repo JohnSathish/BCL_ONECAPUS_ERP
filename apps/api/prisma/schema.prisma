@@ -26,6 +26,8 @@ model Tenant {
   roles                         Role[]
   auditLogs                     AuditLog[]
   loginAttempts                 LoginAttempt[]
+  authQrChallenges              AuthQrChallenge[]
+  authLoginEvents               AuthLoginEvent[]
   institutions                  Institution[]                 @relation("TenantInstitutions")
   refreshTokens                 RefreshSession[]
   usernameGenerationRules       UsernameGenerationRule[]
@@ -257,6 +259,52 @@ model LoginAttempt {
   @@schema("platform")
 }
 
+/// Short-lived one-time QR login challenge (hashed token server-side).
+model AuthQrChallenge {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  jti         String    @unique
+  tokenHash   String    @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  redeemedAt  DateTime? @map("redeemed_at")
+  createdById String?   @map("created_by_id") @db.Uuid
+  deviceHint  String?   @map("device_hint")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@index([expiresAt])
+  @@map("auth_qr_challenges")
+  @@schema("platform")
+}
+
+/// Per-attempt login audit (success / fail / lockout) beyond aggregate LoginAttempt.
+model AuthLoginEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  identifier String
+  method     String
+  outcome    String
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, outcome])
+  @@map("auth_login_events")
+  @@schema("platform")
+}
+
 model TenantDomain {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id") @db.Uuid
@@ -298,6 +346,8 @@ model User {
   shiftAssignments               UserShiftAssignment[]
   identities                     UserIdentity[]
   refreshSessions                RefreshSession[]
+  authQrChallenges               AuthQrChallenge[]
+  authLoginEvents                AuthLoginEvent[]
   mobileDevices                  MobileDevice[]
   passwordHistory                PasswordHistory[]
   passwordResetTokens            PasswordResetToken[]
@@ -967,6 +1017,15 @@ model TenantSecuritySettings {
   sessionTimeoutMinutes  Int      @default(480) @map("session_timeout_minutes")
   mfaEnforced            Boolean  @default(false) @map("mfa_enforced")
   mfaEnforcedRoles       Json     @default("[\"super-admin\",\"principal\",\"accountant\",\"examination-cell\"]") @map("mfa_enforced_roles")
+  /// Mobile / alternate login methods
+  allowBiometricLogin    Boolean  @default(true) @map("allow_biometric_login")
+  allowQrLogin           Boolean  @default(false) @map("allow_qr_login")
+  allowRfidLogin         Boolean  @default(false) @map("allow_rfid_login")
+  requireUppercase       Boolean  @default(true) @map("require_uppercase")
+  requireLowercase       Boolean  @default(true) @map("require_lowercase")
+  requireNumber          Boolean  @default(true) @map("require_number")
+  requireSpecial         Boolean  @default(true) @map("require_special")
+  maxConcurrentSessions  Int?     @map("max_concurrent_sessions")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 

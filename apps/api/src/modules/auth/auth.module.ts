@@ -14,6 +14,9 @@ import { MfaService } from './mfa/mfa.service';
 import { MfaController } from './mfa/mfa.controller';
 import { StepUpService } from './step-up.service';
 import { StepUpController } from './step-up.controller';
+import { AuthQrService } from './login-methods/auth-qr.service';
+import { AuthRfidService } from './login-methods/auth-rfid.service';
+import { LoginMethodsController } from './login-methods/login-methods.controller';
 
 @Module({
   imports: [
@@ -29,7 +32,12 @@ import { StepUpController } from './step-up.controller';
       }),
     }),
   ],
-  controllers: [AuthController, MfaController, StepUpController],
+  controllers: [
+    AuthController,
+    MfaController,
+    StepUpController,
+    LoginMethodsController,
+  ],
   providers: [
     AuthService,
     ChallengeService,
@@ -37,6 +45,8 @@ import { StepUpController } from './step-up.controller';
     JwtStrategy,
     MfaService,
     StepUpService,
+    AuthQrService,
+    AuthRfidService,
   ],
   exports: [AuthService, MfaService, StepUpService, LoginAttemptService],
 })

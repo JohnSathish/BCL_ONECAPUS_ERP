@@ -1,5 +1,6 @@
 import type { Href } from 'expo-router';
 import { ensureDeviceId, hydrateAppType, setAppType } from '@/api/config';
+import { isBiometricEnrolled } from '@/auth/biometric';
 import { CHANGE_PASSWORD_HREF, userMustResetPassword } from '@/auth/password-reset-guard';
 import { resolveMobileRoute } from '@/auth/role-router';
 import {
@@ -19,11 +20,11 @@ import { isNetworkRefreshError, refreshAccessToken } from '@/auth/token-refresh'
 
 export type BootstrapResult = {
   href: Href;
-  reason?: 'session_expired' | 'offline_cached' | 'must_reset_password';
+  reason?: 'session_expired' | 'offline_cached' | 'must_reset_password' | 'biometric_unlock';
 };
 
 /**
- * Cold-start session validation: school → silent refresh → dashboard.
+ * Cold-start session validation: school → biometric unlock (if enrolled) or silent refresh → dashboard.
  * Offline with cached tokens keeps the user in the portal.
  * Users with mustResetPassword are always sent to change-password.
  */
@@ -41,6 +42,14 @@ export async function bootstrapSession(): Promise<BootstrapResult> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) {
     return { href: '/(auth)/welcome' as Href };
+  }
+
+  const enrolled = await isBiometricEnrolled();
+  if (enrolled) {
+    return {
+      href: '/(auth)/login?unlock=1' as Href,
+      reason: 'biometric_unlock',
+    };
   }
 
   try {

@@ -19,6 +19,11 @@ export type LoginContext = {
   showPoweredBy: boolean;
   brandingEnabled: boolean;
   poweredBy: 'BCL OneCampus ERP';
+  loginMethods?: {
+    allowBiometricLogin: boolean;
+    allowQrLogin: boolean;
+    allowRfidLogin: boolean;
+  };
 };
 
 export type LoginChallenge = {

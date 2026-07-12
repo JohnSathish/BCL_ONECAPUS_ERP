@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { clearBiometricEnrollment } from '@/auth/biometric';
 
 const REFRESH_KEY = 'oc_refresh_token';
 const ACCESS_KEY = 'oc_access_token';
@@ -79,4 +80,5 @@ export async function clearSession() {
   await SecureStore.deleteItemAsync(USER_SNAPSHOT_KEY);
   await SecureStore.deleteItemAsync(LAST_LOGIN_KEY);
   await SecureStore.deleteItemAsync(REMEMBER_ME_KEY);
+  await clearBiometricEnrollment();
 }

@@ -192,18 +192,22 @@ export class AuthController {
     if (!refreshToken) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    const session = await this.auth.refresh(refreshToken, {
-      userAgent: req.headers['user-agent'],
-      ipAddress: extractClientIp(req),
-      ...(this.isMobileClient(req)
-        ? {
-            clientType: 'mobile',
-            appType: String(req.headers['x-app-type'] ?? 'student'),
-            appVersion:
-              String(req.headers['x-app-version'] ?? '').trim() || undefined,
-          }
-        : {}),
-    });
+    const session = await this.auth.refresh(
+      refreshToken,
+      {
+        userAgent: req.headers['user-agent'],
+        ipAddress: extractClientIp(req),
+        ...(this.isMobileClient(req)
+          ? {
+              clientType: 'mobile',
+              appType: String(req.headers['x-app-type'] ?? 'student'),
+              appVersion:
+                String(req.headers['x-app-version'] ?? '').trim() || undefined,
+            }
+          : {}),
+      },
+      dto.unlockMethod,
+    );
     return this.respondSession(req, res, session);
   }
 

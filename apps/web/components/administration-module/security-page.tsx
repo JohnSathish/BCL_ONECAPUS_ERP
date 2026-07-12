@@ -57,9 +57,18 @@ export function SecurityPage() {
   const [policy, setPolicy] = useState({
     minPasswordLength: 8,
     passwordHistoryCount: 5,
+    passwordExpiryDays: null as number | null,
     forceResetOnFirstLogin: true,
     sessionTimeoutMinutes: 480,
     mfaEnforced: false,
+    allowBiometricLogin: true,
+    allowQrLogin: false,
+    allowRfidLogin: false,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumber: true,
+    requireSpecial: true,
+    maxConcurrentSessions: null as number | null,
   });
 
   useEffect(() => {
@@ -67,9 +76,18 @@ export function SecurityPage() {
       setPolicy({
         minPasswordLength: settingsQ.data.minPasswordLength,
         passwordHistoryCount: settingsQ.data.passwordHistoryCount,
+        passwordExpiryDays: settingsQ.data.passwordExpiryDays ?? null,
         forceResetOnFirstLogin: settingsQ.data.forceResetOnFirstLogin,
         sessionTimeoutMinutes: settingsQ.data.sessionTimeoutMinutes,
         mfaEnforced: settingsQ.data.mfaEnforced,
+        allowBiometricLogin: settingsQ.data.allowBiometricLogin ?? true,
+        allowQrLogin: settingsQ.data.allowQrLogin ?? false,
+        allowRfidLogin: settingsQ.data.allowRfidLogin ?? false,
+        requireUppercase: settingsQ.data.requireUppercase ?? true,
+        requireLowercase: settingsQ.data.requireLowercase ?? true,
+        requireNumber: settingsQ.data.requireNumber ?? true,
+        requireSpecial: settingsQ.data.requireSpecial ?? true,
+        maxConcurrentSessions: settingsQ.data.maxConcurrentSessions ?? null,
       });
     }
   }, [settingsQ.data]);
@@ -194,15 +212,23 @@ export function SecurityPage() {
                   <th className="py-2">Time</th>
                   <th className="py-2">User</th>
                   <th className="py-2">Type</th>
+                  <th className="py-2">Method</th>
                 </tr>
               </thead>
               <tbody>
                 {(historyQ.data?.items ?? []).map(
-                  (h: { id: string; createdAt: string; email?: string; type: string }) => (
+                  (h: {
+                    id: string;
+                    createdAt: string;
+                    email?: string;
+                    type: string;
+                    method?: string;
+                  }) => (
                     <tr key={h.id} className="border-b border-border/50">
                       <td className="py-2 text-xs">{formatDisplayDateTime(h.createdAt)}</td>
                       <td className="py-2">{h.email ?? '—'}</td>
                       <td className="py-2 capitalize">{h.type}</td>
+                      <td className="py-2 text-xs">{h.method ?? '—'}</td>
                     </tr>
                   ),
                 )}
@@ -226,12 +252,12 @@ export function SecurityPage() {
         ) : null}
 
         {tab === 'policy' ? (
-          <AdminGlassCard className="max-w-lg space-y-4 p-5">
+          <AdminGlassCard className="max-w-xl space-y-5 p-5">
             <div className="space-y-2">
               <Label>Minimum password length</Label>
               <Input
                 type="number"
-                value={settingsQ.data?.minPasswordLength ?? policy.minPasswordLength}
+                value={policy.minPasswordLength}
                 onChange={(e) =>
                   setPolicy((p) => ({ ...p, minPasswordLength: Number(e.target.value) }))
                 }
@@ -241,9 +267,22 @@ export function SecurityPage() {
               <Label>Password history count</Label>
               <Input
                 type="number"
-                value={settingsQ.data?.passwordHistoryCount ?? policy.passwordHistoryCount}
+                value={policy.passwordHistoryCount}
                 onChange={(e) =>
                   setPolicy((p) => ({ ...p, passwordHistoryCount: Number(e.target.value) }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Password expiry (days, blank = never)</Label>
+              <Input
+                type="number"
+                value={policy.passwordExpiryDays ?? ''}
+                onChange={(e) =>
+                  setPolicy((p) => ({
+                    ...p,
+                    passwordExpiryDays: e.target.value === '' ? null : Number(e.target.value),
+                  }))
                 }
               />
             </div>
@@ -251,16 +290,81 @@ export function SecurityPage() {
               <Label>Session timeout (minutes)</Label>
               <Input
                 type="number"
-                value={settingsQ.data?.sessionTimeoutMinutes ?? policy.sessionTimeoutMinutes}
+                value={policy.sessionTimeoutMinutes}
                 onChange={(e) =>
                   setPolicy((p) => ({ ...p, sessionTimeoutMinutes: Number(e.target.value) }))
                 }
               />
             </div>
+            <div className="space-y-2">
+              <Label>Max concurrent sessions (blank = unlimited)</Label>
+              <Input
+                type="number"
+                value={policy.maxConcurrentSessions ?? ''}
+                onChange={(e) =>
+                  setPolicy((p) => ({
+                    ...p,
+                    maxConcurrentSessions: e.target.value === '' ? null : Number(e.target.value),
+                  }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2 border-t border-border/60 pt-4">
+              <p className="text-sm font-semibold">Password complexity</p>
+              {(
+                [
+                  ['requireUppercase', 'Require uppercase'],
+                  ['requireLowercase', 'Require lowercase'],
+                  ['requireNumber', 'Require number'],
+                  ['requireSpecial', 'Require special character'],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={policy[key]}
+                    onChange={(e) => setPolicy((p) => ({ ...p, [key]: e.target.checked }))}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <div className="space-y-2 border-t border-border/60 pt-4">
+              <p className="text-sm font-semibold">Login methods</p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={policy.allowBiometricLogin}
+                  onChange={(e) =>
+                    setPolicy((p) => ({ ...p, allowBiometricLogin: e.target.checked }))
+                  }
+                />
+                Allow biometric unlock (mobile)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={policy.allowQrLogin}
+                  onChange={(e) => setPolicy((p) => ({ ...p, allowQrLogin: e.target.checked }))}
+                />
+                Allow QR login
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={policy.allowRfidLogin}
+                  onChange={(e) => setPolicy((p) => ({ ...p, allowRfidLogin: e.target.checked }))}
+                />
+                Allow RFID / NFC login
+              </label>
+            </div>
+
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={settingsQ.data?.forceResetOnFirstLogin ?? policy.forceResetOnFirstLogin}
+                checked={policy.forceResetOnFirstLogin}
                 onChange={(e) =>
                   setPolicy((p) => ({ ...p, forceResetOnFirstLogin: e.target.checked }))
                 }
@@ -270,7 +374,7 @@ export function SecurityPage() {
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={settingsQ.data?.mfaEnforced ?? policy.mfaEnforced}
+                checked={policy.mfaEnforced}
                 onChange={(e) => setPolicy((p) => ({ ...p, mfaEnforced: e.target.checked }))}
               />
               MFA enforced (policy flag)
@@ -280,9 +384,18 @@ export function SecurityPage() {
                 saveMut.mutate({
                   minPasswordLength: policy.minPasswordLength,
                   passwordHistoryCount: policy.passwordHistoryCount,
+                  passwordExpiryDays: policy.passwordExpiryDays,
                   sessionTimeoutMinutes: policy.sessionTimeoutMinutes,
                   forceResetOnFirstLogin: policy.forceResetOnFirstLogin,
                   mfaEnforced: policy.mfaEnforced,
+                  allowBiometricLogin: policy.allowBiometricLogin,
+                  allowQrLogin: policy.allowQrLogin,
+                  allowRfidLogin: policy.allowRfidLogin,
+                  requireUppercase: policy.requireUppercase,
+                  requireLowercase: policy.requireLowercase,
+                  requireNumber: policy.requireNumber,
+                  requireSpecial: policy.requireSpecial,
+                  maxConcurrentSessions: policy.maxConcurrentSessions,
                 })
               }
             >

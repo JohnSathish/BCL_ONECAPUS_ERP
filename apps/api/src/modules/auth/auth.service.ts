@@ -78,6 +78,90 @@ export class AuthService {
     return this.parseTtlSeconds(ttl);
   }
 
+  private async resolveSecuritySessionPolicy(tenantId: string) {
+    const settings = await this.prisma.tenantSecuritySettings.findUnique({
+      where: { tenantId },
+    });
+    return {
+      sessionTimeoutSeconds: Math.max(
+        5 * 60,
+        (settings?.sessionTimeoutMinutes ?? 480) * 60,
+      ),
+      passwordExpiryDays: settings?.passwordExpiryDays ?? null,
+      maxConcurrentSessions: settings?.maxConcurrentSessions ?? null,
+    };
+  }
+
+  private async isPasswordExpired(
+    tenantId: string,
+    passwordChangedAt: Date | null | undefined,
+  ): Promise<boolean> {
+    const { passwordExpiryDays } =
+      await this.resolveSecuritySessionPolicy(tenantId);
+    if (!passwordExpiryDays || passwordExpiryDays <= 0) return false;
+    const changed = passwordChangedAt ?? new Date(0);
+    const ageMs = Date.now() - changed.getTime();
+    return ageMs > passwordExpiryDays * 24 * 60 * 60 * 1000;
+  }
+
+  private async recordLoginEvent(input: {
+    tenantId: string;
+    userId?: string | null;
+    identifier: string;
+    method: string;
+    outcome: 'success' | 'failure' | 'lockout';
+    reason?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }) {
+    try {
+      await this.prisma.authLoginEvent.create({
+        data: {
+          tenantId: input.tenantId,
+          userId: input.userId ?? null,
+          identifier: input.identifier,
+          method: input.method,
+          outcome: input.outcome,
+          reason: input.reason,
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+          metadata: input.metadata ?? {},
+        },
+      });
+    } catch {
+      // Non-blocking: login must not fail because audit insert failed.
+    }
+  }
+
+  private async enforceConcurrentSessionCap(
+    tenantId: string,
+    userId: string,
+    maxConcurrentSessions: number | null,
+    excludeSessionId?: string,
+  ) {
+    if (!maxConcurrentSessions || maxConcurrentSessions < 1) return;
+    const now = new Date();
+    const active = await this.prisma.refreshSession.findMany({
+      where: {
+        tenantId,
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+        ...(excludeSessionId ? { id: { not: excludeSessionId } } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    const overflow = active.length - (maxConcurrentSessions - 1);
+    if (overflow <= 0) return;
+    const revokeIds = active.slice(0, overflow).map((s) => s.id);
+    await this.prisma.refreshSession.updateMany({
+      where: { id: { in: revokeIds } },
+      data: { revokedAt: now },
+    });
+  }
+
   private async resolveShiftScope(
     userId: string,
     roles: string[],
@@ -203,17 +287,31 @@ export class AuthService {
     const familyId = options.familyId ?? randomUUID();
     const jti = randomUUID();
     const refreshPlain = randomBytes(48).toString('base64url');
-    const refreshMaxAgeSeconds = this.resolveRefreshTtlSeconds(
+    const policy = await this.resolveSecuritySessionPolicy(user.tenantId);
+    let refreshMaxAgeSeconds = this.resolveRefreshTtlSeconds(
       options.rememberMe,
     );
+    if (!options.rememberMe) {
+      refreshMaxAgeSeconds = Math.min(
+        refreshMaxAgeSeconds,
+        policy.sessionTimeoutSeconds,
+      );
+    }
     const accessTtl = options.skipRefreshSession
       ? '1800s'
       : this.config.get<string>('JWT_ACCESS_TTL', '1200s');
-    const accessExpiresIn = this.parseTtlSeconds(accessTtl);
+    let accessExpiresIn = this.parseTtlSeconds(accessTtl);
+    accessExpiresIn = Math.min(accessExpiresIn, policy.sessionTimeoutSeconds);
 
     const refreshExpiresAt = new Date(Date.now() + refreshMaxAgeSeconds * 1000);
 
     if (!options.skipRefreshSession) {
+      await this.enforceConcurrentSessionCap(
+        user.tenantId,
+        user.id,
+        policy.maxConcurrentSessions,
+        options.previousSessionId,
+      );
       await this.prisma.$transaction(async (tx) => {
         const newSession = await tx.refreshSession.create({
           data: {
@@ -537,22 +635,51 @@ export class AuthService {
     const user = await this.resolveLoginUser(tenant.id, trimmed);
     if (!user) {
       await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
+      await this.recordLoginEvent({
+        tenantId,
+        identifier: normalizedEmail,
+        method: 'password',
+        outcome: 'failure',
+        reason: 'unknown_user',
+        ipAddress: ip,
+        userAgent: meta?.userAgent,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
+      await this.recordLoginEvent({
+        tenantId,
+        userId: user.id,
+        identifier: normalizedEmail,
+        method: 'password',
+        outcome: 'failure',
+        reason: 'bad_password',
+        ipAddress: ip,
+        userAgent: meta?.userAgent,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
 
     // Force change when still on a known temporary / first-login password.
-    const mustResetPassword = await this.ensureMustResetPassword(user.id, {
+    let mustResetPassword = await this.ensureMustResetPassword(user.id, {
       mustResetPassword: user.mustResetPassword,
       password,
     });
+    if (
+      !mustResetPassword &&
+      (await this.isPasswordExpired(tenant.id, user.passwordChangedAt))
+    ) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { mustResetPassword: true },
+      });
+      mustResetPassword = true;
+    }
     const userForSession = { ...user, mustResetPassword };
 
     const roles = user.roles.map((r) => r.role.slug);
@@ -616,7 +743,25 @@ export class AuthService {
         action: 'auth.login',
         entityType: 'user',
         entityId: user.id,
-        metadata: { ipAddress: ip, country: meta?.country },
+        metadata: {
+          method: 'password',
+          ipAddress: ip,
+          country: meta?.country,
+        },
+      },
+    });
+
+    await this.recordLoginEvent({
+      tenantId: tenant.id,
+      userId: user.id,
+      identifier: normalizedEmail,
+      method: 'password',
+      outcome: 'success',
+      ipAddress: ip,
+      userAgent: meta?.userAgent,
+      metadata: {
+        clientType: meta?.clientType ?? null,
+        appType: meta?.appType ?? null,
       },
     });
 
@@ -632,6 +777,7 @@ export class AuthService {
       appType?: string;
       appVersion?: string;
     },
+    unlockMethod?: 'biometric_unlock',
   ): Promise<AuthSessionResponse> {
     const hashed = this.hashToken(refreshToken);
 
@@ -683,7 +829,7 @@ export class AuthService {
       >;
       const rememberMe = Boolean(sessionMeta.rememberMe);
 
-      return this.issueTokens(
+      const session = await this.issueTokens(
         activeSession.user,
         tenant.slug,
         roles,
@@ -697,6 +843,34 @@ export class AuthService {
           meta,
         },
       );
+
+      if (unlockMethod === 'biometric_unlock') {
+        await this.prisma.auditLog.create({
+          data: {
+            tenantId: tenant.id,
+            userId: activeSession.user.id,
+            module: 'auth',
+            action: 'auth.login',
+            entityType: 'user',
+            entityId: activeSession.user.id,
+            metadata: {
+              method: 'biometric_unlock',
+              ipAddress: meta?.ipAddress,
+            },
+          },
+        });
+        await this.recordLoginEvent({
+          tenantId: tenant.id,
+          userId: activeSession.user.id,
+          identifier: activeSession.user.email,
+          method: 'biometric_unlock',
+          outcome: 'success',
+          ipAddress: meta?.ipAddress,
+          userAgent: meta?.userAgent,
+        });
+      }
+
+      return session;
     }
 
     const revokedSession = await this.prisma.refreshSession.findFirst({
@@ -1096,5 +1270,107 @@ export class AuthService {
       resolved.dataScope,
       { skipRefreshSession: true, meta },
     );
+  }
+
+  /**
+   * Issue a full session for QR / RFID / device biometric unlock
+   * without password or MFA (caller already authenticated the subject).
+   */
+  async loginWithAlternateMethod(
+    tenantId: string,
+    userId: string,
+    method: 'qr' | 'rfid' | 'biometric_unlock',
+    meta?: {
+      userAgent?: string;
+      ipAddress?: string;
+      clientType?: string;
+      appType?: string;
+      appVersion?: string;
+      deviceId?: string;
+      deviceLabel?: string;
+      country?: string;
+    },
+  ): Promise<AuthSessionResponse> {
+    const [user, tenant] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: {
+          id: userId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        include: {
+          roles: {
+            where: { deletedAt: null },
+            include: { role: true },
+          },
+        },
+      }),
+      this.prisma.tenant.findFirst({
+        where: { id: tenantId, deletedAt: null, status: 'active' },
+      }),
+    ]);
+
+    if (!user || !tenant) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.accountStatus && user.accountStatus !== 'active') {
+      throw new UnauthorizedException('Account is not active');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const roles = user.roles.map((r) => r.role.slug);
+    const resolved = await this.resolveUserPermissions(user.id, roles);
+    const shiftScope = await this.resolveShiftScope(user.id, roles);
+    const session = await this.issueTokens(
+      user,
+      tenant.slug,
+      roles,
+      resolved.permissions,
+      shiftScope,
+      resolved.dataScope,
+      { meta },
+    );
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        userId: user.id,
+        module: 'auth',
+        action: 'auth.login',
+        entityType: 'user',
+        entityId: user.id,
+        metadata: {
+          method,
+          ipAddress: meta?.ipAddress,
+          country: meta?.country,
+          clientType: meta?.clientType,
+        },
+      },
+    });
+
+    await this.prisma.authLoginEvent.create({
+      data: {
+        tenantId: tenant.id,
+        userId: user.id,
+        identifier: user.email,
+        method,
+        outcome: 'success',
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
+        metadata: {
+          method,
+          clientType: meta?.clientType,
+          appType: meta?.appType,
+        },
+      },
+    });
+
+    return session;
   }
 }

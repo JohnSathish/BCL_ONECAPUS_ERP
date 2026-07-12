@@ -31,10 +31,10 @@ export class PasswordPolicyService {
     return {
       minLength,
       maxLength: DEFAULT_MAX_LENGTH,
-      requireUpper: true,
-      requireLower: true,
-      requireNumber: true,
-      requireSpecial: true,
+      requireUpper: settings?.requireUppercase ?? true,
+      requireLower: settings?.requireLowercase ?? true,
+      requireNumber: settings?.requireNumber ?? true,
+      requireSpecial: settings?.requireSpecial ?? true,
       historyCount: settings?.passwordHistoryCount ?? DEFAULT_HISTORY,
     };
   }

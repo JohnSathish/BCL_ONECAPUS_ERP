@@ -36,7 +36,9 @@ type RefreshResponse = RefreshSessionResult & { message?: string };
  * Silently rotate access (+ refresh) tokens.
  * Auth failures clear the local session; network failures do not.
  */
-export async function refreshAccessToken(): Promise<RefreshSessionResult> {
+export async function refreshAccessToken(options?: {
+  unlockMethod?: 'biometric_unlock';
+}): Promise<RefreshSessionResult> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -54,6 +56,7 @@ export async function refreshAccessToken(): Promise<RefreshSessionResult> {
         body: JSON.stringify({
           refreshToken,
           ...(rememberMe != null ? { rememberMe } : {}),
+          ...(options?.unlockMethod ? { unlockMethod: options.unlockMethod } : {}),
         }),
       });
     } catch {

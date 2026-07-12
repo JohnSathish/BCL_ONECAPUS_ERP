@@ -40,6 +40,14 @@ export class SecurityService {
         forceResetOnFirstLogin: dto.forceResetOnFirstLogin,
         sessionTimeoutMinutes: dto.sessionTimeoutMinutes,
         mfaEnforced: dto.mfaEnforced,
+        allowBiometricLogin: dto.allowBiometricLogin,
+        allowQrLogin: dto.allowQrLogin,
+        allowRfidLogin: dto.allowRfidLogin,
+        requireUppercase: dto.requireUppercase,
+        requireLowercase: dto.requireLowercase,
+        requireNumber: dto.requireNumber,
+        requireSpecial: dto.requireSpecial,
+        maxConcurrentSessions: dto.maxConcurrentSessions,
       },
       create: {
         tenantId,
@@ -248,12 +256,41 @@ export class SecurityService {
       items: auditLogs.map((l) => ({
         id: l.id,
         type: l.action === 'auth.login' ? 'success' : 'logout',
+        method:
+          (l.metadata as { method?: string } | null)?.method ??
+          (l.action === 'auth.login' ? 'password' : undefined),
         email: l.user?.email,
         user: l.user,
         ipAddress: (l.metadata as { ipAddress?: string })?.ipAddress ?? null,
         country: (l.metadata as { country?: string })?.country ?? null,
         createdAt: l.createdAt,
       })),
+      recentEvents: await this.prisma.authLoginEvent
+        .findMany({
+          where: {
+            tenantId,
+            ...(query.from || query.to
+              ? {
+                  createdAt: {
+                    ...(query.from ? { gte: new Date(query.from) } : {}),
+                    ...(query.to ? { lte: new Date(query.to) } : {}),
+                  },
+                }
+              : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          select: {
+            id: true,
+            identifier: true,
+            method: true,
+            outcome: true,
+            reason: true,
+            ipAddress: true,
+            createdAt: true,
+          },
+        })
+        .catch(() => []),
       failedAttempts: failedAttempts.map((a) => ({
         email: a.email,
         ipAddress: a.ipAddress,

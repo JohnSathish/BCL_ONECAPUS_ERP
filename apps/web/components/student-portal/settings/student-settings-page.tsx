@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Bell, Eye, KeyRound, Monitor, Palette, Shield, User } from 'lucide-react';
+import { Bell, Eye, KeyRound, Monitor, Palette, QrCode, Shield, User } from 'lucide-react';
+import Link from 'next/link';
 
 import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
 import { GlassCard } from '@/components/erp/glass-card';
@@ -238,6 +239,21 @@ export function StudentSettingsPage() {
               </li>
             ))}
           </ul>
+          <div className="mt-6 rounded-xl border border-border/50 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <QrCode className="mt-0.5 h-5 w-5 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Show login QR</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Generate a one-time QR so you can sign in on the campus mobile app without typing
+                  your password.
+                </p>
+                <Button asChild size="sm" className="mt-3 rounded-xl">
+                  <Link href="/student/settings/login-qr">Open login QR</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
           <p className="mt-4 text-xs text-muted-foreground">
             Two-factor authentication and OTP login — coming soon.
           </p>
