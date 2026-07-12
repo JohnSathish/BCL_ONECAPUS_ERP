@@ -12,6 +12,12 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh max-h-dvh w-full max-w-full overflow-hidden bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
       <WorkspaceThemeEffect />
       <EnterpriseSidebar role="admin" />
       <div
@@ -21,7 +27,13 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
         )}
       >
         {/* Bounded flex child so page shells (DashboardShell) can scroll internally. */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+        <div
+          id="main-content"
+          tabIndex={-1}
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden outline-none"
+        >
+          {children}
+        </div>
         <MobileBottomNav />
       </div>
     </div>

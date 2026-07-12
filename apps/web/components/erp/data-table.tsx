@@ -35,7 +35,11 @@ export function DataTable<T>({
   const hasActions = canManage && (onDelete || onEdit);
 
   if (rows.length === 0) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">{emptyMessage}</p>;
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground" role="status">
+        {emptyMessage}
+      </p>
+    );
   }
 
   return (
