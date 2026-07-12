@@ -11,6 +11,7 @@ export const OFFICIAL_DOCUMENT_TYPES = [
   'TENDER',
   'APPOINTMENT_ORDER',
   'MEETING_NOTICE',
+  'COMMITTEE_MEETING',
 ] as const;
 
 export type OfficialDocumentType = (typeof OFFICIAL_DOCUMENT_TYPES)[number];
@@ -54,6 +55,7 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   TENDER: 'TENDER NOTICE',
   APPOINTMENT_ORDER: 'APPOINTMENT ORDER',
   MEETING_NOTICE: 'MEETING NOTICE',
+  COMMITTEE_MEETING: 'COMMITTEE MEETING NOTICE',
 };
 
 export const DOCUMENT_TYPE_REF_CODES: Record<string, string> = {
@@ -69,6 +71,7 @@ export const DOCUMENT_TYPE_REF_CODES: Record<string, string> = {
   TENDER: 'TENDER',
   APPOINTMENT_ORDER: 'APPOINT',
   MEETING_NOTICE: 'MEETING',
+  COMMITTEE_MEETING: 'CMTG',
 };
 
 export function paginate(page = 1, limit = 20) {

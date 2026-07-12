@@ -72,6 +72,14 @@ const DEFAULT_TEMPLATES = [
     sortOrder: 2,
   },
   {
+    documentType: 'COMMITTEE_MEETING',
+    name: 'Committee Meeting Notice',
+    salutation: 'Dear Committee Members',
+    bodyHtml:
+      '<p>You are hereby informed that a meeting of the selected committee(s) will be held as per the meeting details below. All members are requested to attend without fail and come prepared with relevant documents.</p>',
+    sortOrder: 11,
+  },
+  {
     documentType: 'EXAM',
     name: 'Examination Notice',
     salutation: 'Dear Students',

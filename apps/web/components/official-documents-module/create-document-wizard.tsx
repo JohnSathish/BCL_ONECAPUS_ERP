@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
@@ -8,6 +8,8 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
 import { OfficialDocumentsShell } from '@/components/official-documents-module/official-documents-shell';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   AUDIENCE_OPTIONS,
   createOfficialDocument,
@@ -17,11 +19,34 @@ import {
   SMART_VARIABLES,
   type CreateOfficialDocumentPayload,
 } from '@/services/official-documents';
+import { fetchGovernanceCommittees } from '@/services/governance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
 const STEPS = ['Document Type', 'Issuer', 'Audience', 'Details'] as const;
 const PRIORITIES = ['NORMAL', 'IMPORTANT', 'URGENT', 'EMERGENCY'] as const;
+
+type MeetingDraft = {
+  title: string;
+  date: string;
+  time: string;
+  venue: string;
+  duration: string;
+  convenedBy: string;
+  chairperson: string;
+  agendaText: string;
+};
+
+const EMPTY_MEETING: MeetingDraft = {
+  title: '',
+  date: '',
+  time: '',
+  venue: '',
+  duration: '',
+  convenedBy: 'Principal',
+  chairperson: '',
+  agendaText: '',
+};
 
 export function CreateDocumentWizard() {
   const router = useRouter();
@@ -29,10 +54,14 @@ export function CreateDocumentWizard() {
   const [step, setStep] = useState(0);
   const [documentType, setDocumentType] = useState('NOTICE');
   const [issuerId, setIssuerId] = useState('');
-  const [audience, setAudience] = useState<Record<string, boolean>>({
+  const [audienceFlags, setAudienceFlags] = useState<Record<string, boolean>>({
     students: true,
     staff: true,
   });
+  const [committeeIds, setCommitteeIds] = useState<string[]>([]);
+  const [committeeSearch, setCommitteeSearch] = useState('');
+  const [includeMembers, setIncludeMembers] = useState(true);
+  const [meeting, setMeeting] = useState<MeetingDraft>(EMPTY_MEETING);
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [salutation, setSalutation] = useState('Dear Faculty members and Students');
@@ -42,6 +71,9 @@ export function CreateDocumentWizard() {
   const [expiryDate, setExpiryDate] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [templateId, setTemplateId] = useState('');
+
+  const isCommitteeMeeting = documentType === 'COMMITTEE_MEETING';
+  const showCommittees = Boolean(audienceFlags.committee) || isCommitteeMeeting;
 
   const issuers = useQuery({
     queryKey: ['official-documents', 'issuers'],
@@ -54,10 +86,36 @@ export function CreateDocumentWizard() {
     enabled: step >= 3,
   });
 
+  const committeesQ = useQuery({
+    queryKey: ['governance', 'committees', 'active-for-notices'],
+    queryFn: () => fetchGovernanceCommittees({ status: 'ACTIVE', limit: 200, page: 1 }),
+    enabled: showCommittees || step === 2,
+  });
+
   const selectedIssuer = useMemo(
     () => (issuers.data ?? []).find((i) => i.id === issuerId),
     [issuers.data, issuerId],
   );
+
+  const filteredCommittees = useMemo(() => {
+    const items = committeesQ.data?.items ?? [];
+    const q = committeeSearch.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.shortCode.toLowerCase().includes(q) ||
+        (c.category ?? '').toLowerCase().includes(q),
+    );
+  }, [committeesQ.data?.items, committeeSearch]);
+
+  useEffect(() => {
+    if (isCommitteeMeeting) {
+      setAudienceFlags((prev) => ({ ...prev, committee: true, students: false, staff: false }));
+      setSalutation((s) => (s.startsWith('Dear Faculty') ? 'Dear Committee Members' : s));
+      setIncludeMembers(true);
+    }
+  }, [isCommitteeMeeting]);
 
   const createMut = useMutation({
     mutationFn: (payload: CreateOfficialDocumentPayload) => createOfficialDocument(payload),
@@ -77,6 +135,42 @@ export function CreateDocumentWizard() {
     setBodyHtml(tpl.bodyHtml);
   };
 
+  const toggleCommittee = (id: string) => {
+    setCommitteeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const audiencePayload = useMemo(() => {
+    const base: Record<string, unknown> = { ...audienceFlags };
+    if (showCommittees && committeeIds.length > 0) {
+      base.committee = true;
+      base.committeeIds = committeeIds;
+      base.includeMembers = includeMembers;
+    } else if (!audienceFlags.committee) {
+      delete base.committee;
+    }
+    return base;
+  }, [audienceFlags, committeeIds, includeMembers, showCommittees]);
+
+  const printSettings = useMemo(() => {
+    if (!isCommitteeMeeting && !meeting.title && !meeting.date) return undefined;
+    const agenda = meeting.agendaText
+      .split(/\n/)
+      .map((line) => line.replace(/^\d+[.)]\s*/, '').trim())
+      .filter(Boolean);
+    return {
+      meeting: {
+        title: meeting.title.trim() || title.trim(),
+        date: meeting.date.trim(),
+        time: meeting.time.trim(),
+        venue: meeting.venue.trim(),
+        duration: meeting.duration.trim(),
+        convenedBy: meeting.convenedBy.trim(),
+        chairperson: meeting.chairperson.trim(),
+        agenda,
+      },
+    };
+  }, [isCommitteeMeeting, meeting, title]);
+
   const payload: CreateOfficialDocumentPayload = {
     documentType,
     title: title.trim(),
@@ -86,7 +180,8 @@ export function CreateDocumentWizard() {
     priority,
     issuerId: issuerId || undefined,
     letterheadId: selectedIssuer?.letterhead?.id,
-    audience,
+    audience: audiencePayload,
+    printSettings,
     effectiveDate: effectiveDate || undefined,
     expiryDate: expiryDate || undefined,
     scheduledAt: scheduledAt || undefined,
@@ -98,7 +193,9 @@ export function CreateDocumentWizard() {
       : step === 1
         ? Boolean(issuerId)
         : step === 2
-          ? true
+          ? showCommittees
+            ? committeeIds.length > 0
+            : Object.values(audienceFlags).some(Boolean)
           : Boolean(title.trim() && bodyHtml.trim());
 
   return (
@@ -108,6 +205,7 @@ export function CreateDocumentWizard() {
           <h1 className="text-2xl font-semibold">Create Official Document</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Step-by-step wizard. Reference number and date are assigned automatically on approval.
+            Committee Master lives under Administration → Governance → Committees.
           </p>
         </div>
 
@@ -119,7 +217,9 @@ export function CreateDocumentWizard() {
                 'rounded-full px-3 py-1 text-xs font-semibold',
                 index === step
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground',
+                  : index < step
+                    ? 'bg-muted text-foreground'
+                    : 'bg-muted/50 text-muted-foreground',
               )}
             >
               {index + 1}. {label}
@@ -127,7 +227,7 @@ export function CreateDocumentWizard() {
           ))}
         </div>
 
-        <div className="rounded-2xl border border-border/60 bg-card/85 p-5">
+        <div className="rounded-2xl border border-border/60 bg-card/80 p-5 space-y-4">
           {step === 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {DOCUMENT_TYPE_OPTIONS.map((opt) => (
@@ -136,10 +236,8 @@ export function CreateDocumentWizard() {
                   type="button"
                   onClick={() => setDocumentType(opt.value)}
                   className={cn(
-                    'rounded-xl border px-4 py-3 text-left text-sm transition',
-                    documentType === opt.value
-                      ? 'border-primary bg-primary/5 font-semibold'
-                      : 'border-border hover:bg-muted/40',
+                    'rounded-xl border px-4 py-3 text-left text-sm font-medium',
+                    documentType === opt.value ? 'border-primary bg-primary/5' : 'border-border',
                   )}
                 >
                   {opt.label}
@@ -149,9 +247,11 @@ export function CreateDocumentWizard() {
           ) : null}
 
           {step === 1 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {issuers.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading issuers…</p>
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading issuers…
+                </p>
               ) : (
                 (issuers.data ?? []).map((issuer) => (
                   <button
@@ -175,19 +275,91 @@ export function CreateDocumentWizard() {
           ) : null}
 
           {step === 2 ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {AUDIENCE_OPTIONS.map((opt) => (
-                <label key={opt.key} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(audience[opt.key])}
-                    onChange={(e) =>
-                      setAudience((prev) => ({ ...prev, [opt.key]: e.target.checked }))
-                    }
+            <div className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {AUDIENCE_OPTIONS.map((opt) => (
+                  <label key={opt.key} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(audienceFlags[opt.key])}
+                      onChange={(e) =>
+                        setAudienceFlags((prev) => ({
+                          ...prev,
+                          [opt.key]: e.target.checked,
+                        }))
+                      }
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+
+              {showCommittees ? (
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">Select committees</p>
+                      <p className="text-xs text-muted-foreground">
+                        Members load automatically from Committee Master. Multiple allowed.
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={includeMembers}
+                        onChange={(e) => setIncludeMembers(e.target.checked)}
+                      />
+                      Include committee members table in PDF
+                    </label>
+                  </div>
+                  <Input
+                    placeholder="Search committees…"
+                    value={committeeSearch}
+                    onChange={(e) => setCommitteeSearch(e.target.value)}
                   />
-                  {opt.label}
-                </label>
-              ))}
+                  {committeesQ.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading committees…</p>
+                  ) : (
+                    <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                      {filteredCommittees.map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 text-sm hover:border-border hover:bg-background"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={committeeIds.includes(c.id)}
+                            onChange={() => toggleCommittee(c.id)}
+                          />
+                          <span>
+                            <span className="font-medium">{c.name}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {c.shortCode}
+                              {c.category ? ` · ${c.category}` : ''}
+                              {(() => {
+                                const count =
+                                  c.memberCount ??
+                                  (
+                                    c as {
+                                      _count?: { members?: number };
+                                    }
+                                  )._count?.members;
+                                return typeof count === 'number' ? ` · ${count} members` : '';
+                              })()}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                      {filteredCommittees.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No active committees found. Create them under Governance → Committees.
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -210,6 +382,77 @@ export function CreateDocumentWizard() {
                   </select>
                 </label>
               ) : null}
+
+              {(isCommitteeMeeting || showCommittees) && (
+                <div className="space-y-3 rounded-xl border border-border/70 p-4">
+                  <p className="text-sm font-semibold">Meeting information</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1 md:col-span-2">
+                      <Label>Meeting title</Label>
+                      <Input
+                        value={meeting.title}
+                        onChange={(e) => setMeeting((m) => ({ ...m, title: e.target.value }))}
+                        placeholder="Source Journal Editorial Board Meeting"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Meeting date</Label>
+                      <Input
+                        type="date"
+                        value={meeting.date}
+                        onChange={(e) => setMeeting((m) => ({ ...m, date: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Meeting time</Label>
+                      <Input
+                        value={meeting.time}
+                        onChange={(e) => setMeeting((m) => ({ ...m, time: e.target.value }))}
+                        placeholder="2:15 PM"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Venue</Label>
+                      <Input
+                        value={meeting.venue}
+                        onChange={(e) => setMeeting((m) => ({ ...m, venue: e.target.value }))}
+                        placeholder="Conference Room"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Duration</Label>
+                      <Input
+                        value={meeting.duration}
+                        onChange={(e) => setMeeting((m) => ({ ...m, duration: e.target.value }))}
+                        placeholder="1 hour"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Convened by</Label>
+                      <Input
+                        value={meeting.convenedBy}
+                        onChange={(e) => setMeeting((m) => ({ ...m, convenedBy: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Chairperson</Label>
+                      <Input
+                        value={meeting.chairperson}
+                        onChange={(e) => setMeeting((m) => ({ ...m, chairperson: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <Label>Agenda (one item per line)</Label>
+                      <textarea
+                        className="mt-1 min-h-[110px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                        value={meeting.agendaText}
+                        onChange={(e) => setMeeting((m) => ({ ...m, agendaText: e.target.value }))}
+                        placeholder={'Journal Publication\nPaper Review\nAny Other Matter'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="block text-xs font-medium">
@@ -272,8 +515,8 @@ export function CreateDocumentWizard() {
                     <button
                       key={v}
                       type="button"
-                      className="rounded bg-muted px-2 py-0.5 text-[10px] font-mono"
-                      onClick={() => setBodyHtml((prev) => `${prev}${v}`)}
+                      className="rounded-full border border-border px-2 py-0.5 text-[10px]"
+                      onClick={() => setBodyHtml((html) => `${html}<p>${v}</p>`)}
                     >
                       {v}
                     </button>
@@ -281,55 +524,63 @@ export function CreateDocumentWizard() {
                 </div>
                 <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
               </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-xs font-medium">
+                  Expiry Date
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                  />
+                </label>
+                <label className="block text-xs font-medium">
+                  Schedule publish
+                  <input
+                    type="datetime-local"
+                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                  />
+                </label>
+              </div>
             </div>
           ) : null}
-        </div>
 
-        <div className="flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={step === 0}
-            onClick={() => setStep((s) => s - 1)}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          {step < STEPS.length - 1 ? (
+          {createMut.isError ? (
+            <p className="text-sm text-destructive">
+              {apiErrorMessage(createMut.error, 'Could not create document')}
+            </p>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-3 pt-2">
             <Button
               type="button"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setStep((s) => s + 1)}
+              variant="outline"
+              disabled={step === 0}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
             >
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
             </Button>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              disabled={!canNext || createMut.isPending}
-              onClick={() => createMut.mutate(payload)}
-            >
-              {createMut.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                'Save Draft'
-              )}
-            </Button>
-          )}
+            {step < STEPS.length - 1 ? (
+              <Button type="button" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={!canNext || createMut.isPending}
+                onClick={() => createMut.mutate(payload)}
+              >
+                {createMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Create draft
+              </Button>
+            )}
+          </div>
         </div>
-
-        {createMut.isError ? (
-          <p className="text-sm text-destructive">
-            {apiErrorMessage(createMut.error, 'Failed to create document')}
-          </p>
-        ) : null}
       </div>
     </OfficialDocumentsShell>
   );

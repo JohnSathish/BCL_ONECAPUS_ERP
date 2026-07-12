@@ -12,7 +12,8 @@ export type OfficialDocumentType =
   | 'URGENT'
   | 'TENDER'
   | 'APPOINTMENT_ORDER'
-  | 'MEETING_NOTICE';
+  | 'MEETING_NOTICE'
+  | 'COMMITTEE_MEETING';
 
 export type OfficialDocumentStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -123,6 +124,7 @@ export type CreateOfficialDocumentPayload = {
   issuerId?: string;
   letterheadId?: string;
   audience?: Record<string, unknown>;
+  printSettings?: Record<string, unknown>;
   effectiveDate?: string;
   expiryDate?: string;
   scheduledAt?: string;
@@ -264,14 +266,21 @@ export const DOCUMENT_TYPE_OPTIONS: { value: OfficialDocumentType; label: string
   { value: 'URGENT', label: 'Urgent Notice' },
   { value: 'TENDER', label: 'Tender Notice' },
   { value: 'MEETING_NOTICE', label: 'Meeting Notice' },
+  { value: 'COMMITTEE_MEETING', label: 'Committee Meeting' },
   { value: 'APPOINTMENT_ORDER', label: 'Appointment Order' },
 ];
 
 export const AUDIENCE_OPTIONS = [
   { key: 'students', label: 'Students' },
-  { key: 'staff', label: 'Staff' },
-  { key: 'faculty', label: 'Faculty' },
+  { key: 'staff', label: 'Staff (Teaching & Non-Teaching)' },
+  { key: 'teaching_staff', label: 'Teaching Staff' },
+  { key: 'non_teaching_staff', label: 'Non-Teaching Staff' },
+  { key: 'faculty', label: 'Teaching Staff (Faculty)' },
+  { key: 'hod', label: 'Heads of Department' },
+  { key: 'principal', label: 'Principal' },
+  { key: 'committee', label: 'Committees' },
   { key: 'parents', label: 'Parents' },
+  { key: 'alumni', label: 'Alumni' },
   { key: 'public', label: 'Public' },
   { key: 'hostel', label: 'Hostel' },
   { key: 'ncc', label: 'NCC' },

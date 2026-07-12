@@ -1,266 +1,315 @@
 import { DOCUMENT_TYPE_LABELS } from '../constants/official-documents.constants';
 
 const NOTICE_TYPE_ICONS: Record<string, string> = {
-  HOLIDAY: '🏖',
-  EXAM: '🎓',
-  CIRCULAR: '📢',
-  NOTICE: '📢',
-  MEETING_NOTICE: '📅',
-  OFFICE_ORDER: '📋',
-  MEMORANDUM: '📝',
-  STAFF: '👥',
-  STUDENT: '🎓',
-  URGENT: '⚠',
-  TENDER: '📑',
-  APPOINTMENT_ORDER: '✉',
+  HOLIDAY: '◆',
+  EXAM: '◆',
+  CIRCULAR: '◆',
+  NOTICE: '◆',
+  MEETING_NOTICE: '◆',
+  COMMITTEE_MEETING: '◆',
+  OFFICE_ORDER: '◆',
+  MEMORANDUM: '◆',
+  STAFF: '◆',
+  STUDENT: '◆',
+  URGENT: '◆',
+  TENDER: '◆',
+  APPOINTMENT_ORDER: '◆',
 };
 
 export const OFFICIAL_NOTICE_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Source+Sans+3:wght@400;600;700&display=swap');
 
   :root {
-    --navy: #001b44;
-    --navy-mid: #0b2d5c;
-    --gold: #c5a46a;
-    --accent: #e8f0fa;
-    --ink: #1a1a1a;
-    --muted: #4b5563;
-    --line: #c5a46a;
-    --card-border: #c7d4e8;
+    --navy: #0b2d5c;
+    --navy-deep: #001b44;
+    --gold: #b8924a;
+    --accent: #eef3f9;
+    --ink: #111111;
+    --muted: #555555;
+    --card-border: #c5d0e0;
   }
 
   @page {
     size: A4 portrait;
-    margin: 20mm 18mm 22mm 18mm;
+    margin: 12mm 14mm 12mm 14mm;
   }
 
   * { box-sizing: border-box; }
 
   body {
     font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 10.5pt;
     color: var(--ink);
     margin: 0;
-    line-height: 1.55;
+    line-height: 1.48;
     background: #fff;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .page {
-    position: relative;
-    min-height: 250mm;
-  }
+  .page { position: relative; }
 
   .watermark {
     position: fixed;
-    top: 50%;
+    top: 52%;
     left: 50%;
     transform: translate(-50%, -50%);
-    opacity: 0.05;
+    opacity: 0.045;
     z-index: 0;
     pointer-events: none;
   }
-  .watermark img {
-    width: 280px;
-    height: auto;
-  }
+  .watermark img { width: 240px; height: auto; }
 
   .content { position: relative; z-index: 1; }
 
-  /* ——— Header ——— */
+  /* Header ≈ top 18–20% — strong institutional identity */
   .header {
     text-align: center;
-    padding-bottom: 10px;
+    padding: 0 0 6px;
   }
   .header .logo {
-    height: 78px;
+    height: 76px;
     width: auto;
+    max-width: 92px;
     margin: 0 auto 6px;
     display: block;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
   }
   .header h1 {
     margin: 0;
     font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
-    font-size: 17.5pt;
+    font-size: 29pt;
     font-weight: 700;
     color: var(--navy);
-    letter-spacing: 0.8px;
+    letter-spacing: 0.85px;
     text-transform: uppercase;
-    line-height: 1.25;
+    line-height: 1.12;
   }
-  .header .meta-lines {
-    margin-top: 6px;
-    font-size: 8.5pt;
+  .header .location {
+    margin-top: 5px;
+    font-size: 11pt;
     color: var(--muted);
-    line-height: 1.45;
+    font-weight: 500;
+    line-height: 1.35;
   }
-  .header .meta-lines div { margin: 1px 0; }
-
-  .contact-row {
-    margin-top: 8px;
+  .header .cred-badges {
+    margin: 7px auto 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 4px 14px;
+    gap: 5px 6px;
+    max-width: 170mm;
+  }
+  .header .cred-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: var(--accent);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
     font-size: 8.5pt;
-    color: var(--navy-mid);
+    line-height: 1.25;
+    color: var(--navy);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .header .cred-badge .ico {
+    color: var(--gold);
+    font-size: 9.5pt;
+    line-height: 1;
+  }
+  .header .cred-badge .emph {
+    font-weight: 700;
+    color: var(--navy-deep);
+  }
+  .header .cred-note {
+    margin-top: 4px;
+    font-size: 8pt;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .header .cred-note .emph {
+    color: var(--navy);
     font-weight: 600;
   }
+
+  .contact-row {
+    margin-top: 7px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px 16px;
+    font-size: 10.5pt;
+    color: var(--navy-deep);
+    line-height: 1.35;
+  }
   .contact-row span { white-space: nowrap; }
-  .contact-row .ico { margin-right: 3px; }
-
-  .gold-rule {
-    height: 2.5px;
-    margin: 10px 0 0;
-    background: linear-gradient(90deg, transparent, var(--gold) 12%, var(--navy) 50%, var(--gold) 88%, transparent);
-    border: none;
+  .contact-row .ico {
+    margin-right: 4px;
+    font-size: 11pt;
+    color: var(--gold);
   }
-  .navy-rule {
-    height: 1px;
-    margin: 2px 0 14px;
+  .contact-row .lbl {
+    font-weight: 700;
+    color: var(--navy-deep);
+  }
+  .contact-row .val {
+    font-weight: 600;
+    color: #222;
+  }
+
+  .header-divider {
+    margin: 8px 0 10px;
+  }
+  .header-divider .line-navy {
+    height: 1.5px;
     background: var(--navy);
-    opacity: 0.35;
     border: none;
+    margin: 0;
+  }
+  .header-divider .line-gold {
+    height: 2px;
+    background: var(--gold);
+    border: none;
+    margin: 1.5px 0 0;
   }
 
-  /* ——— Info strip ——— */
   .info-strip {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
-    margin: 0 0 16px;
+    gap: 6px;
+    margin: 0 0 8px;
   }
   .info-card {
     border: 1px solid var(--card-border);
-    border-radius: 6px;
-    background: linear-gradient(180deg, #f7fafc 0%, #fff 100%);
-    padding: 8px 10px;
+    border-radius: 4px;
+    background: #f5f8fc;
+    padding: 5px 7px;
     text-align: center;
   }
   .info-card .label {
-    font-size: 7.5pt;
+    font-size: 7pt;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--muted);
+    letter-spacing: 0.45px;
+    color: #333;
     font-weight: 700;
-    margin-bottom: 3px;
+    margin-bottom: 1px;
+    line-height: 1.2;
   }
   .info-card .value {
-    font-size: 9.5pt;
+    font-size: 11pt;
     font-weight: 700;
-    color: var(--navy);
+    color: var(--navy-deep);
     word-break: break-word;
-    line-height: 1.3;
+    line-height: 1.25;
   }
 
-  /* ——— Title ——— */
   .notice-title {
     text-align: center;
-    margin: 4px 0 18px;
+    margin: 2px 0 8px;
   }
   .notice-title .badge {
     display: inline-block;
     font-family: 'Libre Baskerville', Georgia, serif;
-    font-size: 13.5pt;
+    font-size: 20pt;
     font-weight: 700;
     color: var(--navy);
-    letter-spacing: 1.2px;
+    letter-spacing: 1px;
     text-transform: uppercase;
-    padding: 0 8px 4px;
+    padding: 0 6px 2px;
     border-bottom: 2.5px solid var(--gold);
   }
-  .notice-title .icon { margin-right: 6px; }
+  .notice-title .icon {
+    margin-right: 5px;
+    color: var(--gold);
+    font-size: 12pt;
+  }
 
-  /* ——— Recipients ——— */
   .to-block {
-    margin: 0 0 14px;
-    padding: 10px 12px;
-    background: var(--accent);
-    border-left: 3px solid var(--navy);
-    border-radius: 0 6px 6px 0;
+    margin: 0 0 8px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .to-block .to-label {
-    font-size: 8pt;
+    font-size: 8.5pt;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--navy);
-    margin-bottom: 4px;
+    letter-spacing: 0.4px;
+    color: var(--navy-deep);
+    margin-bottom: 2px;
   }
   .to-block ul {
     margin: 0;
-    padding-left: 16px;
+    padding-left: 14px;
   }
   .to-block li {
-    font-size: 10.5pt;
+    font-size: 10pt;
     font-weight: 600;
     color: var(--ink);
-    margin: 2px 0;
+    margin: 0;
+    line-height: 1.35;
   }
   .to-block .salutation-fallback {
-    font-size: 10.5pt;
+    font-size: 10pt;
     font-weight: 600;
     margin: 0;
   }
 
-  /* ——— Body ——— */
   .body {
     text-align: justify;
-    font-size: 11pt;
-    line-height: 1.65;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: var(--ink);
   }
-  .body p { margin: 0 0 11px; }
-  .body p:first-of-type::first-letter {
-    font-family: 'Libre Baskerville', Georgia, serif;
-    font-size: 2.1em;
-    font-weight: 700;
-    color: var(--navy);
-    float: left;
-    line-height: 0.85;
-    padding: 4px 6px 0 0;
-  }
-  .body ul, .body ol { margin: 0 0 12px; padding-left: 22px; }
-  .body li { margin: 3px 0; }
+  .body p { margin: 0 0 8px; }
+  .body ul, .body ol { margin: 0 0 8px; padding-left: 18px; }
+  .body li { margin: 1px 0; }
   .body table {
     width: 100%;
     border-collapse: collapse;
-    margin: 10px 0 14px;
-    font-size: 10pt;
+    margin: 6px 0 8px;
+    font-size: 9pt;
   }
   .body th, .body td {
-    border: 1px solid #cbd5e1;
-    padding: 6px 8px;
+    border: 1px solid #94a3b8;
+    padding: 4px 6px;
     text-align: left;
   }
   .body th {
     background: var(--accent);
-    color: var(--navy);
+    color: var(--navy-deep);
     font-weight: 700;
   }
   .body .highlight-box,
   .body .callout {
     background: #fffbeb;
-    border: 1px solid #f59e0b;
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin: 12px 0;
+    border: 1px solid #d97706;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin: 8px 0;
   }
 
   .important-box {
-    margin: 16px 0;
+    margin: 8px 0;
     border: 1px solid var(--card-border);
-    border-radius: 8px;
+    border-radius: 5px;
     overflow: hidden;
+    page-break-inside: avoid;
   }
   .important-box .ib-head {
     background: var(--navy);
     color: #fff;
-    font-size: 9pt;
+    font-size: 7.5pt;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     text-transform: uppercase;
-    padding: 7px 12px;
+    padding: 4px 8px;
   }
   .important-box .ib-grid {
     display: grid;
@@ -268,148 +317,243 @@ export const OFFICIAL_NOTICE_STYLES = `
     gap: 0;
   }
   .important-box .ib-item {
-    padding: 10px 12px;
+    padding: 5px 8px;
     border-top: 1px solid var(--card-border);
     border-right: 1px solid var(--card-border);
     background: #f8fafc;
   }
   .important-box .ib-item:nth-child(2n) { border-right: none; }
   .important-box .ib-item .k {
-    font-size: 8pt;
-    color: var(--muted);
+    font-size: 7pt;
+    color: #333;
     font-weight: 700;
     text-transform: uppercase;
   }
   .important-box .ib-item .v {
-    font-size: 11pt;
+    font-size: 9.5pt;
     font-weight: 700;
-    color: var(--navy);
-    margin-top: 2px;
+    color: var(--navy-deep);
+    margin-top: 1px;
   }
 
   .attachments {
-    margin: 16px 0 8px;
-    padding: 10px 12px;
+    margin: 8px 0 4px;
+    padding: 5px 8px;
     border: 1px dashed var(--card-border);
-    border-radius: 6px;
+    border-radius: 4px;
     background: #fafbfc;
+    page-break-inside: avoid;
   }
   .attachments .att-title {
-    font-size: 9pt;
+    font-size: 8pt;
     font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 6px;
+    color: var(--navy-deep);
+    margin-bottom: 2px;
   }
-  .attachments ul { margin: 0; padding-left: 18px; }
-  .attachments li { font-size: 9.5pt; margin: 2px 0; }
+  .attachments ul { margin: 0; padding-left: 14px; }
+  .attachments li { font-size: 8.5pt; margin: 0; color: #222; }
 
   .closing {
-    margin-top: 8px;
+    margin-top: 4px;
+    margin-bottom: 0;
     font-style: italic;
-    color: var(--muted);
+    color: #333;
+    font-size: 10pt;
   }
+  .closing p { margin: 0; }
 
-  /* ——— Signature + QR ——— */
   .bottom-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-top: 28px;
-    gap: 16px;
+    margin-top: 14px;
+    gap: 12px;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .verify-block {
     text-align: center;
-    max-width: 120px;
+    max-width: 100px;
   }
   .verify-block img {
-    width: 78px;
-    height: 78px;
+    width: 62px;
+    height: 62px;
     border: 1px solid var(--card-border);
-    border-radius: 4px;
-    padding: 3px;
+    border-radius: 3px;
+    padding: 2px;
     background: #fff;
   }
   .verify-block .v-label {
-    font-size: 7.5pt;
-    color: var(--muted);
-    margin-top: 4px;
-    line-height: 1.3;
+    font-size: 6.5pt;
+    color: #333;
+    margin-top: 2px;
+    line-height: 1.25;
   }
   .verify-block .v-code {
-    font-size: 7pt;
+    font-size: 6pt;
     font-family: ui-monospace, monospace;
-    color: var(--navy);
+    color: var(--navy-deep);
     word-break: break-all;
   }
 
   .signature-block {
     text-align: center;
-    min-width: 210px;
+    min-width: 180px;
     position: relative;
     margin-left: auto;
+    page-break-inside: avoid;
   }
   .signature-block .sig-space {
-    min-height: 52px;
+    min-height: 36px;
     display: flex;
     align-items: flex-end;
     justify-content: center;
   }
   .signature-block img.sig {
-    max-height: 52px;
-    max-width: 180px;
+    max-height: 40px;
+    max-width: 150px;
     display: block;
-    margin: 0 auto 2px;
+    margin: 0 auto 1px;
   }
   .signature-block img.seal {
     position: absolute;
-    right: -8px;
-    bottom: 8px;
-    width: 64px;
-    opacity: 0.88;
+    right: -4px;
+    bottom: 4px;
+    width: 48px;
+    opacity: 0.9;
   }
   .signature-block .name {
     font-family: 'Libre Baskerville', Georgia, serif;
     font-weight: 700;
-    font-size: 11pt;
-    color: var(--navy);
-    margin-top: 2px;
+    font-size: 10.5pt;
+    color: var(--navy-deep);
+    margin-top: 1px;
   }
   .signature-block .designation {
-    font-size: 9.5pt;
+    font-size: 9pt;
     font-weight: 600;
     color: var(--ink);
   }
   .signature-block .org {
-    font-size: 8.5pt;
-    color: var(--muted);
-    margin-top: 1px;
+    font-size: 8pt;
+    color: #333;
+    margin-top: 0;
   }
   .signature-block .digital-note {
-    margin-top: 6px;
-    font-size: 7.5pt;
-    color: var(--muted);
-    border-top: 1px solid #e2e8f0;
-    padding-top: 5px;
-    line-height: 1.35;
+    margin-top: 3px;
+    font-size: 6.5pt;
+    color: #333;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 3px;
+    line-height: 1.3;
   }
 
-  /* ——— Footer ——— */
   .footer {
-    margin-top: 22px;
-    padding-top: 8px;
-    border-top: 1.5px solid var(--navy);
+    margin-top: 10px;
+    padding-top: 4px;
+    border-top: 1.25px solid var(--navy);
+    page-break-inside: avoid;
   }
   .footer-inner {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 7.5pt;
-    color: var(--muted);
+    align-items: center;
+    gap: 6px;
+    font-size: 7pt;
+    color: #333;
+    line-height: 1.25;
   }
-  .footer-inner strong { color: var(--navy); }
+  .footer-inner strong { color: var(--navy-deep); }
   .footer-center { text-align: center; }
   .footer-right { text-align: right; }
+
+  @media print {
+    .bottom-row { margin-top: 12px; }
+    .header .logo { height: 76px; }
+  }
+
+  .meeting-box {
+    margin: 0 0 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 5px;
+    overflow: hidden;
+    page-break-inside: avoid;
+  }
+  .meeting-box .mb-head {
+    background: var(--navy);
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 5px 10px;
+  }
+  .meeting-box .mb-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    background: #f8fafc;
+  }
+  .meeting-box .mb-item {
+    padding: 5px 10px;
+    border-top: 1px solid var(--card-border);
+    border-right: 1px solid var(--card-border);
+  }
+  .meeting-box .mb-item:nth-child(2n) { border-right: none; }
+  .meeting-box .mb-item.full { grid-column: 1 / -1; border-right: none; }
+  .meeting-box .k {
+    font-size: 7pt;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .meeting-box .v {
+    font-size: 10pt;
+    font-weight: 700;
+    color: var(--navy-deep);
+    margin-top: 1px;
+  }
+  .meeting-box .agenda-list {
+    margin: 4px 0 0;
+    padding-left: 16px;
+  }
+  .meeting-box .agenda-list li {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 1px 0;
+  }
+
+  .committee-block {
+    margin: 10px 0;
+    page-break-inside: avoid;
+  }
+  .committee-block .cb-title {
+    font-family: 'Libre Baskerville', Georgia, serif;
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 4px;
+    padding-bottom: 2px;
+    border-bottom: 1.5px solid var(--gold);
+  }
+  .committee-block table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  .committee-block th,
+  .committee-block td {
+    border: 1px solid #94a3b8;
+    padding: 4px 6px;
+    text-align: left;
+  }
+  .committee-block th {
+    background: var(--accent);
+    color: var(--navy-deep);
+    font-weight: 700;
+  }
+  .committee-block td.sl { width: 36px; text-align: center; }
 `;
 
 export function renderTemplateVars(html: string, vars: Record<string, string>) {
@@ -432,6 +576,22 @@ export type OfficialNoticeImportantItem = {
   value: string;
 };
 
+export type OfficialNoticeMeetingInfo = {
+  title?: string;
+  date?: string;
+  time?: string;
+  venue?: string;
+  duration?: string;
+  convenedBy?: string;
+  chairperson?: string;
+  agenda?: string[];
+};
+
+export type OfficialNoticeCommitteeTable = {
+  committeeName: string;
+  members: Array<{ name: string; designation: string }>;
+};
+
 export type OfficialNoticeHtmlInput = {
   collegeName: string;
   addressLine: string;
@@ -448,6 +608,8 @@ export type OfficialNoticeHtmlInput = {
   bodyHtml: string;
   importantItems?: OfficialNoticeImportantItem[];
   attachmentNames?: string[];
+  meetingInfo?: OfficialNoticeMeetingInfo | null;
+  committeeTables?: OfficialNoticeCommitteeTable[];
   issuerName: string;
   designation: string;
   institutionShortName?: string;
@@ -494,44 +656,51 @@ export function buildOfficialNoticeHtml(input: OfficialNoticeHtmlInput) {
   const affiliation =
     input.affiliationLines && input.affiliationLines.length > 0
       ? input.affiliationLines
-      : [
-          'Tura, Meghalaya – 794002',
-          'Affiliated to North Eastern Hill University (NEHU), Shillong',
-          'Recognised by University Grants Commission (UGC), New Delhi',
-          "(Re-accredited with 'B' Grade by NAAC Bangalore)",
-        ];
+      : null;
 
-  // Prefer structured address as first line when provided
-  const metaLines = [...affiliation];
-  if (
-    input.addressLine?.trim() &&
-    !metaLines.some((l) =>
-      l.toLowerCase().includes(input.addressLine.trim().toLowerCase()),
-    )
-  ) {
-    metaLines[0] = input.addressLine.trim();
-  }
+  const locationLine =
+    affiliation?.[0]?.trim() ||
+    (input.addressLine?.includes('794002')
+      ? input.addressLine.trim()
+      : 'Tura, Meghalaya – 794002');
+
+  const credentialBadges = `
+    <div class="cred-badges">
+      <div class="cred-badge"><span class="ico">✦</span><span>Affiliated to <span class="emph">NEHU</span></span></div>
+      <div class="cred-badge"><span class="ico">✦</span><span>Recognised by <span class="emph">UGC</span></span></div>
+      <div class="cred-badge"><span class="ico">✦</span><span><span class="emph">NAAC</span> Accredited (Grade 'B')</span></div>
+    </div>
+  `;
+
+  // Optional custom affiliation lines override the default badge block
+  const affiliationBlock = affiliation
+    ? `<div class="location">${escapeHtml(locationLine)}</div>
+       <div class="cred-note">${affiliation
+         .slice(1)
+         .map((l) => escapeHtml(l))
+         .join('<br/>')}</div>`
+    : `<div class="location">${escapeHtml(locationLine)}</div>${credentialBadges}`;
 
   const c = input.contact;
   const contactParts: string[] = [];
   if (c.landline?.trim()) {
     contactParts.push(
-      `<span><span class="ico">☎</span>Phone: ${escapeHtml(c.landline.trim())}</span>`,
+      `<span><span class="ico">☎</span><span class="lbl">Phone:</span> <span class="val">${escapeHtml(c.landline.trim())}</span></span>`,
     );
   }
   if (c.mobile?.trim()) {
     contactParts.push(
-      `<span><span class="ico">📱</span>Mobile: ${escapeHtml(c.mobile.trim())}</span>`,
+      `<span><span class="ico">📱</span><span class="lbl">Mobile:</span> <span class="val">${escapeHtml(c.mobile.trim())}</span></span>`,
     );
   }
   if (c.email?.trim()) {
     contactParts.push(
-      `<span><span class="ico">✉</span>${escapeHtml(c.email.trim())}</span>`,
+      `<span><span class="ico">✉</span><span class="val">${escapeHtml(c.email.trim())}</span></span>`,
     );
   }
   if (c.website?.trim()) {
     contactParts.push(
-      `<span><span class="ico">🌐</span>${escapeHtml(c.website.trim())}</span>`,
+      `<span><span class="ico">🌐</span><span class="val">${escapeHtml(c.website.trim())}</span></span>`,
     );
   }
 
@@ -572,6 +741,75 @@ export function buildOfficialNoticeHtml(input: OfficialNoticeHtmlInput) {
         </div>`
       : '';
 
+  const m = input.meetingInfo;
+  const meetingRows: string[] = [];
+  if (m?.title?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item full"><div class="k">Meeting</div><div class="v">${escapeHtml(m.title.trim())}</div></div>`,
+    );
+  }
+  if (m?.date?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Date</div><div class="v">${escapeHtml(m.date.trim())}</div></div>`,
+    );
+  }
+  if (m?.time?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Time</div><div class="v">${escapeHtml(m.time.trim())}</div></div>`,
+    );
+  }
+  if (m?.venue?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Venue</div><div class="v">${escapeHtml(m.venue.trim())}</div></div>`,
+    );
+  }
+  if (m?.duration?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Duration</div><div class="v">${escapeHtml(m.duration.trim())}</div></div>`,
+    );
+  }
+  if (m?.convenedBy?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Convened By</div><div class="v">${escapeHtml(m.convenedBy.trim())}</div></div>`,
+    );
+  }
+  if (m?.chairperson?.trim()) {
+    meetingRows.push(
+      `<div class="mb-item"><div class="k">Chairperson</div><div class="v">${escapeHtml(m.chairperson.trim())}</div></div>`,
+    );
+  }
+  if (m?.agenda && m.agenda.length > 0) {
+    meetingRows.push(
+      `<div class="mb-item full"><div class="k">Agenda</div><ol class="agenda-list">${m.agenda
+        .filter((a) => a.trim())
+        .map((a) => `<li>${escapeHtml(a.trim())}</li>`)
+        .join('')}</ol></div>`,
+    );
+  }
+  const meetingBlock =
+    meetingRows.length > 0
+      ? `<div class="meeting-box"><div class="mb-head">Meeting Details</div><div class="mb-grid">${meetingRows.join('')}</div></div>`
+      : '';
+
+  const committeeBlocks = (input.committeeTables ?? [])
+    .filter((t) => t.members.length > 0)
+    .map((table) => {
+      const rows = table.members
+        .map(
+          (mem, idx) =>
+            `<tr><td class="sl">${idx + 1}</td><td>${escapeHtml(mem.name)}</td><td>${escapeHtml(mem.designation)}</td></tr>`,
+        )
+        .join('');
+      return `<div class="committee-block">
+        <div class="cb-title">${escapeHtml(table.committeeName)}</div>
+        <table>
+          <thead><tr><th class="sl">Sl.No</th><th>Name</th><th>Designation</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    })
+    .join('');
+
   const sig = input.signatureSrc
     ? `<img class="sig" src="${input.signatureSrc}" alt="Signature"/>`
     : '';
@@ -594,17 +832,17 @@ export function buildOfficialNoticeHtml(input: OfficialNoticeHtmlInput) {
     <header class="header">
       ${logo}
       <h1>${escapeHtml(collegeDisplay)}</h1>
-      <div class="meta-lines">
-        ${metaLines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}
-      </div>
+      ${affiliationBlock}
       ${
         contactParts.length
           ? `<div class="contact-row">${contactParts.join('')}</div>`
           : ''
       }
     </header>
-    <div class="gold-rule"></div>
-    <div class="navy-rule"></div>
+    <div class="header-divider">
+      <hr class="line-navy"/>
+      <hr class="line-gold"/>
+    </div>
 
     <div class="info-strip">
       <div class="info-card">
@@ -626,9 +864,11 @@ export function buildOfficialNoticeHtml(input: OfficialNoticeHtmlInput) {
     </div>
 
     ${toBlock}
+    ${meetingBlock}
 
     <div class="body">${input.bodyHtml}</div>
 
+    ${committeeBlocks}
     ${important}
     ${attachments}
 
