@@ -7,7 +7,7 @@ import { StudentScreenShell } from '@/components/student-portal/student-screen-s
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
 import { studentTheme } from '@/components/student-portal/theme';
 import { DeviceSessionsPanel } from '@/components/auth/device-sessions-panel';
-import { isMvpStudentCard } from '@/constants/release';
+import { COLLEGE_NAME, isMvpStudentCard } from '@/constants/release';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
 import { ProfileCompletionCard } from '@/components/student-portal/profile-completion-card';
 import {
@@ -79,7 +79,7 @@ export default function StudentHomeScreen() {
   }
 
   return (
-    <StudentScreenShell title={greeting} subtitle="Don Bosco College Student Portal">
+    <StudentScreenShell title={greeting} subtitle={COLLEGE_NAME}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.heroCard}>
           <View style={styles.headerRow}>

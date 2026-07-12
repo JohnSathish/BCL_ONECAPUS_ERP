@@ -6,6 +6,7 @@ import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-s
 import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-context';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import type { FacultyPendingAction, FacultyTodayClass } from '@/types/faculty-home';
+import { COLLEGE_NAME } from '@/constants/release';
 import { formatInr } from '@/utils/currency';
 import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/faculty-payroll';
 
@@ -91,7 +92,7 @@ export default function FacultyHomeScreen() {
   }
 
   return (
-    <FacultyScreenShell title="Faculty Workspace" subtitle="BCL OneCampus ERP">
+    <FacultyScreenShell title="Faculty Workspace" subtitle={COLLEGE_NAME}>
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={

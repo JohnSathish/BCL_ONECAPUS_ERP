@@ -129,7 +129,7 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
     persona: 'admin',
     href: '/(auth)/login' as Href,
     appType: 'staff',
-    title: 'OneCampus',
+    title: 'Campus Portal',
     subtitle: 'No mobile portal access for this account',
   };
 }

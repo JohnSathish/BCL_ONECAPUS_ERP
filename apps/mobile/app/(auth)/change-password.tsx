@@ -124,7 +124,7 @@ export default function ChangePasswordScreen() {
       >
         <Text style={styles.headerTitle}>Change Password</Text>
         <Text style={styles.headerLead}>
-          Your account requires a new password before you can use OneCampus.
+          Your account requires a new password before you can use the campus portal.
         </Text>
       </LinearGradient>
 

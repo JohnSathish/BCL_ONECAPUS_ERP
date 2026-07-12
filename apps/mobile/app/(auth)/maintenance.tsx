@@ -19,7 +19,7 @@ export default function MaintenanceScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{config?.appName ?? 'BCL OneCampus ERP'}</Text>
+      <Text style={styles.title}>{config?.appName ?? 'Campus Portal'}</Text>
       <Text style={styles.message}>{message}</Text>
       {isForceUpdate ? (
         <Text style={styles.version}>

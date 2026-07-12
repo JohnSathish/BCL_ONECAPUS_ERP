@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearSession } from '@/auth/session';
 import { normalizeSchoolConfig, saveSchoolConfig } from '@/auth/school-config';
-import { PRODUCT_NAME } from '@/constants/release';
+import { COLLEGE_PORTAL_SUBTITLE } from '@/constants/release';
 import {
   fetchSchoolRegistry,
   filterSchools,
@@ -107,7 +107,7 @@ export default function SelectSchoolScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.kicker}>{PRODUCT_NAME}</Text>
+          <Text style={styles.kicker}>{COLLEGE_PORTAL_SUBTITLE}</Text>
           <Text style={styles.title}>Find your institution</Text>
           <Text style={styles.subtitle}>
             Select your college or school. The app will connect to that campus ERP server.

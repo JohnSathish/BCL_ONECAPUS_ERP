@@ -10,8 +10,8 @@ export default function RegistrationWebFallbackScreen() {
       <View style={styles.box}>
         <Text style={styles.text}>
           Subject / course registration uses the full elective workflow on the college web portal.
-          For security, OneCampus opens a private browser session and asks you to sign in again — it
-          will not reuse an existing browser login.
+          For security, the campus portal opens a private browser session and asks you to sign in
+          again — it will not reuse an existing browser login.
         </Text>
         <OpenInWebButton path="/student/registration" label="Sign in on web to register" />
       </View>

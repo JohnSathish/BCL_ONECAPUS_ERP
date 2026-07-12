@@ -38,7 +38,7 @@ const appIcon = isNativeReleaseBuild
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: process.env.EXPO_PUBLIC_APP_NAME ?? 'OneCampus Mobile',
+  name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
   version: '1.0.0',
   scheme: 'onecampus',
@@ -57,7 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 10,
+    versionCode: 11,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -91,7 +91,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-image-picker',
       {
-        photosPermission: 'Allow OneCampus to access photos for passport photo upload.',
+        photosPermission: 'Allow the campus app to access photos for passport photo upload.',
       },
     ],
     'expo-document-picker',
@@ -106,7 +106,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
   },
   extra: {
-    appDisplayName: process.env.EXPO_PUBLIC_APP_NAME ?? 'OneCampus Mobile',
+    appDisplayName: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
     privacyPolicyUrl:
       process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html',
     termsUrl:

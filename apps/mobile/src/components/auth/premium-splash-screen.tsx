@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   POWERED_BY_TAGLINE,
   PRODUCT_NAME,
-  PORTAL_TAGLINE,
   SPLASH_DURATION_MS,
   SPLASH_MOTTO,
+  SPLASH_PRODUCT_TAGLINE,
   SPLASH_ROLES,
 } from '@/constants/release';
 
@@ -208,7 +208,7 @@ export function PremiumSplashScreen() {
           >
             <Text style={styles.productName}>{PRODUCT_NAME}</Text>
             <DiamondSeparator />
-            <Text style={styles.tagline}>{PORTAL_TAGLINE}</Text>
+            <Text style={styles.tagline}>{SPLASH_PRODUCT_TAGLINE}</Text>
             <RoleRow />
           </Animated.View>
 
@@ -219,7 +219,7 @@ export function PremiumSplashScreen() {
         </View>
 
         <Animated.View style={[styles.footer, { opacity: footerOpacity }]}>
-          <Text style={styles.poweredLabel}>Powered by</Text>
+          <Text style={styles.poweredLabel}>Developed by</Text>
           <Text style={styles.poweredBrand}>BaseCode Labs Pvt. Ltd.</Text>
           <Text style={styles.poweredTagline}>{POWERED_BY_TAGLINE}</Text>
           <PageDots />

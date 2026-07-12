@@ -6,6 +6,7 @@ import { studentTheme } from '@/components/student-portal/theme';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import {
   BASECODE_WEBSITE_URL,
+  COLLEGE_NAME,
   PRODUCT_NAME,
   APP_VERSION,
   SUPPORT_EMAIL,
@@ -106,7 +107,7 @@ function LinkRow({
 
 export function StudentAboutScreen() {
   return (
-    <StudentScreenShell title="About" subtitle={PRODUCT_NAME}>
+    <StudentScreenShell title="About" subtitle={COLLEGE_NAME}>
       <AboutBody
         textColor={studentTheme.text}
         mutedColor={studentTheme.textMuted}
@@ -120,7 +121,7 @@ export function StudentAboutScreen() {
 
 export function StaffAboutScreen() {
   return (
-    <FacultyScreenShell title="About" subtitle={PRODUCT_NAME}>
+    <FacultyScreenShell title="About" subtitle={COLLEGE_NAME}>
       <AboutBody
         textColor={facultyTheme.text}
         mutedColor={facultyTheme.textMuted}

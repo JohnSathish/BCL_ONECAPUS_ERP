@@ -14,8 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authColors } from '@/components/auth/auth-theme';
 import {
   COLLEGE_NAME,
+  COLLEGE_PORTAL_SUBTITLE,
   COLLEGE_WEBSITE_URL,
-  PRODUCT_NAME,
+  SIGN_IN_CTA,
   WELCOME_QUICK_ACCESS,
 } from '@/constants/release';
 
@@ -44,7 +45,7 @@ export default function GuestScreen() {
       >
         <Text style={styles.headerTitle}>Guest Portal</Text>
         <Text style={styles.headerSub}>{COLLEGE_NAME}</Text>
-        <Text style={styles.headerProduct}>{PRODUCT_NAME}</Text>
+        <Text style={styles.headerProduct}>{COLLEGE_PORTAL_SUBTITLE}</Text>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
@@ -73,7 +74,7 @@ export default function GuestScreen() {
         </Pressable>
 
         <Pressable style={styles.signInBtn} onPress={() => router.replace('/(auth)/login')}>
-          <Text style={styles.signInText}>Sign In to OneCampus</Text>
+          <Text style={styles.signInText}>{SIGN_IN_CTA}</Text>
         </Pressable>
       </ScrollView>
     </View>

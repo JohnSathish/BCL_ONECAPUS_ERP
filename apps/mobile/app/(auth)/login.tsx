@@ -28,11 +28,12 @@ import { CaptchaWidget, type Challenge } from '@/components/auth/captcha-widget'
 import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
   COLLEGE_NAME,
+  COLLEGE_PORTAL_SUBTITLE,
   DEFAULT_PORTAL_STATS,
   DEFAULT_PORTAL_UPDATES,
+  LOGIN_ACCESS_SUBTITLE,
   POWERED_BY,
   PRIVACY_POLICY_URL,
-  PRODUCT_NAME,
   SUPPORT_PHONE,
   WHATSAPP_SUPPORT_URL,
 } from '@/constants/release';
@@ -162,7 +163,7 @@ export default function LoginScreen() {
       ...MORE_LOGIN_OPTIONS.map((opt) => ({
         text: opt.label,
         onPress: () =>
-          Alert.alert(opt.label, `${opt.label} will be available in a future OneCampus release.`),
+          Alert.alert(opt.label, `${opt.label} will be available in a future campus app release.`),
       })),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
@@ -188,15 +189,15 @@ export default function LoginScreen() {
             <InstitutionLogo branding={config?.branding} size={40} style={styles.logoImage} />
           </View>
           <Text style={styles.collegeName}>{school?.name ?? COLLEGE_NAME}</Text>
-          <Text style={styles.productName}>{PRODUCT_NAME}</Text>
+          <Text style={styles.productName}>{COLLEGE_PORTAL_SUBTITLE}</Text>
 
           <View style={styles.headerDivider} />
 
           <Text style={styles.greetingLine}>
             {greeting.icon} {greeting.text}
           </Text>
-          <Text style={styles.greetingWelcome}>Welcome back to</Text>
-          <Text style={styles.greetingProduct}>{PRODUCT_NAME}</Text>
+          <Text style={styles.greetingWelcome}>Welcome back</Text>
+          <Text style={styles.greetingProduct}>{school?.name ?? COLLEGE_NAME}</Text>
 
           <Text style={styles.metaLine}>
             {semesterLabel} · AY {academicYear} · {campusShortName()}
@@ -318,7 +319,7 @@ export default function LoginScreen() {
                   <Text style={styles.loginBtnTitle}>
                     {loading ? 'Signing in…' : 'Secure Sign In'}
                   </Text>
-                  <Text style={styles.loginBtnSub}>Access OneCampus</Text>
+                  <Text style={styles.loginBtnSub}>{LOGIN_ACCESS_SUBTITLE}</Text>
                 </LinearGradient>
               </Pressable>
             </Animated.View>

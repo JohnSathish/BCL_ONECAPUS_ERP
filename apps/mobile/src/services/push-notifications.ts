@@ -34,7 +34,7 @@ function isExpoPushToken(token: string) {
 export async function ensureAndroidDefaultChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('onecampus_default', {
-    name: 'OneCampus',
+    name: 'Campus Portal',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#020f2e',

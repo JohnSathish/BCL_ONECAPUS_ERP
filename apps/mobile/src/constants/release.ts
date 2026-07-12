@@ -1,9 +1,13 @@
-/** BCL OneCampus ERP — unified campus portal branding */
-export const COLLEGE_NAME = 'Don Bosco College Tura';
+/** White-label campus portal — college-first in-app; product branding on splash/about */
+export const COLLEGE_NAME = 'Don Bosco College, Tura';
+/** Product brand — splash screen + About only */
 export const PRODUCT_NAME = 'BCL OneCampus ERP';
 export const APP_VERSION = '1.0.0';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
+/** Shown under college name on welcome/login (client-facing) */
+export const COLLEGE_PORTAL_SUBTITLE = 'Official ERP Portal';
+/** Splash-only product tagline */
 export const PORTAL_TAGLINE = 'Enterprise Campus Management System';
 export const PORTAL_AUDIENCE = 'Students • Faculty • Staff • Administration';
 export const SPLASH_AUDIENCE_LINE = 'Student • Faculty • Parent';
@@ -16,7 +20,9 @@ export const SPLASH_ROLES = [
   { icon: '💼', label: 'Staff' },
 ] as const;
 export const POWERED_BY_TAGLINE = 'Your Technology Growth Partner';
-export const INSTITUTION_WELCOME_MESSAGE = 'Welcome to BCL OneCampus ERP';
+export const INSTITUTION_WELCOME_MESSAGE = 'Welcome to Don Bosco College, Tura';
+export const SIGN_IN_CTA = 'Sign In to Campus Portal';
+export const LOGIN_ACCESS_SUBTITLE = 'Access your campus portal';
 
 export const NAAC_ACCREDITATION_LABEL = "NAAC Re-accredited with Grade 'B'";
 
@@ -163,7 +169,7 @@ export const SPLASH_TRUST_BADGES = [
   'NEP 2020 Ready',
 ] as const;
 
-export const SPLASH_DURATION_MS = 2400;
+export const SPLASH_DURATION_MS = 2800;
 
 export const PRIVACY_POLICY_URL =
   process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html';
@@ -188,7 +194,7 @@ export const LOGIN_TRUST_BADGES = [
   { icon: '🔒', label: '100% Secure' },
 ] as const;
 
-export const APP_DISPLAY_NAME = process.env.EXPO_PUBLIC_APP_NAME ?? PRODUCT_NAME;
+export const APP_DISPLAY_NAME = process.env.EXPO_PUBLIC_APP_NAME ?? COLLEGE_NAME;
 
 export const POWERED_BY = 'Powered by BaseCode Labs Pvt. Ltd.';
 export const BASECODE_WEBSITE_URL = 'https://www.basecodelabs.com';

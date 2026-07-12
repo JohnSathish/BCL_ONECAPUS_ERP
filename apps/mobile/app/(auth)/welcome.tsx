@@ -22,13 +22,12 @@ import {
   DON_BOSCO_QUOTE,
   INSTITUTION_AFFILIATION_LINES,
   INSTITUTION_BADGES,
-  INSTITUTION_WELCOME_MESSAGE,
   NAAC_ACCREDITATION_LABEL,
-  PORTAL_TAGLINE,
+  COLLEGE_PORTAL_SUBTITLE,
   POWERED_BY,
   POWERED_BY_TAGLINE,
   PRIVACY_POLICY_URL,
-  PRODUCT_NAME,
+  SIGN_IN_CTA,
   SUPPORT_EMAIL,
   WELCOME_FEATURE_CARDS,
   WELCOME_QUICK_ACCESS,
@@ -63,9 +62,7 @@ function SignInButton({
         end={{ x: 1, y: 1 }}
         style={[styles.signInBtn, compact && styles.signInBtnCompact]}
       >
-        <Text style={[styles.signInText, compact && styles.signInTextCompact]}>
-          Sign In to OneCampus
-        </Text>
+        <Text style={[styles.signInText, compact && styles.signInTextCompact]}>{SIGN_IN_CTA}</Text>
         <Text style={styles.signInArrow}>→</Text>
       </LinearGradient>
     </Pressable>
@@ -119,7 +116,7 @@ export default function WelcomeScreen() {
       Alert.alert(
         'Update available',
         config.softUpdateMessage?.trim() ||
-          'A new version of BCL OneCampus is available. Update now to enjoy the latest features and improvements.',
+          'A new version of the campus app is available. Update now to enjoy the latest features and improvements.',
         [
           { text: 'Later', style: 'cancel' },
           {
@@ -206,7 +203,6 @@ export default function WelcomeScreen() {
               <View style={styles.logoRing}>
                 <InstitutionLogo branding={config?.branding} size={46} style={styles.logoImage} />
               </View>
-              <Text style={styles.welcomeMessage}>{INSTITUTION_WELCOME_MESSAGE}</Text>
               <Text style={styles.collegeLine}>{institutionName.toUpperCase()}</Text>
               {INSTITUTION_AFFILIATION_LINES.map((line) => (
                 <Text key={line} style={styles.affiliationLine}>
@@ -220,8 +216,7 @@ export default function WelcomeScreen() {
                   </View>
                 ))}
               </View>
-              <Text style={styles.product}>{PRODUCT_NAME}</Text>
-              <Text style={styles.tagline}>{PORTAL_TAGLINE}</Text>
+              <Text style={styles.tagline}>{COLLEGE_PORTAL_SUBTITLE}</Text>
               <View style={styles.naacBadge}>
                 <Text style={styles.naacStars}>★★★★★</Text>
                 <Text style={styles.naacText}>{NAAC_ACCREDITATION_LABEL}</Text>
@@ -490,22 +485,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  product: {
-    color: '#dbeafe',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 12,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
   tagline: {
     color: '#e0e7ff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    marginTop: 8,
+    marginTop: 14,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
     paddingHorizontal: 8,
+    letterSpacing: 0.2,
   },
   naacBadge: {
     marginTop: 14,
