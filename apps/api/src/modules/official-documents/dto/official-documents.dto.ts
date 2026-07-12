@@ -278,6 +278,14 @@ export class CreateIssuerDto {
   sealPath?: string;
 
   @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
   @IsUUID()
   letterheadId?: string;
 
@@ -307,6 +315,14 @@ export class UpdateIssuerDto {
   @IsOptional()
   @IsString()
   sealPath?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  email?: string | null;
 
   @IsOptional()
   @IsUUID()

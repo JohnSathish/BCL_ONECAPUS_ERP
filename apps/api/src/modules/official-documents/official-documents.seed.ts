@@ -7,6 +7,8 @@ const DEFAULT_ISSUERS = [
     roleCode: 'PRINCIPAL',
     name: 'Fr. Principal SDB',
     designation: 'Principal cum Secretary',
+    phone: '+91 94021 52496',
+    email: 'principaldbct@gmail.com',
     refPrefix: 'DBCT/PR',
     sortOrder: 1,
   },
@@ -14,6 +16,8 @@ const DEFAULT_ISSUERS = [
     roleCode: 'VICE_PRINCIPAL',
     name: 'Fr. John Paul Tirkey SDB',
     designation: 'Vice Principal',
+    phone: '+91 96784 02086',
+    email: 'viceprincipal@donboscocollege.ac.in',
     refPrefix: 'DBCT/JP',
     sortOrder: 2,
   },
@@ -46,6 +50,9 @@ const DEFAULT_ISSUERS = [
     sortOrder: 6,
   },
 ];
+
+const DEFAULT_WEBSITE = 'www.donboscocollege.ac.in';
+const DEFAULT_LETTERHEAD_CONTACT = `Phone: 03651-222361 | Mobile: +91 94021 52496 | Email: principaldbct@gmail.com | Website: ${DEFAULT_WEBSITE}`;
 
 const DEFAULT_TEMPLATES = [
   {
@@ -170,16 +177,20 @@ export class OfficialDocumentsSeedService {
           name: 'Default DBC Letterhead',
           collegeName,
           addressLine,
-          contactLine:
-            'Mobile: 9678402086 | Email: viceprincipal@donboscocollege.ac.in | Website: www.donboscocollege.ac.in',
+          contactLine: DEFAULT_LETTERHEAD_CONTACT,
           logoPath,
           isDefault: true,
         },
       });
-    } else if (!letterhead.logoPath && logoPath) {
+    } else {
       letterhead = await this.db().officialLetterhead.update({
         where: { id: letterhead.id },
-        data: { logoPath, collegeName, addressLine },
+        data: {
+          ...(letterhead.logoPath || !logoPath ? {} : { logoPath }),
+          collegeName,
+          addressLine,
+          contactLine: DEFAULT_LETTERHEAD_CONTACT,
+        },
       });
     }
 
@@ -195,6 +206,9 @@ export class OfficialDocumentsSeedService {
         },
         update: {
           letterheadId: letterhead.id,
+          ...('phone' in issuer && issuer.phone
+            ? { phone: issuer.phone, email: issuer.email }
+            : {}),
         },
       });
     }

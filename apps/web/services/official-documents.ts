@@ -51,6 +51,8 @@ export type OfficialDocumentIssuer = {
   roleCode: string;
   name: string;
   designation: string;
+  phone?: string | null;
+  email?: string | null;
   signaturePath?: string | null;
   sealPath?: string | null;
   refPrefix?: string | null;
@@ -213,6 +215,8 @@ export async function updateOfficialDocumentIssuer(
   payload: Partial<{
     name: string;
     designation: string;
+    phone: string | null;
+    email: string | null;
     signaturePath: string;
     sealPath: string;
     refPrefix: string;

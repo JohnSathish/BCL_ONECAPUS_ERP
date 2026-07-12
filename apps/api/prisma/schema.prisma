@@ -11752,6 +11752,9 @@ model OfficialDocumentIssuer {
   roleCode        String   @map("role_code")
   name            String
   designation     String
+  /// Contact shown on letterhead when this officer issues the document
+  phone           String?
+  email           String?
   signaturePath   String?  @map("signature_path")
   sealPath        String?  @map("seal_path")
   letterheadId    String?  @map("letterhead_id") @db.Uuid

@@ -28,7 +28,11 @@ export class OfficialDocumentApprovalService {
   private async load(tenantId: string, id: string) {
     const doc = await this.db().officialDocument.findFirst({
       where: { id, tenantId },
-      include: { issuer: { include: { letterhead: true } }, letterhead: true },
+      include: {
+        issuer: { include: { letterhead: true } },
+        letterhead: true,
+        attachments: true,
+      },
     });
     if (!doc) throw new NotFoundException('Document not found');
     return doc;

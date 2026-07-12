@@ -33,6 +33,7 @@ export class OfficialDocumentService {
     return {
       issuer: { include: { letterhead: true } },
       letterhead: true,
+      attachments: true,
       approvals: { orderBy: { actedAt: 'desc' as const }, take: 5 },
     };
   }
