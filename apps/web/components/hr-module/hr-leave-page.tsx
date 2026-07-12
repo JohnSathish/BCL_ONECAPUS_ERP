@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 
 import { GlassCard } from '@/components/erp/glass-card';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
@@ -82,96 +83,114 @@ export function HrLeavePage() {
 
       <GlassCard className="p-4">
         <h3 className="mb-3 font-semibold">Pending Approvals</h3>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                <th className="py-2 pr-2">Staff</th>
-                <th className="py-2 pr-2">Type</th>
-                <th className="py-2 pr-2">Dates</th>
-                <th className="py-2 pr-2">Days</th>
-                <th className="py-2 pr-2">Status</th>
-                <th className="py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {appsQ.isLoading ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                    Loading…
-                  </td>
+        {appsQ.isError ? (
+          <QueryErrorPanel
+            title="Unable to load leave applications"
+            error={appsQ.error}
+            onRetry={() => void appsQ.refetch()}
+            isRetrying={appsQ.isFetching}
+          />
+        ) : (
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                  <th className="py-2 pr-2">Staff</th>
+                  <th className="py-2 pr-2">Type</th>
+                  <th className="py-2 pr-2">Dates</th>
+                  <th className="py-2 pr-2">Days</th>
+                  <th className="py-2 pr-2">Status</th>
+                  <th className="py-2 text-right">Actions</th>
                 </tr>
-              ) : appsQ.data?.length ? (
-                appsQ.data.map((a) => (
-                  <tr key={a.id} className="border-b border-border/60">
-                    <td className="py-2 pr-2">{a.staffProfile?.fullName}</td>
-                    <td className="py-2 pr-2">{a.leaveType?.name}</td>
-                    <td className="py-2 pr-2 text-xs">
-                      {a.fromDate.slice(0, 10)} → {a.toDate.slice(0, 10)}
-                    </td>
-                    <td className="py-2 pr-2">{Number(a.totalDays)}</td>
-                    <td className="py-2 pr-2">
-                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px]">
-                        {a.status}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-emerald-600"
-                          onClick={() => approveMut.mutate({ id: a.id, action: 'APPROVE' })}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => approveMut.mutate({ id: a.id, action: 'REJECT' })}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </thead>
+              <tbody>
+                {appsQ.isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                      Loading…
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                    No pending leave applications.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : appsQ.data?.length ? (
+                  appsQ.data.map((a) => (
+                    <tr key={a.id} className="border-b border-border/60">
+                      <td className="py-2 pr-2">{a.staffProfile?.fullName}</td>
+                      <td className="py-2 pr-2">{a.leaveType?.name}</td>
+                      <td className="py-2 pr-2 text-xs">
+                        {a.fromDate.slice(0, 10)} → {a.toDate.slice(0, 10)}
+                      </td>
+                      <td className="py-2 pr-2">{Number(a.totalDays)}</td>
+                      <td className="py-2 pr-2">
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px]">
+                          {a.status}
+                        </span>
+                      </td>
+                      <td className="py-2">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-emerald-600"
+                            onClick={() => approveMut.mutate({ id: a.id, action: 'APPROVE' })}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => approveMut.mutate({ id: a.id, action: 'REJECT' })}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                      No pending leave applications.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard className="p-4">
         <h3 className="mb-3 font-semibold">Leave Balances ({new Date().getFullYear()})</h3>
-        <div className="max-h-80 overflow-auto text-sm">
-          {(balancesQ.data ?? []).slice(0, 100).map((b) => {
-            const remaining =
-              Number(b.allocatedDays) + Number(b.carriedForward) - Number(b.usedDays);
-            return (
-              <div key={b.id} className="flex justify-between border-b border-border/40 py-1.5">
-                <span>
-                  {b.staffProfile?.fullName ?? '—'} · {b.leaveType.name}
-                </span>
-                <span className="tabular-nums">
-                  {remaining} / {Number(b.allocatedDays)} days
-                </span>
-              </div>
-            );
-          })}
-          {!balancesQ.data?.length ? (
-            <p className="text-muted-foreground">
-              No balances yet — run Initialize Balances after configuring leave types.
-            </p>
-          ) : null}
-        </div>
+        {balancesQ.isError ? (
+          <QueryErrorPanel
+            title="Unable to load leave balances"
+            error={balancesQ.error}
+            onRetry={() => void balancesQ.refetch()}
+            isRetrying={balancesQ.isFetching}
+          />
+        ) : (
+          <div className="max-h-80 overflow-auto text-sm">
+            {(balancesQ.data ?? []).slice(0, 100).map((b) => {
+              const remaining =
+                Number(b.allocatedDays) + Number(b.carriedForward) - Number(b.usedDays);
+              return (
+                <div key={b.id} className="flex justify-between border-b border-border/40 py-1.5">
+                  <span>
+                    {b.staffProfile?.fullName ?? '—'} · {b.leaveType.name}
+                  </span>
+                  <span className="tabular-nums">
+                    {remaining} / {Number(b.allocatedDays)} days
+                  </span>
+                </div>
+              );
+            })}
+            {!balancesQ.isLoading && !balancesQ.data?.length ? (
+              <p className="text-muted-foreground">
+                No balances yet — run Initialize Balances after configuring leave types.
+              </p>
+            ) : null}
+          </div>
+        )}
       </GlassCard>
     </div>
   );

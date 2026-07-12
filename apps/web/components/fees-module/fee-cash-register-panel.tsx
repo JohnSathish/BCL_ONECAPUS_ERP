@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Banknote, Download, Printer } from 'lucide-react';
 import { downloadFeeReportExport } from '@/services/fee-cycle';
 import { fetchFeeReport } from '@/services/fees';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -133,6 +134,13 @@ export function FeeCashRegisterPanel() {
 
       {reportQ.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading cash register…</p>
+      ) : reportQ.isError ? (
+        <QueryErrorPanel
+          title="Unable to load cash register"
+          error={reportQ.error}
+          onRetry={() => void reportQ.refetch()}
+          isRetrying={reportQ.isFetching}
+        />
       ) : report ? (
         <>
           <div className="grid gap-3 sm:grid-cols-3">

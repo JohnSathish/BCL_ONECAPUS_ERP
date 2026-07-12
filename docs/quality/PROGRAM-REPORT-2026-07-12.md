@@ -33,8 +33,33 @@
 
 ## Remaining recommendations (Medium/Low)
 
-1. Migrate remaining admin pages onto `ErpPageLayout` + `QueryErrorPanel` systematically
-2. Add Playwright smoke for permission-denied admin routes
+1. Migrate remaining low-traffic admin list pages onto `QueryErrorPanel` (priority hubs done in Phase 5)
+2. Configure GitHub `E2E_*` secrets so Playwright RBAC is a hard CI gate
 3. Bundle analysis for heaviest admin chart pages
-4. Deploy to live VPS (`vps-update.sh`) so Class XII / Feedback / password-force API land in production
-5. Full axe CI gate on critical paths
+4. Confirm live VPS deploy (`vps-update.sh`) after this push
+
+---
+
+## Phase 5 — Backlog pass (2026-07-12)
+
+**Scope:** Deferred Medium items from Phase 0–4 — progressive error panels + e2e/a11y scaffolding.
+
+### QueryErrorPanel wave (~25 hubs)
+
+Students (subject registration, profile verification, bulk update, profile load), Staff directory, HR (dashboard / leave / payslips), Timetable, LMS, Attendance (faculty + reports), Fees (reports / reconciliation / student portal / cash register), Examinations + IA, Library, Communication (campaigns / bulk), Admissions applications control center.
+
+### Playwright + axe
+
+- `apps/web/playwright.config.ts`
+- `apps/web/e2e/rbac-admin.spec.ts` — Access denied UI for restricted admin
+- `apps/web/e2e/a11y-critical.spec.ts` — axe on `/login` (+ authenticated shell when credentials set)
+- CI job `web-e2e` in `.github/workflows/ci.yml` (hard gate when `E2E_RESTRICTED_EMAIL` secret is set)
+
+### Secrets (optional until configured)
+
+| Secret                                             | Purpose                                           |
+| -------------------------------------------------- | ------------------------------------------------- |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | Restricted admin for RBAC + auth a11y             |
+| `PLAYWRIGHT_BASE_URL`                              | Override target (default live ERP URL in CI)      |
+| `E2E_DENIED_PATH`                                  | Path expected to deny (default `/admin/students`) |
+| `E2E_A11Y_PATH`                                    | Authenticated path for axe (default `/admin`)     |

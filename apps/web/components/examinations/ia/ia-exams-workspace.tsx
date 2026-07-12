@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fetchAcademicStreams } from '@/services/academic-engine';
@@ -207,6 +208,14 @@ export function IaExamsWorkspace() {
 
   return (
     <div className="space-y-4">
+      {exams.isError ? (
+        <QueryErrorPanel
+          title="Unable to load IA examinations"
+          error={exams.error}
+          onRetry={() => void exams.refetch()}
+          isRetrying={exams.isFetching}
+        />
+      ) : null}
       {message ? (
         <p className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm">{message}</p>
       ) : null}

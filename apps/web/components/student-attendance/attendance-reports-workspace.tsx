@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileSpreadsheet, Loader2, Printer } from 'lucide-react';
 
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
 import {
@@ -177,6 +178,15 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
       </div>
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+
+      {reportQ.isError ? (
+        <QueryErrorPanel
+          title="Unable to load attendance report"
+          error={reportQ.error}
+          onRetry={() => void reportQ.refetch()}
+          isRetrying={reportQ.isFetching}
+        />
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Students" value={report?.summary?.students ?? rows.length} />

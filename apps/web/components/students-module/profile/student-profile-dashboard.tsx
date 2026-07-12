@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { ErpWorkspace, ErpWorkspaceGrid } from '@/components/erp/erp-workspace-shell';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { StudentPhotoUpload } from '@/components/student-records/student-photo-upload';
 import {
   AcademicSection,
@@ -33,7 +34,6 @@ import { buttonVariants } from '@/components/ui/button';
 import { uploadStudentPhoto } from '@/services/students';
 import type { StudentProfile } from '@/types/students';
 import { LEGACY_SECTION_TO_TAB, PROFILE_TABS, type ProfileTabKey } from '@/types/student-profile';
-import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
 function parseTab(tabParam: string | null, sectionParam: string | null): ProfileTabKey {
@@ -235,9 +235,7 @@ function ProfileSummarySidebar({
           onSelect={(file: File) => photoMut.mutate(file)}
         />
         {photoMut.isError ? (
-          <p className="mt-1 text-[10px] text-destructive">
-            {apiErrorMessage(photoMut.error, 'Photo upload failed')}
-          </p>
+          <QueryErrorPanel title="Photo upload failed" error={photoMut.error} />
         ) : null}
         <h2 className="mt-2 text-sm font-semibold leading-tight">
           <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />

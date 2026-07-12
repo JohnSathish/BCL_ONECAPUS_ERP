@@ -3,12 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { SaaSCard } from '@/components/dashboard/command-center-ui';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchCommunicationDashboard } from '@/services/communication';
 
 export function BulkMessagingPage() {
   const enabled = useAuthQueryEnabled();
-  const { data } = useQuery({
+  const { data, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['communication', 'dashboard'],
     queryFn: fetchCommunicationDashboard,
     enabled,
@@ -16,6 +17,17 @@ export function BulkMessagingPage() {
   });
 
   const q = data?.queueStats;
+
+  if (isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load bulk messaging stats"
+        error={error}
+        onRetry={() => void refetch()}
+        isRetrying={isFetching}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

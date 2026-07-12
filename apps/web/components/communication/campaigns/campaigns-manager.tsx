@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
   cancelCommunicationCampaign,
@@ -70,6 +71,15 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
         </div>
       ) : null}
 
+      {campaigns.isError ? (
+        <QueryErrorPanel
+          title="Unable to load campaigns"
+          error={campaigns.error}
+          onRetry={() => void campaigns.refetch()}
+          isRetrying={campaigns.isFetching}
+        />
+      ) : null}
+
       {filtered.map((c) => {
         const trigger = (c.metadata as Record<string, unknown> | undefined)?.trigger as
           | string
@@ -115,6 +125,16 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                 ) : null}
               </div>
             </div>
+            {expandedId === c.id && recipients.isError ? (
+              <div className="mt-3 border-t border-border/60 pt-3">
+                <QueryErrorPanel
+                  title="Unable to load recipients"
+                  error={recipients.error}
+                  onRetry={() => void recipients.refetch()}
+                  isRetrying={recipients.isFetching}
+                />
+              </div>
+            ) : null}
             {expandedId === c.id && recipients.data ? (
               <ul className="mt-3 max-h-40 overflow-y-auto border-t border-border/60 pt-3 text-xs">
                 {recipients.data.slice(0, 50).map((r) => (
@@ -127,7 +147,9 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
           </div>
         );
       })}
-      {!filtered.length ? <p className="text-sm text-muted-foreground">No campaigns.</p> : null}
+      {!filtered.length && !campaigns.isError ? (
+        <p className="text-sm text-muted-foreground">No campaigns.</p>
+      ) : null}
     </div>
   );
 }

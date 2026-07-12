@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, User } from 'lucide-react';
 
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -41,6 +42,15 @@ export function LibraryMembersWorkspace() {
           Active readers with loans, visits, fines, and reading scores
         </p>
       </div>
+
+      {members.isError ? (
+        <QueryErrorPanel
+          title="Unable to load library members"
+          error={members.error}
+          onRetry={() => void members.refetch()}
+          isRetrying={members.isFetching}
+        />
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-[200px] flex-1">
@@ -118,7 +128,14 @@ export function LibraryMembersWorkspace() {
         </div>
 
         <div className="rounded-xl border bg-card p-4">
-          {selected && detail.data ? (
+          {selected && detail.isError ? (
+            <QueryErrorPanel
+              title="Unable to load member detail"
+              error={detail.error}
+              onRetry={() => void detail.refetch()}
+              isRetrying={detail.isFetching}
+            />
+          ) : selected && detail.data ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">

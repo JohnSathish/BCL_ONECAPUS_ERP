@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useRequireAuth } from '@/hooks/use-auth';
 import {
   fetchApplications,
@@ -239,6 +240,14 @@ export function AdmissionsApplicationsControlCenter({ preset }: Props) {
           </CardHeader>
 
           <CardContent className="space-y-4">
+            {applications.isError ? (
+              <QueryErrorPanel
+                title="Unable to load applications"
+                error={applications.error}
+                onRetry={() => void applications.refetch()}
+                isRetrying={applications.isFetching}
+              />
+            ) : null}
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">

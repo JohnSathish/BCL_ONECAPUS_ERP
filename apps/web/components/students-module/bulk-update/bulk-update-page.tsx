@@ -37,6 +37,7 @@ import {
 } from '@/components/students-module/bulk-update/use-bulk-update-wizard';
 import { DirectoryAdvancedFiltersDrawer } from '@/components/students-module/directory/directory-advanced-filters-drawer';
 import { BulkActionButton, BulkActionToolbar, BulkEmptyState } from '@/components/erp/bulk-actions';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Progress } from '@/components/ui/progress';
 import { useRequireAuth } from '@/hooks/use-auth';
@@ -243,9 +244,10 @@ export function BulkUpdatePage() {
   if (!perms.canBulkUpdate) {
     return (
       <DashboardShell role="admin" title="Bulk Update">
-        <p className="text-sm text-muted-foreground">
-          You do not have permission to bulk update students.
-        </p>
+        <QueryErrorPanel
+          title="Access denied"
+          message="You do not have permission to bulk update students."
+        />
       </DashboardShell>
     );
   }
@@ -418,29 +420,47 @@ export function BulkUpdatePage() {
               ) : null}
 
               {wizard.step === 'Select' ? (
-                <BulkUpdateSelectStep
-                  rows={listQuery.data?.data ?? []}
-                  selectedIds={wizard.selectedIds}
-                  onToggle={wizard.toggleStudent}
-                  onPageSelect={wizard.setPageSelection}
-                  loading={listQuery.isLoading}
-                  total={listQuery.data?.meta.total}
-                  page={listPage}
-                  onPageChange={setListPage}
-                  pageSize={PAGE_SIZE}
-                  disabled={wizard.scopeMode === 'filters'}
-                />
+                listQuery.isError ? (
+                  <QueryErrorPanel
+                    title="Unable to load students"
+                    error={listQuery.error}
+                    onRetry={() => void listQuery.refetch()}
+                    isRetrying={listQuery.isFetching}
+                  />
+                ) : (
+                  <BulkUpdateSelectStep
+                    rows={listQuery.data?.data ?? []}
+                    selectedIds={wizard.selectedIds}
+                    onToggle={wizard.toggleStudent}
+                    onPageSelect={wizard.setPageSelection}
+                    loading={listQuery.isLoading}
+                    total={listQuery.data?.meta.total}
+                    page={listPage}
+                    onPageChange={setListPage}
+                    pageSize={PAGE_SIZE}
+                    disabled={wizard.scopeMode === 'filters'}
+                  />
+                )
               ) : null}
 
               {wizard.step === 'Fields' ? (
-                <BulkUpdateFieldPickerStep
-                  groups={fieldsQuery.data ?? []}
-                  selected={wizard.fieldKeys}
-                  onChange={wizard.setFieldKeys}
-                  canPersonal={perms.canBulkUpdatePersonal}
-                  canAcademic={perms.canBulkUpdateAcademic}
-                  canSubjects={perms.canBulkUpdateSubjects}
-                />
+                fieldsQuery.isError ? (
+                  <QueryErrorPanel
+                    title="Unable to load bulk update fields"
+                    error={fieldsQuery.error}
+                    onRetry={() => void fieldsQuery.refetch()}
+                    isRetrying={fieldsQuery.isFetching}
+                  />
+                ) : (
+                  <BulkUpdateFieldPickerStep
+                    groups={fieldsQuery.data ?? []}
+                    selected={wizard.fieldKeys}
+                    onChange={wizard.setFieldKeys}
+                    canPersonal={perms.canBulkUpdatePersonal}
+                    canAcademic={perms.canBulkUpdateAcademic}
+                    canSubjects={perms.canBulkUpdateSubjects}
+                  />
+                )
               ) : null}
 
               {wizard.step === 'Values' ? (

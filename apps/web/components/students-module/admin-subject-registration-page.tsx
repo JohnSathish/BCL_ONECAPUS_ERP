@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { RegistrationImportDialog } from '@/components/academic-engine/registration-import-dialog';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
@@ -506,6 +507,15 @@ export function AdminSubjectRegistrationPage() {
           <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">{message}</p>
         ) : null}
 
+        {windows.isError ? (
+          <QueryErrorPanel
+            title="Unable to load registration windows"
+            error={windows.error}
+            onRetry={() => void windows.refetch()}
+            isRetrying={windows.isFetching}
+          />
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" disabled={!semesterId} onClick={() => setBulkOpen(true)}>
             Generate registrations
@@ -576,39 +586,48 @@ export function AdminSubjectRegistrationPage() {
           <CompactCard>
             <CompactCardHeader title="Student queue" />
             <CompactCardBody className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="py-2 pr-2">Enrollment</th>
-                    <th className="py-2 pr-2">Name</th>
-                    <th className="py-2 pr-2">Batch</th>
-                    <th className="py-2 pr-2">Status</th>
-                    <th className="py-2">Locked</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(list.data?.items ?? []).map((row) => (
-                    <tr
-                      key={row.studentId}
-                      className={`cursor-pointer border-b border-border/60 hover:bg-muted/40 ${
-                        selectedStudentId === row.studentId ? 'bg-muted/60' : ''
-                      }`}
-                      onClick={() => {
-                        setSelectedStudentId(row.studentId);
-                        setSelections({});
-                        setOverrideBySlot({});
-                        setValidationIssues([]);
-                      }}
-                    >
-                      <td className="py-2 pr-2 font-mono text-xs">{row.enrollmentNumber}</td>
-                      <td className="py-2 pr-2">{row.fullName}</td>
-                      <td className="py-2 pr-2">{row.batchCode ?? '—'}</td>
-                      <td className="py-2 pr-2">{row.registration?.status ?? 'none'}</td>
-                      <td className="py-2">{row.registrationLocked ? 'Yes' : 'No'}</td>
+              {list.isError ? (
+                <QueryErrorPanel
+                  title="Unable to load registration queue"
+                  error={list.error}
+                  onRetry={() => void list.refetch()}
+                  isRetrying={list.isFetching}
+                />
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-2 pr-2">Enrollment</th>
+                      <th className="py-2 pr-2">Name</th>
+                      <th className="py-2 pr-2">Batch</th>
+                      <th className="py-2 pr-2">Status</th>
+                      <th className="py-2">Locked</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(list.data?.items ?? []).map((row) => (
+                      <tr
+                        key={row.studentId}
+                        className={`cursor-pointer border-b border-border/60 hover:bg-muted/40 ${
+                          selectedStudentId === row.studentId ? 'bg-muted/60' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedStudentId(row.studentId);
+                          setSelections({});
+                          setOverrideBySlot({});
+                          setValidationIssues([]);
+                        }}
+                      >
+                        <td className="py-2 pr-2 font-mono text-xs">{row.enrollmentNumber}</td>
+                        <td className="py-2 pr-2">{row.fullName}</td>
+                        <td className="py-2 pr-2">{row.batchCode ?? '—'}</td>
+                        <td className="py-2 pr-2">{row.registration?.status ?? 'none'}</td>
+                        <td className="py-2">{row.registrationLocked ? 'Yes' : 'No'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </CompactCardBody>
           </CompactCard>
 
@@ -626,6 +645,13 @@ export function AdminSubjectRegistrationPage() {
                 <p className="text-sm text-muted-foreground">Select a student from the queue.</p>
               ) : context.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : context.isError ? (
+                <QueryErrorPanel
+                  title="Unable to load student registration"
+                  error={context.error}
+                  onRetry={() => void context.refetch()}
+                  isRetrying={context.isFetching}
+                />
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground">

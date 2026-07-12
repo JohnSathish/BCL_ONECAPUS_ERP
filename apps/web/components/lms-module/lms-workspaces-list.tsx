@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
-import { Button } from '@/components/ui/button';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Input } from '@/components/ui/input';
 import { withApiStartupRetry } from '@/lib/http/wait-for-api';
 import { fetchLmsWorkspaces, formatLmsWorkspaceMeta } from '@/services/lms';
-import { isApiUnavailableError } from '@/utils/api-error';
 
 export function LmsWorkspacesList() {
   const [q, setQ] = useState('');
@@ -42,34 +41,12 @@ export function LmsWorkspacesList() {
           ) : null}
 
           {workspaces.isError ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <div className="space-y-2">
-                  <p className="font-medium text-destructive">
-                    {isApiUnavailableError(workspaces.error)
-                      ? 'Cannot reach the API. It may still be starting after a code change.'
-                      : 'Failed to load workspaces.'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Confirm the terminal shows{' '}
-                    <code className="rounded bg-muted px-1">
-                      Nest application successfully started
-                    </code>
-                    , then retry.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void workspaces.refetch()}
-                  >
-                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <QueryErrorPanel
+              title="Unable to load workspaces"
+              error={workspaces.error}
+              onRetry={() => void workspaces.refetch()}
+              isRetrying={workspaces.isFetching}
+            />
           ) : null}
 
           {!workspaces.isLoading && !workspaces.isError

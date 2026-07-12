@@ -20,6 +20,7 @@ import {
   staffFiltersToParams,
   type StaffDirectoryFilters,
 } from '@/components/staff-module/directory/staff-filter-utils';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
@@ -201,9 +202,10 @@ export function StaffDirectoryPage() {
   if (!perms.canRead) {
     return (
       <DashboardShell role="admin" title="Staff Directory">
-        <p className="text-sm text-muted-foreground">
-          You do not have permission to view staff records.
-        </p>
+        <QueryErrorPanel
+          title="Access denied"
+          message="You do not have permission to view staff records."
+        />
       </DashboardShell>
     );
   }
@@ -283,9 +285,12 @@ export function StaffDirectoryPage() {
         {staffList.isLoading ? (
           <DirectoryTableSkeleton rows={10} />
         ) : staffList.isError ? (
-          <p className="py-8 text-center text-sm text-danger">
-            {apiErrorMessage(staffList.error, 'Failed to load staff')}
-          </p>
+          <QueryErrorPanel
+            title="Unable to load staff directory"
+            error={staffList.error}
+            onRetry={() => void staffList.refetch()}
+            isRetrying={staffList.isFetching}
+          />
         ) : (
           <>
             <StaffDirectoryTable

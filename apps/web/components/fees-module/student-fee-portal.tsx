@@ -36,6 +36,7 @@ import type {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -317,6 +318,17 @@ export function StudentFeePortal() {
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
         Loading your fee account…
       </div>
+    );
+  }
+
+  if (accountQ.isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load fee account"
+        error={accountQ.error}
+        onRetry={() => void accountQ.refetch()}
+        isRetrying={accountQ.isFetching}
+      />
     );
   }
 

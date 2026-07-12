@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { AttendanceStatusButtonBar } from '@/components/student-attendance/attendance-status-buttons';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import {
   ATTENDANCE_STATUS_MAP,
@@ -294,6 +295,15 @@ export function FacultyAttendanceWorkspace() {
         </div>
       </section>
 
+      {sessions.isError ? (
+        <QueryErrorPanel
+          title="Unable to load today's attendance sessions"
+          error={sessions.error}
+          onRetry={() => void sessions.refetch()}
+          isRetrying={sessions.isFetching}
+        />
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
         <aside className="space-y-2">
           {sessions.isLoading ? <LoadingCard label="Loading today's timetable..." /> : null}
@@ -320,6 +330,15 @@ export function FacultyAttendanceWorkspace() {
           {!selected ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
               Select a class to begin.
+            </div>
+          ) : roster.isError ? (
+            <div className="p-4">
+              <QueryErrorPanel
+                title="Unable to load class roster"
+                error={roster.error}
+                onRetry={() => void roster.refetch()}
+                isRetrying={roster.isFetching}
+              />
             </div>
           ) : roster.isLoading ? (
             <LoadingCard label="Loading class roster..." />

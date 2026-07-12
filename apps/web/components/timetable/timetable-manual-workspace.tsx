@@ -20,6 +20,7 @@ import {
 } from '@/components/timetable/timetable-slot-modal';
 import { StreamMasterRoutineView } from '@/components/timetable/stream-master-routine';
 import { ErpWorkspaceGrid } from '@/components/erp/erp-workspace-shell';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -275,6 +276,22 @@ export function TimetableManualWorkspace() {
         title="Manual & Excel Timetable Workspace"
         description="Build FYUGP routines manually or via Excel. Auto-generation is optional under Advanced."
       >
+        {dashboardQ.isError ? (
+          <QueryErrorPanel
+            title="Unable to load timetable dashboard"
+            error={dashboardQ.error}
+            onRetry={() => void dashboardQ.refetch()}
+            isRetrying={dashboardQ.isFetching}
+          />
+        ) : null}
+        {matrixQ.isError ? (
+          <QueryErrorPanel
+            title="Unable to load timetable matrix"
+            error={matrixQ.error}
+            onRetry={() => void matrixQ.refetch()}
+            isRetrying={matrixQ.isFetching}
+          />
+        ) : null}
         <TimetableFilterBar
           shiftId={shiftId}
           setShiftId={setShiftId}

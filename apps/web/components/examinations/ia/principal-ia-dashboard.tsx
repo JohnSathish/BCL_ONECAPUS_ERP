@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardList, TrendingUp, Users } from 'lucide-react';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { fetchIaPrincipalDashboard } from '@/services/examinations-ia';
 
 export function PrincipalIaDashboard() {
@@ -9,6 +10,18 @@ export function PrincipalIaDashboard() {
     queryKey: ['ia', 'principal-dashboard'],
     queryFn: fetchIaPrincipalDashboard,
   });
+
+  if (dashboard.isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load IA dashboard"
+        error={dashboard.error}
+        onRetry={() => void dashboard.refetch()}
+        isRetrying={dashboard.isFetching}
+      />
+    );
+  }
+
   const d = dashboard.data ?? {};
 
   return (

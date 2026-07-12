@@ -7,6 +7,7 @@ import { BookOpen, DoorOpen, Users } from 'lucide-react';
 import { LibraryCirculationDesk } from '@/components/library/library-circulation-desk';
 import { LibraryDashboard } from '@/components/library/library-dashboard';
 import { LibrarySettingsPanel } from '@/components/library/library-settings-panel';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -140,6 +141,14 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
           <DoorOpen className="h-5 w-5" />
           <h1 className="text-lg font-semibold">Visit History</h1>
         </div>
+        {visits.isError ? (
+          <QueryErrorPanel
+            title="Unable to load visits"
+            error={visits.error}
+            onRetry={() => void visits.refetch()}
+            isRetrying={visits.isFetching}
+          />
+        ) : null}
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -178,6 +187,14 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
           <h1 className="text-lg font-semibold">Catalogue</h1>
         </div>
         {message ? <p className="text-sm">{message}</p> : null}
+        {books.isError ? (
+          <QueryErrorPanel
+            title="Unable to load catalogue"
+            error={books.error}
+            onRetry={() => void books.refetch()}
+            isRetrying={books.isFetching}
+          />
+        ) : null}
         <div className="grid gap-2 rounded-lg border p-4 md:grid-cols-5">
           <Input
             placeholder="Accession No"
@@ -243,6 +260,14 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
     return (
       <div className="space-y-4">
         <h1 className="text-lg font-semibold">Reservations</h1>
+        {reservations.isError ? (
+          <QueryErrorPanel
+            title="Unable to load reservations"
+            error={reservations.error}
+            onRetry={() => void reservations.refetch()}
+            isRetrying={reservations.isFetching}
+          />
+        ) : null}
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -275,6 +300,14 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
           <h1 className="text-lg font-semibold">Visitors</h1>
         </div>
         {message ? <p className="text-sm">{message}</p> : null}
+        {visitors.isError ? (
+          <QueryErrorPanel
+            title="Unable to load visitors"
+            error={visitors.error}
+            onRetry={() => void visitors.refetch()}
+            isRetrying={visitors.isFetching}
+          />
+        ) : null}
         <div className="grid gap-2 rounded-lg border p-4 md:grid-cols-5">
           <Input
             placeholder="Name"
@@ -355,6 +388,36 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
       <div className="space-y-6">
         <h1 className="text-lg font-semibold">Reports</h1>
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        {overdue.isError ||
+        deptReport.isError ||
+        digitalReport.isError ||
+        popularDigitalReport.isError ||
+        researchReport.isError ? (
+          <QueryErrorPanel
+            title="Unable to load library reports"
+            error={
+              overdue.error ??
+              deptReport.error ??
+              digitalReport.error ??
+              popularDigitalReport.error ??
+              researchReport.error
+            }
+            onRetry={() => {
+              void overdue.refetch();
+              void deptReport.refetch();
+              void digitalReport.refetch();
+              void popularDigitalReport.refetch();
+              void researchReport.refetch();
+            }}
+            isRetrying={
+              overdue.isFetching ||
+              deptReport.isFetching ||
+              digitalReport.isFetching ||
+              popularDigitalReport.isFetching ||
+              researchReport.isFetching
+            }
+          />
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Button

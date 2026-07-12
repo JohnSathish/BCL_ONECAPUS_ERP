@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { withApiStartupRetry } from '@/lib/http/wait-for-api';
 import {
@@ -38,6 +39,14 @@ export function LmsAdminDashboard() {
 
   return (
     <div className="space-y-6">
+      {dashboard.isError ? (
+        <QueryErrorPanel
+          title="Unable to load LMS dashboard"
+          error={dashboard.error}
+          onRetry={() => void dashboard.refetch()}
+          isRetrying={dashboard.isFetching}
+        />
+      ) : null}
       <section className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">LMS Dashboard</h2>
@@ -93,6 +102,14 @@ export function LmsAdminDashboard() {
           description="Subject workspaces auto-created from sections and pool offerings."
         />
         <CompactCardBody className="space-y-2">
+          {workspaces.isError ? (
+            <QueryErrorPanel
+              title="Unable to load workspaces"
+              error={workspaces.error}
+              onRetry={() => void workspaces.refetch()}
+              isRetrying={workspaces.isFetching}
+            />
+          ) : null}
           {(workspaces.data?.data ?? []).map((ws) => (
             <Link
               key={ws.id}

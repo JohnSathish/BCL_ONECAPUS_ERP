@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { fetchFeeReconciliationReport } from '@/services/fee-cycle';
 
 function formatInr(n: number) {
@@ -31,6 +32,16 @@ export function FeeReconciliationPanel() {
   const data = reportQ.data;
   if (reportQ.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading reconciliation…</p>;
+  }
+  if (reportQ.isError) {
+    return (
+      <QueryErrorPanel
+        title="Unable to load reconciliation"
+        error={reportQ.error}
+        onRetry={() => void reportQ.refetch()}
+        isRetrying={reportQ.isFetching}
+      />
+    );
   }
   if (!data) return null;
 

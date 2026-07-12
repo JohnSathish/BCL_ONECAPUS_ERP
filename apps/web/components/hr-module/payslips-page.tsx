@@ -27,6 +27,7 @@ import {
   type PeriodPreset,
 } from '@/components/hr-module/payslip-period-utils';
 import { GlassCard } from '@/components/erp/glass-card';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -203,13 +204,14 @@ export function PayslipsPage() {
     queryFn: () => fetchPayslipAnalytics(queryParams),
   });
 
-  const loadError =
-    payslipsQ.error || statsQ.error || analyticsQ.error
-      ? apiErrorMessage(
-          payslipsQ.error ?? statsQ.error ?? analyticsQ.error,
-          'Failed to load payslips',
-        )
-      : '';
+  const loadErrorQuery = payslipsQ.isError
+    ? payslipsQ
+    : statsQ.isError
+      ? statsQ
+      : analyticsQ.isError
+        ? analyticsQ
+        : null;
+
   const runsQ = useQuery({
     queryKey: ['payroll', 'runs', filters.month, filters.year],
     queryFn: () => fetchPayrollRuns({ month: filters.month, year: filters.year }),
@@ -309,16 +311,28 @@ export function PayslipsPage() {
 
   return (
     <div className="space-y-4">
-      {(message || error || loadError) && (
+      {loadErrorQuery ? (
+        <QueryErrorPanel
+          title="Unable to load payslips"
+          error={loadErrorQuery.error}
+          onRetry={() => {
+            void payslipsQ.refetch();
+            void statsQ.refetch();
+            void analyticsQ.refetch();
+          }}
+          isRetrying={payslipsQ.isFetching || statsQ.isFetching || analyticsQ.isFetching}
+        />
+      ) : null}
+      {(message || error) && (
         <div
           className={cn(
             'rounded-lg border px-3 py-2 text-sm',
-            error || loadError
+            error
               ? 'border-red-200 bg-red-50 text-red-700'
               : 'border-emerald-200 bg-emerald-50 text-emerald-700',
           )}
         >
-          {error || loadError || message}
+          {error || message}
         </div>
       )}
 

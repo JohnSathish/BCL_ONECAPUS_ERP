@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   bulkReviewProfileRequests,
   exportProfileVerificationReport,
@@ -183,6 +184,32 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
 
   const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected]);
 
+  const activeQuery =
+    mode === 'pending'
+      ? pendingQ
+      : mode === 'class-xii'
+        ? classXiiQ
+        : mode === 'documents'
+          ? docsQ
+          : mode === 'completion'
+            ? completionQ
+            : mode === 'history'
+              ? historyQ
+              : policyQ;
+
+  const modeErrorTitle =
+    mode === 'pending'
+      ? 'Unable to load pending profile updates'
+      : mode === 'class-xii'
+        ? 'Unable to load Class XII verification queue'
+        : mode === 'documents'
+          ? 'Unable to load document verification queue'
+          : mode === 'completion'
+            ? 'Unable to load profile completion dashboard'
+            : mode === 'history'
+              ? 'Unable to load profile update history'
+              : 'Unable to load profile update policy';
+
   return (
     <div className="space-y-4 print:space-y-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -237,7 +264,16 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
       ) : null}
       {message ? <p className="text-sm text-muted-foreground print:hidden">{message}</p> : null}
 
-      {(mode === 'pending' || mode === 'class-xii') && (
+      {activeQuery.isError ? (
+        <QueryErrorPanel
+          title={modeErrorTitle}
+          error={activeQuery.error}
+          onRetry={() => void activeQuery.refetch()}
+          isRetrying={activeQuery.isFetching}
+        />
+      ) : null}
+
+      {(mode === 'pending' || mode === 'class-xii') && !activeQuery.isError && (
         <div className="flex flex-wrap items-center gap-2 print:hidden">
           <Button
             size="sm"
@@ -286,20 +322,21 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
         </div>
       )}
 
-      {(mode === 'pending' || mode === 'class-xii' || mode === 'history') && (
-        <RequestTable
-          rows={requestRows}
-          loading={pendingQ.isLoading || classXiiQ.isLoading || historyQ.isLoading}
-          showActions={mode !== 'history'}
-          selectable={mode !== 'history'}
-          selected={selected}
-          onToggle={(id, on) => setSelected((prev) => ({ ...prev, [id]: on }))}
-          onReview={(id, action) => reviewMut.mutate({ id, action })}
-          reviewing={reviewMut.isPending || bulkMut.isPending}
-        />
-      )}
+      {(mode === 'pending' || mode === 'class-xii' || mode === 'history') &&
+        !activeQuery.isError && (
+          <RequestTable
+            rows={requestRows}
+            loading={pendingQ.isLoading || classXiiQ.isLoading || historyQ.isLoading}
+            showActions={mode !== 'history'}
+            selectable={mode !== 'history'}
+            selected={selected}
+            onToggle={(id, on) => setSelected((prev) => ({ ...prev, [id]: on }))}
+            onReview={(id, action) => reviewMut.mutate({ id, action })}
+            reviewing={reviewMut.isPending || bulkMut.isPending}
+          />
+        )}
 
-      {mode === 'documents' && (
+      {mode === 'documents' && !activeQuery.isError && (
         <div className="overflow-auto rounded-2xl border border-border">
           <table className="min-w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -368,7 +405,7 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
         </div>
       )}
 
-      {mode === 'completion' && (
+      {mode === 'completion' && !activeQuery.isError && (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <Stat label="Average completion" value={`${completionQ.data?.overallAverage ?? 0}%`} />
@@ -405,7 +442,7 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
         </div>
       )}
 
-      {mode === 'policy' && (
+      {mode === 'policy' && !activeQuery.isError && (
         <div className="space-y-4">
           <UpdateWindowPanel
             window={updateWindowQ.data}

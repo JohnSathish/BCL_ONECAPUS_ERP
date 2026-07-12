@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -274,6 +275,15 @@ export function FinancialReportsCenter() {
           Generate audit-ready fee reports with filters and one-click PDF, Excel, and CSV export.
         </p>
       </div>
+
+      {dashboardQ.isError ? (
+        <QueryErrorPanel
+          title="Unable to load fee dashboard"
+          error={dashboardQ.error}
+          onRetry={() => void dashboardQ.refetch()}
+          isRetrying={dashboardQ.isFetching}
+        />
+      ) : null}
 
       <OrphanDemandsPanel />
 
@@ -540,6 +550,13 @@ export function FinancialReportsCenter() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading report…
                   </div>
+                ) : reportQ.isError ? (
+                  <QueryErrorPanel
+                    title="Unable to load financial report"
+                    error={reportQ.error}
+                    onRetry={() => void reportQ.refetch()}
+                    isRetrying={reportQ.isFetching}
+                  />
                 ) : (
                   <>
                     <div className="mb-4 grid gap-3 sm:grid-cols-3">

@@ -19,9 +19,9 @@ import { BarChartWidget } from '@/components/analytics/charts/bar-chart-widget';
 import { DonutChartWidget } from '@/components/analytics/charts/donut-chart-widget';
 import { payScaleLabel } from '@/components/hr-module/pay-scale-utils';
 import { GlassCard } from '@/components/erp/glass-card';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
-import { ApiError } from '@/lib/http/api-error-types';
 import { fetchHrExecutiveDashboard, fetchPayrollDashboard } from '@/services/payroll';
 import { fetchSubstituteDashboard } from '@/services/hr-substitute';
 
@@ -132,11 +132,12 @@ export function HrDashboardPage() {
       {dashQ.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading HR analytics…</p>
       ) : dashQ.isError ? (
-        <p className="text-sm text-destructive">
-          {(dashQ.error as ApiError)?.status === 403
-            ? 'You do not have permission to view HR payroll analytics. Ask an administrator to grant payroll access, then sign out and back in.'
-            : 'Could not load dashboard data.'}
-        </p>
+        <QueryErrorPanel
+          title="Unable to load HR dashboard"
+          error={dashQ.error}
+          onRetry={() => void dashQ.refetch()}
+          isRetrying={dashQ.isFetching}
+        />
       ) : d ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 xl:grid-cols-10">

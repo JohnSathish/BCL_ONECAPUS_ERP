@@ -6,6 +6,7 @@ import { Suspense, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { StudentProfileDashboard } from '@/components/students-module/profile/student-profile-dashboard';
 import { buttonVariants } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
@@ -72,7 +73,12 @@ export default function StudentProfilePage() {
       {profile.isLoading ? (
         <p className="text-xs text-muted-foreground">Loading profile…</p>
       ) : profile.isError || !data ? (
-        <p className="text-xs text-destructive">Could not load student profile.</p>
+        <QueryErrorPanel
+          title="Unable to load student profile"
+          error={profile.error}
+          onRetry={() => void profile.refetch()}
+          isRetrying={profile.isFetching}
+        />
       ) : (
         <Suspense fallback={null}>
           <StudentProfileDashboard profile={data} canEdit={canEdit} onRefresh={invalidate} />
