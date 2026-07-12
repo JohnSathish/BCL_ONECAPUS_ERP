@@ -62,3 +62,6 @@ Emulator Start CMD.txt
 Nano editor shortcut keys.txt
 Soft Delete Demo Data.txt
 dbctura website latest.txt
+
+# Local full safety backups (DB dumps + project archives)
+_safety-backups/
