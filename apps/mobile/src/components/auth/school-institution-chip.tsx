@@ -1,7 +1,26 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { switchInstitution } from '@/auth/switch-institution';
+import { COLLEGE_NAME, PRODUCT_NAME } from '@/constants/release';
+import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
+
+function institutionLabel(
+  brandingName: string | null | undefined,
+  schoolName: string | null | undefined,
+) {
+  const fromBranding = brandingName?.trim();
+  if (fromBranding) return fromBranding;
+  const fromSchool = schoolName?.trim();
+  if (
+    fromSchool &&
+    fromSchool.toLowerCase() !== PRODUCT_NAME.toLowerCase() &&
+    !/onecampus/i.test(fromSchool)
+  ) {
+    return fromSchool;
+  }
+  return COLLEGE_NAME;
+}
 
 export function SchoolInstitutionChip({
   light,
@@ -11,13 +30,16 @@ export function SchoolInstitutionChip({
 }) {
   const router = useRouter();
   const { school } = useSchoolConfig();
+  const { config } = useBootstrap();
 
   if (!school) return null;
+
+  const label = institutionLabel(config?.branding?.displayName, school.name);
 
   return (
     <View style={[styles.wrap, light && styles.wrapLight]}>
       <Text style={[styles.label, light && styles.labelLight]} numberOfLines={1}>
-        {school.name}
+        {label}
       </Text>
       <Pressable
         hitSlop={8}

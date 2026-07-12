@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { COLLEGE_NAME } from '@/constants/release';
 import type { SchoolConfig } from '@/types/school';
 
 const SCHOOL_CONFIG_KEY = 'oc_school_config';
@@ -63,7 +64,7 @@ export async function ensureSchoolConfigFromEnv(): Promise<SchoolConfig | null> 
 
   return saveSchoolConfig({
     id: tenantSlug,
-    name: process.env.EXPO_PUBLIC_APP_NAME?.trim() || 'My Institution',
+    name: process.env.EXPO_PUBLIC_APP_NAME?.trim() || COLLEGE_NAME,
     apiUrl,
     tenantSlug,
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL,

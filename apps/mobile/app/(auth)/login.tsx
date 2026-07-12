@@ -38,7 +38,6 @@ import {
   WHATSAPP_SUPPORT_URL,
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { useSchoolConfig } from '@/hooks/use-school-config';
 import { InstitutionLogo } from '@/components/auth/institution-logo';
 
 const MORE_LOGIN_OPTIONS = [
@@ -72,7 +71,6 @@ export default function LoginScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = authColors(scheme);
   const { config, error: bootstrapError } = useBootstrap();
-  const { school } = useSchoolConfig();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -188,7 +186,9 @@ export default function LoginScreen() {
           <View style={styles.logoRing}>
             <InstitutionLogo branding={config?.branding} size={40} style={styles.logoImage} />
           </View>
-          <Text style={styles.collegeName}>{school?.name ?? COLLEGE_NAME}</Text>
+          <Text style={styles.collegeName}>
+            {config?.branding?.displayName?.trim() || COLLEGE_NAME}
+          </Text>
           <Text style={styles.productName}>{COLLEGE_PORTAL_SUBTITLE}</Text>
 
           <View style={styles.headerDivider} />
@@ -197,7 +197,6 @@ export default function LoginScreen() {
             {greeting.icon} {greeting.text}
           </Text>
           <Text style={styles.greetingWelcome}>Welcome back</Text>
-          <Text style={styles.greetingProduct}>{school?.name ?? COLLEGE_NAME}</Text>
 
           <Text style={styles.metaLine}>
             {semesterLabel} · AY {academicYear} · {campusShortName()}
