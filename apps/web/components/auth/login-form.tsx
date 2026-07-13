@@ -173,7 +173,9 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
         useAuthStore.getState().setBootstrapping(false);
         tokenRefreshManager.scheduleProactiveRefresh(session);
         if (session.user.mustResetPassword) {
-          window.location.assign('/change-password');
+          // Soft navigate so the in-memory session (not persisted) survives.
+          // SessionProvider also bootstraps /change-password from the refresh cookie.
+          router.replace('/change-password');
           return;
         }
         const destination =

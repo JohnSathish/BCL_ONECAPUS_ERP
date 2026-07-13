@@ -26,6 +26,8 @@ export default function ForceChangePasswordPage() {
   const router = useRouter();
   const clear = useAuthStore((s) => s.clear);
   const session = useAuthStore((s) => s.session);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -71,6 +73,18 @@ export default function ForceChangePasswordPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Wait for zustand hydrate + refresh-cookie bootstrap before deciding "not signed in".
+  if (!hasHydrated || isBootstrapping) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Preparing secure password change…
+        </div>
+      </main>
+    );
   }
 
   if (!session?.accessToken) {

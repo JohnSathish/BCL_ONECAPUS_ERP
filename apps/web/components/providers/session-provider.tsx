@@ -72,11 +72,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hasHydrated) return;
 
-    if (
-      pathname === '/login' ||
-      pathname === '/change-password' ||
-      pathname === '/forgot-password'
-    ) {
+    // Login/forgot stay cold — no session restore.
+    // /change-password MUST bootstrap so forced-reset after login (full page
+    // navigation) and refresh still recover the httpOnly refresh cookie.
+    if (pathname === '/login' || pathname === '/forgot-password') {
       initialBootstrapDoneRef.current = false;
       setBootstrapping(false);
       return;
