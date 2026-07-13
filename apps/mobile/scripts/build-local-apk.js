@@ -27,12 +27,22 @@ if (!javaHome) {
 const arches = process.env.REACT_NATIVE_ARCHITECTURES || 'arm64-v8a';
 const skipClean = process.env.SKIP_PREBUILD_CLEAN === '1';
 
+const googleServices = path.join(root, 'google-services.json');
+if (!fs.existsSync(googleServices)) {
+  console.error(
+    'Missing apps/mobile/google-services.json — required for FCM push.\n' +
+      'Download it from Firebase Console for package edu.onecampus.mobile.',
+  );
+  process.exit(1);
+}
+
 const env = {
   ...process.env,
   JAVA_HOME: javaHome,
   PATH: `${path.join(javaHome, 'bin')}${path.delimiter}${process.env.PATH || ''}`,
   LOCAL_NATIVE_RELEASE: '1',
   EAS_BUILD_PROFILE: process.env.EAS_BUILD_PROFILE || 'production-apk',
+  GOOGLE_SERVICES_JSON: process.env.GOOGLE_SERVICES_JSON || googleServices,
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://erp.donboscocollege.ac.in/api',
   EXPO_PUBLIC_TENANT_SLUG: process.env.EXPO_PUBLIC_TENANT_SLUG || 'demo',
   EXPO_PUBLIC_APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || 'Don Bosco College, Tura',

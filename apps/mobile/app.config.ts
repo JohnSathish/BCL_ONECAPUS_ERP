@@ -9,29 +9,40 @@ const isNativeReleaseBuild =
   process.env.EAS_BUILD_PROFILE === 'production-apk' ||
   process.env.LOCAL_NATIVE_RELEASE === '1';
 const easBuildProfile = process.env.EAS_BUILD_PROFILE;
-/** EAS file secret path on build workers; local file for `expo run` / prebuild. */
+/**
+ * FCM config resolution:
+ * 1) EAS file env `GOOGLE_SERVICES_JSON` (absolute path on the build worker)
+ * 2) Local `./google-services.json` (required for local AAB/APK / prebuild)
+ *
+ * IMPORTANT: local scripts set EAS_BUILD_PROFILE=production — do NOT skip the local
+ * file in that case, or the AAB ships without Firebase and push tokens never register.
+ */
 const googleServicesFromEnv = process.env.GOOGLE_SERVICES_JSON?.trim();
 const googleServicesLocal = './google-services.json';
-const googleServicesAbs = path.join(
-  __dirname,
-  googleServicesFromEnv && !path.isAbsolute(googleServicesFromEnv)
-    ? googleServicesFromEnv
-    : googleServicesLocal,
-);
+const googleServicesLocalAbs = path.join(__dirname, googleServicesLocal);
 const googleServicesFile = googleServicesFromEnv
   ? googleServicesFromEnv
-  : // Do not point EAS CLI at a gitignored local file — it will not be uploaded.
-    // The build worker re-evaluates config with GOOGLE_SERVICES_JSON from EAS secrets.
-    !easBuildProfile && fs.existsSync(googleServicesAbs)
+  : fs.existsSync(googleServicesLocalAbs)
     ? googleServicesLocal
-    : googleServicesFromEnv;
+    : undefined;
 const hasGoogleServices = Boolean(
   googleServicesFile &&
   (path.isAbsolute(googleServicesFile)
     ? fs.existsSync(googleServicesFile)
-    : fs.existsSync(path.join(__dirname, googleServicesFile)) ||
-      Boolean(easBuildProfile && googleServicesFromEnv)),
+    : fs.existsSync(path.join(__dirname, googleServicesFile))),
 );
+
+if (
+  (easBuildProfile === 'production' ||
+    easBuildProfile === 'preview' ||
+    easBuildProfile === 'production-apk' ||
+    process.env.LOCAL_NATIVE_RELEASE === '1') &&
+  !hasGoogleServices
+) {
+  throw new Error(
+    'google-services.json is required for this build (FCM). Place it at apps/mobile/google-services.json or set EAS env GOOGLE_SERVICES_JSON (file).',
+  );
+}
 /** Expo Go shows the app icon while bundling — use a solid asset in dev to avoid a second logo splash. */
 const appIcon = isNativeReleaseBuild
   ? './assets/bcl-onecampus-logo.png'
@@ -58,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 15,
+    versionCode: 16,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
