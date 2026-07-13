@@ -11,6 +11,7 @@ import {
   isRazorpayConfigured,
 } from '../../../common/payments/razorpay.util';
 import { PrismaService } from '../../../database/prisma.service';
+import { PaymentGatewayResolverService } from '../../payment-gateway/services/payment-gateway-resolver.service';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 
 export type CreatePaymentRequestDto = {
@@ -25,6 +26,7 @@ export class FeePaymentRequestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: FeeFinanceSettingsService,
+    private readonly gatewayResolver: PaymentGatewayResolverService,
   ) {}
 
   private db() {
@@ -114,13 +116,19 @@ export class FeePaymentRequestService {
       amount: Number(d.balanceAmount),
     }));
 
+    const activeGateway = await this.gatewayResolver.resolveForCheckout(
+      user.tid,
+    );
+    const providerCode = activeGateway.providerCode.toUpperCase();
+
     const payment = await this.db().paymentTransaction.create({
       data: {
         tenantId: user.tid,
         studentId: dto.studentId,
         transactionNo: await this.nextTransactionNo(user.tid),
         paymentMode: 'ONLINE',
-        provider: 'RAZORPAY',
+        paymentSource: 'ERP_GATEWAY',
+        provider: providerCode,
         status: 'INITIATED',
         amount,
         unallocatedAmount: amount,
@@ -131,11 +139,6 @@ export class FeePaymentRequestService {
       },
     });
 
-    const creds = {
-      keyId: process.env.RAZORPAY_KEY_ID ?? '',
-      keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
-      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-    };
     const studentName =
       student.masterProfile?.fullName ?? student.user?.displayName ?? 'Student';
     const description = `Fee ${requestNo}`;
@@ -151,42 +154,100 @@ export class FeePaymentRequestService {
     let paymentLinkUrl: string | null = null;
     let paymentLinkProviderId: string | null = null;
     let qrImageUrl: string | null = null;
-    let mode: 'LIVE' | 'MOCK' = 'MOCK';
+    let mode: 'LIVE' | 'MOCK' | 'SAFE_MOCK' = 'MOCK';
+    let checkoutExtras: Record<string, unknown> = {};
 
-    if (config.onlinePaymentEnabled && isRazorpayConfigured(creds)) {
+    const gatewayEnabled =
+      Boolean(modes?.gateway) || config.onlinePaymentEnabled !== false;
+
+    if (gatewayEnabled && activeGateway.credentials) {
       try {
-        if (dto.channel === 'PAYMENT_LINK') {
-          const link = await createRazorpayPaymentLink(creds, {
-            amountPaise: Math.round(amount * 100),
-            description,
-            referenceId: requestNo,
-            customer: {
-              name: studentName,
-              email: student.masterProfile?.email ?? student.user?.email,
-              contact: student.masterProfile?.mobileNumber ?? undefined,
+        // Desk / portal checkout: always use the institution's active gateway.
+        if (
+          dto.channel === 'DESK_CHECKOUT' ||
+          dto.channel === 'STUDENT_PORTAL' ||
+          providerCode !== 'RAZORPAY'
+        ) {
+          const checkout = await this.gatewayResolver.createCheckoutOrder(
+            user.tid,
+            {
+              amount,
+              currency: 'INR',
+              receipt: requestNo,
+              notes,
             },
-            expireByUnix: closeByUnix,
-            notes,
-          });
-          paymentLinkUrl = link.short_url;
-          providerOrderId = link.id;
-          paymentLinkProviderId = link.id;
-          await this.db().paymentTransaction.update({
-            where: { id: payment.id },
-            data: { providerOrderId: link.id },
-          });
-        } else {
-          const order = await createRazorpayOrder(creds, {
-            amountPaise: Math.round(amount * 100),
-            receipt: requestNo,
-            notes,
-          });
-          providerOrderId = order.id;
-          await this.db().paymentTransaction.update({
-            where: { id: payment.id },
-            data: { providerOrderId: order.id },
-          });
-          if (dto.channel !== 'DESK_CHECKOUT') {
+          );
+          if (checkout.mode === 'SAFE_MOCK') {
+            mode = 'SAFE_MOCK';
+          } else {
+            mode = checkout.mode === 'LIVE' ? 'LIVE' : 'MOCK';
+            providerOrderId = checkout.orderId ?? null;
+            checkoutExtras = {
+              provider: checkout.provider,
+              keyId: checkout.keyId,
+              orderId: checkout.orderId,
+              atomTokenId: checkout.atomTokenId,
+              merchantId: checkout.merchantId,
+              paymentSessionId: checkout.paymentSessionId,
+              checkoutUrl: checkout.checkoutUrl,
+              bdOrderId: checkout.bdOrderId,
+              authToken: checkout.authToken,
+              currency: checkout.currency ?? 'INR',
+            };
+            if (providerOrderId) {
+              await this.db().paymentTransaction.update({
+                where: { id: payment.id },
+                data: { providerOrderId },
+              });
+            }
+          }
+        } else if (providerCode === 'RAZORPAY') {
+          const creds = {
+            keyId: activeGateway.credentials.keyId,
+            keySecret: activeGateway.credentials.keySecret,
+            webhookSecret: activeGateway.credentials.webhookSecret ?? undefined,
+          };
+          if (!isRazorpayConfigured(creds)) {
+            // Fall through to mock below
+          } else if (dto.channel === 'PAYMENT_LINK') {
+            const link = await createRazorpayPaymentLink(creds, {
+              amountPaise: Math.round(amount * 100),
+              description,
+              referenceId: requestNo,
+              customer: {
+                name: studentName,
+                email: student.masterProfile?.email ?? student.user?.email,
+                contact: student.masterProfile?.mobileNumber ?? undefined,
+              },
+              expireByUnix: closeByUnix,
+              notes,
+            });
+            paymentLinkUrl = link.short_url;
+            providerOrderId = link.id;
+            paymentLinkProviderId = link.id;
+            await this.db().paymentTransaction.update({
+              where: { id: payment.id },
+              data: { providerOrderId: link.id },
+            });
+            mode = 'LIVE';
+          } else {
+            // OFFICE_QR / default Razorpay payment-request channels
+            const order = await createRazorpayOrder(creds, {
+              amountPaise: Math.round(amount * 100),
+              receipt: requestNo,
+              notes,
+            });
+            providerOrderId = order.id;
+            await this.db().paymentTransaction.update({
+              where: { id: payment.id },
+              data: { providerOrderId: order.id },
+            });
+            checkoutExtras = {
+              provider: 'RAZORPAY',
+              keyId: creds.keyId,
+              orderId: order.id,
+              currency: 'INR',
+            };
             try {
               const qr = await createRazorpayUpiQr(creds, {
                 amountPaise: Math.round(amount * 100),
@@ -207,19 +268,34 @@ export class FeePaymentRequestService {
               paymentLinkUrl = link.short_url;
               paymentLinkProviderId = link.id;
             }
+            mode = 'LIVE';
           }
         }
-        mode = 'LIVE';
-      } catch {
+      } catch (err) {
+        // Desk/portal checkout must not silently fall back to mock/Razorpay —
+        // otherwise Atom failures look like "Razorpay still opens" or mock pays.
+        if (
+          dto.channel === 'DESK_CHECKOUT' ||
+          dto.channel === 'STUDENT_PORTAL' ||
+          providerCode === 'NTT_DATA' ||
+          providerCode === 'CASHFREE' ||
+          providerCode === 'BILLDESK'
+        ) {
+          throw err;
+        }
         mode = 'MOCK';
+        checkoutExtras = {};
       }
     }
 
-    if (mode === 'MOCK') {
+    if (mode === 'MOCK' || mode === 'SAFE_MOCK') {
       const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
       paymentLinkUrl = `${webOrigin}/admin/fees/collections?mockPay=${payment.id}&ref=${requestNo}`;
       qrImageUrl = `https://quickchart.io/qr?size=280&text=${encodeURIComponent(paymentLinkUrl)}`;
     }
+
+    const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+    const defaultReturnUrl = `${webOrigin}/admin/fees/collections?atomReturn=1&paymentId=${payment.id}`;
 
     const request = await this.db().feePaymentRequest.create({
       data: {
@@ -232,7 +308,7 @@ export class FeePaymentRequestService {
         demandIds: dto.demandIds,
         feeItems,
         paymentId: payment.id,
-        provider: 'RAZORPAY',
+        provider: providerCode,
         providerOrderId,
         paymentLinkUrl,
         qrImageUrl,
@@ -258,8 +334,37 @@ export class FeePaymentRequestService {
         expiresAt,
         qrImageUrl,
         paymentLinkUrl,
+        paymentId: payment.id,
+        provider: providerCode,
         orderId: providerOrderId,
-        keyId: process.env.RAZORPAY_KEY_ID,
+        keyId:
+          typeof checkoutExtras.keyId === 'string'
+            ? checkoutExtras.keyId
+            : undefined,
+        atomTokenId:
+          typeof checkoutExtras.atomTokenId === 'string'
+            ? checkoutExtras.atomTokenId
+            : undefined,
+        merchantId:
+          typeof checkoutExtras.merchantId === 'string'
+            ? checkoutExtras.merchantId
+            : (activeGateway.credentials?.merchantId ?? undefined),
+        paymentSessionId:
+          typeof checkoutExtras.paymentSessionId === 'string'
+            ? checkoutExtras.paymentSessionId
+            : undefined,
+        checkoutUrl:
+          typeof checkoutExtras.checkoutUrl === 'string'
+            ? checkoutExtras.checkoutUrl
+            : undefined,
+        returnUrl:
+          activeGateway.credentials?.successUrl?.trim() || defaultReturnUrl,
+        custEmail:
+          student.masterProfile?.email ??
+          student.user?.email ??
+          'student@college.edu',
+        custMobile: student.masterProfile?.mobileNumber ?? '9999999999',
+        currency: 'INR',
       },
     };
   }

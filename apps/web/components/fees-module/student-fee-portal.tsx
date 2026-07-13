@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -21,11 +21,13 @@ import {
   fetchMyFeeAccount,
   initiateMyFeePayment,
   openFeeReceiptPdf,
+  reconcileFeePayment,
   simulateFeePayment,
   submitMyExternalPayment,
   uploadExternalPaymentAttachment,
   verifyFeePayment,
 } from '@/services/fee-cycle';
+import { runFeeGatewayCheckout } from '@/lib/fee-gateway-checkout';
 import type {
   FeeDemandRow,
   MonthlyFeeTrackerMonth,
@@ -39,20 +41,6 @@ import { Label } from '@/components/ui/label';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => {
-      open: () => void;
-      on: (
-        event: string,
-        handler: (response: { error?: { description?: string } }) => void,
-      ) => void;
-    };
-  }
-}
-
-const CHECKOUT_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
 
 function formatInr(amount: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -69,32 +57,52 @@ function classifyPayable(item: PayableFeeItem) {
   return 'other';
 }
 
-function loadRazorpayScript() {
-  return new Promise<void>((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-    const existing = document.querySelector(`script[src="${CHECKOUT_SCRIPT}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Failed to load Razorpay')));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = CHECKOUT_SCRIPT;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Razorpay'));
-    document.body.appendChild(script);
-  });
-}
-
 export function StudentFeePortal() {
   const qc = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payMsg, setPayMsg] = useState('');
   const [paySuccess, setPaySuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('atomReturn') !== '1') return;
+    const paymentId = params.get('paymentId');
+    if (!paymentId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await reconcileFeePayment(paymentId);
+        if (cancelled) return;
+        if (res.synced || res.alreadyPaid) {
+          setPaySuccess(true);
+          setPayMsg(
+            res.receipt?.receiptNo
+              ? `Payment confirmed — receipt ${res.receipt.receiptNo}.`
+              : 'Payment confirmed.',
+          );
+          void qc.invalidateQueries({ queryKey: ['my-fee-account'] });
+        } else {
+          setPayMsg(
+            `Returned from Atom (${res.providerStatus ?? 'pending'}). Refresh if receipt is not yet shown.`,
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setPayMsg(apiErrorMessage(e, 'Could not confirm payment after return.'));
+        }
+      } finally {
+        params.delete('atomReturn');
+        params.delete('paymentId');
+        const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
+        window.history.replaceState({}, '', next);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [qc]);
+
   const [showExternalForm, setShowExternalForm] = useState(false);
   const [qrCheckout, setQrCheckout] = useState<{
     qrImageUrl?: string | null;
@@ -166,50 +174,48 @@ export function StudentFeePortal() {
   const openCheckout = useCallback(
     async (checkout: {
       keyId?: string;
-      orderId: string;
+      orderId?: string;
       amount: number;
       currency: string;
       mode: string;
       paymentId?: string;
+      provider?: string;
+      atomTokenId?: string;
+      merchantId?: string;
+      paymentSessionId?: string;
+      checkoutUrl?: string;
+      returnUrl?: string;
     }) => {
-      if (checkout.mode === 'SAFE_MOCK' && checkout.paymentId) {
-        const res = await simulateFeePayment(checkout.paymentId);
+      const result = await runFeeGatewayCheckout(
+        {
+          ...checkout,
+          returnUrl:
+            checkout.returnUrl ||
+            `${window.location.origin}/student/fees?atomReturn=1&paymentId=${checkout.paymentId ?? ''}`,
+        },
+        {
+          onRazorpaySuccess: async (response) => {
+            await verifyMut.mutateAsync(response);
+          },
+        },
+      );
+
+      if (result.kind === 'mock' && result.paymentId) {
+        const res = await simulateFeePayment(result.paymentId);
         setPaySuccess(true);
         setPayMsg(`Payment successful — receipt ${res.receipt?.receiptNo ?? 'issued'}.`);
         void accountQ.refetch();
         return;
       }
 
-      if (!checkout.keyId) throw new Error('Online payment is not configured.');
-      await loadRazorpayScript();
-      if (!window.Razorpay) throw new Error('Razorpay checkout unavailable');
+      if (result.kind === 'atom_opened' || result.kind === 'redirected') {
+        setPayMsg('Complete payment in the gateway window. This page will update after return.');
+        return;
+      }
 
-      return new Promise<void>((resolve, reject) => {
-        const rzp = new window.Razorpay!({
-          key: checkout.keyId,
-          amount: Math.round(checkout.amount * 100),
-          currency: checkout.currency,
-          name: 'College Fees',
-          description: 'Fee payment',
-          order_id: checkout.orderId,
-          theme: { color: '#1a2b4b' },
-          handler: (response: {
-            razorpay_order_id: string;
-            razorpay_payment_id: string;
-            razorpay_signature: string;
-          }) => {
-            verifyMut.mutate(response, {
-              onSuccess: () => resolve(),
-              onError: (err) => reject(err),
-            });
-          },
-          modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
-        });
-        rzp.on('payment.failed', (response) => {
-          reject(new Error(response.error?.description ?? 'Payment failed'));
-        });
-        rzp.open();
-      });
+      if (result.kind === 'verified') {
+        setPaySuccess(true);
+      }
     },
     [verifyMut, accountQ],
   );
@@ -219,7 +225,6 @@ export function StudentFeePortal() {
       if (!selectedDemandIds.length) throw new Error('Select at least one fee item.');
       return initiateMyFeePayment({
         amount: selectedTotal,
-        provider: 'RAZORPAY',
         demandIds: selectedDemandIds,
       });
     },
@@ -229,7 +234,10 @@ export function StudentFeePortal() {
     },
     onSuccess: async (res) => {
       try {
-        await openCheckout(res.checkout);
+        await openCheckout({
+          ...res.checkout,
+          paymentId: res.checkout.paymentId ?? res.payment.id,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Payment failed';
         if (message !== 'Payment cancelled') setPayMsg(message);
@@ -617,7 +625,7 @@ export function StudentFeePortal() {
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Razorpay · UPI · Net banking · Debit/Credit card
+              Online gateway · UPI · Net banking · Debit/Credit card
             </p>
             {qrCheckout?.qrImageUrl ? (
               <div className="mt-4 rounded-xl border bg-muted/30 p-4 text-center">

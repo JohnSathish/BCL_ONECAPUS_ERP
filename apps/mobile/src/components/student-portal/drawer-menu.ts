@@ -55,6 +55,43 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         href: '/(student)/syllabus',
         keywords: ['syllabus', 'pdf', 'paper', 'curriculum'],
       },
+      {
+        id: 'short-term-courses',
+        label: 'Short-Term Courses',
+        href: '/(student)/short-term-courses',
+        keywords: ['cafa', 'bccs', 'certificate', 'course', 'short-term'],
+      },
+    ],
+  },
+  {
+    id: 'short-term',
+    title: 'Short-Term Courses',
+    icon: '📚',
+    items: [
+      {
+        id: 'stc-available',
+        label: 'Available Courses',
+        href: '/(student)/short-term-courses',
+        keywords: ['available', 'apply'],
+      },
+      {
+        id: 'stc-my',
+        label: 'My Courses',
+        href: '/(student)/short-term-courses?tab=mine',
+        keywords: ['registered'],
+      },
+      {
+        id: 'stc-attendance',
+        label: 'Attendance',
+        href: '/(student)/short-term-courses?tab=attendance',
+        keywords: ['attendance'],
+      },
+      {
+        id: 'stc-certificate',
+        label: 'Certificate',
+        href: '/(student)/short-term-courses?tab=certificate',
+        keywords: ['certificate', 'download'],
+      },
     ],
   },
   {

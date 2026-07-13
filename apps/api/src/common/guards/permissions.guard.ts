@@ -74,11 +74,12 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const permissions = new Set(user.permissions ?? []);
+    const adminBypass = isSuperAdmin(user.roles ?? []);
 
     if (requiredAll?.length) {
       const missing = requiredAll.filter((p) => !permissions.has(p));
 
-      if (missing.length > 0) {
+      if (missing.length > 0 && !adminBypass) {
         void this.logDenied(user, request, missing.join(', '), 'require_all');
 
         throw new ForbiddenException(
@@ -99,13 +100,7 @@ export class PermissionsGuard implements CanActivate {
     if (requiredAny?.length) {
       const hasAny = requiredAny.some((p) => permissions.has(p));
 
-      if (
-        !hasAny &&
-        !(
-          isSuperAdmin(user.roles ?? []) ||
-          (user.roles ?? []).includes('college-admin')
-        )
-      ) {
+      if (!hasAny && !adminBypass) {
         void this.logDenied(
           user,
           request,

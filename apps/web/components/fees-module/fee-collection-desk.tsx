@@ -45,10 +45,12 @@ import {
   sendDueReminders,
   sendReceiptNotification,
   simulateFeePayment,
+  reconcileFeePayment,
   verifyFeePayment,
 } from '@/services/fee-cycle';
-import { openRazorpayCheckout } from '@/lib/razorpay-checkout';
+import { feeGatewayDisplayName, runFeeGatewayCheckout } from '@/lib/fee-gateway-checkout';
 import { collectFee, fetchFeeDashboard, fetchFeeReport } from '@/services/fees';
+import { fetchActivePaymentGateway } from '@/services/payment-gateway';
 import { fetchStudents } from '@/services/students';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAuth } from '@/hooks/use-auth';
@@ -158,6 +160,12 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
   const [paymentFormValues, setPaymentFormValues] = useState<DeskPaymentFormValues>({});
 
   const settingsQ = useQuery({ queryKey: ['fee-settings'], queryFn: fetchFeeSettings });
+  const activeGatewayQ = useQuery({
+    queryKey: ['payment-gateway', 'active'],
+    queryFn: fetchActivePaymentGateway,
+    staleTime: 60_000,
+  });
+  const gatewayName = feeGatewayDisplayName(activeGatewayQ.data?.providerCode);
   const dashboardQ = useQuery({ queryKey: ['fees', 'dashboard'], queryFn: fetchFeeDashboard });
   const defaultersQ = useQuery({
     queryKey: ['fees', 'defaulters-report'],
@@ -243,6 +251,52 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
       setMessage(`Payment failed or was cancelled for ${row.requestNo}.`);
     }
   }, [activeRequestQ.data?.status, activeRequestQ.data?.id, activeRequestQ.data?.requestNo]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('atomReturn') !== '1') return;
+    const paymentId = params.get('paymentId');
+    if (!paymentId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await reconcileFeePayment(paymentId);
+        if (cancelled) return;
+        if (res.synced || res.alreadyPaid) {
+          setMessage(
+            res.receipt?.receiptNo
+              ? `Atom payment confirmed — receipt ${res.receipt.receiptNo}.`
+              : 'Atom payment confirmed.',
+          );
+          if (res.receipt?.id) setLastReceiptId(res.receipt.id);
+          setActiveCheckout(null);
+          setActiveRequest(null);
+          void accountQ.refetch();
+          void dashboardQ.refetch();
+          void paymentRequestsQ.refetch();
+        } else {
+          setMessage(
+            `Returned from Atom (${res.providerStatus ?? 'pending'}). Waiting for confirmation…`,
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMessage(apiErrorMessage(e, 'Could not confirm Atom payment after return.'));
+        }
+      } finally {
+        params.delete('atomReturn');
+        params.delete('paymentId');
+        const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
+        window.history.replaceState({}, '', next);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally once on mount for Atom return URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setSelectedPayables(new Set());
@@ -341,42 +395,62 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
         requestNo: res.checkout.requestNo,
       });
 
-      if (res.checkout.mode === 'MOCK' && res.payment.id) {
+      if (
+        (res.checkout.mode === 'MOCK' || res.checkout.mode === 'SAFE_MOCK') &&
+        res.payment.id &&
+        !res.checkout.atomTokenId &&
+        !res.checkout.keyId
+      ) {
         const mock = await simulateFeePayment(res.payment.id);
         return {
+          kind: 'mock' as const,
           requestNo: res.checkout.requestNo,
           receiptNo: mock.receipt?.receiptNo,
           receiptId: mock.receipt?.id,
         };
       }
 
-      if (!res.checkout.keyId || !res.checkout.orderId) {
-        throw new Error('Online payment is not configured. Add Razorpay keys on the API server.');
-      }
-
-      let receiptNo: string | undefined;
-      let receiptId: string | undefined;
-      await openRazorpayCheckout({
-        keyId: res.checkout.keyId,
-        orderId: res.checkout.orderId,
-        amount: res.checkout.amount,
+      const result = await runFeeGatewayCheckout(res.checkout, {
         description: `Fee ${res.checkout.requestNo}`,
-        onSuccess: async (response) => {
-          const verified = await verifyFeePayment(response);
-          receiptNo = verified.receipt?.receiptNo;
-          receiptId = verified.receipt?.id;
+        onRazorpaySuccess: async (response) => {
+          await verifyFeePayment(response);
         },
       });
 
-      return { requestNo: res.checkout.requestNo, receiptNo, receiptId };
+      if (result.kind === 'atom_opened' || result.kind === 'redirected') {
+        return {
+          kind: result.kind,
+          requestNo: res.checkout.requestNo,
+        };
+      }
+
+      if (result.kind === 'verified') {
+        const verified = await verifyFeePayment(result);
+        return {
+          kind: 'verified' as const,
+          requestNo: res.checkout.requestNo,
+          receiptNo: verified.receipt?.receiptNo,
+          receiptId: verified.receipt?.id,
+        };
+      }
+
+      return { kind: 'mock' as const, requestNo: res.checkout.requestNo };
     },
     onSuccess: (result) => {
+      if (result.kind === 'atom_opened' || result.kind === 'redirected') {
+        setMessage(
+          result.kind === 'atom_opened'
+            ? `Atom checkout opened for ${result.requestNo}. Complete payment in the Atom window.`
+            : `Redirecting to payment gateway for ${result.requestNo}…`,
+        );
+        return;
+      }
       setActiveCheckout(null);
       setActiveRequest(null);
       setSelectedPayables(new Set());
-      if (result.receiptId) setLastReceiptId(result.receiptId);
+      if ('receiptId' in result && result.receiptId) setLastReceiptId(result.receiptId);
       setMessage(
-        result.receiptNo
+        'receiptNo' in result && result.receiptNo
           ? `Payment successful — receipt ${result.receiptNo}.`
           : `Payment successful — ${result.requestNo}.`,
       );
@@ -388,7 +462,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
       setMessage(
         e instanceof Error && e.message && !('response' in e)
           ? e.message
-          : apiErrorMessage(e, 'Razorpay checkout failed'),
+          : apiErrorMessage(e, 'Online checkout failed'),
       ),
   });
 
@@ -1338,6 +1412,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   values={paymentFormValues}
                   collectedByName={collectorName}
                   methodSource={paymentMethodSource}
+                  gatewayName={gatewayName}
                   onMethodChange={(id) => {
                     setPaymentMethodId(id);
                     setPaymentMethodSource(id ? 'MANUAL' : null);
@@ -1389,17 +1464,17 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                       {deskCheckoutMut.isPending ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Opening Razorpay…
+                          Opening {gatewayName}…
                         </>
                       ) : (
                         <>
                           <CreditCard className="mr-2 h-4 w-4" />
-                          Open Razorpay checkout
+                          Open {gatewayName} checkout
                         </>
                       )}
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                      Opens Razorpay in this window — UPI, debit/credit card, or net banking.
+                      Opens {gatewayName} in this window — UPI, debit/credit card, or net banking.
                       Receipt is issued automatically when payment succeeds.
                     </p>
 
@@ -1454,7 +1529,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                           </Button>
                           <p className="text-xs text-muted-foreground">
                             Share the link via WhatsApp, SMS, or email. This screen auto-updates
-                            when Razorpay confirms payment (every ~3 seconds).
+                            when {gatewayName} confirms payment (every ~3 seconds).
                           </p>
                         </div>
                       </details>
@@ -1462,7 +1537,8 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   </div>
                 ) : gatewayEnabled && !paymentMethodId ? (
                   <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                    Select <strong>Online Payment Gateway</strong> above to open Razorpay checkout.
+                    Select <strong>Online Payment Gateway</strong> above to open {gatewayName}{' '}
+                    checkout.
                   </p>
                 ) : null}
 
@@ -1470,6 +1546,7 @@ export function FeeCollectionDesk({ variant = 'setup' }: { variant?: FeeCollecti
                   <PaymentRequestPanel
                     checkout={activeCheckout}
                     request={activeRequest}
+                    gatewayName={gatewayName}
                     onCancel={() => activeRequest && cancelRequestMut.mutate(activeRequest.id)}
                     onSimulate={() =>
                       activeCheckout.paymentId && simulateMut.mutate(activeCheckout.paymentId)
@@ -2248,6 +2325,7 @@ function PaymentRequestPanel({
   onSimulate,
   simulating,
   cancelling,
+  gatewayName = 'payment gateway',
 }: {
   checkout: {
     qrImageUrl?: string | null;
@@ -2262,6 +2340,7 @@ function PaymentRequestPanel({
   onSimulate: () => void;
   simulating: boolean;
   cancelling: boolean;
+  gatewayName?: string;
 }) {
   const expiresMs = new Date(checkout.expiresAt).getTime() - Date.now();
   const minsLeft = Math.max(0, Math.ceil(expiresMs / 60_000));
@@ -2340,7 +2419,7 @@ function PaymentRequestPanel({
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Checking Razorpay every few seconds — updates automatically after the student pays via
+        Checking {gatewayName} every few seconds — updates automatically after the student pays via
         WhatsApp, SMS, or email link.
       </div>
 

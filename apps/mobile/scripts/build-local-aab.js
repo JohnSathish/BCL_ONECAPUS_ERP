@@ -77,6 +77,27 @@ const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
 if (!skipClean) prebuildArgs.push('--clean');
 run('npx', prebuildArgs);
 
+// Ensure monorepo Metro assets survive R8 resource shrinking after clean prebuild.
+const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
+fs.mkdirSync(keepDir, { recursive: true });
+fs.writeFileSync(
+  path.join(keepDir, 'keep.xml'),
+  `<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+`,
+);
+
+const appGradle = path.join(root, 'android', 'app', 'build.gradle');
+if (fs.existsSync(appGradle)) {
+  let gradleText = fs.readFileSync(appGradle, 'utf8');
+  if (gradleText.includes('proguard-android.txt')) {
+    gradleText = gradleText.replace('proguard-android.txt', 'proguard-android-optimize.txt');
+    fs.writeFileSync(appGradle, gradleText);
+    console.log('Patched release ProGuard defaults → proguard-android-optimize.txt');
+  }
+}
+
 const gradleArgs = [
   'bundleRelease',
   '--no-daemon',
@@ -101,9 +122,12 @@ const distDir = path.join(root, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
 if (fs.existsSync(aabPath)) {
   const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.0.aab');
+  const destR8 = path.join(distDir, 'onecampus-v18-sdk35.aab');
   fs.copyFileSync(aabPath, dest);
+  fs.copyFileSync(aabPath, destR8);
   console.log('\nAAB:', aabPath);
   console.log('Copy:', dest);
+  console.log('Copy:', destR8);
   if (allowDebug) {
     console.log('WARNING: debug-signed — do not upload to Play Console.');
   }

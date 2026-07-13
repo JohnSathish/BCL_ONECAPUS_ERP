@@ -324,7 +324,7 @@ export type FeePaymentRequest = {
 };
 
 export type PaymentRequestCheckout = {
-  mode: 'LIVE' | 'MOCK';
+  mode: 'LIVE' | 'MOCK' | 'SAFE_MOCK';
   amount: number;
   requestNo: string;
   reference: string;
@@ -333,6 +333,16 @@ export type PaymentRequestCheckout = {
   paymentLinkUrl?: string | null;
   orderId?: string | null;
   keyId?: string;
+  paymentId?: string;
+  provider?: string;
+  atomTokenId?: string;
+  merchantId?: string;
+  paymentSessionId?: string;
+  checkoutUrl?: string;
+  returnUrl?: string;
+  custEmail?: string;
+  custMobile?: string;
+  currency?: string;
 };
 
 export type MonthlyFeePlan = {

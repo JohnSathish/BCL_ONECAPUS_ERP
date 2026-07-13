@@ -89,6 +89,7 @@ export function isNavItemActive(pathname: string, item: NavItem): boolean {
 const P = MODULE_PERMISSIONS;
 const QB = P.questionBank;
 const SR = P.syllabusRepository;
+const STC = P.shortTermCourses;
 const OD = P.officialDocuments;
 
 const QUESTION_BANK_CHILDREN: NavChild[] = [
@@ -830,6 +831,66 @@ export const ADMIN_NAV: NavGroup[] = [
         permissions: [...SR],
         activePattern: '^/admin/academics/syllabus-repository(?:/.*)?$',
         children: SYLLABUS_REPOSITORY_CHILDREN,
+      },
+      {
+        label: 'Short-Term Courses',
+        href: '/admin/academics/short-term-courses',
+        icon: Award,
+        module: 'shortTermCourses',
+        permissions: [...STC],
+        activePattern: '^/admin/academics/short-term-courses(?:/.*)?$',
+        children: [
+          {
+            label: 'Dashboard',
+            href: '/admin/academics/short-term-courses',
+            permissions: [...STC],
+          },
+          {
+            label: 'Courses',
+            href: '/admin/academics/short-term-courses?tab=courses',
+            permissions: [...STC],
+          },
+          {
+            label: 'Batches',
+            href: '/admin/academics/short-term-courses?tab=batches',
+            permissions: [...STC],
+          },
+          {
+            label: 'Registrations',
+            href: '/admin/academics/short-term-courses?tab=registrations',
+            permissions: [...STC],
+          },
+          {
+            label: 'Faculty',
+            href: '/admin/academics/short-term-courses?tab=faculty',
+            permissions: [...STC],
+          },
+          {
+            label: 'Attendance',
+            href: '/admin/academics/short-term-courses?tab=attendance',
+            permissions: [...STC],
+          },
+          {
+            label: 'Assessments',
+            href: '/admin/academics/short-term-courses?tab=assessments',
+            permissions: [...STC],
+          },
+          {
+            label: 'Certificates',
+            href: '/admin/academics/short-term-courses?tab=certificates',
+            permissions: [...STC],
+          },
+          {
+            label: 'Payments',
+            href: '/admin/academics/short-term-courses?tab=payments',
+            permissions: [...STC],
+          },
+          {
+            label: 'Reports',
+            href: '/admin/academics/short-term-courses?tab=reports',
+            permissions: [...STC],
+          },
+        ],
       },
       {
         label: 'Lesson Plans',
@@ -2188,6 +2249,7 @@ export const ROLE_NAV: Record<
     { label: 'Certificates', href: '/student/certificates', icon: FileText },
     { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
     { label: 'LMS', href: '/student/lms', icon: GraduationCap },
+    { label: 'Short-Term Courses', href: '/student/short-term-courses', icon: Award },
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },

@@ -984,6 +984,56 @@ ${emailCtaButton('Open Admin')}`,
     variables: ['institution_name', 'report_summary', 'login_url'],
     channels: ['EMAIL', 'IN_APP'],
   },
+
+  // —— SHORT-TERM COURSES ——
+  {
+    code: 'SHORT_TERM_REGISTRATION_CONFIRMED',
+    name: 'Short-Term Course Registration Confirmed',
+    category: 'ACADEMIC',
+    subject: 'Registration confirmed — {{course_name}}',
+    bodyHtml: `${emailGreeting('{{student_name}}')}
+<p style="margin:0 0 12px;color:#15803d;font-weight:600;">Your short-term course registration is confirmed.</p>
+${emailInfoRows([
+  { label: 'Course', value: '{{course_name}}' },
+  { label: 'Batch', value: '{{batch_code}}' },
+  { label: 'Status', value: '{{status}}' },
+])}
+${emailCtaButton('View My Learning')}`,
+    bodyText:
+      'Registration confirmed for {{course_name}} ({{batch_code}}). Status: {{status}}.',
+    variables: [
+      'institution_name',
+      'student_name',
+      'course_name',
+      'batch_code',
+      'status',
+      'login_url',
+    ],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
+    code: 'SHORT_TERM_CERTIFICATE_READY',
+    name: 'Short-Term Course Certificate Ready',
+    category: 'ACADEMIC',
+    subject: 'Certificate ready — {{course_name}}',
+    bodyHtml: `${emailGreeting('{{student_name}}')}
+<p style="margin:0 0 12px;color:#15803d;font-weight:600;">Your completion certificate is ready to download.</p>
+${emailInfoRows([
+  { label: 'Course', value: '{{course_name}}' },
+  { label: 'Certificate No.', value: '{{certificate_number}}' },
+])}
+${emailCtaButton('Download Certificate')}`,
+    bodyText:
+      'Certificate {{certificate_number}} for {{course_name}} is ready.',
+    variables: [
+      'institution_name',
+      'student_name',
+      'course_name',
+      'certificate_number',
+      'login_url',
+    ],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
 ];
 
 export function findDefaultTemplateByCode(code: string) {

@@ -729,6 +729,32 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'View question bank reports and exports',
   },
   {
+    slug: 'short-term-courses:read',
+    resource: 'short-term-courses',
+    action: 'read',
+    description: 'View short-term courses catalogue, batches, and reports',
+  },
+  {
+    slug: 'short-term-courses:manage',
+    resource: 'short-term-courses',
+    action: 'manage',
+    description:
+      'Create and manage short-term courses, batches, fees, and certificates',
+  },
+  {
+    slug: 'short-term-courses:mark-attendance',
+    resource: 'short-term-courses',
+    action: 'mark-attendance',
+    description: 'Mark short-term course session attendance',
+  },
+  {
+    slug: 'short-term-courses:self',
+    resource: 'short-term-courses',
+    action: 'self',
+    description:
+      'Student self-service for short-term course registration and materials',
+  },
+  {
     slug: 'syllabus-repository:read',
     resource: 'syllabus-repository',
     action: 'read',

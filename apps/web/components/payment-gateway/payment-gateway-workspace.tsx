@@ -63,10 +63,10 @@ function healthColor(status?: string | null) {
 function gatewayFieldHints(providerCode: string) {
   if (providerCode === 'NTT_DATA') {
     return {
-      merchantId: 'Merchant ID (from NTT DATA)',
-      apiKey: 'Encryption Key (encKey)',
-      secretKey: 'Merchant Password',
-      webhookSecret: 'Decryption Key (decKey)',
+      merchantId: 'Merchant ID / MID (from Atom)',
+      apiKey: 'Request Hashkey (encryption / encKey)',
+      secretKey: 'Transaction Password',
+      webhookSecret: 'Response Hashkey (decryption / decKey)',
     };
   }
   if (providerCode === 'CASHFREE') {

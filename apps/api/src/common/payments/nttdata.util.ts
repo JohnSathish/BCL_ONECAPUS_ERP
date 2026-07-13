@@ -143,7 +143,7 @@ export async function createNttDataAtomToken(
       },
       payDetails: {
         amount: Number(input.amount).toFixed(2),
-        product: 'NSE',
+        product: process.env.NTT_DATA_PRODUCT_ID?.trim() || 'NSE',
         custAccNo: '213232323',
         txnCurrency: input.currency ?? 'INR',
       },

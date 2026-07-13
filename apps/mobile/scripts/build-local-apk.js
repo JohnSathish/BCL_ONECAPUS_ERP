@@ -100,6 +100,25 @@ if (!skipClean) prebuildArgs.push('--clean');
 run('npx', prebuildArgs);
 patchGradleProperties();
 
+const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
+fs.mkdirSync(keepDir, { recursive: true });
+fs.writeFileSync(
+  path.join(keepDir, 'keep.xml'),
+  `<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+`,
+);
+
+const appGradle = path.join(root, 'android', 'app', 'build.gradle');
+if (fs.existsSync(appGradle)) {
+  let gradleText = fs.readFileSync(appGradle, 'utf8');
+  if (gradleText.includes('proguard-android.txt')) {
+    gradleText = gradleText.replace('proguard-android.txt', 'proguard-android-optimize.txt');
+    fs.writeFileSync(appGradle, gradleText);
+  }
+}
+
 run(
   '.\\gradlew.bat',
   [

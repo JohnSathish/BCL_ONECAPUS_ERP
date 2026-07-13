@@ -69,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 16,
+    versionCode: 18,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -92,6 +92,52 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   },
   plugins: [
+    './plugins/with-android-r8-keep',
+    [
+      'expo-build-properties',
+      {
+        android: {
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+          // Play Console R8/obfuscation/shrinking scores (survives `expo prebuild --clean`).
+          enableProguardInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          extraProguardRules: [
+            '-keepattributes SourceFile,LineNumberTable',
+            '-renamesourcefileattribute SourceFile',
+            '-keepattributes *Annotation*',
+            '-keepattributes Signature',
+            '-keepattributes Exceptions',
+            '-keepattributes InnerClasses',
+            '-keepattributes EnclosingMethod',
+            '-keep class com.facebook.react.** { *; }',
+            '-keep class com.facebook.hermes.** { *; }',
+            '-keep class com.facebook.jni.** { *; }',
+            '-keep class com.facebook.react.turbomodule.** { *; }',
+            '-keep class com.facebook.react.bridge.** { *; }',
+            '-dontwarn com.facebook.react.**',
+            '-dontwarn com.facebook.hermes.**',
+            '-keep class com.swmansion.reanimated.** { *; }',
+            '-keep class com.swmansion.gesturehandler.** { *; }',
+            '-keep class expo.modules.** { *; }',
+            '-dontwarn expo.modules.**',
+            '-keep class com.google.firebase.** { *; }',
+            '-keep class com.google.android.gms.** { *; }',
+            '-dontwarn com.google.firebase.**',
+            '-dontwarn com.google.android.gms.**',
+            '-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }',
+            '-keepattributes JavascriptInterface',
+            '-dontwarn com.razorpay.**',
+            '-keep class com.razorpay.** { *; }',
+            '-keepclasseswithmembers class * { public void onPayment*(...); }',
+            '-optimizations !method/inlining/',
+            '-dontwarn okhttp3.**',
+            '-dontwarn okio.**',
+            '-dontwarn javax.annotation.**',
+          ].join('\n'),
+        },
+      },
+    ],
     [
       'expo-splash-screen',
       {

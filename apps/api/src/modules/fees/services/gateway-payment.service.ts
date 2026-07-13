@@ -82,16 +82,25 @@ export class GatewayPaymentService {
       notes: { studentId: dto.studentId, paymentId: payment.id },
     });
 
-    if (checkout.mode !== 'SAFE_MOCK' && checkout.orderId) {
-      await this.db().paymentTransaction.update({
-        where: { id: payment.id },
-        data: { providerOrderId: checkout.orderId },
-      });
+    const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+    const returnUrl = `${webOrigin}/student/fees?atomReturn=1&paymentId=${payment.id}`;
+
+    if (
+      checkout.mode !== 'SAFE_MOCK' &&
+      (checkout.orderId || checkout.atomTokenId)
+    ) {
+      if (checkout.orderId) {
+        await this.db().paymentTransaction.update({
+          where: { id: payment.id },
+          data: { providerOrderId: checkout.orderId },
+        });
+      }
       return {
         payment,
         checkout: {
           ...checkout,
           paymentId: payment.id,
+          returnUrl,
         },
       };
     }
@@ -116,6 +125,7 @@ export class GatewayPaymentService {
         currency: 'INR',
         mode: 'SAFE_MOCK',
         paymentId: payment.id,
+        returnUrl,
       },
     };
   }
@@ -586,6 +596,85 @@ export class GatewayPaymentService {
     return this.webhook(tenantId, providerCode.toUpperCase(), payload);
   }
 
+  /** After Atom/Cashfree redirect return — reconcile ERP payment by id. */
+  async reconcilePaymentById(user: JwtUser, paymentId: string) {
+    const payment = await this.db().paymentTransaction.findFirst({
+      where: { id: paymentId, tenantId: user.tid },
+    });
+    if (!payment) throw new BadRequestException('Payment not found.');
+
+    if (
+      user.permissions?.includes('student:portal:self') &&
+      !user.permissions?.includes('fees:manage') &&
+      !user.permissions?.includes('fees:read')
+    ) {
+      const account = await this.db().student.findFirst({
+        where: {
+          tenantId: user.tid,
+          userId: user.sub,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!account || payment.studentId !== account.id) {
+        throw new BadRequestException('Payment not found.');
+      }
+    }
+
+    if (payment.status === 'SUCCESS') {
+      return { synced: true, alreadyPaid: true, payment };
+    }
+
+    const request = await this.db().feePaymentRequest.findFirst({
+      where: { paymentId: payment.id, tenantId: user.tid },
+    });
+    if (request?.status === 'PENDING') {
+      const synced = await this.syncPaymentRequest(user, request.id);
+      return { ...synced, paymentId: payment.id };
+    }
+
+    const providerCode = String(payment.provider ?? '').toUpperCase();
+    const providerRef = String(payment.providerOrderId ?? '').trim();
+    if (providerCode === 'NTT_DATA' && providerRef) {
+      const creds = await this.gatewayResolver.resolveCredentials(
+        user.tid,
+        'NTT_DATA',
+      );
+      const ntt = creds ? toNttDataCredentials(creds) : null;
+      if (ntt && isNttDataConfigured(ntt)) {
+        const status = await trackNttDataTransaction(ntt, {
+          merchTxnId: providerRef,
+          amount: Number(payment.amount),
+          txnDate: new Date().toISOString().slice(0, 10),
+        });
+        const code = String(
+          (status as { statusCode?: string }).statusCode ??
+            (status as { txnStatus?: string }).txnStatus ??
+            '',
+        ).toUpperCase();
+        if (code === 'OTS0000' || code === 'SUCCESS') {
+          const result = await this.completePayment(
+            user.tid,
+            payment,
+            String(
+              (status as { atomTxnId?: string }).atomTxnId ??
+                `ntt-${providerRef}`,
+            ),
+            user.sub,
+          );
+          return { synced: true, providerStatus: 'paid', ...result };
+        }
+        return { synced: false, providerStatus: code || 'pending', payment };
+      }
+    }
+
+    if (providerRef) {
+      return this.syncStatus(user, providerCode || 'RAZORPAY', providerRef);
+    }
+
+    return { synced: false, providerStatus: 'NO_PROVIDER_REF', payment };
+  }
+
   async syncStatus(user: JwtUser, provider: string, orderId: string) {
     const payment = await this.db().paymentTransaction.findFirst({
       where: { tenantId: user.tid, provider, providerOrderId: orderId },
@@ -1052,7 +1141,64 @@ export class GatewayPaymentService {
       )
       .catch(() => undefined);
 
+    await this.confirmShortTermEnrollments(
+      tenantId,
+      demandIds,
+      String(payment.id),
+    );
+
     return { payment, allocations, receipt };
+  }
+
+  /** Confirm short-term course enrollments linked to paid demands. */
+  private async confirmShortTermEnrollments(
+    tenantId: string,
+    demandIds: string[],
+    paymentId: string,
+  ) {
+    if (!demandIds.length) return;
+    const demands = await this.db().studentFeeDemand.findMany({
+      where: {
+        tenantId,
+        id: { in: demandIds },
+        demandType: 'SHORT_TERM_COURSE',
+      },
+      select: { id: true, metadata: true },
+    });
+    for (const demand of demands) {
+      const enrollmentId =
+        (demand.metadata as { shortTermEnrollmentId?: string } | null)
+          ?.shortTermEnrollmentId ?? null;
+      if (!enrollmentId) continue;
+      const enrollment = await this.db().shortTermEnrollment.findFirst({
+        where: { id: enrollmentId, tenantId },
+        include: { batch: { include: { course: true } } },
+      });
+      if (
+        !enrollment ||
+        ['CONFIRMED', 'COMPLETED'].includes(enrollment.status)
+      ) {
+        continue;
+      }
+      const maxSeats = enrollment.batch?.course?.maxSeats ?? 40;
+      const confirmed = await this.db().shortTermEnrollment.count({
+        where: {
+          tenantId,
+          batchId: enrollment.batchId,
+          status: { in: ['CONFIRMED', 'COMPLETED'] },
+        },
+      });
+      const available = Math.max(0, maxSeats - confirmed);
+      const nextStatus = available > 0 ? 'CONFIRMED' : 'WAITLISTED';
+      await this.db().shortTermEnrollment.update({
+        where: { id: enrollment.id },
+        data: {
+          status: nextStatus,
+          paymentId,
+          confirmedAt: nextStatus === 'CONFIRMED' ? new Date() : null,
+        },
+      });
+    }
   }
 
   private async nextTransactionNo(tenantId: string) {

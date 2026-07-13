@@ -63,8 +63,9 @@ react {
 }
 
 /**
- * ProGuard/R8 + resource shrinking break Expo/RN release startups in this monorepo
- * (Metro assets get stripped; native modules crash). Keep off unless keep.xml + rules are verified.
+ * R8 minify + resource shrink are controlled by gradle.properties /
+ * expo-build-properties. Monorepo Metro assets are string-referenced, so
+ * keep.xml (res/raw/keep.xml) must ship with shrinkResources or assets vanish.
  */
 def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: false).toBoolean()
 def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: false).toBoolean()
@@ -93,7 +94,9 @@ def uploadStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE') ?: keystoreProper
 def uploadStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_STORE_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_STORE_PASSWORD')
 def uploadKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS') ?: keystoreProperties['MYAPP_UPLOAD_KEY_ALIAS'] ?: findProperty('MYAPP_UPLOAD_KEY_ALIAS')
 def uploadKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_KEY_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_KEY_PASSWORD')
-def hasUploadKeystore = uploadStoreFile && file(uploadStoreFile).exists() && uploadStorePassword && uploadKeyAlias && uploadKeyPassword
+// Resolve relative to android/ (rootProject), not android/app/.
+def uploadStore = uploadStoreFile ? rootProject.file(uploadStoreFile) : null
+def hasUploadKeystore = uploadStore?.exists() && uploadStorePassword && uploadKeyAlias && uploadKeyPassword
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -106,7 +109,7 @@ android {
         applicationId 'edu.onecampus.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
+        versionCode 18
         versionName "1.0.0"
     }
     signingConfigs {
@@ -118,7 +121,7 @@ android {
         }
         release {
             if (hasUploadKeystore) {
-                storeFile file(uploadStoreFile)
+                storeFile uploadStore
                 storePassword uploadStorePassword
                 keyAlias uploadKeyAlias
                 keyPassword uploadKeyPassword
@@ -149,7 +152,8 @@ android {
             }
             shrinkResources enableShrinkResourcesInReleaseBuilds
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // optimize.txt improves Play R8/obfuscation scores (keep rules cover RN/Expo/FCM).
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
         }
     }

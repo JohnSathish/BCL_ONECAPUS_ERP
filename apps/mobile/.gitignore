@@ -16,6 +16,7 @@ GoogleService-Info.plist
 *.aab
 onecampus-*.apk
 android/keystore.properties
+credentials/
 *.jks
 *.keystore
 !android/app/debug.keystore

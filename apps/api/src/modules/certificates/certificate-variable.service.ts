@@ -142,6 +142,18 @@ export class CertificateVariableService {
         : gender === 'MALE' || gender === 'M'
           ? 'son'
           : 'son/daughter';
+    const genderLabel =
+      gender === 'FEMALE' || gender === 'F'
+        ? 'Female'
+        : gender === 'MALE' || gender === 'M'
+          ? 'Male'
+          : custom.gender
+            ? String(custom.gender)
+            : '—';
+    const studentCategory =
+      custom.student_category ??
+      student?.masterProfile?.admissionCategory ??
+      '—';
 
     const permanentAddress = this.formatPermanentAddress(
       student?.addresses,
@@ -198,6 +210,17 @@ export class CertificateVariableService {
       custom.remarks ?? lifecycleMeta.remarks ?? lifecycleReason ?? '';
     const industry =
       custom.industry ?? lifecycleMeta.industry ?? attendance ?? 'Satisfactory';
+    const libraryClearance =
+      custom.library_clearance ?? lifecycleMeta.library_clearance ?? 'Cleared';
+    const hostelClearance =
+      custom.hostel_clearance ?? lifecycleMeta.hostel_clearance ?? 'N/A';
+    const preparedByName =
+      custom.prepared_by ?? custom.prepared_by_name ?? 'Office';
+    const verifiedByName =
+      custom.verified_by ??
+      custom.verified_by_name ??
+      registrar?.displayName ??
+      'Registrar';
     const now = new Date();
     const trackMajor = String(
       custom.major_subject ??
@@ -212,6 +235,8 @@ export class CertificateVariableService {
       son_daughter: sonDaughter,
       parent_name: parentName,
       permanent_address: permanentAddress,
+      gender: genderLabel,
+      student_category: String(studentCategory),
       admission_number: student?.admissionNumber ?? '',
       registration_number:
         student?.enrollmentNumber ?? student?.admissionNumber ?? '',
@@ -251,6 +276,8 @@ export class CertificateVariableService {
       attendance: String(attendance),
       fee_status: String(feeClearance),
       fee_clearance: String(feeClearance),
+      library_clearance: String(libraryClearance),
+      hostel_clearance: String(hostelClearance),
       remarks: String(remarks),
       study_period: admissionYear
         ? `${admissionYear} - ${sessionEnd}`
@@ -268,8 +295,9 @@ export class CertificateVariableService {
       university_name: 'North Eastern Hill University',
       university_affiliation: '(Affiliated to North Eastern Hill University)',
       naac_info: "NAAC Re-accredited with Grade 'B'",
-      college_address: branding?.address ?? 'Tura – 794001, Meghalaya',
-      college_pin: '794001',
+      college_address:
+        branding?.address ?? 'Tura, West Garo Hills, Meghalaya – 794002',
+      college_pin: '794002',
       college_phone: custom.college_phone ?? '+91 3651 232 273',
       college_email: custom.college_email ?? 'principaldbct@gmail.com',
       college_website: custom.college_website ?? 'www.donboscocollege.ac.in',
@@ -278,9 +306,23 @@ export class CertificateVariableService {
       registrar_name: registrar?.displayName ?? '',
       principal_signature_block: this.buildSignatureBlock(
         principal?.displayName ?? 'Principal',
-        'Principal',
+        issueMeta?.categoryCode === 'TRANSFER'
+          ? 'Principal & Official Seal'
+          : 'Principal',
         principal?.signaturePath,
         'dbc-signature',
+      ),
+      prepared_by_block: this.buildSignatureBlock(
+        String(preparedByName),
+        'Prepared By',
+        null,
+        'dbc-tc-signature',
+      ),
+      verified_by_block: this.buildSignatureBlock(
+        String(verifiedByName),
+        'Verified By',
+        registrar?.signaturePath,
+        'dbc-tc-signature',
       ),
       registrar_block: this.buildSignatureBlock(
         registrar?.displayName ?? '',

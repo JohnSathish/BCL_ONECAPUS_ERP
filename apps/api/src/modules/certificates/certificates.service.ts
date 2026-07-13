@@ -216,6 +216,11 @@ export class CertificatesService {
       ['NCC', 'NCC Certificate', 'ACHIEVEMENT'],
       ['RECOMMENDATION', 'Recommendation Letter', 'PLACEMENT'],
       ['RESEARCH_PROJECT', 'Research Project Certificate', 'RESEARCH'],
+      [
+        'SHORT_TERM_COMPLETION',
+        'Short-Term Course Completion Certificate',
+        'TRAINING',
+      ],
     ];
     return Promise.all(
       defaults.map(([code, name, group]) =>
@@ -272,6 +277,8 @@ export class CertificatesService {
             status: 'PUBLISHED',
             activeVersionId: version.id,
             publishedAt: new Date(),
+            orientation: categoryCode === 'TRANSFER' ? 'LANDSCAPE' : 'PORTRAIT',
+            pageSize: 'A4',
           },
           include: {
             category: true,
@@ -285,7 +292,7 @@ export class CertificatesService {
           code: def.code,
           name: def.name,
           description: 'Official Don Bosco College unified certificate layout',
-          orientation: 'PORTRAIT',
+          orientation: categoryCode === 'TRANSFER' ? 'LANDSCAPE' : 'PORTRAIT',
           pageSize: 'A4',
           html: def.html,
           layout: {},

@@ -289,6 +289,8 @@ export class GatewayPaymentDto {
   @Min(0)
   amount!: number;
 
+  /** Ignored at initiate time — the tenant's active gateway is always used. */
+  @IsOptional()
   @IsIn([
     'RAZORPAY',
     'CASHFREE',
@@ -300,7 +302,7 @@ export class GatewayPaymentDto {
     'PAYTM',
     'CCAVENUE',
   ])
-  provider!: string;
+  provider?: string;
 }
 
 export class ConcessionDto {

@@ -21,6 +21,8 @@ type PaymentFieldsProps = {
   onMethodChange: (id: DeskPaymentMethodId | '') => void;
   onValuesChange: (values: DeskPaymentFormValues) => void;
   selectId?: string;
+  /** Active online gateway label, e.g. Atom / Razorpay */
+  gatewayName?: string;
 };
 
 const SOURCE_HINT: Record<PaymentMethodSource, string> = {
@@ -38,6 +40,7 @@ export function FeeCollectionPaymentFields({
   methodSource,
   onMethodChange,
   onValuesChange,
+  gatewayName = 'payment gateway',
   selectId = 'desk-payment-method',
 }: PaymentFieldsProps) {
   const methods = useMemo(() => enabledDeskPaymentMethods(collectionModes), [collectionModes]);
@@ -71,7 +74,12 @@ export function FeeCollectionPaymentFields({
       </div>
 
       {method ? (
-        <DynamicMethodFields method={method} values={values} onFieldChange={setField} />
+        <DynamicMethodFields
+          method={method}
+          values={values}
+          onFieldChange={setField}
+          gatewayName={gatewayName}
+        />
       ) : null}
 
       <div className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
@@ -86,16 +94,18 @@ function DynamicMethodFields({
   method,
   values,
   onFieldChange,
+  gatewayName = 'payment gateway',
 }: {
   method: DeskPaymentMethodDef;
   values: DeskPaymentFormValues;
   onFieldChange: (key: string, value: string) => void;
+  gatewayName?: string;
 }) {
   if (method.usesPaymentRequest) {
     return (
       <p className="text-sm text-muted-foreground">
-        Use <strong>Open Razorpay checkout</strong> below — UPI, card, or net banking. Receipt is
-        issued automatically when payment succeeds.
+        Use <strong>Open {gatewayName} checkout</strong> below — UPI, card, or net banking. Receipt
+        is issued automatically when payment succeeds.
       </p>
     );
   }

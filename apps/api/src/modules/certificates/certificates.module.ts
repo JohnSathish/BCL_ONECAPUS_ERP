@@ -16,6 +16,10 @@ import { CertificateAssetsService } from './certificate-assets.service';
     CertificateDocumentService,
     CertificateAssetsService,
   ],
-  exports: [CertificatesService, CertificateVariableService],
+  exports: [
+    CertificatesService,
+    CertificateVariableService,
+    CertificateDocumentService,
+  ],
 })
 export class CertificatesModule {}

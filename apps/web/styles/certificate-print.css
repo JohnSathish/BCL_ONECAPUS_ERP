@@ -1,5 +1,6 @@
-/* Certificate dedicated print document — import on /admin/certificates/print only */
+/* Certificate dedicated print document — import on certificate print routes only */
 
+html.certificate-print-mode,
 body.certificate-print-mode {
   background: #fff;
   color: #111;
@@ -9,10 +10,11 @@ body.certificate-print-mode {
   min-height: 100vh;
   background: #e5e7eb;
   padding: 1rem;
+  overflow: auto;
 }
 
 .certificate-print-toolbar {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto 1rem;
   display: flex;
   flex-wrap: wrap;
@@ -28,6 +30,17 @@ body.certificate-print-mode {
   box-shadow: 0 4px 24px rgb(0 0 0 / 10%);
 }
 
+.certificate-print-document.is-landscape {
+  max-width: 297mm;
+}
+
+.certificate-print-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
 .certificate-print-loading {
   max-width: 900px;
   margin: 2rem auto;
@@ -36,38 +49,56 @@ body.certificate-print-mode {
   font-size: 0.875rem;
 }
 
+/*
+  Hide ERP chrome if the parent page is printed by mistake.
+  Primary path prints the iframe document only (iframe.contentWindow.print).
+*/
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 7mm;
+  html.certificate-print-mode aside,
+  html.certificate-print-mode nav,
+  html.certificate-print-mode [data-sidebar],
+  html.certificate-print-mode .no-print,
+  body.certificate-print-mode aside,
+  body.certificate-print-mode nav,
+  body.certificate-print-mode [data-sidebar],
+  body.certificate-print-mode .no-print {
+    display: none !important;
   }
 
-  html, body {
+  html.certificate-print-mode,
+  body.certificate-print-mode {
+    background: #fff !important;
     height: auto !important;
     overflow: visible !important;
   }
 
-  body.certificate-print-mode {
-    background: #fff;
+  body.certificate-print-mode > div,
+  body.certificate-print-mode > div > div {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .certificate-print-shell {
-    padding: 0;
-    background: #fff;
+    padding: 0 !important;
+    background: #fff !important;
+    min-height: 0 !important;
   }
 
-  .no-print {
-    display: none !important;
+  .certificate-print-document,
+  .certificate-print-document.is-landscape {
+    box-shadow: none !important;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 
-  .certificate-print-document {
-    box-shadow: none;
-    max-width: none;
-    margin: 0;
-  }
-
-  .certificate-print-document .dbc-tc {
-    page-break-inside: avoid;
-    break-inside: avoid;
+  .certificate-print-frame {
+    width: 100% !important;
+    height: 100vh !important;
+    border: 0 !important;
   }
 }

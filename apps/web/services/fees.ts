@@ -113,7 +113,7 @@ export async function initiateOnlinePayment(payload: {
   studentId: string;
   demandIds?: string[];
   amount: number;
-  provider: 'RAZORPAY' | 'CASHFREE' | 'NTT_DATA' | 'PAYU' | 'CUSTOM';
+  provider?: 'RAZORPAY' | 'CASHFREE' | 'NTT_DATA' | 'PAYU' | 'CUSTOM' | 'BILLDESK';
 }) {
   const { data } = await api.post('/v1/fees/payments/initiate', payload);
   return data;

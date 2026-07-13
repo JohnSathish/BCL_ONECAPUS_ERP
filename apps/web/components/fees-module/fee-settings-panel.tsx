@@ -12,7 +12,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
 const COLLECTION_MODE_ROWS: Array<{ key: CollectionModeKey; hint?: string }> = [
-  { key: 'gateway', hint: 'Razorpay — student web portal & mobile (when mobile toggle is on)' },
+  {
+    key: 'gateway',
+    hint: 'Active payment gateway (Atom / Razorpay / …) — web & mobile when mobile pay is on',
+  },
   { key: 'upi_qr', hint: 'Dynamic UPI QR at fee desk' },
   { key: 'sbi_icollect', hint: 'External entry — SBI iCollect' },
   { key: 'bank_transfer', hint: 'External entry — NEFT / RTGS / UPI ref' },
@@ -242,10 +245,10 @@ export function FeeSettingsPanel() {
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
-              <Label>Razorpay on mobile app</Label>
+              <Label>Online payment on mobile app</Label>
               <p className="text-xs text-muted-foreground">
-                Controls Pay now in the BCL OneCampus student app (EAS / Play Store build). Requires
-                Online Gateway enabled and Razorpay keys on the API server.
+                Controls Pay now in the BCL OneCampus student app. Requires Online Gateway enabled
+                and an active payment gateway (Atom / Razorpay / …).
               </p>
             </div>
             <Switch

@@ -416,7 +416,7 @@ export async function approveFeeConcession(id: string) {
 
 export async function initiateMyFeePayment(payload: {
   amount: number;
-  provider: string;
+  provider?: string;
   demandIds?: string[];
 }) {
   const { data } = await api.post('/v1/fees/me/payments/initiate', payload);
@@ -428,8 +428,13 @@ export async function initiateMyFeePayment(payload: {
       amount: number;
       currency: string;
       keyId?: string;
-      mode: 'LIVE' | 'SAFE_MOCK';
+      mode: 'LIVE' | 'SAFE_MOCK' | 'MOCK';
       paymentId?: string;
+      atomTokenId?: string;
+      merchantId?: string;
+      paymentSessionId?: string;
+      checkoutUrl?: string;
+      returnUrl?: string;
     };
   };
 }
@@ -452,6 +457,17 @@ export async function simulateFeePayment(paymentId: string) {
   return data as {
     alreadyPaid: boolean;
     receipt?: { id: string; receiptNo: string };
+  };
+}
+
+export async function reconcileFeePayment(paymentId: string) {
+  const { data } = await api.post(`/v1/fees/payments/${paymentId}/reconcile`, {});
+  return data as {
+    synced: boolean;
+    alreadyPaid?: boolean;
+    providerStatus?: string;
+    receipt?: { id: string; receiptNo: string };
+    payment?: { id: string; status?: string };
   };
 }
 

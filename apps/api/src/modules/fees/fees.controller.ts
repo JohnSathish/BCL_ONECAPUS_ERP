@@ -908,6 +908,15 @@ export class FeesController {
     return this.gateways.simulateMockPayment(user, paymentId);
   }
 
+  @Post('payments/:paymentId/reconcile')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'student:portal:self')
+  reconcilePayment(
+    @CurrentUser() user: JwtUser,
+    @Param('paymentId') paymentId: string,
+  ) {
+    return this.gateways.reconcilePaymentById(user, paymentId);
+  }
+
   @Get('payment-requests')
   @RequireAnyPermission('fees:read', 'fees:manage')
   listPaymentRequests(

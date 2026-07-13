@@ -12289,3 +12289,226 @@ model KnowledgeChunk {
   @@map("knowledge_chunks")
   @@schema("platform")
 }
+
+/// Short-term / certificate courses (separate from FYUGP Course).
+model ShortTermCourse {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  code           String
+  name           String
+  shortName      String    @map("short_name")
+  category       String    @default("CERTIFICATE")
+  departmentId   String?   @map("department_id") @db.Uuid
+  description    String    @default("") @db.Text
+  objectives     String    @default("") @db.Text
+  outcomes       Json      @default("[]")
+  bannerUrl      String?   @map("banner_url")
+  mode           String    @default("OFFLINE")
+  durationDays   Int       @default(30) @map("duration_days")
+  totalHours     Int       @default(0) @map("total_hours")
+  sessionsCount  Int       @default(0) @map("sessions_count")
+  feeType        String    @default("PAID") @map("fee_type")
+  fees           Json      @default("{}")
+  eligibility    Json      @default("{\"scope\":\"ALL\"}")
+  maxSeats       Int       @default(40) @map("max_seats")
+  certRules      Json      @default("{\"minAttendancePercent\":80,\"passRequired\":true}") @map("cert_rules")
+  status         String    @default("DRAFT")
+  metadata       Json      @default("{}")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  batches ShortTermBatch[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@map("short_term_courses")
+  @@schema("academic")
+}
+
+model ShortTermBatch {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  courseId      String    @map("course_id") @db.Uuid
+  batchCode     String    @map("batch_code")
+  regStartAt    DateTime? @map("reg_start_at")
+  regEndAt      DateTime? @map("reg_end_at")
+  courseStartAt DateTime? @map("course_start_at")
+  courseEndAt   DateTime? @map("course_end_at")
+  classroom     String?
+  meetingLink   String?   @map("meeting_link")
+  status        String    @default("UPCOMING")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  course       ShortTermCourse            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollments  ShortTermEnrollment[]
+  staff        ShortTermStaffAssignment[]
+  sessions     ShortTermSession[]
+  materials    ShortTermMaterial[]
+  assessments  ShortTermAssessment[]
+
+  @@unique([tenantId, batchCode])
+  @@index([tenantId, courseId, status])
+  @@map("short_term_batches")
+  @@schema("academic")
+}
+
+model ShortTermEnrollment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  batchId      String    @map("batch_id") @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  status       String    @default("APPLIED")
+  demandId     String?   @map("demand_id") @db.Uuid
+  paymentId    String?   @map("payment_id") @db.Uuid
+  waitlistRank Int?      @map("waitlist_rank")
+  registeredAt DateTime  @default(now()) @map("registered_at")
+  confirmedAt  DateTime? @map("confirmed_at")
+  completedAt  DateTime? @map("completed_at")
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  batch         ShortTermBatch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  attendance    ShortTermAttendance[]
+  results       ShortTermAssessmentResult[]
+  certificate   ShortTermCertificateLink?
+
+  @@unique([batchId, studentId])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, batchId, status])
+  @@map("short_term_enrollments")
+  @@schema("academic")
+}
+
+model ShortTermStaffAssignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  staffUserId String   @map("staff_user_id") @db.Uuid
+  role        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  batch ShortTermBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, staffUserId, role])
+  @@index([tenantId, batchId])
+  @@map("short_term_staff_assignments")
+  @@schema("academic")
+}
+
+model ShortTermSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  batchId     String    @map("batch_id") @db.Uuid
+  topic       String    @default("")
+  startsAt    DateTime  @map("starts_at")
+  endsAt      DateTime  @map("ends_at")
+  venue       String?
+  meetingLink String?   @map("meeting_link")
+  status      String    @default("SCHEDULED")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  batch      ShortTermBatch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  attendance ShortTermAttendance[]
+
+  @@index([tenantId, batchId, startsAt])
+  @@map("short_term_sessions")
+  @@schema("academic")
+}
+
+model ShortTermAttendance {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  sessionId    String   @map("session_id") @db.Uuid
+  enrollmentId String   @map("enrollment_id") @db.Uuid
+  status       String   @default("PRESENT")
+  markedById   String?  @map("marked_by_id") @db.Uuid
+  markedAt     DateTime @default(now()) @map("marked_at")
+
+  session    ShortTermSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollment ShortTermEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, enrollmentId])
+  @@index([tenantId, enrollmentId])
+  @@map("short_term_attendance")
+  @@schema("academic")
+}
+
+model ShortTermMaterial {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  batchId     String    @map("batch_id") @db.Uuid
+  title       String
+  type        String    @default("NOTES")
+  filePath    String?   @map("file_path")
+  fileUrl     String?   @map("file_url")
+  publishedAt DateTime? @map("published_at")
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  batch ShortTermBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, batchId])
+  @@map("short_term_materials")
+  @@schema("academic")
+}
+
+model ShortTermAssessment {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  batchId   String   @map("batch_id") @db.Uuid
+  title     String
+  type      String   @default("ASSIGNMENT")
+  maxMarks  Decimal  @default(100) @map("max_marks") @db.Decimal(8, 2)
+  passMarks Decimal  @default(40) @map("pass_marks") @db.Decimal(8, 2)
+  weightage Decimal  @default(100) @db.Decimal(8, 2)
+  required  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  batch   ShortTermBatch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  results ShortTermAssessmentResult[]
+
+  @@index([tenantId, batchId])
+  @@map("short_term_assessments")
+  @@schema("academic")
+}
+
+model ShortTermAssessmentResult {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  assessmentId String   @map("assessment_id") @db.Uuid
+  enrollmentId String   @map("enrollment_id") @db.Uuid
+  marks        Decimal  @db.Decimal(8, 2)
+  passed       Boolean  @default(false)
+  gradedById   String?  @map("graded_by_id") @db.Uuid
+  gradedAt     DateTime @default(now()) @map("graded_at")
+
+  assessment ShortTermAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  enrollment ShortTermEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, enrollmentId])
+  @@index([tenantId, enrollmentId])
+  @@map("short_term_assessment_results")
+  @@schema("academic")
+}
+
+model ShortTermCertificateLink {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  enrollmentId       String   @unique @map("enrollment_id") @db.Uuid
+  certificateIssueId String   @map("certificate_issue_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  enrollment ShortTermEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, certificateIssueId])
+  @@map("short_term_certificate_links")
+  @@schema("academic")
+}

@@ -160,7 +160,6 @@ export function FeesWorkspace({
       initiateOnlinePayment({
         studentId: collection.studentId,
         amount: Number(collection.amount),
-        provider: 'RAZORPAY',
       }),
     onSuccess: () => setMessage('Online gateway order prepared in safe mock mode.'),
     onError: (err) => setError(apiErrorMessage(err, 'Unable to initiate online payment.')),
