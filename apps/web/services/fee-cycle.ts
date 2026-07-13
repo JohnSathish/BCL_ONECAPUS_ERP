@@ -112,7 +112,7 @@ export async function fetchMyFeeAccount() {
 }
 
 export async function fetchFeeSettings() {
-  const { data } = await api.get('/v1/fees/settings');
+  const { data } = await api.get('/v1/fees/settings', { timeout: 15_000 });
   return data as FeeFinanceSettings;
 }
 
@@ -135,8 +135,11 @@ export async function updateFeeSettings(payload: Record<string, unknown>) {
   return data as FeeFinanceSettings;
 }
 
-export async function fetchMonthlyPlans() {
-  const { data } = await api.get('/v1/fees/monthly-plans');
+export async function fetchMonthlyPlans(options?: { light?: boolean }) {
+  const { data } = await api.get('/v1/fees/monthly-plans', {
+    params: options?.light ? { light: 1 } : undefined,
+    timeout: 15_000,
+  });
   return data as MonthlyFeePlan[];
 }
 

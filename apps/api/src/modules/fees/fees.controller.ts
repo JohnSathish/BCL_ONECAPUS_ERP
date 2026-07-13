@@ -750,6 +750,7 @@ export class FeesController {
     @CurrentUser() user: JwtUser,
     @Body() dto: Record<string, unknown>,
   ) {
+    const before = await this.financeSettings.get(user.tid);
     const updated = await this.financeSettings.update(
       user,
       dto as {
@@ -766,16 +767,30 @@ export class FeesController {
         blockRegistrationOnDue?: boolean;
       },
     );
-    if (!updated.lateFeeEnabled || Number(updated.lateFeeAmount ?? 0) === 0) {
-      await this.fineEngine.clearOutstandingFines(user.tid);
+
+    // Only clear outstanding fines when late-fee policy actually turns off —
+    // never on every unrelated settings toggle (was freezing Fee Settings saves).
+    const lateFeeTurnedOff =
+      (Boolean(before.lateFeeEnabled) && !updated.lateFeeEnabled) ||
+      (Number(before.lateFeeAmount ?? 0) > 0 &&
+        Number(updated.lateFeeAmount ?? 0) === 0);
+    if (lateFeeTurnedOff) {
+      void this.fineEngine
+        .clearOutstandingFines(user.tid)
+        .catch(() => undefined);
     }
     return updated;
   }
 
   @Get('monthly-plans')
   @RequireAnyPermission('fees:read', 'fees:manage')
-  listMonthlyPlans(@CurrentUser() user: JwtUser) {
-    return this.monthlyPlans.list(user.tid);
+  listMonthlyPlans(
+    @CurrentUser() user: JwtUser,
+    @Query('light') light?: string,
+  ) {
+    return this.monthlyPlans.list(user.tid, {
+      light: light === '1' || light === 'true',
+    });
   }
 
   @Post('monthly-plans')

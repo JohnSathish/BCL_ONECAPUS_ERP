@@ -14,7 +14,16 @@ export class MonthlyFeePlanService {
     return this.prisma as unknown as Record<string, any>;
   }
 
-  list(tenantId: string) {
+  list(tenantId: string, options?: { light?: boolean }) {
+    if (options?.light) {
+      // Fee Settings setup guide only needs existence — avoid loading all lines/modifiers.
+      return this.db().monthlyFeePlan.findMany({
+        where: { tenantId, deletedAt: null },
+        select: { id: true, code: true, name: true, status: true },
+        orderBy: { name: 'asc' },
+        take: 200,
+      });
+    }
     return this.db().monthlyFeePlan.findMany({
       where: { tenantId, deletedAt: null },
       include: {

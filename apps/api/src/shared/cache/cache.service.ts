@@ -12,8 +12,15 @@ export class CacheService implements OnModuleDestroy {
     this.enabled = Boolean(url);
     if (url) {
       this.client = new IORedis(url, {
-        maxRetriesPerRequest: 2,
+        maxRetriesPerRequest: 1,
+        connectTimeout: 1500,
+        commandTimeout: 1500,
         lazyConnect: true,
+        enableOfflineQueue: false,
+        retryStrategy: () => null,
+      });
+      this.client.on('error', () => {
+        /* fail soft — callers treat cache miss as DB fallback */
       });
     }
   }
@@ -84,10 +91,19 @@ export class CacheService implements OnModuleDestroy {
     ttlSeconds: number,
     factory: () => Promise<T>,
   ): Promise<T> {
-    const cached = await this.get<T>(key);
-    if (cached != null) return cached;
+    try {
+      const cached = await Promise.race([
+        this.get<T>(key),
+        new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), 2000);
+        }),
+      ]);
+      if (cached != null) return cached;
+    } catch {
+      // treat as miss
+    }
     const value = await factory();
-    await this.set(key, value, ttlSeconds);
+    void this.set(key, value, ttlSeconds);
     return value;
   }
 

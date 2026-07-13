@@ -37,7 +37,12 @@ const MODE_LABELS: Record<CollectionModeKey, string> = {
 
 export function FeeSettingsPanel() {
   const qc = useQueryClient();
-  const settingsQ = useQuery({ queryKey: ['fee-settings'], queryFn: fetchFeeSettings });
+  const settingsQ = useQuery({
+    queryKey: ['fee-settings'],
+    queryFn: fetchFeeSettings,
+    staleTime: 30_000,
+    retry: 1,
+  });
   const s = settingsQ.data;
   const modes = s?.collectionModes;
 
@@ -51,7 +56,29 @@ export function FeeSettingsPanel() {
     saveMut.mutate({ collectionModes: { ...modes, [key]: enabled } });
   };
 
-  if (!s || !modes) return <div className="text-sm text-muted-foreground">Loading settings…</div>;
+  if (settingsQ.isLoading) {
+    return (
+      <div className="space-y-3 rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Loading fee settings…</p>
+        <p className="text-xs">Fetching institution collection modes and receipt options.</p>
+      </div>
+    );
+  }
+
+  if (settingsQ.isError || !s || !modes) {
+    return (
+      <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm">
+        <p className="font-medium text-destructive">Could not load fee settings</p>
+        <p className="text-muted-foreground">
+          {(settingsQ.error as Error)?.message ||
+            'The settings API timed out or returned an error. Try again.'}
+        </p>
+        <Button type="button" variant="outline" onClick={() => void settingsQ.refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

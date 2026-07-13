@@ -20,7 +20,11 @@ type Step = {
 
 export function MonthlyFeeSetupGuide({ compact = false }: { compact?: boolean }) {
   const settingsQ = useQuery({ queryKey: ['fee-settings'], queryFn: fetchFeeSettings });
-  const plansQ = useQuery({ queryKey: ['monthly-plans'], queryFn: fetchMonthlyPlans });
+  const plansQ = useQuery({
+    queryKey: ['monthly-plans', 'light'],
+    queryFn: () => fetchMonthlyPlans({ light: true }),
+    staleTime: 60_000,
+  });
 
   const settings = settingsQ.data;
   const plans = plansQ.data ?? [];
