@@ -19,6 +19,7 @@ import {
   compactAudienceFilter,
   EMPTY_AUDIENCE_FILTER,
   LARGE_BROADCAST_THRESHOLD,
+  migrateLegacyAudience,
   titleAudienceSuggestions,
 } from '@/components/communication/audience/audience-filter.utils';
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
@@ -87,19 +88,21 @@ export function SmartComposeForm() {
     const segmentId = searchParams.get('segmentId');
     const filterParam = searchParams.get('audienceFilter');
     const typeParam = searchParams.get('audienceType');
-    if (typeParam) {
-      setCompose((c) => ({ ...c, audienceType: typeParam }));
-    }
-    if (filterParam) {
-      try {
-        const parsed = JSON.parse(filterParam) as AudienceFilter;
-        setCompose((c) => ({
-          ...c,
-          audienceFilter: { ...EMPTY_AUDIENCE_FILTER, ...parsed },
-        }));
-      } catch {
-        /* ignore bad query */
+    if (typeParam || filterParam) {
+      let parsed: AudienceFilter = { ...EMPTY_AUDIENCE_FILTER };
+      if (filterParam) {
+        try {
+          parsed = { ...EMPTY_AUDIENCE_FILTER, ...(JSON.parse(filterParam) as AudienceFilter) };
+        } catch {
+          /* ignore bad query */
+        }
       }
+      const migrated = migrateLegacyAudience(typeParam || 'STUDENTS', parsed);
+      setCompose((c) => ({
+        ...c,
+        audienceType: migrated.audienceType,
+        audienceFilter: migrated.filter,
+      }));
     }
     if (segmentId) {
       // Segment payload is applied via audienceFilter query from Audience Builder.
@@ -264,11 +267,18 @@ export function SmartComposeForm() {
                 title={s.description}
                 className="rounded-full border border-border/80 bg-background px-3 py-1 text-xs hover:bg-muted/60"
                 onClick={() =>
-                  setCompose((c) => ({
-                    ...c,
-                    audienceType: s.audienceType ?? c.audienceType,
-                    audienceFilter: { ...c.audienceFilter, ...s.patch },
-                  }))
+                  setCompose((c) => {
+                    const nextType = s.audienceType ?? c.audienceType;
+                    const migrated = migrateLegacyAudience(nextType, {
+                      ...c.audienceFilter,
+                      ...s.patch,
+                    });
+                    return {
+                      ...c,
+                      audienceType: migrated.audienceType,
+                      audienceFilter: migrated.filter,
+                    };
+                  })
                 }
               >
                 {s.label}

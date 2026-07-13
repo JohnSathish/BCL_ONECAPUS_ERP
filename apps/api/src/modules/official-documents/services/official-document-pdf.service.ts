@@ -725,6 +725,12 @@ export class OfficialDocumentPdfService {
     return { storageKey, html };
   }
 
+  /** Generate PDF bytes without persisting (wizard preview). */
+  async generatePreviewBuffer(doc: Record<string, any>, referenceNo: string) {
+    const html = await this.buildHtml(doc, referenceNo);
+    return this.htmlToPdf(html);
+  }
+
   async getPdfBuffer(storageKey: string) {
     const buffer = await this.storage.get(storageKey);
     if (!buffer) throw new Error('PDF not found');

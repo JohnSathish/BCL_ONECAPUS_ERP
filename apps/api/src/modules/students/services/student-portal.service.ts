@@ -948,10 +948,37 @@ export class StudentPortalService {
           ?.assignmentsDue ?? 0,
       ),
       downloads: {
-        syllabusAvailable: false,
+        syllabusAvailable: await this.hasPublishedSyllabusForCourses(
+          user.tid,
+          lines
+            .map(
+              (line) =>
+                line.offering?.course?.id ??
+                offeringMap.get(line.offeringId)?.course?.id ??
+                null,
+            )
+            .filter((id): id is string => Boolean(id)),
+        ),
         curriculumAvailable: Boolean(programVersion?.version),
         subjectListAvailable: subjects.length > 0,
       },
     };
+  }
+
+  private async hasPublishedSyllabusForCourses(
+    tenantId: string,
+    courseIds: string[],
+  ) {
+    const unique = [...new Set(courseIds)];
+    if (!unique.length) return false;
+    const count = await this.prisma.syllabusDocument.count({
+      where: {
+        tenantId,
+        courseId: { in: unique },
+        status: 'PUBLISHED',
+        deletedAt: null,
+      },
+    });
+    return count > 0;
   }
 }

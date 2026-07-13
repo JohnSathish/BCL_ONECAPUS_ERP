@@ -56,6 +56,7 @@ export default function StaffLayout() {
         <Stack.Screen name="payroll" />
         <Stack.Screen name="notification-preferences" />
         <Stack.Screen name="about" />
+        <Stack.Screen name="account-deletion" />
       </Stack>
     </FacultyPortalProvider>
   );

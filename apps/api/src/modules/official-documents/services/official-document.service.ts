@@ -132,6 +132,57 @@ export class OfficialDocumentService {
     return doc;
   }
 
+  /** Ephemeral PDF preview for the create wizard (not saved). */
+  async previewPdf(user: JwtUser, dto: CreateOfficialDocumentDto) {
+    const issuer = dto.issuerId
+      ? await this.db().officialDocumentIssuer.findFirst({
+          where: { id: dto.issuerId, tenantId: user.tid },
+          include: { letterhead: true },
+        })
+      : await this.db().officialDocumentIssuer.findFirst({
+          where: { tenantId: user.tid, active: true },
+          include: { letterhead: true },
+          orderBy: { sortOrder: 'asc' },
+        });
+
+    const letterhead =
+      (dto.letterheadId
+        ? await this.db().officialDocumentLetterhead.findFirst({
+            where: { id: dto.letterheadId, tenantId: user.tid },
+          })
+        : null) ??
+      issuer?.letterhead ??
+      null;
+
+    const year = new Date().getFullYear();
+    const prefix = issuer?.refPrefix?.trim() || 'PR';
+    const previewRef = `DRAFT/${prefix}/${year}/PREVIEW`;
+
+    const ephemeral = {
+      id: 'preview',
+      tenantId: user.tid,
+      documentType: dto.documentType,
+      title: dto.title.trim(),
+      subject: dto.subject?.trim() ?? null,
+      salutation: dto.salutation?.trim() ?? null,
+      bodyHtml: dto.bodyHtml,
+      audience: dto.audience ?? {},
+      printSettings: dto.printSettings ?? {},
+      publishedAt: new Date(),
+      approvedById: null,
+      verifyToken: 'PREVIEW',
+      issuer,
+      letterhead,
+      attachments: [],
+    };
+
+    const buffer = await this.pdf.generatePreviewBuffer(ephemeral, previewRef);
+    return {
+      buffer,
+      filename: `preview-${dto.documentType.toLowerCase()}.pdf`,
+    };
+  }
+
   async update(
     user: JwtUser,
     id: string,

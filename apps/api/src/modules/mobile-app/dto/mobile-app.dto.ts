@@ -132,7 +132,14 @@ export class UpdateDeviceDto {
 }
 
 export class MobileAnalyticsEventDto {
-  @IsIn(['LOGIN', 'SCREEN_VIEW', 'CRASH', 'PUSH_DELIVERED', 'PUSH_OPENED'])
+  @IsIn([
+    'LOGIN',
+    'SCREEN_VIEW',
+    'CRASH',
+    'PUSH_DELIVERED',
+    'PUSH_OPENED',
+    'ACCOUNT_DELETION_REQUEST',
+  ])
   eventType!: string;
 
   @IsIn(['STUDENT', 'STAFF'])

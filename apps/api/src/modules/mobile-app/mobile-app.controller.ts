@@ -205,6 +205,37 @@ export class MobileAppController {
     return this.analytics.ingest(user, dto);
   }
 
+  @Post('account/deletion-request')
+  @RequireAnyPermission('student:portal:self', 'staff:portal:self')
+  accountDeletionRequest(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { reason?: string; source?: string },
+  ) {
+    return this.analytics
+      .ingest(user, {
+        events: [
+          {
+            appType: user.permissions?.includes('staff:portal:self')
+              ? 'STAFF'
+              : 'STUDENT',
+            eventType: 'ACCOUNT_DELETION_REQUEST',
+            metadata: {
+              reason: body?.reason ?? null,
+              source: body?.source ?? 'MOBILE_APP',
+              userId: user.sub,
+              email: user.email ?? null,
+            },
+          },
+        ],
+      })
+      .then((r) => ({
+        success: true,
+        message:
+          'Deletion request recorded. Your institution administrator will process it per policy.',
+        accepted: r.accepted,
+      }));
+  }
+
   @Get('analytics/dashboard')
   @RequirePermissions('mobile:settings:read')
   analyticsDashboard(

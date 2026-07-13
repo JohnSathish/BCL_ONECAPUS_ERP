@@ -6,7 +6,8 @@ const isDevClientBuild = process.env.EAS_BUILD_PROFILE === 'development';
 const isNativeReleaseBuild =
   process.env.EAS_BUILD_PROFILE === 'production' ||
   process.env.EAS_BUILD_PROFILE === 'preview' ||
-  process.env.EAS_BUILD_PROFILE === 'production-apk';
+  process.env.EAS_BUILD_PROFILE === 'production-apk' ||
+  process.env.LOCAL_NATIVE_RELEASE === '1';
 const easBuildProfile = process.env.EAS_BUILD_PROFILE;
 /** EAS file secret path on build workers; local file for `expo run` / prebuild. */
 const googleServicesFromEnv = process.env.GOOGLE_SERVICES_JSON?.trim();
@@ -47,8 +48,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   icon: appIcon,
   splash: {
-    image: './assets/splash-solid.png',
-    resizeMode: 'cover',
+    image: './assets/bcl-onecampus-logo.png',
+    resizeMode: 'contain',
     backgroundColor: '#020f2e',
   },
   ios: {
@@ -57,7 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 12,
+    versionCode: 15,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -69,15 +70,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'RECEIVE_BOOT_COMPLETED',
       'VIBRATE',
       'POST_NOTIFICATIONS',
+      'CAMERA',
+      'USE_BIOMETRIC',
+      'USE_FINGERPRINT',
+    ],
+    /** Strip permissions libraries may merge that we do not use (Play policy). */
+    blockedPermissions: [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.SYSTEM_ALERT_WINDOW',
     ],
   },
   plugins: [
     [
       'expo-splash-screen',
       {
-        image: './assets/splash-solid.png',
+        image: './assets/bcl-onecampus-logo.png',
         backgroundColor: '#020f2e',
-        resizeMode: 'cover',
+        imageWidth: 200,
+        resizeMode: 'contain',
       },
     ],
     [
@@ -118,6 +128,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html',
     termsUrl:
       process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://basecodelabs.com/terms-and-conditions.html',
+    accountDeletionUrl:
+      process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ??
+      'https://basecodelabs.com/account-deletion.html',
     supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'contact@basecodelabs.com',
     eas: {
       projectId: 'b617eca6-5dde-443b-aef6-737b553d54ad',

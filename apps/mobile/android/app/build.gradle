@@ -63,9 +63,11 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * ProGuard/R8 + resource shrinking break Expo/RN release startups in this monorepo
+ * (Metro assets get stripped; native modules crash). Keep off unless keep.xml + rules are verified.
  */
 def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: false).toBoolean()
+def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: false).toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -80,6 +82,19 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
 
+// Upload keystore for Play Store (never commit the .jks). Set in ~/.gradle/gradle.properties
+// or android/keystore.properties (gitignored) / env: MYAPP_UPLOAD_STORE_FILE, etc.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def uploadStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE') ?: keystoreProperties['MYAPP_UPLOAD_STORE_FILE'] ?: findProperty('MYAPP_UPLOAD_STORE_FILE')
+def uploadStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_STORE_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+def uploadKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS') ?: keystoreProperties['MYAPP_UPLOAD_KEY_ALIAS'] ?: findProperty('MYAPP_UPLOAD_KEY_ALIAS')
+def uploadKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_KEY_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+def hasUploadKeystore = uploadStoreFile && file(uploadStoreFile).exists() && uploadStorePassword && uploadKeyAlias && uploadKeyPassword
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -91,7 +106,7 @@ android {
         applicationId 'edu.onecampus.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
+        versionCode 15
         versionName "1.0.0"
     }
     signingConfigs {
@@ -101,16 +116,38 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasUploadKeystore) {
+                storeFile file(uploadStoreFile)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
+            if (hasUploadKeystore) {
+                signingConfig signingConfigs.release
+            } else if (System.getenv('EAS_BUILD') == 'true') {
+                // EAS applies ./eas-build.gradle which sets signingConfigs.release from credentials.json.
+                println 'EAS_BUILD=true — release signing comes from eas-build.gradle / credentials.json.'
+                signingConfig signingConfigs.release
+            } else if ((findProperty('ALLOW_DEBUG_RELEASE_SIGNING') ?: 'false').toBoolean()) {
+                // Local smoke builds only — never upload a debug-signed AAB to Play.
+                println 'WARNING: release is signed with the debug keystore (ALLOW_DEBUG_RELEASE_SIGNING=true). Do not upload to Play Console.'
+                signingConfig signingConfigs.debug
+            } else {
+                throw new GradleException(
+                    'Release signing requires an upload keystore. Create android/keystore.properties ' +
+                    '(see keystore.properties.example) or set MYAPP_UPLOAD_* env vars, ' +
+                    'or use EAS: npm run build:prod:android. For local smoke only: -PALLOW_DEBUG_RELEASE_SIGNING=true'
+                )
+            }
+            shrinkResources enableShrinkResourcesInReleaseBuilds
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
@@ -175,4 +212,21 @@ dependencies {
     }
 }
 
-apply plugin: 'com.google.gms.google-services'
+// Apply Google Services when google-services.json is present (FCM).
+def googleServicesJson = file('google-services.json')
+def googleServicesJsonRoot = rootProject.file('../google-services.json')
+if (!googleServicesJson.exists() && googleServicesJsonRoot.exists()) {
+    copy {
+        from googleServicesJsonRoot
+        into file('.')
+    }
+}
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
+// EAS Build injects this file with Play upload keystore config (credentials.json).
+def easBuildGradle = file('eas-build.gradle')
+if (easBuildGradle.exists()) {
+    apply from: easBuildGradle
+}

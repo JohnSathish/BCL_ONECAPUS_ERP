@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthFailureRedirect } from '@/hooks/useAuthFailureRedirect';
 import {
@@ -12,16 +13,27 @@ import {
   requestPushPermissions,
 } from '@/services/push-notifications';
 
+ExpoSplashScreen.preventAutoHideAsync().catch(() => undefined);
+
 export default function RootLayout() {
   useAuthFailureRedirect();
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
-    void ensureAndroidDefaultChannel();
-    void requestPushPermissions();
-    attachPushResponseListener();
-    void consumeInitialPushResponse();
-    void refreshPushRegistrationIfLoggedIn();
+    // Fail-safe: never leave users on the native splash forever if a later screen hangs.
+    const failsafe = setTimeout(() => {
+      void ExpoSplashScreen.hideAsync().catch(() => undefined);
+    }, 8000);
+
+    try {
+      void ensureAndroidDefaultChannel();
+      void requestPushPermissions();
+      attachPushResponseListener();
+      void consumeInitialPushResponse();
+      void refreshPushRegistrationIfLoggedIn();
+    } catch (err) {
+      console.warn('[root] push bootstrap failed', err);
+    }
 
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && next === 'active') {
@@ -31,6 +43,7 @@ export default function RootLayout() {
     });
 
     return () => {
+      clearTimeout(failsafe);
       sub.remove();
       detachPushResponseListener();
     };

@@ -160,6 +160,13 @@ export async function createOfficialDocument(payload: CreateOfficialDocumentPayl
   return data as OfficialDocument;
 }
 
+export async function previewOfficialDocumentPdf(payload: CreateOfficialDocumentPayload) {
+  const response = await api.post('/v1/admin/official-documents/preview', payload, {
+    responseType: 'blob',
+  });
+  return response.data as Blob;
+}
+
 export async function updateOfficialDocument(
   id: string,
   payload: Partial<CreateOfficialDocumentPayload>,
@@ -299,3 +306,17 @@ export const SMART_VARIABLES = [
   '{{Principal}}',
   '{{VicePrincipal}}',
 ];
+
+export const SALUTATION_OPTIONS = [
+  'Dear Students',
+  'Dear Faculty Members',
+  'Dear Committee Members',
+  'Dear Parents',
+  'Dear Staff',
+  'Respected Professors',
+  'To All Concerned',
+  'Dear Faculty members and Students',
+] as const;
+
+/** Document types that typically need an expiry date */
+export const EXPIRY_RELEVANT_DOCUMENT_TYPES = new Set(['TENDER', 'APPOINTMENT_ORDER', 'URGENT']);

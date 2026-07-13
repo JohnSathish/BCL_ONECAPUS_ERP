@@ -52,6 +52,8 @@ export type AudienceFilter = {
   nonTeaching?: boolean;
   permanent?: boolean;
   contract?: boolean;
+  /** ACTIVE | ON_LEAVE | CONTRACT | VISITING | RETIRED */
+  staffStatuses?: string[];
 };
 
 export type AudienceCountResult = {
@@ -59,6 +61,7 @@ export type AudienceCountResult = {
   byAudienceType: Record<string, number>;
   withEmail: number;
   withPhone: number;
+  withPush: number;
 };
 
 export type AudienceContext = {
@@ -149,11 +152,35 @@ export class CommunicationAudienceService {
       if (r.email?.trim()) withEmail += 1;
       if (r.phone?.trim()) withPhone += 1;
     }
+
+    const userIds = [
+      ...new Set(
+        recipients
+          .map((r) => r.userId)
+          .filter((id): id is string => Boolean(id?.trim())),
+      ),
+    ];
+    let withPush = 0;
+    if (userIds.length) {
+      const pushDevices = await this.prisma.mobileDevice.findMany({
+        where: {
+          tenantId,
+          userId: { in: userIds },
+          status: 'ACTIVE',
+          pushToken: { not: null },
+        },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      withPush = pushDevices.length;
+    }
+
     return {
       total: recipients.length,
       byAudienceType,
       withEmail,
       withPhone,
+      withPush,
     };
   }
 
@@ -668,11 +695,35 @@ export class CommunicationAudienceService {
     tenantId: string,
     filter: AudienceFilter,
   ): Promise<ResolvedRecipient[]> {
+    const statuses = (filter.staffStatuses ?? [])
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+    const wantsActive = statuses.includes('ACTIVE');
+    const wantsOnLeave = statuses.includes('ON_LEAVE');
+    const wantsRetired = statuses.includes('RETIRED');
+    const wantsContract =
+      statuses.includes('CONTRACT') || Boolean(filter.contract);
+    const wantsVisiting = statuses.includes('VISITING');
+    const hasLifecycleStatus = wantsActive || wantsOnLeave || wantsRetired;
+
     const where: Prisma.StaffProfileWhereInput = {
       tenantId,
       deletedAt: null,
-      status: 'ACTIVE',
     };
+
+    if (!statuses.length) {
+      where.status = 'ACTIVE';
+    } else if (hasLifecycleStatus) {
+      const statusValues: string[] = [];
+      if (wantsActive) statusValues.push('ACTIVE');
+      if (wantsOnLeave) statusValues.push('ON_LEAVE', 'LEAVE');
+      if (wantsRetired) statusValues.push('RETIRED');
+      where.status = { in: statusValues };
+    } else {
+      // CONTRACT / VISITING alone → still only active employees of that type.
+      where.status = 'ACTIVE';
+    }
+
     if (filter.departmentIds?.length) {
       where.departmentId = { in: filter.departmentIds };
     }
@@ -685,14 +736,28 @@ export class CommunicationAudienceService {
     if (filter.designationIds?.length) {
       where.designationId = { in: filter.designationIds };
     }
-    if (filter.teaching && !filter.nonTeaching) {
+
+    if (filter.teaching && !filter.nonTeaching && !wantsVisiting) {
       where.staffType = 'TEACHING';
-    } else if (filter.nonTeaching && !filter.teaching) {
+    } else if (filter.nonTeaching && !filter.teaching && !wantsVisiting) {
       where.staffType = { not: 'TEACHING' };
     }
-    if (filter.permanent && !filter.contract) {
+
+    if (wantsVisiting) {
+      where.OR = [
+        { staffType: { equals: 'VISITING', mode: 'insensitive' } },
+        { staffType: { equals: 'GUEST', mode: 'insensitive' } },
+        { employmentType: { equals: 'VISITING', mode: 'insensitive' } },
+      ];
+    }
+
+    if (filter.permanent && !filter.contract && !wantsContract) {
       where.employmentType = 'PERMANENT';
-    } else if (filter.contract && !filter.permanent) {
+    } else if (
+      (filter.contract || wantsContract) &&
+      !filter.permanent &&
+      !wantsVisiting
+    ) {
       where.employmentType = { not: 'PERMANENT' };
     }
     if (filter.gender) {
@@ -748,17 +813,33 @@ export class CommunicationAudienceService {
     filter: AudienceFilter,
   ): Promise<ResolvedRecipient[]> {
     const userIds = filter.userIds ?? [];
-    if (!userIds.length) return [];
+    const staffProfileIds = filter.staffProfileIds ?? [];
+    const studentIds = filter.studentIds ?? [];
 
-    const users = await this.prisma.user.findMany({
-      where: { tenantId, id: { in: userIds }, isActive: true, deletedAt: null },
-      include: {
-        student: { select: { id: true } },
-        staffProfile: { select: { id: true } },
-      },
-    });
+    const [users, staff, students] = await Promise.all([
+      userIds.length
+        ? this.prisma.user.findMany({
+            where: {
+              tenantId,
+              id: { in: userIds },
+              isActive: true,
+              deletedAt: null,
+            },
+            include: {
+              student: { select: { id: true } },
+              staffProfile: { select: { id: true } },
+            },
+          })
+        : Promise.resolve([]),
+      staffProfileIds.length
+        ? this.resolveFaculty(tenantId, { staffProfileIds })
+        : Promise.resolve([]),
+      studentIds.length
+        ? this.resolveStudents(tenantId, { studentIds })
+        : Promise.resolve([]),
+    ]);
 
-    return users.map((u) => ({
+    const fromUsers = users.map((u) => ({
       recipientType: u.student
         ? ('STUDENT' as const)
         : u.staffProfile
@@ -771,6 +852,8 @@ export class CommunicationAudienceService {
       email: u.email,
       phone: u.phone ?? undefined,
     }));
+
+    return this.dedupe([...fromUsers, ...staff, ...students]);
   }
 
   private async resolveCommittee(

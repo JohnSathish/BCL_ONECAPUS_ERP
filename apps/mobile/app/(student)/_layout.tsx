@@ -61,12 +61,14 @@ export default function StudentLayout() {
           <Stack.Screen name="leave" />
           <Stack.Screen name="library" />
           <Stack.Screen name="assignments" />
+          <Stack.Screen name="syllabus" />
           <Stack.Screen name="complete-profile" />
           <Stack.Screen name="registration-web" />
           <Stack.Screen name="feedback" />
           <Stack.Screen name="certificates" />
           <Stack.Screen name="notification-preferences" />
           <Stack.Screen name="about" />
+          <Stack.Screen name="account-deletion" />
         </Stack>
       </StudentPortalProvider>
     </SyncGuardProvider>

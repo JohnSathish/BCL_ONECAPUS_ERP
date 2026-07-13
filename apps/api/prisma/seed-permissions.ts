@@ -729,6 +729,48 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'View question bank reports and exports',
   },
   {
+    slug: 'syllabus-repository:read',
+    resource: 'syllabus-repository',
+    action: 'read',
+    description: 'View syllabus repository documents and dashboard',
+  },
+  {
+    slug: 'syllabus-repository:download',
+    resource: 'syllabus-repository',
+    action: 'download',
+    description: 'Download and preview published syllabi',
+  },
+  {
+    slug: 'syllabus-repository:contribute',
+    resource: 'syllabus-repository',
+    action: 'contribute',
+    description: 'Upload and submit syllabus documents',
+  },
+  {
+    slug: 'syllabus-repository:approve',
+    resource: 'syllabus-repository',
+    action: 'approve',
+    description: 'Approve syllabus workflow steps',
+  },
+  {
+    slug: 'syllabus-repository:publish',
+    resource: 'syllabus-repository',
+    action: 'publish',
+    description: 'Publish approved syllabus documents',
+  },
+  {
+    slug: 'syllabus-repository:manage',
+    resource: 'syllabus-repository',
+    action: 'manage',
+    description: 'Full syllabus repository administration and bulk import',
+  },
+  {
+    slug: 'syllabus-repository:reports',
+    resource: 'syllabus-repository',
+    action: 'reports',
+    description: 'View syllabus repository reports and analytics',
+  },
+  {
     slug: 'exam:view',
     resource: 'exam',
     action: 'view',

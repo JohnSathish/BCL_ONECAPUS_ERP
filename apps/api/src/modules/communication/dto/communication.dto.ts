@@ -38,6 +38,13 @@ export const FEE_STATUS_OPTIONS = [
   'OVERDUE',
   'DEFAULTERS',
 ] as const;
+export const STAFF_STATUS_OPTIONS = [
+  'ACTIVE',
+  'ON_LEAVE',
+  'CONTRACT',
+  'VISITING',
+  'RETIRED',
+] as const;
 
 export class CommunicationTemplateDto {
   @IsString()
@@ -292,6 +299,12 @@ export class AudienceFilterDto {
   @IsOptional()
   @IsBoolean()
   contract?: boolean;
+
+  /** Staff employment / lifecycle statuses for FACULTY targeting. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(STAFF_STATUS_OPTIONS, { each: true })
+  staffStatuses?: (typeof STAFF_STATUS_OPTIONS)[number][];
 }
 
 export class CommunicationCampaignDto {

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { examFeePrismaMessage } from '../../modules/examination-fees/utils/exam-fee-prisma.util';
+import { prismaSchemaDriftMessage } from '../utils/prisma-schema-drift.util';
 
 @Catch()
 export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
@@ -31,7 +32,8 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
     const prismaHint =
       exception instanceof HttpException
         ? null
-        : examFeePrismaMessage(exception);
+        : (prismaSchemaDriftMessage(exception) ??
+          examFeePrismaMessage(exception));
 
     const message =
       exception instanceof HttpException

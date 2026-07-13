@@ -2,11 +2,13 @@
 
 **Application name:** BCL OneCampus ERP  
 **Package name:** `edu.onecampus.mobile`  
-**Version:** 1.0.0 (`versionCode` 1)  
+**Version:** 1.0.0 (`versionCode` **14**)  
+**Target SDK:** 35  
 **Developer:** BaseCode Labs Pvt. Ltd.
 
 See also:
 
+- [docs/play-publishing-checklist.md](docs/play-publishing-checklist.md) — **final submission checklist**
 - [docs/firebase-setup.md](docs/firebase-setup.md) — Firebase / FCM Console steps
 - [docs/play-data-safety.md](docs/play-data-safety.md) — Data Safety form answers
 
@@ -83,6 +85,7 @@ Education
 | Website            | https://basecodelabs.com                           |
 | Privacy policy URL | https://basecodelabs.com/privacy-policy.html       |
 | Terms URL          | https://basecodelabs.com/terms-and-conditions.html |
+| Account deletion   | https://basecodelabs.com/account-deletion.html     |
 
 Institution-specific builds may override privacy URL via `EXPO_PUBLIC_PRIVACY_POLICY_URL`.
 
@@ -90,14 +93,14 @@ Institution-specific builds may override privacy URL via `EXPO_PUBLIC_PRIVACY_PO
 
 ## Required assets (prepare outside repo or add under `assets/store/`)
 
-| Asset              | Spec                                  |
-| ------------------ | ------------------------------------- |
-| App icon           | 512×512 PNG                           |
-| Adaptive icon      | Already configured in `app.config.ts` |
-| Splash             | Configured (`splash-solid.png`)       |
-| Feature graphic    | 1024×500 PNG                          |
-| Phone screenshots  | Min 2 (1080×1920 or similar)          |
-| Tablet screenshots | Optional                              |
+| Asset              | Spec                                                                    |
+| ------------------ | ----------------------------------------------------------------------- |
+| App icon           | 512×512 PNG                                                             |
+| Adaptive icon      | Already configured in `app.config.ts`                                   |
+| Splash             | Configured (`splash-solid.png`)                                         |
+| Feature graphic    | 1024×500 PNG — `assets/store/feature-graphic.png`                       |
+| Phone screenshots  | Min 2 (1080×1920 or similar) — capture into `assets/store/screenshots/` |
+| Tablet screenshots | Optional                                                                |
 
 ---
 
@@ -119,8 +122,9 @@ Use [docs/play-data-safety.md](docs/play-data-safety.md). Summary:
 | ------------------------------------ | --------------------------------------------------- |
 | Notifications (`POST_NOTIFICATIONS`) | After login / first push registration (Android 13+) |
 | Internet                             | Always (API)                                        |
-| Camera / photos                      | Only when user uploads profile/docs (if enabled)    |
-| Biometric                            | Optional future secure login                        |
+| Camera (QR login)                    | When scanning login QR codes                        |
+| Biometric                            | Optional unlock after first login                   |
+| Microphone / overlay                 | Not requested (blocked)                             |
 
 ---
 
@@ -133,9 +137,11 @@ Use [docs/play-data-safety.md](docs/play-data-safety.md). Summary:
 - [ ] PUSH preferences skip disabled categories
 - [ ] Notification Center: read, unread, archive, delete, search
 - [ ] Admin Push Center → Compose with PUSH channel
-- [ ] Privacy Policy, Terms, About screens accessible
+- [ ] Privacy Policy, Terms, About, **Delete account** screens accessible
+- [ ] Account deletion URL live: https://basecodelabs.com/account-deletion.html
 - [ ] Release AAB installs and login works against production API
 - [ ] No critical crashes on smoke paths (login, home, fees, notifications)
+- [ ] targetSdk 35 build uploaded to Internal testing
 
 ---
 
@@ -170,7 +176,7 @@ Steps:
 1. Sign in with the demo account and complete the arithmetic challenge.
 2. Student: open Fees, Attendance, Notifications.
 3. Staff: open Dashboard, Timetable, Notifications.
-4. Profile → Notification preferences / About / Privacy / Terms.
+4. Profile → Notification preferences / About / Privacy / Terms / **Delete account**.
 
 Push notifications require a production/dev-client build with Firebase google-services.json (not Expo Go).
 ```

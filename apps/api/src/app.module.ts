@@ -60,6 +60,7 @@ import { ExaminationFeesModule } from './modules/examination-fees/examination-fe
 import { LmsModule } from './modules/lms/lms.module';
 import { CommunicationModule } from './modules/communication/communication.module';
 import { QuestionBankModule } from './modules/question-bank/question-bank.module';
+import { SyllabusRepositoryModule } from './modules/syllabus-repository/syllabus-repository.module';
 import { LibraryModule } from './modules/library/library.module';
 import { FrontOfficeModule } from './modules/front-office/front-office.module';
 import { GovernanceModule } from './modules/governance/governance.module';
@@ -141,6 +142,7 @@ import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.
     CommunicationModule,
     CertificatesModule,
     QuestionBankModule,
+    SyllabusRepositoryModule,
     LibraryModule,
     CampusAccessModule,
     FrontOfficeModule,

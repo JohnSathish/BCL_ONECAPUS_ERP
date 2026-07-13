@@ -151,6 +151,8 @@ export type AudienceFilter = {
   nonTeaching?: boolean;
   permanent?: boolean;
   contract?: boolean;
+  /** Staff employment / lifecycle statuses: ACTIVE, ON_LEAVE, CONTRACT, VISITING, RETIRED */
+  staffStatuses?: string[];
 };
 
 export type AudienceCountResult = {
@@ -158,6 +160,7 @@ export type AudienceCountResult = {
   byAudienceType: Record<string, number>;
   withEmail?: number;
   withPhone?: number;
+  withPush?: number;
 };
 
 export type AudienceContext = {

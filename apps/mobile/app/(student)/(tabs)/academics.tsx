@@ -298,9 +298,7 @@ export default function StudentAcademicsScreen() {
           <DownloadChip
             label="Syllabus"
             available={data?.downloads.syllabusAvailable}
-            onPress={() =>
-              Alert.alert('Syllabus', 'Syllabus download will be available in a future update.')
-            }
+            onPress={() => router.push('/(student)/syllabus' as never)}
           />
           <DownloadChip
             label="Curriculum"

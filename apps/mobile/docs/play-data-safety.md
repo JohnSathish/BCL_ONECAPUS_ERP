@@ -40,7 +40,10 @@ Use these answers when completing Play Console → App content → Data safety.
 
 ## Data deletion / account
 
-Users request deactivation or deletion through the institution’s administration (college office). Institutions control tenant data retention under their policies.
+- **In-app:** Profile → **Delete account** (student and staff). Submits a deletion request to the college ERP and/or emails support.
+- **Web URL (Play Console):** https://basecodelabs.com/account-deletion.html
+- Accounts are institution-managed. Academic / fee records may be retained under institutional and legal retention policies. Login access is deactivated after the institution processes the request.
+- Email: contact@basecodelabs.com
 
 ## Notifications
 

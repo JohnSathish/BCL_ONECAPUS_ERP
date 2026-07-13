@@ -27,10 +27,12 @@ type Tab = 'dashboard' | 'compose' | 'templates' | 'history' | 'logs';
 
 const AUDIENCE_OPTIONS = [
   { value: 'STUDENTS', label: 'Students' },
-  { value: 'PARENTS', label: 'Parents / Guardians' },
-  { value: 'FACULTY', label: 'Faculty & Staff' },
+  { value: 'FACULTY', label: 'Staff' },
+  { value: 'PARENTS', label: 'Parents' },
+  { value: 'ALUMNI', label: 'Alumni' },
+  { value: 'COMMITTEE', label: 'Committee' },
   { value: 'DEPARTMENTS', label: 'Departments' },
-  { value: 'INDIVIDUAL', label: 'Individual Users' },
+  { value: 'INDIVIDUAL', label: 'Individual' },
 ];
 
 export function CommunicationWorkspace() {

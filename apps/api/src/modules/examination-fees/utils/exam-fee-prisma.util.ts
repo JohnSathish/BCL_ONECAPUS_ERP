@@ -12,6 +12,8 @@ export function examFeePrismaMessage(error: unknown): string | null {
         (error.meta as { table?: string } | undefined)?.table ??
           'finance.exam_fee_*',
       );
+      // Only claim exam-fee when the missing table is actually exam-fee related.
+      if (!/exam_fee/i.test(table)) return null;
       return `Examination fee tables are missing (${table}). On the VPS run: bash scripts/deploy/vps-migrate.sh then recreate the API container.`;
     }
     if (error.code === 'P2022') {

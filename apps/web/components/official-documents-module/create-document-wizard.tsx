@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, Loader2, Sparkles } from 'lucide-react';
 
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
 import { OfficialDocumentsShell } from '@/components/official-documents-module/official-documents-shell';
@@ -12,18 +12,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   AUDIENCE_OPTIONS,
+  approveOfficialDocument,
   createOfficialDocument,
   DOCUMENT_TYPE_OPTIONS,
+  EXPIRY_RELEVANT_DOCUMENT_TYPES,
   fetchOfficialDocumentIssuers,
   fetchOfficialDocumentTemplates,
+  previewOfficialDocumentPdf,
+  SALUTATION_OPTIONS,
   SMART_VARIABLES,
+  submitOfficialDocumentForApproval,
   type CreateOfficialDocumentPayload,
 } from '@/services/official-documents';
 import { fetchGovernanceCommittees } from '@/services/governance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-const STEPS = ['Document Type', 'Issuer', 'Audience', 'Details'] as const;
+const STEPS = ['Document Type', 'Issuer', 'Recipients', 'Details'] as const;
 const PRIORITIES = ['NORMAL', 'IMPORTANT', 'URGENT', 'EMERGENCY'] as const;
 
 type MeetingDraft = {
@@ -37,6 +42,8 @@ type MeetingDraft = {
   agendaText: string;
 };
 
+type PublishMode = 'draft' | 'now' | 'schedule';
+
 const EMPTY_MEETING: MeetingDraft = {
   title: '',
   date: '',
@@ -47,6 +54,8 @@ const EMPTY_MEETING: MeetingDraft = {
   chairperson: '',
   agendaText: '',
 };
+
+const MEETING_STARTER_HTML = `<p>You are hereby informed that a meeting of the selected committee(s) will be held as per the meeting details above. All members are requested to attend without fail and come prepared with relevant documents.</p>`;
 
 export function CreateDocumentWizard() {
   const router = useRouter();
@@ -63,17 +72,22 @@ export function CreateDocumentWizard() {
   const [includeMembers, setIncludeMembers] = useState(true);
   const [meeting, setMeeting] = useState<MeetingDraft>(EMPTY_MEETING);
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('');
   const [salutation, setSalutation] = useState('Dear Faculty members and Students');
+  const [customSalutation, setCustomSalutation] = useState(false);
   const [bodyHtml, setBodyHtml] = useState('<p></p>');
   const [priority, setPriority] = useState('NORMAL');
-  const [effectiveDate, setEffectiveDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [publishMode, setPublishMode] = useState<PublishMode>('draft');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const [templateId, setTemplateId] = useState('');
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const isCommitteeMeeting = documentType === 'COMMITTEE_MEETING';
+  const isMeetingNotice = documentType === 'MEETING_NOTICE' || isCommitteeMeeting;
   const showCommittees = Boolean(audienceFlags.committee) || isCommitteeMeeting;
+  const showExpiry = EXPIRY_RELEVANT_DOCUMENT_TYPES.has(documentType) && !isMeetingNotice;
+  const showManualTitle = !isCommitteeMeeting;
 
   const issuers = useQuery({
     queryKey: ['official-documents', 'issuers'],
@@ -97,6 +111,11 @@ export function CreateDocumentWizard() {
     [issuers.data, issuerId],
   );
 
+  const selectedCommittees = useMemo(() => {
+    const items = committeesQ.data?.items ?? [];
+    return items.filter((c) => committeeIds.includes(c.id));
+  }, [committeesQ.data?.items, committeeIds]);
+
   const filteredCommittees = useMemo(() => {
     const items = committeesQ.data?.items ?? [];
     const q = committeeSearch.trim().toLowerCase();
@@ -109,19 +128,83 @@ export function CreateDocumentWizard() {
     );
   }, [committeesQ.data?.items, committeeSearch]);
 
+  // Auto-select Principal (or first active issuer)
+  useEffect(() => {
+    if (issuerId || !issuers.data?.length) return;
+    const principal =
+      issuers.data.find((i) => /principal/i.test(i.roleCode) || /principal/i.test(i.designation)) ??
+      issuers.data[0];
+    if (principal) setIssuerId(principal.id);
+  }, [issuers.data, issuerId]);
+
   useEffect(() => {
     if (isCommitteeMeeting) {
       setAudienceFlags((prev) => ({ ...prev, committee: true, students: false, staff: false }));
-      setSalutation((s) => (s.startsWith('Dear Faculty') ? 'Dear Committee Members' : s));
+      setSalutation('Dear Committee Members');
+      setCustomSalutation(false);
       setIncludeMembers(true);
+      if (!bodyHtml || bodyHtml === '<p></p>') {
+        setBodyHtml(MEETING_STARTER_HTML);
+      }
     }
-  }, [isCommitteeMeeting]);
+  }, [isCommitteeMeeting]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const autoTitle = useMemo(() => {
+    if (isCommitteeMeeting && meeting.title.trim()) return meeting.title.trim();
+    return title.trim();
+  }, [isCommitteeMeeting, meeting.title, title]);
+
+  const autoSubject = useMemo(() => {
+    if (isCommitteeMeeting) {
+      const names = selectedCommittees.map((c) => c.name);
+      if (names.length === 1) return `Meeting of ${names[0]}`;
+      if (names.length > 1) return `Meeting of ${names.join(' & ')}`;
+      if (meeting.title.trim()) {
+        const t = meeting.title.trim().replace(/\s+Meeting$/i, '');
+        return `Meeting of ${t}`;
+      }
+      return 'Committee Meeting';
+    }
+    if (documentType === 'MEETING_NOTICE' && meeting.title.trim()) {
+      return `Meeting — ${meeting.title.trim()}`;
+    }
+    return autoTitle || undefined;
+  }, [isCommitteeMeeting, selectedCommittees, meeting.title, documentType, autoTitle]);
 
   const createMut = useMutation({
-    mutationFn: (payload: CreateOfficialDocumentPayload) => createOfficialDocument(payload),
+    mutationFn: async (payload: CreateOfficialDocumentPayload) => {
+      const doc = await createOfficialDocument(payload);
+      if (publishMode === 'now') {
+        try {
+          await submitOfficialDocumentForApproval(doc.id);
+          await approveOfficialDocument(doc.id, 'Published from create wizard');
+        } catch {
+          // Draft + submitted is still success if approve not permitted
+          try {
+            await submitOfficialDocumentForApproval(doc.id);
+          } catch {
+            /* keep as draft */
+          }
+        }
+      }
+      return doc;
+    },
     onSuccess: (doc) => {
       void qc.invalidateQueries({ queryKey: ['official-documents'] });
       router.push(`/admin/administration/official-documents/${doc.id}`);
+    },
+  });
+
+  const previewMut = useMutation({
+    mutationFn: (payload: CreateOfficialDocumentPayload) => previewOfficialDocumentPdf(payload),
+    onSuccess: (blob) => {
+      setPreviewError(null);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    onError: (err) => {
+      setPreviewError(apiErrorMessage(err, 'Could not generate preview'));
     },
   });
 
@@ -129,9 +212,11 @@ export function CreateDocumentWizard() {
     setTemplateId(id);
     const tpl = (templates.data ?? []).find((t) => t.id === id);
     if (!tpl) return;
-    if (tpl.title) setTitle(tpl.title);
-    if (tpl.subject) setSubject(tpl.subject);
-    if (tpl.salutation) setSalutation(tpl.salutation);
+    if (tpl.title && showManualTitle) setTitle(tpl.title);
+    if (tpl.salutation) {
+      setSalutation(tpl.salutation);
+      setCustomSalutation(!(SALUTATION_OPTIONS as readonly string[]).includes(tpl.salutation));
+    }
     setBodyHtml(tpl.bodyHtml);
   };
 
@@ -152,14 +237,14 @@ export function CreateDocumentWizard() {
   }, [audienceFlags, committeeIds, includeMembers, showCommittees]);
 
   const printSettings = useMemo(() => {
-    if (!isCommitteeMeeting && !meeting.title && !meeting.date) return undefined;
+    if (!isMeetingNotice && !meeting.title && !meeting.date) return undefined;
     const agenda = meeting.agendaText
       .split(/\n/)
       .map((line) => line.replace(/^\d+[.)]\s*/, '').trim())
       .filter(Boolean);
     return {
       meeting: {
-        title: meeting.title.trim() || title.trim(),
+        title: meeting.title.trim() || autoTitle,
         date: meeting.date.trim(),
         time: meeting.time.trim(),
         venue: meeting.venue.trim(),
@@ -169,12 +254,18 @@ export function CreateDocumentWizard() {
         agenda,
       },
     };
-  }, [isCommitteeMeeting, meeting, title]);
+  }, [isMeetingNotice, meeting, autoTitle]);
+
+  const scheduledAt = useMemo(() => {
+    if (publishMode !== 'schedule' || !scheduleDate) return undefined;
+    const time = scheduleTime.trim() || '09:00';
+    return `${scheduleDate}T${time.length === 5 ? `${time}:00` : time}`;
+  }, [publishMode, scheduleDate, scheduleTime]);
 
   const payload: CreateOfficialDocumentPayload = {
     documentType,
-    title: title.trim(),
-    subject: subject.trim() || undefined,
+    title: autoTitle,
+    subject: autoSubject,
     salutation: salutation.trim() || undefined,
     bodyHtml,
     priority,
@@ -182,9 +273,9 @@ export function CreateDocumentWizard() {
     letterheadId: selectedIssuer?.letterhead?.id,
     audience: audiencePayload,
     printSettings,
-    effectiveDate: effectiveDate || undefined,
-    expiryDate: expiryDate || undefined,
-    scheduledAt: scheduledAt || undefined,
+    effectiveDate: isMeetingNotice && meeting.date ? meeting.date : undefined,
+    expiryDate: showExpiry && expiryDate ? expiryDate : undefined,
+    scheduledAt: publishMode === 'schedule' ? scheduledAt : undefined,
   };
 
   const canNext =
@@ -196,7 +287,27 @@ export function CreateDocumentWizard() {
           ? showCommittees
             ? committeeIds.length > 0
             : Object.values(audienceFlags).some(Boolean)
-          : Boolean(title.trim() && bodyHtml.trim());
+          : Boolean(
+              autoTitle &&
+              bodyHtml.trim() &&
+              (!isCommitteeMeeting ||
+                (meeting.title.trim() &&
+                  meeting.date.trim() &&
+                  meeting.time.trim() &&
+                  meeting.venue.trim())),
+            );
+
+  const insertVariable = (v: string) => {
+    setBodyHtml((html) => `${html}<p>${v}</p>`);
+  };
+
+  const departmentLabel = selectedIssuer
+    ? /principal/i.test(selectedIssuer.designation) || /principal/i.test(selectedIssuer.roleCode)
+      ? 'Office of the Principal'
+      : /vice/i.test(selectedIssuer.designation)
+        ? 'Office of the Vice Principal'
+        : selectedIssuer.designation
+    : '—';
 
   return (
     <OfficialDocumentsShell title="Create Document">
@@ -204,8 +315,7 @@ export function CreateDocumentWizard() {
         <div>
           <h1 className="text-2xl font-semibold">Create Official Document</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Step-by-step wizard. Reference number and date are assigned automatically on approval.
-            Committee Master lives under Administration → Governance → Committees.
+            Reference number, department, date, signature, and seal are applied automatically.
           </p>
         </div>
 
@@ -227,7 +337,7 @@ export function CreateDocumentWizard() {
           ))}
         </div>
 
-        <div className="rounded-2xl border border-border/60 bg-card/80 p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-border/60 bg-card/80 p-5">
           {step === 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {DOCUMENT_TYPE_OPTIONS.map((opt) => (
@@ -247,7 +357,11 @@ export function CreateDocumentWizard() {
           ) : null}
 
           {step === 1 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Issued by is selected from Digital Signatures. Reference number is assigned on
+                publish.
+              </p>
               {issuers.isLoading ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading issuers…
@@ -263,14 +377,29 @@ export function CreateDocumentWizard() {
                       issuerId === issuer.id ? 'border-primary bg-primary/5' : 'border-border',
                     )}
                   >
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Issued By
+                    </span>
                     <span className="font-semibold">{issuer.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {issuer.designation}
-                      {issuer.refPrefix ? ` · Ref prefix ${issuer.refPrefix}` : ''}
+                      {issuer.refPrefix ? ` · Ref ${issuer.refPrefix}/…` : ''}
                     </span>
                   </button>
                 ))
               )}
+              {selectedIssuer ? (
+                <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Department · </span>
+                    {departmentLabel}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Reference number will be generated automatically on publish (e.g. DBCT/
+                    {selectedIssuer.refPrefix || 'PR'}/2026/0008).
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -300,7 +429,7 @@ export function CreateDocumentWizard() {
                     <div>
                       <p className="text-sm font-semibold">Select committees</p>
                       <p className="text-xs text-muted-foreground">
-                        Members load automatically from Committee Master. Multiple allowed.
+                        Members load automatically from Committee Master.
                       </p>
                     </div>
                     <label className="flex items-center gap-2 text-xs">
@@ -309,7 +438,7 @@ export function CreateDocumentWizard() {
                         checked={includeMembers}
                         onChange={(e) => setIncludeMembers(e.target.checked)}
                       />
-                      Include committee members table in PDF
+                      Include members table in PDF
                     </label>
                   </div>
                   <Input
@@ -337,16 +466,6 @@ export function CreateDocumentWizard() {
                             <span className="block text-xs text-muted-foreground">
                               {c.shortCode}
                               {c.category ? ` · ${c.category}` : ''}
-                              {(() => {
-                                const count =
-                                  c.memberCount ??
-                                  (
-                                    c as {
-                                      _count?: { members?: number };
-                                    }
-                                  )._count?.members;
-                                return typeof count === 'number' ? ` · ${count} members` : '';
-                              })()}
                             </span>
                           </span>
                         </label>
@@ -364,39 +483,28 @@ export function CreateDocumentWizard() {
           ) : null}
 
           {step === 3 ? (
-            <div className="space-y-4">
-              {templates.data?.length ? (
-                <label className="block text-xs font-medium">
-                  Apply template
-                  <select
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                    value={templateId}
-                    onChange={(e) => applyTemplate(e.target.value)}
-                  >
-                    <option value="">— Select template —</option>
-                    {templates.data.map((tpl) => (
-                      <option key={tpl.id} value={tpl.id}>
-                        {tpl.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
-              {(isCommitteeMeeting || showCommittees) && (
-                <div className="space-y-3 rounded-xl border border-border/70 p-4">
+            <div className="space-y-5">
+              {/* Meeting Information */}
+              {isMeetingNotice ? (
+                <section className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-4">
                   <p className="text-sm font-semibold">Meeting information</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1 md:col-span-2">
-                      <Label>Meeting title</Label>
+                      <Label>Meeting title *</Label>
                       <Input
                         value={meeting.title}
                         onChange={(e) => setMeeting((m) => ({ ...m, title: e.target.value }))}
                         placeholder="Source Journal Editorial Board Meeting"
                       />
+                      {isCommitteeMeeting && meeting.title.trim() ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          Notice title &amp; subject are generated from this title and selected
+                          committees.
+                        </p>
+                      ) : null}
                     </div>
                     <div className="space-y-1">
-                      <Label>Meeting date</Label>
+                      <Label>Meeting date *</Label>
                       <Input
                         type="date"
                         value={meeting.date}
@@ -404,7 +512,7 @@ export function CreateDocumentWizard() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Meeting time</Label>
+                      <Label>Time *</Label>
                       <Input
                         value={meeting.time}
                         onChange={(e) => setMeeting((m) => ({ ...m, time: e.target.value }))}
@@ -412,7 +520,7 @@ export function CreateDocumentWizard() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Venue</Label>
+                      <Label>Venue *</Label>
                       <Input
                         value={meeting.venue}
                         onChange={(e) => setMeeting((m) => ({ ...m, venue: e.target.value }))}
@@ -451,38 +559,68 @@ export function CreateDocumentWizard() {
                       />
                     </div>
                   </div>
-                </div>
-              )}
+                </section>
+              ) : null}
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="block text-xs font-medium">
-                  Title *
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </label>
-                <label className="block text-xs font-medium">
-                  Subject
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                  />
-                </label>
-                <label className="block text-xs font-medium md:col-span-2">
-                  Salutation
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={salutation}
-                    onChange={(e) => setSalutation(e.target.value)}
-                  />
-                </label>
-                <label className="block text-xs font-medium">
-                  Priority
+              {/* Notice meta — only what is needed */}
+              <section className="grid gap-3 md:grid-cols-2">
+                {showManualTitle ? (
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Title *</Label>
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                  </div>
+                ) : null}
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Salutation</Label>
+                  {!customSalutation ? (
+                    <select
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      value={
+                        (SALUTATION_OPTIONS as readonly string[]).includes(salutation)
+                          ? salutation
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setCustomSalutation(true);
+                          return;
+                        }
+                        setSalutation(e.target.value);
+                      }}
+                    >
+                      {SALUTATION_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                      <option value="__custom__">Custom…</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={salutation}
+                        onChange={(e) => setSalutation(e.target.value)}
+                        placeholder="Custom salutation"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setCustomSalutation(false);
+                          setSalutation('Dear Committee Members');
+                        }}
+                      >
+                        List
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Priority</Label>
                   <select
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
                   >
@@ -492,69 +630,123 @@ export function CreateDocumentWizard() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className="block text-xs font-medium">
-                  Effective Date
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={effectiveDate}
-                    onChange={(e) => setEffectiveDate(e.target.value)}
-                  />
-                </label>
-              </div>
+                </div>
 
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium">Content</span>
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Smart variables:
-                  </span>
-                  {SMART_VARIABLES.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      className="rounded-full border border-border px-2 py-0.5 text-[10px]"
-                      onClick={() => setBodyHtml((html) => `${html}<p>${v}</p>`)}
-                    >
-                      {v}
-                    </button>
-                  ))}
+                {showExpiry ? (
+                  <div className="space-y-1">
+                    <Label>Expiry date</Label>
+                    <Input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </section>
+
+              {/* Notice body */}
+              <section className="space-y-2">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">Notice body</p>
+                    <p className="text-xs text-muted-foreground">
+                      Templates insert starter content for this document type.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {templates.data?.length ? (
+                      <select
+                        className="rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                        value={templateId}
+                        onChange={(e) => applyTemplate(e.target.value)}
+                      >
+                        <option value="">Apply template…</option>
+                        {templates.data.map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Insert variable
+                      <select
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            insertVariable(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                      >
+                        <option value="">Select…</option>
+                        {SMART_VARIABLES.map((v) => (
+                          <option key={v} value={v}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
                 </div>
                 <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
-              </div>
+              </section>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="block text-xs font-medium">
-                  Expiry Date
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                  />
-                </label>
-                <label className="block text-xs font-medium">
-                  Schedule publish
-                  <input
-                    type="datetime-local"
-                    className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                  />
-                </label>
-              </div>
+              {/* Publish */}
+              <section className="space-y-3 rounded-xl border border-border/70 p-4">
+                <p className="text-sm font-semibold">Publish</p>
+                <div className="flex flex-col gap-2 text-sm">
+                  {(
+                    [
+                      { id: 'draft', label: 'Save draft' },
+                      { id: 'now', label: 'Publish now' },
+                      { id: 'schedule', label: 'Schedule later' },
+                    ] as const
+                  ).map((opt) => (
+                    <label key={opt.id} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="publishMode"
+                        checked={publishMode === opt.id}
+                        onChange={() => setPublishMode(opt.id)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+                {publishMode === 'schedule' ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Publish date</Label>
+                      <Input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Publish time</Label>
+                      <Input
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+
+              {(createMut.isError || previewError) && (
+                <p className="text-sm text-destructive">
+                  {previewError || apiErrorMessage(createMut.error, 'Could not create document')}
+                </p>
+              )}
             </div>
           ) : null}
 
-          {createMut.isError ? (
-            <p className="text-sm text-destructive">
-              {apiErrorMessage(createMut.error, 'Could not create document')}
-            </p>
-          ) : null}
-
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
@@ -570,14 +762,36 @@ export function CreateDocumentWizard() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button
-                type="button"
-                disabled={!canNext || createMut.isPending}
-                onClick={() => createMut.mutate(payload)}
-              >
-                {createMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Create draft
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!canNext || previewMut.isPending}
+                  onClick={() => {
+                    setPreviewError(null);
+                    previewMut.mutate(payload);
+                  }}
+                >
+                  {previewMut.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="mr-2 h-4 w-4" />
+                  )}
+                  Preview PDF
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!canNext || createMut.isPending}
+                  onClick={() => createMut.mutate(payload)}
+                >
+                  {createMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {publishMode === 'draft'
+                    ? 'Save draft'
+                    : publishMode === 'now'
+                      ? 'Publish'
+                      : 'Schedule'}
+                </Button>
+              </div>
             )}
           </div>
         </div>

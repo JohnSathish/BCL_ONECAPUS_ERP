@@ -71,6 +71,13 @@ export default function FacultyProfileScreen() {
           <Text style={styles.rowLabel}>About app</Text>
           <Text style={styles.rowValue}>→</Text>
         </Pressable>
+        <Pressable
+          style={styles.row}
+          onPress={() => router.push('/(staff)/account-deletion' as never)}
+        >
+          <Text style={styles.rowLabel}>Delete account</Text>
+          <Text style={styles.rowValue}>→</Text>
+        </Pressable>
         <Pressable style={styles.row} onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowLabel}>Privacy policy</Text>
           <Text style={styles.rowValue}>→</Text>

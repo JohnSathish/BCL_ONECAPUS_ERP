@@ -18,3 +18,13 @@ GoogleService-Info.plist
 *.apk
 *.aab
 onecampus-*.apk
+
+# Native build caches (keep project tiny for EAS upload)
+android/app/build/
+android/build/
+android/.gradle/
+android/keystore.properties
+android/**/build/
+**/.gradle/
+**/build/
+!android/app/src/**/build/

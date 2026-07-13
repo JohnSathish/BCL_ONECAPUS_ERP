@@ -62,6 +62,10 @@ export default function StudentProfileScreen() {
           />
           <LinkRow label="About app" onPress={() => router.push('/(student)/about' as never)} />
           <LinkRow
+            label="Delete account"
+            onPress={() => router.push('/(student)/account-deletion' as never)}
+          />
+          <LinkRow
             label="Change password"
             onPress={() => router.push('/(auth)/change-password' as never)}
           />

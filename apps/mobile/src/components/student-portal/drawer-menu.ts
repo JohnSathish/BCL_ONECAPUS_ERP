@@ -49,6 +49,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         href: '/(student)/assignments',
         keywords: ['homework', 'lms'],
       },
+      {
+        id: 'syllabus',
+        label: 'My Syllabus',
+        href: '/(student)/syllabus',
+        keywords: ['syllabus', 'pdf', 'paper', 'curriculum'],
+      },
     ],
   },
   {

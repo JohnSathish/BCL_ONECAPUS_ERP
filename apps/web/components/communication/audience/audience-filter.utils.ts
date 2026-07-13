@@ -1,4 +1,10 @@
 import type { AudienceFilter } from '@/types/communication';
+import {
+  COMMITTEE_ONLY_FILTER_KEYS,
+  INDIVIDUAL_ONLY_FILTER_KEYS,
+  STAFF_ONLY_FILTER_KEYS,
+  STUDENT_ONLY_FILTER_KEYS,
+} from '@/components/communication/audience/audience-filter-config';
 
 /** Drop empty arrays / blank strings / falsey optionals so the API payload stays clean. */
 export function compactAudienceFilter(filter: AudienceFilter): AudienceFilter {
@@ -32,7 +38,141 @@ export const EMPTY_AUDIENCE_FILTER: AudienceFilter = {
   admissionBatchIds: [],
   studentIds: [],
   excludeStudentIds: [],
+  staffProfileIds: [],
+  designationIds: [],
+  committeeIds: [],
+  userIds: [],
+  staffStatuses: [],
 };
+
+function clearKeys(filter: AudienceFilter, keys: readonly string[]): AudienceFilter {
+  const next = { ...filter } as Record<string, unknown>;
+  for (const key of keys) {
+    if (key.endsWith('Ids') || key === 'semesterSequences' || key === 'staffStatuses') {
+      next[key] = [];
+    } else {
+      next[key] = undefined;
+    }
+  }
+  return next as AudienceFilter;
+}
+
+/**
+ * When the administrator switches audience type, drop incompatible filter fields
+ * so student-only chips never leak into staff campaigns and vice versa.
+ */
+export function resetFilterForAudience(
+  audienceType: string,
+  current: AudienceFilter = EMPTY_AUDIENCE_FILTER,
+): AudienceFilter {
+  let next = { ...EMPTY_AUDIENCE_FILTER, ...current };
+
+  switch (audienceType) {
+    case 'STUDENTS':
+    case 'PARENTS':
+    case 'ALUMNI':
+      next = clearKeys(next, [
+        ...STAFF_ONLY_FILTER_KEYS,
+        ...COMMITTEE_ONLY_FILTER_KEYS,
+        ...INDIVIDUAL_ONLY_FILTER_KEYS,
+      ]);
+      if (audienceType === 'ALUMNI') {
+        next.semesterSequences = [];
+      }
+      break;
+    case 'FACULTY':
+    case 'TEACHING_STAFF':
+    case 'NON_TEACHING_STAFF':
+      next = clearKeys(next, [
+        ...STUDENT_ONLY_FILTER_KEYS,
+        ...COMMITTEE_ONLY_FILTER_KEYS,
+        ...INDIVIDUAL_ONLY_FILTER_KEYS,
+      ]);
+      if (audienceType === 'TEACHING_STAFF') {
+        next.teaching = true;
+        next.nonTeaching = undefined;
+      } else if (audienceType === 'NON_TEACHING_STAFF') {
+        next.nonTeaching = true;
+        next.teaching = undefined;
+      }
+      break;
+    case 'COMMITTEE':
+      next = clearKeys(next, [
+        ...STUDENT_ONLY_FILTER_KEYS,
+        ...STAFF_ONLY_FILTER_KEYS,
+        ...INDIVIDUAL_ONLY_FILTER_KEYS,
+        'departmentIds',
+        'shiftIds',
+        'gender',
+      ]);
+      break;
+    case 'DEPARTMENTS':
+      next = clearKeys(next, [
+        ...STUDENT_ONLY_FILTER_KEYS,
+        ...STAFF_ONLY_FILTER_KEYS,
+        ...COMMITTEE_ONLY_FILTER_KEYS,
+        ...INDIVIDUAL_ONLY_FILTER_KEYS,
+        'shiftIds',
+        'gender',
+      ]);
+      break;
+    case 'INDIVIDUAL':
+      next = clearKeys(next, [
+        ...STUDENT_ONLY_FILTER_KEYS.filter((k) => k !== 'studentIds' && k !== 'excludeStudentIds'),
+        ...STAFF_ONLY_FILTER_KEYS.filter((k) => k !== 'staffProfileIds'),
+        ...COMMITTEE_ONLY_FILTER_KEYS,
+        'departmentIds',
+        'shiftIds',
+        'gender',
+      ]);
+      break;
+    default:
+      break;
+  }
+
+  next.academicYearIds = undefined;
+  next.semesterIds = undefined;
+  return next;
+}
+
+/**
+ * Map legacy saved-segment audience types onto the Phase-1 dropdown values.
+ */
+export function migrateLegacyAudience(
+  audienceType: string,
+  filter: AudienceFilter,
+): {
+  audienceType: string;
+  filter: AudienceFilter;
+} {
+  if (audienceType === 'TEACHING_STAFF') {
+    return {
+      audienceType: 'FACULTY',
+      filter: resetFilterForAudience('FACULTY', {
+        ...filter,
+        teaching: true,
+        nonTeaching: undefined,
+      }),
+    };
+  }
+  if (audienceType === 'NON_TEACHING_STAFF') {
+    return {
+      audienceType: 'FACULTY',
+      filter: resetFilterForAudience('FACULTY', {
+        ...filter,
+        nonTeaching: true,
+        teaching: undefined,
+      }),
+    };
+  }
+  if (audienceType === 'ALL_USERS' || audienceType === 'APPLICANTS') {
+    return {
+      audienceType: 'STUDENTS',
+      filter: resetFilterForAudience('STUDENTS', filter),
+    };
+  }
+  return { audienceType, filter: resetFilterForAudience(audienceType, filter) };
+}
 
 export const LARGE_BROADCAST_THRESHOLD = 1000;
 
@@ -125,8 +265,23 @@ export function titleAudienceSuggestions(title: string): AudienceSuggestion[] {
       id: 'use-batch-filter',
       label: 'Use admission batch',
       description: 'Open More filters → Admission batch for cohort announcements.',
-      audienceType: 'STUDENTS',
+      audienceType: 'ALUMNI',
       patch: {},
+    });
+  }
+
+  if (/\b(staff|faculty|teachers?|hod|principal)\b/.test(t)) {
+    suggestions.push({
+      id: 'all-staff',
+      label: 'All staff',
+      description: 'Switch audience to Staff and clear student-only filters.',
+      audienceType: 'FACULTY',
+      patch: {
+        teaching: undefined,
+        nonTeaching: undefined,
+        designationIds: [],
+        staffStatuses: [],
+      },
     });
   }
 

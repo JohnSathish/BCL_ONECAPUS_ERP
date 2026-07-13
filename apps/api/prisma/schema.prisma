@@ -8637,6 +8637,177 @@ model QuestionBankAuditLog {
   @@schema("academic")
 }
 
+// --- Syllabus Repository ---
+
+model SyllabusRepositorySettings {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  maxUploadMb          Int      @default(25) @map("max_upload_mb")
+  allowedMimeTypes     Json     @default("[]") @map("allowed_mime_types")
+  studentAccessEnabled Boolean  @default(true) @map("student_access_enabled")
+  watermarkEnabled     Boolean  @default(false) @map("watermark_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("syllabus_repository_settings")
+  @@schema("academic")
+}
+
+model SyllabusDocument {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  courseId           String    @map("course_id") @db.Uuid
+  programId          String?   @map("program_id") @db.Uuid
+  programVersionId   String?   @map("program_version_id") @db.Uuid
+  departmentId       String?   @map("department_id") @db.Uuid
+  academicYearId     String?   @map("academic_year_id") @db.Uuid
+  paperCode          String    @map("paper_code")
+  paperTitle         String    @map("paper_title")
+  semesterNo         Int?      @map("semester_no")
+  credits            Decimal?  @db.Decimal(5, 2)
+  subjectType        String?   @map("subject_type")
+  category           String?
+  curriculumVersion  String?   @map("curriculum_version")
+  versionLabel       String?   @map("version_label")
+  effectiveFrom      DateTime? @map("effective_from") @db.Date
+  effectiveTo        DateTime? @map("effective_to") @db.Date
+  filePath           String?   @map("file_path")
+  fileName           String?   @map("file_name")
+  mimeType           String?   @map("mime_type")
+  fileSizeBytes      Int?      @map("file_size_bytes")
+  checksumSha256     String?   @map("checksum_sha256")
+  currentVersionNo   Int       @default(1) @map("current_version_no")
+  status             String    @default("DRAFT")
+  keywords           String[]  @default([])
+  searchText         String?   @map("search_text")
+  uploadedById       String?   @map("uploaded_by_id") @db.Uuid
+  approvedById       String?   @map("approved_by_id") @db.Uuid
+  publishedById      String?   @map("published_by_id") @db.Uuid
+  publishedAt        DateTime? @map("published_at")
+  viewCount          Int       @default(0) @map("view_count")
+  downloadCount      Int       @default(0) @map("download_count")
+  knowledgeDocumentId String?  @map("knowledge_document_id") @db.Uuid
+  notes              String?   @db.Text
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  approvals  SyllabusApproval[]
+  bookmarks  SyllabusBookmark[]
+  accessLogs SyllabusAccessLog[]
+  auditLogs  SyllabusAuditLog[]
+  versions   SyllabusVersion[]
+
+  @@index([tenantId, courseId])
+  @@index([tenantId, status])
+  @@index([tenantId, paperCode])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, semesterNo])
+  @@index([tenantId, category])
+  @@map("syllabus_documents")
+  @@schema("academic")
+}
+
+model SyllabusVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  documentId     String   @map("document_id") @db.Uuid
+  versionNo      Int      @map("version_no")
+  filePath       String   @map("file_path")
+  fileName       String   @map("file_name")
+  mimeType       String?  @map("mime_type")
+  fileSizeBytes  Int?     @map("file_size_bytes")
+  checksumSha256 String?  @map("checksum_sha256")
+  uploadedById   String?  @map("uploaded_by_id") @db.Uuid
+  changeNote     String?  @map("change_note") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  document SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNo])
+  @@index([tenantId, documentId])
+  @@map("syllabus_versions")
+  @@schema("academic")
+}
+
+model SyllabusApproval {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  documentId String    @map("document_id") @db.Uuid
+  stepCode   String    @map("step_code")
+  stepName   String    @map("step_name")
+  roleSlug   String?   @map("role_slug")
+  approverId String?   @map("approver_id") @db.Uuid
+  status     String    @default("PENDING")
+  comments   String?
+  sequence   Int       @default(1)
+  actedAt    DateTime? @map("acted_at")
+  metadata   Json?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  document SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId, status])
+  @@index([tenantId, roleSlug, status])
+  @@map("syllabus_approvals")
+  @@schema("academic")
+}
+
+model SyllabusBookmark {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([tenantId, userId])
+  @@map("syllabus_bookmarks")
+  @@schema("academic")
+}
+
+model SyllabusAccessLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@map("syllabus_access_logs")
+  @@schema("academic")
+}
+
+model SyllabusAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document SyllabusDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, action, createdAt])
+  @@index([tenantId, documentId])
+  @@map("syllabus_audit_logs")
+  @@schema("academic")
+}
+
 // --- library ---
 
 model LibrarySettings {

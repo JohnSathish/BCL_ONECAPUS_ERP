@@ -177,6 +177,10 @@ export const PRIVACY_POLICY_URL =
 export const TERMS_URL =
   process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://basecodelabs.com/terms-and-conditions.html';
 
+/** Google Play account-deletion disclosure URL (also linked from Play Console). */
+export const ACCOUNT_DELETION_URL =
+  process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? 'https://basecodelabs.com/account-deletion.html';
+
 export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'contact@basecodelabs.com';
 
 export const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '9566363655';

@@ -28,6 +28,17 @@ export function revokeAllAuthSessions() {
   });
 }
 
+/** Institution-managed deletion request (Play Console / GDPR path). */
+export function requestAccountDeletion(reason?: string) {
+  return apiFetch<{ success?: boolean; message?: string }>(
+    '/v1/mobile-app/account/deletion-request',
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || undefined, source: 'MOBILE_APP' }),
+    },
+  );
+}
+
 export function changePassword(currentPassword: string, newPassword: string) {
   return apiFetch<{ success: boolean; message?: string }>('/v1/auth/change-password', {
     method: 'POST',

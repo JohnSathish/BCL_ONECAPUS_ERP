@@ -28,7 +28,14 @@
     },
     "production": {
       "env": {
-        "EAS_BUILD_PROFILE": "production"
+        "EAS_BUILD_PROFILE": "production",
+        "EXPO_PUBLIC_API_URL": "https://erp.donboscocollege.ac.in/api",
+        "EXPO_PUBLIC_TENANT_SLUG": "demo",
+        "EXPO_PUBLIC_APP_NAME": "Don Bosco College, Tura",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://basecodelabs.com/privacy-policy.html",
+        "EXPO_PUBLIC_TERMS_URL": "https://basecodelabs.com/terms-and-conditions.html",
+        "EXPO_PUBLIC_ACCOUNT_DELETION_URL": "https://basecodelabs.com/account-deletion.html",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "contact@basecodelabs.com"
       },
       "android": {
         "buildType": "app-bundle"
@@ -37,7 +44,14 @@
     "production-apk": {
       "distribution": "internal",
       "env": {
-        "EAS_BUILD_PROFILE": "production"
+        "EAS_BUILD_PROFILE": "production",
+        "EXPO_PUBLIC_API_URL": "https://erp.donboscocollege.ac.in/api",
+        "EXPO_PUBLIC_TENANT_SLUG": "demo",
+        "EXPO_PUBLIC_APP_NAME": "Don Bosco College, Tura",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://basecodelabs.com/privacy-policy.html",
+        "EXPO_PUBLIC_TERMS_URL": "https://basecodelabs.com/terms-and-conditions.html",
+        "EXPO_PUBLIC_ACCOUNT_DELETION_URL": "https://basecodelabs.com/account-deletion.html",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "contact@basecodelabs.com"
       },
       "android": {
         "buildType": "apk"

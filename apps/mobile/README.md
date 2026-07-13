@@ -38,12 +38,13 @@ Staff portal login is disabled in v1 (student-only Play release).
 
 ## Google Play release (production AAB)
 
-See **`play-store-listing.md`** for store copy, data safety answers, and DBC-specific checklist.
+**Primary checklist:** [`docs/play-publishing-checklist.md`](docs/play-publishing-checklist.md)  
+Also: [`play-store-listing.md`](play-store-listing.md), [`docs/play-data-safety.md`](docs/play-data-safety.md), [`docs/firebase-setup.md`](docs/firebase-setup.md).
 
-1. Copy `.env.production.example` → `.env` with production API URL, tenant slug, and privacy policy URL.
-2. Host `apps/web/public/mobile-privacy.html` at `https://donboscocollege.ac.in/mobile-privacy.html`.
-3. Log in to EAS: `npx eas login`
-4. Configure project: `npx eas build:configure` (first time only)
+1. Copy `.env.production.example` → `.env` with production API URL, tenant slug, and privacy / account-deletion URLs.
+2. Deploy `apps/web/public/privacy-policy.html`, `terms-and-conditions.html`, and **`account-deletion.html`** to your public HTTPS host.
+3. Ensure EAS secret `GOOGLE_SERVICES_JSON` (or local `google-services.json`) for FCM.
+4. Log in to EAS: `npx eas login`
 5. Build production Android bundle:
 
 ```powershell
@@ -57,6 +58,7 @@ npm run submit:android
 ```
 
 Production builds **exclude** `expo-dev-client`. Use `npm run build:dev:android` for Razorpay native testing.
+Local AAB (upload keystore required): `npm run build:aab`.
 
 ## Native Razorpay (EAS dev build)
 
@@ -76,14 +78,16 @@ Fee checkout uses native Razorpay when `mode: LIVE` and keys are configured; oth
 
 ## Scripts
 
-| Command                         | Purpose                          |
-| ------------------------------- | -------------------------------- |
-| `npm start`                     | Metro on port **8082**           |
-| `npm run typecheck`             | TypeScript check                 |
-| `npm run build:dev:android`     | EAS development APK (dev client) |
-| `npm run build:preview:android` | Internal preview APK             |
-| `npm run build:prod:android`    | Production AAB for Google Play   |
-| `npm run submit:android`        | Submit latest AAB to Play        |
+| Command                         | Purpose                           |
+| ------------------------------- | --------------------------------- |
+| `npm start`                     | Metro on port **8082**            |
+| `npm run typecheck`             | TypeScript check                  |
+| `npm run build:dev:android`     | EAS development APK (dev client)  |
+| `npm run build:preview:android` | Internal preview APK              |
+| `npm run build:prod:android`    | Production AAB for Google Play    |
+| `npm run build:aab`             | Local AAB (upload keystore)       |
+| `npm run build:apk`             | Local release APK (debug sign OK) |
+| `npm run submit:android`        | Submit latest AAB to Play         |
 
 ## Environment
 

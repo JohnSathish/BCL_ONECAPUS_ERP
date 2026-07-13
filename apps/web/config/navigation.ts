@@ -88,6 +88,7 @@ export function isNavItemActive(pathname: string, item: NavItem): boolean {
 
 const P = MODULE_PERMISSIONS;
 const QB = P.questionBank;
+const SR = P.syllabusRepository;
 const OD = P.officialDocuments;
 
 const QUESTION_BANK_CHILDREN: NavChild[] = [
@@ -126,6 +127,38 @@ const QUESTION_BANK_CHILDREN: NavChild[] = [
     label: 'Settings',
     href: '/admin/academics/question-bank/settings',
     permissions: ['question-bank:manage'],
+  },
+];
+
+const SYLLABUS_REPOSITORY_CHILDREN: NavChild[] = [
+  {
+    label: 'Dashboard',
+    href: '/admin/academics/syllabus-repository',
+    permissions: [...SR],
+  },
+  {
+    label: 'Documents',
+    href: '/admin/academics/syllabus-repository/documents',
+    permissions: [...SR],
+  },
+  {
+    label: 'Upload',
+    href: '/admin/academics/syllabus-repository/upload',
+    permissions: ['syllabus-repository:contribute', 'syllabus-repository:manage'],
+  },
+  {
+    label: 'Approval Workflow',
+    href: '/admin/academics/syllabus-repository/workflow',
+    permissions: [
+      'syllabus-repository:approve',
+      'syllabus-repository:publish',
+      'syllabus-repository:manage',
+    ],
+  },
+  {
+    label: 'Settings',
+    href: '/admin/academics/syllabus-repository/settings',
+    permissions: ['syllabus-repository:manage'],
   },
 ];
 
@@ -788,6 +821,15 @@ export const ADMIN_NAV: NavGroup[] = [
         permissions: [...QB],
         activePattern: '^/admin/academics/question-bank(?:/.*)?$',
         children: QUESTION_BANK_CHILDREN,
+      },
+      {
+        label: 'Syllabus Repository',
+        href: '/admin/academics/syllabus-repository',
+        icon: Library,
+        module: 'syllabusRepository',
+        permissions: [...SR],
+        activePattern: '^/admin/academics/syllabus-repository(?:/.*)?$',
+        children: SYLLABUS_REPOSITORY_CHILDREN,
       },
       {
         label: 'Lesson Plans',
@@ -2039,6 +2081,11 @@ export const STAFF_NAV: NavGroup[] = [
           { label: 'Attendance Entry', href: '/staff/academic/attendance-entry' },
         ],
       },
+      {
+        label: 'Syllabus Repository',
+        href: '/staff/academic/syllabus-repository',
+        icon: Library,
+      },
     ],
   },
   {
@@ -2142,6 +2189,7 @@ export const ROLE_NAV: Record<
     { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
     { label: 'LMS', href: '/student/lms', icon: GraduationCap },
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
+    { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },
     { label: 'Registration', href: '/student/registration', icon: ClipboardList },
     { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },

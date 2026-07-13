@@ -226,6 +226,19 @@ export class OfficialDocumentsController {
     return this.documents.create(user, dto, req);
   }
 
+  @Post('preview')
+  @RequirePermissions('official-documents:manage')
+  async preview(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateOfficialDocumentDto,
+  ) {
+    const { buffer, filename } = await this.documents.previewPdf(user, dto);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${filename}"`,
+    });
+  }
+
   @Get(':id')
   @RequireAnyPermission('official-documents:read', 'official-documents:manage')
   get(@CurrentUser() user: JwtUser, @Param('id') id: string) {
