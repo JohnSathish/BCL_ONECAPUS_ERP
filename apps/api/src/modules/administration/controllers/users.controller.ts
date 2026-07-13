@@ -122,6 +122,17 @@ export class UsersController {
     return this.users.bulkResetPassword(user.tid, dto, user.sub);
   }
 
+  @Post('bulk/reset-student-passwords-to-roll')
+  @RequirePermissions('users:manage')
+  resetStudentPasswordsToRoll(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { onlyMustReset?: boolean } = {},
+  ) {
+    return this.users.resetAllStudentPasswordsToRoll(user.tid, user.sub, {
+      onlyMustReset: body.onlyMustReset === true,
+    });
+  }
+
   @Post('bulk/activate')
   @RequirePermissions('users:manage')
   bulkActivate(@CurrentUser() user: JwtUser, @Body() dto: BulkUserActionDto) {

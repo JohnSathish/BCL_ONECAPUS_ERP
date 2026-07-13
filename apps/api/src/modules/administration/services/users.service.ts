@@ -444,6 +444,53 @@ export class UsersService {
     return { count: results.length, results };
   }
 
+  /** Reset every active student password to roll (or enrollment) + force change. */
+  async resetAllStudentPasswordsToRoll(
+    tenantId: string,
+    actorUserId: string,
+    options: { onlyMustReset?: boolean } = {},
+  ) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        user: {
+          deletedAt: null,
+          isActive: true,
+          ...(options.onlyMustReset ? { mustResetPassword: true } : {}),
+        },
+      },
+      select: { userId: true, rollNumber: true, enrollmentNumber: true },
+    });
+
+    let updated = 0;
+    let skipped = 0;
+    for (const student of students) {
+      if (!student.rollNumber?.trim() && !student.enrollmentNumber?.trim()) {
+        skipped += 1;
+        continue;
+      }
+      await this.provisioning.resetPassword(tenantId, student.userId, {
+        resetToRoll: true,
+        forceReset: true,
+        actorUserId,
+      });
+      updated += 1;
+    }
+
+    await this.audit.log({
+      tenantId,
+      userId: actorUserId,
+      module: 'administration',
+      action: 'user.bulk_reset_students_to_roll',
+      entityType: 'user',
+      entityId: tenantId,
+      metadata: { updated, skipped, onlyMustReset: options.onlyMustReset },
+    });
+
+    return { updated, skipped, total: students.length };
+  }
+
   async bulkActivate(
     tenantId: string,
     dto: BulkUserActionDto,

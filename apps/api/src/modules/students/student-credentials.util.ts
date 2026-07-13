@@ -16,6 +16,23 @@ export function isSyntheticStudentEmail(
   return Boolean(email?.trim().toLowerCase().endsWith('@students.local'));
 }
 
+/** Compact roll/enrollment for tolerant matching (BA25-888 ≈ BA25888 ≈ ba25_888). */
+export function compactStudentId(value: string | null | undefined): string {
+  return (value ?? '')
+    .trim()
+    .replace(/[\s\-_.]/g, '')
+    .toUpperCase();
+}
+
+export function studentIdsMatch(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  const left = compactStudentId(a);
+  const right = compactStudentId(b);
+  return Boolean(left && right && left === right);
+}
+
 /** Default first-login password: explicit → roll → enrollment → legacy fallback. */
 export function resolveStudentDefaultPassword(opts: {
   password?: string | null;

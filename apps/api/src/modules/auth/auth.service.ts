@@ -17,6 +17,11 @@ import { isSuperAdmin } from '../../common/permissions/permission-registry';
 import { PasswordPolicyService } from '../../common/security/password-policy.service';
 import { MfaService } from './mfa/mfa.service';
 import { resolveLoginHintFromRoles } from './login-hint.util';
+import {
+  compactStudentId,
+  resolveStudentDefaultPassword,
+  studentIdsMatch,
+} from '../students/student-credentials.util';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -219,10 +224,9 @@ export class AuthService {
         where: { userId, deletedAt: null },
         select: { rollNumber: true, enrollmentNumber: true },
       });
-      const roll = student?.rollNumber?.trim();
-      const enroll = student?.enrollmentNumber?.trim();
       force = Boolean(
-        (roll && password === roll) || (enroll && password === enroll),
+        studentIdsMatch(password, student?.rollNumber) ||
+        studentIdsMatch(password, student?.enrollmentNumber),
       );
     }
 
@@ -233,6 +237,62 @@ export class AuthService {
       data: { mustResetPassword: true },
     });
     return true;
+  }
+
+  /**
+   * Accept roll/enrollment as first-login password even when the stored hash
+   * is still the legacy Student@123 (or another bootstrap hash) while
+   * mustResetPassword is set — then re-sync the hash to the canonical roll.
+   */
+  private async tryStudentBootstrapPassword(
+    user: {
+      id: string;
+      passwordHash: string;
+      mustResetPassword?: boolean | null;
+    },
+    password: string,
+  ): Promise<{ canonical: string } | null> {
+    const student = await this.prisma.student.findFirst({
+      where: { userId: user.id, deletedAt: null },
+      select: { rollNumber: true, enrollmentNumber: true },
+    });
+    if (!student) return null;
+
+    const canonical = resolveStudentDefaultPassword({
+      rollNumber: student.rollNumber,
+      enrollmentNumber: student.enrollmentNumber,
+    });
+    const typedMatchesBootstrap =
+      studentIdsMatch(password, student.rollNumber) ||
+      studentIdsMatch(password, student.enrollmentNumber) ||
+      password.trim() === 'Student@123';
+
+    if (!typedMatchesBootstrap) return null;
+
+    const stillOnLegacyDefault = await bcrypt.compare(
+      'Student@123',
+      user.passwordHash,
+    );
+    const stillOnRollHash =
+      (student.rollNumber &&
+        (await bcrypt.compare(student.rollNumber.trim(), user.passwordHash))) ||
+      (student.enrollmentNumber &&
+        (await bcrypt.compare(
+          student.enrollmentNumber.trim(),
+          user.passwordHash,
+        )));
+
+    // Only bootstrap when admin flagged reset, or account is still on a known temp hash.
+    if (!user.mustResetPassword && !stillOnLegacyDefault && !stillOnRollHash) {
+      return null;
+    }
+
+    const passwordHash = await bcrypt.hash(canonical, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustResetPassword: true },
+    });
+    return { canonical };
   }
 
   private buildUserPayload(
@@ -525,6 +585,38 @@ export class AuthService {
       });
     }
 
+    // Tolerant match: BA25-888 ≈ BA25888 (hyphen/space/underscore differences).
+    const compact = compactStudentId(trimmed);
+    if (compact.length >= 4) {
+      const compactHits = await this.prisma.$queryRaw<
+        Array<{ user_id: string }>
+      >`
+        SELECT s.user_id
+        FROM academic.students s
+        WHERE s.tenant_id = ${tenantId}::uuid
+          AND s.deleted_at IS NULL
+          AND (
+            upper(regexp_replace(coalesce(s.roll_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
+            OR upper(regexp_replace(coalesce(s.enrollment_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
+            OR upper(regexp_replace(coalesce(s.university_roll_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
+            OR upper(regexp_replace(coalesce(s.university_registration_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
+          )
+        LIMIT 1
+      `;
+      const compactUserId = compactHits[0]?.user_id;
+      if (compactUserId) {
+        return this.prisma.user.findFirst({
+          where: {
+            id: compactUserId,
+            tenantId,
+            deletedAt: null,
+            isActive: true,
+          },
+          include,
+        });
+      }
+    }
+
     const staff = await this.prisma.staffProfile.findFirst({
       where: {
         tenantId,
@@ -647,7 +739,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    let valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      const bootstrap = await this.tryStudentBootstrapPassword(user, password);
+      if (bootstrap) {
+        valid = true;
+        user.mustResetPassword = true;
+      }
+    }
     if (!valid) {
       await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
       await this.recordLoginEvent({
