@@ -273,11 +273,7 @@ html.theme-glass-disabled .glass-panel {
 
 .sidebar-glow-active {
   position: relative;
-  background: hsl(var(--primary) / 0.14);
-  box-shadow:
-    0 0 0 1px hsl(var(--primary) / 0.12),
-    0 0 20px hsl(var(--primary) / 0.08),
-    inset 0 1px 0 hsl(var(--sidebar-foreground) / 0.04);
+  background: hsl(var(--primary) / 0.12);
 }
 
 .sidebar-glow-active::before {
@@ -286,18 +282,16 @@ html.theme-glass-disabled .glass-panel {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 4px;
-  height: 72%;
-  min-height: 1.25rem;
+  width: 3px;
+  height: 68%;
+  min-height: 1.1rem;
   border-radius: 9999px;
   background: hsl(var(--primary));
-  box-shadow: 0 0 14px hsl(var(--primary) / 0.55);
 }
 
 .sidebar-child-active {
   position: relative;
-  background: hsl(var(--primary) / 0.14);
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+  background: hsl(var(--primary) / 0.1);
 }
 
 .sidebar-child-active::before {
@@ -306,9 +300,9 @@ html.theme-glass-disabled .glass-panel {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 4px;
-  height: 70%;
-  min-height: 0.875rem;
+  width: 2.5px;
+  height: 62%;
+  min-height: 0.75rem;
   border-radius: 9999px;
   background: hsl(var(--primary));
 }

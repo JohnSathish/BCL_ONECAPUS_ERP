@@ -52,11 +52,10 @@ import { SidebarPersonalizationMenu } from '@/components/layout/sidebar-personal
 import { cn } from '@/utils/cn';
 
 const NAV_ITEM_CLASS =
-  'relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all duration-150';
-const NAV_ITEM_ACTIVE =
-  'sidebar-glow-active font-semibold text-sidebar-foreground shadow-[0_0_16px_hsl(var(--primary)/0.12)]';
-const NAV_ITEM_IDLE = 'text-sidebar-muted hover:bg-sidebar-active/50 hover:text-sidebar-foreground';
-const NAV_PARENT_CLASS = 'font-semibold text-sidebar-foreground';
+  'relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors duration-150';
+const NAV_ITEM_ACTIVE = 'sidebar-glow-active font-medium text-sidebar-foreground';
+const NAV_ITEM_IDLE = 'text-sidebar-muted hover:bg-sidebar-active/45 hover:text-sidebar-foreground';
+const NAV_PARENT_CLASS = 'font-medium text-sidebar-foreground';
 
 const SCROLL_NAV_CLASS =
   'sidebar-scroll-auto min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain px-2 py-2';
@@ -293,12 +292,19 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     return groups
       .map((g) => ({
         ...g,
-        items: g.items.filter(
-          (item) =>
-            item.label.toLowerCase().includes(q) ||
-            item.module?.toLowerCase().includes(q) ||
-            item.children?.some((c) => c.label.toLowerCase().includes(q)),
-        ),
+        items: g.items
+          .map((item) => {
+            const labelMatch =
+              item.label.toLowerCase().includes(q) || item.module?.toLowerCase().includes(q);
+            if (!item.children?.length) {
+              return labelMatch ? item : null;
+            }
+            const matchedChildren = item.children.filter((c) => c.label.toLowerCase().includes(q));
+            if (labelMatch) return item;
+            if (matchedChildren.length) return { ...item, children: matchedChildren };
+            return null;
+          })
+          .filter(Boolean) as NavItem[],
       }))
       .filter((g) => g.items.length > 0);
   }, [groups, query]);
@@ -341,15 +347,15 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   };
 
   const resolveOpen = (item: NavItem) => {
+    // While filtering, keep matching groups expanded so hits are visible.
+    if (query.trim() && item.children?.length) return true;
     const stored = openGroups[item.label];
     if (stored === false) return false;
     if (stored === true) return true;
     const hasActiveChild = item.children?.some((c) =>
       isNavChildActive(pathname, c, item.children ?? []),
     );
-    if (hasActiveChild) return true;
-    if (query.trim() && item.children?.length) return true;
-    return false;
+    return Boolean(hasActiveChild);
   };
 
   const handleToggle = (item: NavItem) => {
@@ -449,14 +455,22 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Search modules, actions…"
-                className="h-9 border-0 bg-sidebar-active/40 pl-8 pr-12 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-muted/70 focus-visible:ring-1 focus-visible:ring-primary/40"
-                aria-label="Search navigation"
+                placeholder="Filter modules…"
+                className="h-9 border-0 bg-sidebar-active/40 pl-8 pr-3 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-muted/70 focus-visible:ring-1 focus-visible:ring-primary/40"
+                aria-label="Filter navigation"
               />
-              <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-sidebar-border/60 bg-sidebar-active/50 px-1.5 py-0.5 text-[9px] text-sidebar-muted lg:inline">
-                Ctrl K
-              </kbd>
             </div>
+            <p className="hidden px-0.5 text-[10px] text-sidebar-muted/70 lg:block">
+              Press{' '}
+              <kbd className="rounded border border-sidebar-border/50 px-1 py-px font-sans">
+                Ctrl
+              </kbd>
+              {' + '}
+              <kbd className="rounded border border-sidebar-border/50 px-1 py-px font-sans">
+                K
+              </kbd>{' '}
+              for global search
+            </p>
             {searchAction ? (
               <button
                 type="button"
@@ -741,20 +755,15 @@ function SidebarItem({
 
   const iconNode = (
     <span
-      className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition',
-        active || open ? 'shadow-[0_0_12px_var(--nav-accent-glow)]' : '',
-      )}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
       style={
         {
-          '--nav-accent': accent,
-          '--nav-accent-glow': `${accent}55`,
-          backgroundColor: active || open ? `${accent}22` : `${accent}12`,
+          backgroundColor: active || open ? `${accent}18` : `${accent}0d`,
           color: accent,
         } as React.CSSProperties
       }
     >
-      <Icon className="h-[16px] w-[16px]" />
+      <Icon className="h-[15px] w-[15px]" />
     </span>
   );
 
@@ -841,7 +850,7 @@ function SidebarItem({
                     className={cn(
                       'relative block rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       childActive
-                        ? 'sidebar-child-active font-semibold text-sidebar-foreground'
+                        ? 'sidebar-child-active font-medium text-sidebar-foreground'
                         : 'text-sidebar-muted/90 hover:bg-sidebar-active/35 hover:text-sidebar-foreground',
                     )}
                   >

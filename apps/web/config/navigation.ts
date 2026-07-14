@@ -65,7 +65,9 @@ export type NavItem = {
 export type NavGroup = {
   label: string;
   items: NavItem[];
-  /** @deprecated Layout uses one scroll region; zone is ignored but kept for nav grouping docs */
+  /**
+   * Layout zone hint. Sidebar currently uses one continuous scroll region.
+   */
   zone?: 'pin-top' | 'scroll' | 'pin-bottom';
 };
 
@@ -2043,7 +2045,7 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     label: 'System Administration',
-    zone: 'pin-bottom',
+    zone: 'scroll',
     items: [
       {
         label: 'Administration',
@@ -2111,43 +2113,6 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/administration/device-login',
             permissions: ['sessions:manage', 'audit:read'],
             activePattern: '^/admin/administration/device-login(?:/.*)?$',
-            children: [
-              {
-                label: 'Dashboard',
-                href: '/admin/administration/device-login',
-                permissions: ['sessions:manage', 'audit:read'],
-              },
-              {
-                label: 'Active Sessions',
-                href: '/admin/administration/device-login/sessions',
-                permissions: ['sessions:manage'],
-              },
-              {
-                label: 'Login History',
-                href: '/admin/administration/device-login/history',
-                permissions: ['sessions:manage', 'audit:read'],
-              },
-              {
-                label: 'Registered Devices',
-                href: '/admin/administration/device-login/devices',
-                permissions: ['sessions:manage'],
-              },
-              {
-                label: 'Failed Login Attempts',
-                href: '/admin/administration/device-login/failed',
-                permissions: ['sessions:manage'],
-              },
-              {
-                label: 'Blocked Devices',
-                href: '/admin/administration/device-login/blocked',
-                permissions: ['sessions:manage'],
-              },
-              {
-                label: 'Security Policies',
-                href: '/admin/administration/device-login/policies',
-                permissions: ['sessions:manage'],
-              },
-            ],
           },
           {
             label: 'Audit Logs',
