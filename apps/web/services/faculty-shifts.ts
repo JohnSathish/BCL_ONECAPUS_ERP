@@ -1,5 +1,12 @@
 import { api } from '@/services/api';
 
+export type AssignedShiftChip = {
+  id: string;
+  code: string;
+  name: string;
+  isPrimary: boolean;
+};
+
 export type FacultyShiftAssignmentRow = {
   id: string;
   shiftId: string;
@@ -17,6 +24,10 @@ export type FacultyShiftAssignmentRow = {
   shift: { id: string; code: string; name: string };
   department: { id: string; code: string; name: string } | null;
   designation: { id: string; label: string } | null;
+  assignedShifts?: AssignedShiftChip[];
+  assignedShiftIds?: string[];
+  assignedShiftNames?: string[];
+  teachesMultipleShifts?: boolean;
 };
 
 export type FacultyShiftCandidate = {
@@ -27,13 +38,23 @@ export type FacultyShiftCandidate = {
   staffType: string;
   department: { id: string; name: string } | null;
   designation: { id: string; label: string } | null;
+  assignedShifts?: AssignedShiftChip[];
+  assignedShiftIds?: string[];
+  assignedShiftNames?: string[];
+  teachesMultipleShifts?: boolean;
 };
 
-export async function fetchFacultyShiftAssignments(shiftId: string) {
-  const { data } = await api.get<FacultyShiftAssignmentRow[]>('/v1/faculty-shifts', {
-    params: { shiftId },
+export async function fetchFacultyShiftAssignments(
+  shiftId: string,
+  params?: { page?: number; limit?: number; search?: string },
+) {
+  const { data } = await api.get<
+    FacultyShiftAssignmentRow[] | { data: FacultyShiftAssignmentRow[]; meta?: unknown }
+  >('/v1/faculty-shifts', {
+    params: { shiftId, ...params },
   });
-  return data;
+  if (Array.isArray(data)) return data;
+  return data?.data ?? [];
 }
 
 export async function searchFacultyShiftCandidates(shiftId: string, search?: string, limit = 15) {

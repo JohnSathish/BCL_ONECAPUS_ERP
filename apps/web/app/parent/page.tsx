@@ -1,7 +1,16 @@
 'use client';
 
-import { RoleDashboard } from '@/modules/dashboard/role-pages';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { ParentWardsPortal } from '@/components/parent-portal/parent-wards-portal';
+import { useRequireAuth } from '@/hooks/use-auth';
 
 export default function ParentDashboardPage() {
-  return <RoleDashboard role="parent" title="Parent Portal" />;
+  const session = useRequireAuth();
+  if (!session) return null;
+
+  return (
+    <DashboardShell role="parent" title="Parent Portal">
+      <ParentWardsPortal />
+    </DashboardShell>
+  );
 }

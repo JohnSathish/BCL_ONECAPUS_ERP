@@ -88,6 +88,14 @@ export type SecuritySettings = {
   requireNumber: boolean;
   requireSpecial: boolean;
   maxConcurrentSessions: number | null;
+  alertOnNewDevice?: boolean;
+  alertOnNewCountry?: boolean;
+  maxFailedBeforeFlag?: number;
+  blockOnExcessiveFails?: boolean;
+  notifyEmailOnSecurity?: boolean;
+  notifyPushOnSecurity?: boolean;
+  allowRememberMe?: boolean;
+  geoLookupEnabled?: boolean;
 };
 
 export type ActiveSessionRow = {

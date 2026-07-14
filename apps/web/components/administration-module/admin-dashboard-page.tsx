@@ -66,10 +66,10 @@ const MODULES = [
     desc: 'Unused programmes & orphan versions',
   },
   {
-    href: '/admin/administration/security',
-    label: 'Security & Sessions',
+    href: '/admin/administration/device-login',
+    label: 'Device & Login',
     icon: Shield,
-    desc: 'Sessions & password policy',
+    desc: 'Sessions, devices & policies',
   },
   {
     href: '/admin/administration/audit-logs',

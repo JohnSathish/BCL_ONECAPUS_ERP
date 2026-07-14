@@ -26,6 +26,9 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
+  // Honor X-Forwarded-* / proxy IPs so rate limits are not keyed to the
+  // reverse proxy address for every campus user.
+  app.set('trust proxy', 1);
 
   const config = app.get(ConfigService);
 

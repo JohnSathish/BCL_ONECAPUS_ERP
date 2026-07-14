@@ -777,10 +777,226 @@ export class StaffPortalService {
   async getTodaySchedule(tenantId: string, staffProfileId: string) {
     const today = startOfDay(new Date());
     const dayOfWeek = new Date().getDay();
-    const entries = await this.prisma.timetableEntry.findMany({
-      where: { tenantId, staffProfileId, dayOfWeek },
+
+    type TodaySlot = {
+      id: string;
+      startTime: string;
+      endTime: string;
+      subject: string;
+      semesterNo: number | null;
+      sectionCode: string | null;
+      classroom: string | null;
+      offeringSectionId: string | null;
+      status: string;
+      shiftId: string | null;
+      shiftCode: string | null;
+      shiftName: string | null;
+    };
+
+    const results: TodaySlot[] = [];
+    const seenSlotKeys = new Set<string>();
+
+    const pushSlot = (slot: TodaySlot) => {
+      const key = `${slot.shiftId ?? ''}:${slot.startTime}:${slot.offeringSectionId ?? slot.subject}`;
+      if (seenSlotKeys.has(key)) return;
+      seenSlotKeys.add(key);
+      results.push(slot);
+    };
+
+    const planEntries = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId,
+        staffProfileId,
+        dayOfWeek,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        plan: { tenantId, status: 'PUBLISHED', deletedAt: null },
+      },
+      include: {
+        plan: { select: { id: true, shiftId: true, name: true } },
+      },
       orderBy: { startTime: 'asc' },
     });
+
+    const shiftIds = Array.from(
+      new Set(
+        planEntries
+          .map((e) => e.shiftId ?? e.plan.shiftId)
+          .filter(Boolean) as string[],
+      ),
+    );
+    const courseIds = Array.from(
+      new Set(planEntries.map((e) => e.courseId).filter(Boolean) as string[]),
+    );
+    const classroomIds = Array.from(
+      new Set(
+        planEntries.map((e) => e.classroomId).filter(Boolean) as string[],
+      ),
+    );
+    const sectionIds = Array.from(
+      new Set(
+        planEntries.map((e) => e.offeringSectionId).filter(Boolean) as string[],
+      ),
+    );
+
+    const [shifts, courses, classrooms, sections] = await Promise.all([
+      shiftIds.length
+        ? this.prisma.shift.findMany({
+            where: { tenantId, id: { in: shiftIds } },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve([]),
+      courseIds.length
+        ? this.prisma.course.findMany({
+            where: { id: { in: courseIds } },
+            select: { id: true, code: true, title: true },
+          })
+        : Promise.resolve([]),
+      classroomIds.length
+        ? this.prisma.classroom.findMany({
+            where: { id: { in: classroomIds } },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve([]),
+      sectionIds.length
+        ? this.prisma.offeringSection.findMany({
+            where: { id: { in: sectionIds } },
+            select: {
+              id: true,
+              sectionCode: true,
+              courseOffering: {
+                select: {
+                  semesterSequence: true,
+                  course: { select: { code: true, title: true } },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const shiftMap = new Map(shifts.map((s) => [s.id, s]));
+    const courseMap = new Map(courses.map((c) => [c.id, c]));
+    const roomMap = new Map(classrooms.map((r) => [r.id, r]));
+    const sectionMap = new Map(sections.map((s) => [s.id, s]));
+
+    for (const entry of planEntries) {
+      const shiftId = entry.shiftId ?? entry.plan.shiftId ?? null;
+      const shift = shiftId ? shiftMap.get(shiftId) : undefined;
+      const section = entry.offeringSectionId
+        ? sectionMap.get(entry.offeringSectionId)
+        : undefined;
+      const course = entry.courseId ? courseMap.get(entry.courseId) : undefined;
+      const room = entry.classroomId
+        ? roomMap.get(entry.classroomId)
+        : undefined;
+
+      const subject =
+        course?.title ??
+        course?.code ??
+        section?.courseOffering?.course?.title ??
+        section?.courseOffering?.course?.code ??
+        'Class';
+
+      pushSlot({
+        id: entry.id,
+        startTime: formatTime(entry.startTime),
+        endTime: formatTime(entry.endTime),
+        subject,
+        semesterNo:
+          entry.semesterSequence ??
+          section?.courseOffering?.semesterSequence ??
+          null,
+        sectionCode: entry.sectionCode ?? section?.sectionCode ?? null,
+        classroom: room?.name ?? room?.code ?? null,
+        offeringSectionId: entry.offeringSectionId,
+        status: entry.status,
+        shiftId,
+        shiftCode: shift?.code ?? null,
+        shiftName: shift?.name ?? null,
+      });
+    }
+
+    // Fallback: legacy TimetableEntry rows (pre-plan system) without N+1.
+    if (!planEntries.length) {
+      const legacy = await this.prisma.timetableEntry.findMany({
+        where: { tenantId, staffProfileId, dayOfWeek },
+        orderBy: { startTime: 'asc' },
+      });
+      const legacySectionIds = Array.from(
+        new Set(
+          legacy.map((e) => e.offeringSectionId).filter(Boolean) as string[],
+        ),
+      );
+      const legacyRoomIds = Array.from(
+        new Set(legacy.map((e) => e.classroomId).filter(Boolean) as string[]),
+      );
+      const legacyShiftIds = Array.from(
+        new Set(legacy.map((e) => e.shiftId).filter(Boolean) as string[]),
+      );
+      const [legacySections, legacyRooms, legacyShifts] = await Promise.all([
+        legacySectionIds.length
+          ? this.prisma.offeringSection.findMany({
+              where: { id: { in: legacySectionIds } },
+              include: {
+                courseOffering: {
+                  include: {
+                    course: { select: { code: true, title: true } },
+                  },
+                },
+                classroom: { select: { code: true, name: true } },
+              },
+            })
+          : Promise.resolve([]),
+        legacyRoomIds.length
+          ? this.prisma.classroom.findMany({
+              where: { id: { in: legacyRoomIds } },
+              select: { id: true, code: true, name: true },
+            })
+          : Promise.resolve([]),
+        legacyShiftIds.length
+          ? this.prisma.shift.findMany({
+              where: { tenantId, id: { in: legacyShiftIds } },
+              select: { id: true, code: true, name: true },
+            })
+          : Promise.resolve([]),
+      ]);
+      const lsMap = new Map(legacySections.map((s) => [s.id, s]));
+      const lrMap = new Map(legacyRooms.map((r) => [r.id, r]));
+      const lshMap = new Map(legacyShifts.map((s) => [s.id, s]));
+
+      for (const entry of legacy) {
+        const section = entry.offeringSectionId
+          ? lsMap.get(entry.offeringSectionId)
+          : undefined;
+        const room = entry.classroomId
+          ? lrMap.get(entry.classroomId)
+          : undefined;
+        const shift = entry.shiftId ? lshMap.get(entry.shiftId) : undefined;
+        pushSlot({
+          id: entry.id,
+          startTime: formatTime(entry.startTime),
+          endTime: formatTime(entry.endTime),
+          subject:
+            section?.courseOffering.course?.title ??
+            section?.courseOffering.course?.code ??
+            'Class',
+          semesterNo: section?.courseOffering.semesterSequence ?? null,
+          sectionCode: section?.sectionCode ?? null,
+          classroom:
+            section?.classroom?.name ??
+            section?.classroom?.code ??
+            room?.name ??
+            room?.code ??
+            null,
+          offeringSectionId: entry.offeringSectionId,
+          status: entry.status,
+          shiftId: entry.shiftId,
+          shiftCode: shift?.code ?? null,
+          shiftName: shift?.name ?? null,
+        });
+      }
+    }
 
     const attendanceSessions = await (
       this.prisma as any
@@ -794,125 +1010,83 @@ export class StaffPortalService {
       orderBy: { startTime: 'asc' },
     });
 
-    const results: Array<{
-      id: string;
-      startTime: string;
-      endTime: string;
-      subject: string;
-      semesterNo: number | null;
-      sectionCode: string | null;
-      classroom: string | null;
-      offeringSectionId: string | null;
-      status: string;
-    }> = [];
-    const seenSlotKeys = new Set<string>();
+    if (attendanceSessions.length) {
+      const sessionCourseIds = Array.from(
+        new Set(
+          attendanceSessions
+            .map((s: { courseId?: string | null }) => s.courseId)
+            .filter(Boolean) as string[],
+        ),
+      );
+      const sessionSectionIds = Array.from(
+        new Set(
+          attendanceSessions
+            .map(
+              (s: { offeringSectionId?: string | null }) => s.offeringSectionId,
+            )
+            .filter(Boolean) as string[],
+        ),
+      );
+      const sessionRoomIds = Array.from(
+        new Set(
+          attendanceSessions
+            .map((s: { classroomId?: string | null }) => s.classroomId)
+            .filter(Boolean) as string[],
+        ),
+      );
+      const [sessionCourses, sessionSections, sessionRooms] = await Promise.all(
+        [
+          sessionCourseIds.length
+            ? this.prisma.course.findMany({
+                where: { id: { in: sessionCourseIds } },
+                select: { id: true, code: true, title: true },
+              })
+            : Promise.resolve([]),
+          sessionSectionIds.length
+            ? this.prisma.offeringSection.findMany({
+                where: { id: { in: sessionSectionIds } },
+                select: { id: true, sectionCode: true, shiftId: true },
+              })
+            : Promise.resolve([]),
+          sessionRoomIds.length
+            ? this.prisma.classroom.findMany({
+                where: { id: { in: sessionRoomIds } },
+                select: { id: true, code: true, name: true },
+              })
+            : Promise.resolve([]),
+        ],
+      );
+      const scMap = new Map(sessionCourses.map((c) => [c.id, c]));
+      const ssMap = new Map(sessionSections.map((s) => [s.id, s]));
+      const srMap = new Map(sessionRooms.map((r) => [r.id, r]));
 
-    const pushSlot = (slot: {
-      id: string;
-      startTime: string;
-      endTime: string;
-      subject: string;
-      semesterNo: number | null;
-      sectionCode: string | null;
-      classroom: string | null;
-      offeringSectionId: string | null;
-      status: string;
-    }) => {
-      const key = `${slot.startTime}:${slot.offeringSectionId ?? slot.subject}`;
-      if (seenSlotKeys.has(key)) return;
-      seenSlotKeys.add(key);
-      results.push(slot);
-    };
-
-    for (const entry of entries) {
-      let subject = 'Class';
-      let sectionCode: string | null = null;
-      let semesterNo: number | null = null;
-      let classroom: string | null = null;
-
-      if (entry.offeringSectionId) {
-        const section = await this.prisma.offeringSection.findFirst({
-          where: { id: entry.offeringSectionId },
-          include: {
-            courseOffering: {
-              include: { course: { select: { code: true, title: true } } },
-            },
-            classroom: { select: { code: true, name: true } },
-          },
+      for (const session of attendanceSessions) {
+        const course = session.courseId
+          ? scMap.get(session.courseId)
+          : undefined;
+        const section = session.offeringSectionId
+          ? ssMap.get(session.offeringSectionId)
+          : undefined;
+        const room = session.classroomId
+          ? srMap.get(session.classroomId)
+          : undefined;
+        const shiftId = section?.shiftId ?? null;
+        const shift = shiftId ? shiftMap.get(shiftId) : undefined;
+        pushSlot({
+          id: session.id,
+          startTime: session.startTime ? formatTime(session.startTime) : '—',
+          endTime: session.endTime ? formatTime(session.endTime) : '—',
+          subject: course?.title ?? course?.code ?? 'Class session',
+          semesterNo: session.semesterNo ?? null,
+          sectionCode: section?.sectionCode ?? null,
+          classroom: room?.name ?? room?.code ?? null,
+          offeringSectionId: session.offeringSectionId ?? null,
+          status: session.status ?? 'scheduled',
+          shiftId,
+          shiftCode: shift?.code ?? null,
+          shiftName: shift?.name ?? null,
         });
-        if (section) {
-          subject =
-            section.courseOffering.course?.title ??
-            section.courseOffering.course?.code ??
-            subject;
-          sectionCode = section.sectionCode;
-          semesterNo = section.courseOffering.semesterSequence ?? null;
-          classroom =
-            section.classroom?.name ?? section.classroom?.code ?? null;
-        }
       }
-
-      if (entry.classroomId && !classroom) {
-        const room = await this.prisma.classroom.findFirst({
-          where: { id: entry.classroomId },
-          select: { code: true, name: true },
-        });
-        classroom = room?.name ?? room?.code ?? null;
-      }
-
-      pushSlot({
-        id: entry.id,
-        startTime: formatTime(entry.startTime),
-        endTime: formatTime(entry.endTime),
-        subject,
-        semesterNo,
-        sectionCode,
-        classroom,
-        offeringSectionId: entry.offeringSectionId,
-        status: entry.status,
-      });
-    }
-
-    for (const session of attendanceSessions) {
-      let subject = 'Class session';
-      let sectionCode: string | null = null;
-      let classroom: string | null = null;
-
-      if (session.courseId) {
-        const course = await this.prisma.course.findFirst({
-          where: { id: session.courseId },
-          select: { code: true, title: true },
-        });
-        subject = course?.title ?? course?.code ?? subject;
-      }
-
-      if (session.offeringSectionId) {
-        const section = await this.prisma.offeringSection.findFirst({
-          where: { id: session.offeringSectionId },
-          select: { sectionCode: true },
-        });
-        sectionCode = section?.sectionCode ?? null;
-      }
-
-      if (session.classroomId) {
-        const room = await this.prisma.classroom.findFirst({
-          where: { id: session.classroomId },
-          select: { code: true, name: true },
-        });
-        classroom = room?.name ?? room?.code ?? null;
-      }
-
-      pushSlot({
-        id: session.id,
-        startTime: session.startTime ? formatTime(session.startTime) : '—',
-        endTime: session.endTime ? formatTime(session.endTime) : '—',
-        subject,
-        semesterNo: session.semesterNo ?? null,
-        sectionCode,
-        classroom,
-        offeringSectionId: session.offeringSectionId ?? null,
-        status: session.status ?? 'scheduled',
-      });
     }
 
     return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -920,7 +1094,26 @@ export class StaffPortalService {
 
   async getTodayScheduleForUser(user: JwtUser) {
     const staff = await this.resolveStaffProfile(user.tid, user.sub);
-    return this.getTodaySchedule(user.tid, staff.id);
+    const entries = await this.getTodaySchedule(user.tid, staff.id);
+    const byShift = new Map<string, typeof entries>();
+    for (const slot of entries) {
+      const key = slot.shiftName ?? slot.shiftCode ?? 'Unassigned';
+      const list = byShift.get(key) ?? [];
+      list.push(slot);
+      byShift.set(key, list);
+    }
+    return {
+      entries,
+      groupedByShift: Array.from(byShift.entries()).map(
+        ([shiftLabel, slots]) => ({
+          shiftLabel,
+          shiftId: slots[0]?.shiftId ?? null,
+          shiftCode: slots[0]?.shiftCode ?? null,
+          shiftName: slots[0]?.shiftName ?? null,
+          slots,
+        }),
+      ),
+    };
   }
 
   async getSectionRoster(user: JwtUser, sectionId: string) {

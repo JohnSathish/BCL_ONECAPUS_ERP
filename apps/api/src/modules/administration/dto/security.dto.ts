@@ -60,6 +60,39 @@ export class UpdateSecuritySettingsDto {
   @IsInt()
   @Min(1)
   maxConcurrentSessions?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  alertOnNewDevice?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  alertOnNewCountry?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxFailedBeforeFlag?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  blockOnExcessiveFails?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyEmailOnSecurity?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyPushOnSecurity?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowRememberMe?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  geoLookupEnabled?: boolean;
 }
 
 export class ListSessionsQueryDto {

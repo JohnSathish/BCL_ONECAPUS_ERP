@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GraduationCap, Users } from 'lucide-react';
 
 import { ShiftFacultyAssignPanel } from '@/components/academics/shift-faculty-assign-panel';
+import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-badges';
 import { ShiftFacultyUnassignButton } from '@/components/academics/shift-faculty-unassign-button';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { CompactCard, CompactCardBody } from '@/components/erp/compact-card';
@@ -125,6 +126,7 @@ export default function ShiftFacultyPage() {
               <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Assigned shifts</th>
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3">Department</th>
                   <th className="px-4 py-3">Designation</th>
@@ -139,6 +141,12 @@ export default function ShiftFacultyPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium">{row.fullName}</div>
                       <div className="text-xs text-muted-foreground">{row.email ?? '—'}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ShiftAssignmentBadges
+                        shifts={row.assignedShifts}
+                        currentShiftId={selectedShiftId}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div>{row.shortCode ?? row.employeeCode}</div>

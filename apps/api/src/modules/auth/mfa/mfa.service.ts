@@ -191,8 +191,10 @@ export class MfaService {
   async sendEmailOtp(userId: string, email: string) {
     const key = `mfa:email:${userId}`;
     const sends = (await this.cache.get<number>(`${key}:sends`)) ?? 0;
-    if (sends >= 3) {
-      throw new BadRequestException('Too many OTP requests. Try again later.');
+    if (sends >= 5) {
+      throw new BadRequestException(
+        'Too many verification emails were requested. Please wait about 15 minutes, then try again.',
+      );
     }
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     await this.cache.set(`${key}:code`, otp, 600);
@@ -223,8 +225,10 @@ export class MfaService {
   async verifyEmailOtp(userId: string, code: string): Promise<boolean> {
     const key = `mfa:email:${userId}`;
     const attempts = (await this.cache.get<number>(`${key}:attempts`)) ?? 0;
-    if (attempts >= 3) {
-      throw new BadRequestException('Too many OTP attempts');
+    if (attempts >= 5) {
+      throw new BadRequestException(
+        'Too many incorrect codes for this email verification. Request a new code and try again.',
+      );
     }
     await this.cache.set(`${key}:attempts`, attempts + 1, 600);
     const stored = await this.cache.get<string>(`${key}:code`);

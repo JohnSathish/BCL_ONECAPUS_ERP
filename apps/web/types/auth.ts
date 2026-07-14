@@ -29,4 +29,13 @@ export type LoginPayload = {
   challengeToken: string;
   challengeAnswer: number;
   rememberMe?: boolean;
+  deviceId?: string;
+  clientType?: string;
+  screenResolution?: string;
+  language?: string;
+  timeZone?: string;
+  browserName?: string;
+  browserVersion?: string;
+  platform?: string;
+  country?: string;
 };

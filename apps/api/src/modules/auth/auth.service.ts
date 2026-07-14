@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,6 +17,9 @@ import { PermissionResolverService } from '../../common/permissions/permission-r
 import type { DataScope } from '../../common/permissions/permission-resolver.service';
 import { isSuperAdmin } from '../../common/permissions/permission-registry';
 import { PasswordPolicyService } from '../../common/security/password-policy.service';
+import { AccessDeviceService } from '../administration/services/access-device.service';
+import { SecurityNotifyService } from '../administration/services/security-notify.service';
+import { SuspiciousLoginService } from '../administration/services/suspicious-login.service';
 import { MfaService } from './mfa/mfa.service';
 import { resolveLoginHintFromRoles } from './login-hint.util';
 import {
@@ -29,20 +34,35 @@ type ShiftScope = {
   allShifts: boolean;
 };
 
+export type LoginDeviceMeta = {
+  userAgent?: string;
+  ipAddress?: string;
+  clientType?: string;
+  appType?: string;
+  appVersion?: string;
+  deviceId?: string;
+  deviceLabel?: string;
+  deviceModel?: string;
+  manufacturer?: string;
+  brand?: string;
+  platform?: string;
+  osVersion?: string;
+  browserName?: string;
+  browserVersion?: string;
+  screenResolution?: string;
+  language?: string;
+  timeZone?: string;
+  country?: string;
+  accessDeviceId?: string;
+  lastActivityAt?: string;
+  isNewDevice?: boolean;
+};
+
 type IssueTokensOptions = {
   familyId?: string;
   rememberMe?: boolean;
   previousSessionId?: string;
-  meta?: {
-    userAgent?: string;
-    ipAddress?: string;
-    clientType?: string;
-    appType?: string;
-    appVersion?: string;
-    deviceId?: string;
-    deviceLabel?: string;
-    country?: string;
-  };
+  meta?: LoginDeviceMeta;
   impersonatedBy?: string;
   impersonationSessionId?: string;
   skipRefreshSession?: boolean;
@@ -50,6 +70,8 @@ type IssueTokensOptions = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -59,6 +81,9 @@ export class AuthService {
     private readonly permissionResolver: PermissionResolverService,
     private readonly passwordPolicy: PasswordPolicyService,
     private readonly mfa: MfaService,
+    private readonly accessDevices: AccessDeviceService,
+    private readonly suspiciousLogin: SuspiciousLoginService,
+    private readonly securityNotify: SecurityNotifyService,
   ) {}
 
   private hashToken(token: string) {
@@ -118,7 +143,7 @@ export class AuthService {
     reason?: string;
     ipAddress?: string;
     userAgent?: string;
-    metadata?: Record<string, string | number | boolean | null>;
+    metadata?: Record<string, unknown>;
   }) {
     try {
       await this.prisma.authLoginEvent.create({
@@ -131,7 +156,7 @@ export class AuthService {
           reason: input.reason,
           ipAddress: input.ipAddress,
           userAgent: input.userAgent,
-          metadata: input.metadata ?? {},
+          metadata: (input.metadata ?? {}) as object,
         },
       });
     } catch {
@@ -372,6 +397,71 @@ export class AuthService {
         policy.maxConcurrentSessions,
         options.previousSessionId,
       );
+
+      let accessDeviceId: string | undefined;
+      let clientType =
+        options.meta?.clientType ?? (options.meta?.appType ? 'ANDROID' : 'WEB');
+      const lastActivityAt = new Date().toISOString();
+
+      if (options.meta?.deviceId || options.meta?.userAgent) {
+        try {
+          await this.accessDevices.assertNotBlocked(
+            user.tenantId,
+            user.id,
+            options.meta?.deviceId,
+            options.meta?.userAgent,
+          );
+          const securitySettings =
+            await this.prisma.tenantSecuritySettings.findUnique({
+              where: { tenantId: user.tenantId },
+            });
+          const captured = await this.accessDevices.upsertFromLogin({
+            tenantId: user.tenantId,
+            userId: user.id,
+            deviceId: options.meta?.deviceId,
+            clientType,
+            appType: options.meta?.appType,
+            appVersion: options.meta?.appVersion,
+            deviceLabel: options.meta?.deviceLabel,
+            deviceModel: options.meta?.deviceModel,
+            manufacturer: options.meta?.manufacturer,
+            brand: options.meta?.brand,
+            platform: options.meta?.platform,
+            osVersion: options.meta?.osVersion,
+            browserName: options.meta?.browserName,
+            browserVersion: options.meta?.browserVersion,
+            screenResolution: options.meta?.screenResolution,
+            language: options.meta?.language,
+            timeZone: options.meta?.timeZone,
+            userAgent: options.meta?.userAgent,
+            ipAddress: options.meta?.ipAddress,
+            countryHint: options.meta?.country,
+            geoLookupEnabled: securitySettings?.geoLookupEnabled !== false,
+          });
+          accessDeviceId = captured.device.id;
+          clientType = captured.device.clientType || clientType;
+          if (options.meta) {
+            options.meta.accessDeviceId = accessDeviceId;
+            options.meta.lastActivityAt = lastActivityAt;
+            options.meta.clientType = clientType;
+            options.meta.country =
+              options.meta.country ?? captured.device.lastCountry ?? undefined;
+            options.meta.browserName =
+              options.meta.browserName ??
+              captured.device.browserName ??
+              undefined;
+            options.meta.isNewDevice = captured.isNew;
+          }
+        } catch (err) {
+          if (err instanceof ForbiddenException) throw err;
+          this.logger.debug(
+            `Device upsert skipped: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
+
       await this.prisma.$transaction(async (tx) => {
         const newSession = await tx.refreshSession.create({
           data: {
@@ -384,12 +474,14 @@ export class AuthService {
             userAgent: options.meta?.userAgent,
             ipAddress: options.meta?.ipAddress,
             metadata: {
-              clientType: options.meta?.clientType,
+              clientType,
               appType: options.meta?.appType,
               appVersion: options.meta?.appVersion,
               deviceId: options.meta?.deviceId,
               deviceLabel: options.meta?.deviceLabel,
               rememberMe: Boolean(options.rememberMe),
+              accessDeviceId: accessDeviceId ?? null,
+              lastActivityAt,
             },
           },
         });
@@ -694,16 +786,7 @@ export class AuthService {
     password: string,
     challengeToken: string,
     challengeAnswer: number,
-    meta?: {
-      userAgent?: string;
-      ipAddress?: string;
-      clientType?: string;
-      appType?: string;
-      appVersion?: string;
-      deviceId?: string;
-      deviceLabel?: string;
-      country?: string;
-    },
+    meta?: LoginDeviceMeta,
     rememberMe?: boolean,
   ): Promise<AuthSessionResponse> {
     const ip = meta?.ipAddress ?? 'unknown';
@@ -726,7 +809,11 @@ export class AuthService {
 
     const user = await this.resolveLoginUser(tenant.id, trimmed);
     if (!user) {
-      await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
+      const failure = await this.loginAttempts.recordFailure(
+        tenantId,
+        ip,
+        normalizedEmail,
+      );
       await this.recordLoginEvent({
         tenantId,
         identifier: normalizedEmail,
@@ -736,7 +823,7 @@ export class AuthService {
         ipAddress: ip,
         userAgent: meta?.userAgent,
       });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(failure.message);
     }
 
     let valid = await bcrypt.compare(password, user.passwordHash);
@@ -748,7 +835,11 @@ export class AuthService {
       }
     }
     if (!valid) {
-      await this.loginAttempts.recordFailure(tenantId, ip, normalizedEmail);
+      const failure = await this.loginAttempts.recordFailure(
+        tenantId,
+        ip,
+        normalizedEmail,
+      );
       await this.recordLoginEvent({
         tenantId,
         userId: user.id,
@@ -759,7 +850,16 @@ export class AuthService {
         ipAddress: ip,
         userAgent: meta?.userAgent,
       });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(failure.message);
+    }
+
+    if (user.accountStatus && user.accountStatus !== 'active') {
+      const status = String(user.accountStatus).toLowerCase();
+      throw new UnauthorizedException(
+        status === 'locked' || status === 'blocked' || status === 'suspended'
+          ? 'Your account has been restricted. Please contact your college administrator for help.'
+          : 'Your account is not active yet. Please contact your college administrator.',
+      );
     }
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
@@ -822,6 +922,15 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
+    if (meta?.deviceId || meta?.userAgent) {
+      await this.accessDevices.assertNotBlocked(
+        tenant.id,
+        user.id,
+        meta?.deviceId,
+        meta?.userAgent,
+      );
+    }
+
     const resolved = await this.resolveUserPermissions(user.id, roles);
     const shiftScope = await this.resolveShiftScope(user.id, roles);
     const session = await this.issueTokens(
@@ -832,6 +941,19 @@ export class AuthService {
       shiftScope,
       resolved.dataScope,
       { rememberMe, meta },
+    );
+
+    const suspiciousFlags = await this.suspiciousLogin.evaluate(
+      tenant.id,
+      user.id,
+      {
+        accessDeviceId: meta?.accessDeviceId,
+        isNewDevice: meta?.isNewDevice,
+        country: meta?.country,
+        browserName: meta?.browserName,
+        clientType: meta?.clientType,
+        ipAddress: meta?.ipAddress,
+      },
     );
 
     await this.prisma.auditLog.create({
@@ -846,6 +968,8 @@ export class AuthService {
           method: 'password',
           ipAddress: ip,
           country: meta?.country,
+          accessDeviceId: meta?.accessDeviceId ?? null,
+          suspiciousFlags,
         },
       },
     });
@@ -861,8 +985,35 @@ export class AuthService {
       metadata: {
         clientType: meta?.clientType ?? null,
         appType: meta?.appType ?? null,
+        accessDeviceId: meta?.accessDeviceId ?? null,
+        country: meta?.country ?? null,
+        suspiciousFlags,
       },
     });
+
+    if (suspiciousFlags.includes('NEW_DEVICE')) {
+      const settings = await this.prisma.tenantSecuritySettings.findUnique({
+        where: { tenantId: tenant.id },
+      });
+      if (settings?.alertOnNewDevice !== false) {
+        await this.securityNotify.notify({
+          tenantId: tenant.id,
+          userId: user.id,
+          templateCode: 'SECURITY_NEW_DEVICE',
+          triggerKey: `security.new_device.${meta?.accessDeviceId ?? user.id}.${Date.now()}`,
+          entityType: 'access_device',
+          entityId: String(meta?.accessDeviceId ?? user.id),
+          variables: {
+            device_name: meta?.deviceLabel ?? meta?.deviceModel ?? 'New device',
+            location: [meta?.country].filter(Boolean).join(', ') || 'Unknown',
+            login_at: new Date().toISOString(),
+          },
+          enabled:
+            settings?.notifyEmailOnSecurity !== false ||
+            settings?.notifyPushOnSecurity !== false,
+        });
+      }
+    }
 
     return session;
   }
@@ -1213,6 +1364,17 @@ export class AuthService {
     }
 
     await this.resetPasswordAndRevokeSessions(userId, newPassword);
+    await this.securityNotify.notify({
+      tenantId: user.tenantId,
+      userId,
+      templateCode: 'SECURITY_PASSWORD_CHANGED',
+      triggerKey: `security.password_changed.${userId}.${Date.now()}`,
+      entityType: 'user',
+      entityId: userId,
+      variables: {
+        changed_at: new Date().toISOString(),
+      },
+    });
     return {
       success: true,
       message: 'Password updated. Please sign in again.',

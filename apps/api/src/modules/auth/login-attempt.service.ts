@@ -1,12 +1,21 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
-const MAX_FAILURES = 5;
-const WINDOW_MS = 15 * 60 * 1000;
-const LOCK_MS = 15 * 60 * 1000;
+/** Failed password attempts allowed before a temporary lock (per IP + identifier). */
+const MAX_FAILURES = 8;
+/** Failures older than this window no longer count toward the lock. */
+const WINDOW_MS = 20 * 60 * 1000;
+/** First lock duration — short enough for honest typos, long enough to slow bots. */
+const LOCK_MS = 5 * 60 * 1000;
+/** Escalated lock after repeated lockouts in the same window. */
+const LOCK_ESCALATED_MS = 15 * 60 * 1000;
 
-const LOCK_MESSAGE =
-  'Account locked due to too many failed attempts. Try again in 15 minutes or contact your administrator.';
+export type LoginFailureOutcome = {
+  remaining: number;
+  locked: boolean;
+  retryAfterSeconds: number | null;
+  message: string;
+};
 
 @Injectable()
 export class LoginAttemptService {
@@ -14,6 +23,25 @@ export class LoginAttemptService {
 
   private normalizeKey(value: string) {
     return value.trim().toLowerCase();
+  }
+
+  private minutesLeft(until: Date, now = new Date()) {
+    return Math.max(1, Math.ceil((until.getTime() - now.getTime()) / 60_000));
+  }
+
+  private lockMessage(lockedUntil: Date, now = new Date()) {
+    const minutes = this.minutesLeft(lockedUntil, now);
+    return `For security, sign-in is temporarily paused for this account. Try again in about ${minutes} minute${minutes === 1 ? '' : 's'}, use Forgot password, or ask your college administrator to unlock you.`;
+  }
+
+  private failureMessage(remaining: number) {
+    if (remaining <= 0) {
+      return this.lockMessage(new Date(Date.now() + LOCK_MS));
+    }
+    if (remaining <= 2) {
+      return `Incorrect username or password. ${remaining} attempt${remaining === 1 ? '' : 's'} left before a temporary lock. Double-check your details or use Forgot password.`;
+    }
+    return `Incorrect username or password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before a temporary lock.`;
   }
 
   async assertNotLocked(tenantId: string, ipAddress: string, email: string) {
@@ -28,12 +56,27 @@ export class LoginAttemptService {
       },
     });
 
-    if (record?.lockedUntil && record.lockedUntil > new Date()) {
-      throw new HttpException(LOCK_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+    const now = new Date();
+    if (record?.lockedUntil && record.lockedUntil > now) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          errorCode: 'LOGIN_TEMPORARILY_LOCKED',
+          message: this.lockMessage(record.lockedUntil, now),
+          retryAfterSeconds: Math.ceil(
+            (record.lockedUntil.getTime() - now.getTime()) / 1000,
+          ),
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
   }
 
-  async recordFailure(tenantId: string, ipAddress: string, email: string) {
+  async recordFailure(
+    tenantId: string,
+    ipAddress: string,
+    email: string,
+  ): Promise<LoginFailureOutcome> {
     const normalizedEmail = this.normalizeKey(email);
     const now = new Date();
     const existing = await this.prisma.loginAttempt.findUnique({
@@ -50,8 +93,17 @@ export class LoginAttemptService {
       !existing || now.getTime() - existing.lastAttemptAt.getTime() > WINDOW_MS;
 
     const failedCount = windowExpired ? 1 : existing.failedCount + 1;
+    const escalate =
+      !windowExpired &&
+      Boolean(existing?.lockedUntil) &&
+      existing!.lockedUntil! <= now &&
+      failedCount >= MAX_FAILURES;
+
+    const lockDurationMs = escalate ? LOCK_ESCALATED_MS : LOCK_MS;
     const lockedUntil =
-      failedCount >= MAX_FAILURES ? new Date(now.getTime() + LOCK_MS) : null;
+      failedCount >= MAX_FAILURES
+        ? new Date(now.getTime() + lockDurationMs)
+        : null;
 
     await this.prisma.loginAttempt.upsert({
       where: {
@@ -84,16 +136,36 @@ export class LoginAttemptService {
             identifier: normalizedEmail,
             method: 'password',
             outcome: 'lockout',
-            reason: 'max_failures',
+            reason: escalate ? 'escalated_lockout' : 'max_failures',
             ipAddress,
-            metadata: { failedCount },
+            metadata: { failedCount, lockDurationMs },
           },
         });
       } catch {
-        // ignore
+        // ignore audit write failures
       }
-      throw new HttpException(LOCK_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+
+      const message = this.lockMessage(lockedUntil, now);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          errorCode: 'LOGIN_TEMPORARILY_LOCKED',
+          message,
+          retryAfterSeconds: Math.ceil(
+            (lockedUntil.getTime() - now.getTime()) / 1000,
+          ),
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
+
+    const remaining = Math.max(0, MAX_FAILURES - failedCount);
+    return {
+      remaining,
+      locked: false,
+      retryAfterSeconds: null,
+      message: this.failureMessage(remaining),
+    };
   }
 
   async resetOnSuccess(tenantId: string, ipAddress: string, email: string) {

@@ -8,6 +8,8 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
 import { fetchAllStaff } from '@/services/staff';
+import { fetchFacultyShiftAssignments } from '@/services/faculty-shifts';
+import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-badges';
 import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
 import type { ManualEntryPayload, TimetableEntry } from '@/services/timetable';
 
@@ -23,6 +25,7 @@ const DAYS = [
 
 export type SlotModalContext = {
   planId: string;
+  shiftId?: string;
   dayOfWeek: number;
   periodNo?: number;
   startTime: string;
@@ -71,8 +74,11 @@ export function TimetableSlotModal({
     enabled: authReady && open,
   });
   const staffQ = useQuery({
-    queryKey: ['timetable', 'staff'],
-    queryFn: () => fetchAllStaff({ activeTeachingOnly: true }),
+    queryKey: ['timetable', 'staff', context?.shiftId],
+    queryFn: () =>
+      context?.shiftId
+        ? fetchFacultyShiftAssignments(context.shiftId, { limit: 200 })
+        : fetchAllStaff({ activeTeachingOnly: true }),
     enabled: authReady && open,
   });
   const roomsQ = useQuery({
@@ -118,9 +124,37 @@ export function TimetableSlotModal({
   if (!open || !context) return null;
 
   const courses = coursesQ.data?.data ?? [];
-  const staff = staffQ.data?.data ?? [];
+  const staff = Array.isArray(staffQ.data)
+    ? staffQ.data.map((row) => ({
+        id: 'staffProfileId' in row ? row.staffProfileId : row.id,
+        fullName: row.fullName,
+        shortCode: row.shortCode,
+        employeeCode: row.employeeCode,
+        assignedShifts: 'assignedShifts' in row ? row.assignedShifts : undefined,
+      }))
+    : (
+        (
+          staffQ.data as
+            | {
+                data?: Array<{
+                  id: string;
+                  fullName: string;
+                  shortCode?: string | null;
+                  employeeCode?: string;
+                }>;
+              }
+            | undefined
+        )?.data ?? []
+      ).map((row) => ({
+        id: row.id,
+        fullName: row.fullName,
+        shortCode: row.shortCode ?? null,
+        employeeCode: row.employeeCode ?? '',
+        assignedShifts: undefined as undefined,
+      }));
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
+  const selectedStaff = staff.find((m) => m.id === staffProfileId);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -303,15 +337,25 @@ export function TimetableSlotModal({
                   : staffQ.isError
                     ? 'Failed to load faculty'
                     : staff.length
-                      ? 'Select faculty'
-                      : 'No faculty found'}
+                      ? 'Select faculty eligible for this shift'
+                      : 'No faculty assigned to this shift'}
               </option>
               {staff.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.shortCode ?? member.employeeCode} · {member.fullName}
+                  {member.assignedShifts?.length
+                    ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
+                    : ''}
                 </option>
               ))}
             </select>
+            {selectedStaff?.assignedShifts?.length ? (
+              <ShiftAssignmentBadges
+                className="pt-1"
+                shifts={selectedStaff.assignedShifts}
+                currentShiftId={context.shiftId}
+              />
+            ) : null}
           </label>
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
             Co-faculty

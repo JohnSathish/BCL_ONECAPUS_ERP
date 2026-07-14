@@ -45,6 +45,7 @@ import {
 import { useNavPreferencesStore, type NavRecentEntry } from '@/store/nav-preferences-store';
 import { buildNavIndex, findEntryById, navEntryId, resolveNavEntry } from '@/lib/nav-index';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
+import { fetchEnabledModules } from '@/services/licensing';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
 import { SidebarInstitutionCard } from '@/components/layout/sidebar-institution-card';
 import { SidebarPersonalizationMenu } from '@/components/layout/sidebar-personalization-menu';
@@ -154,6 +155,11 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  const session = useAuthStore((s) => s.session);
+  const workspaceKind = useWorkspaceStore((s) => s.kind);
+  const userPerms = session?.user?.permissions ?? [];
+  const isAdminLayout = role === 'admin';
+
   const statsQ = useQuery({
     queryKey: ['sidebar', 'nav-badges'],
     queryFn: () => fetchOperationsCenter({}),
@@ -162,18 +168,26 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     retry: 1,
   });
 
+  const enabledModulesQ = useQuery({
+    queryKey: ['license', 'modules', 'enabled'],
+    queryFn: fetchEnabledModules,
+    enabled: role === 'admin' && Boolean(session),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname, setMobileNavOpen]);
 
-  const session = useAuthStore((s) => s.session);
-  const workspaceKind = useWorkspaceStore((s) => s.kind);
-  const userPerms = session?.user?.permissions ?? [];
-  const isAdminLayout = role === 'admin';
-
   const groups: NavGroup[] = useMemo(() => {
     if (role === 'admin') {
-      const filtered = filterAdminNav(ADMIN_NAV, buildAdminNavContext(session ?? undefined));
+      // null while loading / on error → RBAC-only (backward compatible)
+      const enabledModules = enabledModulesQ.isSuccess ? enabledModulesQ.data : null;
+      const filtered = filterAdminNav(
+        ADMIN_NAV,
+        buildAdminNavContext(session ?? undefined, enabledModules),
+      );
       return applyWorkspaceNavLabels(filtered, workspaceKind);
     }
     if (role === 'staff') {
@@ -203,7 +217,15 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         })),
       },
     ];
-  }, [role, staffMe.data, userPerms, session, workspaceKind]);
+  }, [
+    role,
+    staffMe.data,
+    userPerms,
+    session,
+    workspaceKind,
+    enabledModulesQ.isSuccess,
+    enabledModulesQ.data,
+  ]);
 
   const navIndex = useMemo(() => buildNavIndex(groups), [groups]);
 

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InventoryController } from './inventory.controller';
+import { AssetLifecycleService } from './services/asset-lifecycle.service';
 import { InventoryLabelsService } from './services/inventory-labels.service';
 import { InventoryPurchaseOrdersService } from './services/inventory-purchase-orders.service';
 import { InventoryRequisitionsService } from './services/inventory-requisitions.service';
@@ -26,6 +27,7 @@ import { InventoryVendorsService } from './services/inventory-vendors.service';
     InventoryVendorPricesService,
     InventoryRequisitionsService,
     InventorySuggestionsService,
+    AssetLifecycleService,
   ],
 })
 export class InventoryModule {}

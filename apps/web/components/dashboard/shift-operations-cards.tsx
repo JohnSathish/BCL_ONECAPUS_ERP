@@ -184,8 +184,8 @@ export function ShiftOperationsSection() {
     queryKey: ['shift', 'operations-summary', 'dashboard', shiftScope.activeShiftId],
     queryFn: () => fetchShiftOperationsSummary(),
     enabled: canLoad,
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 180_000,
   });
 
   const rows = useMemo(() => sortShiftRows(summaryQ.data ?? []), [summaryQ.data]);

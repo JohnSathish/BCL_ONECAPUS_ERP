@@ -119,6 +119,8 @@ export class TimetableReadinessService {
   private suggestion(type: string) {
     if (type === 'FACULTY_CLASH')
       return 'Move one class to a free slot or choose another faculty.';
+    if (type === 'CROSS_SHIFT_FACULTY_CLASH')
+      return 'Reschedule so Morning and Day assignments for this faculty do not overlap on the clock.';
     if (type === 'ROOM_CLASH')
       return 'Choose a different room or mark the entry as a valid shared hall group.';
     if (type === 'CATEGORY_SLOT_RULE_VIOLATION')

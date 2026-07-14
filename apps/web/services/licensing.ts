@@ -84,3 +84,97 @@ export async function fetchRenewalContact() {
   const { data } = await api.get('/v1/license/renewal-contact');
   return data as LicenseSummary['renewalContact'];
 }
+
+/** Optional (toggleable) enterprise modules — keys may be camelCase or kebab-case from API. */
+export const OPTIONAL_LICENSE_MODULE_KEYS = [
+  'shortTermCourses',
+  'lms',
+  'questionBank',
+  'syllabusRepository',
+  'library',
+  'cams',
+  'infrastructure',
+  'frontOffice',
+  'governance',
+  'officialDocuments',
+  'naacIqac',
+  'transport',
+  'inventory',
+  'shifts',
+  'workflow',
+  'helpdesk',
+  'parent-portal',
+  'parentPortal',
+  'visitor-management',
+  'visitorManagement',
+  'placement',
+  'internship',
+  'alumni',
+  'hostel',
+  'research',
+  'integrations',
+  'assetLifecycle',
+  'dms',
+] as const;
+
+export type ModuleEntitlement = {
+  moduleKey: string;
+  label?: string;
+  description?: string;
+  enabled: boolean;
+  /** Core modules are always enabled and not toggleable in admin UI. */
+  core?: boolean;
+  limits?: Record<string, unknown>;
+};
+
+export function normalizeModuleKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/_/g, '-')
+    .toLowerCase();
+}
+
+export function isOptionalLicenseModule(moduleKey: string): boolean {
+  const normalized = normalizeModuleKey(moduleKey);
+  return OPTIONAL_LICENSE_MODULE_KEYS.some((k) => normalizeModuleKey(k) === normalized);
+}
+
+export async function fetchModuleEntitlements(): Promise<ModuleEntitlement[]> {
+  const { data } = await api.get('/v1/license/modules');
+  const raw: unknown[] = Array.isArray(data)
+    ? data
+    : data && Array.isArray((data as { modules?: unknown }).modules)
+      ? (data as { modules: unknown[] }).modules
+      : [];
+  return raw.map((item) => {
+    const row = item as Record<string, unknown>;
+    const moduleKey = String(row.moduleKey ?? row.key ?? '');
+    return {
+      moduleKey,
+      label: row.label as string | undefined,
+      description: row.description as string | undefined,
+      enabled: Boolean(row.enabled),
+      core: row.core === true || row.category === 'core',
+      limits: (row.limits as Record<string, unknown>) ?? {},
+    } satisfies ModuleEntitlement;
+  });
+}
+
+export async function fetchEnabledModules(): Promise<string[]> {
+  const { data } = await api.get('/v1/license/modules/enabled');
+  if (Array.isArray(data)) return data as string[];
+  if (data && Array.isArray((data as { enabled?: unknown }).enabled)) {
+    return (data as { enabled: string[] }).enabled;
+  }
+  if (data && Array.isArray((data as { modules?: unknown }).modules)) {
+    return (data as { modules: string[] }).modules;
+  }
+  return [];
+}
+
+export async function setModuleEntitlement(moduleKey: string, enabled: boolean) {
+  const { data } = await api.patch(`/v1/license/modules/${encodeURIComponent(moduleKey)}`, {
+    enabled,
+  });
+  return data as ModuleEntitlement | { success: boolean; moduleKey: string; enabled: boolean };
+}

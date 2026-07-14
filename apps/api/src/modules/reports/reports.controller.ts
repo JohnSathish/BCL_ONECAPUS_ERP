@@ -8,6 +8,7 @@ import { RequireAnyPermission } from '../../common/decorators/require-permission
 import { ShiftScoped } from '../../common/decorators/shift-scoped.decorator';
 import { ShiftScopeService } from '../../common/services/shift-scope.service';
 import { ShiftsService } from '../shifts/shifts.service';
+import { ShiftReportsService } from './shift-reports.service';
 
 @ApiBearerAuth()
 @ApiTags('reports')
@@ -16,6 +17,7 @@ export class ReportsController {
   constructor(
     private readonly shifts: ShiftsService,
     private readonly shiftScope: ShiftScopeService,
+    private readonly shiftReports: ShiftReportsService,
   ) {}
 
   @Get('shift-summary')
@@ -28,5 +30,15 @@ export class ReportsController {
   ) {
     const scope = this.shiftScope.resolveScope(user, shiftId);
     return this.shifts.shiftSummary(user.tid, scope, campusId);
+  }
+
+  @Get('shift-operations')
+  @RequireAnyPermission('shift:reports:read', 'reports:read', 'shift:read')
+  @ShiftScoped()
+  shiftOperations(
+    @CurrentUser() user: JwtUser,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    return this.shiftReports.pack(user, shiftId);
   }
 }

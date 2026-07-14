@@ -32,6 +32,7 @@ import {
   setRefreshCookie,
 } from './auth-cookie.util';
 import { AuthService } from './auth.service';
+import type { LoginDeviceMeta } from './auth.service';
 import { ChallengeService } from './challenge.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -90,20 +91,51 @@ export class AuthController {
     });
   }
 
-  private mobileMeta(req: Request) {
-    if (!this.isMobileClient(req)) return undefined;
-    const appType = String(req.headers['x-app-type'] ?? '').toLowerCase();
-    return {
+  private mobileMeta(req: Request, dto?: LoginDto): LoginDeviceMeta {
+    const body = dto;
+    const base: LoginDeviceMeta = {
       userAgent: req.headers['user-agent'],
       ipAddress: extractClientIp(req),
+      country: body?.country?.trim() || extractClientCountry(req) || undefined,
+      deviceId: body?.deviceId?.trim() || undefined,
+      clientType: body?.clientType?.trim() || undefined,
+      deviceLabel: body?.deviceLabel?.trim() || undefined,
+      deviceModel: body?.deviceModel?.trim() || undefined,
+      manufacturer: body?.manufacturer?.trim() || undefined,
+      brand: body?.brand?.trim() || undefined,
+      platform: body?.platform?.trim() || undefined,
+      osVersion: body?.osVersion?.trim() || undefined,
+      appVersion: body?.appVersion?.trim() || undefined,
+      screenResolution: body?.screenResolution?.trim() || undefined,
+      language: body?.language?.trim() || undefined,
+      timeZone: body?.timeZone?.trim() || undefined,
+      browserName: body?.browserName?.trim() || undefined,
+      browserVersion: body?.browserVersion?.trim() || undefined,
+    };
+
+    if (!this.isMobileClient(req)) {
+      return {
+        ...base,
+        clientType: base.clientType || 'WEB',
+      };
+    }
+    const appType = String(req.headers['x-app-type'] ?? '').toLowerCase();
+    return {
+      ...base,
       clientType: 'mobile',
       appType: appType === 'staff' ? 'staff' : 'student',
       appVersion:
-        String(req.headers['x-app-version'] ?? '').trim() || undefined,
-      deviceId: String(req.headers['x-device-id'] ?? '').trim() || undefined,
+        base.appVersion ||
+        String(req.headers['x-app-version'] ?? '').trim() ||
+        undefined,
+      deviceId:
+        base.deviceId ||
+        String(req.headers['x-device-id'] ?? '').trim() ||
+        undefined,
       deviceLabel:
-        String(req.headers['x-device-model'] ?? '').trim() || undefined,
-      country: extractClientCountry(req) ?? undefined,
+        base.deviceLabel ||
+        String(req.headers['x-device-model'] ?? '').trim() ||
+        undefined,
     };
   }
 
@@ -140,7 +172,8 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  // Soft burst limit per IP+account; credential lockout is the real protection.
+  @Throttle({ default: { limit: 60, ttl: 900_000 } })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -164,11 +197,7 @@ export class AuthController {
       dto.password,
       dto.challengeToken,
       dto.challengeAnswer,
-      this.mobileMeta(req) ?? {
-        userAgent: req.headers['user-agent'],
-        ipAddress: extractClientIp(req),
-        country: extractClientCountry(req) ?? undefined,
-      },
+      this.mobileMeta(req, dto),
       dto.rememberMe,
     );
     if ('mfaRequired' in session && session.mfaRequired) {

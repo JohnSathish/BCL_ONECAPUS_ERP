@@ -49,12 +49,22 @@ export class FacultyShiftsController {
 
   @Get()
   @RequirePermissions('shift:read')
-  list(@CurrentUser() user: JwtUser, @Query('shiftId') shiftId?: string) {
+  list(
+    @CurrentUser() user: JwtUser,
+    @Query('shiftId') shiftId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
     const effectiveShiftId = this.shiftScope.assertCanUseShiftId(user, shiftId);
     if (!effectiveShiftId) {
       throw new BadRequestException('shiftId query parameter is required');
     }
-    return this.service.listForShift(user, effectiveShiftId);
+    return this.service.listForShift(user, effectiveShiftId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search,
+    });
   }
   @Post()
   @RequirePermissions('shift:manage')

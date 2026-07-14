@@ -2,7 +2,8 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { ClsModule } from 'nestjs-cls';
 import { HttpProblemJsonExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -85,6 +86,16 @@ import { AiAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
 import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.module';
+import { WorkflowEngineModule } from './modules/workflow-engine/workflow-engine.module';
+import { HelpdeskModule } from './modules/helpdesk/helpdesk.module';
+import { ParentPortalModule } from './modules/parent-portal/parent-portal.module';
+import { VisitorManagementModule } from './modules/visitor-management/visitor-management.module';
+import { PlacementModule } from './modules/placement/placement.module';
+import { InternshipModule } from './modules/internship/internship.module';
+import { AlumniModule } from './modules/alumni/alumni.module';
+import { HostelModule } from './modules/hostel/hostel.module';
+import { ResearchModule } from './modules/research/research.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -169,13 +180,23 @@ import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.
     BackupEngineModule,
     OfficialDocumentsModule,
     ProposalsModule,
+    WorkflowEngineModule,
+    HelpdeskModule,
+    ParentPortalModule,
+    VisitorManagementModule,
+    PlacementModule,
+    InternshipModule,
+    AlumniModule,
+    HostelModule,
+    ResearchModule,
+    IntegrationsModule,
   ],
   controllers: [HealthController],
   providers: [
     HealthService,
     CsrfMiddleware,
     { provide: APP_FILTER, useClass: HttpProblemJsonExceptionFilter },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ShiftScopeGuard },

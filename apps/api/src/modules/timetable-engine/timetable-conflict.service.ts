@@ -315,6 +315,13 @@ export class TimetableConflictService {
       }
     }
 
+    const crossShift = await this.detectCrossShiftFacultyClashes(
+      tenantId,
+      plan,
+      entries,
+    );
+    conflicts.push(...crossShift);
+
     if (conflicts.length) {
       await this.prisma.timetableConflict.createMany({
         data: conflicts.map((conflict) => ({
@@ -347,6 +354,145 @@ export class TimetableConflictService {
     right: { startTime: Date; endTime: Date },
   ) {
     return left.startTime < right.endTime && left.endTime > right.startTime;
+  }
+
+  /**
+   * Detect faculty double-booking across Morning/Day (or any other shift)
+   * using wall-clock overlap on the same day-of-week.
+   */
+  private async detectCrossShiftFacultyClashes(
+    tenantId: string,
+    plan: { id: string; shiftId: string | null } | null,
+    entries: Array<{
+      id: string;
+      dayOfWeek: number;
+      startTime: Date;
+      endTime: Date;
+      staffProfileId: string | null;
+      metadata: unknown;
+      shiftId: string | null;
+    }>,
+  ): Promise<ConflictDraft[]> {
+    if (!plan?.shiftId || !entries.length) return [];
+
+    const staffIds = Array.from(
+      new Set(entries.flatMap((e) => this.entryStaffIds(e))),
+    );
+    if (!staffIds.length) return [];
+
+    const otherEntriesRaw = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        staffProfileId: { in: staffIds },
+        planId: { not: plan.id },
+        plan: {
+          tenantId,
+          deletedAt: null,
+          status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED', 'PUBLISHED'] },
+        },
+      },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            shiftId: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    const otherEntries = otherEntriesRaw.filter((e) => {
+      const otherShiftId = e.shiftId ?? e.plan.shiftId;
+      return Boolean(otherShiftId) && otherShiftId !== plan.shiftId;
+    });
+
+    if (!otherEntries.length) return [];
+
+    const otherShiftIds = Array.from(
+      new Set(
+        otherEntries
+          .map((e) => e.shiftId ?? e.plan.shiftId)
+          .filter(Boolean) as string[],
+      ),
+    );
+    const shifts = otherShiftIds.length
+      ? await this.prisma.shift.findMany({
+          where: { tenantId, id: { in: otherShiftIds } },
+          select: { id: true, code: true, name: true },
+        })
+      : [];
+    const shiftMap = new Map(shifts.map((s) => [s.id, s]));
+
+    const staffNames = await this.prisma.staffProfile.findMany({
+      where: { tenantId, id: { in: staffIds } },
+      select: { id: true, fullName: true },
+    });
+    const nameMap = new Map(staffNames.map((s) => [s.id, s.fullName]));
+
+    const conflicts: ConflictDraft[] = [];
+    for (const current of entries) {
+      const currentStaff = this.entryStaffIds(current);
+      if (!currentStaff.length) continue;
+      for (const other of otherEntries) {
+        if (current.dayOfWeek !== other.dayOfWeek) continue;
+        if (!this.overlapsMinutes(current, other)) continue;
+        const otherStaff = this.entryStaffIds(other);
+        const clashingStaff = currentStaff.find((id) =>
+          otherStaff.includes(id),
+        );
+        if (!clashingStaff) continue;
+
+        const otherShiftId = other.shiftId ?? other.plan.shiftId;
+        const otherShift = otherShiftId
+          ? shiftMap.get(otherShiftId)
+          : undefined;
+        const startLabel = this.formatHm(other.startTime);
+        const endLabel = this.formatHm(other.endTime);
+        const facultyName = nameMap.get(clashingStaff) ?? 'Faculty';
+        const shiftLabel =
+          otherShift?.name ?? otherShift?.code ?? 'another shift';
+
+        conflicts.push({
+          entryId: current.id,
+          conflictType: 'CROSS_SHIFT_FACULTY_CLASH',
+          message: `Scheduling Conflict Detected: ${facultyName} is already assigned in ${shiftLabel} (${startLabel}–${endLabel}).`,
+          affectedEntityType: 'STAFF',
+          affectedEntityId: clashingStaff,
+          severity: 'WARNING',
+          metadata: {
+            conflictingEntryId: other.id,
+            conflictingPlanId: other.planId,
+            conflictingShiftId: otherShiftId,
+            conflictingShiftName: otherShift?.name ?? null,
+            conflictingShiftCode: otherShift?.code ?? null,
+            conflictingStartTime: startLabel,
+            conflictingEndTime: endLabel,
+          },
+        });
+      }
+    }
+    return conflicts;
+  }
+
+  private overlapsMinutes(
+    left: { startTime: Date; endTime: Date },
+    right: { startTime: Date; endTime: Date },
+  ) {
+    const ls = this.minutes(left.startTime);
+    const le = this.minutes(left.endTime);
+    const rs = this.minutes(right.startTime);
+    const re = this.minutes(right.endTime);
+    return ls < re && le > rs;
+  }
+
+  private formatHm(value: Date) {
+    const h = value.getUTCHours();
+    const m = value.getUTCMinutes();
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
   private entryStaffIds(entry: {

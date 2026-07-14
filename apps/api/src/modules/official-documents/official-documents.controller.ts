@@ -41,6 +41,7 @@ import {
 import { OfficialDocumentAssetsService } from './services/official-document-assets.service';
 import { OfficialDocumentApprovalService } from './services/official-document-approval.service';
 import { OfficialDocumentDashboardService } from './services/official-document-dashboard.service';
+import { OfficialDocumentSearchService } from './services/official-document-search.service';
 import { OfficialDocumentSettingsService } from './services/official-document-settings.service';
 import { OfficialDocumentAuditService } from './services/official-document-audit.service';
 import { OfficialDocumentService } from './services/official-document.service';
@@ -57,6 +58,7 @@ export class OfficialDocumentsController {
     private readonly dashboard: OfficialDocumentDashboardService,
     private readonly settings: OfficialDocumentSettingsService,
     private readonly audit: OfficialDocumentAuditService,
+    private readonly searchService: OfficialDocumentSearchService,
     private readonly seed: OfficialDocumentsSeedService,
   ) {}
 
@@ -76,7 +78,28 @@ export class OfficialDocumentsController {
     @CurrentUser() user: JwtUser,
     @Query() query: ListOfficialDocumentsQueryDto,
   ) {
+    if (query.q?.trim()) {
+      return this.searchService.fullTextSearch(user.tid, query.q, {
+        page: query.page,
+        limit: query.limit,
+      });
+    }
     return this.documents.list(user.tid, query);
+  }
+
+  @Get('expiring')
+  @RequireAnyPermission('official-documents:read', 'official-documents:manage')
+  expiring(
+    @CurrentUser() user: JwtUser,
+    @Query('withinDays') withinDays?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.searchService.listExpiring(user.tid, {
+      withinDays: withinDays ? Number(withinDays) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('settings/config')

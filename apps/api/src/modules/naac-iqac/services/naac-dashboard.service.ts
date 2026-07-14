@@ -46,6 +46,11 @@ export class NaacDashboardService {
           )
         : 0;
 
+    const evidenceCompleteness = this.buildEvidenceCompleteness(
+      criterionStatus,
+      pending,
+    );
+
     void this.calendarNotify.processUpcomingReminders(tenantId);
 
     await this.db().naacReadinessSnapshot.upsert({
@@ -68,12 +73,68 @@ export class NaacDashboardService {
     return {
       academicYear,
       overallReadiness,
+      evidenceCompleteness,
       aqarCompletionPct: aqar?.completionPct ?? 0,
       aqarStatus: aqar?.status ?? 'DRAFT',
       criterionStatus,
       pending,
       upcomingDeadlines: upcoming,
       aggregates,
+    };
+  }
+
+  /** KPI pack: evidence coverage vs mandatory metrics and criterion gaps. */
+  private buildEvidenceCompleteness(
+    criterionStatus: Array<{
+      criterion: number | string;
+      title: string;
+      score: number;
+      evidenceCount: number;
+      status: string;
+    }>,
+    pending: {
+      missingEvidence: number;
+      metricsPending: number;
+      departmentPending: number;
+      facultyPending: number;
+    },
+  ) {
+    const criteriaCovered = criterionStatus.filter(
+      (c) => c.evidenceCount > 0,
+    ).length;
+    const criteriaTotal = criterionStatus.length || 1;
+    const criteriaCoveragePct = Math.round(
+      (criteriaCovered / criteriaTotal) * 100,
+    );
+    const mandatoryTotal = pending.metricsPending || 0;
+    const mandatoryCovered = Math.max(
+      0,
+      mandatoryTotal - (pending.missingEvidence ?? 0),
+    );
+    const mandatoryCoveragePct =
+      mandatoryTotal > 0
+        ? Math.round((mandatoryCovered / mandatoryTotal) * 100)
+        : 100;
+    const gaps = criterionStatus
+      .filter((c) => c.status === 'NEEDS_ATTENTION')
+      .map((c) => ({
+        criterion: String(c.criterion),
+        title: c.title,
+        evidenceCount: c.evidenceCount,
+        score: c.score,
+      }));
+
+    return {
+      criteriaCoveragePct,
+      criteriaCovered,
+      criteriaTotal: criterionStatus.length,
+      mandatoryCoveragePct,
+      mandatoryCovered,
+      mandatoryTotal,
+      missingEvidence: pending.missingEvidence,
+      departmentPending: pending.departmentPending,
+      facultyPending: pending.facultyPending,
+      gaps,
     };
   }
 

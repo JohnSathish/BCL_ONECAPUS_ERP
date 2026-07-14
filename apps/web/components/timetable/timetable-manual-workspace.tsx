@@ -241,6 +241,7 @@ export function TimetableManualWorkspace() {
     setEditEntry(null);
     setSlotContext({
       planId: selectedPlanId,
+      shiftId: effectiveShiftId || undefined,
       allowedSemesters,
       dayOfWeek: args.dayOfWeek,
       periodNo: args.periodNo ?? undefined,
@@ -257,6 +258,7 @@ export function TimetableManualWorkspace() {
     setEditEntry(entry);
     setSlotContext({
       planId: selectedPlanId,
+      shiftId: effectiveShiftId || entry.shiftId || undefined,
       dayOfWeek: entry.dayOfWeek,
       periodNo: entry.periodNo ?? undefined,
       startTime: entry.startTime,

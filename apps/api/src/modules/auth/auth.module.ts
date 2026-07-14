@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SecurityCommonModule } from '../../common/security/security-common.module';
 import { CryptoModule } from '../../common/crypto/crypto.module';
+import { DeviceSecurityModule } from '../administration/device-security.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { ChallengeService } from './challenge.service';
@@ -23,6 +24,7 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
     TenantsModule,
     SecurityCommonModule,
     CryptoModule,
+    DeviceSecurityModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

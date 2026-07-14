@@ -1,12 +1,16 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { WorkflowEngineService } from '../../workflow-engine/services/workflow-engine.service';
 import { officialDb } from '../utils/official-documents-prisma.util';
 import { OfficialDocumentAuditService } from './official-document-audit.service';
 import { OfficialDocumentPdfService } from './official-document-pdf.service';
@@ -19,6 +23,9 @@ export class OfficialDocumentApprovalService {
     private readonly audit: OfficialDocumentAuditService,
     private readonly pdf: OfficialDocumentPdfService,
     private readonly referenceNumbers: ReferenceNumberService,
+    @Optional()
+    @Inject(forwardRef(() => WorkflowEngineService))
+    private readonly workflow?: WorkflowEngineService,
   ) {}
 
   private db() {
@@ -58,6 +65,21 @@ export class OfficialDocumentApprovalService {
       },
     });
     await this.audit.log(user.tid, id, 'SUBMIT', user.sub, req);
+
+    if (this.workflow) {
+      try {
+        await this.workflow.ensureOfficialDocumentPilot(user.tid);
+        await this.workflow.startInstance(
+          user,
+          'OFFICIAL_DOCUMENT',
+          id,
+          'OFFICIAL_DOCUMENT_APPROVAL',
+        );
+      } catch {
+        // Workflow is optional — do not break official-document submit.
+      }
+    }
+
     return updated;
   }
 
@@ -108,6 +130,21 @@ export class OfficialDocumentApprovalService {
     await this.audit.log(user.tid, id, 'PUBLISH', user.sub, req, {
       referenceNo,
     });
+
+    if (this.workflow) {
+      try {
+        await this.workflow.actionForEntity(
+          user,
+          'OFFICIAL_DOCUMENT',
+          id,
+          'APPROVE',
+          note,
+        );
+      } catch {
+        // Soft — existing approval flow remains authoritative.
+      }
+    }
+
     return updated;
   }
 
@@ -131,6 +168,21 @@ export class OfficialDocumentApprovalService {
       },
     });
     await this.audit.log(user.tid, id, 'REJECT', user.sub, req, { note });
+
+    if (this.workflow) {
+      try {
+        await this.workflow.actionForEntity(
+          user,
+          'OFFICIAL_DOCUMENT',
+          id,
+          'REJECT',
+          note,
+        );
+      } catch {
+        // Soft — existing reject flow remains authoritative.
+      }
+    }
+
     return updated;
   }
 

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -30,6 +31,7 @@ import {
   UpdateVendorDto,
   UpsertVendorPriceDto,
 } from './dto/inventory.dto';
+import { AssetLifecycleService } from './services/asset-lifecycle.service';
 import { InventoryLabelsService } from './services/inventory-labels.service';
 import { InventoryPurchaseOrdersService } from './services/inventory-purchase-orders.service';
 import { InventoryRequisitionsService } from './services/inventory-requisitions.service';
@@ -66,6 +68,7 @@ export class InventoryController {
     private readonly vendorPrices: InventoryVendorPricesService,
     private readonly requisitions: InventoryRequisitionsService,
     private readonly suggestions: InventorySuggestionsService,
+    private readonly assetLifecycle: AssetLifecycleService,
   ) {}
 
   @Get('dashboard')
@@ -306,5 +309,61 @@ export class InventoryController {
     @Body() dto: CreatePoFromSuggestionDto,
   ) {
     return this.suggestions.createPoFromSuggestions(user, dto);
+  }
+
+  @Get('asset-services')
+  @RequireAnyPermission(...INV_READ)
+  listAssetServices(
+    @CurrentUser() user: JwtUser,
+    @Query('inventoryItemId') inventoryItemId?: string,
+  ) {
+    return this.assetLifecycle.list(user.tid, inventoryItemId);
+  }
+
+  @Post('asset-services')
+  @RequireAnyPermission(...INV_MANAGE)
+  createAssetService(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      inventoryItemId?: string;
+      assetTag?: string;
+      serviceType?: string;
+      vendorName?: string;
+      serviceDate?: string;
+      warrantyUntil?: string;
+      amcUntil?: string;
+      cost?: number;
+      notes?: string;
+    },
+  ) {
+    return this.assetLifecycle.create(user, body);
+  }
+
+  @Patch('asset-services/:id')
+  @RequireAnyPermission(...INV_MANAGE)
+  updateAssetService(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    body: Partial<{
+      inventoryItemId: string;
+      assetTag: string;
+      serviceType: string;
+      vendorName: string;
+      serviceDate: string;
+      warrantyUntil: string;
+      amcUntil: string;
+      cost: number;
+      notes: string;
+    }>,
+  ) {
+    return this.assetLifecycle.update(user.tid, id, body);
+  }
+
+  @Delete('asset-services/:id')
+  @RequireAnyPermission(...INV_MANAGE)
+  deleteAssetService(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.assetLifecycle.remove(user.tid, id);
   }
 }

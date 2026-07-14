@@ -67,6 +67,39 @@ JWT claims: `shiftIds`, `primaryShiftId`, `allShifts`.
 
 All workspace-scoped admin modules honor the `x-shift-id` header (auto-sent by the web client when workspace ≠ institution). Shift-only users receive 403 if the header is tampered.
 
+## Ownership model (Option A)
+
+Each shift admin manages **only their own shift**:
+
+| Role                        | Can manage                                                        |
+| --------------------------- | ----------------------------------------------------------------- |
+| Morning Shift Admin         | Morning timetable, Morning faculty allocation, Morning attendance |
+| Day Shift Admin             | Day timetable, Day faculty allocation, Day attendance             |
+| College / Institution admin | All shifts (`allShifts: true`)                                    |
+
+Option B (both admins assigning across shifts) is **not** supported. Cross-shift faculty teaching uses a **single** `StaffProfile` with multiple `StaffShiftAssignment` rows — never duplicate staff records.
+
+## Cross-shift faculty clash
+
+When validating or saving timetable plans, the conflict engine detects **wall-clock overlaps** for the same faculty across Morning and Day (or any other shifts):
+
+- Conflict type: `CROSS_SHIFT_FACULTY_CLASH`
+- Example: Morning 09:00–09:50 vs Day 09:45–10:40 for the same teacher → warning on validate/publish
+- Faculty portal **Today’s Classes** and week matrix remain combined (no Morning/Day portal switch)
+
+## Staff visibility badges
+
+Faculty pickers (shift roster, candidates, timetable slot modal) show assigned-shift chips (`Morning` / `Day`) so admins see who teaches one or both shifts.
+
+## Shift reports pack
+
+| Route / API                            | Content                                                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/admin/academics/shift-reports`       | Workspace UI                                                                                                      |
+| `GET /api/v1/reports/shift-operations` | Faculty workload, subject allocation, timetable coverage, classroom utilization, teaching hours, department staff |
+
+Dashboard `GET /api/v1/shifts/operations/summary` uses batched `groupBy` aggregates (not per-shift N+1 counts).
+
 ## Course delivery model
 
 - **Course** — single master catalog row
@@ -75,12 +108,14 @@ All workspace-scoped admin modules honor the `x-shift-id` header (auto-sent by t
 
 ## UI routes
 
-| Route              | Audience                                                          |
-| ------------------ | ----------------------------------------------------------------- |
-| `/admin/workspace` | Super admin workspace picker (Institution / Morning / Day)        |
-| `/admin/shifts`    | Institution admin — shift CRUD, **shift administrators**, summary |
-| `/admin/*`         | All admin modules — workspace context auto-scopes delivery data   |
-| `/shift/*`         | **Deprecated** — redirects to `/admin` with workspace context     |
+| Route                            | Audience                                                          |
+| -------------------------------- | ----------------------------------------------------------------- |
+| `/admin/workspace`               | Super admin workspace picker (Institution / Morning / Day)        |
+| `/admin/shifts`                  | Institution admin — shift CRUD, **shift administrators**, summary |
+| `/admin/academics/shift-faculty` | Faculty ↔ shift roster with multi-shift badges                    |
+| `/admin/academics/shift-reports` | Shift-wise workload / utilization reports                         |
+| `/admin/*`                       | All admin modules — workspace context auto-scopes delivery data   |
+| `/shift/*`                       | **Deprecated** — redirects to `/admin` with workspace context     |
 
 ### Assigning shift admins (college / super admin)
 

@@ -1,7 +1,5 @@
-'use client';
-
-import { SecurityPage } from '@/components/administration-module/security-page';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <SecurityPage />;
+  redirect('/admin/administration/device-login');
 }

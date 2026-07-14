@@ -165,16 +165,28 @@ export class ShiftOperationsService {
       endTime: Date;
     },
   ) {
-    const base = {
-      tenantId,
-      shiftId: params.shiftId,
-      dayOfWeek: params.dayOfWeek,
+    const minutes = (value: Date) =>
+      value.getUTCHours() * 60 + value.getUTCMinutes();
+    const overlaps = (start: Date, end: Date, eStart: Date, eEnd: Date) => {
+      const ls = minutes(start);
+      const le = minutes(end);
+      const rs = minutes(eStart);
+      const re = minutes(eEnd);
+      return ls < re && le > rs;
     };
-    const entries = await this.prisma.timetableEntry.findMany({ where: base });
-    for (const e of entries) {
-      const overlap =
-        params.startTime < e.endTime && params.endTime > e.startTime;
-      if (!overlap) continue;
+
+    // Same-shift classroom/faculty clashes (legacy TimetableEntry)
+    const sameShift = await this.prisma.timetableEntry.findMany({
+      where: {
+        tenantId,
+        shiftId: params.shiftId,
+        dayOfWeek: params.dayOfWeek,
+      },
+    });
+    for (const e of sameShift) {
+      if (!overlaps(params.startTime, params.endTime, e.startTime, e.endTime)) {
+        continue;
+      }
       if (params.staffProfileId && e.staffProfileId === params.staffProfileId) {
         throw new BadRequestException(
           'Faculty timetable conflict in this shift',
@@ -183,6 +195,45 @@ export class ShiftOperationsService {
       if (params.classroomId && e.classroomId === params.classroomId) {
         throw new BadRequestException(
           'Classroom timetable conflict in this shift',
+        );
+      }
+    }
+
+    // Cross-shift faculty wall-clock overlap (published + draft plan entries)
+    if (params.staffProfileId) {
+      const otherPlanEntries = await this.prisma.timetablePlanEntry.findMany({
+        where: {
+          tenantId,
+          staffProfileId: params.staffProfileId,
+          dayOfWeek: params.dayOfWeek,
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+          plan: {
+            tenantId,
+            deletedAt: null,
+            status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED', 'PUBLISHED'] },
+          },
+        },
+        include: {
+          plan: { select: { shiftId: true, name: true } },
+        },
+      });
+      for (const e of otherPlanEntries) {
+        const entryShiftId = e.shiftId ?? e.plan.shiftId;
+        if (!entryShiftId || entryShiftId === params.shiftId) continue;
+        if (
+          !overlaps(params.startTime, params.endTime, e.startTime, e.endTime)
+        ) {
+          continue;
+        }
+        const shift = await this.prisma.shift.findFirst({
+          where: { id: entryShiftId },
+          select: { name: true, code: true },
+        });
+        throw new BadRequestException(
+          `Scheduling Conflict Detected: faculty is already assigned in ${
+            shift?.name ?? shift?.code ?? 'another shift'
+          } during this time.`,
         );
       }
     }

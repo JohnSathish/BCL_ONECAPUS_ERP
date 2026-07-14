@@ -5,19 +5,38 @@ import {
   isSuperAdmin,
 } from '@/lib/permissions/permission-registry';
 import { canAccessAdminPortal, isStudentOnlyUser } from '@/lib/permissions/portal-access';
+import { isOptionalLicenseModule, normalizeModuleKey } from '@/services/licensing';
 
 export type AdminNavContext = {
   permissions: string[];
   roles: string[];
+  /**
+   * Licensed module keys currently enabled for the tenant.
+   * `null` / `undefined` = skip entitlement gating (RBAC-only / loading / backward compat).
+   */
+  enabledModules?: string[] | null;
 };
 
-export function buildAdminNavContext(session?: {
-  user?: { permissions?: string[]; roles?: string[] };
-}): AdminNavContext {
+export function buildAdminNavContext(
+  session?: {
+    user?: { permissions?: string[]; roles?: string[] };
+  },
+  enabledModules?: string[] | null,
+): AdminNavContext {
   return {
     permissions: session?.user?.permissions ?? [],
     roles: session?.user?.roles ?? [],
+    enabledModules,
   };
+}
+
+function moduleEntitled(moduleId: string | undefined, ctx: AdminNavContext): boolean {
+  if (ctx.enabledModules == null) return true;
+  if (!moduleId) return true;
+  // Core / non-optional modules stay visible under RBAC when entitlement list is present.
+  if (!isOptionalLicenseModule(moduleId)) return true;
+  const wanted = normalizeModuleKey(moduleId);
+  return ctx.enabledModules.some((m) => normalizeModuleKey(m) === wanted);
 }
 
 function childVisible(
@@ -44,6 +63,10 @@ function childVisible(
 
 function filterNavItem(item: NavItem, ctx: AdminNavContext): NavItem | null {
   if (isStudentOnlyUser(ctx.roles) || !canAccessAdminPortal(ctx.roles, ctx.permissions)) {
+    return null;
+  }
+
+  if (!moduleEntitled(item.module, ctx)) {
     return null;
   }
 

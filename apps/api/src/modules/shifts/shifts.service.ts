@@ -255,32 +255,51 @@ export class ShiftsService {
       where,
       orderBy: { sortOrder: 'asc' },
     });
+    if (!shifts.length) return [];
 
-    const results = [];
-    for (const shift of shifts) {
-      const [students, registrations, sections] = await Promise.all([
-        this.prisma.student.count({
-          where: { tenantId, primaryShiftId: shift.id, deletedAt: null },
-        }),
-        this.prisma.semesterRegistration.count({
-          where: { tenantId, shiftId: shift.id },
-        }),
-        this.prisma.offeringSection.count({
-          where: { tenantId, shiftId: shift.id, deletedAt: null },
-        }),
-      ]);
-      results.push({
-        shiftId: shift.id,
-        code: shift.code,
-        name: shift.name,
-        startTime: formatShiftTime(shift.startTime),
-        endTime: formatShiftTime(shift.endTime),
-        students,
-        registrations,
-        sections,
-      });
-    }
-    return results;
+    const shiftIds = shifts.map((s) => s.id);
+    const [students, registrations, sections] = await Promise.all([
+      this.prisma.student.groupBy({
+        by: ['primaryShiftId'],
+        where: {
+          tenantId,
+          primaryShiftId: { in: shiftIds },
+          deletedAt: null,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.semesterRegistration.groupBy({
+        by: ['shiftId'],
+        where: { tenantId, shiftId: { in: shiftIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.offeringSection.groupBy({
+        by: ['shiftId'],
+        where: { tenantId, shiftId: { in: shiftIds }, deletedAt: null },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const studentMap = new Map(
+      students.map((r) => [r.primaryShiftId ?? '', r._count._all]),
+    );
+    const regMap = new Map(
+      registrations.map((r) => [r.shiftId ?? '', r._count._all]),
+    );
+    const sectionMap = new Map(
+      sections.map((r) => [r.shiftId ?? '', r._count._all]),
+    );
+
+    return shifts.map((shift) => ({
+      shiftId: shift.id,
+      code: shift.code,
+      name: shift.name,
+      startTime: formatShiftTime(shift.startTime),
+      endTime: formatShiftTime(shift.endTime),
+      students: studentMap.get(shift.id) ?? 0,
+      registrations: regMap.get(shift.id) ?? 0,
+      sections: sectionMap.get(shift.id) ?? 0,
+    }));
   }
 
   async operationsSummary(user: JwtUser, campusId?: string) {
@@ -298,63 +317,99 @@ export class ShiftsService {
       where,
       orderBy: { sortOrder: 'asc' },
     });
+    if (!shifts.length) return [];
 
-    const results = [];
-    for (const shift of shifts) {
-      const [
-        students,
-        sections,
-        facultyAssignments,
-        timetableEntries,
-        pendingTransfers,
-        pendingRegistrations,
-      ] = await Promise.all([
-        this.prisma.student.count({
-          where: {
-            tenantId: user.tid,
-            primaryShiftId: shift.id,
-            deletedAt: null,
-          },
-        }),
-        this.prisma.offeringSection.count({
-          where: {
-            tenantId: user.tid,
-            shiftId: shift.id,
-            deletedAt: null,
-            status: 'active',
-          },
-        }),
-        this.prisma.staffShiftAssignment.count({
-          where: { tenantId: user.tid, shiftId: shift.id },
-        }),
-        this.prisma.timetableEntry.count({
-          where: { tenantId: user.tid, shiftId: shift.id },
-        }),
-        this.prisma.studentShiftTransfer.count({
-          where: { tenantId: user.tid, status: 'pending', toShiftId: shift.id },
-        }),
-        this.prisma.semesterRegistration.count({
-          where: {
-            tenantId: user.tid,
-            shiftId: shift.id,
-            status: { in: ['submitted', 'pending_approval'] },
-          },
-        }),
-      ]);
+    const shiftIds = shifts.map((s) => s.id);
+    const tenantId = user.tid;
 
-      results.push({
-        shiftId: shift.id,
-        code: shift.code,
-        name: shift.name,
-        startTime: formatShiftTime(shift.startTime),
-        endTime: formatShiftTime(shift.endTime),
-        students,
-        activeSections: sections,
-        facultyAssignments,
-        timetableEntries,
-        pendingApprovals: pendingTransfers + pendingRegistrations,
-      });
-    }
-    return results;
+    const [
+      students,
+      sections,
+      facultyAssignments,
+      timetableEntries,
+      pendingTransfers,
+      pendingRegistrations,
+    ] = await Promise.all([
+      this.prisma.student.groupBy({
+        by: ['primaryShiftId'],
+        where: {
+          tenantId,
+          primaryShiftId: { in: shiftIds },
+          deletedAt: null,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.offeringSection.groupBy({
+        by: ['shiftId'],
+        where: {
+          tenantId,
+          shiftId: { in: shiftIds },
+          deletedAt: null,
+          status: 'active',
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.staffShiftAssignment.groupBy({
+        by: ['shiftId'],
+        where: { tenantId, shiftId: { in: shiftIds }, active: true },
+        _count: { _all: true },
+      }),
+      this.prisma.timetablePlanEntry.groupBy({
+        by: ['shiftId'],
+        where: {
+          tenantId,
+          shiftId: { in: shiftIds },
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.studentShiftTransfer.groupBy({
+        by: ['toShiftId'],
+        where: {
+          tenantId,
+          status: 'pending',
+          toShiftId: { in: shiftIds },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.semesterRegistration.groupBy({
+        by: ['shiftId'],
+        where: {
+          tenantId,
+          shiftId: { in: shiftIds },
+          status: { in: ['submitted', 'pending_approval'] },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const countMap = (
+      rows: Array<
+        { [k: string]: string | null } & { _count: { _all: number } }
+      >,
+      key: string,
+    ) => new Map(rows.map((r) => [String(r[key] ?? ''), r._count._all]));
+
+    const studentMap = countMap(students as any, 'primaryShiftId');
+    const sectionMap = countMap(sections as any, 'shiftId');
+    const facultyMap = countMap(facultyAssignments as any, 'shiftId');
+    const timetableMap = countMap(timetableEntries as any, 'shiftId');
+    const transferMap = countMap(pendingTransfers as any, 'toShiftId');
+    const regMap = countMap(pendingRegistrations as any, 'shiftId');
+
+    return shifts.map((shift) => ({
+      shiftId: shift.id,
+      code: shift.code,
+      name: shift.name,
+      startTime: formatShiftTime(shift.startTime),
+      endTime: formatShiftTime(shift.endTime),
+      students: studentMap.get(shift.id) ?? 0,
+      activeSections: sectionMap.get(shift.id) ?? 0,
+      facultyAssignments: facultyMap.get(shift.id) ?? 0,
+      timetableEntries: timetableMap.get(shift.id) ?? 0,
+      pendingApprovals:
+        (transferMap.get(shift.id) ?? 0) + (regMap.get(shift.id) ?? 0),
+    }));
   }
 }

@@ -72,17 +72,21 @@ export class MfaController {
 
   @ApiBearerAuth()
   @Post('email-otp/send')
-  @Throttle({ default: { limit: 3, ttl: 900_000 } })
+  @Throttle({ default: { limit: 6, ttl: 900_000 } })
   sendEmailOtp(@CurrentUser() user: JwtUser) {
     return this.mfa.sendEmailOtp(user.sub, user.email);
   }
 
   @Public()
   @Post('verify-login')
-  @Throttle({ default: { limit: 3, ttl: 900_000 } })
+  @Throttle({ default: { limit: 15, ttl: 900_000 } })
   async verifyLogin(@Body() dto: MfaLoginDto) {
     const pending = await this.mfa.resolvePendingLogin(dto.mfaToken);
-    if (!pending) throw new BadRequestException('MFA session expired');
+    if (!pending) {
+      throw new BadRequestException(
+        'Your verification session expired. Please sign in again to get a new code.',
+      );
+    }
 
     const method = dto.method ?? 'totp';
     let ok = false;
@@ -93,7 +97,11 @@ export class MfaController {
     } else {
       ok = await this.mfa.verifyTotp(pending.userId, dto.code);
     }
-    if (!ok) throw new BadRequestException('Invalid MFA code');
+    if (!ok) {
+      throw new BadRequestException(
+        'That verification code is incorrect. Check the app or email and try again.',
+      );
+    }
 
     await this.mfa.clearPendingLogin(dto.mfaToken);
     return this.auth.completeMfaLogin(

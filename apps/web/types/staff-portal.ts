@@ -87,6 +87,9 @@ export type StaffTimetableSlot = {
   classroom: string | null;
   offeringSectionId: string | null;
   status: string;
+  shiftId?: string | null;
+  shiftCode?: string | null;
+  shiftName?: string | null;
 };
 
 export type StaffSubjectCard = {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { resolveHomePath } from '@/lib/permissions/portal-access';
+import { getWebDeviceFingerprint } from '@/lib/device-fingerprint';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import type { ApiStartupRetryOptions } from '@/lib/http/wait-for-api';
 import { fetchLoginChallenge, fetchLoginContext, login } from '@/services/auth';
@@ -161,12 +162,14 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
       }
       try {
         const trimmed = values.identifier.trim();
+        const fingerprint = getWebDeviceFingerprint();
         const session = await login({
           ...(trimmed.includes('@') ? { email: trimmed.toLowerCase() } : { identifier: trimmed }),
           password: values.password,
           challengeToken: challenge.token,
           challengeAnswer: challengeAnswerNum,
           rememberMe: values.rememberMe,
+          ...fingerprint,
         });
         setSession(session);
         setPrefs({ rememberMe: values.rememberMe });
@@ -205,21 +208,37 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
             lower.includes('challenge') ||
             lower.includes('equation'))
         ) {
-          setVerificationError('Invalid equation value. Please solve the equation correctly.');
+          setVerificationError(
+            'The security equation answer was incorrect. A new equation is shown below — solve it and try again. This does not lock your account.',
+          );
           resetField('challengeAnswer');
           void loadChallenge();
           return;
         }
         if (status === 429) {
-          setError(text);
+          setError(
+            /throttler/i.test(text)
+              ? 'Too many sign-in attempts. Please wait a few minutes and try again.'
+              : text,
+          );
+          void loadChallenge();
+          return;
+        }
+        if (status === 403) {
+          setError(text || 'Access denied for this device. Contact your college administrator.');
+          void loadChallenge();
           return;
         }
         if (status === 401) {
+          const isGeneric = !text || text === 'Invalid credentials' || /^unauthorized$/i.test(text);
           setError(
-            isDemoLoginWorkspaceEnabled()
-              ? 'Invalid credentials. Use demo credentials below or contact your administrator.'
-              : 'Invalid credentials. Contact your college administrator if you need access.',
+            isGeneric
+              ? isDemoLoginWorkspaceEnabled()
+                ? 'Incorrect username or password. Use the demo credentials below, or contact your administrator.'
+                : 'Incorrect username or password. Check your details, use Forgot password, or contact your college administrator.'
+              : text,
           );
+          void loadChallenge();
           return;
         }
         setError(text);

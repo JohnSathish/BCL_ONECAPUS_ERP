@@ -38,4 +38,65 @@ export class LoginDto {
   @IsOptional()
   @IsBoolean()
   rememberMe?: boolean;
+
+  /** Stable browser fingerprint UUID from localStorage */
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @IsOptional()
+  @IsString()
+  clientType?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceModel?: string;
+
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
+
+  @IsOptional()
+  @IsString()
+  osVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  appVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  screenResolution?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  timeZone?: string;
+
+  @IsOptional()
+  @IsString()
+  browserName?: string;
+
+  @IsOptional()
+  @IsString()
+  browserVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
 }

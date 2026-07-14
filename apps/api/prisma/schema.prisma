@@ -51,6 +51,8 @@ model Tenant {
   mobileDevices                 MobileDevice[]
   mobileAppEvents               MobileAppEvent[]
   mobileAppDailyStats           MobileAppDailyStats[]
+  accessDevices                 AccessDevice[]
+  ipGeoCaches                   IpGeoCache[]
   backupSchedules               BackupSchedule[]
   backupRuns                    BackupRun[]
 
@@ -84,9 +86,30 @@ model TenantLicense {
   notificationLogs  LicenseNotificationLog[]
   auditLogs         LicenseAuditLog[]
   activationKeys    LicenseActivationKey[]
+  moduleEntitlements TenantModuleEntitlement[]
 
   @@index([expiryDate])
   @@map("tenant_licenses")
+  @@schema("platform")
+}
+
+model TenantModuleEntitlement {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  moduleKey   String    @map("module_key")
+  enabled     Boolean   @default(true)
+  limits      Json      @default("{}")
+  enabledAt   DateTime? @map("enabled_at")
+  disabledAt  DateTime? @map("disabled_at")
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  license TenantLicense @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, moduleKey])
+  @@index([tenantId])
+  @@map("tenant_module_entitlements")
   @@schema("platform")
 }
 
@@ -349,6 +372,7 @@ model User {
   authQrChallenges               AuthQrChallenge[]
   authLoginEvents                AuthLoginEvent[]
   mobileDevices                  MobileDevice[]
+  accessDevices                  AccessDevice[]
   passwordHistory                PasswordHistory[]
   passwordResetTokens            PasswordResetToken[]
   mfaSecret                      UserMfaSecret?
@@ -661,8 +685,9 @@ model MobileDevice {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessDevices  AccessDevice[]
 
   @@unique([tenantId, deviceId])
   @@index([tenantId, userId])
@@ -1026,12 +1051,92 @@ model TenantSecuritySettings {
   requireNumber          Boolean  @default(true) @map("require_number")
   requireSpecial         Boolean  @default(true) @map("require_special")
   maxConcurrentSessions  Int?     @map("max_concurrent_sessions")
+  /// Device & Login Management policies
+  alertOnNewDevice       Boolean  @default(true) @map("alert_on_new_device")
+  alertOnNewCountry      Boolean  @default(true) @map("alert_on_new_country")
+  maxFailedBeforeFlag    Int      @default(5) @map("max_failed_before_flag")
+  blockOnExcessiveFails  Boolean  @default(false) @map("block_on_excessive_fails")
+  notifyEmailOnSecurity  Boolean  @default(true) @map("notify_email_on_security")
+  notifyPushOnSecurity   Boolean  @default(true) @map("notify_push_on_security")
+  allowRememberMe        Boolean  @default(true) @map("allow_remember_me")
+  geoLookupEnabled       Boolean  @default(true) @map("geo_lookup_enabled")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_security_settings")
+  @@schema("platform")
+}
+
+/// Unified web + mobile access device registry (operational metadata only; no GPS/PII blobs).
+model AccessDevice {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  deviceFingerprint String    @map("device_fingerprint")
+  clientType        String    @default("WEB") @map("client_type")
+  deviceType        String?   @map("device_type")
+  deviceName        String?   @map("device_name")
+  manufacturer      String?
+  brand             String?
+  model             String?
+  platform          String?
+  osVersion         String?   @map("os_version")
+  appVersion        String?   @map("app_version")
+  browserName       String?   @map("browser_name")
+  browserVersion    String?   @map("browser_version")
+  screenResolution  String?   @map("screen_resolution")
+  language          String?
+  timeZone          String?   @map("time_zone")
+  lastIp            String?   @map("last_ip")
+  lastIpMasked      String?   @map("last_ip_masked")
+  lastCity          String?   @map("last_city")
+  lastRegion        String?   @map("last_region")
+  lastCountry       String?   @map("last_country")
+  lastIsp           String?   @map("last_isp")
+  status            String    @default("ACTIVE")
+  firstSeenAt       DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at")
+  loginCount        Int       @default(0) @map("login_count")
+  blockedAt         DateTime? @map("blocked_at")
+  blockedById       String?   @map("blocked_by_id") @db.Uuid
+  blockReason       String?   @map("block_reason")
+  mobileDeviceId    String?   @map("mobile_device_id") @db.Uuid
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mobileDevice MobileDevice? @relation(fields: [mobileDeviceId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, userId, deviceFingerprint])
+  @@index([tenantId, status])
+  @@index([tenantId, userId])
+  @@index([tenantId, lastSeenAt])
+  @@map("access_devices")
+  @@schema("platform")
+}
+
+/// Cached approximate GeoIP lookups (city/region/country/ISP only).
+model IpGeoCache {
+  id         String   @id @default(uuid()) @db.Uuid
+  ipHash     String   @unique @map("ip_hash")
+  city       String?
+  region     String?
+  country    String?
+  isp        String?
+  raw        Json     @default("{}")
+  lookedUpAt DateTime @default(now()) @map("looked_up_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenantId String? @map("tenant_id") @db.Uuid
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([lookedUpAt])
+  @@map("ip_geo_cache")
   @@schema("platform")
 }
 
@@ -12511,4 +12616,416 @@ model ShortTermCertificateLink {
   @@index([tenantId, certificateIssueId])
   @@map("short_term_certificate_links")
   @@schema("academic")
+}
+
+// ─── Enterprise platform: workflow ─────────────────────────────────────────
+
+model WorkflowDefinition {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  description String   @default("")
+  entityType  String   @map("entity_type")
+  isActive    Boolean  @default(true) @map("is_active")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  steps     WorkflowStep[]
+  instances WorkflowInstance[]
+
+  @@unique([tenantId, code])
+  @@map("workflow_definitions")
+  @@schema("platform")
+}
+
+model WorkflowStep {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  definitionId       String   @map("definition_id") @db.Uuid
+  stepOrder          Int      @map("step_order")
+  name               String
+  assigneeRole       String?  @map("assignee_role")
+  assigneePermission String?  @map("assignee_permission")
+  slaHours           Int?     @map("sla_hours")
+  isParallel         Boolean  @default(false) @map("is_parallel")
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  actions    WorkflowAction[]
+
+  @@unique([definitionId, stepOrder])
+  @@map("workflow_steps")
+  @@schema("platform")
+}
+
+model WorkflowInstance {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  definitionId     String    @map("definition_id") @db.Uuid
+  entityType       String    @map("entity_type")
+  entityId         String    @map("entity_id") @db.Uuid
+  status           String    @default("PENDING")
+  currentStepOrder Int       @default(1) @map("current_step_order")
+  startedById      String?   @map("started_by_id") @db.Uuid
+  completedAt      DateTime? @map("completed_at")
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id])
+  actions    WorkflowAction[]
+  audits     WorkflowAuditLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, entityType, entityId])
+  @@map("workflow_instances")
+  @@schema("platform")
+}
+
+model WorkflowAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  instanceId String   @map("instance_id") @db.Uuid
+  stepId     String?  @map("step_id") @db.Uuid
+  action     String
+  note       String?
+  actorId    String?  @map("actor_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step     WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
+  @@map("workflow_actions")
+  @@schema("platform")
+}
+
+model WorkflowAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  instanceId String   @map("instance_id") @db.Uuid
+  event      String
+  payload    Json     @default("{}")
+  actorId    String?  @map("actor_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_audit_logs")
+  @@schema("platform")
+}
+
+model SupportTicket {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  ticketNo        String    @map("ticket_no")
+  category        String    @default("GENERAL")
+  subject         String
+  description     String    @default("") @db.Text
+  status          String    @default("OPEN")
+  priority        String    @default("MEDIUM")
+  requesterUserId String?   @map("requester_user_id") @db.Uuid
+  requesterType   String    @default("STAFF") @map("requester_type")
+  assigneeUserId  String?   @map("assignee_user_id") @db.Uuid
+  slaDueAt        DateTime? @map("sla_due_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  closedAt        DateTime? @map("closed_at")
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  comments SupportTicketComment[]
+
+  @@unique([tenantId, ticketNo])
+  @@index([tenantId, status])
+  @@map("support_tickets")
+  @@schema("platform")
+}
+
+model SupportTicketComment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  authorUserId String?  @map("author_user_id") @db.Uuid
+  body         String   @db.Text
+  isInternal   Boolean  @default(false) @map("is_internal")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("support_ticket_comments")
+  @@schema("platform")
+}
+
+model ParentStudentLink {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  parentUserId String   @map("parent_user_id") @db.Uuid
+  studentId    String   @map("student_id") @db.Uuid
+  relationship String   @default("GUARDIAN")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, parentUserId, studentId])
+  @@index([tenantId, parentUserId])
+  @@map("parent_student_links")
+  @@schema("academic")
+}
+
+model PlacementRecruiter {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  industry     String?
+  website      String?
+  status       String   @default("ACTIVE")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  drives PlacementDrive[]
+
+  @@map("placement_recruiters")
+  @@schema("academic")
+}
+
+model PlacementDrive {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  recruiterId String    @map("recruiter_id") @db.Uuid
+  title       String
+  driveDate   DateTime? @map("drive_date") @db.Date
+  jobRole     String?   @map("job_role")
+  packageLpa  Decimal?  @map("package_lpa") @db.Decimal(10, 2)
+  eligibility Json      @default("{}")
+  status      String    @default("DRAFT")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  recruiter    PlacementRecruiter      @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  applications PlacementApplication[]
+
+  @@map("placement_drives")
+  @@schema("academic")
+}
+
+model PlacementApplication {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  driveId        String   @map("drive_id") @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  status         String   @default("APPLIED")
+  offerPackageLpa Decimal? @map("offer_package_lpa") @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  drive PlacementDrive @relation(fields: [driveId], references: [id], onDelete: Cascade)
+
+  @@unique([driveId, studentId])
+  @@map("placement_applications")
+  @@schema("academic")
+}
+
+model InternshipCompany {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  address      String?
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  placements InternshipPlacement[]
+
+  @@map("internship_companies")
+  @@schema("academic")
+}
+
+model InternshipPlacement {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  companyId          String    @map("company_id") @db.Uuid
+  studentId          String    @map("student_id") @db.Uuid
+  mentorStaffId      String?   @map("mentor_staff_id") @db.Uuid
+  title              String
+  startDate          DateTime? @map("start_date") @db.Date
+  endDate            DateTime? @map("end_date") @db.Date
+  status             String    @default("ONGOING")
+  evaluationScore    Decimal?  @map("evaluation_score") @db.Decimal(5, 2)
+  evaluationNotes    String?   @map("evaluation_notes")
+  certificateIssueId String?   @map("certificate_issue_id") @db.Uuid
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  company InternshipCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("internship_placements")
+  @@schema("academic")
+}
+
+model AlumniProfile {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  studentId        String?  @map("student_id") @db.Uuid
+  userId           String?  @map("user_id") @db.Uuid
+  fullName         String   @map("full_name")
+  graduationYear   Int?     @map("graduation_year")
+  programme        String?
+  email            String?
+  phone            String?
+  currentOrg       String?  @map("current_org")
+  currentRole      String?  @map("current_role")
+  mentorshipOptIn  Boolean  @default(false) @map("mentorship_opt_in")
+  status           String   @default("ACTIVE")
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, studentId])
+  @@map("alumni_profiles")
+  @@schema("academic")
+}
+
+model HostelBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  gender    String?
+  capacity  Int      @default(0)
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  rooms HostelRoom[]
+
+  @@unique([tenantId, code])
+  @@map("hostel_blocks")
+  @@schema("academic")
+}
+
+model HostelRoom {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  blockId   String   @map("block_id") @db.Uuid
+  roomNo    String   @map("room_no")
+  capacity  Int      @default(2)
+  status    String   @default("AVAILABLE")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  block      HostelBlock       @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  allotments HostelAllotment[]
+
+  @@unique([blockId, roomNo])
+  @@map("hostel_rooms")
+  @@schema("academic")
+}
+
+model HostelAllotment {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  roomId     String    @map("room_id") @db.Uuid
+  studentId  String    @map("student_id") @db.Uuid
+  status     String    @default("ACTIVE")
+  allottedAt DateTime  @default(now()) @map("allotted_at")
+  vacatedAt  DateTime? @map("vacated_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  room HostelRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@map("hostel_allotments")
+  @@schema("academic")
+}
+
+model VisitorVisit {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  visitorName   String    @map("visitor_name")
+  phone         String?
+  photoUrl      String?   @map("photo_url")
+  vehicleNumber String?   @map("vehicle_number")
+  hostUserId    String?   @map("host_user_id") @db.Uuid
+  hostName      String?   @map("host_name")
+  purpose       String?
+  passCode      String?   @map("pass_code")
+  qrToken       String?   @map("qr_token")
+  status        String    @default("CHECKED_IN")
+  checkedInAt   DateTime  @default(now()) @map("checked_in_at")
+  checkedOutAt  DateTime? @map("checked_out_at")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, status])
+  @@map("visitor_visits")
+  @@schema("access")
+}
+
+model InventoryAssetService {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  inventoryItemId String?   @map("inventory_item_id") @db.Uuid
+  assetTag        String?   @map("asset_tag")
+  serviceType     String    @default("AMC") @map("service_type")
+  vendorName      String?   @map("vendor_name")
+  serviceDate     DateTime? @map("service_date") @db.Date
+  warrantyUntil   DateTime? @map("warranty_until") @db.Date
+  amcUntil        DateTime? @map("amc_until") @db.Date
+  cost            Decimal?  @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@map("inventory_asset_services")
+  @@schema("finance")
+}
+
+model ResearchGrant {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tenantId               String    @map("tenant_id") @db.Uuid
+  title                  String
+  principalInvestigatorId String?  @map("principal_investigator_id") @db.Uuid
+  fundingAgency          String?   @map("funding_agency")
+  amount                 Decimal?  @db.Decimal(14, 2)
+  startDate              DateTime? @map("start_date") @db.Date
+  endDate                DateTime? @map("end_date") @db.Date
+  status                 String    @default("ACTIVE")
+  metadata               Json      @default("{}")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("research_grants")
+  @@schema("academic")
+}
+
+model IntegrationConnector {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  provider     String
+  displayName  String    @map("display_name")
+  enabled      Boolean   @default(false)
+  config       Json      @default("{}")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, provider])
+  @@map("integration_connectors")
+  @@schema("platform")
 }

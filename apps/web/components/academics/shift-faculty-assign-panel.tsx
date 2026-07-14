@@ -12,6 +12,7 @@ import {
   searchFacultyShiftCandidates,
   type FacultyShiftCandidate,
 } from '@/services/faculty-shifts';
+import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-badges';
 import { cn } from '@/utils/cn';
 
 type Props = {
@@ -137,6 +138,11 @@ export function ShiftFacultyAssignPanel({ shiftId }: Props) {
                         {candidate.shortCode ?? candidate.employeeCode} ·{' '}
                         {candidate.department?.name ?? 'No department'} · {candidate.staffType}
                       </span>
+                      <ShiftAssignmentBadges
+                        className="mt-1.5"
+                        shifts={candidate.assignedShifts}
+                        currentShiftId={shiftId}
+                      />
                     </span>
                     {selected?.id === candidate.id ? (
                       <span className="text-xs font-medium text-primary">Selected</span>

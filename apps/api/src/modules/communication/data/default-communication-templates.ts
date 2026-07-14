@@ -1034,6 +1034,79 @@ ${emailCtaButton('Download Certificate')}`,
     ],
     channels: ['EMAIL', 'IN_APP', 'PUSH'],
   },
+  {
+    code: 'SECURITY_NEW_DEVICE',
+    name: 'New Device Login Alert',
+    category: 'ADMIN',
+    subject: 'New device signed in — {{institution_name}}',
+    bodyHtml: `${emailGreeting('{{user_name}}')}
+<p style="margin:0 0 12px;color:#334155;">A new device was used to sign in to your account.</p>
+${emailInfoRows([
+  { label: 'Device', value: '{{device_name}}' },
+  { label: 'Approximate location', value: '{{location}}' },
+  { label: 'Time', value: '{{login_at}}' },
+])}
+${emailCtaButton('Review devices')}`,
+    bodyText:
+      'New device {{device_name}} signed in at {{login_at}} ({{location}}).',
+    variables: [
+      'user_name',
+      'device_name',
+      'location',
+      'login_at',
+      'institution_name',
+      'login_url',
+    ],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
+    code: 'SECURITY_DEVICE_BLOCKED',
+    name: 'Device Blocked',
+    category: 'ADMIN',
+    subject: 'A device was blocked — {{institution_name}}',
+    bodyHtml: `${emailGreeting('{{user_name}}')}
+<p style="margin:0 0 12px;color:#b91c1c;">An administrator blocked one of your devices.</p>
+${emailInfoRows([
+  { label: 'Device', value: '{{device_name}}' },
+  { label: 'Reason', value: '{{reason}}' },
+])}
+${emailCtaButton('Contact support')}`,
+    bodyText: 'Device {{device_name}} was blocked. Reason: {{reason}}.',
+    variables: [
+      'user_name',
+      'device_name',
+      'reason',
+      'institution_name',
+      'login_url',
+    ],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
+    code: 'SECURITY_FORCE_LOGOUT',
+    name: 'Forced Logout',
+    category: 'ADMIN',
+    subject: 'You were signed out — {{institution_name}}',
+    bodyHtml: `${emailGreeting('{{user_name}}')}
+<p style="margin:0 0 12px;color:#334155;">Your session was ended by an administrator for security.</p>
+${emailInfoRows([{ label: 'Time', value: '{{logged_out_at}}' }])}
+${emailCtaButton('Sign in again')}`,
+    bodyText: 'Your session was force-logged out at {{logged_out_at}}.',
+    variables: ['user_name', 'logged_out_at', 'institution_name', 'login_url'],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
+    code: 'SECURITY_PASSWORD_CHANGED',
+    name: 'Password Changed',
+    category: 'ADMIN',
+    subject: 'Password changed — {{institution_name}}',
+    bodyHtml: `${emailGreeting('{{user_name}}')}
+<p style="margin:0 0 12px;color:#334155;">Your account password was changed successfully.</p>
+${emailInfoRows([{ label: 'Time', value: '{{changed_at}}' }])}
+${emailCtaButton('Go to portal')}`,
+    bodyText: 'Your password was changed at {{changed_at}}.',
+    variables: ['user_name', 'changed_at', 'institution_name', 'login_url'],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
 ];
 
 export function findDefaultTemplateByCode(code: string) {

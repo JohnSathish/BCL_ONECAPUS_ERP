@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { LicenseActivationKeyForm } from '@/components/licensing/license-activation-key-form';
+import { ModuleEntitlementsPanel } from '@/components/licensing/module-entitlements-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchLicenseDetails, type LicenseStatus } from '@/services/licensing';
 import { cn } from '@/utils/cn';
@@ -66,6 +67,8 @@ export function LicenseDetailsPage() {
       </div>
 
       <LicenseActivationKeyForm />
+
+      <ModuleEntitlementsPanel />
 
       {!hasLicense ? (
         <Card>

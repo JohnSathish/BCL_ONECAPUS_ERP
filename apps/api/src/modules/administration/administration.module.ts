@@ -3,6 +3,8 @@ import { ImportModule } from '../../common/import/import.module';
 import { AuthModule } from '../auth/auth.module';
 import { StaffModule } from '../staff/staff.module';
 import { AdminAuditHelper } from './admin-audit.helper';
+import { DeviceSecurityModule } from './device-security.module';
+import { DeviceSecurityController } from './controllers/device-security.controller';
 import { RollNumberSettingsController } from './controllers/roll-number-settings.controller';
 import { StudentDisplaySettingsController } from './controllers/student-display-settings.controller';
 import { AuditController } from './controllers/audit.controller';
@@ -13,6 +15,7 @@ import { ImportCenterController } from './import/import-center.controller';
 import { ImportCenterService } from './import/import-center.service';
 import { PortalUsersImportHandler } from './import/portal-users-import.handler';
 import { AuditService } from './services/audit.service';
+import { DeviceSecurityService } from './services/device-security.service';
 import { RbacService } from './services/rbac.service';
 import { RollNumberSettingsService } from './services/roll-number-settings.service';
 import { StudentDisplaySettingsService } from './services/student-display-settings.service';
@@ -23,12 +26,18 @@ import { UsernameGenerationService } from './services/username-generation.servic
 import { UsersService } from './services/users.service';
 
 @Module({
-  imports: [AuthModule, ImportModule, forwardRef(() => StaffModule)],
+  imports: [
+    DeviceSecurityModule,
+    AuthModule,
+    ImportModule,
+    forwardRef(() => StaffModule),
+  ],
   controllers: [
     UsersController,
     RbacController,
     AuditController,
     SecurityController,
+    DeviceSecurityController,
     RollNumberSettingsController,
     StudentDisplaySettingsController,
     ImportCenterController,
@@ -44,6 +53,7 @@ import { UsersService } from './services/users.service';
     AuditService,
     SecurityService,
     SecurityCenterService,
+    DeviceSecurityService,
     PortalUsersImportHandler,
     ImportCenterService,
   ],
@@ -53,6 +63,7 @@ import { UsersService } from './services/users.service';
     RollNumberSettingsService,
     StudentDisplaySettingsService,
     AdminAuditHelper,
+    DeviceSecurityModule,
   ],
 })
 export class AdministrationModule {}

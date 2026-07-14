@@ -45,13 +45,27 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         ? (exception.getResponse() as Record<string, unknown>)
         : undefined;
 
-    const detail =
+    const rawDetail =
       prismaHint ??
       (typeof body?.message === 'string'
         ? body.message
         : Array.isArray(body?.message)
           ? (body.message as string[]).join(', ')
           : message);
+
+    const detail =
+      status === HttpStatus.TOO_MANY_REQUESTS &&
+      /throttler/i.test(String(rawDetail))
+        ? 'Too many sign-in attempts. Please wait a few minutes and try again.'
+        : rawDetail;
+
+    const retryAfterSeconds =
+      body &&
+      typeof body === 'object' &&
+      !Array.isArray(body) &&
+      typeof body.retryAfterSeconds === 'number'
+        ? body.retryAfterSeconds
+        : undefined;
 
     const fieldErrors =
       body &&
@@ -97,6 +111,7 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
           status,
           path: request.url,
           method: request.method,
+          ...(retryAfterSeconds != null ? { retryAfterSeconds } : {}),
           ...(fieldErrors ? { fieldErrors } : {}),
           ...(issues ? { issues } : {}),
         },
@@ -107,6 +122,7 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         status,
         detail,
         instance: request.url,
+        ...(retryAfterSeconds != null ? { retryAfterSeconds } : {}),
         ...(fieldErrors ? { fieldErrors } : {}),
         ...(issues ? { issues } : {}),
       });

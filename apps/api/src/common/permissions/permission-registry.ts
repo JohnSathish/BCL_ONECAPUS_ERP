@@ -169,6 +169,22 @@ export const MODULE_PERMISSIONS = {
     'accommodation:manage',
     'accommodation:reports',
   ],
+  workflow: ['workflow:read', 'workflow:manage'],
+  helpdesk: ['helpdesk:read', 'helpdesk:manage'],
+  parentPortal: [
+    'parent-portal:read',
+    'parent-portal:manage',
+    'parent:portal:self',
+  ],
+  visitorManagement: ['visitor-management:read', 'visitor-management:manage'],
+  placement: ['placement:read', 'placement:manage'],
+  internship: ['internship:read', 'internship:manage'],
+  alumni: ['alumni:read', 'alumni:manage'],
+  hostel: ['hostel:read', 'hostel:manage'],
+  research: ['research:read', 'research:manage'],
+  integrations: ['integrations:read', 'integrations:manage'],
+  assetLifecycle: ['inventory:read', 'inventory:manage'],
+  dms: ['official-documents:read', 'official-documents:manage'],
 } as const;
 
 export type ErpModuleId = keyof typeof MODULE_PERMISSIONS;
@@ -373,6 +389,78 @@ export const ERP_MODULES: ErpModule[] = [
     permissions: MODULE_PERMISSIONS.shifts,
     defaultHome: '/admin/shifts',
   },
+  {
+    id: 'workflow',
+    label: 'Workflow',
+    permissions: MODULE_PERMISSIONS.workflow,
+    defaultHome: '/admin/workflow',
+  },
+  {
+    id: 'helpdesk',
+    label: 'Helpdesk',
+    permissions: MODULE_PERMISSIONS.helpdesk,
+    defaultHome: '/admin/helpdesk',
+  },
+  {
+    id: 'parentPortal',
+    label: 'Parent Portal',
+    permissions: MODULE_PERMISSIONS.parentPortal,
+    defaultHome: '/admin/parent-portal',
+  },
+  {
+    id: 'visitorManagement',
+    label: 'Visitor Management',
+    permissions: MODULE_PERMISSIONS.visitorManagement,
+    defaultHome: '/admin/visitor-management',
+  },
+  {
+    id: 'placement',
+    label: 'Placement',
+    permissions: MODULE_PERMISSIONS.placement,
+    defaultHome: '/admin/placement',
+  },
+  {
+    id: 'internship',
+    label: 'Internship',
+    permissions: MODULE_PERMISSIONS.internship,
+    defaultHome: '/admin/internship',
+  },
+  {
+    id: 'alumni',
+    label: 'Alumni',
+    permissions: MODULE_PERMISSIONS.alumni,
+    defaultHome: '/admin/alumni',
+  },
+  {
+    id: 'hostel',
+    label: 'Hostel',
+    permissions: MODULE_PERMISSIONS.hostel,
+    defaultHome: '/admin/hostel',
+  },
+  {
+    id: 'research',
+    label: 'Research',
+    permissions: MODULE_PERMISSIONS.research,
+    defaultHome: '/admin/research',
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    permissions: MODULE_PERMISSIONS.integrations,
+    defaultHome: '/admin/integrations',
+  },
+  {
+    id: 'assetLifecycle',
+    label: 'Asset Lifecycle',
+    permissions: MODULE_PERMISSIONS.assetLifecycle,
+    defaultHome: '/admin/inventory',
+  },
+  {
+    id: 'dms',
+    label: 'Document Management',
+    permissions: MODULE_PERMISSIONS.dms,
+    defaultHome: '/admin/administration/official-documents',
+  },
 ];
 
 /** Flat list of all permissions that grant /admin portal access. */
@@ -448,6 +536,46 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   {
     prefix: '/admin/inventory',
     permissions: [...MODULE_PERMISSIONS.inventory],
+  },
+  {
+    prefix: '/admin/workflow',
+    permissions: [...MODULE_PERMISSIONS.workflow],
+  },
+  {
+    prefix: '/admin/helpdesk',
+    permissions: [...MODULE_PERMISSIONS.helpdesk],
+  },
+  {
+    prefix: '/admin/parent-portal',
+    permissions: [...MODULE_PERMISSIONS.parentPortal],
+  },
+  {
+    prefix: '/admin/visitor-management',
+    permissions: [...MODULE_PERMISSIONS.visitorManagement],
+  },
+  {
+    prefix: '/admin/placement',
+    permissions: [...MODULE_PERMISSIONS.placement],
+  },
+  {
+    prefix: '/admin/internship',
+    permissions: [...MODULE_PERMISSIONS.internship],
+  },
+  {
+    prefix: '/admin/alumni',
+    permissions: [...MODULE_PERMISSIONS.alumni],
+  },
+  {
+    prefix: '/admin/hostel',
+    permissions: [...MODULE_PERMISSIONS.hostel],
+  },
+  {
+    prefix: '/admin/research',
+    permissions: [...MODULE_PERMISSIONS.research],
+  },
+  {
+    prefix: '/admin/integrations',
+    permissions: [...MODULE_PERMISSIONS.integrations],
   },
   {
     prefix: '/admin/communication',
