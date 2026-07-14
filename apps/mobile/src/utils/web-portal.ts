@@ -43,14 +43,19 @@ export async function openWebPortal(
 
   try {
     if (ephemeral) {
-      await WebBrowser.openBrowserAsync(url, {
+      // preferEphemeralSession is an ASWebAuthenticationSession (iOS) hint and is
+      // not part of WebBrowserOpenOptions' type, so widen the type to keep it.
+      const browserOptions: WebBrowser.WebBrowserOpenOptions & {
+        preferEphemeralSession?: boolean;
+      } = {
         preferEphemeralSession: true,
         showTitle: true,
         enableBarCollapsing: true,
         ...(Platform.OS === 'ios'
           ? { dismissButtonStyle: 'close' as const }
           : { showInRecents: false }),
-      });
+      };
+      await WebBrowser.openBrowserAsync(url, browserOptions);
       return;
     }
   } catch {

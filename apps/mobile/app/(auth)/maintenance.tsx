@@ -1,6 +1,6 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { getInstalledAppVersion } from '@/utils/app-version';
+import { getInstalledAppVersion, isVersionBelow } from '@/utils/app-version';
 
 export default function MaintenanceScreen() {
   const { config, retry } = useBootstrap();

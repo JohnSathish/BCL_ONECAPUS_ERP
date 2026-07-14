@@ -6,7 +6,6 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'fade',
-        detachInactiveScreens: true,
       }}
     >
       <Stack.Screen name="splash" />

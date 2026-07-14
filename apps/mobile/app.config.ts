@@ -32,6 +32,15 @@ const hasGoogleServices = Boolean(
     : fs.existsSync(path.join(__dirname, googleServicesFile))),
 );
 
+/**
+ * iOS Firebase config. Drop GoogleService-Info.plist at apps/mobile/ (from the
+ * Firebase iOS app) to enable it. Wired conditionally so Android-only builds and
+ * checkouts without the file never break. NOTE: FCM push tokens on iOS also need
+ * the react-native-firebase messaging SDK (or a direct APNs sender on the API).
+ */
+const googleServiceInfoLocal = './GoogleService-Info.plist';
+const hasGoogleServiceInfo = fs.existsSync(path.join(__dirname, googleServiceInfoLocal));
+
 if (
   (easBuildProfile === 'production' ||
     easBuildProfile === 'preview' ||
@@ -67,6 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
     buildNumber: '1',
+    ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
     infoPlist: {
       // Required so App Store review accepts the biometric (Face ID) unlock flow.
       NSFaceIDUsageDescription: 'Use Face ID to quickly and securely sign in to the campus app.',

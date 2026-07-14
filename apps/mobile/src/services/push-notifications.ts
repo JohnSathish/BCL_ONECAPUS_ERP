@@ -84,6 +84,16 @@ export async function getNativePushToken(): Promise<string | null> {
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
       const raw = deviceToken?.data != null ? String(deviceToken.data).trim() : '';
+      // iOS returns a raw APNs token. The backend delivers via FCM HTTP v1, which
+      // cannot use an APNs token directly. Until Firebase-iOS (FCM tokens on iOS)
+      // or a dedicated APNs sender is wired, skip registration so we never store a
+      // token the sender can't deliver to.
+      if (deviceToken?.type === 'ios') {
+        console.warn(
+          '[push] iOS APNs token received but FCM sender is not configured for iOS yet — skipping push registration',
+        );
+        return null;
+      }
       if (raw && !isExpoPushToken(raw)) {
         return raw;
       }
