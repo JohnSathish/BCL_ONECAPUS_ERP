@@ -120,4 +120,29 @@ export class AcademicSessionService {
     if (!session) throw new NotFoundException('Academic session not found');
     return session;
   }
+
+  /**
+   * Soft-delete an academic year — but refuse while it still owns semesters.
+   * Deleting a year out from under its semesters strands them on a deleted
+   * record (they vanish from the UI and batches resolve to a deleted year),
+   * which is exactly the drift this guard prevents.
+   */
+  async remove(tenantId: string, sessionId: string) {
+    const session = await this.get(tenantId, sessionId);
+
+    const liveSemesters = await this.prisma.semester.count({
+      where: { academicYearId: sessionId, tenantId, deletedAt: null },
+    });
+    if (liveSemesters > 0) {
+      throw new ConflictException(
+        `Cannot delete academic year "${session.name}" while it still has ${liveSemesters} semester(s). ` +
+          'Move or delete those semesters first so they are not orphaned.',
+      );
+    }
+
+    return this.prisma.academicYear.update({
+      where: { id: sessionId },
+      data: { deletedAt: new Date() },
+    });
+  }
 }

@@ -118,64 +118,67 @@ export class SemesterLifecycleService {
     const baseStart = dto.startDate ?? new Date('2026-07-01');
     const baseYearName = dto.baseYearName ?? '2026-27';
 
-    const createdYears: string[] = [];
+    // Concurrent-cohort model: every FYUGP semester (1..N) runs inside ONE
+    // operational academic year — odd semesters (1,3,5) in the Jul–Dec cycle and
+    // even semesters (2,4,6) in the Jan–Jun cycle, taught in parallel to the
+    // different year-groups. resolveCalendarSemester() and activateCycle() assume
+    // exactly one Semester row per number anchored to the current year, so we must
+    // NOT scatter semesters across future academic years — doing so strands senior
+    // cohorts on years they are not actually studying in.
+    const yearStart = new Date(baseStart);
+    const yearEnd = new Date(yearStart);
+    yearEnd.setFullYear(yearEnd.getFullYear() + 1);
+    yearEnd.setDate(yearEnd.getDate() - 1);
+
+    const cycleSplit = new Date(yearStart);
+    cycleSplit.setMonth(cycleSplit.getMonth() + 6);
+
+    const oddStart = new Date(yearStart);
+    const oddEnd = new Date(cycleSplit);
+    oddEnd.setDate(oddEnd.getDate() - 1);
+    const evenStart = new Date(cycleSplit);
+    const evenEnd = new Date(yearEnd);
 
     return this.prisma.$transaction(async (tx) => {
-      for (let yearIdx = 1; yearIdx <= config.operationalYears; yearIdx++) {
-        const yearStart = new Date(baseStart);
-        yearStart.setFullYear(yearStart.getFullYear() + (yearIdx - 1));
-        const yearEnd = new Date(yearStart);
-        yearEnd.setFullYear(yearEnd.getFullYear() + 1);
-        yearEnd.setDate(yearEnd.getDate() - 1);
+      const ay = await tx.academicYear.create({
+        data: {
+          tenantId,
+          institutionId,
+          name: baseYearName,
+          startDate: yearStart,
+          endDate: yearEnd,
+          status: 'ACTIVE',
+          academicYearIndex: 1,
+        },
+      });
 
-        const yearName =
-          yearIdx === 1
-            ? baseYearName
-            : `${yearStart.getFullYear()}-${String(yearEnd.getFullYear()).slice(-2)}`;
+      const definitions = FYUGP_6_SEMESTERS.filter(
+        (s) => s.semesterNumber <= config.maxActiveSemesters,
+      );
 
-        const ay = await tx.academicYear.create({
+      for (const def of definitions) {
+        const isOdd = def.semesterType === 'ODD';
+        await tx.semester.create({
           data: {
             tenantId,
             institutionId,
-            name: yearName,
-            startDate: yearStart,
-            endDate: yearEnd,
-            status: yearIdx === 1 ? 'ACTIVE' : 'UPCOMING',
-            academicYearIndex: yearIdx,
+            academicYearId: ay.id,
+            name: `Semester ${def.semesterNumber}`,
+            // Within-year sequence must be unique per academic year
+            // (@@unique([academicYearId, sequence])); use the program semester
+            // number so all slots are distinct and list in order 1..N.
+            sequence: def.semesterNumber,
+            semesterNumber: def.semesterNumber,
+            semesterType: def.semesterType,
+            progressionOrder: def.progressionOrder,
+            // Program year (1/2/3) the semester belongs to — not the calendar year.
+            academicYearIndex: def.academicYearIndex,
+            isTerminal: def.isTerminal,
+            status: 'PLANNED',
+            startDate: isOdd ? oddStart : evenStart,
+            endDate: isOdd ? oddEnd : evenEnd,
           },
         });
-        createdYears.push(ay.id);
-
-        const semsForYear = FYUGP_6_SEMESTERS.filter(
-          (s) => s.academicYearIndex === yearIdx,
-        );
-
-        for (const def of semsForYear) {
-          const semStart = new Date(yearStart);
-          if (def.sequenceInYear === 2) {
-            semStart.setMonth(semStart.getMonth() + 5);
-          }
-          const semEnd = new Date(semStart);
-          semEnd.setMonth(semEnd.getMonth() + 4);
-
-          await tx.semester.create({
-            data: {
-              tenantId,
-              institutionId,
-              academicYearId: ay.id,
-              name: `Semester ${def.semesterNumber}`,
-              sequence: def.sequenceInYear,
-              semesterNumber: def.semesterNumber,
-              semesterType: def.semesterType,
-              progressionOrder: def.progressionOrder,
-              academicYearIndex: def.academicYearIndex,
-              isTerminal: def.isTerminal,
-              status: 'PLANNED',
-              startDate: semStart,
-              endDate: semEnd,
-            },
-          });
-        }
       }
 
       return this.getStructure(tenantId, institutionId);

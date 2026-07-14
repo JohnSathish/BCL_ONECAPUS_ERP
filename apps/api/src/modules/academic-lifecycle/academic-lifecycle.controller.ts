@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -83,6 +84,15 @@ export class AcademicLifecycleController {
     @Body() dto: UpdateAcademicSessionDto,
   ) {
     return this.service.updateAcademicSession(user.tid, sessionId, dto);
+  }
+
+  @Delete('academic-sessions/:sessionId')
+  @RequirePermissions('academic-lifecycle:manage')
+  deleteAcademicSession(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.service.deleteAcademicSession(user.tid, sessionId);
   }
 
   @Get('institutions/:institutionId/admission-batches')

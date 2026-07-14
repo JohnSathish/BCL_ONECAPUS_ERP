@@ -87,6 +87,10 @@ export class AcademicLifecycleService {
     return this.sessions.update(tenantId, sessionId, dto);
   }
 
+  deleteAcademicSession(tenantId: string, sessionId: string) {
+    return this.sessions.remove(tenantId, sessionId);
+  }
+
   listAdmissionBatches(tenantId: string, institutionId: string) {
     return this.batches.list(tenantId, institutionId);
   }
