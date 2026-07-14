@@ -99,6 +99,7 @@ export class AuthController {
       country: body?.country?.trim() || extractClientCountry(req) || undefined,
       deviceId: body?.deviceId?.trim() || undefined,
       clientType: body?.clientType?.trim() || undefined,
+      deviceType: body?.deviceType?.trim() || undefined,
       deviceLabel: body?.deviceLabel?.trim() || undefined,
       deviceModel: body?.deviceModel?.trim() || undefined,
       manufacturer: body?.manufacturer?.trim() || undefined,

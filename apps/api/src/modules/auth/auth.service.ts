@@ -38,6 +38,7 @@ export type LoginDeviceMeta = {
   userAgent?: string;
   ipAddress?: string;
   clientType?: string;
+  deviceType?: string;
   appType?: string;
   appVersion?: string;
   deviceId?: string;
@@ -420,6 +421,7 @@ export class AuthService {
             userId: user.id,
             deviceId: options.meta?.deviceId,
             clientType,
+            deviceType: options.meta?.deviceType,
             appType: options.meta?.appType,
             appVersion: options.meta?.appVersion,
             deviceLabel: options.meta?.deviceLabel,

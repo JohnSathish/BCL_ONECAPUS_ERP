@@ -66,10 +66,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
+    buildNumber: '1',
+    infoPlist: {
+      // Required so App Store review accepts the biometric (Face ID) unlock flow.
+      NSFaceIDUsageDescription: 'Use Face ID to quickly and securely sign in to the campus app.',
+    },
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 18,
+    versionCode: 19,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',

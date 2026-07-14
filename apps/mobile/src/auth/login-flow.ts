@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import { apiFetch, setAppType } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
+import { getInstalledAppVersion } from '@/utils/app-version';
 import { canAccessMobile, resolveMobileRoute } from '@/auth/role-router';
 import {
   saveAppType,
@@ -45,6 +47,41 @@ export function normalizeLoginIdentifier(raw: string) {
   const value = raw.trim();
   if (value.includes('@')) return value.toLowerCase();
   return value;
+}
+
+/**
+ * Best-effort device details so the web admin's Device & Login panel can show
+ * real model / manufacturer / OS instead of "Unknown". All fields are optional
+ * — a null from expo-device just omits that field.
+ */
+async function collectDeviceMeta() {
+  const platform = Device.osName ?? (Platform.OS === 'ios' ? 'iOS' : 'Android');
+  const osVersion = Device.osVersion ?? String(Platform.Version ?? '') ?? undefined;
+  const model = Device.modelName ?? undefined;
+
+  // Distinguish phones from tablets (e.g. iPad) so the admin panel buckets them
+  // correctly. Failure to resolve just omits the hint (server falls back).
+  let deviceType: 'MOBILE' | 'TABLET' | 'DESKTOP' | undefined;
+  try {
+    const kind = await Device.getDeviceTypeAsync();
+    if (kind === Device.DeviceType.TABLET) deviceType = 'TABLET';
+    else if (kind === Device.DeviceType.PHONE) deviceType = 'MOBILE';
+    else if (kind === Device.DeviceType.DESKTOP) deviceType = 'DESKTOP';
+  } catch {
+    // Ignore — deviceType stays undefined.
+  }
+
+  return {
+    clientType: 'mobile',
+    deviceType,
+    platform,
+    osVersion: osVersion || undefined,
+    deviceModel: model,
+    deviceLabel: model,
+    manufacturer: Device.manufacturer ?? undefined,
+    brand: Device.brand ?? undefined,
+    appVersion: getInstalledAppVersion(),
+  };
 }
 
 /**
@@ -115,6 +152,7 @@ export async function performLogin(input: {
   rememberMe?: boolean;
 }) {
   const identifier = normalizeLoginIdentifier(input.identifier);
+  const deviceMeta = await collectDeviceMeta();
   const session = await apiFetch<LoginResponse>('/v1/auth/login', {
     method: 'POST',
     skipAuth: true,
@@ -124,6 +162,7 @@ export async function performLogin(input: {
       challengeToken: input.challenge.token,
       challengeAnswer: input.challengeAnswer,
       rememberMe: input.rememberMe ?? false,
+      ...deviceMeta,
     }),
   });
 

@@ -48,6 +48,11 @@ export class LoginDto {
   @IsString()
   clientType?: string;
 
+  /** Client-reported form factor hint: MOBILE | TABLET | DESKTOP. */
+  @IsOptional()
+  @IsString()
+  deviceType?: string;
+
   @IsOptional()
   @IsString()
   deviceLabel?: string;

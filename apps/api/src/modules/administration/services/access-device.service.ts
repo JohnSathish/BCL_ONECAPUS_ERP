@@ -12,6 +12,8 @@ export type DeviceCaptureInput = {
   userId: string;
   deviceId?: string | null;
   clientType?: string | null;
+  /** Client-reported form factor: MOBILE | TABLET | DESKTOP | TV. */
+  deviceType?: string | null;
   appType?: string | null;
   appVersion?: string | null;
   deviceLabel?: string | null;
@@ -146,9 +148,42 @@ export class AccessDeviceService {
   async upsertFromLogin(input: DeviceCaptureInput) {
     const uaParsed = this.parseUserAgent(input.userAgent);
     const fingerprint = this.fingerprintFrom(input.deviceId, input.userAgent);
-    const clientType = (
+    const rawClientType = (
       input.clientType || (input.appType ? 'ANDROID' : 'WEB')
     ).toUpperCase();
+    // The mobile app sends clientType "mobile"; treat any app / mobile / native
+    // marker as a mobile device instead of falling back to user-agent parsing
+    // (the RN networking user-agent is not recognized as mobile).
+    const isMobileClient =
+      Boolean(input.appType) ||
+      ['MOBILE', 'ANDROID', 'IOS', 'NATIVE'].includes(rawClientType);
+    const platformHint = (
+      input.platform ??
+      uaParsed.platform ??
+      ''
+    ).toLowerCase();
+    const isIos =
+      rawClientType === 'IOS' ||
+      /ios|iphone|ipad/.test(platformHint) ||
+      (input.appVersion ?? '').toLowerCase().includes('ios');
+    const clientType = isMobileClient
+      ? isIos
+        ? 'IOS'
+        : 'ANDROID'
+      : rawClientType;
+    const resolvedPlatform = isMobileClient
+      ? (input.platform ?? uaParsed.platform ?? (isIos ? 'iOS' : 'Android'))
+      : (input.platform ?? uaParsed.platform);
+    // Prefer an explicit client form-factor hint (e.g. iPad / Android tablet)
+    // so tablets are not lumped in with phones.
+    const deviceTypeHint = (input.deviceType ?? '').trim().toUpperCase();
+    const resolvedDeviceType = ['MOBILE', 'TABLET', 'DESKTOP', 'TV'].includes(
+      deviceTypeHint,
+    )
+      ? deviceTypeHint
+      : isMobileClient
+        ? 'MOBILE'
+        : uaParsed.deviceType;
 
     const geo = await this.geo.lookup(input.ipAddress, {
       enabled: input.geoLookupEnabled !== false,
@@ -159,9 +194,9 @@ export class AccessDeviceService {
       input.deviceLabel ||
       input.deviceModel ||
       [input.brand, input.model].filter(Boolean).join(' ') ||
-      (clientType === 'WEB'
-        ? `${uaParsed.browserName ?? 'Browser'} on ${uaParsed.platform ?? 'Unknown'}`
-        : 'Mobile device');
+      (isMobileClient
+        ? `${isIos ? 'iOS' : 'Android'} device`
+        : `${uaParsed.browserName ?? 'Browser'} on ${uaParsed.platform ?? 'Unknown'}`);
 
     const existing = await this.prisma.accessDevice.findUnique({
       where: {
@@ -183,15 +218,12 @@ export class AccessDeviceService {
     const isNew = !existing;
     const data = {
       clientType,
-      deviceType:
-        input.clientType === 'ANDROID' || clientType === 'ANDROID'
-          ? 'MOBILE'
-          : uaParsed.deviceType,
+      deviceType: resolvedDeviceType,
       deviceName,
       manufacturer: input.manufacturer ?? null,
       brand: input.brand ?? null,
       model: input.model ?? input.deviceModel ?? null,
-      platform: input.platform ?? uaParsed.platform,
+      platform: resolvedPlatform,
       osVersion: input.osVersion ?? uaParsed.osVersion,
       appVersion: input.appVersion ?? null,
       browserName: input.browserName ?? uaParsed.browserName,
