@@ -9,6 +9,7 @@ import { AdmissionBatchService } from './admission-batch.service';
 import { BatchSemesterMappingService } from './batch-semester-mapping.service';
 import { CycleActivationService } from './cycle-activation.service';
 import { InstitutionAcademicConfigService } from './institution-academic-config.service';
+import { PromotionEligibilityService } from './promotion-eligibility.service';
 import { PromotionRunService } from './promotion-run.service';
 import {
   cycleTypeFromSemesterNumber,
@@ -26,6 +27,7 @@ export class CycleRolloverService {
     private readonly batchService: AdmissionBatchService,
     private readonly mappingService: BatchSemesterMappingService,
     private readonly cycleActivation: CycleActivationService,
+    private readonly eligibility: PromotionEligibilityService,
   ) {}
 
   async preview(tenantId: string, institutionId: string) {
@@ -50,20 +52,26 @@ export class CycleRolloverService {
           studentCount: batch._count.studentProfiles,
           promoted: 0,
           detained: 0,
-          completed: batch._count.studentProfiles,
+          completed: 0,
           skipped: true,
-          reason: 'Terminal semester — programme completion only',
+          reason:
+            'Final semester — students stay active; graduation is a separate step',
         });
         continue;
       }
 
       const toSequence = fromSequence + 1;
-      const preview = await this.promotionRun.preview(tenantId, {
-        institutionId,
+      // The preview card only needs COUNTS. Candidate selection already
+      // excludes locked/completed/out-of-sequence students, so every remaining
+      // candidate of a non-terminal batch promotes. A single COUNT is exact and
+      // avoids evaluating thousands of students one-by-one (the N+1 that made
+      // this preview slow). The heavy per-student evaluation still runs at
+      // apply time, where it is actually needed.
+      const promotable = await this.eligibility.countCandidates(
+        tenantId,
         fromSequence,
-        toSequence,
-        admissionBatchId: batch.id,
-      });
+        { admissionBatchId: batch.id },
+      );
 
       batchPreviews.push({
         batchId: batch.id,
@@ -72,13 +80,16 @@ export class CycleRolloverService {
         fromSequence,
         toSequence,
         studentCount: batch._count.studentProfiles,
-        promoted: preview.counts.eligible,
-        detained: preview.counts.detained,
-        completed: (preview.eligible as { status?: string }[]).filter(
-          (r) => r.status === 'COMPLETED',
-        ).length,
+        promoted: promotable,
+        detained: 0,
+        completed: 0,
         skipped: false,
-        counts: preview.counts,
+        counts: {
+          eligible: promotable,
+          detained: 0,
+          failed: 0,
+          total: promotable,
+        },
       });
     }
 

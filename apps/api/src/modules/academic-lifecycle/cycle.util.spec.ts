@@ -48,6 +48,7 @@ describe('PromotionEligibilityService institution rules', () => {
     studentAcademicStanding: { findUnique: jest.fn() },
     semesterRegistration: { findFirst: jest.fn() },
     studentSemesterProgress: { findUnique: jest.fn() },
+    student: { findFirst: jest.fn() },
   };
   const service = new PromotionEligibilityService(prisma as never);
 
@@ -60,6 +61,7 @@ describe('PromotionEligibilityService institution rules', () => {
     });
     prisma.semesterRegistration.findFirst.mockResolvedValue(null);
     prisma.studentSemesterProgress.findUnique.mockResolvedValue(null);
+    prisma.student.findFirst.mockResolvedValue({ programVersionId: null });
 
     const result = await service.evaluateStudent('t', 's', 3, 4, 6);
     expect(result.eligible).toBe(true);

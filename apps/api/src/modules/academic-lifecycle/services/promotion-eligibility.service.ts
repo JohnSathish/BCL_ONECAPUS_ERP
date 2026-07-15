@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   DEFAULT_DEGREE_MIN_CREDITS,
@@ -14,6 +15,14 @@ export type EligibilityResult = {
   status: 'PROMOTED' | 'DETAINED' | 'PENDING' | 'COMPLETED' | 'FAILED';
   messages: string[];
   snapshot: Record<string, unknown>;
+};
+
+export type CandidateFilters = {
+  campusId?: string;
+  shiftId?: string;
+  departmentId?: string;
+  programVersionId?: string;
+  admissionBatchId?: string;
 };
 
 @Injectable()
@@ -91,8 +100,14 @@ export class PromotionEligibilityService {
         ? Number(progress.creditsRequired)
         : DEFAULT_SEMESTER_CREDIT_TARGET;
 
-    const isTerminalPromotion = toSequence >= terminalSemesterNumber;
-    if (isTerminalPromotion && student?.programVersionId) {
+    // Programme completion happens when a student FINISHES the terminal
+    // semester (is promoted OUT of it), NOT when they first enter it. Entering
+    // the final semester (e.g. Sem 5 -> Sem 6 in a 6-semester programme) must
+    // stay a normal active promotion so the student can still register, pay
+    // fees, attend, and sit exams for that final semester. Only when they are
+    // already in the terminal semester and moving beyond it do we graduate.
+    const isGraduation = fromSequence >= terminalSemesterNumber;
+    if (isGraduation && student?.programVersionId) {
       const degreeMinCredits = await resolveDegreeMinCredits(
         this.prisma,
         tenantId,
@@ -115,7 +130,7 @@ export class PromotionEligibilityService {
     const eligible = blocking.length === 0;
 
     let status: EligibilityResult['status'] = eligible ? 'PROMOTED' : 'FAILED';
-    if (isTerminalPromotion && eligible) {
+    if (isGraduation && eligible) {
       status = 'COMPLETED';
     }
 
@@ -141,42 +156,56 @@ export class PromotionEligibilityService {
     };
   }
 
+  private candidateWhere(
+    tenantId: string,
+    fromSequence: number,
+    filters: CandidateFilters,
+  ): Prisma.StudentWhereInput {
+    return {
+      tenantId,
+      deletedAt: null,
+      academicStanding: {
+        currentSemesterSequence: fromSequence,
+        lifecycleState: { in: ['ACTIVE', 'DETAINED'] },
+        promotionLocked: false,
+        programmeStatus: { not: 'COMPLETED' },
+      },
+      ...(filters.campusId ? { campusId: filters.campusId } : {}),
+      ...(filters.shiftId ? { primaryShiftId: filters.shiftId } : {}),
+      ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+      ...(filters.programVersionId
+        ? { programVersionId: filters.programVersionId }
+        : {}),
+      ...(filters.admissionBatchId
+        ? { academicProfile: { admissionBatchId: filters.admissionBatchId } }
+        : {}),
+    };
+  }
+
   async findCandidateStudentIds(
     tenantId: string,
     fromSequence: number,
-    filters: {
-      campusId?: string;
-      shiftId?: string;
-      departmentId?: string;
-      programVersionId?: string;
-      admissionBatchId?: string;
-    },
+    filters: CandidateFilters,
   ) {
     return this.prisma.student.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        academicStanding: {
-          currentSemesterSequence: fromSequence,
-          lifecycleState: { in: ['ACTIVE', 'DETAINED'] },
-          promotionLocked: false,
-          programmeStatus: { not: 'COMPLETED' },
-        },
-        ...(filters.campusId ? { campusId: filters.campusId } : {}),
-        ...(filters.shiftId ? { primaryShiftId: filters.shiftId } : {}),
-        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
-        ...(filters.programVersionId
-          ? { programVersionId: filters.programVersionId }
-          : {}),
-        ...(filters.admissionBatchId
-          ? {
-              academicProfile: {
-                admissionBatchId: filters.admissionBatchId,
-              },
-            }
-          : {}),
-      },
+      where: this.candidateWhere(tenantId, fromSequence, filters),
       select: { id: true },
+    });
+  }
+
+  /**
+   * Fast count of promotable students. The candidate filter already excludes
+   * locked/completed/out-of-sequence students, so for a normal (non-terminal)
+   * promotion every candidate promotes — this COUNT is exact and avoids the
+   * per-student N+1 evaluation that made the rollover preview slow.
+   */
+  countCandidates(
+    tenantId: string,
+    fromSequence: number,
+    filters: CandidateFilters,
+  ) {
+    return this.prisma.student.count({
+      where: this.candidateWhere(tenantId, fromSequence, filters),
     });
   }
 }

@@ -207,9 +207,12 @@ export class PromotionRunService {
           continue;
         }
 
-        const isCompleted =
-          entry.toSequence >= config.terminalSemesterNumber ||
-          entry.status === 'COMPLETED';
+        // Graduate ONLY when eligibility explicitly resolved to COMPLETED
+        // (i.e. the student finished the terminal semester). Merely entering
+        // or reaching the terminal semester is a normal active promotion —
+        // otherwise final-semester students get locked out of registration,
+        // fees, and exams for the very semester they still have to study.
+        const isCompleted = entry.status === 'COMPLETED';
 
         if (isCompleted) {
           await tx.studentAcademicStanding.update({

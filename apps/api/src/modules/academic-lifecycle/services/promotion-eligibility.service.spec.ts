@@ -37,7 +37,7 @@ describe('PromotionEligibilityService', () => {
     expect(result.status).toBe('PROMOTED');
   });
 
-  it('marks terminal promotion as COMPLETED when eligible', async () => {
+  it('keeps entering the final semester as a normal active promotion', async () => {
     prisma.studentAcademicStanding.findUnique.mockResolvedValue({
       currentSemesterSequence: 5,
       lifecycleState: 'ACTIVE',
@@ -47,11 +47,37 @@ describe('PromotionEligibilityService', () => {
     prisma.semesterRegistration.findFirst.mockResolvedValue(null);
     prisma.studentSemesterProgress.findUnique.mockResolvedValue(null);
 
+    // Sem 5 -> Sem 6 is entering the final semester. The student still has to
+    // study it, so they must stay ACTIVE (PROMOTED) — not graduate on entry.
     const result = await service.evaluateStudent(
       'tenant-1',
       'student-1',
       5,
       6,
+      6,
+    );
+
+    expect(result.eligible).toBe(true);
+    expect(result.status).toBe('PROMOTED');
+  });
+
+  it('marks graduation (finishing the terminal semester) as COMPLETED', async () => {
+    prisma.studentAcademicStanding.findUnique.mockResolvedValue({
+      currentSemesterSequence: 6,
+      lifecycleState: 'ACTIVE',
+      promotionLocked: false,
+      programmeStatus: 'IN_PROGRESS',
+    });
+    prisma.semesterRegistration.findFirst.mockResolvedValue(null);
+    prisma.studentSemesterProgress.findUnique.mockResolvedValue(null);
+
+    // Promoting OUT of the terminal semester (from 6) is the true completion
+    // event, so the student graduates here.
+    const result = await service.evaluateStudent(
+      'tenant-1',
+      'student-1',
+      6,
+      7,
       6,
     );
 
