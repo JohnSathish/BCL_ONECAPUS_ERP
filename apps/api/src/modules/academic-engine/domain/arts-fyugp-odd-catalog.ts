@@ -27,6 +27,10 @@ export type ArtsFyugpCourseDef = {
   programCode?: string;
   /** Pool / shared courses mapped to all UG programmes when true. */
   sharedPool?: boolean;
+  /** Stable VTC vocational-track group (e.g. DESKTOP_PUBLISHING) for continuity. */
+  vtcTrackGroupCode?: string;
+  /** VTC stage within the track: 1 (Sem 3), 2 (Sem 4), 3 (Sem 6). */
+  vtcTrackStage?: number;
 };
 
 export type ArtsPaperBasketRow = {

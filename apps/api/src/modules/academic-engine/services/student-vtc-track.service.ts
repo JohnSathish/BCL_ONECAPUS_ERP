@@ -164,8 +164,20 @@ export class StudentVtcTrackService {
     if (expectedStage == null) return sections;
 
     const track = await this.getTrack(tenantId, studentId);
-    if (!track && semesterSequence === 3) return sections;
-    if (!track) return [];
+    let trackGroupCode = track?.trackGroupCode ?? null;
+    if (!trackGroupCode) {
+      // Sem 3 selection is open (student is choosing their vocation now).
+      if (semesterSequence === 3) return sections;
+      // Self-heal: no track row, but the student already chose a VTC in an
+      // earlier semester — derive continuity from that prior line so a missing
+      // track never silently strands the student during promotion.
+      trackGroupCode = await this.resolveTrackGroupFromPriorLine(
+        tenantId,
+        studentId,
+        semesterSequence,
+      );
+      if (!trackGroupCode) return [];
+    }
 
     return sections.filter((s) => {
       const meta = resolveVtcTrackFields({
@@ -175,10 +187,40 @@ export class StudentVtcTrackService {
         vtcTrackStage: s.courseOffering.course.vtcTrackStage,
       });
       return (
-        meta.vtcTrackGroupCode === track.trackGroupCode &&
+        meta.vtcTrackGroupCode === trackGroupCode &&
         meta.vtcTrackStage === expectedStage
       );
     });
+  }
+
+  /** Read-only: infer a student's VTC track group from their most recent prior VTC line. */
+  private async resolveTrackGroupFromPriorLine(
+    tenantId: string,
+    studentId: string,
+    semesterSequence: number,
+  ): Promise<string | null> {
+    const line = await this.prisma.semesterRegistrationLine.findFirst({
+      where: {
+        tenantId,
+        category: { equals: 'VTC', mode: 'insensitive' },
+        status: { in: ['confirmed', 'pending'] },
+        registration: {
+          studentId,
+          semesterSequence: { lt: semesterSequence },
+        },
+      },
+      orderBy: { registration: { semesterSequence: 'desc' } },
+      include: { offering: { include: offeringInclude } },
+    });
+    const course = line?.offering?.course;
+    if (!course) return null;
+    const meta = resolveVtcTrackFields({
+      code: course.code,
+      title: course.title,
+      vtcTrackGroupCode: course.vtcTrackGroupCode,
+      vtcTrackStage: course.vtcTrackStage,
+    });
+    return meta.vtcTrackGroupCode ?? null;
   }
 
   async resetTrack(

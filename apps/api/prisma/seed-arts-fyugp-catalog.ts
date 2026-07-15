@@ -9,6 +9,7 @@ import {
   buildArtsFyugpSem2MinorCourseDefs,
 } from '../src/modules/academic-engine/domain/arts-fyugp-even-catalog';
 import { buildDbcDaySem3VtcCourses } from '../src/modules/academic-engine/domain/dbc-day-sem3-electives-catalog';
+import { buildDbcSem4VtcCourses } from '../src/modules/academic-engine/domain/dbc-sem4-vtc-electives-catalog';
 import { buildDbcDaySem6VtcCourses } from '../src/modules/academic-engine/domain/dbc-day-sem6-vtc-electives-catalog';
 import {
   ARTS_FYUGP_DEPARTMENTS,
@@ -351,11 +352,13 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
   const oddCourses = buildArtsFyugpOddCourses();
   const evenCourses = buildArtsFyugpEvenCourses();
   const sem3VtcCourses = buildDbcDaySem3VtcCourses();
+  const sem4VtcCourses = buildDbcSem4VtcCourses();
   const sem6VtcCourses = buildDbcDaySem6VtcCourses();
   const allCourses = [
     ...oddCourses,
     ...evenCourses,
     ...sem3VtcCourses,
+    ...sem4VtcCourses,
     ...sem6VtcCourses,
   ];
 
@@ -551,6 +554,12 @@ async function upsertArtsCourse(
     subjectSlug: courseDef.subjectSlug,
     courseType: 'CORE',
     deletedAt: null,
+    ...(courseDef.vtcTrackGroupCode
+      ? { vtcTrackGroupCode: courseDef.vtcTrackGroupCode }
+      : {}),
+    ...(courseDef.vtcTrackStage != null
+      ? { vtcTrackStage: courseDef.vtcTrackStage }
+      : {}),
     ...(departmentId ? { departmentId } : {}),
   };
 

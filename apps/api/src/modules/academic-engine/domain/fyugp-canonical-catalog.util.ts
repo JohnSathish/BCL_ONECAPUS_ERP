@@ -45,7 +45,10 @@ import {
   MORNING_SEM3_SEC_CODES,
   MORNING_SEM3_VTC_CODES,
 } from './dbc-morning-sem3-catalog';
-import { DAY_SEM4_VTC_CODES } from './dbc-sem4-vtc-electives-catalog';
+import {
+  DAY_SEM4_VTC_CODES,
+  buildDbcSem4VtcCourses,
+} from './dbc-sem4-vtc-electives-catalog';
 import { DAY_SEM6_VTC_CODES } from './dbc-day-sem6-vtc-electives-catalog';
 import { MORNING_SEM6_VTC_CODES } from './dbc-morning-sem6-vtc-electives-catalog';
 
@@ -312,6 +315,7 @@ export function buildCanonicalCourseCodeSet(): Set<string> {
     ...buildCommerceFyugpOddCourses(),
     ...buildCommerceFyugpEvenCourses(),
     ...buildDbcDaySem3VtcCourses(),
+    ...buildDbcSem4VtcCourses(),
     ...buildDbcDaySem6VtcCourses(),
     ...CANONICAL_POOL_DEFS.flatMap((d) => d.courseCodes),
   ];
