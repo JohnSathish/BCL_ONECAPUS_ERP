@@ -93,6 +93,7 @@ import { VisitorManagementModule } from './modules/visitor-management/visitor-ma
 import { PlacementModule } from './modules/placement/placement.module';
 import { InternshipModule } from './modules/internship/internship.module';
 import { AlumniModule } from './modules/alumni/alumni.module';
+import { JournalsModule } from './modules/journals/journals.module';
 import { HostelModule } from './modules/hostel/hostel.module';
 import { ResearchModule } from './modules/research/research.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
@@ -187,6 +188,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     PlacementModule,
     InternshipModule,
     AlumniModule,
+    JournalsModule,
     HostelModule,
     ResearchModule,
     IntegrationsModule,

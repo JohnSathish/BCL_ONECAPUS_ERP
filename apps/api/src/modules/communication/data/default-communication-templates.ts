@@ -1123,7 +1123,160 @@ ${emailCtaButton('Go to portal')}`,
     variables: ['user_name', 'changed_at', 'institution_name', 'login_url'],
     channels: ['EMAIL', 'IN_APP', 'PUSH'],
   },
+
+  // —— Journals editorial workflow ——
+  {
+    code: 'JOURNAL_SUBMISSION_RECEIVED',
+    name: 'Journal Submission Received',
+    category: 'JOURNALS',
+    subject: 'Submission received — {{journalName}}',
+    bodyHtml: `${emailGreeting('{{authorName}}')}
+<p style="margin:0 0 12px;color:#334155;">We have received your manuscript for <strong>{{journalName}}</strong>.</p>
+${emailInfoRows([
+  { label: 'Title', value: '{{submissionTitle}}' },
+  { label: 'Status', value: '{{status}}' },
+])}
+${emailCtaButton('Open author desk', '{{portalHint}}')}`,
+    bodyText:
+      'Dear {{authorName}}, your submission "{{submissionTitle}}" for {{journalName}} was received ({{status}}).',
+    variables: [
+      'authorName',
+      'journalName',
+      'submissionTitle',
+      'status',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'JOURNAL_SUBMISSION_TO_EDITOR',
+    name: 'Journal New Submission (Editor)',
+    category: 'JOURNALS',
+    subject: 'New submission — {{journalName}}',
+    bodyHtml: `${emailGreeting('Editor')}
+<p style="margin:0 0 12px;color:#334155;">A new manuscript has been submitted to <strong>{{journalName}}</strong>.</p>
+${emailInfoRows([
+  { label: 'Title', value: '{{submissionTitle}}' },
+  { label: 'Author', value: '{{authorName}}' },
+  { label: 'Status', value: '{{status}}' },
+])}
+${emailCtaButton('Open editorial desk', '{{portalHint}}')}`,
+    bodyText:
+      'New submission "{{submissionTitle}}" by {{authorName}} for {{journalName}} ({{status}}).',
+    variables: [
+      'authorName',
+      'journalName',
+      'submissionTitle',
+      'status',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'JOURNAL_REVIEWER_INVITE',
+    name: 'Journal Reviewer Invitation',
+    category: 'JOURNALS',
+    subject: 'Review invitation — {{journalName}}',
+    bodyHtml: `${emailGreeting('{{authorName}}')}
+<p style="margin:0 0 12px;color:#334155;">You are invited to review a manuscript for <strong>{{journalName}}</strong>.</p>
+${emailInfoRows([{ label: 'Manuscript', value: '{{submissionTitle}}' }])}
+${emailCtaButton('Respond to invitation', '{{invitePath}}')}`,
+    bodyText:
+      'You are invited to review "{{submissionTitle}}" for {{journalName}}. Open: {{invitePath}}',
+    variables: [
+      'authorName',
+      'journalName',
+      'submissionTitle',
+      'invitePath',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'JOURNAL_DECISION',
+    name: 'Journal Editorial Decision',
+    category: 'JOURNALS',
+    subject: 'Editorial decision — {{journalName}}',
+    bodyHtml: `${emailGreeting('{{authorName}}')}
+<p style="margin:0 0 12px;color:#334155;">An editorial decision has been recorded for your manuscript.</p>
+${emailInfoRows([
+  { label: 'Title', value: '{{submissionTitle}}' },
+  { label: 'Decision', value: '{{decision}}' },
+  { label: 'Journal', value: '{{journalName}}' },
+])}
+${emailCtaButton('View submission', '{{portalHint}}')}`,
+    bodyText:
+      'Dear {{authorName}}, decision on "{{submissionTitle}}" ({{journalName}}): {{decision}}.',
+    variables: [
+      'authorName',
+      'journalName',
+      'submissionTitle',
+      'decision',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'JOURNAL_PROOF_READY',
+    name: 'Journal Proof Ready',
+    category: 'JOURNALS',
+    subject: 'Proofs ready for review — {{journalName}}',
+    bodyHtml: `${emailGreeting('{{authorName}}')}
+<p style="margin:0 0 12px;color:#334155;">Your manuscript has entered proofing. Please review the proofs and approve when ready.</p>
+${emailInfoRows([
+  { label: 'Title', value: '{{submissionTitle}}' },
+  { label: 'Journal', value: '{{journalName}}' },
+])}
+${emailCtaButton('Review proofs', '{{portalHint}}')}`,
+    bodyText:
+      'Dear {{authorName}}, proofs are ready for "{{submissionTitle}}" ({{journalName}}).',
+    variables: [
+      'authorName',
+      'journalName',
+      'submissionTitle',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
+  {
+    code: 'JOURNAL_PUBLISHED',
+    name: 'Journal Article Published',
+    category: 'JOURNALS',
+    subject: 'Published — {{journalName}}',
+    bodyHtml: `${emailGreeting('{{authorName}}')}
+<p style="margin:0 0 12px;color:#334155;">Your article has been published.</p>
+${emailInfoRows([
+  { label: 'Article', value: '{{articleTitle}}' },
+  { label: 'Journal', value: '{{journalName}}' },
+])}
+${emailCtaButton('View article', '{{portalHint}}')}`,
+    bodyText:
+      'Dear {{authorName}}, "{{articleTitle}}" is now published in {{journalName}}.',
+    variables: [
+      'authorName',
+      'journalName',
+      'articleTitle',
+      'submissionTitle',
+      'portalHint',
+      'institution_name',
+    ],
+    channels: ['EMAIL'],
+  },
 ];
+
+export const JOURNAL_COMMUNICATION_TEMPLATE_CODES = [
+  'JOURNAL_SUBMISSION_RECEIVED',
+  'JOURNAL_SUBMISSION_TO_EDITOR',
+  'JOURNAL_REVIEWER_INVITE',
+  'JOURNAL_DECISION',
+  'JOURNAL_PROOF_READY',
+  'JOURNAL_PUBLISHED',
+] as const;
 
 export function findDefaultTemplateByCode(code: string) {
   return DEFAULT_COMMUNICATION_TEMPLATES.find(

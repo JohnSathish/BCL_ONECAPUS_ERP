@@ -1,0 +1,493 @@
+{
+  "source": "google-sites",
+  "baseUrl": "https://sites.google.com/donboscocollege.ac.in/transient",
+  "capturedAt": "2026-07-17",
+  "journal": {
+    "slug": "transient",
+    "name": "Transient",
+    "shortName": "Transient",
+    "issn": "2250-0650",
+    "tagline": "A Journal of Natural Sciences and Allied Subjects",
+    "contactEmail": "transient@donboscocollege.ac.in",
+    "publisher": "Don Bosco College, Tura",
+    "institution": "Don Bosco College, Tura",
+    "description": "Transient – A Journal of Natural Science and Allied Subjects, is an annual peer reviewed multi-discipline research science journal (ISSN NO. 2250-0650) in English published by Don Bosco College, Tura, Meghalaya, India from the year 2011."
+  },
+  "pages": [
+    {
+      "key": "home",
+      "title": "Home",
+      "bodyHtml": "<p>Transient is a peer-reviewed journal of natural sciences and allied subjects published by Don Bosco College, Tura.</p>",
+      "seoTitle": "Transient — A Journal of Natural Sciences and Allied Subjects",
+      "seoDescription": "Annual peer-reviewed multi-discipline research science journal (ISSN 2250-0650) published by Don Bosco College, Tura.",
+      "seoKeywords": [
+        "Transient",
+        "Don Bosco College Tura",
+        "natural sciences",
+        "peer reviewed"
+      ]
+    },
+    {
+      "key": "about",
+      "title": "About the Journal",
+      "bodyHtml": "<p>Transient – A Journal of Natural Science and Allied Subjects, is an annual peer reviewed multi-discipline research science journal (ISSN NO. 2250-0650) in English published by Don Bosco College, Tura, Meghalaya, India from the year 2011. The types of contributions accepted are categorized as strategy articles, review articles, research articles, short communications and maiden reports. The Journal is visualized as a forum to publish and interchange experiment-based ideas, critical views on scientific issues and express crucial ideas on the beneficial applications of modern science in contemporary society. It is further envisaged that through this journal young scholars may widen their avenues to publish their findings through this national journal. All submissions are reviewed by experts/peers and the Editorial Committee and on their recommendation, manuscripts are published.</p><p><strong>Publisher:</strong> Don Bosco College, Tura, West Garo Hills, Meghalaya-794002</p><p><strong>Academic correspondence:</strong> Dr. Yubaraj Sharma, Chief Editor, Transient, Don Bosco College, Tura, 794002, Meghalaya, India. Email: <a href=\"mailto:transient@donboscocollege.ac.in\">transient@donboscocollege.ac.in</a></p>",
+      "seoTitle": "About Transient Journal",
+      "seoDescription": "About Transient (ISSN 2250-0650) — peer-reviewed journal of natural sciences published by Don Bosco College, Tura.",
+      "seoKeywords": ["2250-0650", "Transient", "about"]
+    },
+    {
+      "key": "chief-editor-message",
+      "title": "From the Chief Editor's desk",
+      "bodyHtml": "<p>The journal Transient is an attempt to provide a platform for researchers in different fields of science to showcase their research; an endeavour along the line of numerous other international, national and regional journals. The rationale for adding one more to the list of existing journals is that a lot of scientific research goes unpublished for the simple reason that most journals put great emphasis on the significance of the results or conclusions drawn from a particular research work; the exclusion of research, however simple or basic, from visible literature might lead researchers to keep on 'reinventing the wheel' causing loss of precious time. In Transient, we try to honour the endeavour and hard work put out by researchers in carrying out their work even though the outcome might not be 'paradigm-changing' by giving due recognition, without sacrificing scientific rigour, to the merits of the scientific content and methods of an article.</p><p>I am pleased to inform the release of the preprints of the Xth volume of the Journal. This special volume is meticulously curated from the submissions to the International Seminar, \"Climate Change: Impact and Resilience\" that was organized by Assam Don Bosco University (ADBU).</p><p>We are now inviting manuscripts for the XIth volume of Transient.</p><p><em>Dr. Yubaraj Sharma</em></p>",
+      "seoTitle": "Chief Editor's Message — Transient",
+      "seoDescription": "Message from the Chief Editor of Transient journal.",
+      "seoKeywords": ["chief editor", "Transient"]
+    },
+    {
+      "key": "contact",
+      "title": "Contact",
+      "bodyHtml": "<p><strong>ADDRESS FOR ACADEMIC CORRESPONDENCE:</strong></p><p>Dr. Yubaraj Sharma,<br/>Chief Editor, Transient<br/>Don Bosco College, Tura, 794002<br/>Meghalaya, India</p><p>Email: <a href=\"mailto:transient@donboscocollege.ac.in\">transient@donboscocollege.ac.in</a></p>",
+      "seoTitle": "Contact Transient Journal",
+      "seoDescription": "Contact the Transient editorial office at Don Bosco College, Tura.",
+      "seoKeywords": ["contact", "transient@donboscocollege.ac.in"]
+    },
+    {
+      "key": "advisory-board",
+      "title": "Advisory Board",
+      "bodyHtml": "<p>The Advisory Board of Transient includes senior academics from leading Indian and international institutions.</p>",
+      "seoTitle": "Advisory Board — Transient",
+      "seoDescription": "Advisory Board members of Transient journal.",
+      "seoKeywords": ["advisory board", "Transient"]
+    },
+    {
+      "key": "editorial-board",
+      "title": "Editorial Board",
+      "bodyHtml": "<p>The Editorial Board reviews submissions and upholds the scientific standards of Transient.</p>",
+      "seoTitle": "Editorial Board — Transient",
+      "seoDescription": "Editorial Board of Transient journal.",
+      "seoKeywords": ["editorial board", "Transient"]
+    }
+  ],
+  "board": [
+    {
+      "fullName": "Rev. Fr. Januarius S Sangma, SDB",
+      "roleTitle": "Chief Patron",
+      "boardType": "CHIEF_PATRON",
+      "institution": "Don Bosco College, Tura",
+      "department": "Principal",
+      "sortOrder": 1
+    },
+    {
+      "fullName": "Rev. Fr. John Paul Tirkey, SDB",
+      "roleTitle": "Patron",
+      "boardType": "PATRON",
+      "institution": "Don Bosco College, Tura",
+      "department": "Vice Principal",
+      "sortOrder": 2
+    },
+    {
+      "fullName": "Dr Yubaraj Sharma",
+      "roleTitle": "Chief Editor",
+      "boardType": "CHIEF_EDITOR",
+      "institution": "Don Bosco College, Tura",
+      "department": "Department of Physics",
+      "email": "transient@donboscocollege.ac.in",
+      "sortOrder": 3
+    },
+    {
+      "fullName": "Dr. Aksana Neah Ch Marak",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 10
+    },
+    {
+      "fullName": "Dr. Arindam Ghosh",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 11
+    },
+    {
+      "fullName": "Shri Biman Tesil R. Sangma",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 12
+    },
+    {
+      "fullName": "Dr. Biswajit Paul",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 13
+    },
+    {
+      "fullName": "Dr. Lillybell Ch. Marak",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 14
+    },
+    {
+      "fullName": "Dr. Madhusudhan Saha",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 15
+    },
+    {
+      "fullName": "Dr. Ratan Chakraborty",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 16
+    },
+    {
+      "fullName": "Shri Samrat Dey",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 17
+    },
+    {
+      "fullName": "Shri T. Sanjeev Lyngdoh",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 18
+    },
+    {
+      "fullName": "Shri Uttam Paul",
+      "roleTitle": "Committee Member",
+      "boardType": "COMMITTEE",
+      "institution": "Don Bosco College, Tura",
+      "sortOrder": 19
+    },
+    {
+      "fullName": "Prof. D K Singh",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "G B Pant University of Agriculture and Technology",
+      "department": "Dept of Vegetable Science",
+      "country": "India",
+      "sortOrder": 100
+    },
+    {
+      "fullName": "Prof. O P Singh",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "North Eastern Hill University, Shillong",
+      "department": "Department of Environmental Sciences",
+      "country": "India",
+      "sortOrder": 101
+    },
+    {
+      "fullName": "Prof. Basil Koikara",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Assam Don Bosco University",
+      "department": "Department of Mathematics",
+      "country": "India",
+      "sortOrder": 102
+    },
+    {
+      "fullName": "Prof. Ranjan Kumar Singh",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Banaras Hindu University, Varanasi",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 103
+    },
+    {
+      "fullName": "Prof. P R Alapati",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Ghani Khan Choudhury Institute of Engineering and Technology",
+      "department": "Director",
+      "country": "India",
+      "sortOrder": 104
+    },
+    {
+      "fullName": "Prof. G Bez",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "North Eastern Hill University, Shillong",
+      "department": "Department of Chemistry",
+      "country": "India",
+      "sortOrder": 105
+    },
+    {
+      "fullName": "Prof. C R Bhattacharjee",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Assam University, Silchar",
+      "department": "Department of Chemistry",
+      "country": "India",
+      "sortOrder": 106
+    },
+    {
+      "fullName": "Prof. Bishnupada Roy",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "North Eastern Hill University, Shillong",
+      "department": "Department of Zoology",
+      "country": "India",
+      "sortOrder": 107
+    },
+    {
+      "fullName": "Prof. Bimalendu Deb",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Indian Association for the Cultivation of Science (IACS), Jadavpur, Kolkata",
+      "department": "Department of Materials Science",
+      "country": "India",
+      "sortOrder": 108
+    },
+    {
+      "fullName": "Dr. (Mrs) P Ramanujam",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "North Eastern Hill University, Shillong",
+      "department": "Department of Botany",
+      "country": "India",
+      "sortOrder": 109
+    },
+    {
+      "fullName": "Dr. D C Kalita",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "North-Eastern Hill University, Tura Campus, Meghalaya",
+      "department": "Department of Rural Development and Agricultural Production",
+      "country": "India",
+      "sortOrder": 110
+    },
+    {
+      "fullName": "Dr. Jharna Rani Das",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Children’s National Medical Center / The George Washington University School of Medicine, Washington DC",
+      "department": "Center for Genetic Medicine",
+      "country": "USA",
+      "sortOrder": 111
+    },
+    {
+      "fullName": "Dr. Jiten Ch Dang",
+      "roleTitle": "Advisory Board Member",
+      "boardType": "ADVISORY",
+      "institution": "Don Bosco College, Tura, Meghalaya",
+      "department": "Department of Botany",
+      "country": "India",
+      "sortOrder": 112
+    },
+    {
+      "fullName": "Dr. Abdul Hannan",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Sikkim University, Gangtok, Sikkim",
+      "department": "Department of Geography",
+      "country": "India",
+      "sortOrder": 200
+    },
+    {
+      "fullName": "Dr. Abhijit Mitra",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Techno India University, West Bengal / University of Calcutta",
+      "department": "Research / Former Head, Department of Marine Science",
+      "country": "India",
+      "sortOrder": 201
+    },
+    {
+      "fullName": "Dr. Anup Paul",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Universidade de Lisboa, Lisboa",
+      "department": "Centro de Quimica Estrutural",
+      "country": "Portugal",
+      "sortOrder": 202
+    },
+    {
+      "fullName": "Dr. Arindam Barman",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Rajiv Gandhi University, Rono Hills, Doimukh, Arunachal Pradesh",
+      "department": "Department of Horticulture",
+      "country": "India",
+      "sortOrder": 203
+    },
+    {
+      "fullName": "Dr. Arindam Ghosh",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Don Bosco College, Tura, Meghalaya",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 204
+    },
+    {
+      "fullName": "Dr. Biswajit Paul",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Don Bosco College, Tura, Meghalaya",
+      "department": "Department of Zoology",
+      "country": "India",
+      "sortOrder": 205
+    },
+    {
+      "fullName": "Dr. Faizuddin Ahmed",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "University of Science & Technology, Meghalaya",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 206
+    },
+    {
+      "fullName": "Dr. Jane Wanry Shangpliang",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Assam Don Bosco University, Assam",
+      "department": "Department of Zoology",
+      "country": "India",
+      "sortOrder": 207
+    },
+    {
+      "fullName": "Dr. Jeeban Prasad Gewali",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Lovely Professional University, Punjab",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 208
+    },
+    {
+      "fullName": "Dr. Joyoshree Mahanta",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Krishi Vigyan Kendra, ICAR, Meghalaya",
+      "department": "Senior Scientist and Head",
+      "country": "India",
+      "sortOrder": 209
+    },
+    {
+      "fullName": "Dr. Kishor Govindrao Rewatkar",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Dr. Ambedkar College, Nagpur, Maharashtra",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 210
+    },
+    {
+      "fullName": "Dr. Ngangom Aomoa",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Assam Don Bosco University, Assam",
+      "department": "Department of Physics",
+      "country": "India",
+      "sortOrder": 211
+    },
+    {
+      "fullName": "Dr. Panchatcharam Mariappan",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Indian Institute of Technology, Tirupati",
+      "department": "Department of Mathematics",
+      "country": "India",
+      "sortOrder": 212
+    },
+    {
+      "fullName": "Dr. Reecha Sharma",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Punjabi University, Patiala, Punjab",
+      "department": "ECE Department",
+      "country": "India",
+      "sortOrder": 213
+    },
+    {
+      "fullName": "Dr. Samrat Dey",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Pragjyotish College, Guwahati, Assam",
+      "country": "India",
+      "sortOrder": 214
+    },
+    {
+      "fullName": "Prof. Sudhanya Ray Hajong",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "North-Eastern Hill University, Meghalaya",
+      "department": "Department of Zoology",
+      "country": "India",
+      "sortOrder": 215
+    },
+    {
+      "fullName": "Prof. Vasanti Rewatkar",
+      "roleTitle": "Editorial Board Member",
+      "boardType": "EDITORIAL",
+      "institution": "Vidya Vikas College, Samudrapur, Maharashtra",
+      "department": "Department of Botany",
+      "country": "India",
+      "sortOrder": 216
+    },
+    {
+      "fullName": "Don Bosco College, Tura",
+      "roleTitle": "Publisher",
+      "boardType": "PUBLISHER",
+      "institution": "Don Bosco College, Tura, West Garo Hills, Meghalaya-794002",
+      "sortOrder": 300
+    }
+  ],
+  "volumes": [
+    { "volumeNumber": 10, "year": 2020, "label": "Volume X", "roman": "X" },
+    { "volumeNumber": 9, "year": 2019, "label": "Volume IX", "roman": "IX" },
+    {
+      "volumeNumber": 8,
+      "year": 2018,
+      "label": "Volume VIII",
+      "roman": "VIII"
+    },
+    { "volumeNumber": 7, "year": 2017, "label": "Volume VII", "roman": "VII" },
+    { "volumeNumber": 6, "year": 2016, "label": "Volume VI", "roman": "VI" },
+    { "volumeNumber": 5, "year": 2015, "label": "Volume V", "roman": "V" },
+    { "volumeNumber": 4, "year": 2014, "label": "Volume IV", "roman": "IV" },
+    { "volumeNumber": 3, "year": 2013, "label": "Volume III", "roman": "III" },
+    { "volumeNumber": 2, "year": 2012, "label": "Volume II", "roman": "II" },
+    { "volumeNumber": 1, "year": 2011, "label": "Volume I", "roman": "I" }
+  ],
+  "downloads": [],
+  "media": [],
+  "redirects": [
+    {
+      "fromPath": "/about-the-journal",
+      "toPath": "/journals-portal/about",
+      "statusCode": 301
+    },
+    {
+      "fromPath": "/published-volumes",
+      "toPath": "/journals-portal/archives",
+      "statusCode": 301
+    },
+    {
+      "fromPath": "/editorial-board",
+      "toPath": "/journals-portal/editorial-board",
+      "statusCode": 301
+    },
+    {
+      "fromPath": "/advisory-board",
+      "toPath": "/journals-portal/advisory-board",
+      "statusCode": 301
+    },
+    {
+      "fromPath": "/contact",
+      "toPath": "/journals-portal/contact",
+      "statusCode": 301
+    }
+  ],
+  "assets": {
+    "note": "PDF/cover URLs from Google Sites volume pages are discovered at import time when crawling; missing assets are logged as Pending Review."
+  }
+}

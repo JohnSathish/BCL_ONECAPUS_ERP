@@ -1307,4 +1307,40 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description:
       'Manage letterheads, issuers, templates, and reference formats',
   },
+  {
+    slug: 'alumni:read',
+    resource: 'alumni',
+    action: 'read',
+    description: 'View alumni module',
+  },
+  {
+    slug: 'alumni:manage',
+    resource: 'alumni',
+    action: 'manage',
+    description: 'Manage alumni module',
+  },
+  {
+    slug: 'journals:read',
+    resource: 'journals',
+    action: 'read',
+    description: 'View journals CMS',
+  },
+  {
+    slug: 'journals:manage',
+    resource: 'journals',
+    action: 'manage',
+    description: 'Manage journals CMS and editorial workflow',
+  },
+  {
+    slug: 'journals:portal:author',
+    resource: 'journals',
+    action: 'portal:author',
+    description: 'Journal author portal self-service',
+  },
+  {
+    slug: 'journals:portal:reviewer',
+    resource: 'journals',
+    action: 'portal:reviewer',
+    description: 'Journal reviewer portal self-service',
+  },
 ];

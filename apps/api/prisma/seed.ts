@@ -390,6 +390,14 @@ async function main() {
     'admissions:portal:self',
     'notifications:read',
   ]);
+  await upsertRole('journal_author', 'Journal Author', [
+    'journals:portal:author',
+    'notifications:read',
+  ]);
+  await upsertRole('journal_reviewer', 'Journal Reviewer', [
+    'journals:portal:reviewer',
+    'notifications:read',
+  ]);
   await upsertRole('hod', 'Head of Department', [
     'academic:read',
     'students:read',

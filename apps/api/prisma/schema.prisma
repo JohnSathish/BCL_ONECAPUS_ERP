@@ -13109,6 +13109,509 @@ model AlumniAssociationSettings {
   @@schema("academic")
 }
 
+model Journal {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  name             String
+  shortName        String   @map("short_name")
+  slug             String
+  subdomain        String?
+  issn             String?
+  logoUrl          String?  @map("logo_url")
+  bannerUrl        String?  @map("banner_url")
+  themeJson        Json     @default("{}") @map("theme_json")
+  contactEmail     String?  @map("contact_email")
+  contactPhone     String?  @map("contact_phone")
+  description      String?
+  publisher        String?
+  institution      String?
+  frequency        String?  @default("ANNUAL")
+  status           String   @default("ACTIVE")
+  defaultLanguage  String   @default("en") @map("default_language")
+  tagline          String?
+  doiPrefix              String?  @map("doi_prefix")
+  crossrefEnabled        Boolean  @default(false) @map("crossref_enabled")
+  crossrefDepositorName  String?  @map("crossref_depositor_name")
+  crossrefDepositorEmail String?  @map("crossref_depositor_email")
+  crossrefRegistrant     String?  @map("crossref_registrant")
+  crossrefUsername       String?  @map("crossref_username")
+  crossrefPasswordEnc    String?  @map("crossref_password_enc")
+  doiSequence            Int      @default(0) @map("doi_sequence")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  pages          JournalPage[]
+  announcements  JournalAnnouncement[]
+  boardMembers   JournalEditorialMember[]
+  volumes        JournalVolume[]
+  submissions    JournalSubmission[]
+  doiRecords     JournalDoiRecord[]
+  downloads      JournalDownload[]
+  mediaAssets    JournalMediaAsset[]
+  redirects      JournalRedirect[]
+  importRuns     JournalImportRun[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("journals")
+  @@schema("academic")
+}
+
+model JournalPage {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  journalId      String   @map("journal_id") @db.Uuid
+  key            String
+  title          String
+  bodyHtml       String?  @map("body_html")
+  seoTitle       String?  @map("seo_title")
+  seoDescription String?  @map("seo_description")
+  seoKeywords    String[] @default([]) @map("seo_keywords")
+  isPublished    Boolean  @default(true) @map("is_published")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@unique([journalId, key])
+  @@index([tenantId, journalId])
+  @@map("journal_pages")
+  @@schema("academic")
+}
+
+model JournalAnnouncement {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  journalId   String    @map("journal_id") @db.Uuid
+  title       String
+  bodyHtml    String?   @map("body_html")
+  publishedAt DateTime? @map("published_at")
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  isPublished Boolean   @default(true) @map("is_published")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, journalId, isPublished])
+  @@map("journal_announcements")
+  @@schema("academic")
+}
+
+model JournalEditorialMember {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  journalId     String   @map("journal_id") @db.Uuid
+  fullName      String   @map("full_name")
+  roleTitle     String   @map("role_title")
+  boardType     String   @default("BOARD") @map("board_type")
+  photoUrl      String?  @map("photo_url")
+  institution   String?
+  department    String?
+  country       String?
+  email         String?
+  orcid         String?
+  bio           String?
+  researchAreas String?  @map("research_areas")
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  importStatus  String?  @map("import_status")
+  importNotes   String?  @map("import_notes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, journalId, isActive])
+  @@index([journalId, boardType])
+  @@map("journal_editorial_members")
+  @@schema("academic")
+}
+
+model JournalVolume {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  journalId    String   @map("journal_id") @db.Uuid
+  volumeNumber Int      @map("volume_number")
+  year         Int
+  label        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  journal   Journal           @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  issues    JournalIssue[]
+  downloads JournalDownload[]
+
+  @@unique([journalId, volumeNumber, year])
+  @@index([tenantId, journalId])
+  @@map("journal_volumes")
+  @@schema("academic")
+}
+
+model JournalIssue {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  journalId       String    @map("journal_id") @db.Uuid
+  volumeId        String    @map("volume_id") @db.Uuid
+  issueNumber     Int       @map("issue_number")
+  title           String?
+  publicationDate DateTime? @map("publication_date") @db.Date
+  coverUrl        String?   @map("cover_url")
+  editorialHtml   String?   @map("editorial_html")
+  summary         String?
+  isCurrent       Boolean   @default(false) @map("is_current")
+  isPublished     Boolean   @default(true) @map("is_published")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  volume    JournalVolume     @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  articles  JournalArticle[]
+  downloads JournalDownload[]
+
+  @@unique([volumeId, issueNumber])
+  @@index([tenantId, journalId, isCurrent])
+  @@map("journal_issues")
+  @@schema("academic")
+}
+
+model JournalArticle {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  journalId     String    @map("journal_id") @db.Uuid
+  issueId       String    @map("issue_id") @db.Uuid
+  title         String
+  abstract      String?
+  keywords      String[]  @default([])
+  doi           String?
+  pageRange     String?   @map("page_range")
+  pdfUrl        String?   @map("pdf_url")
+  htmlContent   String?   @map("html_content")
+  category      String?
+  status        String    @default("PUBLISHED")
+  viewCount     Int       @default(0) @map("view_count")
+  downloadCount Int       @default(0) @map("download_count")
+  publishedAt   DateTime? @map("published_at")
+  sortOrder     Int       @default(0) @map("sort_order")
+  cslJson       Json?     @map("csl_json")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  issue      JournalIssue           @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authors    JournalArticleAuthor[]
+  doiRecords JournalDoiRecord[]
+
+  @@index([tenantId, journalId, status])
+  @@index([issueId])
+  @@map("journal_articles")
+  @@schema("academic")
+}
+
+model JournalArticleAuthor {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  articleId       String   @map("article_id") @db.Uuid
+  fullName        String   @map("full_name")
+  affiliation     String?
+  email           String?
+  orcid           String?
+  isCorresponding Boolean  @default(false) @map("is_corresponding")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  article JournalArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("journal_article_authors")
+  @@schema("academic")
+}
+
+model JournalPersonProfile {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  displayName  String   @map("display_name")
+  email        String
+  affiliation  String?
+  orcid        String?
+  phone        String?
+  bio          String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, email])
+  @@map("journal_person_profiles")
+  @@schema("academic")
+}
+
+model JournalSubmission {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  journalId            String    @map("journal_id") @db.Uuid
+  submittedByUserId    String    @map("submitted_by_user_id") @db.Uuid
+  title                String
+  abstract             String?
+  keywords             String[]  @default([])
+  status               String    @default("DRAFT")
+  currentRound         Int       @default(0) @map("current_round")
+  correspondingEmail   String?   @map("corresponding_email")
+  coverLetter          String?   @map("cover_letter")
+  submittedAt          DateTime? @map("submitted_at")
+  publishedArticleId   String?   @map("published_article_id") @db.Uuid
+  productionNotes      String?   @map("production_notes")
+  proofApprovedAt      DateTime? @map("proof_approved_at")
+  proofApprovedByUserId String?  @map("proof_approved_by_user_id") @db.Uuid
+  similarityScore      Float?    @map("similarity_score")
+  similarityReportFileId String? @map("similarity_report_file_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  journal     Journal                     @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  coAuthors   JournalSubmissionCoAuthor[]
+  files       JournalSubmissionFile[]
+  rounds      JournalReviewRound[]
+  decisions   JournalEditorialDecision[]
+  doiRecords  JournalDoiRecord[]
+
+  @@index([tenantId, journalId, status])
+  @@index([submittedByUserId])
+  @@map("journal_submissions")
+  @@schema("academic")
+}
+
+model JournalSubmissionCoAuthor {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  submissionId    String   @map("submission_id") @db.Uuid
+  fullName        String   @map("full_name")
+  email           String?
+  affiliation     String?
+  orcid           String?
+  isCorresponding Boolean  @default(false) @map("is_corresponding")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  submission JournalSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("journal_submission_co_authors")
+  @@schema("academic")
+}
+
+model JournalSubmissionFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  submissionId String   @map("submission_id") @db.Uuid
+  kind         String   @default("MANUSCRIPT")
+  version      Int      @default(1)
+  storageKey   String   @map("storage_key")
+  fileName     String   @map("file_name")
+  mimeType     String?  @map("mime_type")
+  sizeBytes    Int      @default(0) @map("size_bytes")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  submission JournalSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId, kind])
+  @@map("journal_submission_files")
+  @@schema("academic")
+}
+
+model JournalDoiRecord {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  journalId    String    @map("journal_id") @db.Uuid
+  articleId    String?   @map("article_id") @db.Uuid
+  submissionId String?   @map("submission_id") @db.Uuid
+  doi          String
+  status       String    @default("RESERVED")
+  requestXml   String?   @map("request_xml")
+  responseBody String?   @map("response_body")
+  depositedAt  DateTime? @map("deposited_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  journal    Journal            @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  article    JournalArticle?    @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  submission JournalSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  @@unique([journalId, doi])
+  @@index([tenantId, journalId, status])
+  @@index([articleId])
+  @@map("journal_doi_records")
+  @@schema("academic")
+}
+
+/// Canonical boardType values: CHIEF_PATRON | PATRON | CHIEF_EDITOR | COMMITTEE |
+/// ADVISORY | EDITORIAL | PUBLISHER | OFFICE | MANAGING | BOARD
+model JournalDownload {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  journalId   String   @map("journal_id") @db.Uuid
+  title       String
+  category    String   @default("OTHER")
+  volumeId    String?  @map("volume_id") @db.Uuid
+  issueId     String?  @map("issue_id") @db.Uuid
+  fileUrl     String   @map("file_url")
+  fileName    String?  @map("file_name")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isPublished Boolean  @default(true) @map("is_published")
+  importStatus String? @map("import_status")
+  importNotes  String? @map("import_notes")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  journal Journal        @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  volume  JournalVolume? @relation(fields: [volumeId], references: [id], onDelete: SetNull)
+  issue   JournalIssue?  @relation(fields: [issueId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, journalId, isPublished])
+  @@index([journalId, category])
+  @@map("journal_downloads")
+  @@schema("academic")
+}
+
+model JournalMediaAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  journalId   String   @map("journal_id") @db.Uuid
+  kind        String   @default("OTHER")
+  storageKey  String   @map("storage_key")
+  publicUrl   String   @map("public_url")
+  originalUrl String?  @map("original_url")
+  fileName    String?  @map("file_name")
+  mimeType    String?  @map("mime_type")
+  bytes       Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, journalId, kind])
+  @@index([journalId, originalUrl])
+  @@map("journal_media_assets")
+  @@schema("academic")
+}
+
+model JournalRedirect {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  journalId  String   @map("journal_id") @db.Uuid
+  fromPath  String   @map("from_path")
+  toPath     String   @map("to_path")
+  statusCode Int      @default(301) @map("status_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@unique([journalId, fromPath])
+  @@index([tenantId, journalId])
+  @@map("journal_redirects")
+  @@schema("academic")
+}
+
+model JournalImportRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  journalId  String    @map("journal_id") @db.Uuid
+  source     String
+  status     String    @default("RUNNING")
+  reportJson Json?     @map("report_json")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, journalId, startedAt])
+  @@map("journal_import_runs")
+  @@schema("academic")
+}
+
+model JournalReviewRound {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  submissionId String   @map("submission_id") @db.Uuid
+  roundNumber  Int      @map("round_number")
+  status       String   @default("OPEN")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  submission  JournalSubmission         @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  assignments JournalReviewAssignment[]
+
+  @@unique([submissionId, roundNumber])
+  @@index([tenantId, submissionId])
+  @@map("journal_review_rounds")
+  @@schema("academic")
+}
+
+model JournalReviewAssignment {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  roundId         String    @map("round_id") @db.Uuid
+  reviewerUserId  String    @map("reviewer_user_id") @db.Uuid
+  invitedByUserId String?   @map("invited_by_user_id") @db.Uuid
+  status          String    @default("INVITED")
+  inviteToken     String    @unique @map("invite_token")
+  dueAt           DateTime? @map("due_at")
+  respondedAt     DateTime? @map("responded_at")
+  conflictOfInterest      Boolean? @map("conflict_of_interest")
+  conflictOfInterestNotes String?  @map("conflict_of_interest_notes")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  round  JournalReviewRound   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  report JournalReviewReport?
+
+  @@index([tenantId, reviewerUserId, status])
+  @@index([roundId])
+  @@map("journal_review_assignments")
+  @@schema("academic")
+}
+
+model JournalReviewReport {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  assignmentId       String   @unique @map("assignment_id") @db.Uuid
+  recommendation     String
+  commentsToEditor   String?  @map("comments_to_editor")
+  commentsToAuthor   String?  @map("comments_to_author")
+  confidentialNotes  String?  @map("confidential_notes")
+  submittedAt        DateTime @default(now()) @map("submitted_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  assignment JournalReviewAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@map("journal_review_reports")
+  @@schema("academic")
+}
+
+model JournalEditorialDecision {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  submissionId    String   @map("submission_id") @db.Uuid
+  roundId         String?  @map("round_id") @db.Uuid
+  decision        String
+  notesHtml       String?  @map("notes_html")
+  decidedByUserId String   @map("decided_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  submission JournalSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, submissionId])
+  @@map("journal_editorial_decisions")
+  @@schema("academic")
+}
+
 model HostelBlock {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid

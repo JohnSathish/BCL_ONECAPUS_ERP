@@ -180,6 +180,12 @@ export const MODULE_PERMISSIONS = {
   placement: ['placement:read', 'placement:manage'],
   internship: ['internship:read', 'internship:manage'],
   alumni: ['alumni:read', 'alumni:manage'],
+  journals: [
+    'journals:read',
+    'journals:manage',
+    'journals:portal:author',
+    'journals:portal:reviewer',
+  ],
   hostel: ['hostel:read', 'hostel:manage'],
   research: ['research:read', 'research:manage'],
   integrations: ['integrations:read', 'integrations:manage'],
@@ -432,6 +438,12 @@ export const ERP_MODULES: ErpModule[] = [
     defaultHome: '/admin/alumni',
   },
   {
+    id: 'journals',
+    label: 'Journals',
+    permissions: MODULE_PERMISSIONS.journals,
+    defaultHome: '/admin/journals',
+  },
+  {
     id: 'hostel',
     label: 'Hostel',
     permissions: MODULE_PERMISSIONS.hostel,
@@ -564,6 +576,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   {
     prefix: '/admin/alumni',
     permissions: [...MODULE_PERMISSIONS.alumni],
+  },
+  {
+    prefix: '/admin/journals',
+    permissions: [...MODULE_PERMISSIONS.journals],
   },
   {
     prefix: '/admin/hostel',

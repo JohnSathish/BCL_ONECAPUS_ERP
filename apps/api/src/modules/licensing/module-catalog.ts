@@ -273,6 +273,13 @@ export const MODULE_CATALOG: ModuleCatalogEntry[] = [
     description: 'Alumni profiles and mentorship',
   },
   {
+    key: 'journals',
+    label: 'Journals',
+    category: 'optional',
+    defaultEnabled: true,
+    description: 'Multi-journal academic publishing portals',
+  },
+  {
     key: 'hostel',
     label: 'Hostel',
     category: 'optional',

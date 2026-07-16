@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isAdmissionsLoginPath, isAdmissionsPublicPath } from '@/lib/admissions-portal-routes';
+import { extractJournalSlugFromHost, isJournalHost } from '@/lib/journals-host';
 
 function hostname(host: string) {
   return host.split(':')[0]?.toLowerCase() ?? '';
@@ -31,6 +32,7 @@ function handleCareerHost(request: NextRequest) {
     '/library-desk',
     '/admissions-portal',
     '/alumni-portal',
+    '/journals-portal',
   ]);
 }
 
@@ -43,7 +45,98 @@ function handleAlumniHost(request: NextRequest) {
     '/library-desk',
     '/admissions-portal',
     '/careers-portal',
+    '/journals-portal',
   ]);
+}
+
+async function handleJournalHost(request: NextRequest) {
+  const host = request.headers.get('host') ?? '';
+  const slug = extractJournalSlugFromHost(host);
+  const { pathname } = request.nextUrl;
+
+  if (pathname === '/sitemap.xml' || pathname === '/robots.txt') {
+    const url = request.nextUrl.clone();
+    url.pathname = `/journals-portal${pathname}`;
+    const response = NextResponse.rewrite(url);
+    if (slug) response.headers.set('x-journal-slug', slug);
+    return response;
+  }
+
+  // Legacy Google Sites / CMS redirects (host-aware)
+  if (
+    !pathname.startsWith('/_next') &&
+    !pathname.startsWith('/uploads') &&
+    !pathname.startsWith('/api') &&
+    !pathname.startsWith('/journals-portal') &&
+    pathname !== '/'
+  ) {
+    const redirected = await resolveJournalRedirect(request, pathname, slug);
+    if (redirected) return redirected;
+  }
+
+  const response = handleSubdomainRewrite(request, '/journals-portal', '/journals-portal', [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+    '/admissions-portal',
+    '/careers-portal',
+    '/alumni-portal',
+  ]);
+  if (slug && response instanceof NextResponse) {
+    response.headers.set('x-journal-slug', slug);
+  }
+  return response;
+}
+
+/** Built-in fallbacks + API JournalRedirect lookup for CMS-managed paths. */
+async function resolveJournalRedirect(request: NextRequest, pathname: string, slug: string | null) {
+  const STATIC: Record<string, string> = {
+    '/about-the-journal': '/journals-portal/about',
+    '/published-volumes': '/journals-portal/archives',
+    '/advisory-board': '/journals-portal/advisory-board',
+    '/downloads': '/journals-portal/downloads',
+  };
+  const staticTarget = STATIC[pathname.replace(/\/+$/, '') || '/'];
+  if (staticTarget) {
+    const url = request.nextUrl.clone();
+    url.pathname = staticTarget;
+    return NextResponse.redirect(url, 301);
+  }
+
+  try {
+    const apiBase =
+      process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+    const base = apiBase.startsWith('http')
+      ? apiBase.replace(/\/$/, '')
+      : `${request.nextUrl.origin}${apiBase.replace(/\/$/, '')}`;
+    const qs = new URLSearchParams({ path: pathname });
+    if (slug) qs.set('journal', slug);
+    const res = await fetch(`${base}/v1/journals/portal/redirect-lookup?${qs}`, {
+      headers: {
+        ...(slug ? { 'x-journal-slug': slug } : {}),
+        'x-login-host': request.headers.get('host') ?? '',
+      },
+      // Edge-friendly short timeout via AbortSignal if available
+      signal: AbortSignal.timeout?.(1500),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      toPath?: string;
+      statusCode?: number;
+      data?: { toPath?: string; statusCode?: number };
+    };
+    // API wraps payloads as { success, data }
+    const toPath = data.data?.toPath ?? data.toPath;
+    const statusCode = data.data?.statusCode ?? data.statusCode ?? 301;
+    if (!toPath) return null;
+    const url = request.nextUrl.clone();
+    url.pathname = toPath.startsWith('/') ? toPath : `/${toPath}`;
+    return NextResponse.redirect(url, statusCode as 301 | 302);
+  } catch {
+    return null;
+  }
 }
 
 function handleAdmissionsHost(request: NextRequest) {
@@ -84,6 +177,7 @@ function handleAdmissionsHost(request: NextRequest) {
     '/staff',
     '/shift',
     '/library-desk',
+    '/journals-portal',
   ]);
 }
 
@@ -123,6 +217,7 @@ function handleLibraryHost(request: NextRequest) {
     '/student',
     '/staff',
     '/shift',
+    '/journals-portal',
   ]);
 }
 
@@ -166,7 +261,7 @@ function handleSubdomainRewrite(
   return NextResponse.rewrite(url);
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
 
   if (isAdmissionsHost(host)) {
@@ -183,6 +278,10 @@ export function middleware(request: NextRequest) {
 
   if (isLibraryHost(host)) {
     return handleLibraryHost(request);
+  }
+
+  if (isJournalHost(host)) {
+    return handleJournalHost(request);
   }
 
   return NextResponse.next();

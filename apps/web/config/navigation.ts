@@ -1876,6 +1876,14 @@ export const ADMIN_NAV: NavGroup[] = [
         activePattern: '^/admin/alumni(?:/.*)?$',
       },
       {
+        label: 'Journals',
+        icon: BookOpen,
+        href: '/admin/journals',
+        module: 'journals',
+        permissions: [...P.journals],
+        activePattern: '^/admin/journals(?:/.*)?$',
+      },
+      {
         label: 'Hostel',
         icon: Building2,
         href: '/admin/hostel',
