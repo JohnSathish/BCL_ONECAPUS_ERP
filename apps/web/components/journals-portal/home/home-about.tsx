@@ -8,7 +8,7 @@ type Props = { journal: JournalInfo };
 export function HomeAbout({ journal }: Props) {
   const name = journal.name || 'Transient';
   return (
-    <section className="bg-white px-4 py-16 dark:bg-[var(--jp-card)] lg:px-6 lg:py-20">
+    <section className="bg-[var(--jp-card)] px-4 py-16 lg:px-6 lg:py-20">
       <FadeUp className="mx-auto max-w-3xl text-center">
         <h2 className="jp-eyebrow">About {name}</h2>
         <p className="mt-5 text-base leading-relaxed text-[var(--jp-muted)] sm:text-[1.05rem]">

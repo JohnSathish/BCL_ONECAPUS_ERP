@@ -210,7 +210,7 @@ function JournalLoginForm() {
             type="button"
             disabled={loading}
             onClick={() => void continueWithErp()}
-            className="w-full rounded-xl border border-[#0B2545]/15 bg-white/80 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#0B2545] transition hover:border-[#D4A017]/5 hover:bg-white"
+            className="w-full rounded-xl border border-[#0B2545]/15 bg-white/80 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#0B2545] transition hover:border-[#D4A017]/5 hover:bg-[var(--jp-card)]"
           >
             Continue with ERP login
           </button>

@@ -80,7 +80,7 @@ export function ArticleDetailClient({ articleId }: { articleId: string }) {
         ) : (
           <>
             {article.abstract ? (
-              <div className="rounded-lg border border-[var(--jp-border)] bg-[#f7f8fa] p-5">
+              <div className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-paper)] p-5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--jp-muted)]">
                   Abstract
                 </p>

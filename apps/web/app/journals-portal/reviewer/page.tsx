@@ -72,41 +72,46 @@ export default function ReviewerDashboardPage() {
           ].map((s) => (
             <div
               key={s.label}
-              className="rounded-lg border border-[#0A2342]/10 bg-[#f7f8fa] px-3 py-3 text-center"
+              className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-paper)] px-3 py-3 text-center"
             >
-              <p className="text-2xl font-semibold text-[#0A2342]">{s.value}</p>
-              <p className="text-xs uppercase tracking-wider text-[#0A2342]/55">{s.label}</p>
+              <p className="text-2xl font-semibold text-[var(--jp-ink)]">{s.value}</p>
+              <p className="text-xs uppercase tracking-wider text-[var(--jp-muted)]">{s.label}</p>
             </div>
           ))}
         </div>
 
         {listQ.isLoading ? (
-          <p className="mt-8 text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="mt-8 text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="mt-8 text-sm text-[#0A2342]/60">No review invitations yet.</p>
+          <p className="mt-8 text-sm text-[var(--jp-muted)]">No review invitations yet.</p>
         ) : (
           <ul className="mt-8 space-y-3">
             {rows.map((a) => (
               <li
                 key={a.id}
-                className="flex justify-between gap-4 rounded-lg border border-[#0A2342]/10 p-4"
+                className="flex justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-4"
               >
                 <div>
                   <Link
                     href={`/journals-portal/reviewer/assignments/${a.id}`}
-                    className="font-serif text-lg font-semibold hover:underline"
+                    className="jp-serif text-lg font-semibold text-[var(--jp-ink)] hover:underline"
                   >
                     {a.round?.submission?.title || 'Submission'}
                   </Link>
-                  <p className="text-xs text-[#0A2342]/55">
+                  <p className="text-xs text-[var(--jp-muted)]">
                     Status: {a.status}
                     {a.dueAt ? ` · Due ${new Date(a.dueAt).toLocaleDateString()}` : ''}
                     {isOverdue(a) ? (
-                      <span className="ml-2 font-semibold text-red-700">Overdue</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        Overdue
+                      </span>
                     ) : null}
                   </p>
                 </div>
-                <Link href={`/journals-portal/reviewer/assignments/${a.id}`} className="text-sm">
+                <Link
+                  href={`/journals-portal/reviewer/assignments/${a.id}`}
+                  className="text-sm text-[var(--jp-ink)]"
+                >
                   Open →
                 </Link>
               </li>

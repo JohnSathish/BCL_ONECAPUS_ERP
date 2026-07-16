@@ -26,7 +26,20 @@ html.dark .journals-portal {
   --jp-paper: #0f1724;
   --jp-card: #152033;
   --jp-border: rgba(232, 238, 246, 0.12);
+  --jp-navy-soft: #1a2f4d;
   background-color: #0a1220;
+  color: var(--jp-ink);
+}
+
+/* Theme-aware surfaces (prefer over hardcoded bg-white) */
+.journals-portal .jp-surface {
+  background-color: var(--jp-card);
+  border-color: var(--jp-border);
+  color: var(--jp-ink);
+}
+
+.journals-portal .jp-surface-muted {
+  background-color: var(--jp-paper);
   color: var(--jp-ink);
 }
 
@@ -481,6 +494,23 @@ html.dark .journals-portal .jp-stat-label {
 /* Auth (kept) */
 .journals-portal .jp-auth-shell {
   min-height: calc(100vh - 220px);
+  background: linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+}
+
+html.dark .journals-portal .jp-auth-shell {
+  background: linear-gradient(180deg, #0a1220 0%, #0f1724 100%);
+}
+
+.journals-portal .jp-auth-shell-wash {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(212, 160, 23, 0.08), transparent 45%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+}
+
+html.dark .journals-portal .jp-auth-shell-wash {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(212, 160, 23, 0.1), transparent 45%),
+    linear-gradient(180deg, #0a1220 0%, #0f1724 100%);
 }
 
 .journals-portal .jp-auth-glass {

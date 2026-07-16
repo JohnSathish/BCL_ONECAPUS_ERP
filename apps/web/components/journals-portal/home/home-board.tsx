@@ -27,7 +27,7 @@ export function HomeBoard({ members }: Props) {
   const current = pages[Math.min(page, pages.length - 1)] ?? [];
 
   return (
-    <section className="bg-white px-4 py-16 dark:bg-transparent lg:px-6 lg:py-20">
+    <section className="bg-[var(--jp-card)] px-4 py-16 dark:bg-transparent lg:px-6 lg:py-20">
       <div className="mx-auto max-w-7xl">
         <FadeUp className="relative flex items-center justify-center">
           <h2 className="jp-serif text-center text-3xl font-semibold tracking-tight">

@@ -27,7 +27,7 @@ export default function ArchivesPage() {
             {(issuesQ.data ?? []).map((issue) => (
               <li
                 key={issue.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-4 shadow-sm"
               >
                 <div>
                   <p className="jp-serif text-base font-semibold text-[var(--jp-ink)]">

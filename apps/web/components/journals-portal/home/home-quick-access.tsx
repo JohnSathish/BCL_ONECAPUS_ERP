@@ -25,7 +25,7 @@ export function HomeQuickAccess() {
             <FadeUp key={item.href} delay={i * 0.04}>
               <Link
                 href={item.href}
-                className="jp-lift group flex h-full flex-col items-start gap-2.5 rounded-md border border-[var(--jp-border)] bg-white p-4 shadow-[0_12px_32px_rgba(11,31,58,0.12)] dark:bg-[var(--jp-card)]"
+                className="jp-lift group flex h-full flex-col items-start gap-2.5 rounded-md border border-[var(--jp-border)] bg-[var(--jp-card)] p-4 shadow-[0_12px_32px_rgba(11,31,58,0.12)] dark:bg-[var(--jp-card)]"
               >
                 <span className="text-[var(--jp-gold)]">
                   <Icon className="h-5 w-5" strokeWidth={1.5} />

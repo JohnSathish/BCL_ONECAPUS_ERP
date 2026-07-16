@@ -21,9 +21,12 @@ import {
 } from 'lucide-react';
 import { fetchJournalPortalInfo, fetchJournalPortalMe } from '@/services/journals-portal';
 import { bootstrapSession, logout as apiLogout } from '@/services/auth';
+import { updateUserAppearanceMode } from '@/services/user-preferences';
 import { HOME_FOOTER_INDEXING } from '@/components/journals-portal/home/transient-home-static';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/cn';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UserPreferences } from '@/types/branding';
 
 const NAVY = '#0B1F3A';
 const TOPBAR = '#000B1E';
@@ -93,15 +96,37 @@ function groupActive(pathname: string, group: NavGroup) {
 
 function JournalThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
+  const session = useAuthStore((s) => s.session);
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const isDark = (mounted ? resolvedTheme : 'light') === 'dark';
+
+  const prefsMutation = useMutation({
+    mutationFn: updateUserAppearanceMode,
+    onSuccess: (data) => {
+      queryClient.setQueryData<UserPreferences>(['user-preferences', session?.user?.id], data);
+    },
+  });
+
   return (
     <button
       type="button"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="rounded-md p-2 text-[var(--jp-ink)]/55 transition hover:text-[var(--jp-ink)]"
+      title={isDark ? 'Light mode' : 'Dark mode'}
+      onClick={() => {
+        const next = isDark ? 'light' : 'dark';
+        setTheme(next);
+        if (session?.accessToken && session.user?.id) {
+          // Keep server prefs in sync so theme does not snap back.
+          queryClient.setQueryData<UserPreferences>(
+            ['user-preferences', session.user.id],
+            (prev) => (prev ? { ...prev, appearanceMode: next } : { appearanceMode: next }),
+          );
+          prefsMutation.mutate(next);
+        }
+      }}
+      className="inline-flex items-center justify-center rounded-md border border-[var(--jp-border)] bg-[var(--jp-card)] p-2 text-[var(--jp-ink)]/70 shadow-sm transition hover:border-[rgba(201,162,39,0.45)] hover:text-[var(--jp-ink)]"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
@@ -306,30 +331,31 @@ export function JournalPublicShell({ children }: Props) {
 
       <header
         className={cn(
-          'sticky top-0 z-40 border-b border-[var(--jp-border)] bg-white dark:bg-[var(--jp-card)]',
-          scrolled && 'shadow-[0_8px_24px_rgba(11,31,58,0.08)]',
+          'sticky top-0 z-40 border-b border-[var(--jp-border)] bg-[var(--jp-card)]',
+          scrolled &&
+            'shadow-[0_8px_24px_rgba(11,31,58,0.08)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)]',
         )}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
           <NextLink
             href="/journals-portal"
-            className="flex min-w-0 items-center gap-2.5"
+            className="flex min-w-0 items-center gap-3.5"
             onClick={() => setOpen(false)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logo}
               alt=""
-              className="h-10 w-10 shrink-0 rounded-full bg-white object-contain p-0.5 ring-1 ring-[rgba(201,162,39,0.35)]"
+              className="h-14 w-14 shrink-0 rounded-full bg-white object-contain p-0.5 ring-1 ring-[rgba(201,162,39,0.35)] sm:h-16 sm:w-16"
             />
             <div className="min-w-0 leading-tight">
-              <p className="jp-serif truncate text-[1.45rem] leading-none tracking-tight text-[var(--jp-ink)] sm:text-[1.65rem]">
+              <p className="jp-serif truncate text-[1.85rem] font-semibold uppercase leading-none tracking-tight text-[var(--jp-ink)] sm:text-[2.15rem]">
                 {title}
               </p>
-              <p className="mt-1 max-w-[220px] text-[9px] leading-snug text-[var(--jp-muted)] sm:max-w-[280px] sm:text-[10px]">
-                A Journal of Natural Sciences and Allied Subjects
+              <p className="mt-1.5 max-w-[260px] text-[10px] leading-snug text-[var(--jp-muted)] sm:max-w-[300px] sm:text-[11px]">
+                A Peer Reviewed Annual Journal
                 <br />
-                (a peer reviewed journal) Don Bosco College, Tura
+                Don Bosco College, Tura
               </p>
             </div>
           </NextLink>
@@ -367,7 +393,7 @@ export function JournalPublicShell({ children }: Props) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <NextLink
               href="/journals-portal/search"
               aria-label="Search"
@@ -375,12 +401,10 @@ export function JournalPublicShell({ children }: Props) {
             >
               <Search className="h-4 w-4" />
             </NextLink>
-            <div className="hidden sm:block">
-              <JournalThemeToggle />
-            </div>
+            <JournalThemeToggle />
             <button
               type="button"
-              className="rounded-md border border-[var(--jp-border)] p-2 xl:hidden"
+              className="rounded-md border border-[var(--jp-border)] p-2 text-[var(--jp-ink)] xl:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-label="Toggle menu"
             >
@@ -390,7 +414,7 @@ export function JournalPublicShell({ children }: Props) {
         </div>
 
         {open ? (
-          <div className="border-t border-[var(--jp-border)] bg-white dark:bg-[var(--jp-card)] xl:hidden">
+          <div className="border-t border-[var(--jp-border)] bg-[var(--jp-card)] xl:hidden">
             <div className="flex max-h-[70vh] flex-col overflow-y-auto px-4 py-2">
               {isSignedIn ? (
                 <div className="border-b border-[var(--jp-border)] py-3">
@@ -403,7 +427,7 @@ export function JournalPublicShell({ children }: Props) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="border-b border-[var(--jp-border)] py-3 text-sm font-medium uppercase tracking-wide"
+                  className="border-b border-[var(--jp-border)] py-3 text-sm font-medium uppercase tracking-wide text-[var(--jp-ink)]"
                 >
                   {item.label}
                 </NextLink>
@@ -412,7 +436,7 @@ export function JournalPublicShell({ children }: Props) {
                 <button
                   type="button"
                   onClick={() => void onLogout()}
-                  className="border-b border-[var(--jp-border)] py-3 text-left text-sm font-semibold text-red-700"
+                  className="border-b border-[var(--jp-border)] py-3 text-left text-sm font-semibold text-red-600 dark:text-red-400"
                 >
                   {loggingOut ? 'Signing out…' : 'Logout'}
                 </button>
@@ -438,14 +462,16 @@ export function JournalPublicShell({ children }: Props) {
       <footer className="relative z-10 mt-auto text-white" style={{ backgroundColor: NAVY }}>
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-5 lg:px-6">
           <div className="sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logo}
                 alt=""
-                className="h-9 w-9 rounded-full bg-white object-contain p-0.5"
+                className="h-12 w-12 rounded-full bg-white object-contain p-0.5"
               />
-              <p className="jp-serif text-2xl font-semibold tracking-tight">{title}</p>
+              <p className="jp-serif text-2xl font-semibold uppercase tracking-tight sm:text-3xl">
+                {title}
+              </p>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-white/65">
               {journal?.publisher || 'Don Bosco College, Tura'} — peer-reviewed open-access

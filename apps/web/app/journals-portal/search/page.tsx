@@ -44,7 +44,7 @@ export default function JournalSearchPage() {
           {(articlesQ.data ?? []).map((article) => (
             <li
               key={article.id}
-              className="rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
+              className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-4 shadow-sm"
             >
               <Link
                 href={`/journals-portal/articles/${article.id}`}

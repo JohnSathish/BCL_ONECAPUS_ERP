@@ -60,13 +60,7 @@ export function JournalAuthLayout({ children, mode }: Props) {
           backgroundPosition: 'center',
         }}
       />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse at 20% 20%, rgba(212,160,23,0.08), transparent 45%), linear-gradient(180deg, #F7F9FC 0%, #EEF2F7 100%)',
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0 jp-auth-shell-wash" aria-hidden />
 
       <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-2 lg:gap-10 lg:px-6 lg:py-14">
         {/* Brand panel */}
@@ -150,7 +144,7 @@ export function JournalAuthLayout({ children, mode }: Props) {
 
         {/* Form panel */}
         <div className="jp-fade-up jp-fade-up-delay-1 flex items-center">
-          <div className="jp-auth-glass w-full rounded-3xl border border-white/60 p-6 shadow-[0_24px_60px_rgba(11,37,69,0.12)] sm:p-8 lg:p-10">
+          <div className="jp-auth-glass w-full rounded-3xl border border-[var(--jp-border)] p-6 shadow-[0_24px_60px_rgba(11,37,69,0.12)] sm:p-8 lg:p-10 dark:shadow-[0_24px_60px_rgba(0,0,0,0.4)]">
             <div className="mb-7 lg:hidden">
               <p
                 className="text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -158,19 +152,17 @@ export function JournalAuthLayout({ children, mode }: Props) {
               >
                 {journal?.institution || 'Don Bosco College, Tura'}
               </p>
-              <p className="jp-serif mt-1 text-3xl font-semibold" style={{ color: NAVY }}>
-                {title}
-              </p>
+              <p className="jp-serif mt-1 text-3xl font-semibold text-[var(--jp-ink)]">{title}</p>
               {issn ? (
-                <p className="mt-1 text-xs font-medium text-[#0B2545]/70">ISSN {issn}</p>
+                <p className="mt-1 text-xs font-medium text-[var(--jp-muted)]">ISSN {issn}</p>
               ) : null}
             </div>
             {children}
-            <p className="mt-8 text-center text-xs text-[#0B2545]/70">
+            <p className="mt-8 text-center text-xs text-[var(--jp-muted)]">
               Need help?{' '}
               <Link
                 href="/journals-portal/contact"
-                className="font-semibold text-[#0B2545] underline-offset-2 hover:underline"
+                className="font-semibold text-[var(--jp-ink)] underline-offset-2 hover:underline"
               >
                 Contact the editorial office
               </Link>
@@ -199,7 +191,7 @@ export function AuthField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-[12px] font-semibold text-[#0B2545]">
+      <label htmlFor={id} className="block text-[12px] font-semibold text-[var(--jp-ink)]">
         {label}
       </label>
       <div
@@ -208,13 +200,13 @@ export function AuthField({
           .join(' ')}
       >
         {icon ? (
-          <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-[#0B2545]/50">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-[var(--jp-muted)]">
             {icon}
           </span>
         ) : null}
         {children}
       </div>
-      {hint ? <p className="text-[11px] text-[#0B2545]/65">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-[var(--jp-muted)]">{hint}</p> : null}
     </div>
   );
 }

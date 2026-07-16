@@ -38,7 +38,7 @@ export default function CurrentIssuePage() {
               {(issue.articles ?? []).map((article) => (
                 <li
                   key={article.id}
-                  className="rounded-lg border border-[var(--jp-border)] bg-white p-5 shadow-sm"
+                  className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-5 shadow-sm"
                 >
                   <Link
                     href={`/journals-portal/articles/${article.id}`}

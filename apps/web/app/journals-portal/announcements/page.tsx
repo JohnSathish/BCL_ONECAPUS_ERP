@@ -29,7 +29,7 @@ export default function AnnouncementsPage() {
             {announcements.map((a) => (
               <li
                 key={a.id}
-                className="rounded-lg border border-[var(--jp-border)] bg-white p-5 shadow-sm"
+                className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-5 shadow-sm"
               >
                 <h2 className="jp-serif text-lg font-semibold text-[var(--jp-ink)]">{a.title}</h2>
                 {a.bodyHtml ? (

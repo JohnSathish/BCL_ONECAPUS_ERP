@@ -88,7 +88,7 @@ export default function AuthorDashboardPage() {
             {(listQ.data ?? []).map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-4 shadow-sm"
               >
                 <div>
                   <Link

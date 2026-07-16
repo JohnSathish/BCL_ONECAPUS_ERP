@@ -31,7 +31,7 @@ export default function AdvisoryBoardPage() {
             {members.map((m) => (
               <li
                 key={m.id}
-                className="rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
+                className="rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] p-4 shadow-sm"
               >
                 <p className="font-semibold text-[var(--jp-ink)]">{m.fullName}</p>
                 <p className="text-xs text-[var(--jp-muted)]">{m.roleTitle}</p>

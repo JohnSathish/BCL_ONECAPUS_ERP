@@ -53,7 +53,7 @@ export default function DownloadsPage() {
                           href={d.fileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center justify-between gap-3 rounded-lg border border-[var(--jp-border)] bg-white px-4 py-3 text-sm shadow-sm hover:border-[rgba(201,162,39,0.5)]"
+                          className="flex items-center justify-between gap-3 rounded-lg border border-[var(--jp-border)] bg-[var(--jp-card)] px-4 py-3 text-sm shadow-sm hover:border-[rgba(201,162,39,0.5)]"
                         >
                           <span className="font-medium text-[var(--jp-ink)]">{d.title}</span>
                           <span className="text-xs text-[var(--jp-muted)]">

@@ -55,7 +55,7 @@ export function HomeCurrentIssue({ issue, cover, volumeCount, articleCount, auth
     <section className="bg-[var(--jp-paper)] px-4 py-16 lg:px-6 lg:py-20">
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[220px_1fr_240px] lg:gap-12">
         <FadeUp className="flex justify-center lg:justify-start">
-          <div className="jp-cover w-[180px] overflow-hidden rounded-sm bg-white sm:w-[200px]">
+          <div className="jp-cover w-[180px] overflow-hidden rounded-sm bg-[var(--jp-card)] sm:w-[200px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={cover}
@@ -108,7 +108,7 @@ export function HomeCurrentIssue({ issue, cover, volumeCount, articleCount, auth
             return (
               <div
                 key={s.label}
-                className="jp-lift flex items-center gap-4 rounded-md border border-[var(--jp-border)] bg-white px-4 py-4 dark:bg-[var(--jp-card)]"
+                className="jp-lift flex items-center gap-4 rounded-md border border-[var(--jp-border)] bg-[var(--jp-card)] px-4 py-4 dark:bg-[var(--jp-card)]"
               >
                 <span className="shrink-0 text-[var(--jp-gold)]">
                   <Icon className="h-5 w-5" strokeWidth={1.5} />

@@ -130,7 +130,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     canManageBranding,
     isFetched: brandingFetched,
   } = useInstitutionBranding();
-  const { theme: nextTheme, resolvedTheme, setTheme: setNextTheme } = useNextTheme();
+  const { resolvedTheme, setTheme: setNextTheme } = useNextTheme();
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const setStoreTheme = useThemeStore((s) => s.setTheme);
@@ -174,10 +174,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme, tenantId, setStoreTheme, setSidebarCollapsed]);
 
+  // Apply server appearance only when prefs arrive/change — do not fight local toggles.
   useEffect(() => {
-    if (!userAppearance || nextTheme === userAppearance) return;
+    if (!userAppearance) return;
     setNextTheme(userAppearance);
-  }, [userAppearance, nextTheme, setNextTheme]);
+  }, [userAppearance, setNextTheme]);
 
   const effectiveTheme = useMemo(() => {
     if (!theme) return null;
