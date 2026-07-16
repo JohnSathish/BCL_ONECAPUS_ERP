@@ -19,6 +19,7 @@
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --dry-run
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --enrollment=BA25-035 --apply
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --apply
+ *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --apply --batch=100
  */
 import { PrismaClient } from '@prisma/client';
 
@@ -128,23 +129,44 @@ async function main() {
     return;
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const lines = await tx.semesterRegistrationLine.updateMany({
-      where: { registrationId: { in: regIds }, status: 'pending' },
-      data: { status: 'confirmed' },
-    });
-    const updatedRegs = await tx.semesterRegistration.updateMany({
-      where: {
-        id: { in: regIds },
-        status: { notIn: ['completed', 'rejected'] },
+  // Batch to avoid Prisma interactive-transaction 5s timeout on ~800+ regs.
+  const batchSize = Math.max(1, Number(readArg('batch') ?? '100'));
+  let totalRegs = 0;
+  let totalLines = 0;
+  const batches = Math.ceil(regIds.length / batchSize);
+  console.log(
+    `\nApplying in ${batches} batch(es) of up to ${batchSize} registration(s)…`,
+  );
+
+  for (let i = 0; i < regIds.length; i += batchSize) {
+    const chunk = regIds.slice(i, i + batchSize);
+    const batchNo = Math.floor(i / batchSize) + 1;
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const lines = await tx.semesterRegistrationLine.updateMany({
+          where: { registrationId: { in: chunk }, status: 'pending' },
+          data: { status: 'confirmed' },
+        });
+        const updatedRegs = await tx.semesterRegistration.updateMany({
+          where: {
+            id: { in: chunk },
+            status: { notIn: ['completed', 'rejected'] },
+          },
+          data: { status: 'completed', submittedAt: new Date() },
+        });
+        return { lines: lines.count, regs: updatedRegs.count };
       },
-      data: { status: 'completed', submittedAt: new Date() },
-    });
-    return { lines: lines.count, regs: updatedRegs.count };
-  });
+      { timeout: 60_000, maxWait: 10_000 },
+    );
+    totalRegs += result.regs;
+    totalLines += result.lines;
+    console.log(
+      `  batch ${batchNo}/${batches}: ${result.regs} regs, ${result.lines} lines`,
+    );
+  }
 
   console.log(
-    `\nFinalized ${result.regs} registration(s); confirmed ${result.lines} line(s). Done.\n`,
+    `\nFinalized ${totalRegs} registration(s); confirmed ${totalLines} line(s). Done.\n`,
   );
 }
 

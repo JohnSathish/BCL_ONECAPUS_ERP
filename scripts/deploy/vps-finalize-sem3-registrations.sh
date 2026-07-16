@@ -117,16 +117,19 @@ fi
 
 echo
 echo "[2/4] Attach missing MAJOR sections…"
-api_run npx tsx scripts/attach-missing-major-sections.ts --tenant="${TENANT}" --sem="${SEM}" --dry-run
-if [[ $DRY_RUN -eq 0 ]]; then
+if [[ $DRY_RUN -eq 1 ]]; then
+  api_run npx tsx scripts/attach-missing-major-sections.ts --tenant="${TENANT}" --sem="${SEM}" --dry-run
+else
   api_run npx tsx scripts/attach-missing-major-sections.ts --tenant="${TENANT}" --sem="${SEM}" --apply
 fi
 
 echo
 echo "[3/4] Finalize registrations…"
-api_run npx tsx scripts/finalize-draft-registrations.ts --tenant="${TENANT}" --sem="${SEM}" --dry-run
-if [[ $DRY_RUN -eq 0 ]]; then
-  api_run npx tsx scripts/finalize-draft-registrations.ts --tenant="${TENANT}" --sem="${SEM}" --apply
+if [[ $DRY_RUN -eq 1 ]]; then
+  api_run npx tsx scripts/finalize-draft-registrations.ts --tenant="${TENANT}" --sem="${SEM}" --dry-run
+else
+  # Batched apply (avoids Prisma 5s interactive-transaction timeout on ~800+ regs)
+  api_run npx tsx scripts/finalize-draft-registrations.ts --tenant="${TENANT}" --sem="${SEM}" --apply --batch=100
 fi
 
 echo
