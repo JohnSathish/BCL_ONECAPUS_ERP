@@ -5,15 +5,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { ChevronDown, LogOut, Mail, Menu, Moon, Search, Share2, Sun, User, X } from 'lucide-react';
+import {
+  ChevronDown,
+  LogIn,
+  LogOut,
+  Mail,
+  Menu,
+  Moon,
+  Phone,
+  Search,
+  Share2,
+  Sun,
+  User,
+  X,
+} from 'lucide-react';
 import { fetchJournalPortalInfo, fetchJournalPortalMe } from '@/services/journals-portal';
 import { bootstrapSession, logout as apiLogout } from '@/services/auth';
 import { HOME_FOOTER_INDEXING } from '@/components/journals-portal/home/transient-home-static';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/cn';
 
-const GOLD = '#C9A227';
 const NAVY = '#0B1F3A';
+const TOPBAR = '#000B1E';
 const DEFAULT_LOGO = '/branding/college-logo.png';
 
 function resolveAuthorLabel(displayName?: string | null, email?: string | null) {
@@ -146,7 +159,8 @@ export function JournalPublicShell({ children }: Props) {
   const journal = infoQ.data?.journal;
   const logo = journal?.logoUrl || DEFAULT_LOGO;
   const title = journal?.name || 'Transient';
-  const email = journal?.contactEmail || 'transient@donboscocollege.ac.in';
+  const email = journal?.contactEmail || 'transient.journal@donboscocollege.ac.in';
+  const phone = journal?.contactPhone || '+91 96128 12345';
   const issn = journal?.issn;
 
   const authorName = useMemo(() => {
@@ -219,49 +233,72 @@ export function JournalPublicShell({ children }: Props) {
 
   return (
     <div className="journals-portal jp-grain flex min-h-screen flex-col text-[var(--jp-ink)]">
-      <div className="relative z-30 border-b border-[var(--jp-border)] bg-white text-[11px] text-[var(--jp-ink)]/75 dark:bg-[var(--jp-card)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-            {issn ? <span className="shrink-0 font-medium tracking-wide">ISSN {issn}</span> : null}
-            <span className="hidden text-[var(--jp-ink)]/55 sm:inline">Open Access Journal</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <NextLink
-              href={
-                isSignedIn ? '/journals-portal/author/submissions/new' : '/journals-portal/author'
-              }
-              className="rounded-sm px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0B1F3A]"
-              style={{ backgroundColor: GOLD }}
+      <div className="relative z-30 text-[11px] text-white/90" style={{ backgroundColor: TOPBAR }}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 lg:px-6">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+            <a
+              href={`mailto:${email}`}
+              className="inline-flex min-w-0 items-center gap-1.5 truncate text-white/90 hover:text-white"
             >
-              Submit Paper
-            </NextLink>
+              <Mail className="h-3.5 w-3.5 shrink-0 opacity-80" />
+              <span className="truncate">{email}</span>
+            </a>
+            {phone ? (
+              <a
+                href={`tel:${phone.replace(/\s+/g, '')}`}
+                className="hidden items-center gap-1.5 text-white/90 hover:text-white sm:inline-flex"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                <span>{phone}</span>
+              </a>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-0 text-white/90">
+            {issn ? (
+              <>
+                <span className="hidden font-medium tracking-wide sm:inline">ISSN: {issn}</span>
+                <span className="mx-3 hidden h-3 w-px bg-white/30 sm:inline-block" aria-hidden />
+              </>
+            ) : null}
             {isSignedIn ? (
-              <div className="flex items-center gap-2 sm:gap-3">
+              <>
                 <NextLink
                   href="/journals-portal/author"
-                  className="hidden max-w-[200px] items-center gap-1.5 truncate font-medium text-[var(--jp-ink)] hover:text-[var(--jp-ink)] sm:inline-flex"
+                  className="inline-flex max-w-[140px] items-center gap-1.5 truncate hover:text-white sm:max-w-[180px]"
                   title={authorEmail}
                 >
-                  <User className="h-3.5 w-3.5 shrink-0 text-[var(--jp-gold)]" />
+                  <User className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{authorName}</span>
                 </NextLink>
+                <span className="mx-3 h-3 w-px bg-white/30" aria-hidden />
                 <button
                   type="button"
                   onClick={() => void onLogout()}
                   disabled={loggingOut}
-                  className="inline-flex items-center gap-1 font-semibold text-[var(--jp-ink)]/70 hover:text-[var(--jp-ink)]"
+                  className="inline-flex items-center gap-1.5 hover:text-white"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   {loggingOut ? 'Signing out…' : 'Logout'}
                 </button>
-              </div>
+              </>
             ) : (
-              <NextLink
-                href="/journals-portal/login"
-                className="font-medium text-[var(--jp-ink)]/70 hover:text-[var(--jp-ink)]"
-              >
-                Login
-              </NextLink>
+              <>
+                <NextLink
+                  href="/journals-portal/register"
+                  className="inline-flex items-center gap-1.5 hover:text-white"
+                >
+                  <User className="h-3.5 w-3.5" />
+                  Register
+                </NextLink>
+                <span className="mx-3 h-3 w-px bg-white/30" aria-hidden />
+                <NextLink
+                  href="/journals-portal/login"
+                  className="inline-flex items-center gap-1.5 hover:text-white"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  Login
+                </NextLink>
+              </>
             )}
           </div>
         </div>

@@ -284,6 +284,19 @@ html.dark .journals-portal .jp-nav-link[data-active='true'] {
   will-change: transform;
 }
 
+.journals-portal .jp-hero-unified-overlay {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 18, 36, 0.96) 0%,
+      rgba(8, 18, 36, 0.88) 28%,
+      rgba(8, 18, 36, 0.55) 55%,
+      rgba(8, 18, 36, 0.28) 78%,
+      rgba(8, 18, 36, 0.18) 100%
+    ),
+    linear-gradient(180deg, rgba(8, 18, 36, 0.35) 0%, transparent 28%, rgba(8, 18, 36, 0.45) 100%);
+}
+
 .journals-portal .jp-hero-mesh {
   background-color: var(--jp-navy);
   background-image:
