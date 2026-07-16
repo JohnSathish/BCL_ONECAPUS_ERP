@@ -31,10 +31,13 @@ import {
 import {
   StudentReportExportDto,
   StudentReportFiltersDto,
+  SubjectStrengthExportDto,
 } from './dto/student-reports.dto';
 import { CustomReportService } from './services/custom-report.service';
 import { StudentReportsExportService } from './services/student-reports-export.service';
 import { StudentReportsService } from './services/student-reports.service';
+import { StudentSubjectStrengthReportService } from './services/student-subject-strength-report.service';
+import { StudentDepartmentStrengthReportService } from './services/student-department-strength-report.service';
 
 @ApiBearerAuth()
 @ApiTags('student-reports')
@@ -47,6 +50,8 @@ export class StudentReportsController {
     private readonly reports: StudentReportsService,
     private readonly exportService: StudentReportsExportService,
     private readonly customReports: CustomReportService,
+    private readonly subjectStrengthReports: StudentSubjectStrengthReportService,
+    private readonly departmentStrengthReports: StudentDepartmentStrengthReportService,
   ) {}
 
   @Get('field-registry')
@@ -230,6 +235,82 @@ export class StudentReportsController {
       'subject-papers',
       filters,
       user,
+    );
+  }
+
+  @Get('subject-strength/preview')
+  subjectStrengthPreview(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.subjectStrengthReports.getReport(user.tid, filters, user);
+  }
+
+  @Get('subject-strength')
+  subjectStrength(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.subjectStrengthReports.getReport(user.tid, filters, user);
+  }
+
+  @Get('subject-strength/department')
+  subjectStrengthDepartment(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.departmentStrengthReports.getDepartmentReport(
+      user.tid,
+      filters,
+      user,
+    );
+  }
+
+  @Get('subject-strength/department/students')
+  subjectStrengthDepartmentStudents(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.departmentStrengthReports.getDepartmentStudents(
+      user.tid,
+      filters,
+      user,
+    );
+  }
+
+  @Get('subject-strength/department-summary')
+  subjectStrengthDepartmentSummary(
+    @CurrentUser() user: JwtUser,
+    @Query() filters: StudentReportFiltersDto,
+  ) {
+    return this.departmentStrengthReports.getDepartmentSubjectSummary(
+      user.tid,
+      filters,
+      user,
+    );
+  }
+
+  @Get('subject-strength/export')
+  async subjectStrengthExportGet(
+    @CurrentUser() user: JwtUser,
+    @Query() dto: SubjectStrengthExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.exportService.exportSubjectStrengthHub(user.tid, dto, user),
+    );
+  }
+
+  @Post('subject-strength/export')
+  async subjectStrengthExport(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SubjectStrengthExportDto,
+    @Res() res: Response,
+  ) {
+    await this.sendExport(
+      res,
+      this.exportService.exportSubjectStrengthHub(user.tid, dto, user),
     );
   }
 

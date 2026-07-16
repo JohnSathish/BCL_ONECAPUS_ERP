@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { label: 'Master Report', href: '/admin/reports/students/master' },
   { label: 'Subject Registration', href: '/admin/reports/students/subject-registration' },
   { label: 'Subject Papers', href: '/admin/reports/students/subject-papers' },
+  { label: 'Subject Strength', href: '/admin/reports/students/subject-strength' },
   { label: 'Report Builder', href: '/admin/reports/students/builder' },
   { label: 'Saved Reports', href: '/admin/reports/students/saved' },
   { label: 'Scheduled', href: '/admin/reports/students/scheduled' },

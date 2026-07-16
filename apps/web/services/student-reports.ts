@@ -30,6 +30,8 @@ export type StudentReportFilters = {
   district?: string;
   feeStatus?: string;
   residenceType?: string;
+  majorSubjectId?: string;
+  minorSubjectId?: string;
   sortBy?: string;
   sortDirection?: 'asc' | 'desc';
 };
@@ -126,6 +128,100 @@ export type AgeReport = {
   buckets: ReportBucket[];
 };
 
+export type SubjectStrengthSubjectRow = {
+  offeringId: string;
+  courseCode: string;
+  courseTitle: string;
+  studentCount: number;
+};
+
+export type SubjectStrengthCategoryGroup = {
+  category: string;
+  label: string;
+  subjects: SubjectStrengthSubjectRow[];
+};
+
+export type SubjectStrengthSemesterGroup = {
+  semesterSequence: number;
+  label: string;
+  totalStudents: number;
+  categories: SubjectStrengthCategoryGroup[];
+};
+
+export type SubjectStrengthReport = {
+  title: string;
+  totalEnrollments: number;
+  semesters: SubjectStrengthSemesterGroup[];
+};
+
+export type DepartmentStrengthRow = {
+  departmentId: string | null;
+  departmentName: string;
+  majorSubjectId: string;
+  majorSubjectName: string;
+  studentCount: number;
+};
+
+export type DepartmentStrengthReport = {
+  title: string;
+  academicYearLabel: string | null;
+  semesterLabel: string | null;
+  semesterSequence: number | null;
+  summary: {
+    totalDepartments: number;
+    totalStudents: number;
+  };
+  rows: DepartmentStrengthRow[];
+};
+
+export type DepartmentStrengthStudentRow = {
+  studentId: string;
+  enrollmentNumber: string;
+  rollNumber: string;
+  fullName: string;
+  majorDepartment: string;
+  minorDepartment: string;
+  mobileNumber: string;
+  admissionStatus: string;
+};
+
+export type DepartmentStrengthStudentsReport = {
+  title: string;
+  departmentName: string;
+  majorSubjectName: string;
+  semesterLabel: string | null;
+  total: number;
+  students: DepartmentStrengthStudentRow[];
+};
+
+export type DepartmentSubjectSummaryLine = {
+  category: string;
+  categoryLabel: string;
+  label: string;
+  courseCode: string;
+  courseTitle: string;
+  majorPaperIndex: number | null;
+  studentCount: number;
+};
+
+export type DepartmentSubjectSummaryDept = {
+  departmentId: string | null;
+  departmentName: string;
+  lines: DepartmentSubjectSummaryLine[];
+};
+
+export type DepartmentSubjectSummaryReport = {
+  title: string;
+  semesterLabel: string | null;
+  departments: DepartmentSubjectSummaryDept[];
+};
+
+export type SubjectStrengthExportVariant =
+  | 'department'
+  | 'subject'
+  | 'department-summary'
+  | 'department-students';
+
 export type StudentReportType =
   | 'dashboard'
   | 'strength'
@@ -143,7 +239,8 @@ export type StudentReportType =
   | 'age'
   | 'blood-group'
   | 'admission'
-  | 'contact';
+  | 'contact'
+  | 'subject-strength';
 
 function cleanParams(filters?: StudentReportFilters) {
   const params: Record<string, string | number> = {};
@@ -180,11 +277,70 @@ export async function fetchStudentCombinationsReport(
   return data;
 }
 
+export async function fetchSubjectStrengthReport(
+  filters?: StudentReportFilters,
+): Promise<SubjectStrengthReport> {
+  const { data } = await api.get('/v1/student-reports/subject-strength', {
+    params: cleanParams(filters),
+  });
+  return data;
+}
+
+export async function fetchDepartmentStrengthReport(
+  filters?: StudentReportFilters,
+): Promise<DepartmentStrengthReport> {
+  const { data } = await api.get('/v1/student-reports/subject-strength/department', {
+    params: cleanParams(filters),
+  });
+  return data;
+}
+
+export async function fetchDepartmentStrengthStudents(
+  filters: StudentReportFilters & { majorSubjectId?: string; departmentId?: string },
+): Promise<DepartmentStrengthStudentsReport> {
+  const { data } = await api.get('/v1/student-reports/subject-strength/department/students', {
+    params: cleanParams(filters),
+  });
+  return data;
+}
+
+export async function fetchDepartmentSubjectSummaryReport(
+  filters?: StudentReportFilters,
+): Promise<DepartmentSubjectSummaryReport> {
+  const { data } = await api.get('/v1/student-reports/subject-strength/department-summary', {
+    params: cleanParams(filters),
+  });
+  return data;
+}
+
+export async function exportSubjectStrengthReport(
+  format: 'xlsx' | 'csv' | 'pdf',
+  filters?: StudentReportFilters & {
+    majorSubjectId?: string;
+    departmentId?: string;
+  },
+  variant: SubjectStrengthExportVariant = 'department',
+): Promise<void> {
+  const response = await api.get('/v1/student-reports/subject-strength/export', {
+    params: { ...cleanParams(filters), format, variant },
+    responseType: 'blob',
+  });
+  const ext = format === 'xlsx' ? 'xlsx' : format === 'csv' ? 'csv' : 'pdf';
+  const header = response.headers['content-disposition'] as string | undefined;
+  downloadBlob(
+    response.data,
+    filenameFromContentDisposition(header) ?? `student_report_subject-strength-${variant}.${ext}`,
+  );
+}
+
 export async function exportStudentReport(
   reportType: StudentReportType,
   format: 'xlsx' | 'csv',
   filters?: StudentReportFilters,
 ): Promise<void> {
+  if (reportType === 'subject-strength') {
+    return exportSubjectStrengthReport(format, filters);
+  }
   const response = await api.get('/v1/student-reports/export', {
     params: { ...cleanParams(filters), reportType, format },
     responseType: 'blob',

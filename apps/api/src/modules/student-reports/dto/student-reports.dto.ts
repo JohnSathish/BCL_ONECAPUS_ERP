@@ -116,3 +116,19 @@ export class StudentReportExportDto extends StudentReportFiltersDto {
   @IsIn(['xlsx', 'csv'])
   format!: 'xlsx' | 'csv';
 }
+
+/** Query/body for subject-strength hub exports. */
+export class SubjectStrengthExportDto extends StudentReportFiltersDto {
+  @IsOptional()
+  @IsIn(['xlsx', 'csv', 'pdf'])
+  format?: 'xlsx' | 'csv' | 'pdf';
+
+  /** Which hub report to export. Default: department */
+  @IsOptional()
+  @IsIn(['department', 'subject', 'department-summary', 'department-students'])
+  variant?:
+    | 'department'
+    | 'subject'
+    | 'department-summary'
+    | 'department-students';
+}

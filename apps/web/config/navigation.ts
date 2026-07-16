@@ -1963,6 +1963,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:read', 'reports:read'],
           },
           {
+            label: 'Subject Strength',
+            href: '/admin/reports/students/subject-strength',
+            permissions: ['students:read', 'reports:read'],
+          },
+          {
             label: 'Report Builder',
             href: '/admin/reports/students/builder',
             permissions: ['students:read', 'reports:read'],

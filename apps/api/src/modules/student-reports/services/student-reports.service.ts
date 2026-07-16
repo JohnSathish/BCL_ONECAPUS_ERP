@@ -9,6 +9,8 @@ import type {
   StudentReportDashboard,
 } from '../student-reports.types';
 import { StudentReportsQueryService } from './student-reports-query.service';
+import { StudentSubjectStrengthReportService } from './student-subject-strength-report.service';
+import { StudentDepartmentStrengthReportService } from './student-department-strength-report.service';
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Male',
@@ -55,7 +57,11 @@ type StudentRow = {
 
 @Injectable()
 export class StudentReportsService {
-  constructor(private readonly query: StudentReportsQueryService) {}
+  constructor(
+    private readonly query: StudentReportsQueryService,
+    private readonly subjectStrength: StudentSubjectStrengthReportService,
+    private readonly departmentStrength: StudentDepartmentStrengthReportService,
+  ) {}
 
   private studentSelect = {
     id: true,
@@ -724,6 +730,26 @@ export class StudentReportsService {
         return this.getAdmissionReport(tenantId, filters, user);
       case 'contact':
         return this.getContactReport(tenantId, filters, user);
+      case 'subject-strength':
+        return this.subjectStrength.getReport(tenantId, filters, user);
+      case 'subject-strength-department':
+        return this.departmentStrength.getDepartmentReport(
+          tenantId,
+          filters,
+          user,
+        );
+      case 'subject-strength-department-summary':
+        return this.departmentStrength.getDepartmentSubjectSummary(
+          tenantId,
+          filters,
+          user,
+        );
+      case 'subject-strength-department-students':
+        return this.departmentStrength.getDepartmentStudents(
+          tenantId,
+          filters,
+          user,
+        );
       default:
         return this.getDashboard(tenantId, filters, user);
     }

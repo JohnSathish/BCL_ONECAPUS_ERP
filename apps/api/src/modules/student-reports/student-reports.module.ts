@@ -8,6 +8,8 @@ import { StudentReportsExportService } from './services/student-reports-export.s
 import { StudentReportsQueryService } from './services/student-reports-query.service';
 import { StudentReportsService } from './services/student-reports.service';
 import { StudentSubjectReportService } from './services/student-subject-report.service';
+import { StudentSubjectStrengthReportService } from './services/student-subject-strength-report.service';
+import { StudentDepartmentStrengthReportService } from './services/student-department-strength-report.service';
 import { StudentTabularExportService } from './services/student-tabular-export.service';
 
 @Module({
@@ -19,6 +21,8 @@ import { StudentTabularExportService } from './services/student-tabular-export.s
     StudentReportsExportService,
     StudentMasterAssemblerService,
     StudentSubjectReportService,
+    StudentSubjectStrengthReportService,
+    StudentDepartmentStrengthReportService,
     StudentTabularExportService,
     CustomReportService,
   ],
@@ -26,6 +30,8 @@ import { StudentTabularExportService } from './services/student-tabular-export.s
     StudentReportsService,
     CustomReportService,
     StudentReportsQueryService,
+    StudentSubjectStrengthReportService,
+    StudentDepartmentStrengthReportService,
   ],
 })
 export class StudentReportsModule {}

@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OneCampus ERP — Printable Product Demo Script</title>
+  <style>
+    :root {
+      --ink: #1a2332;
+      --muted: #4a5568;
+      --line: #d8dee8;
+      --say-bg: #f0f5fb;
+      --say-border: #2c5282;
+      --accent: #1e3a5f;
+      --soft: #f7f8fa;
+      --check: #2f855a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 11.5pt;
+      line-height: 1.45;
+      background: #e8ecf1;
+    }
+
+    .sheet {
+      max-width: 210mm;
+      margin: 16px auto;
+      padding: 18mm 16mm 20mm;
+      background: #fff;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 0.25em;
+      font-size: 22pt;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      margin: 1.4em 0 0.45em;
+      font-size: 14pt;
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.2em;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      margin: 1em 0 0.35em;
+      font-size: 12pt;
+      color: var(--ink);
+      page-break-after: avoid;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11pt;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4em 1.5em;
+      margin: 1.1em 0 0;
+      padding: 0.75em 1em;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      font-size: 10.5pt;
+    }
+
+    .meta strong { color: var(--accent); }
+
+    .cover-note {
+      margin-top: 1em;
+      font-size: 10.5pt;
+      color: var(--muted);
+    }
+
+    .agenda {
+      list-style: none;
+      padding: 0;
+      margin: 0.6em 0 0;
+    }
+
+    .agenda li {
+      display: flex;
+      gap: 0.6em;
+      align-items: flex-start;
+      padding: 0.35em 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .agenda .num {
+      flex: 0 0 1.6em;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .act {
+      margin: 1.25em 0 0;
+      page-break-inside: avoid;
+    }
+
+    .act-head {
+      display: flex;
+      align-items: center;
+      gap: 0.55em;
+      margin-bottom: 0.35em;
+    }
+
+    .act-head input[type="checkbox"] {
+      width: 1.05em;
+      height: 1.05em;
+      accent-color: var(--check);
+      flex-shrink: 0;
+    }
+
+    .act-head h2 {
+      margin: 0;
+      flex: 1;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .say {
+      margin: 0.55em 0;
+      padding: 0.75em 0.9em;
+      background: var(--say-bg);
+      border-left: 4px solid var(--say-border);
+      font-style: italic;
+      page-break-inside: avoid;
+    }
+
+    .say::before {
+      content: "Say this";
+      display: block;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 9pt;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--say-border);
+      margin-bottom: 0.35em;
+    }
+
+    .block {
+      margin: 0.45em 0;
+      page-break-inside: avoid;
+    }
+
+    .label {
+      display: inline-block;
+      font-weight: 700;
+      font-size: 9pt;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      min-width: 6.5em;
+    }
+
+    .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10pt;
+      background: var(--soft);
+      padding: 0.15em 0.35em;
+      border-radius: 2px;
+    }
+
+    ul.compact {
+      margin: 0.25em 0 0.4em 1.2em;
+      padding: 0;
+    }
+
+    ul.compact li { margin: 0.15em 0; }
+
+    .why {
+      margin: 0.4em 0 0;
+      padding: 0.4em 0.65em;
+      background: #f3faf4;
+      border: 1px solid #c6e6cd;
+      font-size: 10.5pt;
+    }
+
+    .why strong { color: #276749; }
+
+    .also {
+      margin-top: 0.6em;
+      padding: 0.55em 0.75em;
+      background: var(--soft);
+      border: 1px dashed var(--line);
+      font-size: 10.5pt;
+      color: var(--muted);
+    }
+
+    .speech-long {
+      margin: 0.6em 0;
+      padding: 0.9em 1em;
+      background: var(--say-bg);
+      border-left: 4px solid var(--say-border);
+      page-break-inside: avoid;
+    }
+
+    .speech-long p { margin: 0 0 0.7em; }
+    .speech-long p:last-child { margin-bottom: 0; }
+
+    .tip {
+      margin: 0.5em 0;
+      font-size: 10.5pt;
+      color: var(--muted);
+    }
+
+    table.simple {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+      margin: 0.5em 0;
+    }
+
+    table.simple th,
+    table.simple td {
+      border: 1px solid var(--line);
+      padding: 0.4em 0.55em;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    table.simple th {
+      background: var(--soft);
+      color: var(--accent);
+    }
+
+    footer.doc-footer {
+      margin-top: 2em;
+      padding-top: 0.75em;
+      border-top: 1px solid var(--line);
+      font-size: 9.5pt;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .print-hint {
+      margin: 12px auto;
+      max-width: 210mm;
+      padding: 0 16mm;
+      font-size: 10pt;
+      color: #555;
+    }
+
+    @page {
+      size: A4;
+      margin: 14mm 12mm 16mm;
+      @bottom-center {
+        content: "OneCampus ERP — Demo Script · " counter(page);
+        font-size: 9pt;
+        color: #667;
+      }
+    }
+
+    @media print {
+      body { background: #fff; font-size: 10.5pt; }
+      .sheet {
+        margin: 0;
+        padding: 0;
+        max-width: none;
+        box-shadow: none;
+      }
+      .print-hint { display: none; }
+      .act { page-break-inside: avoid; }
+      h2, .act-head { page-break-after: avoid; }
+      .say, .speech-long { page-break-inside: avoid; }
+      .break-before { page-break-before: always; }
+    }
+
+    @media screen {
+      .page-num::after { content: none; }
+    }
+  </style>
+</head>
+<body>
+  <p class="print-hint">
+    Open this file in Chrome or Edge → <strong>Ctrl+P</strong> → set paper to <strong>A4</strong>,
+    margins <strong>Default</strong>, background graphics <strong>On</strong> → Print or Save as PDF.
+  </p>
+
+  <main class="sheet">
+    <!-- COVER -->
+    <header>
+      <h1>BCL OneCampus ERP</h1>
+      <p class="subtitle">Live product demo script — module by module, menu by menu</p>
+      <div class="meta">
+        <div><strong>Document type:</strong> Spoken demo script (printable)</div>
+        <div><strong>Suggested duration:</strong> 45–60 minutes</div>
+        <div><strong>Audience:</strong> College leadership &amp; prospective buyers</div>
+        <div><strong>Date:</strong> ________________________</div>
+        <div><strong>Presenter:</strong> ________________________</div>
+        <div><strong>Environment:</strong> Live ERP / demo tenant</div>
+      </div>
+      <p class="cover-note">
+        Use this as your cue card while projecting the live system. Tick each act after you cover it.
+        Prefer showing real screens over reading every word — the “Say this” blocks are safety nets.
+      </p>
+    </header>
+
+    <!-- WELCOME -->
+    <section>
+      <h2>Welcome speech (2–3 minutes)</h2>
+      <p class="tip">Stand, smile, pause once after the first paragraph. Do not click yet.</p>
+      <div class="speech-long">
+        <p>
+          Good morning / Good afternoon. Thank you for your time. Today I will walk you through
+          <strong>OneCampus</strong> — a complete College ERP built for day-to-day operations under
+          NEP 2020 and FYUGP, from admission to alumni.
+        </p>
+        <p>
+          Most colleges today run on a mix of registers, spreadsheets, and separate softwares for
+          fees, exams, and attendance. That creates duplicate work, delayed reports, and weak audit
+          trails when NAAC or the university asks for evidence. OneCampus replaces that fragmentation
+          with <strong>one shared student and staff record</strong> across admissions, academics,
+          examinations, fees, HR, library, and governance.
+        </p>
+        <p>
+          You will see four perspectives: the <strong>public college face</strong> and admissions
+          entry; the <strong>Admin ERP</strong> where the office runs the institution; the
+          <strong>Faculty portal</strong> for teaching work; and the <strong>Student portal and
+          mobile app</strong> for self-service. I will keep explanations brief and show the menus
+          as we go. Please stop me anytime with questions.
+        </p>
+      </div>
+    </section>
+
+    <!-- AGENDA -->
+    <section>
+      <h2>Demo agenda</h2>
+      <ol class="agenda">
+        <li><span class="num">A</span><span>College website vs ERP vs Admissions portal</span></li>
+        <li><span class="num">B</span><span>Admin: Dashboard → Students → Admissions → Subject registration / renewal</span></li>
+        <li><span class="num">C</span><span>Academics, Timetable, LMS, Attendance</span></li>
+        <li><span class="num">D</span><span>Examinations, Semester exam fees, Certificates</span></li>
+        <li><span class="num">E</span><span>Fee Management &amp; Finance</span></li>
+        <li><span class="num">F</span><span>Staff, HR &amp; Identity / ID cards</span></li>
+        <li><span class="num">G</span><span>Library, Governance / IQAC–NAAC, Communication</span></li>
+        <li><span class="num">H</span><span>Faculty / Staff portal</span></li>
+        <li><span class="num">I</span><span>Student portal &amp; Subject renewal</span></li>
+        <li><span class="num">J</span><span>Mobile app</span></li>
+        <li><span class="num">K</span><span>Close &amp; Q&amp;A</span></li>
+      </ol>
+      <p class="tip">
+        <strong>Short demo (25 min):</strong> Welcome → A → B (Students + Admissions only) → D (Exams briefly) →
+        E (Fees briefly) → I → J → K.
+      </p>
+    </section>
+
+    <!-- ACT A -->
+    <section class="act break-before">
+      <div class="act-head">
+        <input type="checkbox" id="a" />
+        <h2>Act A — Website, ERP, and Admissions</h2>
+      </div>
+      <div class="say">
+        “Before we log in, notice three surfaces. The <em>college website</em> is the public face —
+        news, about the college, programmes. The <em>ERP</em> is the secure operations system for
+        staff and students. <em>Admissions</em> is the applicant entry point that feeds directly
+        into the ERP — no retyping of applications.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        Open public site → then ERP login → optionally Admissions portal apply page
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        <ul class="compact">
+          <li>College website home (marketing / information)</li>
+          <li>ERP login (tenant / institution, role-based access)</li>
+          <li>Admissions portal as the student-facing apply &amp; pay flow</li>
+        </ul>
+      </div>
+      <p class="why"><strong>Why it matters:</strong> One brand outside; one database inside — applicants become students without Excel handoffs.</p>
+    </section>
+
+    <!-- ACT B -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="b" />
+        <h2>Act B — Admin: Dashboard, Students, Admissions</h2>
+      </div>
+
+      <h3>B1 · Dashboard</h3>
+      <div class="say">
+        “This is the Admin home. Leadership sees institution-wide activity without chasing departments
+        for spreadsheets. Every other user only sees menus their role allows.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Dashboard</span> → optionally <span class="path">Analytics</span>
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        KPI cards, pending tasks, module shortcuts; mention global search (Ctrl+K) if available
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Instant situational awareness for the Principal’s desk.</p>
+
+      <h3>B2 · Students lifecycle</h3>
+      <div class="say">
+        “Every enrolled learner lives here — directory, profile, academic status, fees link, and
+        verification. From application to promotion, it is one continuous record.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Students</span> →
+        <span class="path">Student Directory</span> /
+        <span class="path">Add Student</span> /
+        <span class="path">Subject Registration</span> /
+        <span class="path">Student Profile Verification</span> /
+        <span class="path">Promotion</span>
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        <ul class="compact">
+          <li>Open one student profile — identity, programme, semester, ABC ID if present</li>
+          <li>Subject Registration — Major/Minor locked after promotion; electives for renewal</li>
+          <li>Filter incomplete renewals / Prepare semester renewals (if demoing FYUGP renewal)</li>
+        </ul>
+      </div>
+      <p class="why"><strong>Why it matters:</strong> NEP FYUGP registration and semester renewal without parallel Excel sheets.</p>
+
+      <h3>B3 · Admissions</h3>
+      <div class="say">
+        “Admissions is a full pipeline: intake setup, applications, document and payment checks,
+        merit and selection, then admitted students handed to the academic office.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Admissions</span> → Control center / Applications / Document verification /
+        Payment verification / Merit &amp; selection / Admitted students / Intakes
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        Application list → one application detail → status / verification flags
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Transparent, auditable admission season with less queue chaos.</p>
+    </section>
+
+    <!-- ACT C -->
+    <section class="act break-before">
+      <div class="act-head">
+        <input type="checkbox" id="c" />
+        <h2>Act C — Academics, Timetable, LMS, Attendance</h2>
+      </div>
+
+      <h3>C1 · Academics</h3>
+      <div class="say">
+        “Academics is the curriculum backbone — programmes, courses, subject mapping, and academic
+        sessions. Everything exam and timetable depends on this master data.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Academics</span> → Programmes / Curriculum / Course Master /
+        Subject Sections / Academic Sessions
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Change the curriculum once; every linked module stays consistent.</p>
+
+      <h3>C2 · Timetable</h3>
+      <div class="say">
+        “Timetable planning, teaching allocation, conflict checks, and publish — so classrooms and
+        faculty load are visible to the whole campus.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Timetable</span> → Plans / Teaching Allocation / Generation / Conflicts / Publish
+      </div>
+
+      <h3>C3 · LMS &amp; repositories</h3>
+      <div class="say">
+        “Teaching continues online: materials, assignments, quizzes. Question papers and syllabus
+        live in repositories so faculty and students share the same sources.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">LMS</span> ·
+        <span class="path">Question Paper Repository</span> ·
+        <span class="path">Syllabus Repository</span> ·
+        <span class="path">Short-Term Courses</span>
+      </div>
+
+      <h3>C4 · Attendance</h3>
+      <div class="say">
+        “Student and staff attendance can be taken live, reviewed in daily and monthly registers,
+        and linked to biometric devices where the college uses them.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Student Attendance</span> ·
+        <span class="path">Staff Attendance</span>
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Attendance stops being a month-end scramble.</p>
+    </section>
+
+    <!-- ACT D -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="d" />
+        <h2>Act D — Examinations, Exam fees, Certificates</h2>
+      </div>
+
+      <h3>D1 · Examinations</h3>
+      <div class="say">
+        “Internal assessment, mark entry, defaulters, analytics, and university submission sit in
+        one examination module — not a separate spreadsheet culture.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Examinations</span> → IA Exams / Mark Entry / Defaulters / Analytics /
+        University Submission
+      </div>
+
+      <h3>D2 · Semester Exam Fees</h3>
+      <div class="say">
+        “Semester exam fee sessions, applications, back papers, payments, verification, and receipts —
+        students can apply from their portal while the office verifies.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Semester Exam Fees</span> → Setup / Sessions / Applications / Payments / Receipts
+      </div>
+
+      <h3>D3 · Certificates</h3>
+      <div class="say">
+        “Bonafide, TC, and other certificates use templates, requests, bulk issue, and verification —
+        with an approval workflow when the college requires it.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Certificates</span> → Templates / Generator / Requests / Bulk Issue / Verification
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Exam season and certificate counters become trackable processes, not ad-hoc printing.</p>
+    </section>
+
+    <!-- ACT E -->
+    <section class="act break-before">
+      <div class="act-head">
+        <input type="checkbox" id="e" />
+        <h2>Act E — Fee Management &amp; Finance</h2>
+      </div>
+
+      <h3>E1 · Fee Management</h3>
+      <div class="say">
+        “Fee structures, demands, collection center, scholarships, ledgers, defaulters, and day
+        closing — the accounts counter works from the same student record as academics.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Fee Management</span> → Fee Structure / Demand Generator / Collection Center /
+        Student Ledger / Defaulters / Day Closing / Reports
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        One student ledger + collection screen (avoid live payment unless prepared)
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Clear dues, fewer disputes, faster day close.</p>
+
+      <h3>E2 · Finance &amp; Accounts</h3>
+      <div class="say">
+        “Beyond student fees, the college can run chart of accounts, vouchers, cash and bank books,
+        expenses, budgets, and financial reports in the same platform.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Finance &amp; Accounts</span> → Chart of Accounts / Vouchers / Cash-Bank Book /
+        General Ledger / Financial Reports
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Fee collection and institutional accounts stay connected.</p>
+    </section>
+
+    <!-- ACT F -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="f" />
+        <h2>Act F — Staff, HR &amp; Identity</h2>
+      </div>
+      <div class="say">
+        “People operations are included: staff directory, teaching assignments, roles, leave,
+        payroll, and identity cards — so HR is not a separate silo from academics.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <ul class="compact">
+          <li><span class="path">Staff</span> — Directory, Teaching Assignments, Portal Users, Roles</li>
+          <li><span class="path">Human Resources</span> — Attendance, Leave, Payroll, Payslips, Appraisal</li>
+          <li><span class="path">Identity &amp; ID Cards</span> — Templates, Production, Print Queue, RFID</li>
+        </ul>
+      </div>
+      <div class="block">
+        <span class="label">Show</span>
+        One staff profile or ID production screen (30–60 seconds)
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Faculty load, leave, and campus identity share one staff master.</p>
+    </section>
+
+    <!-- ACT G -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="g" />
+        <h2>Act G — Library, Governance, Communication</h2>
+      </div>
+
+      <h3>G1 · Library</h3>
+      <div class="say">
+        “Catalog, accession, circulation, members, and digital library — with NAAC-oriented reports
+        when accreditation needs library evidence.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Library</span> → Catalog / Circulation / Members / Digital Library / NAAC Reports
+      </div>
+
+      <h3>G2 · Governance &amp; IQAC / NAAC</h3>
+      <div class="say">
+        “Committees, meetings, ATR, notices, and NAAC criteria with evidence and AQAR support —
+        accreditation becomes continuous documentation, not a last-minute scramble.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Principal Desk</span> ·
+        <span class="path">Governance</span> ·
+        <span class="path">IQAC / NAAC</span> ·
+        <span class="path">Official Documents</span>
+      </div>
+
+      <h3>G3 · Communication</h3>
+      <div class="say">
+        “Notifications, campaigns, and templates reach the right audience — students, staff, or
+        custom segments — from one communication center.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        <span class="path">Communication</span> → Notifications / Compose / Campaigns / Templates
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Official communication and NAAC evidence leave a trail.</p>
+
+      <div class="also">
+        <strong>Also available (mention only if asked):</strong>
+        In-Out Management, Infrastructure, Front Office, Transport, Inventory, Help Desk,
+        Parent Portal, Visitor Management, Placement, Internship, Alumni, Hostel, Research Grants,
+        Workflow Engine, Integrations, Administration (Roles, License, Backup, Theme, Mobile Config).
+      </div>
+    </section>
+
+    <!-- ACT H -->
+    <section class="act break-before">
+      <div class="act-head">
+        <input type="checkbox" id="h" />
+        <h2>Act H — Faculty / Staff portal</h2>
+      </div>
+      <div class="say">
+        “Now we switch roles. Faculty do not need the full Admin ERP. Their portal is teaching-first:
+        my subjects, timetable, attendance entry, marks, LMS, leave, and payslips.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        Log out Admin → log in as Faculty/Staff
+      </div>
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>Menu group</th>
+            <th>What to open</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Home</td>
+            <td>Dashboard, Notifications, My Calendar</td>
+          </tr>
+          <tr>
+            <td>Academic</td>
+            <td>My Subjects, Timetable, LMS, Attendance Entry, Marks Entry, Internal Assessment</td>
+          </tr>
+          <tr>
+            <td>Operations</td>
+            <td>My Profile, Leave, Salary &amp; Payslips, Documents</td>
+          </tr>
+          <tr>
+            <td>Administration</td>
+            <td>Approvals, Department Workspace, My Committees, NAAC &amp; IQAC (as permitted)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="block">
+        <span class="label">Show</span>
+        Today’s classes or attendance entry → one mark entry screen (keep under 3 minutes)
+      </div>
+      <p class="why"><strong>Why it matters:</strong> Teachers work faster in a focused portal; Admin retains control.</p>
+    </section>
+
+    <!-- ACT I -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="i" />
+        <h2>Act I — Student portal</h2>
+      </div>
+      <div class="say">
+        “Students self-serve: fees, results, timetable, LMS, certificates, attendance, and —
+        after semester promotion — <em>Subject renewal</em>, where Major and Minor stay locked and
+        they choose electives such as AEC, MDC, SEC, and VTC/VAC.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        Log in as Student → walk key menus
+      </div>
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>Menu</th>
+            <th>Brief point</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dashboard</td>
+            <td>Overview + Subject renewal widget when a window is open</td>
+          </tr>
+          <tr>
+            <td>My Profile / Results</td>
+            <td>Identity and academic outcomes</td>
+          </tr>
+          <tr>
+            <td>Fees → My Fee Account / Semester Exam Fees</td>
+            <td>Dues, pay, receipts</td>
+          </tr>
+          <tr>
+            <td>Timetable · LMS · Library</td>
+            <td>Daily academic life</td>
+          </tr>
+          <tr>
+            <td>Subject renewal</td>
+            <td>Confirm → Electives → Review → Submit</td>
+          </tr>
+          <tr>
+            <td>Attendance · Examinations · Certificates · Feedback</td>
+            <td>Self-service instead of office queues</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="why"><strong>Why it matters:</strong> Less counter load; students finish NEP elective choices on time.</p>
+    </section>
+
+    <!-- ACT J -->
+    <section class="act">
+      <div class="act-head">
+        <input type="checkbox" id="j" />
+        <h2>Act J — Mobile app (OneCampus)</h2>
+      </div>
+      <div class="say">
+        “The same journey is on the phone. Students open modules from a clear drawer — academics,
+        examination, finance, and services. Subject renewal sits under Services and opens a secure
+        web sign-in for the full elective wizard.”
+      </div>
+      <div class="block">
+        <span class="label">Click path</span>
+        Student mobile drawer
+      </div>
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Items to mention</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>My Academics</td>
+            <td>Profile, Attendance, Timetable, Assignments, Syllabus, Short-Term Courses</td>
+          </tr>
+          <tr>
+            <td>Examination</td>
+            <td>Hall Ticket, Results, Internal Marks, Exam Schedule</td>
+          </tr>
+          <tr>
+            <td>Finance</td>
+            <td>Fees, Semester Exam Fees, Receipts</td>
+          </tr>
+          <tr>
+            <td>Services</td>
+            <td>Feedback, Certificates, <strong>Subject renewal</strong></td>
+          </tr>
+          <tr>
+            <td>Campus</td>
+            <td>Library, Alerts, Apply Leave</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="why"><strong>Why it matters:</strong> Campus in the pocket — especially for fee receipts and hall tickets.</p>
+    </section>
+
+    <!-- ACT K -->
+    <section class="act break-before">
+      <div class="act-head">
+        <input type="checkbox" id="k" />
+        <h2>Act K — Closing speech</h2>
+      </div>
+      <div class="speech-long">
+        <p>
+          To close: OneCampus is one platform for the whole campus lifecycle — public admissions in,
+          administration in the middle, and faculty plus students served on web and mobile.
+        </p>
+        <p>
+          What you saw today is not a brochure of separate modules. Admissions feed Students;
+          curriculum feeds Timetable, LMS, and Exams; fees and certificates read the same records;
+          governance and NAAC draw evidence from daily work.
+        </p>
+        <p>
+          I am happy to take questions — on rollout, training, data migration, NEP subject renewal,
+          or any module you want to see again in depth. Thank you.
+        </p>
+      </div>
+      <div class="meta" style="margin-top: 1em;">
+        <div><strong>Next step / contact:</strong></div>
+        <div>________________________________</div>
+        <div><strong>Follow-up demo date:</strong></div>
+        <div>________________________________</div>
+        <div><strong>Notes:</strong></div>
+        <div>________________________________</div>
+      </div>
+    </section>
+
+    <!-- PRESENTER CHEAT SHEET -->
+    <section class="break-before">
+      <h2>Presenter cheat sheet</h2>
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>If they ask…</th>
+            <th>Go to…</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>“How do students pick electives after promotion?”</td>
+            <td>Admin Subject Registration / Prepare renewals → Student Subject renewal → Mobile Services</td>
+          </tr>
+          <tr>
+            <td>“Can roles be restricted?”</td>
+            <td>Administration → Roles &amp; Permissions</td>
+          </tr>
+          <tr>
+            <td>“What about NAAC?”</td>
+            <td>IQAC / NAAC + evidence from daily modules</td>
+          </tr>
+          <tr>
+            <td>“Mobile?”</td>
+            <td>Act J — BCL OneCampus ERP app</td>
+          </tr>
+          <tr>
+            <td>“Fees and accounts?”</td>
+            <td>Fee Management + Finance &amp; Accounts</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="tip">
+        Keep a second browser profile ready for Faculty and Student logins so you do not waste time
+        logging out mid-demo.
+      </p>
+    </section>
+
+    <footer class="doc-footer">
+      <span>BCL OneCampus ERP — Product demo script</span>
+      <span>Printable HTML · docs/demo/onecampus-product-demo.html</span>
+    </footer>
+  </main>
+</body>
+</html>
