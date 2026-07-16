@@ -26,6 +26,7 @@ import { Sem1ImportCurriculumService } from './import/sem1-import-curriculum.ser
 import { Sem2ImportCurriculumService } from './import/sem2-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './import/sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './import/sem5-import-curriculum.service';
+import { Sem7ImportCurriculumService } from './import/sem7-import-curriculum.service';
 import { MigrationStatusService } from './migration/migration-status.service';
 import { StudentPhotoBulkController } from './photos/student-photo-bulk.controller';
 import { StudentPhotoBulkProcessor } from './photos/student-photo-bulk.processor';
@@ -108,6 +109,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
     Sem1ImportCurriculumService,
     Sem2ImportCurriculumService,
     Sem5ImportCurriculumService,
+    Sem7ImportCurriculumService,
     StudentBulkUpdateService,
     StudentBulkSectionWriterService,
     StudentBulkUpdateProcessor,

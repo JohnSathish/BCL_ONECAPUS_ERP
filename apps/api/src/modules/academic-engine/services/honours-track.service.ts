@@ -14,6 +14,7 @@ export type SetHonoursTrackDto = {
   track: HonoursTrack;
   effectiveFromSemester?: number;
   eligibilityOverride?: boolean;
+  eligibilityOverrideReason?: string;
   aggregatePercentageAtSelection?: number;
 };
 
@@ -21,8 +22,10 @@ export type HonoursTrackEligibility = {
   track: HonoursTrack;
   eligible: boolean;
   warning: string | null;
+  blockReason: string | null;
   aggregatePercentageThroughSem6: number | null;
   eligibilityOverride: boolean;
+  requiresOverride: boolean;
 };
 
 @Injectable()
@@ -65,15 +68,21 @@ export class HonoursTrackService {
       effectiveFromSemester,
       aggregatePercentageThroughSem6: aggregate,
       eligibilityOverride: track?.eligibilityOverride ?? false,
+      eligibilityOverrideReason: track?.eligibilityOverrideReason ?? null,
       aggregatePercentageAtSelection:
         track?.aggregatePercentageAtSelection != null
           ? Number(track.aggregatePercentageAtSelection)
           : null,
+      researchEligibilityPercent: HONOURS_RESEARCH_ELIGIBILITY_PERCENT,
       eligibility,
       record: track,
     };
   }
 
+  /**
+   * Research track is eligible only when attested Sem-6 aggregate >= 75%,
+   * or an explicit principal override with reason is supplied.
+   */
   evaluateEligibility(
     track: HonoursTrack,
     aggregatePercentageThroughSem6: number | null,
@@ -84,8 +93,10 @@ export class HonoursTrackService {
         track,
         eligible: true,
         warning: null,
+        blockReason: null,
         aggregatePercentageThroughSem6,
         eligibilityOverride,
+        requiresOverride: false,
       };
     }
 
@@ -94,29 +105,35 @@ export class HonoursTrackService {
         track,
         eligible: true,
         warning: null,
+        blockReason: null,
         aggregatePercentageThroughSem6,
         eligibilityOverride: true,
+        requiresOverride: false,
       };
     }
 
     if (aggregatePercentageThroughSem6 == null) {
       return {
         track,
-        eligible: true,
-        warning:
-          'Aggregate percentage through Semester 6 is not recorded. Research track selection is allowed with admin acknowledgment.',
+        eligible: false,
+        warning: null,
+        blockReason:
+          'Aggregate percentage through Semester 6 is not recorded. Enter the NEHU-attested percentage before selecting Honours with Research.',
         aggregatePercentageThroughSem6: null,
         eligibilityOverride: false,
+        requiresOverride: true,
       };
     }
 
     if (aggregatePercentageThroughSem6 < HONOURS_RESEARCH_ELIGIBILITY_PERCENT) {
       return {
         track,
-        eligible: true,
-        warning: `Aggregate ${aggregatePercentageThroughSem6}% is below the recommended ${HONOURS_RESEARCH_ELIGIBILITY_PERCENT}% for Honours with Research. Admin override may be required.`,
+        eligible: false,
+        warning: null,
+        blockReason: `Aggregate ${aggregatePercentageThroughSem6}% is below the NEHU ${HONOURS_RESEARCH_ELIGIBILITY_PERCENT}% threshold for Honours with Research. Principal override with reason is required.`,
         aggregatePercentageThroughSem6,
         eligibilityOverride: false,
+        requiresOverride: true,
       };
     }
 
@@ -124,8 +141,10 @@ export class HonoursTrackService {
       track,
       eligible: true,
       warning: null,
+      blockReason: null,
       aggregatePercentageThroughSem6,
       eligibilityOverride: false,
+      requiresOverride: false,
     };
   }
 
@@ -154,11 +173,31 @@ export class HonoursTrackService {
         ? Number(standing.aggregatePercentageThroughSem6)
         : null);
 
+    const wantsOverride =
+      dto.track === 'HONOURS_WITH_RESEARCH' && Boolean(dto.eligibilityOverride);
+    const overrideReason = dto.eligibilityOverrideReason?.trim() || null;
+
+    if (wantsOverride && (!overrideReason || overrideReason.length < 5)) {
+      throw new BadRequestException(
+        'Principal override requires a reason (at least 5 characters) when selecting Honours with Research below the eligibility threshold.',
+      );
+    }
+
     const eligibility = this.evaluateEligibility(
       dto.track,
       aggregate,
-      dto.eligibilityOverride ?? false,
+      wantsOverride,
     );
+
+    if (!eligibility.eligible) {
+      throw new BadRequestException({
+        message: eligibility.blockReason ?? 'Research track is not eligible',
+        code: 'HONOURS_RESEARCH_NOT_ELIGIBLE',
+        requiresOverride: eligibility.requiresOverride,
+        aggregatePercentageThroughSem6: aggregate,
+        researchEligibilityPercent: HONOURS_RESEARCH_ELIGIBILITY_PERCENT,
+      });
+    }
 
     const saved = await this.prisma.studentAcademicTrack.upsert({
       where: {
@@ -171,19 +210,22 @@ export class HonoursTrackService {
         effectiveFromSemester,
         aggregatePercentageAtSelection:
           aggregate != null ? new Prisma.Decimal(aggregate.toFixed(2)) : null,
-        eligibilityOverride: dto.eligibilityOverride ?? false,
+        eligibilityOverride: wantsOverride,
+        eligibilityOverrideReason: wantsOverride ? overrideReason : null,
         selectedById: selectedById ?? null,
       },
       update: {
         track: dto.track,
         aggregatePercentageAtSelection:
           aggregate != null ? new Prisma.Decimal(aggregate.toFixed(2)) : null,
-        eligibilityOverride: dto.eligibilityOverride ?? false,
+        eligibilityOverride: wantsOverride,
+        eligibilityOverrideReason: wantsOverride ? overrideReason : null,
         selectedById: selectedById ?? null,
       },
     });
 
     return {
+      track: saved.track as HonoursTrack,
       record: saved,
       eligibility,
     };
@@ -194,6 +236,16 @@ export class HonoursTrackService {
     studentId: string,
     aggregatePercentage: number,
   ) {
+    if (
+      !Number.isFinite(aggregatePercentage) ||
+      aggregatePercentage < 0 ||
+      aggregatePercentage > 100
+    ) {
+      throw new BadRequestException(
+        'Aggregate percentage must be between 0 and 100',
+      );
+    }
+
     const standing = await this.prisma.studentAcademicStanding.findUnique({
       where: { studentId },
     });
@@ -209,5 +261,23 @@ export class HonoursTrackService {
         ),
       },
     });
+  }
+
+  /** Ensure a Sem-8 track exists before registration auto-assign. */
+  async assertTrackForSemester8(tenantId: string, studentId: string) {
+    const track = await this.prisma.studentAcademicTrack.findUnique({
+      where: {
+        studentId_effectiveFromSemester: {
+          studentId,
+          effectiveFromSemester: 8,
+        },
+      },
+    });
+    if (!track) {
+      throw new BadRequestException(
+        'Select Semester 8 Honours pathway (UG Honours or Honours with Research) before registering subjects.',
+      );
+    }
+    return track.track as HonoursTrack;
   }
 }

@@ -20,4 +20,12 @@ describe('import-column-map', () => {
     expect(normalizeHeader('Address in Tura')).toBe('turaLine1');
     expect(normalizeHeader('Board Roll Number')).toBe('boardRollNumber');
   });
+
+  it('maps Sem 7 lateral entry headers', () => {
+    expect(normalizeHeader('Aggregate % Through Sem 6')).toBe(
+      'aggregatePercentageThroughSem6',
+    );
+    expect(normalizeHeader('Previous College')).toBe('previousCollegeName');
+    expect(normalizeHeader('Admission Type')).toBe('admissionType');
+  });
 });

@@ -218,6 +218,12 @@ export class StudentProfileService {
       majorSubject: majorChoice?.subjectName ?? directoryRow.majorSubject,
       minorSubjectSlug: minorChoice?.subjectSlug ?? null,
       minorSubject: minorChoice?.subjectName ?? null,
+      admissionType: student.masterProfile?.admissionType ?? null,
+      previousCollegeName: student.academicProfile?.previousCollegeName ?? null,
+      aggregatePercentageThroughSem6:
+        student.academicStanding?.aggregatePercentageThroughSem6 != null
+          ? Number(student.academicStanding.aggregatePercentageThroughSem6)
+          : null,
       documents: student.documents,
       semesterHistory,
       promotionEntries,

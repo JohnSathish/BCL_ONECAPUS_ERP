@@ -38,6 +38,9 @@ describe('AdminRegistrationService buildAutoAssignLines', () => {
     }),
     filterSections: jest.fn().mockImplementation((_rows) => _rows),
   };
+  const honoursTrack = {
+    assertTrackForSemester8: jest.fn().mockResolvedValue('HONOURS'),
+  };
 
   const service = new AdminRegistrationService(
     prisma as never,
@@ -48,6 +51,7 @@ describe('AdminRegistrationService buildAutoAssignLines', () => {
     majorMinorTrack as never,
     vtcTrack as never,
     courseEligibility as never,
+    honoursTrack as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

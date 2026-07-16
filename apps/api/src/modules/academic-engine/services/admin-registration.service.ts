@@ -31,6 +31,8 @@ import {
 import { StudentMajorMinorTrackService } from './student-major-minor-track.service';
 import { StudentVtcTrackService } from './student-vtc-track.service';
 import { CourseEligibilityService } from './course-eligibility.service';
+import { HonoursTrackService } from './honours-track.service';
+import { assertAdvancedSemesterDocuments } from '../domain/advanced-semester-document-gate';
 import {
   buildPriorLineContextMap,
   priorLineSlotKey,
@@ -89,6 +91,7 @@ export class AdminRegistrationService {
     private readonly majorMinorTrack: StudentMajorMinorTrackService,
     private readonly vtcTrack: StudentVtcTrackService,
     private readonly courseEligibility: CourseEligibilityService,
+    private readonly honoursTrack: HonoursTrackService,
   ) {}
 
   parseWorkflow(raw: unknown): RegistrationWorkflowSettings {
@@ -323,6 +326,17 @@ export class AdminRegistrationService {
         'Only draft registrations can be auto-assigned',
       );
     }
+
+    if (reg.semesterSequence === 8) {
+      await this.honoursTrack.assertTrackForSemester8(tenantId, reg.studentId);
+    }
+
+    await assertAdvancedSemesterDocuments(
+      this.prisma,
+      tenantId,
+      reg.studentId,
+      reg.semesterSequence,
+    );
 
     const lines = await this.buildAutoAssignLines(tenantId, reg, assignMode);
     await this.engine.updateRegistrationLines(tenantId, registrationId, lines, {

@@ -19,6 +19,7 @@ import {
 import {
   GenerateFyugpRegistrationDto,
   SetHonoursTrackDto,
+  UpdateAggregateThroughSem6Dto,
   ValidateFyugpRegistrationDto,
 } from './dto/fyugp.dto';
 import { AcademicEngineService } from './academic-engine.service';
@@ -210,5 +211,19 @@ export class FyugpController {
     @Body() dto: SetHonoursTrackDto,
   ) {
     return this.honoursTrack.setTrack(user.tid, studentId, dto, user.sub);
+  }
+
+  @Put('students/:studentId/aggregate-through-sem6')
+  @RequireAnyPermission('academic-engine:manage', 'students:manage')
+  updateAggregateThroughSem6(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Body() dto: UpdateAggregateThroughSem6Dto,
+  ) {
+    return this.honoursTrack.updateAggregateThroughSem6(
+      user.tid,
+      studentId,
+      dto.aggregatePercentageThroughSem6,
+    );
   }
 }

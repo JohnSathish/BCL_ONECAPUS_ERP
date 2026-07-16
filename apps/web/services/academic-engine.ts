@@ -908,9 +908,12 @@ export async function fetchStudentAcademicTrack(studentId: string, effectiveFrom
   return data as {
     track: 'HONOURS' | 'HONOURS_WITH_RESEARCH';
     aggregatePercentageThroughSem6: number | null;
+    researchEligibilityPercent?: number;
     eligibility: {
       warning: string | null;
+      blockReason?: string | null;
       eligible: boolean;
+      requiresOverride?: boolean;
     };
   };
 }
@@ -921,10 +924,21 @@ export async function setStudentAcademicTrack(
     track: 'HONOURS' | 'HONOURS_WITH_RESEARCH';
     effectiveFromSemester?: number;
     eligibilityOverride?: boolean;
+    eligibilityOverrideReason?: string;
     aggregatePercentageAtSelection?: number;
   },
 ) {
   const { data } = await api.put(`/v1/fyugp/students/${studentId}/academic-track`, payload);
+  return data;
+}
+
+export async function updateAggregateThroughSem6(
+  studentId: string,
+  aggregatePercentageThroughSem6: number,
+) {
+  const { data } = await api.put(`/v1/fyugp/students/${studentId}/aggregate-through-sem6`, {
+    aggregatePercentageThroughSem6,
+  });
   return data;
 }
 

@@ -146,6 +146,9 @@ export type StudentProfile = StudentDirectoryRow & {
   denominationLookupId?: string | null;
   differentlyAbled?: boolean;
   ews?: boolean;
+  admissionType?: string | null;
+  previousCollegeName?: string | null;
+  aggregatePercentageThroughSem6?: number | null;
   addresses?: import('./student-profile').StudentAddress[];
   guardians?: import('./student-profile').StudentGuardian[];
   boardExam?: import('./student-profile').StudentBoardExam | null;
@@ -235,6 +238,9 @@ export type AdmitStudentPayload = {
   admissionDate?: string;
   admissionType?: string;
   currentSemester?: number;
+  /** NEHU-attested aggregate % through Sem 6 (required for Sem 7+). */
+  aggregatePercentageThroughSem6?: number;
+  previousCollegeName?: string;
   rfidNumber?: string;
 };
 

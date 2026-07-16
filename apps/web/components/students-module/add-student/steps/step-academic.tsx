@@ -288,6 +288,47 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
             </select>
           </GlassField>
         </ErpFormGrid>
+        {semesterSequence >= 7 ? (
+          <ErpFormGrid className="mt-3">
+            <GlassField
+              label="Attested aggregate % through Sem 6"
+              error={errors.aggregatePercentageThroughSem6}
+            >
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                className={glassInputClass}
+                placeholder="From NEHU documents (required)"
+                value={draft.aggregatePercentageThroughSem6 ?? ''}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    aggregatePercentageThroughSem6: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
+                    admissionType: d.admissionType === 'REGULAR' ? 'LATERAL' : d.admissionType,
+                  }))
+                }
+              />
+            </GlassField>
+            <GlassField label="Previous college (NEHU-affiliated)">
+              <input
+                className={glassInputClass}
+                placeholder="College name from migration / marksheet"
+                value={draft.previousCollegeName}
+                onChange={(e) => setDraft((d) => ({ ...d, previousCollegeName: e.target.value }))}
+              />
+            </GlassField>
+          </ErpFormGrid>
+        ) : null}
+        {semesterSequence >= 7 ? (
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Semester 7+ advanced entry: office must verify NEHU documents before admit. Research
+            pathway is chosen later at Semester 8 registration (needs ≥ 75% or principal override).
+          </p>
+        ) : null}
       </ErpFormSection>
 
       <ErpFormSection
@@ -350,7 +391,9 @@ export function StepAcademic({ draft, setDraft, lookups, batchMeta, errors }: Pr
         ) : null}
       </ErpFormSection>
 
-      <Class12AcademicBackgroundSection draft={draft} setDraft={setDraft} errors={errors} />
+      {semesterSequence < 7 ? (
+        <Class12AcademicBackgroundSection draft={draft} setDraft={setDraft} errors={errors} />
+      ) : null}
     </div>
   );
 }

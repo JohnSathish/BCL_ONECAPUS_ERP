@@ -29,6 +29,7 @@ import { Sem1ImportCurriculumService } from './sem1-import-curriculum.service';
 import { Sem2ImportCurriculumService } from './sem2-import-curriculum.service';
 import { Sem3ImportCurriculumService } from './sem3-import-curriculum.service';
 import { Sem5ImportCurriculumService } from './sem5-import-curriculum.service';
+import { Sem7ImportCurriculumService } from './sem7-import-curriculum.service';
 
 /** Large student imports run in the background to avoid HTTP timeouts. */
 const STUDENT_IMPORT_ASYNC_COMMIT_THRESHOLD = Number(
@@ -60,6 +61,7 @@ export class StudentImportService {
     private readonly sem2Curriculum: Sem2ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
     private readonly sem5Curriculum: Sem5ImportCurriculumService,
+    private readonly sem7Curriculum: Sem7ImportCurriculumService,
 
     private readonly queue: QueueService,
   ) {}
@@ -128,6 +130,17 @@ export class StudentImportService {
     return this.handler.buildSem5AdmissionTemplateWorkbook(options);
   }
 
+  buildSem7AdmissionTemplate(options: {
+    tenantId: string;
+    programme?: string;
+    programVersionId?: string;
+    semesterSequence?: number;
+    academicYearId?: string;
+    shiftId?: string;
+  }) {
+    return this.handler.buildSem7AdmissionTemplateWorkbook(options);
+  }
+
   listSem3ImportProgrammes(tenantId: string) {
     return this.sem3Curriculum.listPublishedProgrammes(tenantId);
   }
@@ -166,6 +179,23 @@ export class StudentImportService {
 
   listSem5ImportProgrammes(tenantId: string) {
     return this.sem5Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  listSem7ImportProgrammes(tenantId: string) {
+    return this.sem7Curriculum.listPublishedProgrammes(tenantId);
+  }
+
+  getSem7ImportCurriculum(
+    tenantId: string,
+    input: {
+      programme?: string;
+      programVersionId?: string;
+      semesterSequence?: number;
+      academicYearId?: string;
+      shiftId?: string;
+    },
+  ) {
+    return this.sem7Curriculum.buildCatalog(tenantId, input);
   }
 
   getSem3ImportCurriculum(

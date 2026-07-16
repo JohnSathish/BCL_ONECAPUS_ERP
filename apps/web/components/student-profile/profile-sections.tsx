@@ -647,6 +647,14 @@ export function AcademicSection({
     hostelBlock: profile.hostelBlock ?? '',
     hostelRoom: profile.hostelRoom ?? '',
   });
+  const [advancedForm, setAdvancedForm] = useState({
+    aggregatePercentageThroughSem6:
+      profile.aggregatePercentageThroughSem6 != null
+        ? String(profile.aggregatePercentageThroughSem6)
+        : '',
+    previousCollegeName: profile.previousCollegeName ?? '',
+    admissionType: profile.admissionType ?? '',
+  });
 
   useEffect(() => {
     setResidenceForm({
@@ -655,6 +663,17 @@ export function AcademicSection({
       hostelRoom: profile.hostelRoom ?? '',
     });
   }, [profile.residenceType, profile.hostelBlock, profile.hostelRoom]);
+
+  useEffect(() => {
+    setAdvancedForm({
+      aggregatePercentageThroughSem6:
+        profile.aggregatePercentageThroughSem6 != null
+          ? String(profile.aggregatePercentageThroughSem6)
+          : '',
+      previousCollegeName: profile.previousCollegeName ?? '',
+      admissionType: profile.admissionType ?? '',
+    });
+  }, [profile.aggregatePercentageThroughSem6, profile.previousCollegeName, profile.admissionType]);
 
   const residencePayload = useMemo(
     () => ({
@@ -671,13 +690,30 @@ export function AcademicSection({
     canEdit,
   );
 
+  const advancedPayload = useMemo(() => {
+    const pctRaw = advancedForm.aggregatePercentageThroughSem6.trim();
+    const pct = pctRaw === '' ? undefined : Number(pctRaw);
+    return {
+      aggregatePercentageThroughSem6: pct != null && Number.isFinite(pct) ? pct : undefined,
+      previousCollegeName: advancedForm.previousCollegeName.trim() || undefined,
+      admissionType: advancedForm.admissionType || undefined,
+    };
+  }, [advancedForm]);
+  const showAdvanced = profile.semester >= 7;
+  const { message: advancedMessage, saving: advancedSaving } = useDebouncedSave(
+    profile.id,
+    'academic',
+    advancedPayload,
+    canEdit && showAdvanced,
+  );
+
   const isHosteller = residenceForm.residenceType === 'HOSTELLER';
 
   return (
     <SectionCard
       title="Academic Information"
       description="Derived from programme choices and current semester registration"
-      footer={residenceSaving ? 'Saving residence…' : residenceMessage}
+      footer={residenceSaving || advancedSaving ? 'Saving…' : residenceMessage || advancedMessage}
     >
       <FieldGrid>
         <Field label="Major Subject">
@@ -693,6 +729,66 @@ export function AcademicSection({
           <input className={inputClass} disabled value={profile.entrySession ?? '—'} />
         </Field>
       </FieldGrid>
+      {showAdvanced ? (
+        <div className="mt-3 rounded-md border border-border p-3">
+          <p className="text-xs font-medium uppercase text-muted-foreground">
+            Sem 7+ / NEHU attestation
+          </p>
+          <FieldGrid>
+            <Field label="Admission type">
+              <select
+                className={inputClass}
+                disabled={!canEdit}
+                value={advancedForm.admissionType}
+                onChange={(e) => setAdvancedForm((f) => ({ ...f, admissionType: e.target.value }))}
+              >
+                <option value="">Not set</option>
+                {['REGULAR', 'LATERAL', 'MIGRATION', 'RE_ADMISSION'].map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Attested aggregate % through Sem 6">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                className={inputClass}
+                disabled={!canEdit}
+                value={advancedForm.aggregatePercentageThroughSem6}
+                onChange={(e) =>
+                  setAdvancedForm((f) => ({
+                    ...f,
+                    aggregatePercentageThroughSem6: e.target.value,
+                  }))
+                }
+                placeholder="From NEHU documents"
+              />
+            </Field>
+            <Field label="Previous college">
+              <input
+                className={inputClass}
+                disabled={!canEdit}
+                value={advancedForm.previousCollegeName}
+                onChange={(e) =>
+                  setAdvancedForm((f) => ({
+                    ...f,
+                    previousCollegeName: e.target.value,
+                  }))
+                }
+                placeholder="NEHU-affiliated college (lateral)"
+              />
+            </Field>
+          </FieldGrid>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Research pathway at Sem 8 needs ≥ 75%. Lateral / migration also need MIGRATION or TC
+            documents before Sem 7+ registration can be submitted.
+          </p>
+        </div>
+      ) : null}
       <div className="rounded-md border border-border p-3">
         <p className="text-xs font-medium uppercase text-muted-foreground">Residence / Hostel</p>
         <FieldGrid>

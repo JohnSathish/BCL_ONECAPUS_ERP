@@ -125,6 +125,11 @@ export function buildAdmitFullPayload(draft: AddStudentDraft): AdmitStudentFullP
     admissionDate: draft.admissionDate || undefined,
     admissionType: draft.admissionType || undefined,
     currentSemester: draft.currentSemester || undefined,
+    aggregatePercentageThroughSem6:
+      draft.aggregatePercentageThroughSem6 != null
+        ? draft.aggregatePercentageThroughSem6
+        : undefined,
+    previousCollegeName: draft.previousCollegeName.trim() || undefined,
     guardianName: primaryGuardian.fullName || undefined,
     guardianMobile: primaryGuardian.contactNumber || undefined,
     sections: Object.keys(sections).length > 0 ? sections : undefined,

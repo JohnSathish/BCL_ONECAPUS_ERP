@@ -374,6 +374,14 @@ export class StudentProfileSectionsService {
           admissionType: student.masterProfile?.admissionType,
           admissionCategory: student.masterProfile?.admissionCategory,
           class12Subjects: student.academicProfile?.class12Subjects,
+          previousCollegeName:
+            student.academicProfile?.previousCollegeName ?? null,
+          aggregatePercentageThroughSem6:
+            student.academicStanding?.aggregatePercentageThroughSem6 != null
+              ? Number(student.academicStanding.aggregatePercentageThroughSem6)
+              : null,
+          currentSemesterSequence:
+            student.academicStanding?.currentSemesterSequence ?? null,
         };
       case 'category_reservation':
         return {
@@ -1116,7 +1124,8 @@ export class StudentProfileSectionsService {
         dto.streamId !== undefined ||
         dto.admissionBatchId !== undefined ||
         dto.admissionYearId !== undefined ||
-        dto.class12Subjects !== undefined
+        dto.class12Subjects !== undefined ||
+        dto.previousCollegeName !== undefined
       ) {
         await tx.studentAcademicProfile.upsert({
           where: { studentId },
@@ -1128,6 +1137,7 @@ export class StudentProfileSectionsService {
             admissionYearId: dto.admissionYearId,
             class12Subjects:
               (dto.class12Subjects as Prisma.InputJsonValue) ?? [],
+            previousCollegeName: dto.previousCollegeName?.trim() || null,
           },
           update: {
             ...(dto.streamId !== undefined ? { streamId: dto.streamId } : {}),
@@ -1142,6 +1152,34 @@ export class StudentProfileSectionsService {
                   class12Subjects: dto.class12Subjects as Prisma.InputJsonValue,
                 }
               : {}),
+            ...(dto.previousCollegeName !== undefined
+              ? {
+                  previousCollegeName: dto.previousCollegeName?.trim() || null,
+                }
+              : {}),
+          },
+        });
+      }
+
+      if (dto.aggregatePercentageThroughSem6 !== undefined) {
+        const pct = Number(dto.aggregatePercentageThroughSem6);
+        if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+          throw new BadRequestException(
+            'Aggregate percentage through Sem 6 must be between 0 and 100',
+          );
+        }
+        await tx.studentAcademicStanding.upsert({
+          where: { studentId },
+          create: {
+            tenantId,
+            studentId,
+            currentSemesterSequence: 1,
+            lifecycleState: 'ACTIVE',
+            programmeStatus: 'IN_PROGRESS',
+            aggregatePercentageThroughSem6: new Prisma.Decimal(pct.toFixed(2)),
+          },
+          update: {
+            aggregatePercentageThroughSem6: new Prisma.Decimal(pct.toFixed(2)),
           },
         });
       }

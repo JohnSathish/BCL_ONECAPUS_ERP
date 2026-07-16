@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -231,6 +232,19 @@ export class AdmitStudentDto {
   @IsInt()
   @Min(1)
   currentSemester?: number;
+
+  /** NEHU-attested aggregate % through Semester 6 (required for Sem 7 lateral / Sem 8 Research). */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  aggregatePercentageThroughSem6?: number;
+
+  /** Previous NEHU-affiliated college (lateral Sem 7 entry). */
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  previousCollegeName?: string;
 
   @IsOptional()
   @IsString()

@@ -74,6 +74,9 @@ export type AddStudentDraft = {
   admissionDate: string;
   admissionType: string;
   currentSemester?: number;
+  /** NEHU-attested aggregate through Semester 6 (Sem 7+ lateral / Research gate). */
+  aggregatePercentageThroughSem6?: number;
+  previousCollegeName: string;
   categoryLookupId: string;
   tribeLookupId: string;
   denominationLookupId: string;
@@ -154,6 +157,8 @@ export function createEmptyDraft(): AddStudentDraft {
     minorCourseOfferingId: '',
     admissionDate: todayIsoDate(),
     admissionType: 'REGULAR',
+    aggregatePercentageThroughSem6: undefined,
+    previousCollegeName: '',
     categoryLookupId: '',
     tribeLookupId: '',
     denominationLookupId: '',

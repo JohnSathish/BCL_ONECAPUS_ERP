@@ -8,7 +8,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -123,6 +125,16 @@ export class UpdateAcademicSectionDto {
   @IsOptional() @IsIn(['HOSTELLER', 'DAY_SCHOLAR']) residenceType?: string;
   @IsOptional() @IsString() hostelBlock?: string;
   @IsOptional() @IsString() hostelRoom?: string;
+  /** NEHU-attested aggregate % through Sem 6 (Sem 7+ / Research gate). */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  aggregatePercentageThroughSem6?: number;
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  previousCollegeName?: string;
 }
 
 export class VerifyDocumentDto {

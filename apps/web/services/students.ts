@@ -642,6 +642,51 @@ export async function downloadSem5AdmissionTemplate(params?: {
   return data as Blob;
 }
 
+export async function downloadSem7AdmissionTemplate(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+  shiftId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/template', {
+    params: { variant: 'sem7-admission', ...params },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export type Sem7ImportProgrammeOption = {
+  programVersionId: string;
+  code: string;
+  name: string;
+};
+
+export type Sem7ImportCurriculum = {
+  programVersionId: string;
+  programCode: string;
+  programName: string;
+  semesterSequence: number;
+  majorDepartments: { departmentName: string; subjectSlug: string }[];
+  minorByMajor: Record<string, string[]>;
+};
+
+export async function fetchSem7ImportProgrammes() {
+  const { data } = await api.get('/v1/students/import/sem7-curriculum/programmes');
+  return data as Sem7ImportProgrammeOption[];
+}
+
+export async function fetchSem7ImportCurriculum(params?: {
+  programme?: string;
+  programVersionId?: string;
+  semesterSequence?: number;
+  academicYearId?: string;
+  shiftId?: string;
+}) {
+  const { data } = await api.get('/v1/students/import/sem7-curriculum', { params });
+  return data as Sem7ImportCurriculum;
+}
+
 export type Sem5ImportProgrammeOption = {
   programVersionId: string;
   code: string;

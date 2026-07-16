@@ -1,10 +1,12 @@
 import {
   IsBoolean,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
 } from 'class-validator';
 
@@ -93,5 +95,16 @@ export class SetHonoursTrackDto {
   eligibilityOverride?: boolean;
 
   @IsOptional()
+  @IsString()
+  eligibilityOverrideReason?: string;
+
+  @IsOptional()
   aggregatePercentageAtSelection?: number;
+}
+
+export class UpdateAggregateThroughSem6Dto {
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  aggregatePercentageThroughSem6!: number;
 }

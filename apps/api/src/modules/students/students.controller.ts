@@ -247,80 +247,83 @@ export class StudentsController {
       | 'sem1-admission'
       | 'sem2-admission'
       | 'sem3-admission'
-      | 'sem5-admission' = 'full-admission',
+      | 'sem5-admission'
+      | 'sem7-admission' = 'full-admission',
     @Query('programme') programme?: string,
     @Query('programVersionId') programVersionId?: string,
     @Query('semesterSequence') semesterSequence?: string,
     @Query('academicYearId') academicYearId?: string,
     @Query('shiftId') shiftId?: string,
   ) {
-    const buffer =
-      variant === 'full-admission'
-        ? await this.studentImport.buildFullAdmissionTemplate({
-            tenantId: user.tid,
-            programme,
-            programVersionId,
-            academicYearId,
-            shiftId,
-          })
-        : variant === 'sem1-admission'
-          ? await this.studentImport.buildSem1AdmissionTemplate({
-              tenantId: user.tid,
-              programme,
-              programVersionId,
-              semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
-              academicYearId,
-              shiftId,
-            })
-          : variant === 'sem2-admission'
-            ? await this.studentImport.buildSem2AdmissionTemplate({
-                tenantId: user.tid,
-                programme,
-                programVersionId,
-                shiftId,
-                academicYearId,
-              })
-            : variant === 'sem3-admission'
-              ? await this.studentImport.buildSem3AdmissionTemplate({
-                  tenantId: user.tid,
-                  programme,
-                  programVersionId,
-                  semesterSequence: semesterSequence
-                    ? Number(semesterSequence)
-                    : 3,
-                  shiftId,
-                })
-              : variant === 'sem5-admission'
-                ? await this.studentImport.buildSem5AdmissionTemplate({
-                    tenantId: user.tid,
-                    programme,
-                    programVersionId,
-                    semesterSequence: semesterSequence
-                      ? Number(semesterSequence)
-                      : 5,
-                    academicYearId,
-                    shiftId,
-                  })
-                : await this.studentImport.buildTemplate({
-                    mode,
-                    tenantId: user.tid,
-                  });
+    let buffer: Buffer;
+    let filename = 'Student_Import_Template.xlsx';
+    if (variant === 'full-admission') {
+      buffer = await this.studentImport.buildFullAdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        academicYearId,
+        shiftId,
+      });
+      filename = 'Full_Admission_Import_Template.xlsx';
+    } else if (variant === 'sem1-admission') {
+      buffer = await this.studentImport.buildSem1AdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        semesterSequence: semesterSequence ? Number(semesterSequence) : 1,
+        academicYearId,
+        shiftId,
+      });
+      filename = 'Sem1_Admission_Import_Template.xlsx';
+    } else if (variant === 'sem2-admission') {
+      buffer = await this.studentImport.buildSem2AdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        shiftId,
+        academicYearId,
+      });
+      filename = 'Sem2_Admission_Import_Template.xlsx';
+    } else if (variant === 'sem3-admission') {
+      buffer = await this.studentImport.buildSem3AdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        semesterSequence: semesterSequence ? Number(semesterSequence) : 3,
+        shiftId,
+      });
+      filename = 'Sem3_Admission_Import_Template.xlsx';
+    } else if (variant === 'sem5-admission') {
+      buffer = await this.studentImport.buildSem5AdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
+        academicYearId,
+        shiftId,
+      });
+      filename = 'Sem5_Admission_Import_Template.xlsx';
+    } else if (variant === 'sem7-admission') {
+      buffer = await this.studentImport.buildSem7AdmissionTemplate({
+        tenantId: user.tid,
+        programme,
+        programVersionId,
+        semesterSequence: semesterSequence ? Number(semesterSequence) : 7,
+        academicYearId,
+        shiftId,
+      });
+      filename = 'Sem7_Admission_Import_Template.xlsx';
+    } else {
+      buffer = await this.studentImport.buildTemplate({
+        mode,
+        tenantId: user.tid,
+      });
+    }
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    const filename =
-      variant === 'full-admission'
-        ? 'Full_Admission_Import_Template.xlsx'
-        : variant === 'sem1-admission'
-          ? 'Sem1_Admission_Import_Template.xlsx'
-          : variant === 'sem2-admission'
-            ? 'Sem2_Admission_Import_Template.xlsx'
-            : variant === 'sem3-admission'
-              ? 'Sem3_Admission_Import_Template.xlsx'
-              : variant === 'sem5-admission'
-                ? 'Sem5_Admission_Import_Template.xlsx'
-                : 'Student_Import_Template.xlsx';
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
   }
@@ -477,6 +480,31 @@ export class StudentsController {
       programme,
       programVersionId,
       semesterSequence: semesterSequence ? Number(semesterSequence) : 5,
+      academicYearId,
+      shiftId,
+    });
+  }
+
+  @Get('import/sem7-curriculum/programmes')
+  @RequirePermissions('students:import')
+  listSem7ImportProgrammes(@CurrentUser() user: JwtUser) {
+    return this.studentImport.listSem7ImportProgrammes(user.tid);
+  }
+
+  @Get('import/sem7-curriculum')
+  @RequirePermissions('students:import')
+  getSem7ImportCurriculum(
+    @CurrentUser() user: JwtUser,
+    @Query('programme') programme?: string,
+    @Query('programVersionId') programVersionId?: string,
+    @Query('semesterSequence') semesterSequence?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    return this.studentImport.getSem7ImportCurriculum(user.tid, {
+      programme,
+      programVersionId,
+      semesterSequence: semesterSequence ? Number(semesterSequence) : 7,
       academicYearId,
       shiftId,
     });

@@ -175,11 +175,40 @@ export function validateStepFields(
     if (needsMinor && !draft.minorSubjectSlug) {
       errors.minorSubjectSlug = 'Select a minor subject.';
     }
-    Object.assign(errors, validateClass12Background(draft));
+    const semester = draft.currentSemester ?? 1;
+    if (semester >= 7) {
+      if (
+        draft.aggregatePercentageThroughSem6 == null ||
+        !Number.isFinite(draft.aggregatePercentageThroughSem6) ||
+        draft.aggregatePercentageThroughSem6 < 0 ||
+        draft.aggregatePercentageThroughSem6 > 100
+      ) {
+        errors.aggregatePercentageThroughSem6 =
+          'Enter NEHU-attested aggregate % through Semester 6 (0–100).';
+      }
+      if (!draft.majorSubjectSlug?.trim()) {
+        errors.majorSubjectSlug = 'Major subject is required for Semester 7+ entry.';
+      }
+      if (!draft.minorSubjectSlug?.trim()) {
+        errors.minorSubjectSlug = 'Minor subject is required for Semester 7+ entry.';
+      }
+    }
+    // Class XII is for Sem 1 regular entry; skip for advanced / lateral Sem 7+.
+    if (semester < 7) {
+      Object.assign(errors, validateClass12Background(draft));
+    }
   }
 
   if (step === 'fyugp') {
-    if (!isClass12BackgroundComplete(draft)) {
+    const semester = draft.currentSemester ?? 1;
+    if (semester >= 7) {
+      // Sem 7+ uses Major/Minor paths only; pool basket is for Sem 1 entry.
+      if (!draft.majorSubjectSlug) {
+        errors.subjectSelections = 'Set major subject path in Academic Details first.';
+      } else if (needsMinor && !draft.minorSubjectSlug) {
+        errors.subjectSelections = 'Set major and minor subject paths in Academic Details first.';
+      }
+    } else if (!isClass12BackgroundComplete(draft)) {
       errors.class12Subjects = 'Complete Class XII Academic Background on the Academic step first.';
     } else if (!draft.majorSubjectSlug) {
       errors.subjectSelections = 'Set major subject path in Academic Details first.';

@@ -910,6 +910,16 @@ export class StudentsService {
       throw new BadRequestException('Stream is mandatory for admission');
     }
 
+    if (
+      dto.currentSemester != null &&
+      dto.currentSemester >= 7 &&
+      (!dto.majorSubjectSlug?.trim() || !dto.minorSubjectSlug?.trim())
+    ) {
+      throw new BadRequestException(
+        'Major and Minor subject paths are required for Semester 7+ entry.',
+      );
+    }
+
     await this.assertProgramVersion(tenantId, dto.programVersionId);
 
     const batch = await this.prisma.admissionBatch.findFirst({
@@ -1091,6 +1101,38 @@ export class StudentsService {
       await this.prisma.studentAcademicStanding.update({
         where: { studentId: student.id },
         data: { currentSemesterSequence: dto.currentSemester },
+      });
+    }
+
+    if (
+      dto.aggregatePercentageThroughSem6 != null ||
+      (dto.currentSemester != null && dto.currentSemester >= 7)
+    ) {
+      if (
+        dto.currentSemester != null &&
+        dto.currentSemester >= 7 &&
+        dto.aggregatePercentageThroughSem6 == null
+      ) {
+        throw new BadRequestException(
+          'NEHU-attested aggregate percentage through Semester 6 is required for Semester 7+ entry.',
+        );
+      }
+      if (dto.aggregatePercentageThroughSem6 != null) {
+        await this.prisma.studentAcademicStanding.update({
+          where: { studentId: student.id },
+          data: {
+            aggregatePercentageThroughSem6: new Prisma.Decimal(
+              Number(dto.aggregatePercentageThroughSem6).toFixed(2),
+            ),
+          },
+        });
+      }
+    }
+
+    if (dto.previousCollegeName?.trim()) {
+      await this.prisma.studentAcademicProfile.update({
+        where: { studentId: student.id },
+        data: { previousCollegeName: dto.previousCollegeName.trim() },
       });
     }
 

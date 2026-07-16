@@ -5119,6 +5119,8 @@ model StudentAcademicProfile {
   residenceType       String?  @map("residence_type")
   hostelBlock         String?  @map("hostel_block")
   hostelRoom          String?  @map("hostel_room")
+  /// Previous NEHU-affiliated college for lateral Sem 7+ entry
+  previousCollegeName String?  @map("previous_college_name")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -5618,6 +5620,7 @@ model StudentAcademicTrack {
   effectiveFromSemester          Int      @default(8) @map("effective_from_semester")
   aggregatePercentageAtSelection Decimal? @map("aggregate_percentage_at_selection") @db.Decimal(5, 2)
   eligibilityOverride            Boolean  @default(false) @map("eligibility_override")
+  eligibilityOverrideReason      String?  @map("eligibility_override_reason")
   selectedById                   String?  @map("selected_by_id") @db.Uuid
   createdAt                      DateTime @default(now()) @map("created_at")
   updatedAt                      DateTime @updatedAt @map("updated_at")

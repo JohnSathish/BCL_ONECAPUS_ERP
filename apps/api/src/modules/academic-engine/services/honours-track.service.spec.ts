@@ -12,16 +12,28 @@ describe('HonoursTrackService', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('warns when aggregate is below research threshold', () => {
+  it('blocks research when aggregate is below threshold without override', () => {
     const result = service.evaluateEligibility(
       'HONOURS_WITH_RESEARCH',
       70,
       false,
     );
-    expect(result.warning).toContain(
+    expect(result.eligible).toBe(false);
+    expect(result.requiresOverride).toBe(true);
+    expect(result.blockReason).toContain(
       String(HONOURS_RESEARCH_ELIGIBILITY_PERCENT),
     );
-    expect(result.eligible).toBe(true);
+  });
+
+  it('blocks research when aggregate is missing without override', () => {
+    const result = service.evaluateEligibility(
+      'HONOURS_WITH_RESEARCH',
+      null,
+      false,
+    );
+    expect(result.eligible).toBe(false);
+    expect(result.requiresOverride).toBe(true);
+    expect(result.blockReason).toMatch(/not recorded/i);
   });
 
   it('allows research track with eligibility override', () => {
@@ -30,11 +42,21 @@ describe('HonoursTrackService', () => {
       60,
       true,
     );
-    expect(result.warning).toBeNull();
+    expect(result.eligible).toBe(true);
     expect(result.eligibilityOverride).toBe(true);
   });
 
-  it('persists track selection for student', async () => {
+  it('allows research when aggregate meets threshold', () => {
+    const result = service.evaluateEligibility(
+      'HONOURS_WITH_RESEARCH',
+      80,
+      false,
+    );
+    expect(result.eligible).toBe(true);
+    expect(result.blockReason).toBeNull();
+  });
+
+  it('persists track selection for eligible student', async () => {
     prisma.student.findFirst.mockResolvedValue({ id: 's1', tenantId: 't1' });
     prisma.studentAcademicStanding.findUnique.mockResolvedValue({
       aggregatePercentageThroughSem6: 80,
@@ -50,5 +72,30 @@ describe('HonoursTrackService', () => {
 
     expect(saved.record.track).toBe('HONOURS_WITH_RESEARCH');
     expect(prisma.studentAcademicTrack.upsert).toHaveBeenCalled();
+  });
+
+  it('rejects research below threshold without override reason', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 's1', tenantId: 't1' });
+    prisma.studentAcademicStanding.findUnique.mockResolvedValue({
+      aggregatePercentageThroughSem6: 70,
+    });
+
+    await expect(
+      service.setTrack('t1', 's1', { track: 'HONOURS_WITH_RESEARCH' }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects override without a reason', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 's1', tenantId: 't1' });
+    prisma.studentAcademicStanding.findUnique.mockResolvedValue({
+      aggregatePercentageThroughSem6: 70,
+    });
+
+    await expect(
+      service.setTrack('t1', 's1', {
+        track: 'HONOURS_WITH_RESEARCH',
+        eligibilityOverride: true,
+      }),
+    ).rejects.toThrow(/reason/i);
   });
 });

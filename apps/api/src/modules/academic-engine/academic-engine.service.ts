@@ -67,6 +67,8 @@ import {
   evaluateProfileSoftGateFromPrisma,
   roughProfileCompletionPercent,
 } from '../students/utils/profile-soft-gate.util';
+import { HonoursTrackService } from './services/honours-track.service';
+import { assertAdvancedSemesterDocuments } from './domain/advanced-semester-document-gate';
 
 @Injectable()
 export class AcademicEngineService {
@@ -88,6 +90,7 @@ export class AcademicEngineService {
     private readonly courseEligibility: CourseEligibilityService,
     private readonly feeEnforcement: FeeEnforcementService,
     private readonly academicChangeHistory: AcademicChangeHistoryService,
+    private readonly honoursTrack: HonoursTrackService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -992,6 +995,16 @@ export class AcademicEngineService {
       throw new BadRequestException('Registration already submitted');
     }
 
+    await assertAdvancedSemesterDocuments(
+      this.prisma,
+      tenantId,
+      reg.studentId,
+      reg.semesterSequence,
+    );
+    if (reg.semesterSequence === 8) {
+      await this.honoursTrack.assertTrackForSemester8(tenantId, reg.studentId);
+    }
+
     const student = await this.prisma.student.findFirstOrThrow({
       where: { id: reg.studentId },
       include: { academicProfile: true },
@@ -1075,6 +1088,16 @@ export class AcademicEngineService {
   ) {
     const reg = await this.getRegistration(tenantId, registrationId);
     if (reg.status === 'completed') return reg;
+
+    await assertAdvancedSemesterDocuments(
+      this.prisma,
+      tenantId,
+      reg.studentId,
+      reg.semesterSequence,
+    );
+    if (reg.semesterSequence === 8) {
+      await this.honoursTrack.assertTrackForSemester8(tenantId, reg.studentId);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       await tx.semesterRegistrationLine.updateMany({
