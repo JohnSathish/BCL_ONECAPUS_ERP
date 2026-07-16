@@ -18,6 +18,10 @@ function isCareerHost(host: string) {
   return hostname(host).startsWith('career.');
 }
 
+function isAlumniHost(host: string) {
+  return hostname(host).startsWith('alumni.');
+}
+
 function handleCareerHost(request: NextRequest) {
   return handleSubdomainRewrite(request, '/careers-portal', '/careers-portal', [
     '/admin',
@@ -26,6 +30,19 @@ function handleCareerHost(request: NextRequest) {
     '/shift',
     '/library-desk',
     '/admissions-portal',
+    '/alumni-portal',
+  ]);
+}
+
+function handleAlumniHost(request: NextRequest) {
+  return handleSubdomainRewrite(request, '/alumni-portal', '/alumni-portal/register', [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+    '/admissions-portal',
+    '/careers-portal',
   ]);
 }
 
@@ -158,6 +175,10 @@ export function middleware(request: NextRequest) {
 
   if (isCareerHost(host)) {
     return handleCareerHost(request);
+  }
+
+  if (isAlumniHost(host)) {
+    return handleAlumniHost(request);
   }
 
   if (isLibraryHost(host)) {

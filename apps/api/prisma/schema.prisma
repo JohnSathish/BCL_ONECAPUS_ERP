@@ -12882,25 +12882,230 @@ model InternshipPlacement {
 }
 
 model AlumniProfile {
-  id               String   @id @default(uuid()) @db.Uuid
-  tenantId         String   @map("tenant_id") @db.Uuid
-  studentId        String?  @map("student_id") @db.Uuid
-  userId           String?  @map("user_id") @db.Uuid
-  fullName         String   @map("full_name")
-  graduationYear   Int?     @map("graduation_year")
-  programme        String?
-  email            String?
-  phone            String?
-  currentOrg       String?  @map("current_org")
-  currentRole      String?  @map("current_role")
-  mentorshipOptIn  Boolean  @default(false) @map("mentorship_opt_in")
-  status           String   @default("ACTIVE")
-  metadata         Json     @default("{}")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  studentId          String?   @map("student_id") @db.Uuid
+  userId             String?   @map("user_id") @db.Uuid
+  membershipNumber   String?   @map("membership_number")
+  fullName           String    @map("full_name")
+  gender             String?
+  dateOfBirth        DateTime? @map("date_of_birth") @db.Date
+  bloodGroup         String?   @map("blood_group")
+  photoUrl           String?   @map("photo_url")
+  graduationYear     Int?      @map("graduation_year")
+  programme          String?
+  department         String?
+  email              String?
+  phone              String?
+  whatsapp           String?
+  currentAddress     String?   @map("current_address")
+  state              String?
+  country            String?   @default("India")
+  pinCode            String?   @map("pin_code")
+  occupation         String?
+  currentOrg         String?   @map("current_org")
+  currentRole        String?   @map("current_role")
+  officeAddress      String?   @map("office_address")
+  linkedinUrl        String?   @map("linkedin_url")
+  facebookUrl        String?   @map("facebook_url")
+  instagramUrl       String?   @map("instagram_url")
+  emergencyName      String?   @map("emergency_name")
+  emergencyMobile    String?   @map("emergency_mobile")
+  emergencyRelation  String?   @map("emergency_relation")
+  mentorshipOptIn    Boolean   @default(false) @map("mentorship_opt_in")
+  directoryVisible   Boolean   @default(true) @map("directory_visible")
+  /// PENDING_VERIFICATION | OFFICE_VERIFIED | COMMITTEE_APPROVED | ACTIVE | REJECTED | INACTIVE
+  status             String    @default("PENDING_VERIFICATION")
+  profileCompletedAt DateTime? @map("profile_completed_at")
+  activatedAt        DateTime? @map("activated_at")
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
+  memberships AlumniMembership[]
+  payments    AlumniPayment[]
+  eventRegs   AlumniEventRegistration[]
+  donations   AlumniDonation[]
+
+  @@unique([tenantId, membershipNumber])
   @@index([tenantId, studentId])
+  @@index([tenantId, status])
+  @@index([tenantId, graduationYear])
   @@map("alumni_profiles")
+  @@schema("academic")
+}
+
+model AlumniMembershipType {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String
+  name            String
+  description     String?
+  amountPaise     Int       @default(0) @map("amount_paise")
+  durationMonths  Int?      @map("duration_months")
+  isLifetime         Boolean   @default(false) @map("is_lifetime")
+  sortOrder       Int       @default(0) @map("sort_order")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  memberships AlumniMembership[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("alumni_membership_types")
+  @@schema("academic")
+}
+
+model AlumniMembership {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  alumniId         String    @map("alumni_id") @db.Uuid
+  membershipTypeId String    @map("membership_type_id") @db.Uuid
+  /// PENDING_PAYMENT | ACTIVE | EXPIRED | CANCELLED
+  status           String    @default("PENDING_PAYMENT")
+  startsAt         DateTime? @map("starts_at")
+  expiresAt        DateTime? @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  alumni         AlumniProfile       @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  membershipType AlumniMembershipType @relation(fields: [membershipTypeId], references: [id], onDelete: Restrict)
+  payments       AlumniPayment[]
+
+  @@index([tenantId, alumniId])
+  @@index([tenantId, status])
+  @@map("alumni_memberships")
+  @@schema("academic")
+}
+
+model AlumniPayment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  alumniId       String    @map("alumni_id") @db.Uuid
+  membershipId   String?   @map("membership_id") @db.Uuid
+  amountPaise    Int       @map("amount_paise")
+  currency       String    @default("INR")
+  /// PENDING | PAID | FAILED | REFUNDED
+  status         String    @default("PENDING")
+  gateway        String?
+  gatewayOrderId String?   @map("gateway_order_id")
+  gatewayPaymentId String? @map("gateway_payment_id")
+  receiptNumber  String?   @map("receipt_number")
+  paidAt         DateTime? @map("paid_at")
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  alumni     AlumniProfile     @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  membership AlumniMembership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, alumniId])
+  @@index([tenantId, status])
+  @@map("alumni_payments")
+  @@schema("academic")
+}
+
+model AlumniEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  title       String
+  slug        String
+  summary     String?
+  description String?
+  eventType   String    @default("REUNION") @map("event_type")
+  venue       String?
+  startsAt    DateTime  @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  isPublished Boolean   @default(false) @map("is_published")
+  coverUrl    String?   @map("cover_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  registrations AlumniEventRegistration[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isPublished, startsAt])
+  @@map("alumni_events")
+  @@schema("academic")
+}
+
+model AlumniEventRegistration {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  eventId   String   @map("event_id") @db.Uuid
+  alumniId  String   @map("alumni_id") @db.Uuid
+  status    String   @default("REGISTERED")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  event  AlumniEvent   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  alumni AlumniProfile @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, alumniId])
+  @@index([tenantId, eventId])
+  @@map("alumni_event_registrations")
+  @@schema("academic")
+}
+
+model AlumniDonation {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  alumniId      String?   @map("alumni_id") @db.Uuid
+  donorName     String    @map("donor_name")
+  amountPaise   Int       @map("amount_paise")
+  campaign      String?
+  status        String    @default("PENDING")
+  receiptNumber String?   @map("receipt_number")
+  paidAt        DateTime? @map("paid_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  alumni AlumniProfile? @relation(fields: [alumniId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@map("alumni_donations")
+  @@schema("academic")
+}
+
+model AlumniCommitteeMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  fullName  String   @map("full_name")
+  roleTitle String   @map("role_title")
+  photoUrl  String?  @map("photo_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, isActive])
+  @@map("alumni_committee_members")
+  @@schema("academic")
+}
+
+model AlumniAssociationSettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @unique @map("tenant_id") @db.Uuid
+  associationName    String   @default("Alumni Association") @map("association_name")
+  tagline            String?
+  aboutHtml          String?  @map("about_html")
+  contactEmail       String?  @map("contact_email")
+  contactPhone       String?  @map("contact_phone")
+  address            String?
+  logoUrl            String?  @map("logo_url")
+  heroImageUrl       String?  @map("hero_image_url")
+  heroImagesJson     Json?    @map("hero_images_json")
+  primaryColor       String   @default("#1A2B47") @map("primary_color")
+  accentColor        String   @default("#F3B63B") @map("accent_color")
+  statsAlumni        Int      @default(0) @map("stats_alumni")
+  statsLegacyYears   Int      @default(0) @map("stats_legacy_years")
+  statsEvents        Int      @default(0) @map("stats_events")
+  statsCountries     Int      @default(0) @map("stats_countries")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("alumni_association_settings")
   @@schema("academic")
 }
 
