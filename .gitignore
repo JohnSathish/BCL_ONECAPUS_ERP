@@ -65,3 +65,7 @@ dbctura website latest.txt
 
 # Local full safety backups (DB dumps + project archives)
 _safety-backups/
+
+# One-time office-filled legacy minor CSVs (keep directory via .gitkeep)
+apps/api/scripts/data/**
+!apps/api/scripts/data/.gitkeep
