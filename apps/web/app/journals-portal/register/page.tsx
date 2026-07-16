@@ -41,6 +41,7 @@ export default function JournalRegisterPage() {
   const [form, setForm] = useState({
     displayName: '',
     email: '',
+    confirmEmail: '',
     phone: '',
     affiliation: '',
     department: '',
@@ -70,6 +71,10 @@ export default function JournalRegisterPage() {
       setError('Please agree to the Author Guidelines to continue.');
       return;
     }
+    if (form.email.trim().toLowerCase() !== form.confirmEmail.trim().toLowerCase()) {
+      setError('Email addresses do not match. Please re-check for typos.');
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -87,7 +92,7 @@ export default function JournalRegisterPage() {
     try {
       await journalPortalRegister({
         displayName: form.displayName,
-        email: form.email,
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         phone: form.phone || undefined,
         affiliation: form.affiliation || undefined,
@@ -96,7 +101,9 @@ export default function JournalRegisterPage() {
         country: form.country || undefined,
         orcid: form.orcid || undefined,
       });
-      router.push('/journals-portal/login?registered=1');
+      router.push(
+        `/journals-portal/login?registered=1&email=${encodeURIComponent(form.email.trim().toLowerCase())}`,
+      );
     } catch (err) {
       setError(apiErrorMessage(err, 'Registration failed'));
     } finally {
@@ -115,7 +122,7 @@ export default function JournalRegisterPage() {
           >
             Create your {short} author account
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#0B2545]/6">
+          <p className="mt-2 text-sm leading-relaxed text-[#0B2545]/75">
             Register once to submit manuscripts, track peer review, and manage production proofs.
           </p>
         </div>
@@ -128,7 +135,7 @@ export default function JournalRegisterPage() {
                 id="reg-name"
                 required
                 autoComplete="name"
-                placeholder="Dr. Yubaraj Sharma"
+                placeholder="John Smith"
                 value={form.displayName}
                 onChange={(e) => set('displayName', e.target.value)}
               />
@@ -146,20 +153,31 @@ export default function JournalRegisterPage() {
                 />
               </AuthField>
               <AuthField
-                id="reg-phone"
-                label="Phone (optional)"
-                icon={<Phone className="h-4 w-4" />}
+                id="reg-email-confirm"
+                label="Confirm email"
+                icon={<Mail className="h-4 w-4" />}
               >
                 <input
-                  id="reg-phone"
-                  type="tel"
-                  autoComplete="tel"
-                  placeholder="+91 …"
-                  value={form.phone}
-                  onChange={(e) => set('phone', e.target.value)}
+                  id="reg-email-confirm"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="Re-enter email"
+                  value={form.confirmEmail}
+                  onChange={(e) => set('confirmEmail', e.target.value)}
                 />
               </AuthField>
             </div>
+            <AuthField id="reg-phone" label="Phone (optional)" icon={<Phone className="h-4 w-4" />}>
+              <input
+                id="reg-phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+91 …"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+              />
+            </AuthField>
           </section>
 
           <section className="space-y-3.5">

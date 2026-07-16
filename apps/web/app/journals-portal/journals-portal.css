@@ -10,12 +10,13 @@
   --jp-paper: #f7f9fc;
   --jp-card: #ffffff;
   --jp-border: rgba(11, 31, 58, 0.1);
-  --jp-serif: var(--font-jp-display), Georgia, 'Times New Roman', serif;
+  --jp-serif: var(--font-jp-display), 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --jp-sans: var(--font-jp-sans), system-ui, sans-serif;
   font-family: var(--jp-sans);
   color: var(--jp-ink);
   background-color: #fff;
-  font-feature-settings: 'kern' on;
+  font-feature-settings: 'kern' on, 'lnum' 1, 'tnum' 1;
+  font-variant-numeric: lining-nums tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -31,8 +32,10 @@ html.dark .journals-portal {
 
 .journals-portal .jp-serif {
   font-family: var(--jp-serif);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: 'lnum' 1, 'tnum' 1, 'kern' on;
 }
 
 .journals-portal .jp-eyebrow {
@@ -395,7 +398,7 @@ html.dark .journals-portal .jp-auth-field select {
 }
 
 .journals-portal .jp-auth-field input::placeholder {
-  color: rgba(11, 31, 58, 0.38);
+  color: rgba(11, 31, 58, 0.45);
 }
 
 .journals-portal .jp-auth-field input:focus,
@@ -490,9 +493,62 @@ html.dark .journals-portal .jp-auth-field select {
   background: rgba(11, 31, 58, 0.1);
 }
 
+.journals-portal .jp-cms-prose {
+  color: var(--jp-ink);
+}
+
+.journals-portal .jp-cms-prose h2 {
+  font-family: var(--jp-serif);
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  color: var(--jp-ink);
+}
+
+.journals-portal .jp-cms-prose h3 {
+  font-family: var(--jp-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--jp-ink);
+}
+
+.journals-portal .jp-cms-prose p,
+.journals-portal .jp-cms-prose li {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--jp-muted);
+}
+
+.journals-portal .jp-cms-prose strong {
+  color: var(--jp-ink);
+  font-weight: 600;
+}
+
+.journals-portal .jp-cms-prose ul,
+.journals-portal .jp-cms-prose ol {
+  margin: 0.75rem 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.journals-portal .jp-cms-prose li + li {
+  margin-top: 0.45rem;
+}
+
+.journals-portal .jp-cms-prose a {
+  color: var(--jp-gold);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .journals-portal .jp-hide-scrollbar {
   scrollbar-width: none;
 }
 .journals-portal .jp-hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+

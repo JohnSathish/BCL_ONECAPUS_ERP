@@ -5,15 +5,23 @@ import { Megaphone } from 'lucide-react';
 import type { JournalPortalInfo } from '@/services/journals-portal';
 import { FadeUp } from './home-motion';
 
-type Props = { announcements: JournalPortalInfo['announcements'] };
+type Props = {
+  announcements: JournalPortalInfo['announcements'];
+  featuredImageUrl?: string | null;
+  featuredHeadline?: string | null;
+  featuredSubtext?: string | null;
+};
 
-export function HomeAnnouncements({ announcements }: Props) {
-  const featured = announcements[0];
-  if (!featured && announcements.length === 0) {
-    // Still show mockup layout with empty placeholder
-  }
-
-  const item = featured ?? null;
+export function HomeAnnouncements({
+  announcements,
+  featuredImageUrl,
+  featuredHeadline,
+  featuredSubtext,
+}: Props) {
+  const item = announcements[0] ?? null;
+  const image = featuredImageUrl || '/branding/transient-science-hero.png';
+  const headline = featuredHeadline || 'Scholarship in print & open access';
+  const subtext = featuredSubtext || 'Peer-reviewed research from Don Bosco College, Tura';
 
   return (
     <section className="bg-[var(--jp-paper)] px-4 py-16 lg:px-6 lg:py-20">
@@ -81,16 +89,13 @@ export function HomeAnnouncements({ announcements }: Props) {
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{
-                backgroundImage:
-                  "url('/branding/alumni-campus-hero.png'), linear-gradient(135deg, #0B1F3A 0%, #1a3a5c 55%, #C9A227 140%)",
+                backgroundImage: `url('${image}'), linear-gradient(135deg, #0B1F3A 0%, #1a3a5c 55%, #C9A227 140%)`,
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-[rgba(11,31,58,0.55)] via-transparent to-[rgba(201,162,39,0.25)]" />
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-              <p className="jp-serif text-xl font-semibold">Scholarship in print & open access</p>
-              <p className="mt-1 text-sm text-white/75">
-                Peer-reviewed research from Don Bosco College, Tura
-              </p>
+              <p className="jp-serif text-xl font-semibold">{headline}</p>
+              <p className="mt-1 text-sm text-white/75">{subtext}</p>
             </div>
           </FadeUp>
         </div>

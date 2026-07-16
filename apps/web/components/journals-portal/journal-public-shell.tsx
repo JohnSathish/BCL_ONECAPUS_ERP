@@ -1,18 +1,33 @@
 'use client';
 
 import NextLink from 'next/link';
-import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { ChevronDown, Mail, Menu, Moon, Search, Share2, Sun, X } from 'lucide-react';
-import { fetchJournalPortalInfo } from '@/services/journals-portal';
+import { ChevronDown, LogOut, Mail, Menu, Moon, Search, Share2, Sun, User, X } from 'lucide-react';
+import { fetchJournalPortalInfo, fetchJournalPortalMe } from '@/services/journals-portal';
+import { bootstrapSession, logout as apiLogout } from '@/services/auth';
 import { HOME_FOOTER_INDEXING } from '@/components/journals-portal/home/transient-home-static';
+import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/cn';
 
 const GOLD = '#C9A227';
 const NAVY = '#0B1F3A';
 const DEFAULT_LOGO = '/branding/college-logo.png';
+
+function resolveAuthorLabel(displayName?: string | null, email?: string | null) {
+  const name = displayName?.trim() || '';
+  const mail = email?.trim() || '';
+  if (name && !name.includes('@') && name.toLowerCase() !== mail.toLowerCase()) {
+    return name;
+  }
+  if (mail.includes('@')) {
+    const local = mail.split('@')[0] || 'Author';
+    return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return name || 'Author';
+}
 
 type NavItem = { href: string; label: string; exact?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
@@ -53,17 +68,6 @@ const FOR_AUTHORS: NavGroup = {
 const TRAILING: NavItem[] = [
   { href: '/journals-portal/downloads', label: 'Downloads' },
   { href: '/journals-portal/contact', label: 'Contact' },
-];
-
-const MOBILE: NavItem[] = [
-  ...PRIMARY,
-  { href: '/journals-portal/current-issue', label: 'Current Issue' },
-  ARCHIVES,
-  { href: '/journals-portal/editorial-board', label: 'Editorial Board' },
-  ...FOR_AUTHORS.items,
-  ...TRAILING,
-  { href: '/journals-portal/login', label: 'Login' },
-  { href: '/journals-portal/search', label: 'Search' },
 ];
 
 function isActive(pathname: string, item: NavItem) {
@@ -118,18 +122,42 @@ type Props = { children: React.ReactNode };
 
 export function JournalPublicShell({ children }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const session = useAuthStore((s) => s.session);
+  const setSession = useAuthStore((s) => s.setSession);
+  const clear = useAuthStore((s) => s.clear);
+
   const infoQ = useQuery({
     queryKey: ['journal-portal-info'],
     queryFn: fetchJournalPortalInfo,
     staleTime: 60_000,
   });
+  const meQ = useQuery({
+    queryKey: ['journal-me'],
+    queryFn: fetchJournalPortalMe,
+    enabled: Boolean(session?.accessToken),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const journal = infoQ.data?.journal;
   const logo = journal?.logoUrl || DEFAULT_LOGO;
   const title = journal?.name || 'Transient';
   const email = journal?.contactEmail || 'transient@donboscocollege.ac.in';
   const issn = journal?.issn;
+
+  const authorName = useMemo(() => {
+    return resolveAuthorLabel(
+      meQ.data?.displayName || meQ.data?.profile?.displayName || session?.user?.displayName,
+      meQ.data?.email || session?.user?.email,
+    );
+  }, [meQ.data, session?.user]);
+
+  const authorEmail = meQ.data?.email || session?.user?.email || '';
+  const isSignedIn = Boolean(session?.accessToken);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -138,34 +166,107 @@ export function JournalPublicShell({ children }: Props) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (session?.accessToken) return;
+      try {
+        const restored = await bootstrapSession();
+        if (!cancelled && restored?.accessToken) {
+          setSession(restored);
+          useAuthStore.getState().setBootstrapping(false);
+        }
+      } catch {
+        /* no session */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, setSession]);
+
+  async function onLogout() {
+    setLoggingOut(true);
+    try {
+      await apiLogout();
+    } catch {
+      /* still clear local session */
+    } finally {
+      clear();
+      setLoggingOut(false);
+      setOpen(false);
+      router.push('/journals-portal/login');
+    }
+  }
+
+  const mobileLinks = [
+    ...PRIMARY,
+    { href: '/journals-portal/current-issue', label: 'Current Issue' },
+    ARCHIVES,
+    { href: '/journals-portal/editorial-board', label: 'Editorial Board' },
+    ...FOR_AUTHORS.items,
+    ...TRAILING,
+    ...(isSignedIn
+      ? [
+          { href: '/journals-portal/author', label: 'My submissions' },
+          { href: '/journals-portal/search', label: 'Search' },
+        ]
+      : [
+          { href: '/journals-portal/login', label: 'Login' },
+          { href: '/journals-portal/search', label: 'Search' },
+        ]),
+  ];
+
   return (
     <div className="journals-portal jp-grain flex min-h-screen flex-col text-[var(--jp-ink)]">
-      {/* Utility bar — white, matching mockup */}
       <div className="relative z-30 border-b border-[var(--jp-border)] bg-white text-[11px] text-[var(--jp-ink)]/75 dark:bg-[var(--jp-card)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 lg:px-6">
           <div className="flex min-w-0 items-center gap-3 sm:gap-5">
             {issn ? <span className="shrink-0 font-medium tracking-wide">ISSN {issn}</span> : null}
             <span className="hidden text-[var(--jp-ink)]/55 sm:inline">Open Access Journal</span>
           </div>
-          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <NextLink
-              href="/journals-portal/author"
+              href={
+                isSignedIn ? '/journals-portal/author/submissions/new' : '/journals-portal/author'
+              }
               className="rounded-sm px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0B1F3A]"
               style={{ backgroundColor: GOLD }}
             >
               Submit Paper
             </NextLink>
-            <NextLink
-              href="/journals-portal/login"
-              className="font-medium text-[var(--jp-ink)]/70 hover:text-[var(--jp-ink)]"
-            >
-              Login
-            </NextLink>
+            {isSignedIn ? (
+              <div className="flex items-center gap-2 sm:gap-3">
+                <NextLink
+                  href="/journals-portal/author"
+                  className="hidden max-w-[200px] items-center gap-1.5 truncate font-medium text-[var(--jp-ink)] hover:text-[var(--jp-ink)] sm:inline-flex"
+                  title={authorEmail}
+                >
+                  <User className="h-3.5 w-3.5 shrink-0 text-[var(--jp-gold)]" />
+                  <span className="truncate">{authorName}</span>
+                </NextLink>
+                <button
+                  type="button"
+                  onClick={() => void onLogout()}
+                  disabled={loggingOut}
+                  className="inline-flex items-center gap-1 font-semibold text-[var(--jp-ink)]/70 hover:text-[var(--jp-ink)]"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  {loggingOut ? 'Signing out…' : 'Logout'}
+                </button>
+              </div>
+            ) : (
+              <NextLink
+                href="/journals-portal/login"
+                className="font-medium text-[var(--jp-ink)]/70 hover:text-[var(--jp-ink)]"
+              >
+                Login
+              </NextLink>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Main nav — white */}
       <header
         className={cn(
           'sticky top-0 z-40 border-b border-[var(--jp-border)] bg-white dark:bg-[var(--jp-card)]',
@@ -254,7 +355,13 @@ export function JournalPublicShell({ children }: Props) {
         {open ? (
           <div className="border-t border-[var(--jp-border)] bg-white dark:bg-[var(--jp-card)] xl:hidden">
             <div className="flex max-h-[70vh] flex-col overflow-y-auto px-4 py-2">
-              {MOBILE.map((item) => (
+              {isSignedIn ? (
+                <div className="border-b border-[var(--jp-border)] py-3">
+                  <p className="text-sm font-semibold text-[var(--jp-ink)]">{authorName}</p>
+                  <p className="truncate text-xs text-[var(--jp-muted)]">{authorEmail}</p>
+                </div>
+              ) : null}
+              {mobileLinks.map((item) => (
                 <NextLink
                   key={item.href}
                   href={item.href}
@@ -264,6 +371,15 @@ export function JournalPublicShell({ children }: Props) {
                   {item.label}
                 </NextLink>
               ))}
+              {isSignedIn ? (
+                <button
+                  type="button"
+                  onClick={() => void onLogout()}
+                  className="border-b border-[var(--jp-border)] py-3 text-left text-sm font-semibold text-red-700"
+                >
+                  {loggingOut ? 'Signing out…' : 'Logout'}
+                </button>
+              ) : null}
               <div className="flex items-center justify-between py-3">
                 <span className="text-sm text-[var(--jp-muted)]">Appearance</span>
                 <JournalThemeToggle />

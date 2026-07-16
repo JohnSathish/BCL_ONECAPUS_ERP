@@ -1,9 +1,9 @@
-import { Inter, Cormorant_Garamond } from 'next/font/google';
+import { Inter, Source_Serif_4 } from 'next/font/google';
 import type { Metadata } from 'next';
 import { JOURNALS_PUBLIC_URL } from '@/lib/journals-host';
 import './journals-portal.css';
 
-const jpDisplay = Cormorant_Garamond({
+const jpDisplay = Source_Serif_4({
   subsets: ['latin'],
   weight: ['500', '600', '700'],
   variable: '--font-jp-display',

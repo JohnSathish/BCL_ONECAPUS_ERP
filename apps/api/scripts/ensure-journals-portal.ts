@@ -9,6 +9,10 @@ import {
   JOURNAL_COMMUNICATION_TEMPLATE_CODES,
   findDefaultTemplateByCode,
 } from '../src/modules/communication/data/default-communication-templates';
+import {
+  TRANSIENT_AUTHOR_GUIDELINES_HTML,
+  TRANSIENT_PEER_REVIEW_HTML,
+} from '../src/modules/journals/content/transient-author-guidelines';
 
 const prisma = new PrismaClient();
 
@@ -42,19 +46,18 @@ const DEFAULT_PAGES: Array<{ key: string; title: string; bodyHtml: string }> = [
   {
     key: 'peer-review',
     title: 'Peer Review Policy',
-    bodyHtml: '<p>All submissions undergo rigorous peer review.</p>',
+    bodyHtml: TRANSIENT_PEER_REVIEW_HTML,
   },
   {
     key: 'ethics',
     title: 'Publication Ethics',
     bodyHtml:
-      '<p>The journal follows established publication ethics guidelines.</p>',
+      '<p>The journal follows established publication ethics guidelines. Copyright in published papers is reserved by the publisher as stated in journal policy.</p>',
   },
   {
     key: 'author-guidelines',
     title: 'Author Guidelines',
-    bodyHtml:
-      '<p>Authors should follow the submission guidelines published by the journal.</p>',
+    bodyHtml: TRANSIENT_AUTHOR_GUIDELINES_HTML,
   },
   {
     key: 'indexing',
@@ -70,13 +73,19 @@ const DEFAULT_PAGES: Array<{ key: string; title: string; bodyHtml: string }> = [
   },
 ];
 
+const FORCE_UPDATE_PAGE_KEYS = new Set([
+  'about',
+  'author-guidelines',
+  'peer-review',
+]);
+
 async function ensurePages(tenantId: string, journalId: string) {
   for (const [index, page] of DEFAULT_PAGES.entries()) {
     const exists = await prisma.journalPage.findFirst({
       where: { journalId, key: page.key },
     });
     if (exists) {
-      if (page.key === 'about') {
+      if (FORCE_UPDATE_PAGE_KEYS.has(page.key)) {
         await prisma.journalPage.update({
           where: { id: exists.id },
           data: { title: page.title, bodyHtml: page.bodyHtml },

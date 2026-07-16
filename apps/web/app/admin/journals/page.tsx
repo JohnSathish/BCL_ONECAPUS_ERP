@@ -38,6 +38,8 @@ import {
   reserveArticleDoi,
   seedAdminJournals,
   updateAdminJournal,
+  updateAdminBoardMember,
+  updateAdminIssue,
   updateCrossrefSettings,
   uploadAdminMedia,
   uploadSimilarityReport,
@@ -46,6 +48,11 @@ import {
   type JournalSubmission,
 } from '@/services/journals-portal';
 import { apiErrorMessage } from '@/utils/api-error';
+
+async function uploadAndGetUrl(journalId: string, file: File, kind: string) {
+  const asset = await uploadAdminMedia(journalId, file, kind);
+  return asset.publicUrl;
+}
 
 type Tab =
   | 'branding'
@@ -246,17 +253,57 @@ function BrandingTab({
     contactPhone: journal.contactPhone ?? '',
     logoUrl: journal.logoUrl ?? '',
     bannerUrl: journal.bannerUrl ?? '',
+    homeAnnouncementsImageUrl: journal.homeAnnouncementsImageUrl ?? '',
+    homeAnnouncementsHeadline: journal.homeAnnouncementsHeadline ?? '',
+    homeAnnouncementsSubtext: journal.homeAnnouncementsSubtext ?? '',
   });
 
+  useEffect(() => {
+    setForm({
+      name: journal.name,
+      shortName: journal.shortName,
+      issn: journal.issn ?? '',
+      tagline: journal.tagline ?? '',
+      description: journal.description ?? '',
+      contactEmail: journal.contactEmail ?? '',
+      contactPhone: journal.contactPhone ?? '',
+      logoUrl: journal.logoUrl ?? '',
+      bannerUrl: journal.bannerUrl ?? '',
+      homeAnnouncementsImageUrl: journal.homeAnnouncementsImageUrl ?? '',
+      homeAnnouncementsHeadline: journal.homeAnnouncementsHeadline ?? '',
+      homeAnnouncementsSubtext: journal.homeAnnouncementsSubtext ?? '',
+    });
+  }, [journal]);
+
   const save = useMutation({
-    mutationFn: () => updateAdminJournal(journal.id, form),
+    mutationFn: () =>
+      updateAdminJournal(journal.id, {
+        ...form,
+        homeAnnouncementsImageUrl: form.homeAnnouncementsImageUrl || null,
+        homeAnnouncementsHeadline: form.homeAnnouncementsHeadline || null,
+        homeAnnouncementsSubtext: form.homeAnnouncementsSubtext || null,
+      }),
     onSuccess: onSaved,
     onError: (e) => onError(apiErrorMessage(e, 'Save failed')),
   });
 
+  const uploadField = async (
+    key: 'logoUrl' | 'bannerUrl' | 'homeAnnouncementsImageUrl',
+    kind: string,
+    file: File | undefined,
+  ) => {
+    if (!file) return;
+    try {
+      const url = await uploadAndGetUrl(journal.id, file, kind);
+      setForm((f) => ({ ...f, [key]: url }));
+    } catch (e) {
+      onError(apiErrorMessage(e, 'Upload failed'));
+    }
+  };
+
   return (
     <CompactCard>
-      <CompactCardHeader title={`${journal.name} — branding`} />
+      <CompactCardHeader title={`${journal.name} — branding & homepage images`} />
       <CompactCardBody className="grid gap-3 md:grid-cols-2">
         {(
           [
@@ -266,8 +313,6 @@ function BrandingTab({
             ['tagline', 'Tagline'],
             ['contactEmail', 'Contact email'],
             ['contactPhone', 'Contact phone'],
-            ['logoUrl', 'Logo URL'],
-            ['bannerUrl', 'Banner URL'],
           ] as const
         ).map(([key, label]) => (
           <label key={key} className="block text-sm">
@@ -278,6 +323,63 @@ function BrandingTab({
             />
           </label>
         ))}
+
+        <div className="space-y-2 md:col-span-2">
+          <p className="text-sm font-semibold">Portal images (homepage)</p>
+          <p className="text-xs text-muted-foreground">
+            Logo = header. Banner = hero slider / fallback cover. Announcements image = right panel
+            under Latest Announcements.
+          </p>
+        </div>
+
+        {(
+          [
+            ['logoUrl', 'Logo URL', 'LOGO'],
+            ['bannerUrl', 'Hero / banner URL', 'BANNER'],
+            ['homeAnnouncementsImageUrl', 'Announcements panel image URL', 'BANNER'],
+          ] as const
+        ).map(([key, label, kind]) => (
+          <div key={key} className="space-y-2 md:col-span-1">
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted-foreground">{label}</span>
+              <Input
+                value={form[key]}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              />
+            </label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => void uploadField(key, kind, e.target.files?.[0])}
+            />
+            {form[key] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form[key]} alt="" className="h-16 w-auto rounded border object-cover" />
+            ) : null}
+          </div>
+        ))}
+
+        <label className="block text-sm md:col-span-2">
+          <span className="mb-1 block text-muted-foreground">
+            Announcements panel headline (optional)
+          </span>
+          <Input
+            value={form.homeAnnouncementsHeadline}
+            onChange={(e) => setForm((f) => ({ ...f, homeAnnouncementsHeadline: e.target.value }))}
+            placeholder="Scholarship in print & open access"
+          />
+        </label>
+        <label className="block text-sm md:col-span-2">
+          <span className="mb-1 block text-muted-foreground">
+            Announcements panel subtext (optional)
+          </span>
+          <Input
+            value={form.homeAnnouncementsSubtext}
+            onChange={(e) => setForm((f) => ({ ...f, homeAnnouncementsSubtext: e.target.value }))}
+            placeholder="Peer-reviewed research from Don Bosco College, Tura"
+          />
+        </label>
+
         <label className="block text-sm md:col-span-2">
           <span className="mb-1 block text-muted-foreground">Description</span>
           <textarea
@@ -420,6 +522,10 @@ function AnnouncementsTab({
       <CompactCard>
         <CompactCardHeader title="Announcements" />
         <CompactCardBody className="space-y-2">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Left card on the homepage uses the latest pinned/published announcement. The right-side
+            image is set under <strong>Branding & Settings</strong> → Announcements panel image.
+          </p>
           {((listQ.data as Array<{ id: string; title: string }>) ?? []).map((a) => (
             <div key={a.id} className="rounded-md border border-border px-3 py-2 text-sm">
               {a.title}
@@ -459,9 +565,17 @@ function BoardTab({ journalId, onMessage }: { journalId: string; onMessage: (m: 
     boardType: 'EDITORIAL',
     institution: '',
     email: '',
+    photoUrl: '',
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPhoto, setEditPhoto] = useState('');
+
   const create = useMutation({
-    mutationFn: () => createAdminBoardMember(journalId, form),
+    mutationFn: () =>
+      createAdminBoardMember(journalId, {
+        ...form,
+        photoUrl: form.photoUrl || null,
+      }),
     onSuccess: () => {
       onMessage('Board member added.');
       setForm({
@@ -470,10 +584,21 @@ function BoardTab({ journalId, onMessage }: { journalId: string; onMessage: (m: 
         boardType: 'EDITORIAL',
         institution: '',
         email: '',
+        photoUrl: '',
       });
       void qc.invalidateQueries({ queryKey: ['admin-journal-board', journalId] });
     },
     onError: (e) => onMessage(apiErrorMessage(e, 'Create failed')),
+  });
+  const savePhoto = useMutation({
+    mutationFn: () =>
+      updateAdminBoardMember(journalId, editingId!, { photoUrl: editPhoto || null }),
+    onSuccess: () => {
+      onMessage('Board photo updated.');
+      setEditingId(null);
+      void qc.invalidateQueries({ queryKey: ['admin-journal-board', journalId] });
+    },
+    onError: (e) => onMessage(apiErrorMessage(e, 'Photo update failed')),
   });
   const remove = useMutation({
     mutationFn: (memberId: string) => deleteAdminBoardMember(journalId, memberId),
@@ -501,24 +626,78 @@ function BoardTab({ journalId, onMessage }: { journalId: string; onMessage: (m: 
             ))}
           </select>
           {(listQ.data ?? []).map((m) => (
-            <div
-              key={m.id}
-              className="flex items-start justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-            >
-              <div>
-                <p className="font-medium">{m.fullName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {m.roleTitle} · {m.boardType}
-                </p>
+            <div key={m.id} className="rounded-md border border-border px-3 py-2 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
+                    {m.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.photoUrl} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="font-medium">{m.fullName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.roleTitle} · {m.boardType}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingId(m.id);
+                      setEditPhoto(m.photoUrl ?? '');
+                    }}
+                  >
+                    Photo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate(m.id)}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(m.id)}
-              >
-                Remove
-              </Button>
+              {editingId === m.id ? (
+                <div className="mt-3 space-y-2 border-t border-border pt-3">
+                  <Input
+                    value={editPhoto}
+                    onChange={(e) => setEditPhoto(e.target.value)}
+                    placeholder="Photo URL"
+                  />
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const url = await uploadAndGetUrl(journalId, file, 'PHOTO');
+                        setEditPhoto(url);
+                      } catch (err) {
+                        onMessage(apiErrorMessage(err, 'Upload failed'));
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={savePhoto.isPending}
+                      onClick={() => savePhoto.mutate()}
+                    >
+                      Save photo
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
         </CompactCardBody>
@@ -556,6 +735,25 @@ function BoardTab({ journalId, onMessage }: { journalId: string; onMessage: (m: 
             placeholder="Email"
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+          <Input
+            placeholder="Photo URL (optional)"
+            value={form.photoUrl}
+            onChange={(e) => setForm((f) => ({ ...f, photoUrl: e.target.value }))}
+          />
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const url = await uploadAndGetUrl(journalId, file, 'PHOTO');
+                setForm((f) => ({ ...f, photoUrl: url }));
+              } catch (err) {
+                onMessage(apiErrorMessage(err, 'Upload failed'));
+              }
+            }}
           />
           <Button
             disabled={!form.fullName || !form.roleTitle || create.isPending}
@@ -772,7 +970,9 @@ function VolumesTab({
     issueNumber: 1,
     title: '',
     isCurrent: true,
+    coverUrl: '',
   });
+  const [coverEdit, setCoverEdit] = useState<{ id: string; coverUrl: string } | null>(null);
 
   const createVol = useMutation({
     mutationFn: () => createAdminVolume(journalId, vol),
@@ -784,12 +984,30 @@ function VolumesTab({
   });
 
   const createIss = useMutation({
-    mutationFn: () => createAdminIssue(journalId, issue),
+    mutationFn: () =>
+      createAdminIssue(journalId, {
+        ...issue,
+        coverUrl: issue.coverUrl || undefined,
+      }),
     onSuccess: () => {
       onMessage('Issue created.');
+      setIssue((s) => ({ ...s, title: '', coverUrl: '' }));
       void qc.invalidateQueries({ queryKey: ['admin-journal-volumes', journalId] });
     },
     onError: (e) => onMessage(apiErrorMessage(e, 'Issue create failed')),
+  });
+
+  const saveCover = useMutation({
+    mutationFn: () =>
+      updateAdminIssue(journalId, coverEdit!.id, {
+        coverUrl: coverEdit!.coverUrl || null,
+      }),
+    onSuccess: () => {
+      onMessage('Issue cover updated — this is the Current Issue book image on the homepage.');
+      setCoverEdit(null);
+      void qc.invalidateQueries({ queryKey: ['admin-journal-volumes', journalId] });
+    },
+    onError: (e) => onMessage(apiErrorMessage(e, 'Cover update failed')),
   });
 
   type VolRow = {
@@ -797,26 +1015,92 @@ function VolumesTab({
     volumeNumber: number;
     year: number;
     label: string | null;
-    issues: Array<{ id: string; issueNumber: number; title: string | null; isCurrent: boolean }>;
+    issues: Array<{
+      id: string;
+      issueNumber: number;
+      title: string | null;
+      isCurrent: boolean;
+      coverUrl?: string | null;
+    }>;
   };
   const volumes = (volsQ.data as VolRow[]) ?? [];
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <CompactCard>
-        <CompactCardHeader title="Volumes" />
+        <CompactCardHeader title="Volumes & covers" />
         <CompactCardBody className="space-y-3">
           {volumes.map((v) => (
             <div key={v.id} className="rounded-md border border-border p-3 text-sm">
               <p className="font-medium">
                 Vol. {v.volumeNumber} ({v.year}) {v.label ? `— ${v.label}` : ''}
               </p>
-              <ul className="mt-1 text-xs text-muted-foreground">
+              <ul className="mt-2 space-y-2">
                 {v.issues.map((i) => (
-                  <li key={i.id}>
-                    Issue {i.issueNumber}
-                    {i.title ? `: ${i.title}` : ''}
-                    {i.isCurrent ? ' (current)' : ''}
+                  <li key={i.id} className="rounded border border-border/70 bg-muted/20 p-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p>
+                          Issue {i.issueNumber}
+                          {i.title ? `: ${i.title}` : ''}
+                          {i.isCurrent ? ' (current)' : ''}
+                        </p>
+                        {i.coverUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={i.coverUrl}
+                            alt=""
+                            className="mt-2 h-20 w-auto rounded border object-cover"
+                          />
+                        ) : (
+                          <p className="mt-1 text-xs text-muted-foreground">No cover set</p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCoverEdit({ id: i.id, coverUrl: i.coverUrl ?? '' })}
+                      >
+                        Set cover
+                      </Button>
+                    </div>
+                    {coverEdit?.id === i.id ? (
+                      <div className="mt-2 space-y-2 border-t border-border pt-2">
+                        <Input
+                          value={coverEdit.coverUrl}
+                          onChange={(e) =>
+                            setCoverEdit((c) => (c ? { ...c, coverUrl: e.target.value } : c))
+                          }
+                          placeholder="Cover image URL"
+                        />
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const url = await uploadAndGetUrl(journalId, file, 'COVER');
+                              setCoverEdit((c) => (c ? { ...c, coverUrl: url } : c));
+                            } catch (err) {
+                              onMessage(apiErrorMessage(err, 'Upload failed'));
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={saveCover.isPending}
+                            onClick={() => saveCover.mutate()}
+                          >
+                            Save cover
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setCoverEdit(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -877,6 +1161,25 @@ function VolumesTab({
               value={issue.title}
               onChange={(e) => setIssue((s) => ({ ...s, title: e.target.value }))}
               placeholder="Title"
+            />
+            <Input
+              value={issue.coverUrl}
+              onChange={(e) => setIssue((s) => ({ ...s, coverUrl: e.target.value }))}
+              placeholder="Cover image URL (optional)"
+            />
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const url = await uploadAndGetUrl(journalId, file, 'COVER');
+                  setIssue((s) => ({ ...s, coverUrl: url }));
+                } catch (err) {
+                  onMessage(apiErrorMessage(err, 'Upload failed'));
+                }
+              }}
             />
             <label className="flex items-center gap-2 text-sm">
               <input

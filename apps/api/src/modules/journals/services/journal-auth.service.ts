@@ -168,7 +168,9 @@ export class JournalAuthService {
       where: { tenantId, email, deletedAt: null },
     });
     if (existing) {
-      throw new ConflictException('An account already exists for this email');
+      throw new ConflictException(
+        'An account already exists for this email. Sign in with your existing password, or use a different email to register.',
+      );
     }
 
     const roles = dto.asReviewer
@@ -183,6 +185,7 @@ export class JournalAuthService {
         password: dto.password,
         displayName: dto.displayName.trim(),
         phone: dto.phone,
+        mustResetPassword: false,
         username: `jr_${email.split('@')[0]!.slice(0, 24)}_${randomBytes(2).toString('hex')}`,
       },
     );
@@ -217,11 +220,22 @@ export class JournalAuthService {
     const user = await this.prisma.user.findFirst({
       where: { tenantId, email, deletedAt: null, isActive: true },
     });
-    if (!user?.passwordHash) {
-      throw new UnauthorizedException('Invalid email or password');
+    if (!user) {
+      throw new UnauthorizedException(
+        'No account found for this email. Check the spelling or register a new author account.',
+      );
+    }
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account has no password set. Contact the editorial office or use ERP login.',
+      );
     }
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid email or password');
+    if (!ok) {
+      throw new UnauthorizedException(
+        'Incorrect password. If you just registered, confirm you are using the same email address.',
+      );
+    }
 
     await this.ensurePersonProfile(tenantId, user.id, {
       displayName: user.displayName || email,

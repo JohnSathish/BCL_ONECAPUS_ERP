@@ -19,7 +19,7 @@ export function JournalCmsPage({ pageKey, fallbackTitle }: Props) {
     <JournalPublicShell>
       <div className="mx-auto max-w-3xl px-4 py-12 lg:px-6">
         <p className="jp-eyebrow">Journal</p>
-        <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">
+        <h1 className="jp-serif mt-2 text-3xl font-semibold text-[#0A2342]">
           {pageQ.data?.title || fallbackTitle}
         </h1>
         {pageQ.isLoading ? (
@@ -28,7 +28,7 @@ export function JournalCmsPage({ pageKey, fallbackTitle }: Props) {
           <p className="mt-6 text-sm text-red-700">Page content is not available yet.</p>
         ) : pageQ.data?.bodyHtml ? (
           <div
-            className="prose prose-slate mt-8 max-w-none prose-headings:font-serif prose-headings:text-[#0A2342]"
+            className="jp-cms-prose mt-8 max-w-none"
             dangerouslySetInnerHTML={{ __html: pageQ.data.bodyHtml }}
           />
         ) : (

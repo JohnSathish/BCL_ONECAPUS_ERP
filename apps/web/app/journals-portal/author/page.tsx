@@ -9,6 +9,19 @@ import { fetchMySubmissions, fetchJournalPortalMe } from '@/services/journals-po
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 
+function resolveAuthorLabel(displayName?: string | null, email?: string | null) {
+  const name = displayName?.trim() || '';
+  const mail = email?.trim() || '';
+  if (name && !name.includes('@') && name.toLowerCase() !== mail.toLowerCase()) {
+    return name;
+  }
+  if (mail.includes('@')) {
+    const local = mail.split('@')[0] || 'Author';
+    return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return name || 'Author';
+}
+
 export default function AuthorDashboardPage() {
   const router = useRouter();
   const session = useAuthStore((s) => s.session);
@@ -31,6 +44,12 @@ export default function AuthorDashboardPage() {
     enabled: Boolean(session?.accessToken),
   });
 
+  const authorName = resolveAuthorLabel(
+    meQ.data?.displayName || meQ.data?.profile?.displayName || session?.user?.displayName,
+    meQ.data?.email || session?.user?.email,
+  );
+  const authorEmail = meQ.data?.email || session?.user?.email || '';
+
   return (
     <JournalPublicShell>
       <div className="mx-auto max-w-4xl px-4 py-12 lg:px-6">
@@ -42,9 +61,10 @@ export default function AuthorDashboardPage() {
             <h1 className="mt-1 font-serif text-3xl font-semibold text-[#0A2342]">
               My submissions
             </h1>
-            {meQ.data?.profile?.displayName ? (
+            {session?.accessToken ? (
               <p className="mt-1 text-sm text-[#0A2342]/65">
-                Signed in as {meQ.data.profile.displayName}
+                Signed in as <span className="font-medium text-[#0A2342]">{authorName}</span>
+                {authorEmail ? <span className="text-[#0A2342]/50"> · {authorEmail}</span> : null}
               </p>
             ) : null}
           </div>

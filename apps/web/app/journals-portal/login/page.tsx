@@ -23,6 +23,7 @@ function JournalLoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const registered = search.get('registered') === '1';
+  const emailFromQuery = search.get('email') ?? '';
   const setSession = useAuthStore((s) => s.setSession);
   const existing = useAuthStore((s) => s.session);
   const infoQ = useQuery({
@@ -32,7 +33,7 @@ function JournalLoginForm() {
   });
   const short = infoQ.data?.journal?.shortName || infoQ.data?.journal?.name || 'TRANSIENT';
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(emailFromQuery);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -116,14 +117,21 @@ function JournalLoginForm() {
         >
           Sign in to {short}
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-[#0B2545]/6">
+        <p className="mt-2 text-sm leading-relaxed text-[#0B2545]/75">
           Access your author desk, submissions, and reviewer assignments.
         </p>
       </div>
 
       {registered ? (
         <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-          Account created. Sign in with your new credentials.
+          Account created
+          {emailFromQuery ? (
+            <>
+              {' '}
+              for <strong>{emailFromQuery}</strong>
+            </>
+          ) : null}
+          . Sign in with your new credentials.
         </p>
       ) : null}
 

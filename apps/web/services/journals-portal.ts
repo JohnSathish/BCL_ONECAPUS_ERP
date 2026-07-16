@@ -17,6 +17,9 @@ export type JournalInfo = {
   publisher: string | null;
   institution: string | null;
   frequency: string | null;
+  homeAnnouncementsImageUrl?: string | null;
+  homeAnnouncementsHeadline?: string | null;
+  homeAnnouncementsSubtext?: string | null;
 };
 
 export type JournalArticleAuthor = {
@@ -321,6 +324,7 @@ export async function createAdminBoardMember(
     department?: string;
     country?: string;
     email?: string;
+    photoUrl?: string | null;
   },
 ) {
   const { data } = await api.post(`/v1/journals/${journalId}/board`, body);
@@ -437,9 +441,26 @@ export async function createAdminIssue(
     summary?: string;
     publicationDate?: string;
     isCurrent?: boolean;
+    coverUrl?: string;
   },
 ) {
   const { data } = await api.post(`/v1/journals/${journalId}/issues`, body);
+  return data;
+}
+
+export async function updateAdminIssue(
+  journalId: string,
+  issueId: string,
+  body: Partial<{
+    title: string | null;
+    summary: string | null;
+    coverUrl: string | null;
+    publicationDate: string | null;
+    isCurrent: boolean;
+    isPublished: boolean;
+  }>,
+) {
+  const { data } = await api.patch(`/v1/journals/${journalId}/issues/${issueId}`, body);
   return data;
 }
 

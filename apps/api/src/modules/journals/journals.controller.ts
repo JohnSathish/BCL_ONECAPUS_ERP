@@ -102,6 +102,9 @@ export class JournalsController {
       status: string;
       publisher: string;
       institution: string;
+      homeAnnouncementsImageUrl: string | null;
+      homeAnnouncementsHeadline: string | null;
+      homeAnnouncementsSubtext: string | null;
     }>,
   ) {
     return this.journals.updateJournal(user, journalId, body);
@@ -184,6 +187,7 @@ export class JournalsController {
       orcid?: string;
       bio?: string;
       researchAreas?: string;
+      photoUrl?: string | null;
       sortOrder?: number;
     },
   ) {
@@ -389,6 +393,25 @@ export class JournalsController {
     },
   ) {
     return this.journals.createIssue(user, journalId, body);
+  }
+
+  @Patch(':journalId/issues/:issueId')
+  @RequirePermissions('journals:manage')
+  updateIssue(
+    @CurrentUser() user: JwtUser,
+    @Param('journalId') journalId: string,
+    @Param('issueId') issueId: string,
+    @Body()
+    body: Partial<{
+      title: string | null;
+      summary: string | null;
+      coverUrl: string | null;
+      publicationDate: string | null;
+      isCurrent: boolean;
+      isPublished: boolean;
+    }>,
+  ) {
+    return this.journals.updateIssue(user, journalId, issueId, body);
   }
 
   @Get(':journalId/articles')

@@ -111,7 +111,7 @@ export const HOME_TESTIMONIALS = [
 export const HOME_FAQ = [
   {
     q: 'How do I submit a manuscript?',
-    a: 'Create an author account on the portal, start a new submission, upload your manuscript PDF, and submit for editorial screening.',
+    a: 'Create an author account on this portal, open Author Desk → New submission, upload your manuscript PDF, and submit for editorial screening. Google Forms are no longer used. See Author Guidelines for categories, abstract length, and formatting.',
   },
   {
     q: 'Is Transient peer reviewed?',

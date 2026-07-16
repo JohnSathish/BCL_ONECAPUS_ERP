@@ -7,6 +7,14 @@ import { fetchJournalPortalInfo } from '@/services/journals-portal';
 
 const NAVY = '#0B2545';
 const GOLD = '#D4A017';
+/** Natural-sciences backdrop (not campus architecture). */
+const AUTH_HERO = '/branding/transient-science-hero.png';
+const CAMPUS_FALLBACK = '/branding/alumni-campus-hero.png';
+
+function resolveAuthBackdrop(url?: string | null) {
+  if (!url || url === CAMPUS_FALLBACK) return AUTH_HERO;
+  return url;
+}
 
 const HIGHLIGHTS = [
   { icon: ShieldCheck, label: 'Peer Reviewed' },
@@ -32,8 +40,8 @@ export function JournalAuthLayout({ children, mode }: Props) {
   const title = journal?.name || 'Transient';
   const short = journal?.shortName || title;
   const issn = journal?.issn || metrics?.issn;
-  const cover = issue?.coverUrl || journal?.bannerUrl || '/branding/alumni-campus-hero.png';
-  const banner = journal?.bannerUrl || '/branding/alumni-campus-hero.png';
+  const cover = resolveAuthBackdrop(issue?.coverUrl || journal?.bannerUrl);
+  const banner = resolveAuthBackdrop(journal?.bannerUrl);
 
   const stats = [
     { value: `${metrics?.volumeCount || issue?.volume.volumeNumber || 12}+`, label: 'Volumes' },
@@ -154,15 +162,15 @@ export function JournalAuthLayout({ children, mode }: Props) {
                 {title}
               </p>
               {issn ? (
-                <p className="mt-1 text-xs font-medium text-[#0B2545]/55">ISSN {issn}</p>
+                <p className="mt-1 text-xs font-medium text-[#0B2545]/70">ISSN {issn}</p>
               ) : null}
             </div>
             {children}
-            <p className="mt-8 text-center text-xs text-[#0B2545]/45">
+            <p className="mt-8 text-center text-xs text-[#0B2545]/70">
               Need help?{' '}
               <Link
                 href="/journals-portal/contact"
-                className="font-medium text-[#0B2545]/7 underline-offset-2 hover:underline"
+                className="font-semibold text-[#0B2545] underline-offset-2 hover:underline"
               >
                 Contact the editorial office
               </Link>
@@ -191,7 +199,7 @@ export function AuthField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-[12px] font-semibold text-[#0B2545]/8">
+      <label htmlFor={id} className="block text-[12px] font-semibold text-[#0B2545]">
         {label}
       </label>
       <div
@@ -200,13 +208,13 @@ export function AuthField({
           .join(' ')}
       >
         {icon ? (
-          <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-[#0B2545]/4">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-[#0B2545]/50">
             {icon}
           </span>
         ) : null}
         {children}
       </div>
-      {hint ? <p className="text-[11px] text-[#0B2545]/45">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-[#0B2545]/65">{hint}</p> : null}
     </div>
   );
 }

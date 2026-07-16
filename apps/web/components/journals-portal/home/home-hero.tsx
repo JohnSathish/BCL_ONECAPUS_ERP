@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
@@ -13,6 +13,25 @@ type HeroSlide = {
   effect?: 'none' | 'ken' | 'ken-alt';
 };
 
+/** Three Transient-themed slides (fleeting light, signal, natural moment). */
+const TRANSIENT_HERO_SLIDES: HeroSlide[] = [
+  {
+    src: '/branding/transient-hero-01-light.png',
+    caption: 'Fleeting light',
+    effect: 'none',
+  },
+  {
+    src: '/branding/transient-hero-02-signal.png',
+    caption: 'Transient signal',
+    effect: 'ken',
+  },
+  {
+    src: '/branding/transient-hero-03-moment.png',
+    caption: 'A momentary science',
+    effect: 'ken-alt',
+  },
+];
+
 type Props = {
   journal: JournalInfo;
   issue: JournalIssue | null;
@@ -20,25 +39,9 @@ type Props = {
   cover: string;
 };
 
-export function HomeHero({ journal, issue, banner, cover }: Props) {
+export function HomeHero({ journal, issue }: Props) {
   const issn = journal.issn;
-  const slides = useMemo((): HeroSlide[] => {
-    const urls = [banner, cover].filter(Boolean);
-    const unique = [...new Set(urls)];
-    if (unique.length === 1) {
-      return [
-        { src: unique[0], caption: 'Campus', effect: 'none' },
-        { src: unique[0], caption: 'Campus', effect: 'ken' },
-        { src: unique[0], caption: 'Campus', effect: 'ken-alt' },
-      ];
-    }
-    return unique.map((src, i) => ({
-      src,
-      caption: i === 0 ? 'Campus' : 'Journal',
-      effect: 'none' as const,
-    }));
-  }, [banner, cover]);
-
+  const slides = TRANSIENT_HERO_SLIDES;
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -129,7 +132,7 @@ export function HomeHero({ journal, issue, banner, cover }: Props) {
               transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={slide?.src} alt={slide?.caption || 'Campus'} className={imgClass} />
+              <img src={slide?.src} alt={slide?.caption || 'Transient'} className={imgClass} />
               <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-[rgba(11,31,58,0.15)] lg:hidden" />
             </motion.div>
           </AnimatePresence>

@@ -6,6 +6,10 @@ import {
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { JournalResolutionService } from './journal-resolution.service';
+import {
+  TRANSIENT_AUTHOR_GUIDELINES_HTML,
+  TRANSIENT_PEER_REVIEW_HTML,
+} from '../content/transient-author-guidelines';
 
 const DEFAULT_PAGE_KEYS: Array<{
   key: string;
@@ -27,19 +31,18 @@ const DEFAULT_PAGE_KEYS: Array<{
   {
     key: 'peer-review',
     title: 'Peer Review Policy',
-    bodyHtml: '<p>All submissions undergo rigorous peer review.</p>',
+    bodyHtml: TRANSIENT_PEER_REVIEW_HTML,
   },
   {
     key: 'ethics',
     title: 'Publication Ethics',
     bodyHtml:
-      '<p>The journal follows established publication ethics guidelines.</p>',
+      '<p>The journal follows established publication ethics guidelines. Copyright in published papers is reserved by the publisher as stated in journal policy.</p>',
   },
   {
     key: 'author-guidelines',
     title: 'Author Guidelines',
-    bodyHtml:
-      '<p>Authors should follow the submission guidelines published by the journal.</p>',
+    bodyHtml: TRANSIENT_AUTHOR_GUIDELINES_HTML,
   },
   {
     key: 'indexing',
@@ -138,7 +141,7 @@ export class JournalsService {
         institution: data.institution,
         frequency: data.frequency,
         logoUrl: '/branding/college-logo.png',
-        bannerUrl: '/branding/alumni-campus-hero.png',
+        bannerUrl: '/branding/transient-science-hero.png',
         status: 'ACTIVE',
       },
     });
@@ -226,7 +229,7 @@ export class JournalsService {
           issueNumber: 1,
           title: 'Transient – 2024',
           publicationDate: new Date('2024-12-01'),
-          coverUrl: '/branding/alumni-campus-hero.png',
+          coverUrl: '/branding/transient-science-hero.png',
           summary:
             'The 2024 annual issue of TRANSIENT featuring peer-reviewed research contributions.',
           isCurrent: true,
@@ -378,7 +381,7 @@ export class JournalsService {
       .catch(() => articleCount);
 
     return {
-      journal,
+      journal: this.withHomeThemeFields(journal),
       pages,
       announcements,
       boardPreview: board,
@@ -553,11 +556,31 @@ export class JournalsService {
   }
 
   // —— Admin ——
-  listJournals(tenantId: string) {
-    return this.prisma.journal.findMany({
+  async listJournals(tenantId: string) {
+    const rows = await this.prisma.journal.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
     });
+    return rows.map((journal) => this.withHomeThemeFields(journal));
+  }
+
+  private withHomeThemeFields<T extends { themeJson: unknown }>(journal: T) {
+    const theme = (journal.themeJson ?? {}) as Record<string, unknown>;
+    return {
+      ...journal,
+      homeAnnouncementsImageUrl:
+        typeof theme.homeAnnouncementsImageUrl === 'string'
+          ? theme.homeAnnouncementsImageUrl
+          : null,
+      homeAnnouncementsHeadline:
+        typeof theme.homeAnnouncementsHeadline === 'string'
+          ? theme.homeAnnouncementsHeadline
+          : null,
+      homeAnnouncementsSubtext:
+        typeof theme.homeAnnouncementsSubtext === 'string'
+          ? theme.homeAnnouncementsSubtext
+          : null,
+    };
   }
 
   async createJournal(
@@ -615,37 +638,60 @@ export class JournalsService {
       status: string;
       publisher: string;
       institution: string;
+      homeAnnouncementsImageUrl: string | null;
+      homeAnnouncementsHeadline: string | null;
+      homeAnnouncementsSubtext: string | null;
     }>,
   ) {
-    await this.resolution.requireJournal(user.tid, journalId);
-    return this.prisma.journal.update({
-      where: { id: journalId },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-        ...(dto.shortName !== undefined
-          ? { shortName: dto.shortName.trim() }
-          : {}),
-        ...(dto.issn !== undefined ? { issn: dto.issn } : {}),
-        ...(dto.tagline !== undefined ? { tagline: dto.tagline } : {}),
-        ...(dto.description !== undefined
-          ? { description: dto.description }
-          : {}),
-        ...(dto.contactEmail !== undefined
-          ? { contactEmail: dto.contactEmail }
-          : {}),
-        ...(dto.contactPhone !== undefined
-          ? { contactPhone: dto.contactPhone }
-          : {}),
-        ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
-        ...(dto.bannerUrl !== undefined ? { bannerUrl: dto.bannerUrl } : {}),
-        ...(dto.frequency !== undefined ? { frequency: dto.frequency } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
-        ...(dto.institution !== undefined
-          ? { institution: dto.institution }
-          : {}),
-      },
-    });
+    const existing = await this.resolution.requireJournal(user.tid, journalId);
+    const theme = {
+      ...((existing.themeJson ?? {}) as Record<string, unknown>),
+    };
+    if (dto.homeAnnouncementsImageUrl !== undefined) {
+      theme.homeAnnouncementsImageUrl = dto.homeAnnouncementsImageUrl;
+    }
+    if (dto.homeAnnouncementsHeadline !== undefined) {
+      theme.homeAnnouncementsHeadline = dto.homeAnnouncementsHeadline;
+    }
+    if (dto.homeAnnouncementsSubtext !== undefined) {
+      theme.homeAnnouncementsSubtext = dto.homeAnnouncementsSubtext;
+    }
+    const themeTouched =
+      dto.homeAnnouncementsImageUrl !== undefined ||
+      dto.homeAnnouncementsHeadline !== undefined ||
+      dto.homeAnnouncementsSubtext !== undefined;
+
+    return this.withHomeThemeFields(
+      await this.prisma.journal.update({
+        where: { id: journalId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.shortName !== undefined
+            ? { shortName: dto.shortName.trim() }
+            : {}),
+          ...(dto.issn !== undefined ? { issn: dto.issn } : {}),
+          ...(dto.tagline !== undefined ? { tagline: dto.tagline } : {}),
+          ...(dto.description !== undefined
+            ? { description: dto.description }
+            : {}),
+          ...(dto.contactEmail !== undefined
+            ? { contactEmail: dto.contactEmail }
+            : {}),
+          ...(dto.contactPhone !== undefined
+            ? { contactPhone: dto.contactPhone }
+            : {}),
+          ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
+          ...(dto.bannerUrl !== undefined ? { bannerUrl: dto.bannerUrl } : {}),
+          ...(dto.frequency !== undefined ? { frequency: dto.frequency } : {}),
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
+          ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
+          ...(dto.institution !== undefined
+            ? { institution: dto.institution }
+            : {}),
+          ...(themeTouched ? { themeJson: theme } : {}),
+        },
+      }),
+    );
   }
 
   listAdminPages(tenantId: string, journalId: string) {
@@ -763,6 +809,7 @@ export class JournalsService {
       orcid?: string;
       bio?: string;
       researchAreas?: string;
+      photoUrl?: string | null;
       sortOrder?: number;
     },
   ) {
@@ -781,6 +828,7 @@ export class JournalsService {
         orcid: dto.orcid,
         bio: dto.bio,
         researchAreas: dto.researchAreas,
+        photoUrl: dto.photoUrl ?? null,
         sortOrder: dto.sortOrder ?? 0,
       },
     });
@@ -921,6 +969,53 @@ export class JournalsService {
           : null,
         isCurrent: dto.isCurrent ?? false,
         isPublished: true,
+      },
+    });
+  }
+
+  async updateIssue(
+    user: JwtUser,
+    journalId: string,
+    issueId: string,
+    dto: Partial<{
+      title: string | null;
+      summary: string | null;
+      coverUrl: string | null;
+      publicationDate: string | null;
+      isCurrent: boolean;
+      isPublished: boolean;
+    }>,
+  ) {
+    await this.resolution.requireJournal(user.tid, journalId);
+    const issue = await this.prisma.journalIssue.findFirst({
+      where: { id: issueId, tenantId: user.tid, journalId },
+    });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    if (dto.isCurrent === true) {
+      await this.prisma.journalIssue.updateMany({
+        where: { journalId, tenantId: user.tid, id: { not: issueId } },
+        data: { isCurrent: false },
+      });
+    }
+
+    return this.prisma.journalIssue.update({
+      where: { id: issueId },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.summary !== undefined ? { summary: dto.summary } : {}),
+        ...(dto.coverUrl !== undefined ? { coverUrl: dto.coverUrl } : {}),
+        ...(dto.publicationDate !== undefined
+          ? {
+              publicationDate: dto.publicationDate
+                ? new Date(dto.publicationDate)
+                : null,
+            }
+          : {}),
+        ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}),
+        ...(dto.isPublished !== undefined
+          ? { isPublished: dto.isPublished }
+          : {}),
       },
     });
   }

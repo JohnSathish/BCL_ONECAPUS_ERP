@@ -1,7 +1,7 @@
 'use client';
 
-import { JournalCmsPage } from '@/components/journals-portal/journal-cms-page';
+import { AuthorGuidelinesView } from '@/components/journals-portal/author-guidelines-view';
 
 export default function AuthorGuidelinesPage() {
-  return <JournalCmsPage pageKey="author-guidelines" fallbackTitle="Author Guidelines" />;
+  return <AuthorGuidelinesView />;
 }

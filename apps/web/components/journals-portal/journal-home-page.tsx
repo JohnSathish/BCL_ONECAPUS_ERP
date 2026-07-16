@@ -22,7 +22,7 @@ export function JournalHomePage() {
   const journal = data?.journal;
   const issue = data?.currentIssue ?? null;
   const metrics = data?.metrics;
-  const banner = journal?.bannerUrl || '/branding/alumni-campus-hero.png';
+  const banner = journal?.bannerUrl || '/branding/transient-science-hero.png';
   const cover = issue?.coverUrl || banner;
 
   if (infoQ.isLoading) {
@@ -63,7 +63,12 @@ export function JournalHomePage() {
       />
       <HomeWhyPublish />
       <HomeBoard members={data?.boardPreview ?? []} />
-      <HomeAnnouncements announcements={data?.announcements ?? []} />
+      <HomeAnnouncements
+        announcements={data?.announcements ?? []}
+        featuredImageUrl={journal.homeAnnouncementsImageUrl}
+        featuredHeadline={journal.homeAnnouncementsHeadline}
+        featuredSubtext={journal.homeAnnouncementsSubtext}
+      />
       <HomeArticles articles={articles} />
       <HomeFaq />
       <HomeCta />
