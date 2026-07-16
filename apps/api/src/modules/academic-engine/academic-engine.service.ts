@@ -940,7 +940,11 @@ export class AcademicEngineService {
     return { registration, auditRecorded };
   }
 
-  async validateRegistration(tenantId: string, registrationId: string) {
+  async validateRegistration(
+    tenantId: string,
+    registrationId: string,
+    opts?: { ignoreWindow?: boolean },
+  ) {
     const reg = await this.getRegistration(tenantId, registrationId);
     const student = await this.prisma.student.findFirstOrThrow({
       where: { id: reg.studentId },
@@ -952,6 +956,7 @@ export class AcademicEngineService {
       tenantId,
       reg,
       student.programVersionId,
+      opts,
     );
     const issues = runValidators(ctx);
     const blockingIssues = blockingValidationIssues(issues);
@@ -1054,6 +1059,51 @@ export class AcademicEngineService {
     }
 
     return this.getRegistration(tenantId, registrationId);
+  }
+
+  /**
+   * Finalize a registration directly to the terminal "registered" state used by
+   * the UI (registration = 'completed', lines = 'confirmed'), for ADMIN bulk
+   * import of offline admissions. Unlike submitRegistration this does NOT gate
+   * on the self-service registration window and does NOT allocate seat-ledger
+   * seats (which would waitlist over-capacity shared papers). Idempotent.
+   */
+  async adminCompleteRegistration(
+    tenantId: string,
+    registrationId: string,
+    actorId?: string,
+  ) {
+    const reg = await this.getRegistration(tenantId, registrationId);
+    if (reg.status === 'completed') return reg;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.semesterRegistrationLine.updateMany({
+        where: { registrationId, tenantId, status: 'pending' },
+        data: { status: 'confirmed' },
+      });
+      await tx.registrationAuditLog.create({
+        data: {
+          tenantId,
+          registrationId,
+          action: 'completed',
+          actorId,
+          metadata: { source: 'ADMIN_IMPORT' },
+        },
+      });
+      return tx.semesterRegistration.update({
+        where: { id: registrationId },
+        data: { status: 'completed', submittedAt: new Date() },
+        include: {
+          lines: {
+            include: {
+              offering: { include: { course: true } },
+              offeringSection: { include: { shift: true } },
+            },
+          },
+          semester: true,
+        },
+      });
+    });
   }
 
   approveRegistration(
@@ -1358,6 +1408,7 @@ export class AcademicEngineService {
       }[];
     },
     programVersionId: string,
+    opts?: { ignoreWindow?: boolean },
   ) {
     const sectionIds = reg.lines
       .map((l) => l.offeringSectionId)
@@ -1452,9 +1503,13 @@ export class AcademicEngineService {
       : policy;
 
     const now = new Date();
-    const windowOpen = window
-      ? !window.locked && now >= window.opensAt && now <= window.closesAt
-      : true;
+    // Admin bulk import (ignoreWindow) is not gated by the self-service
+    // registration window — offline admissions are imported regardless.
+    const windowOpen = opts?.ignoreWindow
+      ? true
+      : window
+        ? !window.locked && now >= window.opensAt && now <= window.closesAt
+        : true;
 
     const priorConfirmedByCategory: Partial<Record<NepCategory, string>> = {};
     if (priorRegs) {
@@ -1612,7 +1667,7 @@ export class AcademicEngineService {
       studentStreamLabel:
         studentStream?.code ?? studentStream?.name ?? profile?.streamId ?? null,
       windowOpen,
-      windowLocked: window?.locked ?? false,
+      windowLocked: opts?.ignoreWindow ? false : (window?.locked ?? false),
       priorConfirmedByCategory,
       majorMinorTrackLocked: majorMinorTrackRow?.isTrackLocked ?? false,
       vtcTrackGroupCode: vtcTrackRow?.trackGroupCode ?? null,

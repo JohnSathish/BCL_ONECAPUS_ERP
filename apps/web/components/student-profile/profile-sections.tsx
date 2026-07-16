@@ -173,7 +173,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
           [
             ['Application Number', 'applicationNumber'],
             ['Admission Number', 'admissionNumber'],
-            ['Registration Number', 'enrollmentNumber'],
+            ['Enrollment / Admission No.', 'enrollmentNumber'],
             ['Full Name', 'fullName'],
             ['Email', 'email'],
             ['Mobile', 'mobileNumber'],
@@ -200,6 +200,12 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
               />
             )}
+            {key === 'enrollmentNumber' ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Permanent admission ID — does not change on a shift transfer. The current shift roll
+                is in “College Roll No.”
+              </p>
+            ) : null}
           </Field>
         ))}
         <Field label="Student Status">

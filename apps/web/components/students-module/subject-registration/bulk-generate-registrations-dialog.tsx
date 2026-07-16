@@ -116,13 +116,20 @@ export function BulkGenerateRegistrationsDialog({
                 ))}
               </div>
             </div>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
+                className="mt-0.5"
                 checked={submitAfter}
                 onChange={(e) => setSubmitAfter(e.target.checked)}
               />
-              Submit and allocate seats after generation
+              <span>
+                Mark as registered after generation
+                <span className="block text-xs text-muted-foreground">
+                  Finalizes each student to “Completed” (skips the registration-window check; no
+                  seat booking). Leave unchecked to keep drafts for editing.
+                </span>
+              </span>
             </label>
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
             <div className="flex justify-end gap-2">

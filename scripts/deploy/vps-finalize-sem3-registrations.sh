@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
-# Finalize imported-but-"Pending" Sem-3 subject registrations on production.
+# Finalize imported-but-"Pending" subject registrations on production.
+# Works for any semester via SEM=n (default 3). Handles Sem-3 and Sem-5.
 #
 # What it does (idempotent, dry-run first):
-#   1. Read-only pre-flight summary of Sem-3 registration/line statuses.
-#   2. attach-missing-major-sections.ts — attach the shift-matching section to
-#      any draft line left without one (e.g. Garo GAR-200 / GAR-201).
-#   3. finalize-draft-registrations.ts — flip every non-completed Sem-3
-#      registration to status 'completed' and its lines to 'confirmed', which
-#      is the ONLY state the UI renders as fully registered (clears "Pending").
-#   4. Read-only post summary.
+#   1. Read-only pre-flight summary of Sem-<SEM> registration/line statuses.
+#   2. Semester-specific data corrections (only when needed):
+#        SEM=5 → fix PHY-303 INTERNSHIP section stream (mistagged Arts → Science).
+#   3. attach-missing-major-sections.ts — attach the shift-matching section to
+#      any draft line left without one (e.g. Garo GAR-200 / GAR-201 in Sem-3).
+#   4. finalize-draft-registrations.ts — flip every non-completed registration
+#      for a LIVE student to status 'completed' and its lines to 'confirmed',
+#      the ONLY state the UI renders as fully registered (clears "Pending").
+#      Registrations belonging to soft-deleted students are skipped (orphans).
+#   5. Read-only post summary.
 #
 # It does NOT book seat-ledger seats (unused in this deployment; booking would
 # waitlist over-capacity shared papers) and does NOT write semester_progress.
 #
 # Run on VPS (after vps-update.sh / vps-pull.sh so the scripts are present):
 #   BACK UP THE DATABASE FIRST.
-#   bash scripts/deploy/vps-finalize-sem3-registrations.sh --dry-run   # preview
-#   bash scripts/deploy/vps-finalize-sem3-registrations.sh             # apply
-#   TENANT=demo SEM=3 bash scripts/deploy/vps-finalize-sem3-registrations.sh
+#   bash scripts/deploy/vps-finalize-sem3-registrations.sh --dry-run           # Sem-3 preview
+#   bash scripts/deploy/vps-finalize-sem3-registrations.sh                     # Sem-3 apply
+#   SEM=5 bash scripts/deploy/vps-finalize-sem3-registrations.sh --dry-run     # Sem-5 preview
+#   SEM=5 bash scripts/deploy/vps-finalize-sem3-registrations.sh               # Sem-5 apply
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
@@ -85,6 +90,30 @@ psql_q "SELECT COUNT(*) AS null_section_draft_lines
         JOIN academic.semester_registrations sr ON sr.id=l.registration_id
         WHERE sr.semester_sequence=${SEM} AND sr.status NOT IN ('completed','rejected')
           AND l.offering_section_id IS NULL;"
+
+if [[ "${SEM}" == "5" ]]; then
+  echo
+  echo "[1b/4] Sem-5 data correction — PHY-303 INTERNSHIP stream (Arts → Science):"
+  if [[ $DRY_RUN -eq 1 ]]; then
+    psql_q "SELECT c.code, sec.section_code, st.name AS current_stream
+            FROM academic.offering_sections sec
+            JOIN academic.course_offerings o ON o.id=sec.course_offering_id
+            JOIN academic.courses c ON c.id=o.course_id
+            JOIN academic.offering_section_streams oss ON oss.offering_section_id=sec.id
+            JOIN core.academic_streams st ON st.id=oss.academic_stream_id
+            WHERE c.code='PHY-303' AND o.semester_sequence=5;"
+    echo "  (dry-run — no change; would set any Arts row here to Science)"
+  else
+    psql_q "UPDATE academic.offering_section_streams oss
+            SET academic_stream_id = (SELECT id FROM core.academic_streams WHERE code='SCIENCE' AND deleted_at IS NULL)
+            WHERE oss.academic_stream_id = (SELECT id FROM core.academic_streams WHERE code='ARTS' AND deleted_at IS NULL)
+              AND oss.offering_section_id IN (
+                SELECT sec.id FROM academic.offering_sections sec
+                JOIN academic.course_offerings o ON o.id=sec.course_offering_id
+                JOIN academic.courses c ON c.id=o.course_id
+                WHERE c.code='PHY-303' AND o.semester_sequence=5);"
+  fi
+fi
 
 echo
 echo "[2/4] Attach missing MAJOR sections…"

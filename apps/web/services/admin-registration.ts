@@ -193,6 +193,27 @@ export async function bulkGenerateRegistrations(payload: {
   return data as BulkGenerateResult;
 }
 
+export type BulkCompleteResult = {
+  scanned: number;
+  completed: number;
+  skipped: number;
+  skippedSample: { enrollment: string; reason: string }[];
+  failed: number;
+  failedSample: { enrollment: string; error: string }[];
+};
+
+export async function bulkCompleteRegistrations(payload: {
+  semesterId?: string;
+  semesterSequence: number;
+  programVersionId?: string;
+  admissionBatchId?: string;
+  shiftId?: string;
+  studentIds?: string[];
+}) {
+  const { data } = await api.post('/v1/academic-engine/registrations/bulk-complete', payload);
+  return data as BulkCompleteResult;
+}
+
 export async function freezeRegistrations(payload: {
   frozen: boolean;
   studentIds?: string[];

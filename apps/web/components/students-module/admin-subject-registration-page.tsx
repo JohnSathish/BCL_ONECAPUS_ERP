@@ -12,6 +12,7 @@ import { RegistrationImportDialog } from '@/components/academic-engine/registrat
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Button } from '@/components/ui/button';
 import { BulkGenerateRegistrationsDialog } from '@/components/students-module/subject-registration/bulk-generate-registrations-dialog';
+import { CompleteRegistrationsDialog } from '@/components/students-module/subject-registration/complete-registrations-dialog';
 import { ElectiveSlotPicker } from '@/components/students-module/subject-registration/elective-slot-picker';
 import { EligibilityOverrideDialog } from '@/components/students-module/subject-registration/eligibility-override-dialog';
 import { MigrationChecklistCard } from '@/components/students-module/subject-registration/migration-checklist-card';
@@ -85,6 +86,7 @@ export function AdminSubjectRegistrationPage() {
   const [validationIssues, setValidationIssues] = useState<{ code: string; message: string }[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
 
   useEffect(() => {
     const id = searchParams.get('student');
@@ -530,6 +532,15 @@ export function AdminSubjectRegistrationPage() {
             Import Excel
           </Button>
           <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!semesterId}
+            onClick={() => setCompleteOpen(true)}
+          >
+            Complete registrations
+          </Button>
+          <Button
             size="sm"
             variant="outline"
             disabled={freezeMut.isPending}
@@ -557,6 +568,18 @@ export function AdminSubjectRegistrationPage() {
         <BulkGenerateRegistrationsDialog
           open={bulkOpen}
           onOpenChange={setBulkOpen}
+          semesterId={semesterId ?? ''}
+          semesterSequence={semesterSequence}
+          programVersionId={scope.programVersionId || undefined}
+          admissionBatchId={scope.batchId || undefined}
+          shiftId={scope.shiftId || undefined}
+          studentIds={studentIds}
+          onComplete={() => invalidate()}
+        />
+
+        <CompleteRegistrationsDialog
+          open={completeOpen}
+          onOpenChange={setCompleteOpen}
           semesterId={semesterId ?? ''}
           semesterSequence={semesterSequence}
           programVersionId={scope.programVersionId || undefined}

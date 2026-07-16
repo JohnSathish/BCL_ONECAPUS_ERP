@@ -31,6 +31,7 @@ import {
   CreateRegistrationWindowDto,
   BulkAutoAssignDto,
   BulkGenerateRegistrationsDto,
+  BulkCompleteRegistrationsDto,
   AutoAssignRegistrationDto,
   FreezeRegistrationDto,
   ListRegistrationsQueryDto,
@@ -950,6 +951,15 @@ export class AcademicEngineController {
     @Body() dto: BulkGenerateRegistrationsDto,
   ) {
     return this.adminRegistration.bulkGenerate(user.tid, dto, user.sub);
+  }
+
+  @Post('registrations/bulk-complete')
+  @RequirePermissions('academic-engine:manage')
+  bulkComplete(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: BulkCompleteRegistrationsDto,
+  ) {
+    return this.adminRegistration.bulkComplete(user.tid, dto, user.sub);
   }
 
   @Post('registrations/freeze')

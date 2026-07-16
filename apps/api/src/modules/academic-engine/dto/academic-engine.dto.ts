@@ -419,6 +419,33 @@ export class BulkGenerateRegistrationsDto {
   studentIds?: string[];
 }
 
+export class BulkCompleteRegistrationsDto {
+  @IsOptional()
+  @IsUUID()
+  semesterId?: string;
+
+  @IsInt()
+  @Min(1)
+  semesterSequence!: number;
+
+  @IsOptional()
+  @IsUUID()
+  programVersionId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  admissionBatchId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+}
+
 export class FreezeRegistrationDto {
   @IsBoolean()
   frozen!: boolean;

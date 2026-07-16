@@ -463,7 +463,21 @@ export class AdminRegistrationService {
         }
 
         if (dto.submitAfter && registration.status === 'draft') {
-          await this.engine.submitRegistration(
+          // Admin finalize: structural validation (window-tolerant) then mark
+          // registered directly — no self-service window gate, no seat booking.
+          const validation = await this.engine.validateRegistration(
+            tenantId,
+            registration.id,
+            { ignoreWindow: true },
+          );
+          if (!validation.ok) {
+            const msgs = validation.issues
+              .filter((i) => i.severity !== 'warning')
+              .map((i) => i.message)
+              .join('; ');
+            throw new BadRequestException(`Validation failed: ${msgs}`);
+          }
+          await this.engine.adminCompleteRegistration(
             tenantId,
             registration.id,
             actorId,
@@ -496,6 +510,87 @@ export class AdminRegistrationService {
       successful: results.filter((r) => r.ok).length,
       failed: results.filter((r) => !r.ok).length,
       results,
+    };
+  }
+
+  /**
+   * Finalize (mark as registered → "Completed") every non-completed registration
+   * for a scope, regardless of how its lines were built (auto-assigned Major/Minor
+   * + entered MDC/AEC/SEC/VAC/VTC). Method-agnostic final step for bulk imports.
+   *
+   * Safety: skips registrations for soft-deleted students (orphans) and any
+   * registration that still has no subjects or an unassigned section — those are
+   * reported so the admin can fix them (auto-assign / enter subjects) first.
+   */
+  async bulkComplete(
+    tenantId: string,
+    dto: {
+      semesterId?: string;
+      semesterSequence: number;
+      programVersionId?: string;
+      admissionBatchId?: string;
+      shiftId?: string;
+      studentIds?: string[];
+    },
+    actorId?: string,
+  ) {
+    const regs = await this.prisma.semesterRegistration.findMany({
+      where: {
+        tenantId,
+        semesterSequence: dto.semesterSequence,
+        ...(dto.semesterId ? { semesterId: dto.semesterId } : {}),
+        status: { notIn: ['completed', 'rejected'] },
+        student: {
+          deletedAt: null,
+          ...(dto.programVersionId
+            ? { programVersionId: dto.programVersionId }
+            : {}),
+          ...(dto.shiftId ? { primaryShiftId: dto.shiftId } : {}),
+          ...(dto.admissionBatchId
+            ? { academicProfile: { admissionBatchId: dto.admissionBatchId } }
+            : {}),
+          ...(dto.studentIds?.length ? { id: { in: dto.studentIds } } : {}),
+        },
+      },
+      select: {
+        id: true,
+        student: { select: { enrollmentNumber: true } },
+        lines: { select: { offeringSectionId: true } },
+      },
+    });
+
+    let completed = 0;
+    const skipped: { enrollment: string; reason: string }[] = [];
+    const failed: { enrollment: string; error: string }[] = [];
+
+    for (const reg of regs) {
+      const label = reg.student?.enrollmentNumber ?? reg.id.slice(0, 8);
+      if (reg.lines.length === 0) {
+        skipped.push({ enrollment: label, reason: 'no subjects assigned' });
+        continue;
+      }
+      if (reg.lines.some((l) => !l.offeringSectionId)) {
+        skipped.push({ enrollment: label, reason: 'a subject has no section' });
+        continue;
+      }
+      try {
+        await this.engine.adminCompleteRegistration(tenantId, reg.id, actorId);
+        completed++;
+      } catch (e) {
+        failed.push({
+          enrollment: label,
+          error: e instanceof Error ? e.message : 'completion failed',
+        });
+      }
+    }
+
+    return {
+      scanned: regs.length,
+      completed,
+      skipped: skipped.length,
+      skippedSample: skipped.slice(0, 25),
+      failed: failed.length,
+      failedSample: failed.slice(0, 25),
     };
   }
 

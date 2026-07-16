@@ -46,6 +46,29 @@ function parseTab(tabParam: string | null, sectionParam: string | null): Profile
   return 'overview';
 }
 
+/** Primary at-a-glance ID: current college roll, not permanent enrollment. */
+function primaryStudentId(
+  profile: Pick<StudentProfile, 'rollNumber' | 'enrollmentNumber'>,
+): string {
+  return profile.rollNumber?.trim() || profile.enrollmentNumber;
+}
+
+function profileIdentitySubtitle(
+  profile: Pick<StudentProfile, 'rollNumber' | 'enrollmentNumber' | 'batch' | 'semester'>,
+): string {
+  const primary = primaryStudentId(profile);
+  const enrollment = profile.enrollmentNumber?.trim();
+  const showEnrollment =
+    Boolean(enrollment) && enrollment !== primary && Boolean(profile.rollNumber?.trim());
+  const parts = [
+    primary,
+    showEnrollment ? `Enroll ${enrollment}` : null,
+    profile.batch || null,
+    `Sem ${profile.semester}`,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
 function ProfileTabStub({
   title,
   description,
@@ -240,7 +263,14 @@ function ProfileSummarySidebar({
         <h2 className="mt-2 text-sm font-semibold leading-tight">
           <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
         </h2>
-        <p className="text-[11px] text-muted-foreground">{profile.enrollmentNumber}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {primaryStudentId(profile)}
+          {profile.rollNumber?.trim() &&
+          profile.enrollmentNumber?.trim() &&
+          profile.enrollmentNumber.trim() !== profile.rollNumber.trim()
+            ? ` · Enroll ${profile.enrollmentNumber}`
+            : null}
+        </p>
       </div>
       <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px]">
         <div>
@@ -346,11 +376,7 @@ export function StudentProfileDashboard({ profile, canEdit, onRefresh }: Props) 
           <h1 className="truncate text-base font-bold">
             <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
           </h1>
-          <p className="text-[11px] text-muted-foreground">
-            {profile.enrollmentNumber}
-            {profile.batch ? ` · ${profile.batch}` : ''}
-            {` · Sem ${profile.semester}`}
-          </p>
+          <p className="text-[11px] text-muted-foreground">{profileIdentitySubtitle(profile)}</p>
         </div>
         <div className="flex flex-wrap gap-1">
           {badges.map((b) => (

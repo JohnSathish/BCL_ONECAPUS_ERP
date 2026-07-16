@@ -668,9 +668,12 @@ export class RegistrationImportHandler implements ImportModuleHandler<Normalized
         { registrationSource: 'IMPORTED', assignedById: ctx.userId },
       );
 
+      // Admin bulk import is not gated by the self-service registration
+      // window; still enforce structural rules (sections, curriculum, streams).
       const validation = await this.engine.validateRegistration(
         ctx.tenantId,
         registration.id,
+        { ignoreWindow: true },
       );
       if (!validation.ok) {
         const msgs = validation.issues.map((i) => i.message).join('; ');
@@ -680,7 +683,10 @@ export class RegistrationImportHandler implements ImportModuleHandler<Normalized
       }
 
       if (options.submitAfterImport) {
-        await this.engine.submitRegistration(
+        // Finalize directly to "registered" (completed + confirmed lines)
+        // without window gating or seat allocation — correct for offline
+        // admissions imported in bulk.
+        await this.engine.adminCompleteRegistration(
           ctx.tenantId,
           registration.id,
           ctx.userId,

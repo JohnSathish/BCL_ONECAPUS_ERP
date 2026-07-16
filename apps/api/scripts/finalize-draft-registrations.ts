@@ -64,23 +64,34 @@ async function main() {
     select: {
       id: true,
       status: true,
-      student: { select: { enrollmentNumber: true } },
+      student: { select: { enrollmentNumber: true, deletedAt: true } },
       _count: { select: { lines: true } },
     },
   });
 
-  const regIds = regs.map((r) => r.id);
+  // Safety guard: never finalize a registration whose student has been
+  // soft-deleted (removed / dropped-out). Those are orphaned rows and must not
+  // be resurrected to "completed". Report them so they can be cleaned up.
+  const orphaned = regs.filter((r) => r.student?.deletedAt != null);
+  const liveRegs = regs.filter((r) => r.student?.deletedAt == null);
+  if (orphaned.length > 0) {
+    console.log(
+      `Skipping ${orphaned.length} registration(s) whose student is soft-deleted (orphaned).`,
+    );
+  }
+
+  const regIds = liveRegs.map((r) => r.id);
   const nullSectionLines = await prisma.semesterRegistrationLine.count({
     where: { registrationId: { in: regIds }, offeringSectionId: null },
   });
 
-  console.log(`Draft registrations to finalize: ${regs.length}`);
+  console.log(`Live registrations to finalize: ${liveRegs.length}`);
   console.log(
-    `Total lines: ${regs.reduce((s, r) => s + r._count.lines, 0)}` +
+    `Total lines: ${liveRegs.reduce((s, r) => s + r._count.lines, 0)}` +
       ` (avg ${
-        regs.length
+        liveRegs.length
           ? (
-              regs.reduce((s, r) => s + r._count.lines, 0) / regs.length
+              liveRegs.reduce((s, r) => s + r._count.lines, 0) / liveRegs.length
             ).toFixed(1)
           : 0
       }/reg)`,
@@ -95,20 +106,20 @@ async function main() {
     return;
   }
 
-  if (regs.length === 0) {
-    console.log('\nNothing to do — no matching draft registrations.\n');
+  if (liveRegs.length === 0) {
+    console.log('\nNothing to do — no matching live draft registrations.\n');
     return;
   }
 
   if (dryRun) {
     const byStatus = new Map<string, number>();
-    for (const r of regs)
+    for (const r of liveRegs)
       byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
     console.log('\nBy current status:');
     for (const [st, n] of [...byStatus.entries()].sort())
       console.log(`  ${String(n).padStart(5)}  ${st} → completed`);
     console.log('\nSample (first 5):');
-    for (const r of regs.slice(0, 5)) {
+    for (const r of liveRegs.slice(0, 5)) {
       console.log(
         `  ${(r.student?.enrollmentNumber ?? r.id.slice(0, 8)).padEnd(14)} ${r._count.lines} lines  ${r.status}→completed`,
       );

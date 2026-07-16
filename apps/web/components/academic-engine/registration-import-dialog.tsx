@@ -222,13 +222,20 @@ export function RegistrationImportDialog({
             ) : null}
 
             <div className="flex flex-col gap-2 text-sm">
-              <label className="flex items-center gap-2">
+              <label className="flex items-start gap-2">
                 <input
                   type="checkbox"
+                  className="mt-0.5"
                   checked={submitAfterImport}
                   onChange={(e) => setSubmitAfterImport(e.target.checked)}
                 />
-                Submit and allocate seats after import
+                <span>
+                  Mark as registered after import{' '}
+                  <span className="text-muted-foreground">
+                    (recommended — finalizes each student to “Completed”; skips the
+                    registration-window check for offline admissions)
+                  </span>
+                </span>
               </label>
               <label className="flex items-center gap-2">
                 <input
