@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import { fetchJournalPortalInfo } from '@/services/journals-portal';
 
 export default function AnnouncementsPage() {
@@ -13,24 +14,27 @@ export default function AnnouncementsPage() {
 
   return (
     <JournalPublicShell>
+      <JournalPageHero
+        eyebrow="News"
+        title="Announcements"
+        subtitle="Calls, deadlines, and editorial notices from Transient."
+      />
       <div className="mx-auto max-w-3xl px-4 py-12 lg:px-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">News</p>
-        <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">Announcements</h1>
         {infoQ.isLoading ? (
-          <p className="mt-6 text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : announcements.length === 0 ? (
-          <p className="mt-6 text-sm text-[#0A2342]/60">No announcements at this time.</p>
+          <p className="text-sm text-[var(--jp-muted)]">No announcements at this time.</p>
         ) : (
-          <ul className="mt-8 space-y-4">
+          <ul className="space-y-4">
             {announcements.map((a) => (
               <li
                 key={a.id}
-                className="rounded-lg border border-[#0A2342]/10 bg-white p-5 shadow-sm"
+                className="rounded-lg border border-[var(--jp-border)] bg-white p-5 shadow-sm"
               >
-                <h2 className="font-serif text-lg font-semibold text-[#0A2342]">{a.title}</h2>
+                <h2 className="jp-serif text-lg font-semibold text-[var(--jp-ink)]">{a.title}</h2>
                 {a.bodyHtml ? (
                   <div
-                    className="prose prose-sm mt-2 max-w-none text-[#0A2342]/80"
+                    className="prose prose-sm mt-2 max-w-none text-[var(--jp-ink)]/80"
                     dangerouslySetInnerHTML={{ __html: a.bodyHtml }}
                   />
                 ) : null}

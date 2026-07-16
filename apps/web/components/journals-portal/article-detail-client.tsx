@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import {
   fetchArticleCite,
   fetchJournalArticle,
@@ -55,40 +56,41 @@ export function ArticleDetailClient({ articleId }: { articleId: string }) {
 
   return (
     <JournalPublicShell>
+      <JournalPageHero
+        eyebrow={article?.category || 'Article'}
+        title={articleQ.isLoading ? 'Loading…' : article?.title || 'Article not found'}
+        subtitle={
+          article
+            ? [
+                (article.authors ?? []).map((a) => a.fullName).join(', '),
+                article.doi ? `DOI: ${article.doi}` : null,
+                article.pageRange ? `pp. ${article.pageRange}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : undefined
+        }
+        hideSubtitle={!article}
+      />
       <div className="mx-auto max-w-3xl px-4 py-12 lg:px-6">
         {articleQ.isLoading ? (
-          <p className="text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : !article ? (
           <p className="text-sm text-red-700">Article not found.</p>
         ) : (
           <>
-            {article.category ? (
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-                {article.category}
-              </p>
-            ) : null}
-            <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">
-              {article.title}
-            </h1>
-            <p className="mt-3 text-sm text-[#0A2342]/70">
-              {(article.authors ?? []).map((a) => a.fullName).join(', ')}
-            </p>
-            {article.doi ? (
-              <p className="mt-1 text-xs text-[#0A2342]/55">DOI: {article.doi}</p>
-            ) : null}
-            {article.pageRange ? (
-              <p className="mt-1 text-xs text-[#0A2342]/50">pp. {article.pageRange}</p>
-            ) : null}
             {article.abstract ? (
-              <div className="mt-8 rounded-lg border border-[#0A2342]/10 bg-[#f7f8fa] p-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#0A2342]/55">
+              <div className="rounded-lg border border-[var(--jp-border)] bg-[#f7f8fa] p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--jp-muted)]">
                   Abstract
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-[#0A2342]/85">{article.abstract}</p>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--jp-ink)]/85">
+                  {article.abstract}
+                </p>
               </div>
             ) : null}
             {article.keywords?.length ? (
-              <p className="mt-4 text-xs text-[#0A2342]/60">
+              <p className="mt-4 text-xs text-[var(--jp-muted)]">
                 Keywords: {article.keywords.join(', ')}
               </p>
             ) : null}
@@ -101,7 +103,7 @@ export function ArticleDetailClient({ articleId }: { articleId: string }) {
                   onClick={() =>
                     void recordJournalArticleDownload(article.id).catch(() => undefined)
                   }
-                  className="rounded-md bg-[#F4B400] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0A2342]"
+                  className="rounded-md bg-[#C9A227] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0B1F3A]"
                 >
                   Download PDF
                 </a>
@@ -109,26 +111,26 @@ export function ArticleDetailClient({ articleId }: { articleId: string }) {
               <button
                 type="button"
                 onClick={() => void onCite('csl')}
-                className="rounded-md border border-[#0A2342]/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0A2342]"
+                className="rounded-md border border-[var(--jp-border)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--jp-ink)]"
               >
                 Cite CSL
               </button>
               <button
                 type="button"
                 onClick={() => void onCite('ris')}
-                className="rounded-md border border-[#0A2342]/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0A2342]"
+                className="rounded-md border border-[var(--jp-border)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--jp-ink)]"
               >
                 Cite RIS
               </button>
               <button
                 type="button"
                 onClick={() => void onCite('crossref-xml')}
-                className="rounded-md border border-[#0A2342]/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0A2342]"
+                className="rounded-md border border-[var(--jp-border)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--jp-ink)]"
               >
                 Crossref XML
               </button>
             </div>
-            {citeMsg ? <p className="mt-2 text-xs text-[#0A2342]/60">{citeMsg}</p> : null}
+            {citeMsg ? <p className="mt-2 text-xs text-[var(--jp-muted)]">{citeMsg}</p> : null}
             {article.htmlContent ? (
               <div
                 className="prose prose-slate mt-10 max-w-none prose-headings:font-serif"

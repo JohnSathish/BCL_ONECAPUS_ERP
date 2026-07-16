@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import {
   approveProof,
   fetchMySubmission,
@@ -70,27 +71,27 @@ export default function SubmissionDetailPage() {
 
   return (
     <JournalPublicShell>
+      <JournalPageHero
+        eyebrow={s?.status || 'Submission'}
+        title={subQ.isLoading ? 'Loading…' : s?.title || 'Submission not found'}
+        subtitle={s?.abstract || undefined}
+        hideSubtitle={!s?.abstract}
+      />
       <div className="mx-auto max-w-3xl px-4 py-12">
         {subQ.isLoading ? (
-          <p className="text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : !s ? (
           <p className="text-sm text-red-700">Submission not found.</p>
         ) : (
           <>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-              {s.status}
-            </p>
-            <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">{s.title}</h1>
-            {s.abstract ? <p className="mt-4 text-sm text-[#0A2342]/75">{s.abstract}</p> : null}
-
             {['COPYEDITING', 'PROOFING', 'READY_TO_PUBLISH'].includes(s.status) ? (
-              <p className="mt-4 rounded-md border border-[#F4B400]/40 bg-[#F4B400]/10 px-3 py-2 text-sm">
+              <p className="rounded-md border border-[rgba(201,162,39,0.4)] bg-[rgba(201,162,39,0.1)] px-3 py-2 text-sm">
                 In production: {s.status}
                 {s.status === 'PROOFING' ? ' — review proofs and approve when ready.' : ''}
               </p>
             ) : null}
 
-            <h2 className="mt-8 font-serif text-xl font-semibold text-[#0A2342]">Files</h2>
+            <h2 className="mt-8 jp-serif text-xl font-semibold text-[var(--jp-ink)]">Files</h2>
             <ul className="mt-2 space-y-1 text-sm">
               {s.files.map((f) => (
                 <li key={f.id}>

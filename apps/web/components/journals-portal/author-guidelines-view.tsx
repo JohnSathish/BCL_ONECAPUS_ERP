@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
 import { FadeUp } from '@/components/journals-portal/home/home-motion';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 
 const CATEGORIES = [
   {
@@ -106,46 +107,35 @@ const INSTRUCTIONS = [
 export function AuthorGuidelinesView() {
   return (
     <JournalPublicShell>
-      {/* Hero band */}
-      <section className="border-b border-[var(--jp-border)] bg-[var(--jp-navy)] text-white">
-        <div className="mx-auto max-w-5xl px-4 py-14 lg:px-6 lg:py-16">
-          <FadeUp>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#E4BC3A]">
-              For authors
-            </p>
-            <h1 className="jp-serif mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Author Guidelines
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/75">
-              TRANSIENT — A Journal of Natural Sciences and Allied Subjects (peer reviewed) · ISSN
-              2250-0650 · Don Bosco College, Tura
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/journals-portal/author/submissions/new"
-                className="jp-btn jp-btn-gold inline-flex items-center gap-2 rounded-sm px-5 py-3"
-              >
-                <Send className="h-4 w-4" />
-                Start a new submission
-              </Link>
-              <Link
-                href="/journals-portal/downloads"
-                className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
-              >
-                <Download className="h-4 w-4" />
-                Downloads / templates
-              </Link>
-              <Link
-                href="/journals-portal/peer-review"
-                className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
-              >
-                <ShieldCheck className="h-4 w-4" />
-                Peer review policy
-              </Link>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
+      <JournalPageHero
+        eyebrow="For authors"
+        title="Author Guidelines"
+        actions={
+          <>
+            <Link
+              href="/journals-portal/author/submissions/new"
+              className="jp-btn jp-btn-gold inline-flex items-center gap-2 rounded-sm px-5 py-3"
+            >
+              <Send className="h-4 w-4" />
+              Start a new submission
+            </Link>
+            <Link
+              href="/journals-portal/downloads"
+              className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
+            >
+              <Download className="h-4 w-4" />
+              Downloads / templates
+            </Link>
+            <Link
+              href="/journals-portal/peer-review"
+              className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Peer review policy
+            </Link>
+          </>
+        }
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-12 lg:px-6 lg:py-16">
         {/* Intro callout */}

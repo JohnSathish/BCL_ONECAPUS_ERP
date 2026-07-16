@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import {
   createMySubmission,
   uploadMySubmissionFile,
@@ -79,21 +80,23 @@ export default function NewSubmissionPage() {
 
   return (
     <JournalPublicShell>
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <p className="jp-eyebrow">Author desk</p>
-        <h1 className="jp-serif mt-2 text-3xl font-semibold text-[var(--jp-ink)]">
-          New submission
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--jp-muted)]">
-          Submit your manuscript through this portal — Google Forms are no longer used. Please read
-          the{' '}
+      <JournalPageHero
+        eyebrow="Author desk"
+        title="New submission"
+        subtitle="Submit your manuscript through this portal — Google Forms are no longer used."
+        actions={
           <Link
             href="/journals-portal/author-guidelines"
-            className="font-semibold text-[var(--jp-gold)] hover:underline"
+            className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
           >
             Author Guidelines
-          </Link>{' '}
-          (categories, abstract length, keywords, figures/tables, APA references) before uploading.
+          </Link>
+        }
+      />
+      <div className="mx-auto max-w-2xl px-4 py-12">
+        <p className="text-sm leading-relaxed text-[var(--jp-muted)]">
+          Please read the Author Guidelines (categories, abstract length, keywords, figures/tables,
+          APA references) before uploading.
         </p>
 
         <form onSubmit={onSubmit} className="mt-8 space-y-4">

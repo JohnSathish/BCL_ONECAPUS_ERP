@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import {
   acceptReviewAssignment,
   declineReviewAssignment,
@@ -94,6 +95,20 @@ export default function ReviewAssignmentPage() {
 
   return (
     <JournalPublicShell>
+      <JournalPageHero
+        eyebrow={
+          a
+            ? `${a.status}${a.dueAt ? ` · Due ${new Date(a.dueAt).toLocaleDateString()}` : ''}${overdue ? ' · OVERDUE' : ''}`
+            : 'Review assignment'
+        }
+        title={
+          q.isLoading
+            ? 'Loading…'
+            : a?.round?.submission?.title || (a ? 'Review assignment' : 'Assignment not found')
+        }
+        subtitle={a?.round?.submission?.abstract || undefined}
+        hideSubtitle={!a?.round?.submission?.abstract}
+      />
       <div className="mx-auto max-w-3xl px-4 py-12">
         {q.isLoading ? (
           <p className="text-sm">Loading…</p>
@@ -101,21 +116,9 @@ export default function ReviewAssignmentPage() {
           <p className="text-sm text-red-700">Assignment not found.</p>
         ) : (
           <>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-              {a.status}
-              {a.dueAt ? ` · Due ${new Date(a.dueAt).toLocaleDateString()}` : ''}
-              {overdue ? ' · OVERDUE' : ''}
-            </p>
-            <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">
-              {a.round?.submission?.title || 'Review assignment'}
-            </h1>
-            {a.round?.submission?.abstract ? (
-              <p className="mt-4 text-sm text-[#0A2342]/75">{a.round.submission.abstract}</p>
-            ) : null}
-
             {a.status === 'INVITED' ? (
-              <div className="mt-6 space-y-3 rounded-lg border border-[#0A2342]/10 p-4">
-                <p className="text-sm font-medium text-[#0A2342]">
+              <div className="space-y-3 rounded-lg border border-[var(--jp-border)] p-4">
+                <p className="text-sm font-medium text-[var(--jp-ink)]">
                   Conflict of interest declaration (required to accept)
                 </p>
                 <label className="flex items-start gap-2 text-sm">

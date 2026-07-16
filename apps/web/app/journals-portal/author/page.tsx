@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import { fetchMySubmissions, fetchJournalPortalMe } from '@/services/journals-portal';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
@@ -52,60 +53,58 @@ export default function AuthorDashboardPage() {
 
   return (
     <JournalPublicShell>
-      <div className="mx-auto max-w-4xl px-4 py-12 lg:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-              Author portal
-            </p>
-            <h1 className="mt-1 font-serif text-3xl font-semibold text-[#0A2342]">
-              My submissions
-            </h1>
-            {session?.accessToken ? (
-              <p className="mt-1 text-sm text-[#0A2342]/65">
-                Signed in as <span className="font-medium text-[#0A2342]">{authorName}</span>
-                {authorEmail ? <span className="text-[#0A2342]/50"> · {authorEmail}</span> : null}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
+      <JournalPageHero
+        eyebrow="Author portal"
+        title="My submissions"
+        subtitle={
+          session?.accessToken
+            ? `Signed in as ${authorName}${authorEmail ? ` · ${authorEmail}` : ''}`
+            : undefined
+        }
+        actions={
+          <>
+            <Button
+              asChild
+              variant="outline"
+              className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            >
               <Link href="/journals-portal/reviewer">Reviewer desk</Link>
             </Button>
-            <Button asChild className="bg-[#F4B400] text-[#0A2342] hover:bg-[#F4B400]/90">
+            <Button asChild className="bg-[#C9A227] text-[#0B1F3A] hover:bg-[#C9A227]/90">
               <Link href="/journals-portal/author/submissions/new">New submission</Link>
             </Button>
-          </div>
-        </div>
-
+          </>
+        }
+      />
+      <div className="mx-auto max-w-4xl px-4 py-12 lg:px-6">
         {listQ.isLoading ? (
-          <p className="mt-8 text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : (listQ.data ?? []).length === 0 ? (
-          <p className="mt-8 text-sm text-[#0A2342]/60">
+          <p className="text-sm text-[var(--jp-muted)]">
             No submissions yet. Start a new manuscript submission.
           </p>
         ) : (
-          <ul className="mt-8 space-y-3">
+          <ul className="space-y-3">
             {(listQ.data ?? []).map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-[#0A2342]/10 bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
               >
                 <div>
                   <Link
                     href={`/journals-portal/author/submissions/${s.id}`}
-                    className="font-serif text-lg font-semibold text-[#0A2342] hover:underline"
+                    className="jp-serif text-lg font-semibold text-[var(--jp-ink)] hover:underline"
                   >
                     {s.title}
                   </Link>
-                  <p className="text-xs text-[#0A2342]/55">
+                  <p className="text-xs text-[var(--jp-muted)]">
                     Status: {s.status}
                     {s.currentRound ? ` · Round ${s.currentRound}` : ''}
                   </p>
                 </div>
                 <Link
                   href={`/journals-portal/author/submissions/${s.id}`}
-                  className="text-sm font-medium text-[#0A2342]"
+                  className="text-sm font-medium text-[var(--jp-ink)]"
                 >
                   Open →
                 </Link>

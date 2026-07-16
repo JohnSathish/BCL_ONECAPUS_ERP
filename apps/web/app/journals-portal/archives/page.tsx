@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import { fetchJournalIssues } from '@/services/journals-portal';
 
 export default function ArchivesPage() {
@@ -13,33 +14,34 @@ export default function ArchivesPage() {
 
   return (
     <JournalPublicShell>
+      <JournalPageHero
+        eyebrow="Publications"
+        title="Archives"
+        subtitle="Browse past volumes and issues of Transient."
+      />
       <div className="mx-auto max-w-4xl px-4 py-12 lg:px-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-          Publications
-        </p>
-        <h1 className="mt-2 font-serif text-3xl font-semibold text-[#0A2342]">Archives</h1>
         {issuesQ.isLoading ? (
-          <p className="mt-6 text-sm text-[#0A2342]/60">Loading…</p>
+          <p className="text-sm text-[var(--jp-muted)]">Loading…</p>
         ) : (
-          <ul className="mt-8 space-y-3">
+          <ul className="space-y-3">
             {(issuesQ.data ?? []).map((issue) => (
               <li
                 key={issue.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-[#0A2342]/10 bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-lg border border-[var(--jp-border)] bg-white p-4 shadow-sm"
               >
                 <div>
-                  <p className="font-serif text-base font-semibold text-[#0A2342]">
+                  <p className="jp-serif text-base font-semibold text-[var(--jp-ink)]">
                     {issue.title ||
                       `Vol. ${issue.volume.volumeNumber} (${issue.volume.year}) — Issue ${issue.issueNumber}`}
                   </p>
-                  <p className="text-xs text-[#0A2342]/55">
+                  <p className="text-xs text-[var(--jp-muted)]">
                     {issue._count?.articles ?? 0} article(s)
                     {issue.isCurrent ? ' · Current' : ''}
                   </p>
                 </div>
                 <Link
                   href={`/journals-portal/issues/${issue.id}`}
-                  className="text-sm font-medium text-[#0A2342] hover:underline"
+                  className="text-sm font-medium text-[var(--jp-ink)] hover:underline"
                 >
                   View →
                 </Link>

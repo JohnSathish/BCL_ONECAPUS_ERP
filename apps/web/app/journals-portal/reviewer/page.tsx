@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { JournalPublicShell } from '@/components/journals-portal/journal-public-shell';
+import { JournalPageHero } from '@/components/journals-portal/journal-page-hero';
 import { fetchMyReviewAssignments } from '@/services/journals-portal';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -48,18 +49,21 @@ export default function ReviewerDashboardPage() {
 
   return (
     <JournalPublicShell>
-      <div className="mx-auto max-w-4xl px-4 py-12">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#F4B400]">
-          Reviewer portal
-        </p>
-        <h1 className="mt-1 font-serif text-3xl font-semibold text-[#0A2342]">My assignments</h1>
-        <p className="mt-2 text-sm">
-          <Link href="/journals-portal/author" className="underline">
+      <JournalPageHero
+        eyebrow="Reviewer portal"
+        title="My assignments"
+        subtitle="Manage peer-review invitations and reports."
+        actions={
+          <Link
+            href="/journals-portal/author"
+            className="jp-btn inline-flex items-center gap-2 rounded-sm border border-white/35 bg-transparent px-5 py-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white hover:bg-white/10"
+          >
             Author desk
           </Link>
-        </p>
-
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        }
+      />
+      <div className="mx-auto max-w-4xl px-4 py-12">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: 'Total', value: stats.total },
             { label: 'Pending', value: stats.pending },
