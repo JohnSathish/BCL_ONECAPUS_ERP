@@ -5724,24 +5724,27 @@ model StudentVtcTrack {
 }
 
 model SemesterPromotionRun {
-  id                   String    @id @default(uuid()) @db.Uuid
-  tenantId             String    @map("tenant_id") @db.Uuid
-  institutionId        String    @map("institution_id") @db.Uuid
-  campusId             String?   @map("campus_id") @db.Uuid
-  shiftId              String?   @map("shift_id") @db.Uuid
-  fromSemesterId       String?   @map("from_semester_id") @db.Uuid
-  toSemesterSequence   Int       @map("to_semester_sequence")
-  fromSequence         Int       @map("from_sequence")
-  trigger              String    @default("MANUAL")
-  status               String    @default("DRAFT")
-  counts               Json?
-  admissionBatchId     String?   @map("admission_batch_id") @db.Uuid
-  cycleRolloverGroupId String?   @map("cycle_rollover_group_id") @db.Uuid
-  appliedAt            DateTime? @map("applied_at")
-  appliedById          String?   @map("applied_by") @db.Uuid
-  rolledBackAt         DateTime? @map("rolled_back_at")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  id                                String    @id @default(uuid()) @db.Uuid
+  tenantId                          String    @map("tenant_id") @db.Uuid
+  institutionId                     String    @map("institution_id") @db.Uuid
+  campusId                          String?   @map("campus_id") @db.Uuid
+  shiftId                           String?   @map("shift_id") @db.Uuid
+  fromSemesterId                    String?   @map("from_semester_id") @db.Uuid
+  toSemesterSequence                Int       @map("to_semester_sequence")
+  fromSequence                      Int       @map("from_sequence")
+  trigger                           String    @default("MANUAL")
+  status                            String    @default("DRAFT")
+  counts                            Json?
+  /// When true, promotion leaves next-semester registration as draft with
+  /// compulsory Major/Minor filled so students complete electives (renewal).
+  leaveElectivesForStudentRenewal   Boolean   @default(true) @map("leave_electives_for_student_renewal")
+  admissionBatchId                  String?   @map("admission_batch_id") @db.Uuid
+  cycleRolloverGroupId              String?   @map("cycle_rollover_group_id") @db.Uuid
+  appliedAt                         DateTime? @map("applied_at")
+  appliedById                       String?   @map("applied_by") @db.Uuid
+  rolledBackAt                      DateTime? @map("rolled_back_at")
+  createdAt                         DateTime  @default(now()) @map("created_at")
+  updatedAt                         DateTime  @updatedAt @map("updated_at")
 
   institution    Institution                 @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   campus         Campus?                     @relation(fields: [campusId], references: [id], onDelete: SetNull)

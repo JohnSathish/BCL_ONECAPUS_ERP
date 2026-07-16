@@ -213,8 +213,12 @@ export class PromotionRegistrationService {
       toSequence: number;
       promotionRunId: string;
       actorId?: string;
+      /** Leave draft with compulsory lines; students finish electives (default true). */
+      leaveElectivesForStudentRenewal?: boolean;
     },
   ) {
+    const leaveElectives = input.leaveElectivesForStudentRenewal !== false;
+
     const validation = await this.validateStudent(tenantId, input.studentId, {
       institutionId: input.institutionId,
       fromSequence: input.fromSequence,
@@ -294,6 +298,43 @@ export class PromotionRegistrationService {
       })),
       { assignedById: input.actorId },
     );
+
+    await this.prisma.semesterRegistration.update({
+      where: { id: registration.id },
+      data: { promotionRunId: input.promotionRunId },
+    });
+
+    const electiveSlots = await this.adminRegistration.computeElectiveSlots(
+      tenantId,
+      input.studentId,
+      input.toSequence,
+      lines.map((l) => l.category),
+    );
+
+    await this.prisma.registrationAuditLog.create({
+      data: {
+        tenantId,
+        registrationId: registration.id,
+        actorId: input.actorId ?? null,
+        action: leaveElectives
+          ? 'PROMOTION_RENEWAL_DRAFT'
+          : 'PROMOTION_ALLOCATED',
+        metadata: {
+          promotionRunId: input.promotionRunId,
+          leaveElectivesForStudentRenewal: leaveElectives,
+          compulsoryLineCount: lines.length,
+          electiveSlots,
+        },
+      },
+    });
+
+    if (leaveElectives) {
+      return {
+        ...(await this.engine.getRegistration(tenantId, registration.id)),
+        electiveSlots,
+        renewalDraft: true as const,
+      };
+    }
 
     return this.allocation.allocateRegistration(
       tenantId,

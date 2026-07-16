@@ -212,6 +212,7 @@ export async function createPromotionRun(payload: {
   shiftId?: string;
   trigger?: string;
   admissionBatchId?: string;
+  leaveElectivesForStudentRenewal?: boolean;
 }) {
   const { data } = await api.post('/v1/academic-lifecycle/promotion-runs', payload);
   return data;

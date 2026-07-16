@@ -84,7 +84,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 19,
+    versionCode: 20,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',

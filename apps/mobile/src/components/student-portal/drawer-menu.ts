@@ -169,7 +169,7 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
       },
       {
         id: 'registration-web',
-        label: 'Course Registration',
+        label: 'Subject renewal',
         href: '/(student)/registration-web',
         keywords: ['subject', 'elective', 'fyugp'],
       },

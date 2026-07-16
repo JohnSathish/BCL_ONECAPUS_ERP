@@ -44,6 +44,7 @@ import {
   fetchAdminRegistrations,
   fetchStudentRegistrationContext,
   freezeRegistrations,
+  remindIncompleteRenewals,
   submitAdminRegistration,
   updateAdminRegistrationLines,
   validateAdminRegistration,
@@ -86,6 +87,7 @@ export function AdminSubjectRegistrationPage() {
   const [validationIssues, setValidationIssues] = useState<{ code: string; message: string }[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [prepareRenewalsOpen, setPrepareRenewalsOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
 
   useEffect(() => {
@@ -479,6 +481,25 @@ export function AdminSubjectRegistrationPage() {
     onError: (e) => setMessage(apiErrorMessage(e, 'Freeze update failed')),
   });
 
+  const remindMut = useMutation({
+    mutationFn: () =>
+      remindIncompleteRenewals({
+        semesterId: semesterId || undefined,
+        programVersionId: scope.programVersionId || undefined,
+        admissionBatchId: scope.batchId || undefined,
+        shiftId: scope.shiftId || undefined,
+        studentIds: studentIds.length ? studentIds : undefined,
+      }),
+    onSuccess: (r) => {
+      setMessage(r.message);
+      if (scope.statusFilter !== 'renewal_incomplete') {
+        setScope((s) => ({ ...s, statusFilter: 'renewal_incomplete' }));
+      }
+      invalidate();
+    },
+    onError: (e) => setMessage(apiErrorMessage(e, 'Renewal reminders failed')),
+  });
+
   if (!session) return null;
 
   const reg = context.data?.registration;
@@ -521,6 +542,24 @@ export function AdminSubjectRegistrationPage() {
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" disabled={!semesterId} onClick={() => setBulkOpen(true)}>
             Generate registrations
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!semesterId}
+            onClick={() => setPrepareRenewalsOpen(true)}
+          >
+            Prepare semester renewals
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={remindMut.isPending}
+            onClick={() => remindMut.mutate()}
+          >
+            {remindMut.isPending ? 'Sending…' : 'Remind incomplete renewals'}
           </Button>
           <Button
             type="button"
@@ -575,6 +614,24 @@ export function AdminSubjectRegistrationPage() {
           shiftId={scope.shiftId || undefined}
           studentIds={studentIds}
           onComplete={() => invalidate()}
+        />
+
+        <BulkGenerateRegistrationsDialog
+          open={prepareRenewalsOpen}
+          onOpenChange={setPrepareRenewalsOpen}
+          semesterId={semesterId ?? ''}
+          semesterSequence={semesterSequence}
+          programVersionId={scope.programVersionId || undefined}
+          admissionBatchId={scope.batchId || undefined}
+          shiftId={scope.shiftId || undefined}
+          studentIds={studentIds}
+          defaultMode="PREPARE_ELECTIVES"
+          title="Prepare semester renewals"
+          description={`Semester ${semesterSequence} · Fills Major/Minor (compulsory) and leaves electives for students on Subject renewal. Use when the cohort is already on this semester (no promotion).`}
+          onComplete={() => {
+            setScope((s) => ({ ...s, statusFilter: 'renewal_incomplete' }));
+            invalidate();
+          }}
         />
 
         <CompleteRegistrationsDialog
@@ -644,7 +701,17 @@ export function AdminSubjectRegistrationPage() {
                         <td className="py-2 pr-2 font-mono text-xs">{row.enrollmentNumber}</td>
                         <td className="py-2 pr-2">{row.fullName}</td>
                         <td className="py-2 pr-2">{row.batchCode ?? '—'}</td>
-                        <td className="py-2 pr-2">{row.registration?.status ?? 'none'}</td>
+                        <td className="py-2 pr-2">
+                          {row.registration?.status ?? 'none'}
+                          {Array.isArray(
+                            (row as { electiveSlots?: { remaining: number }[] }).electiveSlots,
+                          ) &&
+                          (row as { electiveSlots: { remaining: number }[] }).electiveSlots.some(
+                            (s) => s.remaining > 0,
+                          )
+                            ? ' · electives open'
+                            : ''}
+                        </td>
                         <td className="py-2">{row.registrationLocked ? 'Yes' : 'No'}</td>
                       </tr>
                     ))}

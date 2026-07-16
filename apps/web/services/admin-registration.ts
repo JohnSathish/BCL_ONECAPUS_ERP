@@ -19,6 +19,13 @@ export type AdminRegistrationListItem = {
   currentSemester: number;
   registrationLocked: boolean;
   registration: SemesterRegistration | null;
+  electiveSlots?: {
+    category: string;
+    required: number;
+    filled: number;
+    remaining: number;
+  }[];
+  renewalIncomplete?: boolean;
 };
 
 export type StudentRegistrationContext = {
@@ -191,6 +198,25 @@ export async function bulkGenerateRegistrations(payload: {
 }) {
   const { data } = await api.post('/v1/academic-engine/registrations/bulk-generate', payload);
   return data as BulkGenerateResult;
+}
+
+export async function remindIncompleteRenewals(payload: {
+  semesterId?: string;
+  programVersionId?: string;
+  admissionBatchId?: string;
+  shiftId?: string;
+  studentIds?: string[];
+}) {
+  const { data } = await api.post(
+    '/v1/academic-engine/registrations/remind-incomplete-renewals',
+    payload,
+  );
+  return data as {
+    candidates: number;
+    queued: number;
+    skipped: number;
+    message: string;
+  };
 }
 
 export type BulkCompleteResult = {

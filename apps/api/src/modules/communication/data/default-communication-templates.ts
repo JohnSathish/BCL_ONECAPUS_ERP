@@ -593,6 +593,22 @@ ${emailCtaButton('Register Now')}`,
     channels: ['EMAIL', 'IN_APP'],
   },
   {
+    code: 'STUDENT_SUBJECT_RENEWAL_REMINDER',
+    name: 'Subject Renewal Reminder',
+    category: 'STUDENT',
+    subject:
+      'Complete your Semester {{semester}} subject renewal — {{institution_name}}',
+    bodyHtml: `${emailGreeting()}
+<p style="margin:0 0 12px;color:#334155;">Your Major/Minor are locked. Please choose your electives (AEC, MDC, SEC, VTC/VAC) and submit subject renewal before the window closes.</p>
+${studentCard()}
+${emailInfoRows([{ label: 'Deadline', value: '{{deadline}}' }])}
+${emailCtaButton('Open Subject Renewal')}`,
+    bodyText:
+      'Complete Semester {{semester}} subject renewal (electives) before {{deadline}}, {{student_name}}.',
+    variables: [...V.student, 'deadline'],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
     code: 'STUDENT_EXAM_REGISTRATION',
     name: 'Examination Registration',
     category: 'STUDENT',

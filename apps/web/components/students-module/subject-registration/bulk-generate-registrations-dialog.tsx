@@ -26,6 +26,10 @@ type BulkGenerateRegistrationsDialogProps = {
   admissionBatchId?: string;
   shiftId?: string;
   studentIds?: string[];
+  /** Prefill generation mode (e.g. PREPARE_ELECTIVES for semester renewals). */
+  defaultMode?: BulkGenerateMode;
+  title?: string;
+  description?: string;
   onComplete?: (result: BulkGenerateResult) => void;
 };
 
@@ -38,10 +42,13 @@ export function BulkGenerateRegistrationsDialog({
   admissionBatchId,
   shiftId,
   studentIds,
+  defaultMode = 'COMPULSORY_ONLY',
+  title = 'Generate semester registrations',
+  description,
   onComplete,
 }: BulkGenerateRegistrationsDialogProps) {
   const [step, setStep] = useState<'configure' | 'results'>('configure');
-  const [mode, setMode] = useState<BulkGenerateMode>('COMPULSORY_ONLY');
+  const [mode, setMode] = useState<BulkGenerateMode>(defaultMode);
   const [submitAfter, setSubmitAfter] = useState(false);
   const [result, setResult] = useState<BulkGenerateResult | null>(null);
   const [error, setError] = useState('');
@@ -49,12 +56,14 @@ export function BulkGenerateRegistrationsDialog({
   useEffect(() => {
     if (!open) {
       setStep('configure');
-      setMode('COMPULSORY_ONLY');
+      setMode(defaultMode);
       setSubmitAfter(false);
       setResult(null);
       setError('');
+    } else {
+      setMode(defaultMode);
     }
-  }, [open]);
+  }, [open, defaultMode]);
 
   const runMut = useMutation({
     mutationFn: () =>
@@ -81,10 +90,10 @@ export function BulkGenerateRegistrationsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate semester registrations</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Semester {semesterSequence} · Creates drafts and optionally auto-assigns compulsory
-            subjects
+            {description ??
+              `Semester ${semesterSequence} · Creates drafts and optionally auto-assigns compulsory subjects`}
           </DialogDescription>
         </DialogHeader>
 
@@ -97,7 +106,10 @@ export function BulkGenerateRegistrationsDialog({
                   [
                     ['DRAFT_ONLY', 'Draft only — create empty registrations'],
                     ['COMPULSORY_ONLY', 'Compulsory only — auto-assign Major/Minor etc.'],
-                    ['PREPARE_ELECTIVES', 'Compulsory + report unfilled elective slots'],
+                    [
+                      'PREPARE_ELECTIVES',
+                      'Prepare renewals — compulsory filled; electives left for students',
+                    ],
                     ['FULL', 'Full auto-assign all categories (legacy)'],
                   ] as const
                 ).map(([value, label]) => (

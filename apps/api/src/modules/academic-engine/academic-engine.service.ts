@@ -69,6 +69,7 @@ import {
 } from '../students/utils/profile-soft-gate.util';
 import { HonoursTrackService } from './services/honours-track.service';
 import { assertAdvancedSemesterDocuments } from './domain/advanced-semester-document-gate';
+import { unfilledElectiveSlots } from './domain/registration-category-classification';
 
 @Injectable()
 export class AcademicEngineService {
@@ -581,6 +582,56 @@ export class AcademicEngineService {
         }),
       ]);
 
+    const percent = await roughProfileCompletionPercent(
+      this.prisma,
+      tenantId,
+      student.id,
+    );
+    const [softGate, feeClearance] = await Promise.all([
+      evaluateProfileSoftGateFromPrisma(
+        this.prisma,
+        tenantId,
+        student.id,
+        percent,
+      ),
+      this.feeEnforcement.checkFeesClear(tenantId, student.id, 'REGISTRATION'),
+    ]);
+
+    let electiveSlots:
+      | {
+          category: string;
+          required: number;
+          filled: number;
+          remaining: number;
+        }[]
+      | null = null;
+    if (reg?.status === 'draft' && student.programVersionId) {
+      const [rule, workflow] = await Promise.all([
+        this.prisma.semesterStructureRule.findFirst({
+          where: {
+            tenantId,
+            programVersionId: student.programVersionId,
+            semesterSequence: reg.semesterSequence,
+          },
+          include: { lines: true },
+        }),
+        this.registrationWorkflow.getForStudent(tenantId, student.id),
+      ]);
+      if (rule) {
+        const filledByCategory: Record<string, number> = {};
+        for (const line of reg.lines) {
+          filledByCategory[line.category] =
+            (filledByCategory[line.category] ?? 0) + 1;
+        }
+        electiveSlots = unfilledElectiveSlots(
+          rule.categoryCounts as Record<string, number>,
+          rule.lines,
+          workflow.studentElectiveCategories,
+          filledByCategory,
+        );
+      }
+    }
+
     return {
       student,
       registration: reg,
@@ -590,6 +641,9 @@ export class AcademicEngineService {
       canChangeMajorMinor,
       class12Subjects:
         (academicProfile?.class12Subjects as { name: string }[] | null) ?? [],
+      softGate,
+      feeClearance,
+      electiveSlots,
     };
   }
 
@@ -668,6 +722,16 @@ export class AcademicEngineService {
       throw new BadRequestException(
         gate.message ??
           'Complete your student profile before submitting registration.',
+      );
+    }
+    const feeCheck = await this.feeEnforcement.checkFeesClear(
+      tenantId,
+      student.id,
+      'REGISTRATION',
+    );
+    if (feeCheck.blocked) {
+      throw new BadRequestException(
+        `Fee dues outstanding (₹${feeCheck.outstandingAmount}). ${feeCheck.reasons.join('; ')}`,
       );
     }
     const reg = await this.getRegistration(tenantId, registrationId);

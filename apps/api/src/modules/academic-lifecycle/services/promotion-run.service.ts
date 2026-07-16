@@ -119,6 +119,10 @@ export class PromotionRunService {
       admissionBatchId: dto.admissionBatchId,
     });
 
+    const leaveElectivesForStudentRenewal =
+      dto.leaveElectivesForStudentRenewal ??
+      (dto.toSequence >= 2 && dto.toSequence <= 7);
+
     const run = await this.prisma.semesterPromotionRun.create({
       data: {
         tenantId,
@@ -131,6 +135,7 @@ export class PromotionRunService {
         trigger: dto.trigger ?? 'MANUAL',
         status: 'PREVIEW',
         counts: preview.counts,
+        leaveElectivesForStudentRenewal,
         admissionBatchId: dto.admissionBatchId,
         cycleRolloverGroupId: dto.cycleRolloverGroupId,
       },
@@ -174,6 +179,7 @@ export class PromotionRunService {
 
     await this.audit(tenantId, run.id, actorId, 'RUN_CREATED', {
       counts: preview.counts,
+      leaveElectivesForStudentRenewal,
     });
 
     return this.getRun(tenantId, run.id);
@@ -302,6 +308,8 @@ export class PromotionRunService {
           toSequence: entry.toSequence,
           promotionRunId: runId,
           actorId,
+          leaveElectivesForStudentRenewal:
+            run.leaveElectivesForStudentRenewal ?? true,
         });
       }
 

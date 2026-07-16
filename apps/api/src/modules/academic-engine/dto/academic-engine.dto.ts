@@ -464,6 +464,29 @@ export class FreezeRegistrationDto {
   programVersionId?: string;
 }
 
+export class RemindIncompleteRenewalsDto {
+  @IsOptional()
+  @IsUUID()
+  semesterId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  programVersionId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  admissionBatchId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+}
+
 export class UpdateRegistrationWorkflowDto {
   @IsOptional()
   @IsString()

@@ -2352,7 +2352,7 @@ export const ROLE_NAV: Record<
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },
-    { label: 'Registration', href: '/student/registration', icon: ClipboardList },
+    { label: 'Subject renewal', href: '/student/registration', icon: ClipboardList },
     { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },
     { label: 'Examinations', href: '/student/examinations', icon: Ticket },
     { label: 'Committee Notices', href: '/student/governance/notices', icon: Megaphone },

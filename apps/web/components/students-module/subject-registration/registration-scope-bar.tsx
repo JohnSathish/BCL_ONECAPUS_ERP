@@ -76,6 +76,7 @@ export function RegistrationScopeBar({
       >
         <option value="">All statuses</option>
         <option value="draft">Draft</option>
+        <option value="renewal_incomplete">Renewal incomplete</option>
         <option value="pending_approval">Pending approval</option>
         <option value="completed">Completed</option>
       </select>

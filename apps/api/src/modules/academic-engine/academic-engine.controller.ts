@@ -34,6 +34,7 @@ import {
   BulkCompleteRegistrationsDto,
   AutoAssignRegistrationDto,
   FreezeRegistrationDto,
+  RemindIncompleteRenewalsDto,
   ListRegistrationsQueryDto,
   LockWindowDto,
   ResetVtcTrackDto,
@@ -973,6 +974,25 @@ export class AcademicEngineController {
       admissionBatchId: dto.admissionBatchId,
       programVersionId: dto.programVersionId,
     });
+  }
+
+  @Post('registrations/remind-incomplete-renewals')
+  @RequirePermissions('academic-engine:manage')
+  remindIncompleteRenewals(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: RemindIncompleteRenewalsDto,
+  ) {
+    return this.adminRegistration.remindIncompleteRenewals(
+      user.tid,
+      {
+        semesterId: dto.semesterId,
+        programVersionId: dto.programVersionId,
+        admissionBatchId: dto.admissionBatchId,
+        shiftId: dto.shiftId,
+        studentIds: dto.studentIds,
+      },
+      user.sub,
+    );
   }
 
   @Get('institutions/:institutionId/registration-workflow')

@@ -38,6 +38,8 @@ import {
   priorLineSlotKey,
   resolveSuccessorOfferingId,
 } from '../domain/promotion-line-resolver';
+import { CommunicationTriggerService } from '../../communication/services/communication-trigger.service';
+import type { ResolvedRecipient } from '../../communication/services/communication-audience.service';
 
 export type {
   RegistrationWorkflowSettings,
@@ -92,6 +94,7 @@ export class AdminRegistrationService {
     private readonly vtcTrack: StudentVtcTrackService,
     private readonly courseEligibility: CourseEligibilityService,
     private readonly honoursTrack: HonoursTrackService,
+    private readonly communicationTriggers: CommunicationTriggerService,
   ) {}
 
   parseWorkflow(raw: unknown): RegistrationWorkflowSettings {
@@ -126,6 +129,8 @@ export class AdminRegistrationService {
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
     const skip = (page - 1) * limit;
+    const renewalIncomplete = filters.status === 'renewal_incomplete';
+    const statusFilter = renewalIncomplete ? 'draft' : filters.status;
 
     const search = filters.search?.trim();
     const studentWhere = {
@@ -162,7 +167,109 @@ export class AdminRegistrationService {
             ],
           }
         : {}),
+      ...(statusFilter
+        ? {
+            semesterRegistrations: {
+              some: {
+                ...(filters.semesterId
+                  ? { semesterId: filters.semesterId }
+                  : {}),
+                status: statusFilter,
+              },
+            },
+          }
+        : {}),
     };
+
+    if (renewalIncomplete) {
+      const students = await this.prisma.student.findMany({
+        where: studentWhere,
+        orderBy: { enrollmentNumber: 'asc' },
+        include: {
+          user: { select: { email: true } },
+          masterProfile: { select: { fullName: true } },
+          academicStanding: true,
+          academicProfile: {
+            include: { admissionBatch: { select: { batchCode: true } } },
+          },
+          programVersion: {
+            include: { program: { select: { code: true, name: true } } },
+          },
+          semesterRegistrations: {
+            where: {
+              ...(filters.semesterId ? { semesterId: filters.semesterId } : {}),
+              status: 'draft',
+            },
+            include: {
+              lines: {
+                include: {
+                  offering: { include: { course: true } },
+                },
+              },
+              semester: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      const incompleteItems: {
+        studentId: string;
+        enrollmentNumber: string | null;
+        email: string;
+        fullName: string;
+        programCode: string | undefined;
+        programName: string | undefined;
+        batchCode: string | undefined;
+        currentSemester: number;
+        registrationLocked: boolean;
+        registration:
+          | (typeof students)[number]['semesterRegistrations'][number]
+          | null;
+        electiveSlots: {
+          category: string;
+          required: number;
+          filled: number;
+          remaining: number;
+        }[];
+        renewalIncomplete: boolean;
+      }[] = [];
+
+      for (const s of students) {
+        const registration = s.semesterRegistrations[0] ?? null;
+        if (!registration) continue;
+        const electiveSlots = await this.computeElectiveSlots(
+          tenantId,
+          s.id,
+          registration.semesterSequence,
+          registration.lines.map((l) => l.category),
+        );
+        const hasUnfilled = electiveSlots.some((slot) => slot.remaining > 0);
+        if (!hasUnfilled) continue;
+        incompleteItems.push({
+          studentId: s.id,
+          enrollmentNumber: s.enrollmentNumber,
+          email: s.user.email,
+          fullName: s.masterProfile?.fullName ?? s.user.email,
+          programCode: s.programVersion?.program.code,
+          programName: s.programVersion?.program.name,
+          batchCode: s.academicProfile?.admissionBatch?.batchCode,
+          currentSemester: s.academicStanding?.currentSemesterSequence ?? 1,
+          registrationLocked: s.academicStanding?.registrationLocked ?? false,
+          registration,
+          electiveSlots,
+          renewalIncomplete: true,
+        });
+      }
+
+      return {
+        page,
+        limit,
+        total: incompleteItems.length,
+        items: incompleteItems.slice(skip, skip + limit),
+      };
+    }
 
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
@@ -183,7 +290,7 @@ export class AdminRegistrationService {
           semesterRegistrations: {
             where: {
               ...(filters.semesterId ? { semesterId: filters.semesterId } : {}),
-              ...(filters.status ? { status: filters.status } : {}),
+              ...(statusFilter ? { status: statusFilter } : {}),
             },
             include: {
               lines: {
@@ -217,6 +324,138 @@ export class AdminRegistrationService {
         registrationLocked: s.academicStanding?.registrationLocked ?? false,
         registration: s.semesterRegistrations[0] ?? null,
       })),
+    };
+  }
+
+  /**
+   * Notify students whose draft registration still has unfilled elective slots
+   * (subject renewal incomplete). Uses STUDENT_SUBJECT_RENEWAL_REMINDER template.
+   */
+  async remindIncompleteRenewals(
+    tenantId: string,
+    filters: {
+      semesterId?: string;
+      programVersionId?: string;
+      admissionBatchId?: string;
+      shiftId?: string;
+      studentIds?: string[];
+    },
+    actorId?: string,
+  ) {
+    const listed = await this.listRegistrations(tenantId, {
+      ...filters,
+      status: 'renewal_incomplete',
+      page: 1,
+      limit: 100,
+    });
+
+    // Page through remaining incomplete students (college-scale batches).
+    let page = 2;
+    const allItems = [...listed.items];
+    while (allItems.length < listed.total && page <= 20) {
+      const next = await this.listRegistrations(tenantId, {
+        ...filters,
+        status: 'renewal_incomplete',
+        page,
+        limit: 100,
+      });
+      allItems.push(...next.items);
+      if (!next.items.length) break;
+      page += 1;
+    }
+
+    const scoped = filters.studentIds?.length
+      ? allItems.filter((row) => filters.studentIds!.includes(row.studentId))
+      : allItems;
+
+    const institutionName =
+      await this.communicationTriggers.getInstitutionName(tenantId);
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    let window: { closesAt: Date | null; name: string } | null = null;
+    if (filters.semesterId) {
+      window = await this.prisma.registrationWindow.findFirst({
+        where: { tenantId, semesterId: filters.semesterId },
+        orderBy: { opensAt: 'desc' },
+        select: { closesAt: true, name: true },
+      });
+    }
+
+    const deadline = window?.closesAt
+      ? window.closesAt.toISOString().slice(0, 10)
+      : 'the registration deadline';
+
+    let queued = 0;
+    let skipped = 0;
+
+    for (const row of scoped) {
+      const registration = row.registration;
+      if (!registration) {
+        skipped += 1;
+        continue;
+      }
+
+      const student = await this.prisma.student.findFirst({
+        where: { id: row.studentId, tenantId, deletedAt: null },
+        include: {
+          user: { select: { id: true, email: true, displayName: true } },
+          masterProfile: {
+            select: { fullName: true, email: true, mobileNumber: true },
+          },
+          department: { select: { name: true } },
+          programVersion: {
+            include: { program: { select: { name: true } } },
+          },
+        },
+      });
+      if (!student?.user) {
+        skipped += 1;
+        continue;
+      }
+
+      const recipient: ResolvedRecipient = {
+        recipientType: 'STUDENT',
+        userId: student.user.id,
+        studentId: student.id,
+        displayName:
+          student.masterProfile?.fullName ??
+          student.user.displayName ??
+          student.user.email,
+        email: student.masterProfile?.email ?? student.user.email,
+        phone: student.masterProfile?.mobileNumber ?? undefined,
+      };
+
+      const result = await this.communicationTriggers.trigger({
+        tenantId,
+        templateCode: 'STUDENT_SUBJECT_RENEWAL_REMINDER',
+        triggerKey: `registration.renewal_incomplete.${todayKey}`,
+        entityType: 'semester_registration',
+        entityId: registration.id,
+        recipient,
+        variables: {
+          student_name: recipient.displayName,
+          roll_number: student.enrollmentNumber ?? '',
+          department: student.department?.name ?? '',
+          programme: student.programVersion?.program.name ?? '',
+          semester: String(registration.semesterSequence),
+          academic_year: '',
+          institution_name: institutionName,
+          login_url: '/student/registration?renewal=1',
+          deadline,
+          triggered_by: actorId ?? 'admin',
+        },
+        channels: ['EMAIL', 'IN_APP', 'PUSH'],
+      });
+
+      if (result.skipped) skipped += 1;
+      else queued += 1;
+    }
+
+    return {
+      candidates: scoped.length,
+      queued,
+      skipped,
+      message: `Queued ${queued} subject-renewal reminder(s); ${skipped} skipped (already reminded today or missing contact).`,
     };
   }
 
@@ -608,7 +847,7 @@ export class AdminRegistrationService {
     };
   }
 
-  private async computeElectiveSlots(
+  async computeElectiveSlots(
     tenantId: string,
     studentId: string,
     semesterSequence: number,

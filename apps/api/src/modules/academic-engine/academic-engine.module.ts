@@ -35,6 +35,7 @@ import { ShiftCurriculumService } from './services/shift-curriculum.service';
 import { LmsModule } from '../lms/lms.module';
 import { FeesModule } from '../fees/fees.module';
 import { AcademicChangeHistoryModule } from '../students/academic-change-history/academic-change-history.module';
+import { CommunicationModule } from '../communication/communication.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AcademicChangeHistoryModule } from '../students/academic-change-history
     ImportModule,
     LmsModule,
     FeesModule,
+    CommunicationModule,
   ],
   controllers: [
     AcademicEngineController,

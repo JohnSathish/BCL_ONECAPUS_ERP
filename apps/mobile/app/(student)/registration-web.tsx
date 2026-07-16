@@ -3,17 +3,20 @@ import { StudentScreenShell } from '@/components/student-portal/student-screen-s
 import { OpenInWebButton } from '@/components/student-portal/open-in-web-button';
 import { studentTheme } from '@/components/student-portal/theme';
 
-/** Registration stays on web for F1 — opens a private browser session with login required. */
+/** Subject renewal stays on web for v1 — opens a private browser session with login required. */
 export default function RegistrationWebFallbackScreen() {
   return (
-    <StudentScreenShell title="Course Registration" subtitle="Secure web sign-in required">
+    <StudentScreenShell title="Subject renewal" subtitle="Secure web sign-in required">
       <View style={styles.box}>
         <Text style={styles.text}>
-          Subject / course registration uses the full elective workflow on the college web portal.
-          For security, the campus portal opens a private browser session and asks you to sign in
-          again — it will not reuse an existing browser login.
+          Semester subject renewal (locked Major/Minor plus AEC, MDC, SEC, VTC/VAC electives) uses
+          the college web portal. For security, the campus portal opens a private browser session
+          and asks you to sign in again — it will not reuse an existing browser login.
         </Text>
-        <OpenInWebButton path="/student/registration" label="Sign in on web to register" />
+        <OpenInWebButton
+          path="/student/registration?renewal=1"
+          label="Sign in on web for subject renewal"
+        />
       </View>
     </StudentScreenShell>
   );

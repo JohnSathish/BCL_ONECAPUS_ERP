@@ -148,6 +148,15 @@ export class CreatePromotionRunDto {
   @IsOptional()
   @IsUUID()
   cycleRolloverGroupId?: string;
+
+  /**
+   * When true (default for target Sem 2–7), leave draft registration with
+   * compulsory Major/Minor filled; students complete electives via renewal.
+   * When false, allocate/complete immediately (legacy behaviour).
+   */
+  @IsOptional()
+  @IsBoolean()
+  leaveElectivesForStudentRenewal?: boolean;
 }
 
 export class ActivateCycleDto {

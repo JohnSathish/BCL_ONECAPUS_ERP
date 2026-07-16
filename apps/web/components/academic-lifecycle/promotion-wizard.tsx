@@ -52,6 +52,9 @@ export function PromotionWizard({
   const [message, setMessage] = useState('');
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
   const toSequence = fromSequence + 1;
+  const [leaveElectivesForStudentRenewal, setLeaveElectivesForStudentRenewal] = useState(
+    toSequence >= 2 && toSequence <= 7,
+  );
 
   const scope = {
     institutionId,
@@ -82,13 +85,19 @@ export function PromotionWizard({
 
   const applyMut = useMutation({
     mutationFn: async () => {
-      const run = await createPromotionRun({ ...scope, trigger: 'MANUAL' });
+      const run = await createPromotionRun({
+        ...scope,
+        trigger: 'MANUAL',
+        leaveElectivesForStudentRenewal,
+      });
       const runId = (run as { id: string }).id;
       return applyPromotionRun(runId);
     },
     onSuccess: () => {
       setMessage(
-        'Promotion applied — semester standing updated and subject registrations regenerated.',
+        leaveElectivesForStudentRenewal
+          ? 'Promotion applied — drafts created with locked Major/Minor. Students must finish electives in Subject renewal before the window closes.'
+          : 'Promotion applied — semester standing updated and subject registrations completed.',
       );
       onApplied?.();
     },
@@ -111,6 +120,7 @@ export function PromotionWizard({
     setStep(0);
     setMessage('');
     setExpandedStudentId(null);
+    setLeaveElectivesForStudentRenewal(toSequence >= 2 && toSequence <= 7);
   };
 
   return (
@@ -118,7 +128,8 @@ export function PromotionWizard({
       <CardHeader>
         <CardTitle>Semester promotion wizard</CardTitle>
         <CardDescription>
-          Promote students, preview subject mappings from curriculum, and regenerate registrations.
+          Promote students, preview subject mappings, and prepare semester renewals (draft with
+          locked Major/Minor; students choose electives).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -156,7 +167,12 @@ export function PromotionWizard({
                   <select
                     className="h-10 w-full rounded-md border border-border bg-card px-3"
                     value={fromSequence}
-                    onChange={(e) => setFromSequence(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextFrom = Number(e.target.value);
+                      setFromSequence(nextFrom);
+                      const nextTo = nextFrom + 1;
+                      setLeaveElectivesForStudentRenewal(nextTo >= 2 && nextTo <= 7);
+                    }}
                   >
                     {[1, 2, 3, 4, 5, 6, 7].map((n) => (
                       <option key={n} value={n}>
@@ -169,6 +185,22 @@ export function PromotionWizard({
                   <span className="text-muted-foreground">Promote to</span>
                   <p className="text-lg font-semibold">Semester {toSequence}</p>
                 </div>
+                <label className="col-span-full flex items-start gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={leaveElectivesForStudentRenewal}
+                    onChange={(e) => setLeaveElectivesForStudentRenewal(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">Leave electives for student renewal</span>
+                    <span className="mt-0.5 block text-muted-foreground">
+                      Recommended for Sem 2–7. Creates a draft with Major/Minor filled; students
+                      complete AEC/MDC/SEC/VTC–VAC on Subject renewal before the window closes. Turn
+                      off to allocate and complete registrations immediately (legacy).
+                    </span>
+                  </span>
+                </label>
               </div>
             ) : null}
 
@@ -270,10 +302,21 @@ export function PromotionWizard({
                   Promote <span className="font-medium">{eligibleCount}</span> students from Sem{' '}
                   {fromSequence} to Sem {toSequence}.
                 </p>
-                <p className="text-muted-foreground">
-                  This will update standing, archive prior registrations, and regenerate target
-                  semester subjects from curriculum mapping.
-                </p>
+                {leaveElectivesForStudentRenewal ? (
+                  <p className="text-muted-foreground">
+                    This will update standing, archive prior registrations, and create{' '}
+                    <strong>draft</strong> renewals with locked Major/Minor. Students must finish
+                    electives on Subject renewal (portal or mobile) before the registration window
+                    closes. Monitor incomplete renewals under Subject Registration → status
+                    &quot;Renewal incomplete&quot;.
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    This will update standing, archive prior registrations, and allocate/complete
+                    target semester registrations immediately (students cannot edit electives
+                    afterward).
+                  </p>
+                )}
               </div>
             ) : null}
 

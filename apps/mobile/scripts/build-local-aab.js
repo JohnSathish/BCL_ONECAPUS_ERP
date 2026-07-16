@@ -121,8 +121,8 @@ const aabPath = path.join(
 const distDir = path.join(root, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
 if (fs.existsSync(aabPath)) {
-  const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.0.aab');
-  const destR8 = path.join(distDir, 'onecampus-v19-sdk35.aab');
+  const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.0-vc20.aab');
+  const destR8 = path.join(distDir, 'onecampus-v20-sdk35.aab');
   fs.copyFileSync(aabPath, dest);
   fs.copyFileSync(aabPath, destR8);
   console.log('\nAAB:', aabPath);
