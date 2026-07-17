@@ -63,6 +63,7 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { QuestionBankModule } from './modules/question-bank/question-bank.module';
 import { SyllabusRepositoryModule } from './modules/syllabus-repository/syllabus-repository.module';
 import { ShortTermCoursesModule } from './modules/short-term-courses/short-term-courses.module';
+import { DepartmentActivitiesModule } from './modules/department-activities/department-activities.module';
 import { LibraryModule } from './modules/library/library.module';
 import { FrontOfficeModule } from './modules/front-office/front-office.module';
 import { GovernanceModule } from './modules/governance/governance.module';
@@ -157,6 +158,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     QuestionBankModule,
     SyllabusRepositoryModule,
     ShortTermCoursesModule,
+    DepartmentActivitiesModule,
     LibraryModule,
     CampusAccessModule,
     FrontOfficeModule,

@@ -61,6 +61,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         href: '/(student)/short-term-courses',
         keywords: ['cafa', 'bccs', 'certificate', 'course', 'short-term'],
       },
+      {
+        id: 'department-activities',
+        label: 'Department Activities',
+        href: '/(student)/department-activities',
+        keywords: ['seminar', 'workshop', 'activity', 'department', 'event'],
+      },
     ],
   },
   {

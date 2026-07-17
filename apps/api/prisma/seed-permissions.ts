@@ -755,6 +755,42 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
       'Student self-service for short-term course registration and materials',
   },
   {
+    slug: 'department-activities:read',
+    resource: 'department-activities',
+    action: 'read',
+    description: 'View department activities, seminars, and dashboards',
+  },
+  {
+    slug: 'department-activities:manage',
+    resource: 'department-activities',
+    action: 'manage',
+    description: 'Create and manage department activities and registrations',
+  },
+  {
+    slug: 'department-activities:approve',
+    resource: 'department-activities',
+    action: 'approve',
+    description: 'Approve department activities for publication',
+  },
+  {
+    slug: 'department-activities:attend',
+    resource: 'department-activities',
+    action: 'attend',
+    description: 'Mark attendance for department activities',
+  },
+  {
+    slug: 'department-activities:certificates',
+    resource: 'department-activities',
+    action: 'certificates',
+    description: 'Issue participation certificates for department activities',
+  },
+  {
+    slug: 'department-activities:self',
+    resource: 'department-activities',
+    action: 'self',
+    description: 'Student self-service for activity registration and QR pass',
+  },
+  {
     slug: 'syllabus-repository:read',
     resource: 'syllabus-repository',
     action: 'read',

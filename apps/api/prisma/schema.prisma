@@ -1633,6 +1633,7 @@ model Department {
   teachingSubjectGroups TeachingSubjectGroup[]
   recruitmentVacancies RecruitmentVacancy[]
   shiftDepartmentConfigs ShiftDepartmentConfig[]
+  departmentActivities DepartmentActivity[]
 
   @@index([tenantId])
   @@index([institutionId])
@@ -12621,6 +12622,114 @@ model ShortTermCertificateLink {
 
   @@index([tenantId, certificateIssueId])
   @@map("short_term_certificate_links")
+  @@schema("academic")
+}
+
+// ─── Department Activities / Seminars / Certificates bridge ─────────────────
+
+model DepartmentActivity {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  departmentId         String    @map("department_id") @db.Uuid
+  title                String
+  activityType         String    @map("activity_type")
+  academicYearId       String?   @map("academic_year_id") @db.Uuid
+  semesterSequence     Int?      @map("semester_sequence")
+  venue                String    @default("")
+  eventDate            DateTime  @map("event_date") @db.Date
+  startTime            String?   @map("start_time")
+  endTime              String?   @map("end_time")
+  registrationStartsAt DateTime? @map("registration_starts_at")
+  registrationEndsAt   DateTime? @map("registration_ends_at")
+  coordinatorStaffId   String?   @map("coordinator_staff_id") @db.Uuid
+  hodStaffId           String?   @map("hod_staff_id") @db.Uuid
+  guestSpeaker         String    @default("") @map("guest_speaker")
+  chiefGuest           String    @default("") @map("chief_guest")
+  theme                String    @default("")
+  objectives           String    @default("")
+  learningOutcomes     String    @default("") @map("learning_outcomes")
+  description          String    @default("")
+  posterUrl            String?   @map("poster_url")
+  bannerUrl            String?   @map("banner_url")
+  brochureUrl          String?   @map("brochure_url")
+  maxParticipants      Int?      @map("max_participants")
+  status               String    @default("DRAFT")
+  attendanceFinalized  Boolean   @default(false) @map("attendance_finalized")
+  attendanceFinalizedAt DateTime? @map("attendance_finalized_at")
+  createdById          String?   @map("created_by_id") @db.Uuid
+  approvedById         String?   @map("approved_by_id") @db.Uuid
+  approvedAt           DateTime? @map("approved_at")
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  department     Department                        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  registrations  DepartmentActivityRegistration[]
+  certificateLinks DepartmentActivityCertificateLink[]
+
+  @@index([tenantId, departmentId, status])
+  @@index([tenantId, eventDate])
+  @@index([tenantId, activityType])
+  @@map("department_activities")
+  @@schema("academic")
+}
+
+model DepartmentActivityRegistration {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  activityId    String    @map("activity_id") @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  status        String    @default("REGISTERED")
+  qrPassToken   String    @unique @map("qr_pass_token")
+  registeredAt  DateTime  @default(now()) @map("registered_at")
+  withdrawnAt   DateTime? @map("withdrawn_at")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  activity   DepartmentActivity            @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  attendance DepartmentActivityAttendance?
+
+  @@unique([activityId, studentId])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, activityId, status])
+  @@map("department_activity_registrations")
+  @@schema("academic")
+}
+
+model DepartmentActivityAttendance {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  registrationId String   @unique @map("registration_id") @db.Uuid
+  method         String   @default("MANUAL")
+  markedAt       DateTime @default(now()) @map("marked_at")
+  markedById     String?  @map("marked_by_id") @db.Uuid
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  registration DepartmentActivityRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, markedAt])
+  @@map("department_activity_attendance")
+  @@schema("academic")
+}
+
+model DepartmentActivityCertificateLink {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  activityId         String   @map("activity_id") @db.Uuid
+  registrationId     String   @map("registration_id") @db.Uuid
+  certificateIssueId String   @map("certificate_issue_id") @db.Uuid
+  certificateType    String   @default("PARTICIPATION") @map("certificate_type")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  activity DepartmentActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, certificateType])
+  @@index([tenantId, activityId])
+  @@index([tenantId, certificateIssueId])
+  @@map("department_activity_certificate_links")
   @@schema("academic")
 }
 

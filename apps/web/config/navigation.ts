@@ -95,6 +95,7 @@ const P = MODULE_PERMISSIONS;
 const QB = P.questionBank;
 const SR = P.syllabusRepository;
 const STC = P.shortTermCourses;
+const DA = P.departmentActivities;
 const OD = P.officialDocuments;
 
 const QUESTION_BANK_CHILDREN: NavChild[] = [
@@ -896,6 +897,14 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: [...STC],
           },
         ],
+      },
+      {
+        label: 'Department Activities',
+        href: '/admin/academics/department-activities',
+        icon: CalendarDays,
+        module: 'departmentActivities',
+        permissions: [...DA],
+        activePattern: '^/admin/academics/department-activities(?:/.*)?$',
       },
       {
         label: 'Lesson Plans',
@@ -2362,6 +2371,7 @@ export const ROLE_NAV: Record<
     { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
     { label: 'LMS', href: '/student/lms', icon: GraduationCap },
     { label: 'Short-Term Courses', href: '/student/short-term-courses', icon: Award },
+    { label: 'Department Activities', href: '/student/department-activities', icon: CalendarDays },
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },

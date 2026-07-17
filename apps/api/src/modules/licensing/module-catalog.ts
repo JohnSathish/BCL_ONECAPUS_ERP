@@ -140,6 +140,13 @@ export const MODULE_CATALOG: ModuleCatalogEntry[] = [
     description: 'Certificate / short-term course catalogue',
   },
   {
+    key: 'departmentActivities',
+    label: 'Department Activities',
+    category: 'optional',
+    defaultEnabled: true,
+    description: 'Seminars, workshops, attendance, and certificates',
+  },
+  {
     key: 'lms',
     label: 'LMS',
     category: 'optional',
