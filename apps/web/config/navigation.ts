@@ -96,6 +96,7 @@ const QB = P.questionBank;
 const SR = P.syllabusRepository;
 const STC = P.shortTermCourses;
 const DA = P.departmentActivities;
+const CC = P.campusCompetitions;
 const OD = P.officialDocuments;
 
 const QUESTION_BANK_CHILDREN: NavChild[] = [
@@ -905,6 +906,14 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'departmentActivities',
         permissions: [...DA],
         activePattern: '^/admin/academics/department-activities(?:/.*)?$',
+      },
+      {
+        label: 'Campus Competitions',
+        href: '/admin/campus-competitions',
+        icon: Award,
+        module: 'campusCompetitions',
+        permissions: [...CC],
+        activePattern: '^/admin/campus-competitions(?:/.*)?$',
       },
       {
         label: 'Lesson Plans',
@@ -2377,6 +2386,7 @@ export const ROLE_NAV: Record<
       href: '/student/department-activities/transcript',
       icon: Award,
     },
+    { label: 'Campus Competitions', href: '/student/campus-competitions', icon: Award },
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },

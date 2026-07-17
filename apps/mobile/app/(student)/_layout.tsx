@@ -67,6 +67,7 @@ export default function StudentLayout() {
           <Stack.Screen name="feedback" />
           <Stack.Screen name="certificates" />
           <Stack.Screen name="department-activities" />
+          <Stack.Screen name="campus-competitions" />
           <Stack.Screen name="notification-preferences" />
           <Stack.Screen name="about" />
           <Stack.Screen name="account-deletion" />

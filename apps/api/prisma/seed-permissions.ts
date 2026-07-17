@@ -791,6 +791,48 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Student self-service for activity registration and QR pass',
   },
   {
+    slug: 'campus-competitions:read',
+    resource: 'campus-competitions',
+    action: 'read',
+    description: 'View houses, meets, leaderboards, and competition reports',
+  },
+  {
+    slug: 'campus-competitions:manage',
+    resource: 'campus-competitions',
+    action: 'manage',
+    description: 'Create and manage houses, meets, events, and teams',
+  },
+  {
+    slug: 'campus-competitions:allocate',
+    resource: 'campus-competitions',
+    action: 'allocate',
+    description: 'Allocate and transfer students between houses',
+  },
+  {
+    slug: 'campus-competitions:score',
+    resource: 'campus-competitions',
+    action: 'score',
+    description: 'Enter and publish competition results',
+  },
+  {
+    slug: 'campus-competitions:approve',
+    resource: 'campus-competitions',
+    action: 'approve',
+    description: 'Approve published competition results',
+  },
+  {
+    slug: 'campus-competitions:certificates',
+    resource: 'campus-competitions',
+    action: 'certificates',
+    description: 'Issue competition participation and place certificates',
+  },
+  {
+    slug: 'campus-competitions:self',
+    resource: 'campus-competitions',
+    action: 'self',
+    description: 'Student self-service for house view and event registration',
+  },
+  {
     slug: 'syllabus-repository:read',
     resource: 'syllabus-repository',
     action: 'read',

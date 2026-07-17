@@ -147,6 +147,14 @@ export const MODULE_CATALOG: ModuleCatalogEntry[] = [
     description: 'Seminars, workshops, attendance, and certificates',
   },
   {
+    key: 'campusCompetitions',
+    label: 'Campus Competitions',
+    category: 'optional',
+    defaultEnabled: true,
+    description:
+      'Houses, sports meets, cultural competitions, scoring, and certificates',
+  },
+  {
     key: 'lms',
     label: 'LMS',
     category: 'optional',

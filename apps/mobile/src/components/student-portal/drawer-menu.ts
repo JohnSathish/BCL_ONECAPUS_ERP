@@ -73,6 +73,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         href: '/(student)/department-activities',
         keywords: ['transcript', 'achievement', 'certificate', 'share'],
       },
+      {
+        id: 'campus-competitions',
+        label: 'Campus Competitions',
+        href: '/(student)/campus-competitions',
+        keywords: ['house', 'sports', 'meet', 'competition', 'leaderboard'],
+      },
     ],
   },
   {

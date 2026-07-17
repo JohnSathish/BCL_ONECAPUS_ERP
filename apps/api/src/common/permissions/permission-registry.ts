@@ -69,6 +69,15 @@ export const MODULE_PERMISSIONS = {
     'department-activities:certificates',
     'department-activities:self',
   ],
+  campusCompetitions: [
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:allocate',
+    'campus-competitions:score',
+    'campus-competitions:approve',
+    'campus-competitions:certificates',
+    'campus-competitions:self',
+  ],
   studentAttendance: ['students:read', 'students:manage', 'academic:read'],
   staffAttendance: [
     'staff-attendance:view',
@@ -276,6 +285,12 @@ export const ERP_MODULES: ErpModule[] = [
     label: 'Department Activities',
     permissions: MODULE_PERMISSIONS.departmentActivities,
     defaultHome: '/admin/academics/department-activities',
+  },
+  {
+    id: 'campusCompetitions',
+    label: 'Campus Competitions',
+    permissions: MODULE_PERMISSIONS.campusCompetitions,
+    defaultHome: '/admin/campus-competitions',
   },
   {
     id: 'studentAttendance',
@@ -659,6 +674,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   {
     prefix: '/admin/academics/department-activities',
     permissions: [...MODULE_PERMISSIONS.departmentActivities],
+  },
+  {
+    prefix: '/admin/campus-competitions',
+    permissions: [...MODULE_PERMISSIONS.campusCompetitions],
   },
   {
     prefix: '/admin/academics/attendance',
