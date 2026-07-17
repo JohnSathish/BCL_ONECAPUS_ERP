@@ -2372,6 +2372,11 @@ export const ROLE_NAV: Record<
     { label: 'LMS', href: '/student/lms', icon: GraduationCap },
     { label: 'Short-Term Courses', href: '/student/short-term-courses', icon: Award },
     { label: 'Department Activities', href: '/student/department-activities', icon: CalendarDays },
+    {
+      label: 'Activity transcript',
+      href: '/student/department-activities/transcript',
+      icon: Award,
+    },
     { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
     { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
     { label: 'Library', href: '/student/library', icon: Library },

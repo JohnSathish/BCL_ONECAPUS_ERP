@@ -338,6 +338,115 @@ export async function updateActivityReport(
   return data;
 }
 
+export type TranscriptCertificate = {
+  certificateLinkId: string;
+  certificateType: string;
+  certificateNo?: string | null;
+  status?: string | null;
+  verificationToken?: string | null;
+  verifyUrl?: string | null;
+  issuedAt?: string | null;
+  hasIntegritySeal?: boolean;
+};
+
+export type TranscriptEntry = {
+  registrationId: string;
+  registrationStatus: string;
+  registeredAt?: string | null;
+  attended: boolean;
+  attendanceMarkedAt?: string | null;
+  activity: {
+    id: string;
+    title: string;
+    activityType: string;
+    activityTypeLabel: string;
+    eventDate: string;
+    venue?: string | null;
+    status: string;
+    department?: { id: string; name: string; code: string };
+  };
+  result?: {
+    position: string;
+    positionLabel: string;
+    remarks?: string | null;
+  } | null;
+  presentation?: {
+    id: string;
+    topicTitle: string;
+    status: string;
+  } | null;
+  certificates: TranscriptCertificate[];
+};
+
+export type ActivityTranscript = {
+  student: {
+    id: string;
+    name?: string | null;
+    enrollmentNumber?: string | null;
+    rollNumber?: string | null;
+  };
+  summary: {
+    total: number;
+    attended: number;
+    withCertificates: number;
+    awards: number;
+  };
+  entries: TranscriptEntry[];
+};
+
+export type AchievementShareResult = {
+  shareToken: string;
+  shareUrl: string;
+  visibility: string;
+  createdAt: string;
+};
+
+export type PublicAchievement = {
+  shareToken: string;
+  studentName: string;
+  activityTitle: string;
+  activityType: string;
+  activityTypeLabel: string;
+  achievementLabel: string;
+  certificateType: string;
+  departmentName?: string | null;
+  eventDate: string;
+  collegeName?: string | null;
+  certificateNo?: string | null;
+  issuedAt?: string | null;
+  revoked: boolean;
+  verifyUrl?: string | null;
+  hasIntegritySeal?: boolean;
+};
+
+export async function fetchMyTranscript(params?: {
+  activityType?: string;
+  academicYear?: string;
+  hasCertificate?: boolean;
+}): Promise<ActivityTranscript> {
+  const { data } = await api.get(`${base}/me/transcript`, {
+    params: {
+      activityType: params?.activityType,
+      academicYear: params?.academicYear,
+      hasCertificate:
+        params?.hasCertificate === undefined ? undefined : params.hasCertificate ? 'true' : 'false',
+    },
+  });
+  return data;
+}
+
+export async function createAchievementShare(
+  certificateLinkId: string,
+): Promise<AchievementShareResult> {
+  const { data } = await api.post(`${base}/me/achievements/${certificateLinkId}/share`, {});
+  return data;
+}
+
+export async function fetchPublicAchievement(shareToken: string): Promise<PublicAchievement> {
+  const { data } = await api.get(`${base}/achievements/${shareToken}`);
+  return data;
+}
+
 export function positionLabel(position: string) {
   return position
     .split('_')

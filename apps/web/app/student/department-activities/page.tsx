@@ -284,10 +284,15 @@ export default function StudentDepartmentActivitiesPage() {
           title="Department Activities"
           subtitle="Register for seminars, workshops, and competitions. Show your QR pass at the venue for attendance."
           actions={
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left backdrop-blur">
-              <p className="text-[11px] uppercase tracking-wide text-sky-100">Open now</p>
-              <p className="text-2xl font-semibold tabular-nums">{openActivities.length}</p>
-              <p className="text-xs text-slate-300">activities accepting registration</p>
+            <div className="flex flex-col items-end gap-3">
+              <Button size="sm" variant="secondary" type="button" asChild>
+                <Link href="/student/department-activities/transcript">Activity transcript</Link>
+              </Button>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left backdrop-blur">
+                <p className="text-[11px] uppercase tracking-wide text-sky-100">Open now</p>
+                <p className="text-2xl font-semibold tabular-nums">{openActivities.length}</p>
+                <p className="text-xs text-slate-300">activities accepting registration</p>
+              </div>
             </div>
           }
         />

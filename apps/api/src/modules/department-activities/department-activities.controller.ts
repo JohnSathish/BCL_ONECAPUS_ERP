@@ -10,6 +10,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import {
@@ -28,12 +29,14 @@ import {
 } from './dto/department-activities.dto';
 import { DepartmentActivitiesPhase2Service } from './services/department-activities-phase2.service';
 import { DepartmentActivitiesService } from './services/department-activities.service';
+import { DepartmentActivitiesTranscriptService } from './services/department-activities-transcript.service';
 
 @Controller('department-activities')
 export class DepartmentActivitiesController {
   constructor(
     private readonly service: DepartmentActivitiesService,
     private readonly phase2: DepartmentActivitiesPhase2Service,
+    private readonly transcript: DepartmentActivitiesTranscriptService,
   ) {}
 
   @Get('types')
@@ -113,6 +116,66 @@ export class DepartmentActivitiesController {
   @RequireAnyPermission('department-activities:self', 'student:portal:self')
   myRegistrations(@CurrentUser() user: JwtUser) {
     return this.service.myRegistrations(user);
+  }
+
+  @Get('me/transcript')
+  @RequireAnyPermission('department-activities:self', 'student:portal:self')
+  myTranscript(
+    @CurrentUser() user: JwtUser,
+    @Query('activityType') activityType?: string,
+    @Query('academicYear') academicYear?: string,
+    @Query('hasCertificate') hasCertificate?: string,
+  ) {
+    return this.transcript.getMyTranscript(user, {
+      activityType,
+      academicYear,
+      hasCertificate:
+        hasCertificate === 'true' || hasCertificate === '1'
+          ? true
+          : hasCertificate === 'false' || hasCertificate === '0'
+            ? false
+            : undefined,
+    });
+  }
+
+  @Get('students/:studentId/transcript')
+  @RequireAnyPermission(
+    'department-activities:read',
+    'department-activities:manage',
+    'department-activities:approve',
+  )
+  studentTranscript(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Query('activityType') activityType?: string,
+    @Query('academicYear') academicYear?: string,
+    @Query('hasCertificate') hasCertificate?: string,
+  ) {
+    return this.transcript.getStudentTranscript(user, studentId, {
+      activityType,
+      academicYear,
+      hasCertificate:
+        hasCertificate === 'true' || hasCertificate === '1'
+          ? true
+          : hasCertificate === 'false' || hasCertificate === '0'
+            ? false
+            : undefined,
+    });
+  }
+
+  @Post('me/achievements/:certificateLinkId/share')
+  @RequireAnyPermission('department-activities:self', 'student:portal:self')
+  createAchievementShare(
+    @CurrentUser() user: JwtUser,
+    @Param('certificateLinkId') certificateLinkId: string,
+  ) {
+    return this.transcript.createAchievementShare(user, certificateLinkId);
+  }
+
+  @Public()
+  @Get('achievements/:shareToken')
+  getPublicAchievement(@Param('shareToken') shareToken: string) {
+    return this.transcript.getPublicAchievement(shareToken);
   }
 
   @Get()

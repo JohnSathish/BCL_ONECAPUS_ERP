@@ -1209,6 +1209,16 @@ function VerificationPanel({
             <p className="mt-2 break-all rounded-xl bg-slate-50 p-2 text-xs">
               /verify/certificates/{issue.verificationToken}
             </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Integrity:{' '}
+              {issue.contentHash ? (
+                <span className="font-medium text-emerald-700">sealed</span>
+              ) : (
+                <span className="font-medium text-amber-700">legacy</span>
+              )}
+              {' · '}
+              Verifications: {issue._count?.verifications ?? 0}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="outline" onClick={() => onPrint(issue.id)}>
                 <Printer className="mr-1.5 h-3.5 w-3.5" />

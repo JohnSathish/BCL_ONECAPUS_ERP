@@ -67,6 +67,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         href: '/(student)/department-activities',
         keywords: ['seminar', 'workshop', 'activity', 'department', 'event'],
       },
+      {
+        id: 'activity-transcript',
+        label: 'Activity transcript',
+        href: '/(student)/department-activities',
+        keywords: ['transcript', 'achievement', 'certificate', 'share'],
+      },
     ],
   },
   {

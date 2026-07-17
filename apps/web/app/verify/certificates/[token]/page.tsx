@@ -41,6 +41,22 @@ export default async function PublicCertificateVerificationPage({ params }: Prop
           />
           <Info label="Institution" value={data?.institution ?? 'Unavailable'} />
           <Info label="Status" value={data?.status ?? 'INVALID'} />
+          <Info
+            label="Integrity"
+            value={
+              data?.integrityOk === true
+                ? 'Seal verified'
+                : data?.integrityOk === false
+                  ? 'Seal mismatch'
+                  : data?.contentHash
+                    ? 'Hash present'
+                    : 'Legacy (no seal)'
+            }
+          />
+          <Info
+            label="Verification count"
+            value={data?.verificationCount != null ? String(data.verificationCount) : 'Unavailable'}
+          />
         </div>
       </section>
     </main>

@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { CertificateDocumentService } from '../../certificates/certificate-document.service';
+import { CertificateIntegrityService } from '../../certificates/certificate-integrity.service';
 import { CertificateVariableService } from '../../certificates/certificate-variable.service';
 import {
   ACTIVITY_STATUSES,
@@ -45,6 +46,7 @@ export class DepartmentActivitiesService {
     private readonly prisma: PrismaService,
     private readonly variables: CertificateVariableService,
     private readonly documents: CertificateDocumentService,
+    private readonly integrity: CertificateIntegrityService,
   ) {}
 
   private db() {
@@ -752,8 +754,39 @@ h2{text-align:center;letter-spacing:3px;margin:18px 0;font-size:18px;text-decora
           metadata: { htmlPath: document.htmlPath, pdfPath: document.pdfPath },
         },
       });
+      await this.integrity.sealIssuedDocument({
+        tenantId: user.tid,
+        issueId: issue.id,
+        certificateNo: issue.certificateNo,
+        verificationToken: issue.verificationToken,
+        publicPath: document.primaryPath,
+        actorId: user.sub,
+        writeAudit: true,
+        metadata: {
+          source: 'department_activity',
+          activityId: activity.id,
+          certificateType: 'PARTICIPATION',
+          registrationId: registration.id,
+        },
+      });
     } catch {
       /* PDF optional if puppeteer unavailable */
+      await this.integrity.sealIssuedDocument({
+        tenantId: user.tid,
+        issueId: issue.id,
+        certificateNo: issue.certificateNo,
+        verificationToken: issue.verificationToken,
+        publicPath: null,
+        actorId: user.sub,
+        writeAudit: true,
+        metadata: {
+          source: 'department_activity',
+          activityId: activity.id,
+          certificateType: 'PARTICIPATION',
+          registrationId: registration.id,
+          pdfSkipped: true,
+        },
+      });
     }
 
     const link = await this.db().departmentActivityCertificateLink.create({

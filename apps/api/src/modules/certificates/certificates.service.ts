@@ -22,6 +22,7 @@ import type {
 } from './dto/certificates.dto';
 import { CertificateVariableService } from './certificate-variable.service';
 import { CertificateDocumentService } from './certificate-document.service';
+import { CertificateIntegrityService } from './certificate-integrity.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import {
   evaluateProfileSoftGateFromPrisma,
@@ -55,6 +56,7 @@ export class CertificatesService {
     private readonly prisma: PrismaService,
     private readonly variables: CertificateVariableService,
     private readonly documents: CertificateDocumentService,
+    private readonly integrity: CertificateIntegrityService,
     private readonly communication: CommunicationTriggerService,
   ) {}
 
@@ -609,7 +611,11 @@ export class CertificatesService {
         ...(query.categoryId ? { categoryId: query.categoryId } : {}),
         ...(query.studentId ? { studentId: query.studentId } : {}),
       },
-      include: { category: true, request: true },
+      include: {
+        category: true,
+        request: true,
+        _count: { select: { verifications: true } },
+      },
       orderBy: { issuedAt: 'desc' },
       take: 500,
     });
@@ -880,12 +886,24 @@ export class CertificatesService {
       issue.id,
       renderedHtml,
     );
-    const withDocument = await this.db().certificateIssue.update({
+    await this.db().certificateIssue.update({
       where: { id: issue.id },
       data: {
         pdfPath: document.primaryPath,
         metadata: { htmlPath: document.htmlPath, pdfPath: document.pdfPath },
       },
+    });
+    await this.integrity.sealIssuedDocument({
+      tenantId: user.tid,
+      issueId: issue.id,
+      certificateNo: issue.certificateNo,
+      verificationToken: issue.verificationToken,
+      publicPath: document.primaryPath,
+      actorId: user.sub,
+      writeAudit: false,
+    });
+    const withDocument = await this.db().certificateIssue.findFirst({
+      where: { id: issue.id },
       include: { category: true, template: true },
     });
 
@@ -899,6 +917,10 @@ export class CertificatesService {
       issueId: issue.id,
       requestId: dto.requestId,
       after: withDocument,
+      metadata: {
+        contentHash: withDocument?.contentHash ?? null,
+        integritySealed: Boolean(withDocument?.contentHash),
+      },
     });
     void this.notifyCertificateIssued(user.tid, withDocument);
     return withDocument;
@@ -996,7 +1018,10 @@ export class CertificatesService {
   ) {
     const issue = await this.db().certificateIssue.findFirst({
       where: { verificationToken: token },
-      include: { category: true },
+      include: {
+        category: true,
+        _count: { select: { verifications: true } },
+      },
     });
     if (!issue) throw new NotFoundException('Certificate not found');
     await this.db().certificateVerification.create({
@@ -1009,6 +1034,7 @@ export class CertificatesService {
         userAgent: meta.userAgent,
       },
     });
+    const integrityOk = this.integrity.checkIntegrity(issue);
     return {
       valid: issue.status === 'ISSUED',
       status: issue.status,
@@ -1018,6 +1044,9 @@ export class CertificatesService {
       programme: issue.variableSnapshot?.programme,
       issueDate: issue.issuedAt,
       institution: issue.variableSnapshot?.college_name,
+      contentHash: issue.contentHash ?? null,
+      integrityOk,
+      verificationCount: (issue._count?.verifications ?? 0) + 1,
     };
   }
 

@@ -5,6 +5,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -12,10 +13,13 @@ import {
 import { Link } from 'expo-router';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import {
+  createAchievementShare,
+  fetchMyActivityTranscript,
   fetchMyDepartmentActivityRegistrations,
   fetchOpenDepartmentActivities,
   registerForDepartmentActivity,
   withdrawDepartmentActivity,
+  type ActivityTranscript,
   type DeptActivity,
   type DeptActivityRegistration,
 } from '@/services/department-activities';
@@ -25,17 +29,20 @@ export default function DepartmentActivitiesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [open, setOpen] = useState<DeptActivity[]>([]);
   const [mine, setMine] = useState<DeptActivityRegistration[]>([]);
+  const [transcript, setTranscript] = useState<ActivityTranscript | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const [openList, myList] = await Promise.all([
+      const [openList, myList, transcriptData] = await Promise.all([
         fetchOpenDepartmentActivities(),
         fetchMyDepartmentActivityRegistrations(),
+        fetchMyActivityTranscript().catch(() => null),
       ]);
       setOpen(openList ?? []);
       setMine(myList ?? []);
+      setTranscript(transcriptData);
       setMessage('');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Unable to load activities');
@@ -69,6 +76,21 @@ export default function DepartmentActivitiesScreen() {
       await load();
     } catch (e) {
       Alert.alert('Withdraw', e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const shareAchievement = async (certificateLinkId: string, title: string) => {
+    setBusyId(certificateLinkId);
+    try {
+      const result = await createAchievementShare(certificateLinkId);
+      await Share.share({
+        message: `${title}\n${result.shareUrl}`,
+        url: result.shareUrl,
+      });
+    } catch (e) {
+      Alert.alert('Share', e instanceof Error ? e.message : 'Unable to share');
     } finally {
       setBusyId(null);
     }
@@ -140,6 +162,48 @@ export default function DepartmentActivitiesScreen() {
                     <Text style={styles.btnGhostText}>Withdraw</Text>
                   </Pressable>
                 ) : null}
+              </View>
+            ))
+          )}
+
+          <Text style={styles.heading}>Activity transcript</Text>
+          {transcript ? (
+            <Text style={styles.meta}>
+              {transcript.summary.total} activities · {transcript.summary.attended} attended ·{' '}
+              {transcript.summary.withCertificates} certificates
+            </Text>
+          ) : null}
+          {!transcript || transcript.entries.length === 0 ? (
+            <Text style={styles.empty}>No transcript entries yet.</Text>
+          ) : (
+            transcript.entries.map((entry) => (
+              <View key={entry.registrationId} style={styles.card}>
+                <Text style={styles.title}>{entry.activity.title}</Text>
+                <Text style={styles.meta}>
+                  {entry.activity.activityTypeLabel}
+                  {entry.activity.department?.name ? ` · ${entry.activity.department.name}` : ''}
+                </Text>
+                <Text style={styles.meta}>
+                  {new Date(entry.activity.eventDate).toLocaleDateString()}
+                  {entry.attended ? ' · Attended' : ''}
+                  {entry.result ? ` · ${entry.result.positionLabel}` : ''}
+                </Text>
+                {entry.certificates.map((cert) => (
+                  <Pressable
+                    key={cert.certificateLinkId}
+                    style={[styles.btn, styles.btnGhost]}
+                    disabled={busyId === cert.certificateLinkId}
+                    onPress={() =>
+                      void shareAchievement(cert.certificateLinkId, entry.activity.title)
+                    }
+                  >
+                    <Text style={styles.btnGhostText}>
+                      {busyId === cert.certificateLinkId
+                        ? 'Preparing…'
+                        : `Share ${cert.certificateType === 'PARTICIPATION' ? 'participation' : 'award'}`}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
             ))
           )}

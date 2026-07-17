@@ -71,8 +71,11 @@ export type CertificateIssue = {
   renderedHtml?: string | null;
   qrPayload?: string | null;
   verificationToken: string;
+  contentHash?: string | null;
+  integritySignature?: string | null;
   issuedAt: string;
   category?: CertificateCategory;
+  _count?: { verifications?: number };
 };
 
 export type CertificateDashboard = {
@@ -101,4 +104,7 @@ export type CertificateVerificationResult = {
   programme: string;
   issueDate: string;
   institution: string;
+  contentHash?: string | null;
+  integrityOk?: boolean | null;
+  verificationCount?: number;
 };

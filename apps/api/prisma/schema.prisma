@@ -7897,17 +7897,19 @@ model CertificateIssue {
   status            String    @default("ISSUED")
   renderedHtml      String?   @map("rendered_html")
   pdfPath           String?   @map("pdf_path")
-  qrPayload         String?   @map("qr_payload")
-  verificationToken String    @unique @map("verification_token")
-  variableSnapshot  Json      @default("{}") @map("variable_snapshot")
-  issuedById        String?   @map("issued_by_id") @db.Uuid
-  issuedAt          DateTime  @default(now()) @map("issued_at")
-  revokedAt         DateTime? @map("revoked_at")
-  revokedById       String?   @map("revoked_by_id") @db.Uuid
-  revokeReason      String?   @map("revoke_reason")
-  metadata          Json?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  qrPayload           String?   @map("qr_payload")
+  verificationToken   String    @unique @map("verification_token")
+  variableSnapshot    Json      @default("{}") @map("variable_snapshot")
+  contentHash         String?   @map("content_hash")
+  integritySignature  String?   @map("integrity_signature")
+  issuedById          String?   @map("issued_by_id") @db.Uuid
+  issuedAt            DateTime  @default(now()) @map("issued_at")
+  revokedAt           DateTime? @map("revoked_at")
+  revokedById         String?   @map("revoked_by_id") @db.Uuid
+  revokeReason        String?   @map("revoke_reason")
+  metadata            Json?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   category      CertificateCategory       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   template      CertificateTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
@@ -12734,12 +12736,31 @@ model DepartmentActivityCertificateLink {
   certificateType    String   @default("PARTICIPATION") @map("certificate_type")
   createdAt          DateTime @default(now()) @map("created_at")
 
-  activity DepartmentActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  activity     DepartmentActivity                     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  achievementShares DepartmentActivityAchievementShare[]
 
   @@unique([registrationId, certificateType])
   @@index([tenantId, activityId])
   @@index([tenantId, certificateIssueId])
   @@map("department_activity_certificate_links")
+  @@schema("academic")
+}
+
+model DepartmentActivityAchievementShare {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  studentId         String    @map("student_id") @db.Uuid
+  certificateLinkId String    @map("certificate_link_id") @db.Uuid
+  shareToken        String    @unique @map("share_token")
+  visibility        String    @default("UNLISTED")
+  expiresAt         DateTime? @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  certificateLink DepartmentActivityCertificateLink @relation(fields: [certificateLinkId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, certificateLinkId])
+  @@map("department_activity_achievement_shares")
   @@schema("academic")
 }
 

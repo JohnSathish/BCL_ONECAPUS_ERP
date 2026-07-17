@@ -5,6 +5,7 @@ import { CertificatesController } from './certificates.controller';
 import { CertificatesService } from './certificates.service';
 import { CertificateVariableService } from './certificate-variable.service';
 import { CertificateDocumentService } from './certificate-document.service';
+import { CertificateIntegrityService } from './certificate-integrity.service';
 import { CertificateAssetsService } from './certificate-assets.service';
 
 @Module({
@@ -14,12 +15,14 @@ import { CertificateAssetsService } from './certificate-assets.service';
     CertificatesService,
     CertificateVariableService,
     CertificateDocumentService,
+    CertificateIntegrityService,
     CertificateAssetsService,
   ],
   exports: [
     CertificatesService,
     CertificateVariableService,
     CertificateDocumentService,
+    CertificateIntegrityService,
   ],
 })
 export class CertificatesModule {}
