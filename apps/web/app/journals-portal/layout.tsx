@@ -1,18 +1,26 @@
-import { Inter, Source_Serif_4 } from 'next/font/google';
+import localFont from 'next/font/local';
 import type { Metadata } from 'next';
 import { JOURNALS_PUBLIC_URL } from '@/lib/journals-host';
 import './journals-portal.css';
 
-const jpDisplay = Source_Serif_4({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
+/** Self-hosted fonts — Google Fonts fetch fails in Docker/VPS builds (ETIMEDOUT). */
+const jpDisplay = localFont({
+  src: [
+    { path: './fonts/source-serif-4-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/source-serif-4-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/source-serif-4-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-jp-display',
   display: 'swap',
 });
 
-const jpSans = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const jpSans = localFont({
+  src: [
+    { path: './fonts/inter-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/inter-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/inter-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/inter-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-jp-sans',
   display: 'swap',
 });
