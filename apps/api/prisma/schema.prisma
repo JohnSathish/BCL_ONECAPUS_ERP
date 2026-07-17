@@ -12934,6 +12934,9 @@ model CompetitionMeet {
   description        String    @default("")
   status             String    @default("DRAFT")
   leaderboardVersion Int       @default(0) @map("leaderboard_version")
+  displayToken       String?   @unique @map("display_token")
+  liveEventId        String?   @map("live_event_id") @db.Uuid
+  requireResultApproval Boolean @default(true) @map("require_result_approval")
   createdById        String?   @map("created_by_id") @db.Uuid
   metadata           Json      @default("{}")
   createdAt          DateTime  @default(now()) @map("created_at")
@@ -12946,6 +12949,7 @@ model CompetitionMeet {
   medals       CompetitionMedal[]
   certificateLinks CompetitionCertificateLink[]
   media        CompetitionMedia[]
+  announcements CompetitionAnnouncement[]
 
   @@index([tenantId, status])
   @@index([tenantId, meetType, startsAt])
@@ -13240,6 +13244,23 @@ model CompetitionMedia {
   @@index([tenantId, meetId])
   @@index([tenantId, houseId])
   @@map("competition_media")
+  @@schema("academic")
+}
+
+model CompetitionAnnouncement {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  meetId      String    @map("meet_id") @db.Uuid
+  message     String
+  severity    String    @default("INFO")
+  createdById String?   @map("created_by_id") @db.Uuid
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  meet CompetitionMeet @relation(fields: [meetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, meetId, createdAt])
+  @@map("competition_announcements")
   @@schema("academic")
 }
 

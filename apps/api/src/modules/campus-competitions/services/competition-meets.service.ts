@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import {
@@ -21,12 +22,14 @@ import type {
   UpsertPointRulesDto,
 } from '../dto/campus-competitions.dto';
 import { CompetitionHousesService } from './competition-houses.service';
+import { CompetitionRealtimePublisher } from './competition-realtime.publisher';
 
 @Injectable()
 export class CompetitionMeetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly houses: CompetitionHousesService,
+    private readonly realtime: CompetitionRealtimePublisher,
   ) {}
 
   private db() {
@@ -92,6 +95,8 @@ export class CompetitionMeetsService {
         theme: dto.theme?.trim() ?? '',
         description: dto.description?.trim() ?? '',
         status: 'DRAFT',
+        displayToken: randomUUID().replace(/-/g, ''),
+        requireResultApproval: true,
         createdById: user.sub,
       },
     });
@@ -473,6 +478,81 @@ export class CompetitionMeetsService {
         _count: { select: { events: true } },
       },
       orderBy: { startsAt: 'asc' },
+    });
+  }
+
+  async ensureDisplayToken(user: JwtUser, meetId: string) {
+    this.requireManage(user);
+    const meet = await this.getMeet(user, meetId);
+    if (meet.displayToken) return meet;
+    return this.db().competitionMeet.update({
+      where: { id: meetId },
+      data: { displayToken: randomUUID().replace(/-/g, '') },
+    });
+  }
+
+  async setLiveEvent(
+    user: JwtUser,
+    meetId: string,
+    liveEventId: string | null,
+  ) {
+    this.requireManage(user);
+    await this.getMeet(user, meetId);
+    if (liveEventId) {
+      const event = await this.db().competitionEvent.findFirst({
+        where: { id: liveEventId, meetId, tenantId: user.tid, deletedAt: null },
+      });
+      if (!event) throw new NotFoundException('Event not found for this meet');
+    }
+    const meet = await this.db().competitionMeet.update({
+      where: { id: meetId },
+      data: { liveEventId },
+    });
+    this.realtime.publish(user.tid, 'competition:live-event', {
+      meetId,
+      liveEventId,
+      leaderboardVersion: meet.leaderboardVersion,
+    });
+    return meet;
+  }
+
+  async createAnnouncement(
+    user: JwtUser,
+    meetId: string,
+    message: string,
+    severity = 'INFO',
+  ) {
+    if (
+      !this.hasPermission(user, 'campus-competitions:manage') &&
+      !this.hasPermission(user, 'campus-competitions:score')
+    ) {
+      throw new ForbiddenException('Permission required');
+    }
+    await this.getMeet(user, meetId);
+    const row = await this.db().competitionAnnouncement.create({
+      data: {
+        tenantId: user.tid,
+        meetId,
+        message: message.trim(),
+        severity,
+        createdById: user.sub,
+      },
+    });
+    this.realtime.publish(user.tid, 'competition:announcement', {
+      meetId,
+      id: row.id,
+      message: row.message,
+      severity: row.severity,
+      createdAt: row.createdAt,
+    });
+    return row;
+  }
+
+  listAnnouncements(user: JwtUser, meetId: string) {
+    return this.db().competitionAnnouncement.findMany({
+      where: { tenantId: user.tid, meetId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 }

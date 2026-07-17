@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   RequireAnyPermission,
   RequirePermissions,
@@ -43,6 +44,12 @@ export class CampusCompetitionsController {
     private readonly meets: CompetitionMeetsService,
     private readonly scoring: CompetitionScoringService,
   ) {}
+
+  @Public()
+  @Get('display/:token/live')
+  publicLiveBoard(@Param('token') token: string) {
+    return this.scoring.publicLiveBoard(token);
+  }
 
   @Get('meet-types')
   @RequireAnyPermission(
@@ -304,6 +311,66 @@ export class CampusCompetitionsController {
     return this.scoring.leaderboard(user, id);
   }
 
+  @Get('meets/:id/live')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+    'campus-competitions:self',
+    'student:portal:self',
+  )
+  liveBoard(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.liveBoard(user, id);
+  }
+
+  @Post('meets/:id/display-token')
+  @RequirePermissions('campus-competitions:manage')
+  ensureDisplayToken(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.meets.ensureDisplayToken(user, id);
+  }
+
+  @Post('meets/:id/live-event')
+  @RequireAnyPermission(
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  setLiveEvent(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { liveEventId?: string | null },
+  ) {
+    return this.meets.setLiveEvent(user, id, body.liveEventId ?? null);
+  }
+
+  @Get('meets/:id/announcements')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+    'campus-competitions:self',
+  )
+  listAnnouncements(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.meets.listAnnouncements(user, id);
+  }
+
+  @Post('meets/:id/announcements')
+  @RequireAnyPermission(
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  createAnnouncement(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { message: string; severity?: string },
+  ) {
+    return this.meets.createAnnouncement(
+      user,
+      id,
+      body.message ?? '',
+      body.severity ?? 'INFO',
+    );
+  }
+
   @Get('meets/:id/medals')
   @RequireAnyPermission(
     'campus-competitions:read',
@@ -442,5 +509,29 @@ export class CampusCompetitionsController {
     @Param('eventId') eventId: string,
   ) {
     return this.scoring.publishEventResults(user, eventId);
+  }
+
+  @Post('events/:eventId/results/submit')
+  @RequireAnyPermission(
+    'campus-competitions:score',
+    'campus-competitions:manage',
+  )
+  submitResults(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.scoring.submitResultsForApproval(user, eventId);
+  }
+
+  @Post('events/:eventId/results/approve')
+  @RequireAnyPermission(
+    'campus-competitions:approve',
+    'campus-competitions:manage',
+  )
+  approveResults(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.scoring.approveAndPublishResults(user, eventId);
   }
 }

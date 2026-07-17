@@ -163,6 +163,7 @@ export function canAccessPath(roles: string[], path: string, permissions: string
     '/change-password',
     '/access-denied',
     '/verify',
+    '/tv',
     '/request-demo',
     '/careers-portal',
     '/kiosk',

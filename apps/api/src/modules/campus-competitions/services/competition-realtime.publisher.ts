@@ -1,6 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
+export type CompetitionRealtimeEvent =
+  | 'competition:leaderboard'
+  | 'competition:result'
+  | 'competition:medals'
+  | 'competition:announcement'
+  | 'competition:live-event';
+
 @Injectable()
 export class CompetitionRealtimePublisher {
   private readonly logger = new Logger(CompetitionRealtimePublisher.name);
@@ -9,15 +16,15 @@ export class CompetitionRealtimePublisher {
 
   publish(
     tenantId: string,
-    event:
-      | 'competition:leaderboard'
-      | 'competition:result'
-      | 'competition:medals'
-      | 'competition:announcement',
+    event: CompetitionRealtimeEvent,
     payload: Record<string, unknown>,
   ) {
     try {
       this.realtime?.broadcastToTenant(tenantId, event, payload);
+      const meetId = payload.meetId;
+      if (typeof meetId === 'string' && meetId.length > 0) {
+        this.realtime?.broadcastToRoom(`meet:${meetId}`, event, payload);
+      }
     } catch (error) {
       this.logger.warn(
         `Realtime publish skipped (${event}): ${

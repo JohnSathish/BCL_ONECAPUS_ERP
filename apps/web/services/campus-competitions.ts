@@ -23,6 +23,9 @@ export type CompetitionMeet = {
   status: string;
   leaderboardVersion?: number;
   theme?: string;
+  displayToken?: string | null;
+  liveEventId?: string | null;
+  requireResultApproval?: boolean;
   pointRuleSet?: {
     firstPoints: number;
     secondPoints: number;
@@ -31,6 +34,52 @@ export type CompetitionMeet = {
   };
   events?: CompetitionEvent[];
   _count?: { events?: number };
+};
+
+export type CompetitionAnnouncement = {
+  id: string;
+  message: string;
+  severity: string;
+  createdAt: string;
+};
+
+export type CompetitionLiveBoard = {
+  meet: {
+    id: string;
+    name: string;
+    meetType: string;
+    status: string;
+    venue: string;
+    theme: string;
+    leaderboardVersion: number;
+    displayToken?: string | null;
+  };
+  liveEvent: {
+    id: string;
+    name: string;
+    status: string;
+    scheduledAt?: string | null;
+    entryMode: string;
+  } | null;
+  nextEvent: {
+    id: string;
+    name: string;
+    status: string;
+    scheduledAt?: string | null;
+    entryMode: string;
+  } | null;
+  leaderboard: LeaderboardRow[];
+  recentResults: Array<{
+    position: number;
+    metricValue: string | null;
+    eventName: string;
+    eventId: string;
+    houseName: string | null;
+    houseCode: string | null;
+    houseColor: string | null;
+  }>;
+  announcements: CompetitionAnnouncement[];
+  refreshedAt: string;
 };
 
 export type CompetitionEvent = {
@@ -125,6 +174,46 @@ export async function fetchLeaderboard(meetId: string) {
   return data as LeaderboardRow[];
 }
 
+export async function fetchLiveBoard(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/live`);
+  return data as CompetitionLiveBoard;
+}
+
+export async function fetchPublicLiveBoard(token: string) {
+  const { getApiBaseUrl } = await import('@/lib/http/env');
+  const res = await fetch(
+    `${getApiBaseUrl()}/v1/campus-competitions/display/${encodeURIComponent(token)}/live`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    throw new Error(res.status === 404 ? 'Display board not found' : 'Unable to load live board');
+  }
+  return (await res.json()) as CompetitionLiveBoard;
+}
+
+export async function ensureDisplayToken(meetId: string) {
+  const { data } = await api.post(`${base}/meets/${meetId}/display-token`, {});
+  return data as CompetitionMeet;
+}
+
+export async function setLiveEvent(meetId: string, liveEventId: string | null) {
+  const { data } = await api.post(`${base}/meets/${meetId}/live-event`, { liveEventId });
+  return data as CompetitionMeet;
+}
+
+export async function fetchAnnouncements(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/announcements`);
+  return data as CompetitionAnnouncement[];
+}
+
+export async function createAnnouncement(
+  meetId: string,
+  payload: { message: string; severity?: string },
+) {
+  const { data } = await api.post(`${base}/meets/${meetId}/announcements`, payload);
+  return data as CompetitionAnnouncement;
+}
+
 export async function upsertResults(
   eventId: string,
   results: Array<{ entryId?: string; teamId?: string; position: number; metricValue?: string }>,
@@ -137,6 +226,32 @@ export async function upsertResults(
 export async function publishResults(eventId: string) {
   const { data } = await api.post(`${base}/events/${eventId}/results/publish`, {});
   return data;
+}
+
+export async function submitResultsForApproval(eventId: string) {
+  const { data } = await api.post(`${base}/events/${eventId}/results/submit`, {});
+  return data;
+}
+
+export async function approveResults(eventId: string) {
+  const { data } = await api.post(`${base}/events/${eventId}/results/approve`, {});
+  return data;
+}
+
+export async function fetchEventResults(eventId: string) {
+  const { data } = await api.get(`${base}/events/${eventId}/results`);
+  return data as Array<{
+    id: string;
+    position: number;
+    status: string;
+    metricValue?: string | null;
+    entryId?: string | null;
+    teamId?: string | null;
+    entry?: {
+      id: string;
+      house?: { name: string; code: string; color: string } | null;
+    } | null;
+  }>;
 }
 
 export async function fetchEventEntries(eventId: string) {

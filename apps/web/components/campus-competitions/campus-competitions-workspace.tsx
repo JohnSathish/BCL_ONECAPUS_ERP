@@ -1,43 +1,57 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Award, Home, Loader2, Plus, Trophy } from 'lucide-react';
+import { Award, Home, Loader2, Megaphone, Plus, Radio, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CompetitionLiveScoreboard } from '@/components/campus-competitions/competition-live-scoreboard';
 import {
   StcEmptyState,
   StcPanel,
   StcStatusBadge,
 } from '@/components/short-term-courses/stc-shared';
+import { useCompetitionRealtime } from '@/hooks/use-competition-realtime';
 import {
+  approveResults,
   autoAllocateHouses,
+  createAnnouncement,
   createEvent,
   createHouse,
   createMeet,
   downloadMeetReportCsv,
+  ensureDisplayToken,
+  fetchEventEntries,
+  fetchEventResults,
   fetchHouses,
-  fetchLeaderboard,
+  fetchLiveBoard,
   fetchMeet,
   fetchMeetTypes,
   fetchMeets,
   generateFixtures,
   issueParticipationCertificates,
   issuePlaceCertificates,
+  setLiveEvent,
+  submitResultsForApproval,
   transitionMeetStatus,
   updatePointRules,
+  upsertResults,
   type CompetitionMeet,
 } from '@/services/campus-competitions';
 import { apiErrorMessage } from '@/utils/api-error';
 
-type Tab = 'houses' | 'meets' | 'scoring' | 'reports';
+type Tab = 'houses' | 'meets' | 'scoring' | 'live' | 'reports';
 
 export function CampusCompetitionsWorkspace() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('houses');
   const [message, setMessage] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [selectedMeetId, setSelectedMeetId] = useState<string>('');
+  const [scoreEventId, setScoreEventId] = useState('');
+  const [announceText, setAnnounceText] = useState('');
+  const [tvUrl, setTvUrl] = useState('');
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
@@ -56,16 +70,51 @@ export function CampusCompetitionsWorkspace() {
     queryFn: () => fetchMeet(selectedMeetId),
     enabled: Boolean(selectedMeetId),
   });
-  const boardQ = useQuery({
-    queryKey: ['campus-competitions', 'leaderboard', selectedMeetId],
-    queryFn: () => fetchLeaderboard(selectedMeetId),
-    enabled: Boolean(selectedMeetId),
-    refetchInterval: 15_000,
+  const liveQ = useQuery({
+    queryKey: ['campus-competitions', 'live', selectedMeetId],
+    queryFn: () => fetchLiveBoard(selectedMeetId),
+    enabled: Boolean(selectedMeetId) && (tab === 'live' || tab === 'scoring'),
+    refetchInterval: 20_000,
+  });
+  const entriesQ = useQuery({
+    queryKey: ['campus-competitions', 'entries', scoreEventId],
+    queryFn: () => fetchEventEntries(scoreEventId),
+    enabled: Boolean(scoreEventId) && tab === 'scoring',
+  });
+  const resultsQ = useQuery({
+    queryKey: ['campus-competitions', 'results', scoreEventId],
+    queryFn: () => fetchEventResults(scoreEventId),
+    enabled: Boolean(scoreEventId) && tab === 'scoring',
+  });
+
+  useCompetitionRealtime(selectedMeetId || null, {
+    onLeaderboard: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+    },
+    onResult: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'results', scoreEventId] });
+    },
+    onAnnouncement: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+    },
+    onLiveEvent: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'meet', selectedMeetId] });
+    },
   });
 
   const houses = housesQ.data ?? [];
   const meets = meetsQ.data ?? [];
   const selectedMeet = meetQ.data;
+
+  useEffect(() => {
+    if (selectedMeet?.displayToken && typeof window !== 'undefined') {
+      setTvUrl(`${window.location.origin}/tv/competitions/${selectedMeet.displayToken}`);
+    } else {
+      setTvUrl('');
+    }
+  }, [selectedMeet?.displayToken]);
 
   const [houseForm, setHouseForm] = useState({
     name: '',
@@ -89,6 +138,9 @@ export function CampusCompetitionsWorkspace() {
     thirdPoints: 5,
     participationPoints: 2,
   });
+  const [placeDrafts, setPlaceDrafts] = useState<
+    Record<string, { position: string; metricValue: string }>
+  >({});
 
   const createHouseMut = useMutation({
     mutationFn: () => createHouse(houseForm),
@@ -148,12 +200,40 @@ export function CampusCompetitionsWorkspace() {
     onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }),
   });
 
+  const saveResultsMut = useMutation({
+    mutationFn: async (publish: boolean) => {
+      const results = Object.entries(placeDrafts)
+        .filter(([, v]) => v.position.trim())
+        .map(([entryId, v]) => ({
+          entryId,
+          position: Number(v.position),
+          metricValue: v.metricValue.trim() || undefined,
+        }));
+      if (!results.length) throw new Error('Enter at least one position');
+      return upsertResults(scoreEventId, results, publish);
+    },
+    onSuccess: (data) => {
+      const submitted = Boolean((data as { submitted?: number })?.submitted);
+      setMessage({
+        tone: 'ok',
+        text: submitted
+          ? 'Results submitted for approval.'
+          : (data as { published?: boolean })?.published
+            ? 'Results published.'
+            : 'Draft results saved.',
+      });
+      void qc.invalidateQueries({ queryKey: ['campus-competitions'] });
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Save failed') }),
+  });
+
   const tabs = useMemo(
     () =>
       [
         ['houses', 'Houses', Home],
         ['meets', 'Meets', Trophy],
-        ['scoring', 'Leaderboard', Award],
+        ['scoring', 'Scoring', Award],
+        ['live', 'Live ops', Radio],
         ['reports', 'Reports', Award],
       ] as const,
     [],
@@ -491,37 +571,316 @@ export function CampusCompetitionsWorkspace() {
       ) : null}
 
       {tab === 'scoring' ? (
-        <StcPanel
-          title="Live leaderboard (polling)"
-          description="Updates after published results; Socket.IO-ready for Phase C"
-        >
-          {!selectedMeetId ? (
-            <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
-          ) : boardQ.isLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <div className="space-y-2">
-              {(boardQ.data ?? []).map((row) => (
-                <div
-                  key={row.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-semibold text-slate-500">#{row.rank}</span>
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: row.color }} />
-                    <div>
-                      <p className="font-semibold">{row.name}</p>
-                      <p className="text-xs text-slate-500">
-                        G{row.medals.gold} S{row.medals.silver} B{row.medals.bronze}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xl font-semibold tabular-nums">{row.points}</p>
+        <div className="space-y-4">
+          <StcPanel
+            title="Live scoring"
+            description={
+              selectedMeet?.requireResultApproval
+                ? 'Draft → submit for approval → publish to leaderboard'
+                : 'Save drafts or publish immediately'
+            }
+          >
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label>Event</Label>
+                  <select
+                    className="mt-1.5 w-full max-w-md rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={scoreEventId}
+                    onChange={(e) => {
+                      setScoreEventId(e.target.value);
+                      setPlaceDrafts({});
+                    }}
+                  >
+                    <option value="">Select event</option>
+                    {(selectedMeet?.events ?? []).map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-            </div>
-          )}
-        </StcPanel>
+
+                {scoreEventId ? (
+                  <>
+                    <div className="space-y-2">
+                      {(Array.isArray(entriesQ.data) ? entriesQ.data : []).map(
+                        (entry: {
+                          id: string;
+                          bibNumber?: string | null;
+                          studentId?: string | null;
+                          house?: { name?: string; code?: string } | null;
+                        }) => (
+                          <div
+                            key={entry.id}
+                            className="grid gap-2 rounded-xl border border-slate-200 px-3 py-2 md:grid-cols-[1fr_100px_120px]"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {entry.house?.name ?? 'Entry'}
+                                {entry.bibNumber ? ` · Bib ${entry.bibNumber}` : ''}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {entry.house?.code ?? '—'}
+                                {entry.studentId ? ` · ${entry.studentId.slice(0, 8)}` : ''}
+                              </p>
+                            </div>
+                            <Input
+                              placeholder="Place"
+                              value={placeDrafts[entry.id]?.position ?? ''}
+                              onChange={(e) =>
+                                setPlaceDrafts((d) => ({
+                                  ...d,
+                                  [entry.id]: {
+                                    position: e.target.value,
+                                    metricValue: d[entry.id]?.metricValue ?? '',
+                                  },
+                                }))
+                              }
+                            />
+                            <Input
+                              placeholder="Metric"
+                              value={placeDrafts[entry.id]?.metricValue ?? ''}
+                              onChange={(e) =>
+                                setPlaceDrafts((d) => ({
+                                  ...d,
+                                  [entry.id]: {
+                                    position: d[entry.id]?.position ?? '',
+                                    metricValue: e.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </div>
+                        ),
+                      )}
+                      {entriesQ.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                      {!entriesQ.isLoading &&
+                      (!Array.isArray(entriesQ.data) || entriesQ.data.length === 0) ? (
+                        <p className="text-sm text-slate-500">No entries for this event yet.</p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={saveResultsMut.isPending}
+                        onClick={() => saveResultsMut.mutate(false)}
+                      >
+                        Save draft
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={saveResultsMut.isPending}
+                        onClick={() => saveResultsMut.mutate(true)}
+                      >
+                        {selectedMeet?.requireResultApproval
+                          ? 'Save & submit for approval'
+                          : 'Save & publish'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() =>
+                          void submitResultsForApproval(scoreEventId)
+                            .then(() => {
+                              setMessage({ tone: 'ok', text: 'Submitted for approval.' });
+                              void qc.invalidateQueries({ queryKey: ['campus-competitions'] });
+                            })
+                            .catch((e) =>
+                              setMessage({
+                                tone: 'err',
+                                text: apiErrorMessage(e, 'Submit failed'),
+                              }),
+                            )
+                        }
+                      >
+                        Submit drafts
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          void approveResults(scoreEventId)
+                            .then(() => {
+                              setMessage({ tone: 'ok', text: 'Approved and published.' });
+                              void qc.invalidateQueries({ queryKey: ['campus-competitions'] });
+                            })
+                            .catch((e) =>
+                              setMessage({
+                                tone: 'err',
+                                text: apiErrorMessage(e, 'Approve failed'),
+                              }),
+                            )
+                        }
+                      >
+                        Approve & publish
+                      </Button>
+                    </div>
+
+                    {(resultsQ.data ?? []).length > 0 ? (
+                      <div className="rounded-xl border border-slate-200 p-3">
+                        <p className="mb-2 text-sm font-semibold">Current results</p>
+                        <div className="space-y-1 text-sm">
+                          {(resultsQ.data ?? []).map((r) => (
+                            <div key={r.id} className="flex justify-between gap-2">
+                              <span>
+                                #{r.position} · {r.entry?.house?.name ?? '—'}
+                              </span>
+                              <StcStatusBadge status={r.status} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel
+            title="Leaderboard preview"
+            description="Socket.IO updates when results publish"
+          >
+            <CompetitionLiveScoreboard
+              board={liveQ.data}
+              loading={liveQ.isLoading}
+              compact
+              showChrome={false}
+            />
+          </StcPanel>
+        </div>
+      ) : null}
+
+      {tab === 'live' ? (
+        <div className="space-y-4">
+          <StcPanel
+            title="Live operations"
+            description="TV display, now-playing event, and announcements"
+            actions={
+              selectedMeetId ? (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void ensureDisplayToken(selectedMeetId)
+                      .then((meet) => {
+                        setMessage({ tone: 'ok', text: 'TV display token ready.' });
+                        void qc.invalidateQueries({
+                          queryKey: ['campus-competitions', 'meet', selectedMeetId],
+                        });
+                        if (meet.displayToken && typeof window !== 'undefined') {
+                          setTvUrl(
+                            `${window.location.origin}/tv/competitions/${meet.displayToken}`,
+                          );
+                        }
+                      })
+                      .catch((e) =>
+                        setMessage({ tone: 'err', text: apiErrorMessage(e, 'Token failed') }),
+                      )
+                  }
+                >
+                  Ensure TV token
+                </Button>
+              ) : null
+            }
+          >
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
+            ) : (
+              <div className="space-y-4">
+                {tvUrl ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <p className="font-medium">TV mode URL</p>
+                    <Link className="break-all text-sky-700 underline" href={tvUrl} target="_blank">
+                      {tvUrl}
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Generate a display token to open TV mode.
+                  </p>
+                )}
+
+                <div>
+                  <Label>Now playing event</Label>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <select
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      value={selectedMeet?.liveEventId ?? ''}
+                      onChange={(e) =>
+                        void setLiveEvent(selectedMeetId, e.target.value || null)
+                          .then(() => {
+                            setMessage({ tone: 'ok', text: 'Live event updated.' });
+                            void qc.invalidateQueries({ queryKey: ['campus-competitions'] });
+                          })
+                          .catch((err) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(err, 'Live event failed'),
+                            }),
+                          )
+                      }
+                    >
+                      <option value="">None</option>
+                      {(selectedMeet?.events ?? []).map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Announcement</Label>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <Input
+                      className="max-w-lg"
+                      placeholder="Now calling finalists to lane 3…"
+                      value={announceText}
+                      onChange={(e) => setAnnounceText(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      disabled={!announceText.trim()}
+                      onClick={() =>
+                        void createAnnouncement(selectedMeetId, {
+                          message: announceText.trim(),
+                          severity: 'INFO',
+                        })
+                          .then(() => {
+                            setAnnounceText('');
+                            setMessage({ tone: 'ok', text: 'Announcement sent.' });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'live', selectedMeetId],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Announcement failed'),
+                            }),
+                          )
+                      }
+                    >
+                      <Megaphone className="mr-1 h-4 w-4" />
+                      Broadcast
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel title="Live board" description="Realtime via Socket.IO + fallback poll">
+            <CompetitionLiveScoreboard board={liveQ.data} loading={liveQ.isLoading} />
+          </StcPanel>
+        </div>
       ) : null}
 
       {tab === 'reports' ? (

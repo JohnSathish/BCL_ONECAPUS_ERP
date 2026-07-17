@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Award, Home, Loader2, Trophy } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
+import { CompetitionLiveScoreboard } from '@/components/campus-competitions/competition-live-scoreboard';
 import {
   StcEmptyState,
   StcHero,
@@ -13,8 +14,9 @@ import {
   StcStatusBadge,
 } from '@/components/short-term-courses/stc-shared';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useCompetitionRealtime } from '@/hooks/use-competition-realtime';
 import {
-  fetchLeaderboard,
+  fetchLiveBoard,
   fetchMeet,
   fetchMyHouse,
   fetchOpenMeets,
@@ -43,11 +45,23 @@ export default function StudentCampusCompetitionsPage() {
     queryFn: () => fetchMeet(selectedMeetId),
     enabled: Boolean(session && selectedMeetId),
   });
-  const boardQ = useQuery({
-    queryKey: ['campus-competitions', 'board', selectedMeetId],
-    queryFn: () => fetchLeaderboard(selectedMeetId),
+  const liveQ = useQuery({
+    queryKey: ['campus-competitions', 'live', selectedMeetId],
+    queryFn: () => fetchLiveBoard(selectedMeetId),
     enabled: Boolean(session && selectedMeetId),
-    refetchInterval: 15_000,
+    refetchInterval: 12_000,
+  });
+
+  useCompetitionRealtime(selectedMeetId || null, {
+    onLeaderboard: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+    },
+    onResult: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+    },
+    onAnnouncement: () => {
+      void qc.invalidateQueries({ queryKey: ['campus-competitions', 'live', selectedMeetId] });
+    },
   });
 
   const registerMut = useMutation({
@@ -164,18 +178,8 @@ export default function StudentCampusCompetitionsPage() {
         ) : null}
 
         {selectedMeetId ? (
-          <StcPanel title="Leaderboard" icon={Award}>
-            {(boardQ.data ?? []).map((row) => (
-              <div
-                key={row.id}
-                className="mb-2 flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
-              >
-                <span>
-                  #{row.rank} {row.name}
-                </span>
-                <span className="font-semibold tabular-nums">{row.points}</span>
-              </div>
-            ))}
+          <StcPanel title="Live board" icon={Award} description="Updates over Socket.IO">
+            <CompetitionLiveScoreboard board={liveQ.data} loading={liveQ.isLoading} compact />
           </StcPanel>
         ) : null}
       </div>

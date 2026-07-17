@@ -56,6 +56,17 @@ export default function CampusCompetitionsScreen() {
     void load();
   }, [load]);
 
+  // Faster live refresh while a meet is selected
+  useEffect(() => {
+    if (!selectedMeetId) return;
+    const id = setInterval(() => {
+      void fetchCompetitionLeaderboard(selectedMeetId)
+        .then((lb) => setBoard(lb ?? []))
+        .catch(() => undefined);
+    }, 8_000);
+    return () => clearInterval(id);
+  }, [selectedMeetId]);
+
   return (
     <StudentScreenShell title="Campus Competitions">
       {loading ? (

@@ -55,6 +55,15 @@ export class CompetitionScoringService {
     }
   }
 
+  private requireApprove(user: JwtUser) {
+    if (
+      !this.hasPermission(user, 'campus-competitions:approve') &&
+      !this.hasPermission(user, 'campus-competitions:manage')
+    ) {
+      throw new ForbiddenException('Approve permission required');
+    }
+  }
+
   async houseBalance(tenantId: string, meetId: string, houseId: string) {
     const last = await this.db().housePointLedger.findFirst({
       where: { tenantId, meetId, houseId },
@@ -126,7 +135,7 @@ export class CompetitionScoringService {
           ...(item.entryId
             ? { entryId: item.entryId }
             : { teamId: item.teamId }),
-          status: 'DRAFT',
+          status: { in: ['DRAFT', 'PENDING_APPROVAL'] },
         },
       });
       if (existing) {
@@ -138,6 +147,7 @@ export class CompetitionScoringService {
               metricValue: item.metricValue ?? null,
               metricUnit: item.metricUnit ?? null,
               remarks: item.remarks?.trim() ?? '',
+              status: 'DRAFT',
               recordedById: user.sub,
             },
           }),
@@ -163,29 +173,240 @@ export class CompetitionScoringService {
     }
 
     if (dto.publish) {
+      const meet = await this.db().competitionMeet.findFirst({
+        where: { id: event.meetId, tenantId: user.tid },
+      });
+      if (meet?.requireResultApproval) {
+        return this.submitResultsForApproval(user, eventId);
+      }
       return this.publishEventResults(user, eventId);
     }
     return { results: created, published: false, meetId: event.meetId };
   }
 
-  async publishEventResults(user: JwtUser, eventId: string) {
+  async submitResultsForApproval(user: JwtUser, eventId: string) {
     this.requireScore(user);
     const event = await this.meets.getEvent(user, eventId);
+    const drafts = await this.db().competitionResult.updateMany({
+      where: { tenantId: user.tid, eventId, status: 'DRAFT' },
+      data: { status: 'PENDING_APPROVAL' },
+    });
+    if (!drafts.count) {
+      throw new BadRequestException('No draft results to submit');
+    }
+    await this.db().competitionAuditLog.create({
+      data: {
+        tenantId: user.tid,
+        meetId: event.meetId,
+        actorId: user.sub,
+        entityType: 'event',
+        entityId: eventId,
+        action: 'results.submitted',
+        after: { count: drafts.count },
+      },
+    });
+    this.realtime.publish(user.tid, 'competition:result', {
+      meetId: event.meetId,
+      eventId,
+      status: 'PENDING_APPROVAL',
+    });
+    return { submitted: drafts.count, published: false };
+  }
+
+  async approveAndPublishResults(user: JwtUser, eventId: string) {
+    this.requireApprove(user);
+    return this.publishEventResults(user, eventId, {
+      fromStatuses: ['PENDING_APPROVAL', 'DRAFT'],
+      skipScoreCheck: true,
+    });
+  }
+
+  async liveBoard(user: JwtUser, meetId: string) {
+    const meet = await this.meets.getMeet(user, meetId);
+    return this.buildLiveBoard(user.tid, meet);
+  }
+
+  async publicLiveBoard(displayToken: string) {
+    const meet = await this.db().competitionMeet.findFirst({
+      where: { displayToken, deletedAt: null },
+      include: {
+        events: {
+          where: { deletedAt: null },
+          orderBy: { scheduledAt: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            scheduledAt: true,
+            entryMode: true,
+          },
+        },
+      },
+    });
+    if (!meet) throw new NotFoundException('Display board not found');
+    return this.buildLiveBoard(meet.tenantId, meet);
+  }
+
+  private async buildLiveBoard(
+    tenantId: string,
+    meet: {
+      id: string;
+      name: string;
+      meetType: string;
+      status: string;
+      venue: string;
+      theme: string;
+      leaderboardVersion: number;
+      liveEventId?: string | null;
+      displayToken?: string | null;
+      events?: Array<{
+        id: string;
+        name: string;
+        status: string;
+        scheduledAt: Date | null;
+        entryMode: string;
+      }>;
+    },
+  ) {
+    const houses = await this.db().competitionHouse.findMany({
+      where: { tenantId, status: 'ACTIVE', deletedAt: null },
+      select: { id: true, name: true, code: true, color: true },
+    });
+    const board = [];
+    for (const house of houses) {
+      const points = await this.houseBalance(tenantId, meet.id, house.id);
+      const medals = await this.db().competitionMedal.groupBy({
+        by: ['metal'],
+        where: { tenantId, meetId: meet.id, houseId: house.id },
+        _count: true,
+      });
+      const tally = { gold: 0, silver: 0, bronze: 0 };
+      for (const m of medals) {
+        if (m.metal === 'GOLD') tally.gold = m._count;
+        if (m.metal === 'SILVER') tally.silver = m._count;
+        if (m.metal === 'BRONZE') tally.bronze = m._count;
+      }
+      board.push({ ...house, points, medals: tally });
+    }
+    board.sort((a, b) => b.points - a.points || b.medals.gold - a.medals.gold);
+    const ranked = board.map((r, i) => ({ ...r, rank: i + 1 }));
+
+    let liveEvent =
+      (meet.events ?? []).find((e) => e.id === meet.liveEventId) ?? null;
+    if (!liveEvent && meet.liveEventId) {
+      liveEvent = await this.db().competitionEvent.findFirst({
+        where: { id: meet.liveEventId, tenantId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          scheduledAt: true,
+          entryMode: true,
+        },
+      });
+    }
+
+    const recentResults = await this.db().competitionResult.findMany({
+      where: {
+        tenantId,
+        status: 'PUBLISHED',
+        event: { meetId: meet.id },
+      },
+      include: {
+        event: { select: { id: true, name: true } },
+        entry: {
+          include: {
+            house: { select: { name: true, code: true, color: true } },
+          },
+        },
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 8,
+    });
+
+    const announcements = await this.db().competitionAnnouncement.findMany({
+      where: { tenantId, meetId: meet.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    const events = meet.events ?? [];
+    const nextEvent =
+      events.find(
+        (e) =>
+          e.id !== meet.liveEventId &&
+          e.scheduledAt &&
+          new Date(e.scheduledAt) > new Date(),
+      ) ??
+      events.find((e) => e.id !== meet.liveEventId) ??
+      null;
+
+    return {
+      meet: {
+        id: meet.id,
+        name: meet.name,
+        meetType: meet.meetType,
+        status: meet.status,
+        venue: meet.venue,
+        theme: meet.theme,
+        leaderboardVersion: meet.leaderboardVersion,
+        displayToken: meet.displayToken ?? null,
+      },
+      liveEvent,
+      nextEvent,
+      leaderboard: ranked,
+      recentResults: recentResults.map(
+        (r: {
+          position: number;
+          metricValue: string | null;
+          event: { id: string; name: string };
+          entry: {
+            house: { name: string; code: string; color: string } | null;
+          } | null;
+        }) => ({
+          position: r.position,
+          metricValue: r.metricValue,
+          eventName: r.event.name,
+          eventId: r.event.id,
+          houseName: r.entry?.house?.name ?? null,
+          houseCode: r.entry?.house?.code ?? null,
+          houseColor: r.entry?.house?.color ?? null,
+        }),
+      ),
+      announcements,
+      refreshedAt: new Date().toISOString(),
+    };
+  }
+
+  async publishEventResults(
+    user: JwtUser,
+    eventId: string,
+    opts?: { fromStatuses?: string[]; skipScoreCheck?: boolean },
+  ) {
+    if (!opts?.skipScoreCheck) {
+      this.requireScore(user);
+    }
+    const event = await this.meets.getEvent(user, eventId);
     const meetId = event.meetId;
+    const fromStatuses = opts?.fromStatuses ?? ['DRAFT'];
     const rules = await this.db().competitionPointRuleSet.findFirst({
       where: { meetId, tenantId: user.tid },
     });
     if (!rules) throw new NotFoundException('Point rules missing');
 
     const drafts = await this.db().competitionResult.findMany({
-      where: { tenantId: user.tid, eventId, status: 'DRAFT' },
+      where: {
+        tenantId: user.tid,
+        eventId,
+        status: { in: fromStatuses },
+      },
       include: {
         entry: true,
         team: true,
       },
     });
     if (!drafts.length) {
-      throw new BadRequestException('No draft results to publish');
+      throw new BadRequestException('No results ready to publish');
     }
 
     // Reverse prior published ledger/medals for this event (compensating entries)

@@ -101,8 +101,34 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     this.server.to(`tenant:${tenantId}`).emit(event, payload);
   }
 
+  broadcastToRoom(room: string, event: string, payload: unknown) {
+    this.server.to(room).emit(event, payload);
+  }
+
   notifyUser(userId: string, event: string, payload: unknown) {
     this.server.to(`user:${userId}`).emit(event, payload);
+  }
+
+  @SubscribeMessage('competition:join-meet')
+  handleJoinMeet(
+    @ConnectedSocket() client: AppSocket,
+    @MessageBody() body: { meetId?: string },
+  ) {
+    const meetId = body?.meetId?.trim();
+    if (!meetId || !client.data.user?.tid) return { ok: false };
+    void client.join(`meet:${meetId}`);
+    return { ok: true, room: `meet:${meetId}` };
+  }
+
+  @SubscribeMessage('competition:leave-meet')
+  handleLeaveMeet(
+    @ConnectedSocket() client: AppSocket,
+    @MessageBody() body: { meetId?: string },
+  ) {
+    const meetId = body?.meetId?.trim();
+    if (!meetId) return { ok: false };
+    void client.leave(`meet:${meetId}`);
+    return { ok: true };
   }
 
   @SubscribeMessage('announcement')
