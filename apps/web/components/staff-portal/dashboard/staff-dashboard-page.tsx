@@ -35,16 +35,32 @@ import { PortalCalendarWidget } from '@/components/portal/portal-calendar-widget
 
 import { HodDashboardWidget } from '@/components/staff-portal/widgets/hod-dashboard-widget';
 
+import { BirthdaysTodayWidget } from '@/components/portal/birthdays-today-widget';
+
 import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
 
 import { useStaffPortalLayoutStore } from '@/store/staff-portal-layout-store';
 
 import { isAxiosError } from 'axios';
 
+import { useQuery } from '@tanstack/react-query';
+
+import { fetchStaffBirthdaysWidget } from '@/services/staff-portal';
+
+import { useAuthQueryEnabled } from '@/hooks/use-auth';
+
 export function StaffDashboardPage() {
   useRequireStaffPortal();
 
   const dashboardQ = useStaffDashboard();
+
+  const authEnabled = useAuthQueryEnabled();
+  const birthdaysQ = useQuery({
+    queryKey: ['staff-portal', 'dashboard-widget', 'birthdays'],
+    queryFn: fetchStaffBirthdaysWidget,
+    enabled: authEnabled,
+    staleTime: 30_000,
+  });
 
   const widgets = useStaffPortalLayoutStore((s) => s.widgets);
 
@@ -69,6 +85,14 @@ export function StaffDashboardPage() {
         ) : null}
         <StaffMobileDashboard data={data} loading={loading} />
 
+        <div className="md:hidden">
+          <BirthdaysTodayWidget
+            data={birthdaysQ.data}
+            loading={birthdaysQ.isLoading}
+            notificationsHref="/staff/notifications"
+          />
+        </div>
+
         <div className="hidden space-y-4 md:block">
           <StaffQuickActionsBar isTeaching={data?.profile.isTeaching} />
 
@@ -79,6 +103,12 @@ export function StaffDashboardPage() {
           <TeachingWorkspaceWidget isTeaching={data?.profile.isTeaching} />
 
           <HodDashboardWidget data={data} loading={loading} />
+
+          <BirthdaysTodayWidget
+            data={birthdaysQ.data}
+            loading={birthdaysQ.isLoading}
+            notificationsHref="/staff/notifications"
+          />
 
           <div className="grid gap-4 lg:grid-cols-3">
             {widgets.schedule !== false ? (

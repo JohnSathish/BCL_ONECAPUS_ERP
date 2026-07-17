@@ -297,7 +297,12 @@ export class CommunicationTemplatesService {
     const created = [];
     for (const tpl of DEFAULT_TEMPLATES) {
       const forceRefresh =
-        tpl.code === 'BACKUP_SUCCESS' || tpl.code === 'BACKUP_FAILED';
+        tpl.code === 'BACKUP_SUCCESS' ||
+        tpl.code === 'BACKUP_FAILED' ||
+        tpl.code === 'STUDENT_BIRTHDAY_SELF' ||
+        tpl.code === 'STUDENT_BIRTHDAY_PEER' ||
+        tpl.code === 'STAFF_BIRTHDAY_SELF' ||
+        tpl.code === 'STAFF_BIRTHDAY_COLLEAGUE';
       const row = await this.prisma.communicationTemplate.upsert({
         where: {
           tenantId_code: { tenantId: user.tid, code: tpl.code },
@@ -322,6 +327,7 @@ export class CommunicationTemplatesService {
               bodyHtml: tpl.bodyHtml,
               bodyText: tpl.bodyText,
               variables: tpl.variables ?? [],
+              channels: tpl.channels ?? ['EMAIL', 'IN_APP'],
             }
           : {},
       });

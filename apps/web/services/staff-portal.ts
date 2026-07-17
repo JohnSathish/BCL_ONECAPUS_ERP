@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import type { BirthdaysWidgetData } from '@/components/portal/birthdays-today-widget';
 import type {
   StaffDashboardData,
   StaffMeProfile,
@@ -16,6 +17,15 @@ export async function fetchStaffMe(): Promise<StaffMeProfile> {
 export async function fetchStaffDashboard(): Promise<StaffDashboardData> {
   const { data } = await api.get('/v1/staff/me/dashboard');
   return data;
+}
+
+export async function fetchStaffDashboardWidget<T = unknown>(widget: string): Promise<T> {
+  const { data } = await api.get(`/v1/staff/me/dashboard/widgets/${widget}`);
+  return data;
+}
+
+export async function fetchStaffBirthdaysWidget(): Promise<BirthdaysWidgetData> {
+  return fetchStaffDashboardWidget<BirthdaysWidgetData>('birthdays');
 }
 
 export async function fetchMySubjectAssignments(): Promise<

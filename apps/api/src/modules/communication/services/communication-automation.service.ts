@@ -85,12 +85,29 @@ export class CommunicationAutomationService {
         schedule: '0 8 * * *',
         templateCode: 'HR_PROBATION_REMINDER',
       },
+      {
+        code: 'student.birthday.daily',
+        name: 'Student Birthday Alerts',
+        category: 'GENERAL',
+        schedule: '0 8 * * *',
+        templateCode: 'STUDENT_BIRTHDAY_SELF',
+      },
+      {
+        code: 'staff.birthday.daily',
+        name: 'Staff Birthday Alerts',
+        category: 'GENERAL',
+        schedule: '0 8 * * *',
+        templateCode: 'STAFF_BIRTHDAY_SELF',
+      },
     ];
 
     for (const rule of defaults) {
+      const channels = rule.code.includes('birthday')
+        ? (['IN_APP', 'PUSH'] as const)
+        : (['EMAIL', 'IN_APP', 'SMS'] as const);
       await this.prisma.communicationAutomationRule.upsert({
         where: { tenantId_code: { tenantId, code: rule.code } },
-        create: { tenantId, ...rule, channels: ['EMAIL', 'IN_APP', 'SMS'] },
+        create: { tenantId, ...rule, channels: [...channels] },
         update: { name: rule.name, schedule: rule.schedule },
       });
     }

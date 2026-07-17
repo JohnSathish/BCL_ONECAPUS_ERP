@@ -89,6 +89,10 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('/student/notifications') || lower.includes('/student/alerts')) {
     return '/(student)/(tabs)/notifications' as Href;
   }
+  if (lower.includes('birthday')) {
+    if (lower.includes('/staff')) return '/(staff)/(tabs)' as Href;
+    return '/(student)/(tabs)' as Href;
+  }
   if (lower.includes('/student/certificates')) {
     return '/(student)/(tabs)' as Href;
   }

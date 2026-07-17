@@ -18,6 +18,7 @@ export const STUDENT_PUSH_CATEGORIES = [
   { key: 'assignment', label: 'Assignment notifications' },
   { key: 'circulars', label: 'General announcements' },
   { key: 'timetable', label: 'Timetable changes' },
+  { key: 'birthday', label: 'Birthday wishes' },
   { key: 'general', label: 'Other alerts' },
 ] as const;
 
@@ -27,5 +28,6 @@ export const STAFF_PUSH_CATEGORIES = [
   { key: 'examination', label: 'Examination / marks' },
   { key: 'circulars', label: 'Official circulars' },
   { key: 'leave', label: 'Leave updates' },
+  { key: 'birthday', label: 'Birthday wishes' },
   { key: 'general', label: 'Other alerts' },
 ] as const;

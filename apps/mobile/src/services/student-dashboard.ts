@@ -42,6 +42,7 @@ export type StudentDashboardWidgets = {
   examinations?: ExaminationsWidget;
   library?: LibraryWidget;
   notifications?: NotificationsWidget;
+  birthdays?: BirthdaysWidget;
 };
 
 export type DashboardWidgetName =
@@ -49,14 +50,29 @@ export type DashboardWidgetName =
   | 'lms'
   | 'examinations'
   | 'library'
-  | 'notifications';
+  | 'notifications'
+  | 'birthdays';
+
+export type BirthdaysWidget = {
+  isMyBirthday?: boolean;
+  birthdays?: {
+    id: string;
+    fullName: string;
+    photoUrl?: string | null;
+    role: 'student' | 'staff';
+  }[];
+};
 
 export function fetchStudentDashboardWidget<T>(widget: DashboardWidgetName) {
   return apiFetch<T>(`/v1/students/me/dashboard/widgets/${widget}`);
 }
 
+export function fetchStaffBirthdaysWidget() {
+  return apiFetch<BirthdaysWidget>('/v1/staff/me/dashboard/widgets/birthdays');
+}
+
 export async function fetchStudentHomeWidgets() {
-  const [timetable, lms, examinations, library, notifications] = await Promise.all([
+  const [timetable, lms, examinations, library, notifications, birthdays] = await Promise.all([
     fetchStudentDashboardWidget<TimetableWidgetSlot[]>('timetable').catch(
       () => [] as TimetableWidgetSlot[],
     ),
@@ -68,6 +84,7 @@ export async function fetchStudentHomeWidgets() {
     fetchStudentDashboardWidget<NotificationsWidget>('notifications').catch(
       () => ({}) as NotificationsWidget,
     ),
+    fetchStudentDashboardWidget<BirthdaysWidget>('birthdays').catch(() => ({}) as BirthdaysWidget),
   ]);
-  return { timetable, lms, examinations, library, notifications };
+  return { timetable, lms, examinations, library, notifications, birthdays };
 }

@@ -10,6 +10,7 @@ import type {
   StudentTimetableSlot,
 } from '@/types/student-portal';
 import type { PortalCalendarEvent } from '@/utils/portal-calendar';
+import type { BirthdaysWidgetData } from '@/components/portal/birthdays-today-widget';
 
 export type DashboardWidgetId =
   | 'attendance'
@@ -21,7 +22,8 @@ export type DashboardWidgetId =
   | 'calendar'
   | 'library'
   | 'health'
-  | 'qr-pass';
+  | 'qr-pass'
+  | 'birthdays';
 
 type WidgetDataMap = {
   attendance: NonNullable<StudentDashboardView['attendance']>;
@@ -37,6 +39,7 @@ type WidgetDataMap = {
   library: NonNullable<StudentDashboardView['library']>;
   health: NonNullable<StudentDashboardView['health']>;
   'qr-pass': LibraryQrPass | null;
+  birthdays: BirthdaysWidgetData;
 };
 
 export function useStudentDashboardWidget<W extends DashboardWidgetId>(widget: W) {

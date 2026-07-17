@@ -14,6 +14,7 @@ import { FeeWidget } from '@/components/student-portal/widgets/fee-widget';
 import { HealthScoreWidget } from '@/components/student-portal/widgets/health-score-widget';
 import { LmsWidget } from '@/components/student-portal/widgets/lms-widget';
 import { StudentNotificationsWidget } from '@/components/student-portal/widgets/notifications-widget';
+import { BirthdaysTodayWidget } from '@/components/portal/birthdays-today-widget';
 import { SubjectRenewalWidget } from '@/components/student-portal/widgets/subject-renewal-widget';
 import { TodayTimetableWidget } from '@/components/student-portal/widgets/today-timetable-widget';
 import { useStudentDashboard } from '@/hooks/use-student-dashboard';
@@ -44,6 +45,7 @@ export function StudentDashboardPage() {
   const libraryQ = useStudentDashboardWidget('library');
   const healthQ = useStudentDashboardWidget('health');
   const qrQ = useStudentDashboardWidget('qr-pass');
+  const birthdaysQ = useStudentDashboardWidget('birthdays');
 
   const shellWithTimetable = shell
     ? {
@@ -72,6 +74,11 @@ export function StudentDashboardPage() {
         <StudentDashboardHeader data={shellWithTimetable} loading={shellLoading} />
         <StudentQuickStats data={shell} loading={shellLoading} />
         <SubjectRenewalWidget />
+        <BirthdaysTodayWidget
+          data={birthdaysQ.data}
+          loading={birthdaysQ.isLoading}
+          notificationsHref="/student/notifications"
+        />
         <AcademicSnapshotWidget chips={shell?.academicChips} loading={shellLoading} />
 
         <TodayTimetableWidget schedule={timetableQ.data} loading={timetableQ.isLoading} />

@@ -48,7 +48,10 @@ export class BrandedEmailLayoutService {
       settings?.notificationLogoUrl?.trim() ||
       branding?.logoUrl?.trim() ||
       null;
-    const logoUrl = logoRaw ? this.toAbsoluteUrl(logoRaw) : null;
+    let logoUrl = logoRaw ? this.toAbsoluteAssetUrl(logoRaw) : null;
+    if (!logoUrl) {
+      logoUrl = this.defaultLogoUrl();
+    }
 
     const primary =
       branding?.primaryColor?.trim() ||
@@ -224,14 +227,42 @@ export class BrandedEmailLayoutService {
     };
   }
 
-  private toAbsoluteUrl(url: string): string {
-    if (/^https?:\/\//i.test(url)) return url;
-    const base =
+  private appWebOrigin(): string {
+    return (
+      this.config.get<string>('PUBLIC_APP_URL') ??
+      this.config.get<string>('WEB_APP_URL') ??
+      ''
+    ).replace(/\/$/, '');
+  }
+
+  private appApiOrigin(): string {
+    return (
       this.config.get<string>('PUBLIC_API_URL') ??
       this.config.get<string>('API_PUBLIC_URL') ??
-      this.config.get<string>('PUBLIC_APP_URL') ??
-      '';
+      this.appWebOrigin()
+    ).replace(/\/$/, '');
+  }
+
+  /** Bundled college crest served from the web app public folder. */
+  private defaultLogoUrl(): string | null {
+    const web = this.appWebOrigin();
+    return web ? `${web}/branding/college-logo.png` : null;
+  }
+
+  private toAbsoluteAssetUrl(url: string): string {
+    if (/^https?:\/\//i.test(url)) return url;
+    const normalized = url.startsWith('/') ? url : `/${url}`;
+    if (normalized.startsWith('/branding/')) {
+      const web = this.appWebOrigin();
+      if (web) return `${web}${normalized}`;
+    }
+    const base = this.appApiOrigin();
     if (!base) return url;
-    return `${base.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
+    return `${base}${normalized}`;
+  }
+
+  /** @deprecated Use toAbsoluteAssetUrl */
+  private toAbsoluteUrl(url: string): string {
+    return this.toAbsoluteAssetUrl(url);
   }
 }

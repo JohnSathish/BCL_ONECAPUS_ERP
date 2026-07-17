@@ -5,6 +5,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { AcademicEngineService } from '../../academic-engine/academic-engine.service';
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
+import { BirthdayQueryService } from '../../communication/services/birthday-query.service';
 import { ExaminationsService } from '../../examinations/examinations.service';
 import { StudentFeeSummaryService } from '../../fees/services/student-fee-summary.service';
 import { LibraryQrService } from '../../library/services/library-qr.service';
@@ -77,6 +78,7 @@ export class StudentPortalService {
     private readonly libraryQr: LibraryQrService,
     private readonly academicEngine: AcademicEngineService,
     private readonly calendar: StudentPortalCalendarService,
+    private readonly birthdays: BirthdayQueryService,
   ) {}
 
   async resolveStudent(user: JwtUser) {
@@ -405,6 +407,11 @@ export class StudentPortalService {
 
   async getDashboardWidgetQrPass(user: JwtUser) {
     return this.libraryQr.getStudentQr(user).catch(() => null);
+  }
+
+  async getDashboardWidgetBirthdays(user: JwtUser) {
+    const student = await this.resolveStudent(user);
+    return this.birthdays.getStudentWidgetBirthdays(user.tid, student.id);
   }
 
   private profileCompletion(input: {

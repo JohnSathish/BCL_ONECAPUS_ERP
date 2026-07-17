@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../../database/prisma.service';
 import { AcademicLifecycleService } from '../../academic-lifecycle/academic-lifecycle.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
+import { BirthdayQueryService } from '../../communication/services/birthday-query.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { getZonedHour } from '../../../common/utils/time-greeting';
@@ -56,6 +57,7 @@ export class StaffPortalService {
     private readonly lifecycle: AcademicLifecycleService,
     private readonly notifications: UserNotificationsService,
     private readonly lms: LmsDashboardService,
+    private readonly birthdays: BirthdayQueryService,
   ) {}
 
   async resolveStaffProfile(tenantId: string, userId: string) {
@@ -132,6 +134,15 @@ export class StaffPortalService {
       greeting: greetingForHour(getZonedHour(new Date())),
       online: staff.portalUser?.isActive ?? false,
     };
+  }
+
+  async getDashboardWidgetBirthdays(user: JwtUser) {
+    const staff = await this.resolveStaffProfile(user.tid, user.sub);
+    return this.birthdays.getStaffWidgetBirthdays(
+      user.tid,
+      staff.id,
+      staff.departmentId,
+    );
   }
 
   async getDashboard(user: JwtUser) {

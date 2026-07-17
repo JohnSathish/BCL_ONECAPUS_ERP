@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
+import { BirthdaysTodayCard } from '@/components/notifications/birthdays-today-card';
 import { FACULTY_QUICK_ACTIONS } from '@/components/faculty-portal/drawer-menu';
 import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-shell';
 import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-context';
@@ -9,6 +11,7 @@ import type { FacultyPendingAction, FacultyTodayClass } from '@/types/faculty-ho
 import { COLLEGE_NAME } from '@/constants/release';
 import { formatInr } from '@/utils/currency';
 import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/faculty-payroll';
+import { fetchStaffBirthdaysWidget, type BirthdaysWidget } from '@/services/student-dashboard';
 
 const TONE_COLORS: Record<FacultyPendingAction['tone'], string> = {
   urgent: facultyTheme.urgent,
@@ -45,6 +48,14 @@ function formatTimeRange(cls: FacultyTodayClass) {
 export default function FacultyHomeScreen() {
   const router = useRouter();
   const { home, loading, refreshHome } = useFacultyPortal();
+  const [birthdays, setBirthdays] = useState<BirthdaysWidget | null>(null);
+
+  useEffect(() => {
+    void refreshHome();
+    void fetchStaffBirthdaysWidget()
+      .then((data) => setBirthdays(data))
+      .catch(() => setBirthdays(null));
+  }, [refreshHome]);
 
   const profile = home?.profile;
   const workload = home?.workloadSummary;
@@ -96,7 +107,15 @@ export default function FacultyHomeScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => void refreshHome()} />
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => {
+              void refreshHome();
+              void fetchStaffBirthdaysWidget()
+                .then(setBirthdays)
+                .catch(() => setBirthdays(null));
+            }}
+          />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -131,6 +150,12 @@ export default function FacultyHomeScreen() {
             <SummaryChip label="Assignments" value={String(workload?.assignmentsPending ?? 0)} />
           </View>
         </View>
+
+        <BirthdaysTodayCard
+          data={birthdays}
+          variant="staff"
+          onPressNotifications={() => router.push('/(staff)/notifications' as never)}
+        />
 
         {/* Today's schedule — top priority */}
         <SectionTitle

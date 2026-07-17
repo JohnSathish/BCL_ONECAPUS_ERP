@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { JournalResolutionService } from './journal-resolution.service';
@@ -661,35 +662,37 @@ export class JournalsService {
       dto.homeAnnouncementsHeadline !== undefined ||
       dto.homeAnnouncementsSubtext !== undefined;
 
+    const data: Prisma.JournalUpdateInput = {
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(dto.shortName !== undefined
+        ? { shortName: dto.shortName.trim() }
+        : {}),
+      ...(dto.issn !== undefined ? { issn: dto.issn } : {}),
+      ...(dto.tagline !== undefined ? { tagline: dto.tagline } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
+      ...(dto.contactEmail !== undefined
+        ? { contactEmail: dto.contactEmail }
+        : {}),
+      ...(dto.contactPhone !== undefined
+        ? { contactPhone: dto.contactPhone }
+        : {}),
+      ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
+      ...(dto.bannerUrl !== undefined ? { bannerUrl: dto.bannerUrl } : {}),
+      ...(dto.frequency !== undefined ? { frequency: dto.frequency } : {}),
+      ...(dto.status !== undefined ? { status: dto.status } : {}),
+      ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
+      ...(dto.institution !== undefined
+        ? { institution: dto.institution }
+        : {}),
+      ...(themeTouched ? { themeJson: theme as Prisma.InputJsonValue } : {}),
+    };
+
     return this.withHomeThemeFields(
       await this.prisma.journal.update({
         where: { id: journalId },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(dto.shortName !== undefined
-            ? { shortName: dto.shortName.trim() }
-            : {}),
-          ...(dto.issn !== undefined ? { issn: dto.issn } : {}),
-          ...(dto.tagline !== undefined ? { tagline: dto.tagline } : {}),
-          ...(dto.description !== undefined
-            ? { description: dto.description }
-            : {}),
-          ...(dto.contactEmail !== undefined
-            ? { contactEmail: dto.contactEmail }
-            : {}),
-          ...(dto.contactPhone !== undefined
-            ? { contactPhone: dto.contactPhone }
-            : {}),
-          ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
-          ...(dto.bannerUrl !== undefined ? { bannerUrl: dto.bannerUrl } : {}),
-          ...(dto.frequency !== undefined ? { frequency: dto.frequency } : {}),
-          ...(dto.status !== undefined ? { status: dto.status } : {}),
-          ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
-          ...(dto.institution !== undefined
-            ? { institution: dto.institution }
-            : {}),
-          ...(themeTouched ? { themeJson: theme } : {}),
-        },
+        data,
       }),
     );
   }

@@ -10,6 +10,7 @@ import { DeviceSessionsPanel } from '@/components/auth/device-sessions-panel';
 import { COLLEGE_NAME, isMvpStudentCard } from '@/constants/release';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
 import { ProfileCompletionCard } from '@/components/student-portal/profile-completion-card';
+import { BirthdaysTodayCard } from '@/components/notifications/birthdays-today-card';
 import {
   fetchStudentHomeWidgets,
   type StudentDashboardWidgets,
@@ -100,6 +101,12 @@ export default function StudentHomeScreen() {
         </View>
 
         <ProfileCompletionCard />
+
+        <BirthdaysTodayCard
+          data={widgets?.birthdays}
+          variant="student"
+          onPressNotifications={() => router.push('/(student)/(tabs)/notifications' as never)}
+        />
 
         {academicChips.length > 0 ? (
           <Pressable

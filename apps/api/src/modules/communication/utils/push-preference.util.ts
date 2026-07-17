@@ -7,6 +7,7 @@ export const PUSH_CATEGORY_KEYS = [
   'circulars',
   'timetable',
   'leave',
+  'birthday',
   'general',
 ] as const;
 
@@ -21,6 +22,7 @@ export const DEFAULT_PUSH_CATEGORY_SETTINGS: Record<PushCategoryKey, boolean> =
     circulars: true,
     timetable: true,
     leave: true,
+    birthday: true,
     general: true,
   };
 
@@ -102,6 +104,9 @@ export function resolvePushCategory(input: {
   }
   if (hay.includes('leave')) {
     return 'leave';
+  }
+  if (hay.includes('birthday')) {
+    return 'birthday';
   }
   if (
     hay.includes('circular') ||

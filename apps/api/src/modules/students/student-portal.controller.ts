@@ -83,6 +83,8 @@ export class StudentPortalController {
         return this.portal.getDashboardWidgetHealth(user);
       case 'qr-pass':
         return this.portal.getDashboardWidgetQrPass(user);
+      case 'birthdays':
+        return this.portal.getDashboardWidgetBirthdays(user);
       default:
         throw new BadRequestException(`Unknown dashboard widget: ${widget}`);
     }

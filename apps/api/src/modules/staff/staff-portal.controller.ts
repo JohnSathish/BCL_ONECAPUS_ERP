@@ -43,6 +43,18 @@ export class StaffPortalController {
     return this.portal.getDashboard(user);
   }
 
+  @Get('me/dashboard/widgets/:widget')
+  @RequireAnyPermission('staff:portal:self')
+  getDashboardWidget(
+    @CurrentUser() user: JwtUser,
+    @Param('widget') widget: string,
+  ) {
+    if (widget === 'birthdays') {
+      return this.portal.getDashboardWidgetBirthdays(user);
+    }
+    throw new BadRequestException(`Unknown dashboard widget: ${widget}`);
+  }
+
   @Get('me/subject-assignments')
   @RequireAnyPermission('staff:portal:self')
   getSubjectAssignments(@CurrentUser() user: JwtUser) {

@@ -847,6 +847,72 @@ ${emailCtaButton('View Summary')}`,
     variables: V.staff,
     channels: ['EMAIL', 'IN_APP'],
   },
+  {
+    code: 'STUDENT_BIRTHDAY_SELF',
+    name: 'Student Birthday Greeting',
+    category: 'STUDENT',
+    subject: '🎂 Happy Birthday, {{student_name}}!',
+    bodyHtml: `<p style="margin:0 0 16px;font-size:28px;line-height:1.2;text-align:center;">🎂🎉🥳</p>
+${emailGreeting('{{student_name}}')}
+<p style="margin:0 0 12px;color:#334155;">Wishing you a wonderful birthday from everyone at <strong>{{institution_name}}</strong>! 🎈</p>
+<p style="margin:0;color:#334155;">May your year ahead be filled with success, joy, and many happy moments. ✨</p>`,
+    bodyText:
+      '🎂 Happy Birthday, {{student_name}}! Wishing you a wonderful day from {{institution_name}}.',
+    variables: [
+      'student_name',
+      'institution_name',
+      'program_name',
+      'department_name',
+    ],
+    channels: ['IN_APP', 'PUSH', 'EMAIL'],
+  },
+  {
+    code: 'STUDENT_BIRTHDAY_PEER',
+    name: 'Classmate Birthday Alert',
+    category: 'STUDENT',
+    subject: "🎉 Today is {{student_name}}'s birthday!",
+    bodyHtml: `<p style="margin:0 0 16px;font-size:28px;line-height:1.2;text-align:center;">🎂🎈🥳</p>
+${emailGreeting()}
+<p style="margin:0 0 12px;color:#334155;">Today is <strong>{{student_name}}</strong>'s birthday — take a moment to wish them well! 🎉</p>
+<p style="margin:0;color:#334155;">Spread some cheer and make their day special. 🎊</p>`,
+    bodyText:
+      "🎉 Today is {{student_name}}'s birthday — wish them well from {{institution_name}}.",
+    variables: [
+      'student_name',
+      'institution_name',
+      'program_name',
+      'department_name',
+    ],
+    channels: ['IN_APP', 'PUSH', 'EMAIL'],
+  },
+  {
+    code: 'STAFF_BIRTHDAY_SELF',
+    name: 'Staff Birthday Greeting',
+    category: 'STAFF',
+    subject: '🎂 Happy Birthday, {{staff_name}}!',
+    bodyHtml: `<p style="margin:0 0 16px;font-size:28px;line-height:1.2;text-align:center;">🎂🎉🥳</p>
+${emailGreeting('{{staff_name}}')}
+<p style="margin:0 0 12px;color:#334155;">Warm birthday wishes from <strong>{{institution_name}}</strong>! 🎈</p>
+<p style="margin:0;color:#334155;">Thank you for your dedication and service. Have a wonderful celebration! ✨</p>`,
+    bodyText:
+      '🎂 Happy Birthday, {{staff_name}}! Warm wishes from {{institution_name}}.',
+    variables: ['staff_name', 'institution_name', 'department_name'],
+    channels: ['IN_APP', 'PUSH', 'EMAIL'],
+  },
+  {
+    code: 'STAFF_BIRTHDAY_COLLEAGUE',
+    name: 'Staff Colleague Birthday Alert',
+    category: 'STAFF',
+    subject: "🎉 Today is {{staff_name}}'s birthday!",
+    bodyHtml: `<p style="margin:0 0 16px;font-size:28px;line-height:1.2;text-align:center;">🎂🎈🥳</p>
+${emailGreeting()}
+<p style="margin:0 0 12px;color:#334155;">Today is <strong>{{staff_name}}</strong>'s birthday in {{department_name}}. Wish them a happy birthday! 🎉</p>
+<p style="margin:0;color:#334155;">A small message from you can make their day brighter. 🎊</p>`,
+    bodyText:
+      "🎉 Today is {{staff_name}}'s birthday — wish them well from {{institution_name}}.",
+    variables: ['staff_name', 'institution_name', 'department_name'],
+    channels: ['IN_APP', 'PUSH', 'EMAIL'],
+  },
 
   // —— PARENT ——
   {

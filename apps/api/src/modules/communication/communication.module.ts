@@ -11,6 +11,9 @@ import { CommunicationDeliveryService } from './services/communication-delivery.
 import { CommunicationEmailService } from './services/communication-email.service';
 import { CommunicationSmsService } from './services/communication-sms.service';
 import { CommunicationSchedulerService } from './services/communication-scheduler.service';
+import { BirthdayQueryService } from './services/birthday-query.service';
+import { BirthdayNotificationService } from './services/birthday-notification.service';
+import { BirthdaySchedulerService } from './services/birthday-scheduler.service';
 import { CommunicationSettingsService } from './services/communication-settings.service';
 import { CommunicationTemplateRendererService } from './services/communication-template-renderer.service';
 import { CommunicationTemplatesService } from './services/communication-templates.service';
@@ -43,6 +46,9 @@ import { BrandedEmailLayoutService } from './services/branded-email-layout.servi
     BrandedEmailLayoutService,
     CommunicationTriggerService,
     CommunicationSchedulerService,
+    BirthdayQueryService,
+    BirthdayNotificationService,
+    BirthdaySchedulerService,
     UserNotificationsService,
     CommunicationNotificationProcessor,
     FcmPushService,
@@ -51,6 +57,7 @@ import { BrandedEmailLayoutService } from './services/branded-email-layout.servi
     CommunicationDeliveryService,
     CommunicationTriggerService,
     UserNotificationsService,
+    BirthdayQueryService,
     CommunicationEmailService,
     CommunicationSmsService,
     CommunicationWhatsAppService,
