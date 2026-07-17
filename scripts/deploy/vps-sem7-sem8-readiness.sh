@@ -1,35 +1,118 @@
 #!/usr/bin/env bash
-# Sem 7/8 curriculum readiness checklist (ops — run after deploy / before first intake)
+# Sem 7/8 curriculum readiness — verify (and optionally seed) placeholder offerings.
 #
 # Prerequisites:
-#   - ERP updated (vps-update-erp-safe.sh)
+#   - ERP updated (vps-update-erp-safe.sh / vps-update.sh)
 #   - Migrations applied (includes eligibility_override_reason, previous_college_name)
+#   - DB backup recommended before --seed
 #
-# 1) Seed / verify Sem 7 offerings per programme + shift
-#    Expected pattern: 3 MAJOR + 2 MINOR (20 credits)
-#    Admin → Programs → curriculum coverage for semesterSequence=7
+# Usage on VPS:
+#   bash scripts/deploy/vps-sem7-sem8-readiness.sh              # verify only
+#   bash scripts/deploy/vps-sem7-sem8-readiness.sh --seed       # verify → seed → re-verify
+#   bash scripts/deploy/vps-sem7-sem8-readiness.sh --seed --dry-run
+#   TENANT=demo bash scripts/deploy/vps-sem7-sem8-readiness.sh --seed
 #
-# 2) Seed / verify Sem 8 pathway offerings
-#    HONOURS: 5 MAJOR advanced papers
-#    HONOURS_WITH_RESEARCH: 1 DISSERTATION (12 cr) + 2 MAJOR
-#    Confirm pools resolve via FYUGP template pathway variants
-#
-# 3) Sem 7 intake channels
-#    - One-by-one: Add Student → Current semester 7 → attested aggregate % + Major/Minor
-#    - Bulk: Students import → Sem 7 Template (LATERAL columns + Aggregate % Through Sem 6)
-#
-# 4) Sem 8 registration gate
-#    - Enter attested aggregate on standing (admit/import or profile Academic tab)
-#    - Select Honours pathway on Sem 8 registration UI before auto-assign / submit
-#    - Research blocked unless aggregate >= 75 or principal override with reason
-#    - Sem 7+: marksheet document required; LATERAL/MIGRATION also need MIGRATION or TC
-#
-# 5) Smoke
-#    - Admit one Sem 7 lateral with aggregate 70 + docs → register Sem 7
-#    - Promote/register Sem 8 → Research rejected; Honours allowed
-#    - Same with aggregate 80 → Research allowed
-#    - Override path: Research with reason when aggregate < 75
+# After green verify, smoke manually:
+#   1) Admit one Sem 7 lateral with aggregate 70 + marksheet (+ MIGRATION/TC if LATERAL)
+#   2) Register Sem 7 (3 Major + 2 Minor)
+#   3) Sem 8: Research blocked at 70%; Honours allowed; Research at 80% or override+reason
 #
 set -euo pipefail
-echo "Sem 7/8 readiness notes — see comments in scripts/deploy/vps-sem7-sem8-readiness.sh"
-echo "No automated seed in this script; verify curriculum coverage in Admin UI."
+
+APP_DIR="${APP_DIR:-/opt/nep-erp}"
+cd "$APP_DIR"
+
+COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
+
+SEED=0
+DRY_RUN=0
+TENANT="${TENANT:-demo}"
+
+for arg in "$@"; do
+  case "$arg" in
+    --seed) SEED=1 ;;
+    --dry-run) DRY_RUN=1 ;;
+    --help|-h)
+      echo "Usage: bash scripts/deploy/vps-sem7-sem8-readiness.sh [--seed] [--dry-run]"
+      echo "  TENANT=demo (default)"
+      exit 0
+      ;;
+    *) echo "Unknown option: $arg (try --help)" >&2; exit 1 ;;
+  esac
+done
+
+if [[ ! -f .env ]]; then
+  echo "Missing $APP_DIR/.env" >&2
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
+
+api_run() {
+  "${COMPOSE[@]}" run --rm \
+    -e DATABASE_URL="${DATABASE_URL}" \
+    -v "${APP_DIR}/apps/api/prisma:/app/apps/api/prisma:ro" \
+    -v "${APP_DIR}/apps/api/src:/app/apps/api/src:ro" \
+    -v "${APP_DIR}/apps/api/scripts:/app/apps/api/scripts:ro" \
+    api "$@"
+}
+
+echo "=== NEP ERP — Sem 7/8 curriculum readiness ==="
+echo "Tenant: ${TENANT}   Seed: $([[ $SEED -eq 1 ]] && echo yes || echo no)   Dry-run: $([[ $DRY_RUN -eq 1 ]] && echo yes || echo no)"
+echo
+echo "Reminder: ensure migrations are applied (eligibility_override_reason, previous_college_name)."
+echo
+
+echo "[0] Ensuring postgres/redis up…"
+"${COMPOSE[@]}" up -d postgres redis
+for i in $(seq 1 60); do
+  if "${COMPOSE[@]}" exec -T postgres pg_isready -U "${POSTGRES_USER:-nep}" -d "${POSTGRES_DB:-nep_erp}" >/dev/null 2>&1; then break; fi
+  sleep 2
+done
+
+echo "[1] Verify Sem 7/8 offerings…"
+VERIFY_OK=0
+if api_run sh -c "cd /app/apps/api && npx tsx scripts/verify-sem7-sem8-curriculum.ts --tenant=${TENANT}"; then
+  VERIFY_OK=1
+fi
+
+if [[ $SEED -eq 1 ]]; then
+  echo
+  echo "[2] Seed provisional Sem 7/8 catalog…"
+  SEED_ARGS=(scripts/seed-sem7-sem8-placeholder-catalog.ts "--tenant=${TENANT}")
+  if [[ $DRY_RUN -eq 1 ]]; then
+    SEED_ARGS+=(--dry-run)
+  fi
+  api_run sh -c "cd /app/apps/api && npx tsx ${SEED_ARGS[*]}"
+
+  echo
+  echo "[3] Re-verify…"
+  if api_run sh -c "cd /app/apps/api && npx tsx scripts/verify-sem7-sem8-curriculum.ts --tenant=${TENANT}"; then
+    VERIFY_OK=1
+  else
+    VERIFY_OK=0
+  fi
+elif [[ $VERIFY_OK -eq 0 ]]; then
+  echo
+  echo "Gaps found. Re-run with --seed to create provisional offerings:"
+  echo "  bash scripts/deploy/vps-sem7-sem8-readiness.sh --seed"
+fi
+
+echo
+echo "=== Smoke checklist (manual) ==="
+echo "  - One-by-one: Add Student → Current semester 7 → attested aggregate % + Major/Minor"
+echo "  - Bulk: Students import → Sem 7 Template"
+echo "  - Sem 8 pathway: Research blocked unless aggregate >= 75 (or override + reason)"
+echo "  - Sem 7+: marksheet required; LATERAL/MIGRATION also need MIGRATION or TC"
+echo "  - Rename provisional titles from NEHU syllabi in Admin → Programs → curriculum"
+echo
+
+if [[ $VERIFY_OK -eq 1 ]]; then
+  echo "READY — Sem 7/8 curriculum verify passed."
+  exit 0
+fi
+
+echo "NOT READY — Sem 7/8 curriculum verify failed."
+exit 1
