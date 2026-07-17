@@ -145,3 +145,64 @@ export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
 export function isValidActivityType(code: string) {
   return DEPARTMENT_ACTIVITY_TYPES.some((t) => t.code === code);
 }
+
+export function isCompetitionActivityType(code: string) {
+  return DEPARTMENT_ACTIVITY_TYPES.some(
+    (t) => t.code === code && t.isCompetition,
+  );
+}
+
+export const COMPETITION_POSITIONS = [
+  'WINNER',
+  'RUNNER_UP',
+  'SECOND_RUNNER_UP',
+  'SPECIAL_PRIZE',
+  'CONSOLATION',
+  'MERIT',
+  'BEST_PRESENTER',
+  'BEST_PAPER',
+] as const;
+
+export type CompetitionPosition = (typeof COMPETITION_POSITIONS)[number];
+
+export const MEDIA_TYPES = [
+  'PHOTO',
+  'VIDEO',
+  'INVITATION',
+  'BANNER',
+  'ATTENDANCE',
+  'REPORT',
+  'PRESS_RELEASE',
+  'CERTIFICATE',
+  'OTHER',
+] as const;
+
+export function positionCertificateType(position: string) {
+  switch (position) {
+    case 'WINNER':
+      return 'WINNER';
+    case 'RUNNER_UP':
+      return 'RUNNER_UP';
+    case 'SECOND_RUNNER_UP':
+      return 'SECOND_RUNNER_UP';
+    case 'BEST_PRESENTER':
+      return 'BEST_PRESENTER';
+    case 'BEST_PAPER':
+      return 'BEST_PAPER';
+    case 'SPECIAL_PRIZE':
+      return 'SPECIAL_PRIZE';
+    case 'CONSOLATION':
+      return 'CONSOLATION';
+    case 'MERIT':
+      return 'MERIT';
+    default:
+      return 'ACHIEVEMENT';
+  }
+}
+
+export function positionLabel(position: string) {
+  return position
+    .split('_')
+    .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
+    .join(' ');
+}

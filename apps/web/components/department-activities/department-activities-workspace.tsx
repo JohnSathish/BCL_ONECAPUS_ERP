@@ -1,14 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Award,
+  BarChart3,
   CalendarDays,
   ClipboardCheck,
+  Download,
+  FileText,
+  Image,
   LayoutDashboard,
   Loader2,
+  Mic,
   Plus,
+  Trash2,
+  Trophy,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,15 +32,30 @@ import {
 } from '@/components/short-term-courses/stc-shared';
 import { fetchDepartments } from '@/services/organization';
 import {
+  addActivityMedia,
+  COMPETITION_POSITIONS,
   createActivity,
+  deleteActivityMedia,
+  downloadReportsCsv,
   fetchActivities,
+  fetchActivity,
+  fetchActivityMedia,
+  fetchActivityResults,
   fetchActivityTypes,
   fetchDashboard,
+  fetchPresentations,
   fetchRegistrations,
+  fetchReportsSummary,
   finalizeAttendance,
+  issueAwardCertificates,
   issueParticipationCertificates,
   markAttendance,
+  MEDIA_TYPES,
+  positionLabel,
+  reviewPresentation,
+  saveActivityResults,
   transitionStatus,
+  updateActivityReport,
   type UpsertActivityPayload,
 } from '@/services/department-activities';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -41,10 +63,21 @@ import { apiErrorMessage } from '@/utils/api-error';
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'activities', label: 'Activities', icon: CalendarDays },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'create', label: 'Create', icon: Plus },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
+
+const ACTIVITY_DETAIL_TABS = [
+  { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+  { id: 'results', label: 'Results', icon: Trophy },
+  { id: 'presentations', label: 'Presentations', icon: Mic },
+  { id: 'gallery', label: 'Gallery', icon: Image },
+  { id: 'report', label: 'Report', icon: FileText },
+] as const;
+
+type ActivityDetailTab = (typeof ACTIVITY_DETAIL_TABS)[number]['id'];
 
 const STATUS_ACTIONS: Record<string, { label: string; next: string } | undefined> = {
   DRAFT: { label: 'Submit', next: 'PENDING_APPROVAL' },
@@ -90,12 +123,28 @@ const emptyForm: UpsertActivityPayload = {
   registrationEndsAt: '',
 };
 
+type ResultDraft = { position: string; remarks: string };
+
 export function DepartmentActivitiesWorkspace() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [detailTab, setDetailTab] = useState<ActivityDetailTab>('attendance');
   const [message, setMessage] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState<UpsertActivityPayload>(emptyForm);
+  const [resultDrafts, setResultDrafts] = useState<Record<string, ResultDraft>>({});
+  const [reportForm, setReportForm] = useState({
+    reportText: '',
+    outcomesSummary: '',
+    feedbackSummary: '',
+  });
+  const [mediaForm, setMediaForm] = useState({ mediaType: 'PHOTO', url: '', title: '' });
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [reportFilters, setReportFilters] = useState({
+    departmentId: '',
+    from: '',
+    to: '',
+  });
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['dept-activities'] });
 
@@ -119,6 +168,36 @@ export function DepartmentActivitiesWorkspace() {
     queryKey: ['dept-activities', 'registrations', selectedId],
     queryFn: () => fetchRegistrations(selectedId),
     enabled: Boolean(selectedId),
+  });
+  const activityDetailQ = useQuery({
+    queryKey: ['dept-activities', 'detail', selectedId],
+    queryFn: () => fetchActivity(selectedId),
+    enabled: Boolean(selectedId),
+  });
+  const resultsQ = useQuery({
+    queryKey: ['dept-activities', 'results', selectedId],
+    queryFn: () => fetchActivityResults(selectedId),
+    enabled: Boolean(selectedId) && detailTab === 'results',
+  });
+  const presentationsQ = useQuery({
+    queryKey: ['dept-activities', 'presentations', selectedId],
+    queryFn: () => fetchPresentations(selectedId),
+    enabled: Boolean(selectedId) && detailTab === 'presentations',
+  });
+  const mediaQ = useQuery({
+    queryKey: ['dept-activities', 'media', selectedId],
+    queryFn: () => fetchActivityMedia(selectedId),
+    enabled: Boolean(selectedId) && detailTab === 'gallery',
+  });
+  const reportsSummaryQ = useQuery({
+    queryKey: ['dept-activities', 'reports-summary', reportFilters],
+    queryFn: () =>
+      fetchReportsSummary({
+        departmentId: reportFilters.departmentId || undefined,
+        from: reportFilters.from || undefined,
+        to: reportFilters.to || undefined,
+      }),
+    enabled: tab === 'reports',
   });
 
   const statusMut = useMutation({
@@ -176,15 +255,157 @@ export function DepartmentActivitiesWorkspace() {
       setMessage({ tone: 'err', text: apiErrorMessage(e, 'Certificate issue failed') }),
   });
 
+  const saveResultsMut = useMutation({
+    mutationFn: ({
+      activityId,
+      results,
+    }: {
+      activityId: string;
+      results: { registrationId: string; position: string; remarks?: string }[];
+    }) => saveActivityResults(activityId, results),
+    onSuccess: () => {
+      setMessage({ tone: 'ok', text: 'Results saved.' });
+      invalidate();
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Save results failed') }),
+  });
+
+  const awardCertMut = useMutation({
+    mutationFn: issueAwardCertificates,
+    onSuccess: (res) => {
+      setMessage({ tone: 'ok', text: `Issued ${res.issued ?? 0} award certificate(s).` });
+      invalidate();
+    },
+    onError: (e) =>
+      setMessage({ tone: 'err', text: apiErrorMessage(e, 'Award certificates failed') }),
+  });
+
+  const reviewMut = useMutation({
+    mutationFn: ({
+      presentationId,
+      status,
+      reviewNote,
+    }: {
+      presentationId: string;
+      status: 'APPROVED' | 'REJECTED';
+      reviewNote?: string;
+    }) => reviewPresentation(presentationId, { status, reviewNote }),
+    onSuccess: (_data, vars) => {
+      setMessage({
+        tone: 'ok',
+        text: `Presentation ${vars.status === 'APPROVED' ? 'approved' : 'rejected'}.`,
+      });
+      invalidate();
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Review failed') }),
+  });
+
+  const addMediaMut = useMutation({
+    mutationFn: ({
+      activityId,
+      ...payload
+    }: {
+      activityId: string;
+      mediaType: string;
+      url: string;
+      title?: string;
+    }) => addActivityMedia(activityId, payload),
+    onSuccess: () => {
+      setMessage({ tone: 'ok', text: 'Media added.' });
+      setMediaForm({ mediaType: 'PHOTO', url: '', title: '' });
+      invalidate();
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Add media failed') }),
+  });
+
+  const deleteMediaMut = useMutation({
+    mutationFn: deleteActivityMedia,
+    onSuccess: () => {
+      setMessage({ tone: 'ok', text: 'Media removed.' });
+      invalidate();
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Delete media failed') }),
+  });
+
+  const reportMut = useMutation({
+    mutationFn: ({
+      activityId,
+      ...payload
+    }: {
+      activityId: string;
+      reportText?: string;
+      outcomesSummary?: string;
+      feedbackSummary?: string;
+    }) => updateActivityReport(activityId, payload),
+    onSuccess: () => {
+      setMessage({ tone: 'ok', text: 'Activity report saved.' });
+      invalidate();
+    },
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Save report failed') }),
+  });
+
+  const csvMut = useMutation({
+    mutationFn: () =>
+      downloadReportsCsv({
+        departmentId: reportFilters.departmentId || undefined,
+        from: reportFilters.from || undefined,
+        to: reportFilters.to || undefined,
+      }),
+    onSuccess: () => setMessage({ tone: 'ok', text: 'CSV download started.' }),
+    onError: (e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'CSV download failed') }),
+  });
+
   const activities = activitiesQ.data ?? [];
   const selected = useMemo(
-    () => activities.find((a) => a.id === selectedId) ?? null,
-    [activities, selectedId],
+    () => activityDetailQ.data ?? activities.find((a) => a.id === selectedId) ?? null,
+    [activities, selectedId, activityDetailQ.data],
   );
   const registrations = registrationsQ.data ?? [];
+  const results = resultsQ.data ?? [];
+  const presentations = presentationsQ.data ?? [];
+  const mediaItems = mediaQ.data ?? [];
   const types = typesQ.data ?? [];
   const departments = departmentsQ.data ?? [];
   const dash = dashQ.data;
+  const reportsSummary = reportsSummaryQ.data;
+
+  useEffect(() => {
+    setDetailTab('attendance');
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected || detailTab !== 'report') return;
+    setReportForm({
+      reportText: selected.reportText ?? '',
+      outcomesSummary: selected.outcomesSummary ?? '',
+      feedbackSummary: selected.feedbackSummary ?? '',
+    });
+  }, [selected, detailTab]);
+
+  useEffect(() => {
+    if (detailTab !== 'results') return;
+    const drafts: Record<string, ResultDraft> = {};
+    for (const reg of registrations.filter((r) => r.status === 'REGISTERED')) {
+      const existing = results.find((r) => r.registrationId === reg.id);
+      drafts[reg.id] = {
+        position: existing?.position ?? '',
+        remarks: existing?.remarks ?? '',
+      };
+    }
+    setResultDrafts(drafts);
+  }, [registrations, results, detailTab]);
+
+  const handleSaveResults = () => {
+    if (!selected) return;
+    const payload = Object.entries(resultDrafts)
+      .filter(([, draft]) => draft.position)
+      .map(([registrationId, draft]) => ({
+        registrationId,
+        position: draft.position,
+        remarks: draft.remarks.trim() || undefined,
+      }));
+    saveResultsMut.mutate({ activityId: selected.id, results: payload });
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,7 +632,8 @@ export function DepartmentActivitiesWorkspace() {
             <CardContent className="space-y-4">
               {!selected ? (
                 <p className="text-sm text-slate-500">
-                  Select an activity to view registrations, mark attendance, and issue certificates.
+                  Select an activity to view registrations, mark attendance, record results, and
+                  manage post-event content.
                 </p>
               ) : (
                 <>
@@ -442,82 +664,550 @@ export function DepartmentActivitiesWorkspace() {
                     </div>
                   </dl>
 
-                  <div className="flex flex-wrap gap-2">
-                    {!selected.attendanceFinalized &&
-                    ['OPEN', 'CLOSED', 'COMPLETED'].includes(selected.status) ? (
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        disabled={finalizeMut.isPending}
-                        onClick={() => finalizeMut.mutate(selected.id)}
-                      >
-                        Finalize Attendance
-                      </Button>
-                    ) : null}
-                    {selected.attendanceFinalized ? (
-                      <Button
-                        size="sm"
-                        type="button"
-                        disabled={certMut.isPending}
-                        onClick={() => certMut.mutate(selected.id)}
-                      >
-                        Issue Participation Certificates
-                      </Button>
-                    ) : null}
-                  </div>
+                  <nav className="flex flex-wrap gap-1 rounded-xl border border-slate-200/80 bg-slate-50 p-1">
+                    {ACTIVITY_DETAIL_TABS.map((item) => {
+                      const Icon = item.icon;
+                      const active = detailTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setDetailTab(item.id)}
+                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${
+                            active
+                              ? 'bg-white text-slate-900 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Icon className="h-3 w-3 opacity-80" />
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </nav>
 
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Roster
-                    </p>
-                    {registrationsQ.isLoading ? (
-                      <LoadingBlock label="Loading roster…" />
-                    ) : registrations.length === 0 ? (
-                      <p className="text-sm text-slate-500">No registrations yet.</p>
-                    ) : (
-                      <ul className="max-h-72 space-y-2 overflow-y-auto">
-                        {registrations
-                          .filter((r) => r.status === 'REGISTERED')
-                          .map((reg) => (
-                            <li
-                              key={reg.id}
-                              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-3 py-2 text-sm"
-                            >
-                              <div>
-                                <p className="font-medium text-slate-900">{studentName(reg)}</p>
-                                <p className="text-xs text-slate-500">
-                                  {reg.student?.enrollmentNumber ?? reg.student?.rollNumber ?? '—'}
-                                </p>
-                              </div>
-                              {reg.attendance ? (
-                                <StcStatusBadge status="CONFIRMED" />
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  type="button"
-                                  disabled={markMut.isPending}
-                                  onClick={() =>
-                                    markMut.mutate({
-                                      activityId: selected.id,
-                                      registrationId: reg.id,
-                                    })
-                                  }
+                  {detailTab === 'attendance' ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {!selected.attendanceFinalized &&
+                        ['OPEN', 'CLOSED', 'COMPLETED'].includes(selected.status) ? (
+                          <Button
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            disabled={finalizeMut.isPending}
+                            onClick={() => finalizeMut.mutate(selected.id)}
+                          >
+                            Finalize Attendance
+                          </Button>
+                        ) : null}
+                        {selected.attendanceFinalized ? (
+                          <Button
+                            size="sm"
+                            type="button"
+                            disabled={certMut.isPending}
+                            onClick={() => certMut.mutate(selected.id)}
+                          >
+                            Issue Participation Certificates
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Roster
+                        </p>
+                        {registrationsQ.isLoading ? (
+                          <LoadingBlock label="Loading roster…" />
+                        ) : registrations.length === 0 ? (
+                          <p className="text-sm text-slate-500">No registrations yet.</p>
+                        ) : (
+                          <ul className="max-h-72 space-y-2 overflow-y-auto">
+                            {registrations
+                              .filter((r) => r.status === 'REGISTERED')
+                              .map((reg) => (
+                                <li
+                                  key={reg.id}
+                                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-3 py-2 text-sm"
                                 >
-                                  Mark Present
-                                </Button>
-                              )}
+                                  <div>
+                                    <p className="font-medium text-slate-900">{studentName(reg)}</p>
+                                    <p className="text-xs text-slate-500">
+                                      {reg.student?.enrollmentNumber ??
+                                        reg.student?.rollNumber ??
+                                        '—'}
+                                    </p>
+                                  </div>
+                                  {reg.attendance ? (
+                                    <StcStatusBadge status="CONFIRMED" />
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      type="button"
+                                      disabled={markMut.isPending}
+                                      onClick={() =>
+                                        markMut.mutate({
+                                          activityId: selected.id,
+                                          registrationId: reg.id,
+                                        })
+                                      }
+                                    >
+                                      Mark Present
+                                    </Button>
+                                  )}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {detailTab === 'results' ? (
+                    <div className="space-y-3">
+                      {resultsQ.isLoading || registrationsQ.isLoading ? (
+                        <LoadingBlock label="Loading results…" />
+                      ) : (
+                        <>
+                          <ul className="max-h-72 space-y-2 overflow-y-auto">
+                            {registrations
+                              .filter((r) => r.status === 'REGISTERED')
+                              .map((reg) => {
+                                const draft = resultDrafts[reg.id] ?? { position: '', remarks: '' };
+                                return (
+                                  <li
+                                    key={reg.id}
+                                    className="space-y-2 rounded-lg border border-slate-200/80 px-3 py-2 text-sm"
+                                  >
+                                    <p className="font-medium text-slate-900">{studentName(reg)}</p>
+                                    <select
+                                      className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                                      value={draft.position}
+                                      onChange={(e) =>
+                                        setResultDrafts((prev) => ({
+                                          ...prev,
+                                          [reg.id]: { ...draft, position: e.target.value },
+                                        }))
+                                      }
+                                    >
+                                      <option value="">No position</option>
+                                      {COMPETITION_POSITIONS.map((pos) => (
+                                        <option key={pos} value={pos}>
+                                          {positionLabel(pos)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <Input
+                                      placeholder="Remarks (optional)"
+                                      value={draft.remarks}
+                                      onChange={(e) =>
+                                        setResultDrafts((prev) => ({
+                                          ...prev,
+                                          [reg.id]: { ...draft, remarks: e.target.value },
+                                        }))
+                                      }
+                                    />
+                                  </li>
+                                );
+                              })}
+                          </ul>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              type="button"
+                              disabled={saveResultsMut.isPending}
+                              onClick={handleSaveResults}
+                            >
+                              Save Results
+                            </Button>
+                            <Button
+                              size="sm"
+                              type="button"
+                              variant="outline"
+                              disabled={awardCertMut.isPending}
+                              onClick={() => awardCertMut.mutate(selected.id)}
+                            >
+                              Issue Award Certificates
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {detailTab === 'presentations' ? (
+                    <div className="space-y-3">
+                      {presentationsQ.isLoading ? (
+                        <LoadingBlock label="Loading presentations…" />
+                      ) : presentations.length === 0 ? (
+                        <p className="text-sm text-slate-500">No presentations submitted yet.</p>
+                      ) : (
+                        <ul className="max-h-80 space-y-3 overflow-y-auto">
+                          {presentations.map((pres) => (
+                            <li
+                              key={pres.id}
+                              className="space-y-2 rounded-lg border border-slate-200/80 px-3 py-2 text-sm"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-medium text-slate-900">{pres.topicTitle}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {studentName(pres.registration ?? {})} ·{' '}
+                                    {pres.supervisor || 'No supervisor'}
+                                  </p>
+                                </div>
+                                <StcStatusBadge status={pres.status} />
+                              </div>
+                              {pres.abstractText ? (
+                                <p className="line-clamp-2 text-xs text-slate-600">
+                                  {pres.abstractText}
+                                </p>
+                              ) : null}
+                              {pres.fileUrl ? (
+                                <a
+                                  href={pres.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-sky-700 hover:underline"
+                                >
+                                  View file
+                                </a>
+                              ) : null}
+                              {pres.status === 'SUBMITTED' ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    placeholder="Review note (optional)"
+                                    value={reviewNotes[pres.id] ?? ''}
+                                    onChange={(e) =>
+                                      setReviewNotes((prev) => ({
+                                        ...prev,
+                                        [pres.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      type="button"
+                                      disabled={reviewMut.isPending}
+                                      onClick={() =>
+                                        reviewMut.mutate({
+                                          presentationId: pres.id,
+                                          status: 'APPROVED',
+                                          reviewNote: reviewNotes[pres.id],
+                                        })
+                                      }
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      type="button"
+                                      variant="outline"
+                                      disabled={reviewMut.isPending}
+                                      onClick={() =>
+                                        reviewMut.mutate({
+                                          presentationId: pres.id,
+                                          status: 'REJECTED',
+                                          reviewNote: reviewNotes[pres.id],
+                                        })
+                                      }
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : pres.reviewNote ? (
+                                <p className="text-xs text-slate-500">Note: {pres.reviewNote}</p>
+                              ) : null}
                             </li>
                           ))}
-                      </ul>
-                    )}
-                  </div>
+                        </ul>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {detailTab === 'gallery' ? (
+                    <div className="space-y-4">
+                      {mediaQ.isLoading ? (
+                        <LoadingBlock label="Loading gallery…" />
+                      ) : mediaItems.length === 0 ? (
+                        <p className="text-sm text-slate-500">No media added yet.</p>
+                      ) : (
+                        <ul className="max-h-48 space-y-2 overflow-y-auto">
+                          {mediaItems.map((item) => (
+                            <li
+                              key={item.id}
+                              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-slate-900">
+                                  {item.title || item.mediaType}
+                                </p>
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate text-xs text-sky-700 hover:underline"
+                                >
+                                  {item.url}
+                                </a>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                type="button"
+                                disabled={deleteMediaMut.isPending}
+                                onClick={() => deleteMediaMut.mutate(item.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <form
+                        className="space-y-2 border-t border-slate-200 pt-3"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!mediaForm.url.trim()) return;
+                          addMediaMut.mutate({
+                            activityId: selected.id,
+                            mediaType: mediaForm.mediaType,
+                            url: mediaForm.url.trim(),
+                            title: mediaForm.title.trim() || undefined,
+                          });
+                        }}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Add media
+                        </p>
+                        <select
+                          className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                          value={mediaForm.mediaType}
+                          onChange={(e) =>
+                            setMediaForm((f) => ({ ...f, mediaType: e.target.value }))
+                          }
+                        >
+                          {MEDIA_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {positionLabel(type)}
+                            </option>
+                          ))}
+                        </select>
+                        <Input
+                          placeholder="URL"
+                          value={mediaForm.url}
+                          onChange={(e) => setMediaForm((f) => ({ ...f, url: e.target.value }))}
+                          required
+                        />
+                        <Input
+                          placeholder="Title (optional)"
+                          value={mediaForm.title}
+                          onChange={(e) => setMediaForm((f) => ({ ...f, title: e.target.value }))}
+                        />
+                        <Button size="sm" type="submit" disabled={addMediaMut.isPending}>
+                          Add to gallery
+                        </Button>
+                      </form>
+                    </div>
+                  ) : null}
+
+                  {detailTab === 'report' ? (
+                    <form
+                      className="space-y-3"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        reportMut.mutate({
+                          activityId: selected.id,
+                          reportText: reportForm.reportText,
+                          outcomesSummary: reportForm.outcomesSummary,
+                          feedbackSummary: reportForm.feedbackSummary,
+                        });
+                      }}
+                    >
+                      <div className="space-y-1.5">
+                        <Label htmlFor="da-report-text">Event report</Label>
+                        <textarea
+                          id="da-report-text"
+                          className="min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          value={reportForm.reportText}
+                          onChange={(e) =>
+                            setReportForm((f) => ({ ...f, reportText: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="da-outcomes">Outcomes summary</Label>
+                        <textarea
+                          id="da-outcomes"
+                          className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          value={reportForm.outcomesSummary}
+                          onChange={(e) =>
+                            setReportForm((f) => ({ ...f, outcomesSummary: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="da-feedback">Feedback summary</Label>
+                        <textarea
+                          id="da-feedback"
+                          className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          value={reportForm.feedbackSummary}
+                          onChange={(e) =>
+                            setReportForm((f) => ({ ...f, feedbackSummary: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <Button size="sm" type="submit" disabled={reportMut.isPending}>
+                        Save report
+                      </Button>
+                    </form>
+                  ) : null}
                 </>
               )}
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {tab === 'reports' ? (
+        <StcPanel
+          title="Global reports"
+          description="Summary KPIs across department activities — filter by department and date range"
+          icon={BarChart3}
+        >
+          <div className="mb-4 grid gap-3 md:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rep-dept">Department</Label>
+              <select
+                id="rep-dept"
+                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                value={reportFilters.departmentId}
+                onChange={(e) => setReportFilters((f) => ({ ...f, departmentId: e.target.value }))}
+              >
+                <option value="">All departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.code} — {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rep-from">From</Label>
+              <DateInput
+                id="rep-from"
+                value={reportFilters.from}
+                onChange={(v) => setReportFilters((f) => ({ ...f, from: v }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rep-to">To</Label>
+              <DateInput
+                id="rep-to"
+                value={reportFilters.to}
+                onChange={(v) => setReportFilters((f) => ({ ...f, to: v }))}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={csvMut.isPending}
+                onClick={() => csvMut.mutate()}
+              >
+                {csvMut.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing…
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download CSV
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {reportsSummaryQ.isLoading ? (
+            <LoadingBlock label="Loading report summary…" />
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <StcKpiCard
+                  label="Participants"
+                  value={reportsSummary?.participants ?? 0}
+                  icon={Users}
+                  tone="from-emerald-50 to-white"
+                />
+                <StcKpiCard
+                  label="Certificates"
+                  value={reportsSummary?.certificates ?? 0}
+                  icon={Award}
+                  tone="from-amber-50 to-white"
+                />
+                <StcKpiCard
+                  label="Winners"
+                  value={reportsSummary?.winners ?? 0}
+                  icon={Trophy}
+                  tone="from-violet-50 to-white"
+                />
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Card className="border-slate-200/80 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">By status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {Object.keys(reportsSummary?.byStatus ?? {}).length === 0 ? (
+                      <p className="text-sm text-slate-500">No activities in range.</p>
+                    ) : (
+                      <ul className="space-y-1 text-sm">
+                        {Object.entries(reportsSummary?.byStatus ?? {}).map(([status, count]) => (
+                          <li key={status} className="flex justify-between gap-2">
+                            <span className="text-slate-600">{status.replace(/_/g, ' ')}</span>
+                            <span className="font-medium tabular-nums">{count}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">By activity type</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {Object.keys(reportsSummary?.byActivityType ?? {}).length === 0 ? (
+                      <p className="text-sm text-slate-500">No activities in range.</p>
+                    ) : (
+                      <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                        {Object.entries(reportsSummary?.byActivityType ?? {}).map(
+                          ([typeCode, count]) => {
+                            const typeLabel =
+                              types.find((t) => t.code === typeCode)?.label ?? typeCode;
+                            return (
+                              <li key={typeCode} className="flex justify-between gap-2">
+                                <span className="text-slate-600">{typeLabel}</span>
+                                <span className="font-medium tabular-nums">{count}</span>
+                              </li>
+                            );
+                          },
+                        )}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </StcPanel>
       ) : null}
 
       {tab === 'create' ? (

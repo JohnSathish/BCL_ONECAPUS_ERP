@@ -12659,6 +12659,11 @@ model DepartmentActivity {
   createdById          String?   @map("created_by_id") @db.Uuid
   approvedById         String?   @map("approved_by_id") @db.Uuid
   approvedAt           DateTime? @map("approved_at")
+  reportText           String    @default("") @map("report_text")
+  outcomesSummary      String    @default("") @map("outcomes_summary")
+  feedbackSummary      String    @default("") @map("feedback_summary")
+  calendarPublishedAt  DateTime? @map("calendar_published_at")
+  naacEvidenceTaggedAt DateTime? @map("naac_evidence_tagged_at")
   metadata             Json      @default("{}")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
@@ -12667,6 +12672,9 @@ model DepartmentActivity {
   department     Department                        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   registrations  DepartmentActivityRegistration[]
   certificateLinks DepartmentActivityCertificateLink[]
+  results        DepartmentActivityResult[]
+  presentations  DepartmentActivityPresentation[]
+  media          DepartmentActivityMedia[]
 
   @@index([tenantId, departmentId, status])
   @@index([tenantId, eventDate])
@@ -12690,6 +12698,8 @@ model DepartmentActivityRegistration {
 
   activity   DepartmentActivity            @relation(fields: [activityId], references: [id], onDelete: Cascade)
   attendance DepartmentActivityAttendance?
+  result     DepartmentActivityResult?
+  presentation DepartmentActivityPresentation?
 
   @@unique([activityId, studentId])
   @@index([tenantId, studentId, status])
@@ -12730,6 +12740,70 @@ model DepartmentActivityCertificateLink {
   @@index([tenantId, activityId])
   @@index([tenantId, certificateIssueId])
   @@map("department_activity_certificate_links")
+  @@schema("academic")
+}
+
+model DepartmentActivityResult {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  activityId     String   @map("activity_id") @db.Uuid
+  registrationId String   @unique @map("registration_id") @db.Uuid
+  position       String
+  remarks        String   @default("")
+  recordedById   String?  @map("recorded_by_id") @db.Uuid
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  activity     DepartmentActivity             @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  registration DepartmentActivityRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, activityId, position])
+  @@map("department_activity_results")
+  @@schema("academic")
+}
+
+model DepartmentActivityPresentation {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  activityId     String    @map("activity_id") @db.Uuid
+  registrationId String    @unique @map("registration_id") @db.Uuid
+  topicTitle     String    @map("topic_title")
+  abstractText   String    @default("") @map("abstract_text")
+  fileUrl        String?   @map("file_url")
+  supervisor     String    @default("")
+  keywords       String    @default("")
+  status         String    @default("SUBMITTED")
+  reviewedById   String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt     DateTime? @map("reviewed_at")
+  reviewNote     String    @default("") @map("review_note")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  activity     DepartmentActivity             @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  registration DepartmentActivityRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, activityId, status])
+  @@map("department_activity_presentations")
+  @@schema("academic")
+}
+
+model DepartmentActivityMedia {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  activityId   String    @map("activity_id") @db.Uuid
+  mediaType    String    @map("media_type")
+  title        String    @default("")
+  url          String
+  uploadedById String?   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  activity DepartmentActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, activityId, mediaType])
+  @@map("department_activity_media")
   @@schema("academic")
 }
 

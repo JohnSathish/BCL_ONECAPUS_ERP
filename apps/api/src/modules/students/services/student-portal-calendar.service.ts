@@ -26,43 +26,72 @@ export class StudentPortalCalendarService {
     const from = new Date(y, m, 1);
     const to = new Date(y, m + span, 0, 23, 59, 59, 999);
 
-    const [holidays, demands, lines, workspaceIds] = await Promise.all([
-      this.prisma.staffPublicHoliday.findMany({
-        where: {
-          tenantId,
-          active: true,
-          holidayDate: { gte: from, lte: to },
-        },
-        select: { id: true, name: true, holidayDate: true, holidayType: true },
-      }),
-      this.prisma.studentFeeDemand.findMany({
-        where: {
-          tenantId,
-          studentId,
-          dueDate: { gte: from, lte: to },
-          balanceAmount: { gt: 0 },
-        },
-        select: {
-          id: true,
-          demandNo: true,
-          dueDate: true,
-          balanceAmount: true,
-          billingPeriod: true,
-        },
-      }),
-      this.prisma.semesterRegistrationLine.findMany({
-        where: {
-          tenantId,
-          status: { in: [...ENROLLED_LINE_STATUSES] },
-          registration: { studentId },
-        },
-        select: {
-          offeringId: true,
-          offering: { select: { courseId: true } },
-        },
-      }),
-      this.studentWorkspaceIds(tenantId, studentId),
-    ]);
+    const [holidays, demands, lines, workspaceIds, deptActivities] =
+      await Promise.all([
+        this.prisma.staffPublicHoliday.findMany({
+          where: {
+            tenantId,
+            active: true,
+            holidayDate: { gte: from, lte: to },
+          },
+          select: {
+            id: true,
+            name: true,
+            holidayDate: true,
+            holidayType: true,
+          },
+        }),
+        this.prisma.studentFeeDemand.findMany({
+          where: {
+            tenantId,
+            studentId,
+            dueDate: { gte: from, lte: to },
+            balanceAmount: { gt: 0 },
+          },
+          select: {
+            id: true,
+            demandNo: true,
+            dueDate: true,
+            balanceAmount: true,
+            billingPeriod: true,
+          },
+        }),
+        this.prisma.semesterRegistrationLine.findMany({
+          where: {
+            tenantId,
+            status: { in: [...ENROLLED_LINE_STATUSES] },
+            registration: { studentId },
+          },
+          select: {
+            offeringId: true,
+            offering: { select: { courseId: true } },
+          },
+        }),
+        this.studentWorkspaceIds(tenantId, studentId),
+        (this.prisma as any).departmentActivity.findMany({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: { in: ['OPEN', 'APPROVED', 'CLOSED', 'COMPLETED'] },
+            eventDate: { gte: from, lte: to },
+            OR: [
+              { status: 'OPEN' },
+              {
+                registrations: {
+                  some: { studentId, status: 'REGISTERED' },
+                },
+              },
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            status: true,
+            department: { select: { name: true } },
+          },
+        }),
+      ]);
 
     const courseIds = [
       ...new Set(lines.map((l) => l.offering?.courseId).filter(Boolean)),
@@ -146,6 +175,16 @@ export class StudentPortalCalendarService {
         type: 'assignment',
         title: a.title,
         subtitle: 'Assignment due',
+      });
+    }
+
+    for (const activity of deptActivities) {
+      events.push({
+        id: `dept-activity-${activity.id}`,
+        date: this.dateOnly(activity.eventDate),
+        type: 'event',
+        title: activity.title,
+        subtitle: activity.department?.name ?? activity.status,
       });
     }
 

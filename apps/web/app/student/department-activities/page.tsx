@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Award, CalendarDays, Download, Loader2, QrCode } from 'lucide-react';
+import { Award, CalendarDays, Download, Loader2, Mic, QrCode } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   StcEmptyState,
   StcHero,
@@ -16,8 +18,11 @@ import { useRequireAuth } from '@/hooks/use-auth';
 import {
   fetchMyRegistrations,
   fetchOpenActivities,
+  fetchPresentations,
   registerForActivity,
+  submitPresentation,
   withdrawRegistration,
+  type ActivityRegistration,
 } from '@/services/department-activities';
 import { apiErrorMessage } from '@/utils/api-error';
 
@@ -28,6 +33,207 @@ function formatDate(value?: string | null) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function RegistrationCard({
+  reg,
+  onMessage,
+  withdrawPending,
+  onWithdraw,
+}: {
+  reg: ActivityRegistration;
+  onMessage: (msg: { tone: 'ok' | 'err'; text: string }) => void;
+  withdrawPending: boolean;
+  onWithdraw: () => void;
+}) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    topicTitle: '',
+    abstractText: '',
+    fileUrl: '',
+    supervisor: '',
+    keywords: '',
+  });
+
+  const presentationsQ = useQuery({
+    queryKey: ['dept-activities', 'presentations', reg.activityId],
+    queryFn: () => fetchPresentations(reg.activityId),
+  });
+
+  const myPresentation = useMemo(
+    () => presentationsQ.data?.find((p) => p.registrationId === reg.id) ?? null,
+    [presentationsQ.data, reg.id],
+  );
+
+  const submitMut = useMutation({
+    mutationFn: () =>
+      submitPresentation(reg.activityId, {
+        topicTitle: form.topicTitle.trim(),
+        abstractText: form.abstractText.trim() || undefined,
+        fileUrl: form.fileUrl.trim() || undefined,
+        supervisor: form.supervisor.trim() || undefined,
+        keywords: form.keywords.trim() || undefined,
+      }),
+    onSuccess: () => {
+      onMessage({ tone: 'ok', text: 'Presentation submitted for review.' });
+      setShowForm(false);
+      void qc.invalidateQueries({ queryKey: ['dept-activities'] });
+    },
+    onError: (e) =>
+      onMessage({ tone: 'err', text: apiErrorMessage(e, 'Presentation submit failed') }),
+  });
+
+  const openForm = () => {
+    if (myPresentation) {
+      setForm({
+        topicTitle: myPresentation.topicTitle ?? '',
+        abstractText: myPresentation.abstractText ?? '',
+        fileUrl: myPresentation.fileUrl ?? '',
+        supervisor: myPresentation.supervisor ?? '',
+        keywords: myPresentation.keywords ?? '',
+      });
+    }
+    setShowForm(true);
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-900">{reg.activity?.title}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {reg.activity?.department?.name} · {formatDate(reg.activity?.eventDate)}
+          </p>
+        </div>
+        {reg.attendance ? (
+          <StcStatusBadge status="CONFIRMED" />
+        ) : (
+          <StcStatusBadge status={reg.status} />
+        )}
+      </div>
+      {reg.qrPassToken ? (
+        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            QR pass token
+          </p>
+          <p className="mt-1 break-all font-mono text-sm text-slate-800">{reg.qrPassToken}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-slate-900">
+            <Mic className="h-3.5 w-3.5" />
+            Presentation
+          </p>
+          {presentationsQ.isLoading ? (
+            <span className="text-xs text-slate-500">Loading…</span>
+          ) : myPresentation ? (
+            <StcStatusBadge status={myPresentation.status} />
+          ) : null}
+        </div>
+        {myPresentation ? (
+          <div className="mt-2 space-y-1 text-sm">
+            <p className="font-medium text-slate-800">{myPresentation.topicTitle}</p>
+            {myPresentation.abstractText ? (
+              <p className="line-clamp-2 text-xs text-slate-600">{myPresentation.abstractText}</p>
+            ) : null}
+            {myPresentation.reviewNote ? (
+              <p className="text-xs text-slate-500">Reviewer note: {myPresentation.reviewNote}</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">
+            Submit your topic and abstract if this activity requires a presentation.
+          </p>
+        )}
+        {showForm ? (
+          <form
+            className="mt-3 space-y-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitMut.mutate();
+            }}
+          >
+            <div className="space-y-1">
+              <Label htmlFor={`topic-${reg.id}`}>Topic title</Label>
+              <Input
+                id={`topic-${reg.id}`}
+                value={form.topicTitle}
+                onChange={(e) => setForm((f) => ({ ...f, topicTitle: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`abstract-${reg.id}`}>Abstract</Label>
+              <textarea
+                id={`abstract-${reg.id}`}
+                className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                value={form.abstractText}
+                onChange={(e) => setForm((f) => ({ ...f, abstractText: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`file-${reg.id}`}>File URL</Label>
+              <Input
+                id={`file-${reg.id}`}
+                value={form.fileUrl}
+                onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))}
+                placeholder="https://…"
+              />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor={`supervisor-${reg.id}`}>Supervisor</Label>
+                <Input
+                  id={`supervisor-${reg.id}`}
+                  value={form.supervisor}
+                  onChange={(e) => setForm((f) => ({ ...f, supervisor: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`keywords-${reg.id}`}>Keywords</Label>
+                <Input
+                  id={`keywords-${reg.id}`}
+                  value={form.keywords}
+                  onChange={(e) => setForm((f) => ({ ...f, keywords: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" type="submit" disabled={submitMut.isPending}>
+                {submitMut.isPending
+                  ? 'Submitting…'
+                  : myPresentation
+                    ? 'Update submission'
+                    : 'Submit'}
+              </Button>
+              <Button size="sm" type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button className="mt-3" size="sm" variant="outline" type="button" onClick={openForm}>
+            {myPresentation ? 'Edit presentation' : 'Submit presentation'}
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          type="button"
+          disabled={withdrawPending || Boolean(reg.attendance)}
+          onClick={onWithdraw}
+        >
+          Withdraw
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function StudentDepartmentActivitiesPage() {
@@ -190,45 +396,13 @@ export default function StudentDepartmentActivitiesPage() {
           ) : (
             <div className="space-y-3">
               {myRegistrations.map((reg) => (
-                <div
+                <RegistrationCard
                   key={reg.id}
-                  className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-900">{reg.activity?.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {reg.activity?.department?.name} · {formatDate(reg.activity?.eventDate)}
-                      </p>
-                    </div>
-                    {reg.attendance ? (
-                      <StcStatusBadge status="CONFIRMED" />
-                    ) : (
-                      <StcStatusBadge status={reg.status} />
-                    )}
-                  </div>
-                  {reg.qrPassToken ? (
-                    <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        QR pass token
-                      </p>
-                      <p className="mt-1 break-all font-mono text-sm text-slate-800">
-                        {reg.qrPassToken}
-                      </p>
-                    </div>
-                  ) : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      disabled={withdrawMut.isPending || Boolean(reg.attendance)}
-                      onClick={() => withdrawMut.mutate(reg.activityId)}
-                    >
-                      Withdraw
-                    </Button>
-                  </div>
-                </div>
+                  reg={reg}
+                  onMessage={setMessage}
+                  withdrawPending={withdrawMut.isPending}
+                  onWithdraw={() => withdrawMut.mutate(reg.activityId)}
+                />
               ))}
             </div>
           )}

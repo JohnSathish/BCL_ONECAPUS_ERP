@@ -1,4 +1,6 @@
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -7,8 +9,13 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
-import { ACTIVITY_STATUSES } from '../domain/activity-types';
+import {
+  ACTIVITY_STATUSES,
+  COMPETITION_POSITIONS,
+  MEDIA_TYPES,
+} from '../domain/activity-types';
 
 export class UpsertDepartmentActivityDto {
   @IsString()
@@ -121,4 +128,81 @@ export class MarkAttendanceDto {
   @IsOptional()
   @IsIn(['QR', 'MANUAL', 'FACULTY'])
   method?: string;
+}
+
+export class UpsertResultItemDto {
+  @IsUUID()
+  registrationId!: string;
+
+  @IsIn([...COMPETITION_POSITIONS])
+  position!: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class UpsertResultsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpsertResultItemDto)
+  results!: UpsertResultItemDto[];
+}
+
+export class SubmitPresentationDto {
+  @IsString()
+  @MaxLength(500)
+  topicTitle!: string;
+
+  @IsOptional()
+  @IsString()
+  abstractText?: string;
+
+  @IsOptional()
+  @IsString()
+  fileUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  supervisor?: string;
+
+  @IsOptional()
+  @IsString()
+  keywords?: string;
+}
+
+export class ReviewPresentationDto {
+  @IsIn(['APPROVED', 'REJECTED'])
+  status!: string;
+
+  @IsOptional()
+  @IsString()
+  reviewNote?: string;
+}
+
+export class AddMediaDto {
+  @IsIn([...MEDIA_TYPES])
+  mediaType!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  title?: string;
+
+  @IsString()
+  url!: string;
+}
+
+export class UpsertActivityReportDto {
+  @IsOptional()
+  @IsString()
+  reportText?: string;
+
+  @IsOptional()
+  @IsString()
+  outcomesSummary?: string;
+
+  @IsOptional()
+  @IsString()
+  feedbackSummary?: string;
 }

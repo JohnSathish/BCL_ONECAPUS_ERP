@@ -84,6 +84,7 @@ export const NAAC_EVIDENCE_SOURCE_TYPES = [
   'faculty_achievement',
   'student_achievement',
   'mou',
+  'department_activity',
 ] as const;
 
 export function paginate(page?: number, limit?: number) {
