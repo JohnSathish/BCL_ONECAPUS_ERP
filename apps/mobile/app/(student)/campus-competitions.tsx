@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,8 @@ import {
 } from 'react-native';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import {
+  fetchChampionshipStandings,
+  fetchCompetitionAcademicYears,
   fetchCompetitionHouseDashboard,
   fetchCompetitionLeaderboard,
   fetchCompetitionMeet,
@@ -40,19 +43,48 @@ export default function CampusCompetitionsScreen() {
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
   const [message, setMessage] = useState('');
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
+  const [years, setYears] = useState<
+    Array<{ id: string; name: string; isPrimarySession?: boolean }>
+  >([]);
+  const [champYearId, setChampYearId] = useState<string | null>(null);
+  const [champStandings, setChampStandings] = useState<
+    Array<{
+      id: string;
+      name: string;
+      code: string;
+      color: string;
+      points: number;
+      rank: number;
+    }>
+  >([]);
+  const [houseOfYear, setHouseOfYear] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [h, open, mine, myMedals] = await Promise.all([
+      const [h, open, mine, myMedals, ay] = await Promise.all([
         fetchMyCompetitionHouse().catch(() => null),
         fetchOpenCompetitionMeets().catch(() => []),
         fetchMyCompetitionEntries().catch(() => []),
         fetchMyCompetitionMedals().catch(() => []),
+        fetchCompetitionAcademicYears().catch(() => []),
       ]);
       setHouse(h);
       setMeets(open ?? []);
       setEntries(mine ?? []);
       setMedals(myMedals ?? []);
+      setYears(ay ?? []);
+      const yearId = champYearId ?? ay?.find((y) => y.isPrimarySession)?.id ?? ay?.[0]?.id ?? null;
+      if (!champYearId && yearId) {
+        setChampYearId(yearId);
+      }
+      if (yearId) {
+        const champ = await fetchChampionshipStandings(yearId).catch(() => null);
+        setChampStandings(champ?.standings ?? []);
+        setHouseOfYear(champ?.houseOfYear?.name ?? null);
+      } else {
+        setChampStandings([]);
+        setHouseOfYear(null);
+      }
       const meetId = selectedMeetId ?? open?.[0]?.id ?? null;
       setSelectedMeetId(meetId);
 
@@ -83,7 +115,7 @@ export default function CampusCompetitionsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedMeetId]);
+  }, [selectedMeetId, champYearId]);
 
   useEffect(() => {
     void load();
@@ -173,9 +205,17 @@ export default function CampusCompetitionsScreen() {
                     {checkedIn ? ' · Checked in' : ''}
                   </Text>
                   {entry.qrPassToken ? (
-                    <Text style={styles.pass} selectable>
-                      Pass: {entry.qrPassToken}
-                    </Text>
+                    <View style={styles.passBox}>
+                      <Image
+                        source={{
+                          uri: `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(entry.qrPassToken)}`,
+                        }}
+                        style={styles.qr}
+                      />
+                      <Text style={styles.pass} selectable>
+                        {entry.qrPassToken}
+                      </Text>
+                    </View>
                   ) : null}
                 </Pressable>
               );
@@ -192,6 +232,41 @@ export default function CampusCompetitionsScreen() {
                   {m.metal} · {m.event?.name ?? 'Event'}
                 </Text>
                 <Text style={styles.meta}>{m.meet?.name ?? ''}</Text>
+              </View>
+            ))
+          )}
+
+          <Text style={styles.heading}>Championship</Text>
+          {years.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 8 }}
+            >
+              {years.map((y) => (
+                <Pressable
+                  key={y.id}
+                  style={[styles.yearChip, champYearId === y.id && styles.yearChipActive]}
+                  onPress={() => setChampYearId(y.id)}
+                >
+                  <Text style={styles.yearChipText}>{y.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+          {houseOfYear ? <Text style={styles.meta}>House of the Year: {houseOfYear}</Text> : null}
+          {champStandings.length === 0 ? (
+            <Text style={styles.empty}>No championship points yet.</Text>
+          ) : (
+            champStandings.map((row) => (
+              <View key={row.id} style={styles.row}>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.swatch, { backgroundColor: row.color, marginBottom: 0 }]} />
+                  <Text style={styles.title}>
+                    #{row.rank} {row.name}
+                  </Text>
+                </View>
+                <Text style={styles.points}>{row.points}</Text>
               </View>
             ))
           )}
@@ -294,10 +369,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     color: '#0f172a',
+  },
+  passBox: {
+    marginTop: 8,
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: '#f8fafc',
-    padding: 8,
+    padding: 10,
     borderRadius: 8,
   },
+  qr: { width: 140, height: 140, backgroundColor: '#fff' },
+  yearChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+    marginRight: 8,
+  },
+  yearChipActive: { borderColor: '#0ea5e9', backgroundColor: '#f0f9ff' },
+  yearChipText: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

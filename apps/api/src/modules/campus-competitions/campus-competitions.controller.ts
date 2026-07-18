@@ -29,6 +29,7 @@ import {
   TransferByKeyDto,
   TransferStudentDto,
   TransitionMeetStatusDto,
+  UpsertCoordinatorByKeyDto,
   UpsertCoordinatorDto,
   UpsertEventDto,
   UpsertHouseDto,
@@ -154,6 +155,16 @@ export class CampusCompetitionsController {
     @Body() dto: UpsertCoordinatorDto,
   ) {
     return this.houses.upsertCoordinator(user, id, dto);
+  }
+
+  @Post('houses/:id/coordinators/by-key')
+  @RequirePermissions('campus-competitions:manage')
+  upsertCoordinatorByKey(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpsertCoordinatorByKeyDto,
+  ) {
+    return this.houses.upsertCoordinatorByKey(user, id, dto);
   }
 
   @Delete('coordinators/:coordinatorId')
@@ -615,6 +626,17 @@ export class CampusCompetitionsController {
     @Param('eventId') eventId: string,
   ) {
     return this.scoring.approveAndPublishResults(user, eventId);
+  }
+
+  @Get('academic-years')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:self',
+    'student:portal:self',
+  )
+  listCompetitionAcademicYears(@CurrentUser() user: JwtUser) {
+    return this.championship.listAcademicYears(user);
   }
 
   @Get('championship/:academicYearId/standings')

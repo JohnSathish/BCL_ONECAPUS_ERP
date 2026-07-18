@@ -13,6 +13,7 @@ import type {
   BulkTransferDto,
   TransferByKeyDto,
   TransferStudentDto,
+  UpsertCoordinatorByKeyDto,
   UpsertCoordinatorDto,
   UpsertHouseDto,
 } from '../dto/campus-competitions.dto';
@@ -140,6 +141,23 @@ export class CompetitionHousesService {
             },
           });
     const byId = new Map(students.map((s) => [s.id, s]));
+
+    const staffIds = (house.coordinators as Array<{ staffId: string }>).map(
+      (c) => c.staffId,
+    );
+    const staffRows =
+      staffIds.length === 0
+        ? []
+        : await this.prisma.staffProfile.findMany({
+            where: { tenantId: user.tid, id: { in: staffIds } },
+            select: {
+              id: true,
+              employeeCode: true,
+              fullName: true,
+            },
+          });
+    const staffById = new Map(staffRows.map((s) => [s.id, s]));
+
     return {
       ...house,
       memberships: (house.memberships as Array<{ studentId: string }>).map(
@@ -162,6 +180,21 @@ export class CompetitionHousesService {
           };
         },
       ),
+      coordinators: (
+        house.coordinators as Array<{ id: string; staffId: string }>
+      ).map((c) => {
+        const s = staffById.get(c.staffId);
+        return {
+          ...c,
+          staff: s
+            ? {
+                id: s.id,
+                employeeCode: s.employeeCode,
+                fullName: s.fullName,
+              }
+            : null,
+        };
+      }),
     };
   }
 
@@ -331,6 +364,31 @@ export class CompetitionHousesService {
         role: dto.role,
         isPrimary: dto.isPrimary ?? false,
       },
+    });
+  }
+
+  async upsertCoordinatorByKey(
+    user: JwtUser,
+    houseId: string,
+    dto: UpsertCoordinatorByKeyDto,
+  ) {
+    const key = dto.staffKey.trim();
+    if (!key) throw new BadRequestException('staffKey required');
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: {
+        tenantId: user.tid,
+        OR: [
+          { id: key },
+          { employeeCode: { equals: key, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!staff) throw new NotFoundException('Staff not found for key');
+    return this.upsertCoordinator(user, houseId, {
+      staffId: staff.id,
+      role: dto.role,
+      isPrimary: dto.isPrimary,
     });
   }
 

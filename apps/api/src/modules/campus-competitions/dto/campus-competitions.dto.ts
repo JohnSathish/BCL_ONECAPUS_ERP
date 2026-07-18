@@ -57,6 +57,18 @@ export class UpsertCoordinatorDto {
   isPrimary?: boolean;
 }
 
+export class UpsertCoordinatorByKeyDto {
+  @IsString()
+  staffKey!: string;
+
+  @IsIn([...HOUSE_COORDINATOR_ROLES])
+  role!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
+
 export class AllocateStudentsDto {
   @IsArray()
   @IsUUID('4', { each: true })

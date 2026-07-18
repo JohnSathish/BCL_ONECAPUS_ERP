@@ -232,9 +232,19 @@ export default function StudentCampusCompetitionsPage() {
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Check-in QR pass
                         </p>
-                        <p className="mt-1 break-all font-mono text-sm text-slate-800">
-                          {entry.qrPassToken}
-                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(entry.qrPassToken)}`}
+                            alt="Check-in QR"
+                            width={140}
+                            height={140}
+                            className="rounded-md border border-slate-200 bg-white p-1"
+                          />
+                          <p className="break-all font-mono text-sm text-slate-800">
+                            {entry.qrPassToken}
+                          </p>
+                        </div>
                       </div>
                     ) : null}
                   </div>

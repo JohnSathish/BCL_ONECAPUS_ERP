@@ -153,12 +153,53 @@ export async function fetchHouse(houseId: string) {
         fullName: string;
       } | null;
     }>;
+    coordinators?: Array<{
+      id: string;
+      staffId: string;
+      role: string;
+      isPrimary: boolean;
+      staff?: {
+        id: string;
+        employeeCode: string;
+        fullName: string;
+      } | null;
+    }>;
   };
 }
 
 export async function setHouseStatus(houseId: string, status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') {
   const { data } = await api.post(`${base}/houses/${houseId}/status`, { status });
   return data as CompetitionHouse;
+}
+
+export async function mergeHouses(fromHouseId: string, intoHouseId: string) {
+  const { data } = await api.post(`${base}/houses/${fromHouseId}/merge`, {
+    intoHouseId,
+  });
+  return data;
+}
+
+export async function upsertHouseCoordinatorByKey(
+  houseId: string,
+  payload: { staffKey: string; role: string; isPrimary?: boolean },
+) {
+  const { data } = await api.post(`${base}/houses/${houseId}/coordinators/by-key`, payload);
+  return data;
+}
+
+export async function removeHouseCoordinator(coordinatorId: string) {
+  const { data } = await api.delete(`${base}/coordinators/${coordinatorId}`);
+  return data;
+}
+
+export async function fetchCompetitionAcademicYears() {
+  const { data } = await api.get(`${base}/academic-years`);
+  return data as Array<{
+    id: string;
+    name: string;
+    status: string;
+    isPrimarySession?: boolean;
+  }>;
 }
 
 export async function allocateByKeys(payload: {

@@ -47,6 +47,8 @@ import {
   importHouseAllocations,
   issueParticipationCertificates,
   issuePlaceCertificates,
+  mergeHouses,
+  removeHouseCoordinator,
   seedDefaultHouses,
   setHouseStatus,
   setLiveEvent,
@@ -54,6 +56,7 @@ import {
   transferByKey,
   transitionMeetStatus,
   updatePointRules,
+  upsertHouseCoordinatorByKey,
   upsertResults,
   type CompetitionMeet,
 } from '@/services/campus-competitions';
@@ -91,6 +94,11 @@ export function CampusCompetitionsWorkspace() {
     name: '',
     memberKeys: '',
   });
+  const [coordForm, setCoordForm] = useState({
+    staffKey: '',
+    role: 'FACULTY_COORDINATOR',
+  });
+  const [mergeIntoId, setMergeIntoId] = useState('');
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
@@ -659,6 +667,143 @@ export function CampusCompetitionsWorkspace() {
                       }
                     >
                       Transfer
+                    </Button>
+                  </div>
+                  <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+                    <p className="text-sm font-semibold">Coordinators</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Input
+                        className="max-w-[160px]"
+                        placeholder="Employee code"
+                        value={coordForm.staffKey}
+                        onChange={(e) => setCoordForm((f) => ({ ...f, staffKey: e.target.value }))}
+                      />
+                      <select
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={coordForm.role}
+                        onChange={(e) => setCoordForm((f) => ({ ...f, role: e.target.value }))}
+                      >
+                        <option value="FACULTY_COORDINATOR">Faculty coordinator</option>
+                        <option value="HOUSE_MASTER">House master</option>
+                        <option value="HOUSE_MISTRESS">House mistress</option>
+                        <option value="HOUSE_CAPTAIN">House captain</option>
+                        <option value="VICE_CAPTAIN">Vice captain</option>
+                      </select>
+                      <Button
+                        size="sm"
+                        type="button"
+                        disabled={!coordForm.staffKey.trim()}
+                        onClick={() =>
+                          void upsertHouseCoordinatorByKey(selectedHouseId, {
+                            staffKey: coordForm.staffKey.trim(),
+                            role: coordForm.role,
+                          })
+                            .then(() => {
+                              setMessage({ tone: 'ok', text: 'Coordinator saved.' });
+                              setCoordForm((f) => ({ ...f, staffKey: '' }));
+                              void qc.invalidateQueries({
+                                queryKey: ['campus-competitions', 'house', selectedHouseId],
+                              });
+                            })
+                            .catch((e) =>
+                              setMessage({
+                                tone: 'err',
+                                text: apiErrorMessage(e, 'Coordinator failed'),
+                              }),
+                            )
+                        }
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      {(houseDetailQ.data?.coordinators ?? []).map((c) => (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between rounded-lg border border-slate-100 px-2 py-1 text-xs"
+                        >
+                          <span>
+                            {c.staff?.fullName ?? c.staffId.slice(0, 8)} · {c.role}
+                            {c.staff?.employeeCode ? ` · ${c.staff.employeeCode}` : ''}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            type="button"
+                            onClick={() =>
+                              void removeHouseCoordinator(c.id)
+                                .then(() => {
+                                  setMessage({ tone: 'ok', text: 'Coordinator removed.' });
+                                  void qc.invalidateQueries({
+                                    queryKey: ['campus-competitions', 'house', selectedHouseId],
+                                  });
+                                })
+                                .catch((e) =>
+                                  setMessage({
+                                    tone: 'err',
+                                    text: apiErrorMessage(e, 'Remove failed'),
+                                  }),
+                                )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2 rounded-xl border border-rose-200 bg-rose-50/40 p-3">
+                    <div className="min-w-[160px]">
+                      <Label>Merge this house into</Label>
+                      <select
+                        className="mt-1.5 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={mergeIntoId}
+                        onChange={(e) => setMergeIntoId(e.target.value)}
+                      >
+                        <option value="">Select target</option>
+                        {houses
+                          .filter((h) => h.id !== selectedHouseId)
+                          .map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      disabled={!mergeIntoId}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            'Merge moves all members into the target house and archives this house. Continue?',
+                          )
+                        ) {
+                          return;
+                        }
+                        void mergeHouses(selectedHouseId, mergeIntoId)
+                          .then(() => {
+                            setMessage({ tone: 'ok', text: 'Houses merged.' });
+                            setSelectedHouseId(mergeIntoId);
+                            setMergeIntoId('');
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'houses'],
+                            });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'house'],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Merge failed'),
+                            }),
+                          );
+                      }}
+                    >
+                      Merge houses
                     </Button>
                   </div>
                 </div>

@@ -40,6 +40,22 @@ export class CompetitionChampionshipService {
     }
   }
 
+  async listAcademicYears(user: JwtUser) {
+    this.requireRead(user);
+    return this.prisma.academicYear.findMany({
+      where: { tenantId: user.tid, deletedAt: null },
+      orderBy: [{ startDate: 'desc' }, { name: 'desc' }],
+      select: {
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        isPrimarySession: true,
+      },
+    });
+  }
+
   async yearStandings(user: JwtUser, academicYearId: string) {
     this.requireRead(user);
     const meets = await this.db().competitionMeet.findMany({

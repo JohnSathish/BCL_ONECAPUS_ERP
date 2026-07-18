@@ -89,6 +89,33 @@ export function fetchCompetitionHouseDashboard(houseId: string, meetId?: string)
   );
 }
 
+export function fetchCompetitionAcademicYears() {
+  return apiFetch<
+    Array<{
+      id: string;
+      name: string;
+      status: string;
+      isPrimarySession?: boolean;
+    }>
+  >('/v1/campus-competitions/academic-years');
+}
+
+export function fetchChampionshipStandings(academicYearId: string) {
+  return apiFetch<{
+    meetCount: number;
+    houseOfYear?: { id: string; name: string; code: string; color: string } | null;
+    standings: Array<{
+      id: string;
+      name: string;
+      code: string;
+      color: string;
+      points: number;
+      rank: number;
+      medals?: { gold: number; silver: number; bronze: number };
+    }>;
+  }>(`/v1/campus-competitions/championship/${academicYearId}/standings`);
+}
+
 export function registerForCompetitionEvent(eventId: string) {
   return apiFetch('/v1/campus-competitions/entries', {
     method: 'POST',
