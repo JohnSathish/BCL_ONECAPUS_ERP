@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { CertificatesModule } from '../certificates/certificates.module';
+import { CommunicationModule } from '../communication/communication.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { CampusCompetitionsController } from './campus-competitions.controller';
 import { CompetitionHousesService } from './services/competition-houses.service';
@@ -8,7 +9,11 @@ import { CompetitionRealtimePublisher } from './services/competition-realtime.pu
 import { CompetitionScoringService } from './services/competition-scoring.service';
 
 @Module({
-  imports: [CertificatesModule, forwardRef(() => RealtimeModule)],
+  imports: [
+    CertificatesModule,
+    forwardRef(() => RealtimeModule),
+    forwardRef(() => CommunicationModule),
+  ],
   controllers: [CampusCompetitionsController],
   providers: [
     CompetitionHousesService,

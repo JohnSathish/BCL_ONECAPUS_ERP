@@ -26,6 +26,13 @@ export function resolveNotificationLink(input: {
     if (trigger.includes('fee') || trigger.includes('due'))
       return '/student/fees';
     if (trigger.includes('timetable')) return '/student/timetable';
+    if (
+      trigger.includes('campus.competition') ||
+      trigger.includes('campus_competition') ||
+      trigger.includes('competition')
+    ) {
+      return '/student/campus-competitions';
+    }
     if (trigger.includes('exam') || trigger.includes('result'))
       return '/student/results';
     if (trigger.includes('admission')) return '/student';

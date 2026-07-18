@@ -268,6 +268,29 @@ ${emailCtaButton('View Result')}`,
     channels: ['EMAIL', 'IN_APP'],
   },
   {
+    code: 'CAMPUS_COMPETITION_RESULTS_PUBLISHED',
+    name: 'Campus Competition Results Published',
+    category: 'ACADEMIC',
+    subject: 'Results published — {{event_name}}',
+    bodyHtml: `${emailGreeting()}
+<p style="margin:0 0 12px;color:#334155;">Competition results are now live for your event.</p>
+${emailInfoRows([
+  { label: 'Meet', value: '{{meet_name}}' },
+  { label: 'Event', value: '{{event_name}}' },
+])}
+${emailCtaButton('View Competitions')}`,
+    bodyText:
+      'Results for {{event_name}} ({{meet_name}}) are published. Open Campus Competitions to see the board.',
+    variables: [
+      'student_name',
+      'meet_name',
+      'event_name',
+      'institution_name',
+      'login_url',
+    ],
+    channels: ['EMAIL', 'IN_APP', 'PUSH'],
+  },
+  {
     code: 'EXAM_NOTICE',
     name: 'Examination Notice',
     category: 'EXAMINATIONS',

@@ -284,6 +284,63 @@ export async function fetchMyHouse() {
   return data;
 }
 
+export async function fetchMyEntries() {
+  const { data } = await api.get(`${base}/mine`);
+  return data as Array<{
+    id: string;
+    status: string;
+    bibNumber?: string | null;
+    house?: { id: string; name: string; code: string; color: string } | null;
+    event?: {
+      id: string;
+      name: string;
+      status: string;
+      scheduledAt?: string | null;
+      meet?: {
+        id: string;
+        name: string;
+        meetType: string;
+        status: string;
+      } | null;
+    } | null;
+    results?: Array<{
+      id: string;
+      position: number;
+      status: string;
+      metricValue?: string | null;
+    }>;
+  }>;
+}
+
+export async function fetchMyMedals(meetId?: string) {
+  const { data } = await api.get(`${base}/me/medals`, { params: { meetId } });
+  return data as Array<{
+    id: string;
+    metal: string;
+    awardType: string;
+    createdAt: string;
+    house?: { name: string; code: string; color: string } | null;
+    meet?: { id: string; name: string; meetType: string } | null;
+    event?: { id: string; name: string } | null;
+  }>;
+}
+
+export async function fetchHouseDashboard(houseId: string, meetId?: string) {
+  const { data } = await api.get(`${base}/houses/${houseId}/dashboard`, {
+    params: { meetId },
+  });
+  return data as {
+    house: { id: string; name: string; code: string; color: string };
+    totalStudents: number;
+    boys: number;
+    girls: number;
+    facultyCoordinators: number;
+    championshipPoints: number;
+    currentRank: number | null;
+    medals: { gold: number; silver: number; bronze: number };
+  };
+}
+
 export async function fetchOpenMeets() {
   const { data } = await api.get(`${base}/open`);
   return data as CompetitionMeet[];

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
@@ -10,11 +11,13 @@ import { PrismaService } from '../../../database/prisma.service';
 import { CertificateDocumentService } from '../../certificates/certificate-document.service';
 import { CertificateIntegrityService } from '../../certificates/certificate-integrity.service';
 import { CertificateVariableService } from '../../certificates/certificate-variable.service';
+import { CommunicationTriggerService } from '../../communication/services/communication-trigger.service';
 import {
   metalForPosition,
   pointsForPosition,
 } from '../domain/competition.constants';
 import type { UpsertResultsDto } from '../dto/campus-competitions.dto';
+import { CompetitionHousesService } from './competition-houses.service';
 import { CompetitionMeetsService } from './competition-meets.service';
 import { CompetitionRealtimePublisher } from './competition-realtime.publisher';
 
@@ -23,10 +26,12 @@ export class CompetitionScoringService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly meets: CompetitionMeetsService,
+    private readonly houses: CompetitionHousesService,
     private readonly variables: CertificateVariableService,
     private readonly documents: CertificateDocumentService,
     private readonly integrity: CertificateIntegrityService,
     private readonly realtime: CompetitionRealtimePublisher,
+    @Optional() private readonly communication?: CommunicationTriggerService,
   ) {}
 
   private db() {
@@ -100,6 +105,26 @@ export class CompetitionScoringService {
 
   async medalTally(user: JwtUser, meetId: string) {
     return this.leaderboard(user, meetId);
+  }
+
+  async myMedals(user: JwtUser, meetId?: string) {
+    const studentId = await this.houses.resolveStudentId(user);
+    return this.db().competitionMedal.findMany({
+      where: {
+        tenantId: user.tid,
+        studentId,
+        ...(meetId ? { meetId } : {}),
+      },
+      include: {
+        house: { select: { id: true, name: true, code: true, color: true } },
+        meet: {
+          select: { id: true, name: true, meetType: true, status: true },
+        },
+        event: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   }
 
   listResults(user: JwtUser, eventId: string) {
@@ -540,11 +565,88 @@ export class CompetitionScoringService {
       },
     });
 
+    void this.notifyResultsPublished(
+      user.tid,
+      meetId,
+      eventId,
+      event.name,
+    ).catch(() => undefined);
+
     return {
       published: published.length,
       leaderboardVersion: meet.leaderboardVersion,
       leaderboard: board,
     };
+  }
+
+  private async notifyResultsPublished(
+    tenantId: string,
+    meetId: string,
+    eventId: string,
+    eventName: string,
+  ) {
+    if (!this.communication) return;
+
+    const entries = await this.db().competitionEntry.findMany({
+      where: { tenantId, eventId, status: 'REGISTERED' },
+      select: { studentId: true },
+    });
+    const studentIds = [
+      ...new Set(
+        entries
+          .map((e: { studentId: string | null }) => e.studentId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    if (!studentIds.length) return;
+
+    const students = await this.prisma.student.findMany({
+      where: { tenantId, id: { in: studentIds }, deletedAt: null },
+      include: {
+        user: {
+          select: { id: true, email: true, displayName: true, isActive: true },
+        },
+        masterProfile: { select: { fullName: true, email: true } },
+      },
+    });
+
+    const meet = await this.db().competitionMeet.findFirst({
+      where: { id: meetId, tenantId },
+      select: { name: true },
+    });
+    const institutionName =
+      await this.communication.getInstitutionName(tenantId);
+
+    await this.communication.triggerBulk({
+      tenantId,
+      templateCode: 'CAMPUS_COMPETITION_RESULTS_PUBLISHED',
+      triggerKey: `campus.competition.results_published.${eventId}`,
+      entityType: 'competition_event_student',
+      channels: ['EMAIL', 'IN_APP', 'PUSH'],
+      recipients: students
+        .filter((s) => s.user?.isActive && s.userId)
+        .map((s) => {
+          const displayName =
+            s.masterProfile?.fullName ?? s.user.displayName ?? s.user.email;
+          return {
+            entityId: s.id,
+            recipient: {
+              recipientType: 'STUDENT' as const,
+              userId: s.userId!,
+              studentId: s.id,
+              displayName,
+              email: s.masterProfile?.email ?? s.user.email,
+            },
+            variables: {
+              institution_name: institutionName,
+              student_name: displayName ?? 'Student',
+              meet_name: meet?.name ?? 'Campus Competition',
+              event_name: eventName,
+              login_url: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+            },
+          };
+        }),
+    });
   }
 
   private async resolveParticipationCategory(tenantId: string) {

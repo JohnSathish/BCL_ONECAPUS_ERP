@@ -217,6 +217,18 @@ export class CampusCompetitionsController {
     return this.houses.myHouse(user);
   }
 
+  @Get('mine')
+  @RequireAnyPermission('campus-competitions:self', 'student:portal:self')
+  myEntries(@CurrentUser() user: JwtUser) {
+    return this.meets.myEntries(user);
+  }
+
+  @Get('me/medals')
+  @RequireAnyPermission('campus-competitions:self', 'student:portal:self')
+  myMedals(@CurrentUser() user: JwtUser, @Query('meetId') meetId?: string) {
+    return this.scoring.myMedals(user, meetId);
+  }
+
   @Get('open')
   @RequireAnyPermission('campus-competitions:self', 'student:portal:self')
   openMeets(@CurrentUser() user: JwtUser) {

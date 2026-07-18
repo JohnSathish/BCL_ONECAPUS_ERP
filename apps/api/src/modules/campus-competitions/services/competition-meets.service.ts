@@ -481,6 +481,48 @@ export class CompetitionMeetsService {
     });
   }
 
+  async myEntries(user: JwtUser) {
+    const studentId = await this.houses.resolveStudentId(user);
+    return this.db().competitionEntry.findMany({
+      where: { tenantId: user.tid, studentId },
+      include: {
+        house: { select: { id: true, name: true, code: true, color: true } },
+        event: {
+          select: {
+            id: true,
+            name: true,
+            entryMode: true,
+            status: true,
+            scheduledAt: true,
+            meet: {
+              select: {
+                id: true,
+                name: true,
+                meetType: true,
+                status: true,
+                startsAt: true,
+                endsAt: true,
+              },
+            },
+          },
+        },
+        results: {
+          where: { status: { in: ['PUBLISHED', 'PENDING_APPROVAL', 'DRAFT'] } },
+          select: {
+            id: true,
+            position: true,
+            status: true,
+            metricValue: true,
+            publishedAt: true,
+          },
+          orderBy: { position: 'asc' },
+        },
+      },
+      orderBy: { registeredAt: 'desc' },
+      take: 100,
+    });
+  }
+
   async ensureDisplayToken(user: JwtUser, meetId: string) {
     this.requireManage(user);
     const meet = await this.getMeet(user, meetId);

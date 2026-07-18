@@ -69,6 +69,9 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('/student/library') || lower.includes('library')) {
     return '/(student)/library' as Href;
   }
+  if (lower.includes('/student/campus-competitions') || lower.includes('campus-competition')) {
+    return '/(student)/campus-competitions' as Href;
+  }
   if (
     lower.includes('/student/assignments') ||
     lower.includes('/student/lms') ||
