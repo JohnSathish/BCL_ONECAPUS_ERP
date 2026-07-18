@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../database/prisma.service';
+import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { FeeFineEngineService } from './fee-fine-engine.service';
+import { FeeSettlementReconciliationService } from './fee-settlement-reconciliation.service';
 import { MonthlyFeeEngineService } from './monthly-fee-engine.service';
 
 @Injectable()
@@ -12,6 +14,8 @@ export class FeeSchedulerService {
     private readonly prisma: PrismaService,
     private readonly monthly: MonthlyFeeEngineService,
     private readonly fines: FeeFineEngineService,
+    private readonly settlementRecon: FeeSettlementReconciliationService,
+    private readonly notifications: UserNotificationsService,
   ) {}
 
   private db() {
@@ -56,6 +60,51 @@ export class FeeSchedulerService {
       } catch (err) {
         this.logger.error(
           `Late fee accrual failed for tenant ${tenant.id}`,
+          err,
+        );
+      }
+    }
+  }
+
+  /** Daily 8:00 AM — notify Finance when settlement recon exceptions remain open. */
+  @Cron('0 8 * * *')
+  async notifySettlementExceptions() {
+    const tenants = await this.db().tenant.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true },
+    });
+    for (const tenant of tenants) {
+      try {
+        const count = await this.settlementRecon.countOpenExceptions(tenant.id);
+        if (count <= 0) continue;
+
+        const userIds = await this.settlementRecon.findFinanceUserIds(
+          tenant.id,
+        );
+        if (!userIds.length) {
+          this.logger.warn(
+            `Settlement exceptions=${count} tenant=${tenant.id} but no fees:manage users`,
+          );
+          continue;
+        }
+
+        for (const userId of userIds) {
+          await this.notifications.createInApp({
+            tenantId: tenant.id,
+            userId,
+            type: 'FEE_SETTLEMENT_EXCEPTIONS',
+            title: 'Fee settlement exceptions need review',
+            body: `${count} settlement reconciliation exception(s) are open. Review matches, mismatches, and unsettled ERP payments.`,
+            link: '/admin/fees/reconciliation',
+            metadata: { exceptionCount: count },
+          });
+        }
+        this.logger.log(
+          `Settlement exception notify tenant=${tenant.id} count=${count} users=${userIds.length}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Settlement exception notify failed for tenant ${tenant.id}`,
           err,
         );
       }

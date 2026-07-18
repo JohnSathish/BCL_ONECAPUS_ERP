@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { apiErrorMessage } from '@/utils/api-error';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   downloadSettlementReconExport,
   downloadSettlementTemplate,
@@ -20,8 +21,10 @@ import {
   markSettlementLineManualReview,
   markSettlementLineReconciled,
   rematchSettlementBatch,
+  searchSettlementPayments,
   updateSettlementLineRemarks,
   type FeeSettlementLine,
+  type FeeSettlementPaymentHit,
 } from '@/services/fee-settlement-reconciliation';
 
 function formatInr(n: number) {
@@ -51,6 +54,7 @@ export function FeeSettlementReconciliationPanel() {
   const [provider, setProvider] = useState('RAZORPAY');
   const [message, setMessage] = useState('');
   const [linkPaymentId, setLinkPaymentId] = useState<Record<string, string>>({});
+  const [linkSearch, setLinkSearch] = useState<Record<string, string>>({});
   const [remarksDraft, setRemarksDraft] = useState<Record<string, string>>({});
 
   const dashQ = useQuery({
@@ -93,7 +97,7 @@ export function FeeSettlementReconciliationPanel() {
   const rematchMut = useMutation({
     mutationFn: (id: string) => rematchSettlementBatch(id),
     onSuccess: () => {
-      setMessage('Auto-match completed');
+      setMessage('Auto-match completed (includes unsettled ERP scan)');
       invalidate();
     },
     onError: (err) => setMessage(apiErrorMessage(err)),
@@ -151,6 +155,7 @@ export function FeeSettlementReconciliationPanel() {
       'DUPLICATE',
       'UNMATCHED',
       'MANUAL_REVIEW',
+      'SETTLEMENT_PENDING',
     ],
     [],
   );
@@ -160,13 +165,13 @@ export function FeeSettlementReconciliationPanel() {
       <div className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-lg font-semibold">Fee settlement reconciliation</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Import gateway settlement CSV (Razorpay / BillDesk style), auto-match to ERP payments by
-          Transaction ID → Gateway Ref → UTR → Receipt → Student+Amount+Date, then clear exceptions.
+          Import gateway settlement CSV/Excel, auto-match ERP payments, flag unsettled ERP rows, and
+          clear exceptions. Provider preset improves fee/GST/net column mapping.
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <div>
-            <Label htmlFor="provider">Provider</Label>
+            <Label htmlFor="provider">Provider preset</Label>
             <select
               id="provider"
               className="mt-1 flex h-10 w-40 rounded-md border border-input bg-background px-3 text-sm"
@@ -181,11 +186,11 @@ export function FeeSettlementReconciliationPanel() {
             </select>
           </div>
           <div>
-            <Label htmlFor="settlement-file">Settlement CSV</Label>
+            <Label htmlFor="settlement-file">Settlement file</Label>
             <Input
               id="settlement-file"
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="mt-1 max-w-xs"
               disabled={busy}
               onChange={(e) => {
@@ -261,15 +266,17 @@ export function FeeSettlementReconciliationPanel() {
           isRetrying={dashQ.isFetching}
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           <Kpi label="Settlement lines" value={String(kpis?.totalLines ?? 0)} />
           <Kpi label="Matched" value={String(kpis?.matched ?? 0)} />
           <Kpi label="Exceptions" value={String(kpis?.exceptions ?? 0)} />
-          <Kpi label="Net settled" value={formatInr(kpis?.totalNet ?? 0)} />
+          <Kpi label="Settlement pending" value={String(kpis?.settlementPending ?? 0)} />
           <Kpi label="Unmatched" value={String(kpis?.unmatched ?? 0)} />
+          <Kpi label="Gross" value={formatInr(kpis?.totalGross ?? 0)} />
+          <Kpi label="Gateway fees" value={formatInr(kpis?.totalFees ?? 0)} />
+          <Kpi label="Tax / GST" value={formatInr(kpis?.totalTax ?? 0)} />
+          <Kpi label="Net settled" value={formatInr(kpis?.totalNet ?? 0)} />
           <Kpi label="Amount mismatch" value={String(kpis?.amountMismatch ?? 0)} />
-          <Kpi label="Duplicates" value={String(kpis?.duplicates ?? 0)} />
-          <Kpi label="Gross amount" value={formatInr(kpis?.totalGross ?? 0)} />
         </div>
       )}
 
@@ -336,17 +343,17 @@ export function FeeSettlementReconciliationPanel() {
           </div>
         ) : lines.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            No lines yet. Import a settlement CSV to begin.
+            No lines yet. Import a settlement CSV/Excel to begin.
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
+            <table className="w-full min-w-[1100px] text-left text-sm">
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
                   <th className="px-2 py-2">#</th>
                   <th className="px-2 py-2">Status</th>
                   <th className="px-2 py-2">Gateway / UTR</th>
-                  <th className="px-2 py-2">Amount</th>
+                  <th className="px-2 py-2">Gross / Fee / Tax / Net</th>
                   <th className="px-2 py-2">ERP payment</th>
                   <th className="px-2 py-2">Actions</th>
                 </tr>
@@ -358,8 +365,10 @@ export function FeeSettlementReconciliationPanel() {
                     line={line}
                     busy={busy}
                     linkValue={linkPaymentId[line.id] ?? ''}
+                    searchValue={linkSearch[line.id] ?? ''}
                     remarksValue={remarksDraft[line.id] ?? line.remarks ?? ''}
                     onLinkValue={(v) => setLinkPaymentId((prev) => ({ ...prev, [line.id]: v }))}
+                    onSearchValue={(v) => setLinkSearch((prev) => ({ ...prev, [line.id]: v }))}
                     onRemarksValue={(v) => setRemarksDraft((prev) => ({ ...prev, [line.id]: v }))}
                     onReconcile={() =>
                       reconcileMut.mutate({
@@ -376,7 +385,7 @@ export function FeeSettlementReconciliationPanel() {
                     onLink={() => {
                       const paymentId = linkPaymentId[line.id]?.trim();
                       if (!paymentId) {
-                        setMessage('Enter an ERP payment ID to link');
+                        setMessage('Select or enter an ERP payment to link');
                         return;
                       }
                       linkMut.mutate({
@@ -391,6 +400,16 @@ export function FeeSettlementReconciliationPanel() {
                         remarks: remarksDraft[line.id] ?? '',
                       })
                     }
+                    onPickPayment={(hit) => {
+                      setLinkPaymentId((prev) => ({
+                        ...prev,
+                        [line.id]: hit.id,
+                      }));
+                      setLinkSearch((prev) => ({
+                        ...prev,
+                        [line.id]: `${hit.transactionNo} · ${hit.studentName ?? ''}`,
+                      }));
+                    }}
                   />
                 ))}
               </tbody>
@@ -415,25 +434,38 @@ function SettlementLineRow({
   line,
   busy,
   linkValue,
+  searchValue,
   remarksValue,
   onLinkValue,
+  onSearchValue,
   onRemarksValue,
   onReconcile,
   onReview,
   onLink,
   onSaveRemarks,
+  onPickPayment,
 }: {
   line: FeeSettlementLine;
   busy: boolean;
   linkValue: string;
+  searchValue: string;
   remarksValue: string;
   onLinkValue: (v: string) => void;
+  onSearchValue: (v: string) => void;
   onRemarksValue: (v: string) => void;
   onReconcile: () => void;
   onReview: () => void;
   onLink: () => void;
   onSaveRemarks: () => void;
+  onPickPayment: (hit: FeeSettlementPaymentHit) => void;
 }) {
+  const debouncedSearch = useDebouncedValue(searchValue, 300);
+  const searchQ = useQuery({
+    queryKey: ['fee-settlement-payment-search', line.id, debouncedSearch],
+    queryFn: () => searchSettlementPayments(debouncedSearch, 8),
+    enabled: !line.paymentId && debouncedSearch.trim().length >= 2,
+  });
+
   return (
     <tr className="border-b align-top">
       <td className="px-2 py-3 text-muted-foreground">{line.lineNo}</td>
@@ -454,7 +486,10 @@ function SettlementLineRow({
       </td>
       <td className="px-2 py-3">
         <p>{formatInr(line.grossAmount)}</p>
-        <p className="text-xs text-muted-foreground">Net {formatInr(line.netAmount)}</p>
+        <p className="text-xs text-muted-foreground">
+          Fee {formatInr(line.feeCharges)} · Tax {formatInr(line.taxAmount)}
+        </p>
+        <p className="text-xs font-medium">Net {formatInr(line.netAmount)}</p>
         {line.amountDifference != null && Math.abs(line.amountDifference) > 0.01 ? (
           <p className="text-xs text-amber-700">Diff {formatInr(line.amountDifference)}</p>
         ) : null}
@@ -475,7 +510,7 @@ function SettlementLineRow({
         )}
       </td>
       <td className="px-2 py-3">
-        <div className="flex max-w-sm flex-col gap-2">
+        <div className="flex max-w-md flex-col gap-2">
           <Input
             placeholder="Remarks"
             value={remarksValue}
@@ -505,16 +540,51 @@ function SettlementLineRow({
             </Button>
           </div>
           {!line.paymentId ? (
-            <div className="flex gap-1">
-              <Input
-                placeholder="ERP payment UUID"
-                value={linkValue}
-                onChange={(e) => onLinkValue(e.target.value)}
-                className="h-8"
-              />
-              <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onLink}>
-                <Link2 className="h-3.5 w-3.5" />
-              </Button>
+            <div className="relative space-y-1">
+              <div className="flex gap-1">
+                <Input
+                  placeholder="Search txn / UTR / admission / name"
+                  value={searchValue}
+                  onChange={(e) => {
+                    onSearchValue(e.target.value);
+                    onLinkValue('');
+                  }}
+                  className="h-8"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !linkValue}
+                  onClick={onLink}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {searchQ.data && searchQ.data.length > 0 ? (
+                <ul className="absolute z-10 max-h-48 w-full overflow-auto rounded-md border bg-popover text-xs shadow">
+                  {searchQ.data.map((hit) => (
+                    <li key={hit.id}>
+                      <button
+                        type="button"
+                        className="w-full px-2 py-1.5 text-left hover:bg-muted"
+                        onClick={() => onPickPayment(hit)}
+                      >
+                        <span className="font-medium">{hit.transactionNo}</span>
+                        {' · '}
+                        {formatInr(hit.amount)}
+                        {hit.studentName ? ` · ${hit.studentName}` : ''}
+                        {hit.admissionNo ? ` (${hit.admissionNo})` : ''}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {linkValue ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Selected payment id: {linkValue.slice(0, 8)}…
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

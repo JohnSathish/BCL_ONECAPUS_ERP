@@ -3,10 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   EXCEPTION_MATCH_STATUSES,
+  resolveSettlementHeaderMap,
   type FeeSettlementMatchMethod,
   type FeeSettlementMatchStatus,
 } from '../constants/fee-settlement.constants';
@@ -28,55 +30,6 @@ type ParsedSettlementRow = {
   rawRow: Record<string, string>;
 };
 
-const HEADER_ALIASES: Record<string, keyof ParsedSettlementRow | 'ignore'> = {
-  payment_id: 'gatewayPaymentId',
-  paymentid: 'gatewayPaymentId',
-  gateway_payment_id: 'gatewayPaymentId',
-  entity_id: 'gatewayPaymentId',
-  razorpay_payment_id: 'gatewayPaymentId',
-  order_id: 'gatewayOrderId',
-  orderid: 'gatewayOrderId',
-  gateway_order_id: 'gatewayOrderId',
-  razorpay_order_id: 'gatewayOrderId',
-  transaction_id: 'gatewayTransactionId',
-  txn_id: 'gatewayTransactionId',
-  transactionid: 'gatewayTransactionId',
-  gateway_transaction_id: 'gatewayTransactionId',
-  merchant_tran_id: 'gatewayTransactionId',
-  utr: 'utr',
-  settlement_utr: 'utr',
-  bank_utr: 'utr',
-  bank_reference: 'utr',
-  bank_ref: 'utr',
-  receipt_no: 'receiptNo',
-  receipt_number: 'receiptNo',
-  receiptno: 'receiptNo',
-  student_id: 'studentIdentifier',
-  admission_no: 'studentIdentifier',
-  admission_number: 'studentIdentifier',
-  customer_id: 'studentIdentifier',
-  amount: 'grossAmount',
-  payment_amount: 'grossAmount',
-  gross_amount: 'grossAmount',
-  credit: 'grossAmount',
-  debit: 'grossAmount',
-  fee: 'feeCharges',
-  fee_charges: 'feeCharges',
-  gateway_fee: 'feeCharges',
-  charges: 'feeCharges',
-  tax: 'taxAmount',
-  gst: 'taxAmount',
-  tax_amount: 'taxAmount',
-  net: 'netAmount',
-  net_amount: 'netAmount',
-  credit_amount: 'netAmount',
-  settled_at: 'settlementDate',
-  settlement_date: 'settlementDate',
-  credit_date: 'settlementDate',
-  settled_on: 'settlementDate',
-  currency: 'currency',
-};
-
 @Injectable()
 export class FeeSettlementReconciliationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -94,15 +47,18 @@ export class FeeSettlementReconciliationService {
   }
 
   private parseAmount(value?: string): number {
-    if (!value) return 0;
-    const cleaned = value.replace(/[,₹\s]/g, '').replace(/^\((.*)\)$/, '-$1');
+    if (value == null || value === '') return 0;
+    const cleaned = String(value)
+      .replace(/[,₹\s]/g, '')
+      .replace(/^\((.*)\)$/, '-$1');
     const n = Number(cleaned);
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
   }
 
-  private parseDate(value?: string): Date | undefined {
-    if (!value?.trim()) return undefined;
-    const raw = value.trim();
+  private parseDate(value?: string | Date): Date | undefined {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    if (value == null || !String(value).trim()) return undefined;
+    const raw = String(value).trim();
     const iso = Date.parse(raw);
     if (!Number.isNaN(iso)) return new Date(iso);
     const mdy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
@@ -111,7 +67,6 @@ export class FeeSettlementReconciliationService {
       const m = Number(mdy[2]);
       let y = Number(mdy[3]);
       if (y < 100) y += 2000;
-      // Prefer DD/MM/YYYY for Indian settlement files
       return new Date(Date.UTC(y, m - 1, d));
     }
     return undefined;
@@ -143,36 +98,37 @@ export class FeeSettlementReconciliationService {
     return out.map((c) => c.trim());
   }
 
-  parseSettlementCsv(buffer: Buffer): ParsedSettlementRow[] {
-    const text = buffer
-      .toString('utf8')
-      .replace(/^\uFEFF/, '')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const lines = text.split('\n').filter((l) => l.trim().length > 0);
-    if (lines.length < 2) {
-      throw new BadRequestException(
-        'Settlement file must include a header row and at least one data row',
-      );
+  private cellToString(value: unknown): string {
+    if (value == null) return '';
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'object' && value && 'text' in (value as object)) {
+      return String((value as { text?: string }).text ?? '');
     }
+    if (typeof value === 'object' && value && 'result' in (value as object)) {
+      return String((value as { result?: unknown }).result ?? '');
+    }
+    return String(value);
+  }
 
-    const headers = this.splitCsvLine(lines[0]).map((h) =>
-      this.normalizeHeader(h),
-    );
-    const mapped = headers.map((h) => HEADER_ALIASES[h] ?? null);
+  private buildRowsFromMatrix(
+    headers: string[],
+    dataRows: string[][],
+    provider?: string,
+  ): ParsedSettlementRow[] {
+    const aliases = resolveSettlementHeaderMap(provider);
+    const mapped = headers.map((h) => aliases[h] ?? null);
     if (!mapped.some((m) => m && m !== 'ignore')) {
       throw new BadRequestException(
-        'Unrecognized settlement CSV headers. Expected columns like payment_id, order_id, amount, utr, settlement_date.',
+        'Unrecognized settlement headers. Expected columns like payment_id, order_id, amount, fee, tax, utr, settlement_date.',
       );
     }
 
     const rows: ParsedSettlementRow[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = this.splitCsvLine(lines[i]);
-      if (cols.every((c) => !c.trim())) continue;
+    dataRows.forEach((cols, idx) => {
+      if (cols.every((c) => !String(c ?? '').trim())) return;
       const rawRow: Record<string, string> = {};
       const row: ParsedSettlementRow = {
-        lineNo: i,
+        lineNo: idx + 1,
         grossAmount: 0,
         feeCharges: 0,
         taxAmount: 0,
@@ -181,10 +137,10 @@ export class FeeSettlementReconciliationService {
         rawRow,
       };
 
-      headers.forEach((header, idx) => {
-        const value = cols[idx] ?? '';
+      headers.forEach((header, colIdx) => {
+        const value = cols[colIdx] ?? '';
         rawRow[header] = value;
-        const field = mapped[idx];
+        const field = mapped[colIdx];
         if (!field || field === 'ignore') return;
         if (field === 'grossAmount') row.grossAmount = this.parseAmount(value);
         else if (field === 'feeCharges')
@@ -214,14 +170,84 @@ export class FeeSettlementReconciliationService {
         row.utr ||
         row.receiptNo ||
         row.studentIdentifier;
-      if (!hasIdentity && !row.grossAmount && !row.netAmount) continue;
+      if (!hasIdentity && !row.grossAmount && !row.netAmount) return;
       rows.push(row);
-    }
+    });
 
     if (!rows.length) {
-      throw new BadRequestException('No settlement rows found in CSV');
+      throw new BadRequestException('No settlement rows found in file');
     }
     return rows;
+  }
+
+  parseSettlementCsv(buffer: Buffer, provider?: string): ParsedSettlementRow[] {
+    const text = buffer
+      .toString('utf8')
+      .replace(/^\uFEFF/, '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const lines = text.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length < 2) {
+      throw new BadRequestException(
+        'Settlement file must include a header row and at least one data row',
+      );
+    }
+    const headers = this.splitCsvLine(lines[0]).map((h) =>
+      this.normalizeHeader(h),
+    );
+    const dataRows = lines.slice(1).map((line) => this.splitCsvLine(line));
+    return this.buildRowsFromMatrix(headers, dataRows, provider);
+  }
+
+  async parseSettlementXlsx(
+    buffer: Buffer,
+    provider?: string,
+  ): Promise<ParsedSettlementRow[]> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) {
+      throw new BadRequestException('Excel file has no worksheets');
+    }
+    const headerRow = sheet.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber - 1] = this.normalizeHeader(
+        this.cellToString(cell.value),
+      );
+    });
+    while (headers.length && !headers[headers.length - 1]) headers.pop();
+    if (headers.length < 1) {
+      throw new BadRequestException('Excel settlement sheet has no headers');
+    }
+
+    const dataRows: string[][] = [];
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const cols: string[] = [];
+      for (let c = 1; c <= headers.length; c++) {
+        cols.push(this.cellToString(row.getCell(c).value));
+      }
+      dataRows.push(cols);
+    });
+    return this.buildRowsFromMatrix(headers, dataRows, provider);
+  }
+
+  async parseSettlementFile(
+    file: Express.Multer.File,
+    provider?: string,
+  ): Promise<ParsedSettlementRow[]> {
+    const name = (file.originalname || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    const isXlsx =
+      name.endsWith('.xlsx') ||
+      name.endsWith('.xls') ||
+      mime.includes('spreadsheet') ||
+      mime.includes('excel');
+    if (isXlsx) {
+      return this.parseSettlementXlsx(file.buffer, provider);
+    }
+    return this.parseSettlementCsv(file.buffer, provider);
   }
 
   async listBatches(tenantId: string, limit = 30) {
@@ -250,6 +276,8 @@ export class FeeSettlementReconciliationService {
       select: {
         matchStatus: true,
         grossAmount: true,
+        feeCharges: true,
+        taxAmount: true,
         netAmount: true,
         amountDifference: true,
       },
@@ -273,6 +301,14 @@ export class FeeSettlementReconciliationService {
       (s: number, l: any) => s + Number(l.grossAmount ?? 0),
       0,
     );
+    const totalFees = lines.reduce(
+      (s: number, l: any) => s + Number(l.feeCharges ?? 0),
+      0,
+    );
+    const totalTax = lines.reduce(
+      (s: number, l: any) => s + Number(l.taxAmount ?? 0),
+      0,
+    );
     const totalNet = lines.reduce(
       (s: number, l: any) => s + Number(l.netAmount ?? 0),
       0,
@@ -288,7 +324,10 @@ export class FeeSettlementReconciliationService {
         unmatched: byStatus.UNMATCHED?.count ?? 0,
         amountMismatch: byStatus.AMOUNT_MISMATCH?.count ?? 0,
         duplicates: byStatus.DUPLICATE?.count ?? 0,
+        settlementPending: byStatus.SETTLEMENT_PENDING?.count ?? 0,
         totalGross,
+        totalFees,
+        totalTax,
         totalNet,
       },
       byStatus,
@@ -400,8 +439,8 @@ export class FeeSettlementReconciliationService {
     if (!file?.buffer?.length) {
       throw new BadRequestException('No settlement file uploaded');
     }
-    const rows = this.parseSettlementCsv(file.buffer);
     const provider = (opts?.provider || 'GENERIC').trim().toUpperCase();
+    const rows = await this.parseSettlementFile(file, provider);
 
     const batch = await this.db().feeSettlementBatch.create({
       data: {
@@ -472,9 +511,12 @@ export class FeeSettlementReconciliationService {
         id: true,
         transactionNo: true,
         amount: true,
+        provider: true,
         providerPaymentId: true,
         providerOrderId: true,
         externalReference: true,
+        paymentMode: true,
+        paymentSource: true,
         studentId: true,
         paidAt: true,
         reconStatus: true,
@@ -587,8 +629,266 @@ export class FeeSettlementReconciliationService {
       }
     }
 
+    await this.flagUnsettledErpPayments(tenantId, batchId, usedPaymentIds);
     await this.refreshBatchCounts(tenantId, batchId);
     return this.getBatchSummary(tenantId, batchId);
+  }
+
+  /**
+   * ERP SUCCESS gateway payments in the settlement window that were not matched
+   * to any settlement file row → SETTLEMENT_PENDING exception lines.
+   */
+  private async flagUnsettledErpPayments(
+    tenantId: string,
+    batchId: string,
+    matchedPaymentIds: Set<string>,
+  ) {
+    await this.db().feeSettlementLine.deleteMany({
+      where: { tenantId, batchId, matchStatus: 'SETTLEMENT_PENDING' },
+    });
+
+    const batch = await this.getBatch(tenantId, batchId);
+    const settlementLines = await this.db().feeSettlementLine.findMany({
+      where: {
+        tenantId,
+        batchId,
+        matchStatus: { not: 'SETTLEMENT_PENDING' },
+      },
+      select: { settlementDate: true, lineNo: true },
+    });
+
+    const dates = settlementLines
+      .map((l: any) => (l.settlementDate ? new Date(l.settlementDate) : null))
+      .filter(Boolean) as Date[];
+    let from: Date;
+    let to: Date;
+    if (dates.length) {
+      from = new Date(Math.min(...dates.map((d) => d.getTime())));
+      to = new Date(Math.max(...dates.map((d) => d.getTime())));
+    } else if (batch.settlementDate) {
+      from = new Date(batch.settlementDate);
+      to = new Date(batch.settlementDate);
+    } else {
+      to = new Date(batch.createdAt);
+      from = new Date(to.getTime() - 7 * 86_400_000);
+    }
+    from = new Date(from.getTime() - 86_400_000);
+    to = new Date(to.getTime() + 2 * 86_400_000);
+
+    const candidates = await this.db().paymentTransaction.findMany({
+      where: {
+        tenantId,
+        status: { in: ['SUCCESS', 'COMPLETED', 'PAID', 'CLEARED'] },
+        reconStatus: { notIn: ['RECONCILED'] },
+        paidAt: { gte: from, lte: to },
+        OR: [
+          { provider: { not: null } },
+          { providerPaymentId: { not: null } },
+          { providerOrderId: { not: null } },
+          { paymentSource: 'ERP_GATEWAY' },
+          {
+            paymentMode: {
+              in: ['ONLINE', 'GATEWAY', 'UPI', 'CARD', 'NETBANKING'],
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        amount: true,
+        providerPaymentId: true,
+        providerOrderId: true,
+        transactionNo: true,
+        externalReference: true,
+        paidAt: true,
+      },
+      take: 5_000,
+    });
+
+    const maxLineNo = settlementLines.reduce(
+      (m: number, l: any) => Math.max(m, Number(l.lineNo ?? 0)),
+      0,
+    );
+
+    const unsettled = candidates.filter(
+      (p: any) => !matchedPaymentIds.has(p.id),
+    );
+    if (!unsettled.length) return;
+
+    await this.db().feeSettlementLine.createMany({
+      data: unsettled.map((p: any, idx: number) => ({
+        tenantId,
+        batchId,
+        lineNo: maxLineNo + idx + 1,
+        gatewayPaymentId: p.providerPaymentId,
+        gatewayOrderId: p.providerOrderId,
+        gatewayTransactionId: p.transactionNo,
+        utr: p.externalReference,
+        grossAmount: Number(p.amount),
+        netAmount: Number(p.amount),
+        settlementDate: p.paidAt,
+        matchStatus: 'SETTLEMENT_PENDING',
+        paymentId: p.id,
+        remarks: 'ERP payment not found in settlement file',
+        rawRow: { source: 'erp_unsettled_scan' },
+      })),
+    });
+
+    await this.db().paymentTransaction.updateMany({
+      where: { id: { in: unsettled.map((p: any) => p.id) } },
+      data: { reconStatus: 'EXCEPTION' },
+    });
+  }
+
+  async searchPayments(
+    tenantId: string,
+    q: string,
+    limit = 12,
+  ): Promise<
+    Array<{
+      id: string;
+      transactionNo: string;
+      amount: number;
+      status: string;
+      paidAt?: string | null;
+      providerPaymentId?: string | null;
+      providerOrderId?: string | null;
+      externalReference?: string | null;
+      studentName?: string | null;
+      admissionNo?: string | null;
+      reconStatus?: string | null;
+    }>
+  > {
+    const term = q.trim();
+    if (term.length < 2) return [];
+
+    const students = await this.db().student.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { admissionNo: { contains: term, mode: 'insensitive' } },
+          {
+            user: {
+              displayName: { contains: term, mode: 'insensitive' },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+      take: 20,
+    });
+    const studentIds = students.map((s: any) => s.id);
+
+    const payments = await this.db().paymentTransaction.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { transactionNo: { contains: term, mode: 'insensitive' } },
+          { providerPaymentId: { contains: term, mode: 'insensitive' } },
+          { providerOrderId: { contains: term, mode: 'insensitive' } },
+          { externalReference: { contains: term, mode: 'insensitive' } },
+          ...(studentIds.length ? [{ studentId: { in: studentIds } }] : []),
+          ...(term.match(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+          )
+            ? [{ id: term }]
+            : []),
+        ],
+      },
+      orderBy: { paidAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        transactionNo: true,
+        amount: true,
+        status: true,
+        paidAt: true,
+        providerPaymentId: true,
+        providerOrderId: true,
+        externalReference: true,
+        studentId: true,
+        reconStatus: true,
+      },
+    });
+
+    const payStudentIds = [
+      ...new Set(payments.map((p: any) => p.studentId).filter(Boolean)),
+    ];
+    const studentRows = payStudentIds.length
+      ? await this.db().student.findMany({
+          where: { tenantId, id: { in: payStudentIds } },
+          select: {
+            id: true,
+            admissionNo: true,
+            user: { select: { displayName: true } },
+          },
+        })
+      : [];
+    const studentMap = new Map<string, any>(
+      studentRows.map((s: any) => [s.id as string, s]),
+    );
+
+    return payments.map((p: any) => {
+      const student: any = studentMap.get(p.studentId);
+      return {
+        id: p.id,
+        transactionNo: p.transactionNo,
+        amount: Number(p.amount),
+        status: p.status,
+        paidAt: p.paidAt,
+        providerPaymentId: p.providerPaymentId,
+        providerOrderId: p.providerOrderId,
+        externalReference: p.externalReference,
+        reconStatus: p.reconStatus,
+        studentName: student?.user?.displayName ?? null,
+        admissionNo: student?.admissionNo ?? null,
+      };
+    });
+  }
+
+  async countOpenExceptions(tenantId: string) {
+    return this.db().feeSettlementLine.count({
+      where: {
+        tenantId,
+        matchStatus: { in: EXCEPTION_MATCH_STATUSES },
+      },
+    });
+  }
+
+  async findFinanceUserIds(tenantId: string): Promise<string[]> {
+    const permission = await this.db().permission.findFirst({
+      where: { slug: 'fees:manage' },
+      select: { id: true },
+    });
+    if (!permission) return [];
+
+    const userIds = new Set<string>();
+    const rolePerms = await this.db().rolePermission.findMany({
+      where: {
+        permissionId: permission.id,
+        role: { tenantId, deletedAt: null },
+      },
+      select: { roleId: true },
+    });
+    const roleIds = rolePerms.map((r: any) => r.roleId);
+    if (roleIds.length) {
+      const userRoles = await this.db().userRole.findMany({
+        where: { roleId: { in: roleIds }, deletedAt: null },
+        select: { userId: true },
+      });
+      for (const ur of userRoles) userIds.add(ur.userId);
+    }
+
+    const direct = await this.db().userPermission.findMany({
+      where: {
+        permissionId: permission.id,
+        user: { tenantId, deletedAt: null },
+      },
+      select: { userId: true },
+    });
+    for (const row of direct) userIds.add(row.userId);
+
+    return [...userIds];
   }
 
   private resolveMatch(

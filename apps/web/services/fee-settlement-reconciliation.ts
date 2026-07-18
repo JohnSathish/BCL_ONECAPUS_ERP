@@ -26,11 +26,28 @@ export type FeeSettlementDashboard = {
     unmatched: number;
     amountMismatch: number;
     duplicates: number;
+    settlementPending: number;
     totalGross: number;
+    totalFees: number;
+    totalTax: number;
     totalNet: number;
   };
   byStatus: Record<string, { count: number; amount: number }>;
   recentBatches: FeeSettlementBatch[];
+};
+
+export type FeeSettlementPaymentHit = {
+  id: string;
+  transactionNo: string;
+  amount: number;
+  status: string;
+  paidAt?: string | null;
+  providerPaymentId?: string | null;
+  providerOrderId?: string | null;
+  externalReference?: string | null;
+  studentName?: string | null;
+  admissionNo?: string | null;
+  reconStatus?: string | null;
 };
 
 export type FeeSettlementLine = {
@@ -110,6 +127,14 @@ export async function importSettlementCsv(
     '/v1/fees/settlement-reconciliation/import',
     form,
     { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data;
+}
+
+export async function searchSettlementPayments(q: string, limit = 12) {
+  const { data } = await api.get<FeeSettlementPaymentHit[]>(
+    '/v1/fees/settlement-reconciliation/payments/search',
+    { params: { q, limit } },
   );
   return data;
 }

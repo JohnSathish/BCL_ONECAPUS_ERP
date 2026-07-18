@@ -436,6 +436,20 @@ export class FeesController {
     });
   }
 
+  @Get('settlement-reconciliation/payments/search')
+  @RequireAnyPermission('fees:read', 'fees:manage')
+  searchSettlementPayments(
+    @CurrentUser() user: JwtUser,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.settlementRecon.searchPayments(
+      user.tid,
+      q ?? '',
+      limit ? Number(limit) : undefined,
+    );
+  }
+
   @Get('settlement-reconciliation/template')
   @RequireAnyPermission('fees:read', 'fees:manage')
   settlementTemplate(@Res() res: Response) {
