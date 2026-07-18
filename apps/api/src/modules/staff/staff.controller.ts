@@ -171,7 +171,7 @@ export class StaffController {
   }
 
   @Get()
-  @RequirePermissions('staff:read')
+  @RequireAnyPermission('staff:read', 'staff:assign-subjects')
   list(@CurrentUser() user: JwtUser, @Query() query: StaffDirectoryQueryDto) {
     return this.staff.listDirectory(user, query);
   }

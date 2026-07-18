@@ -64,7 +64,11 @@ export class TimetableEngineController {
   }
 
   @Get('context')
-  @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
   context(@CurrentUser() user: JwtUser) {
     return this.timetable.context(user);
   }

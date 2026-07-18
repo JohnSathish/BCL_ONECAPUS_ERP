@@ -225,6 +225,12 @@ export default function DepartmentWorkloadPage() {
             Assign faculty and rooms to master slots for your department. Clash checks run on save.
             Move draft rows through HOD and Academic Office approval before publish.
           </p>
+          <ol className="mt-4 max-w-3xl list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>Pick Odd/Even semester and the timetable plan for your shift.</li>
+            <li>For each day/slot row, choose Faculty and Room, then click Save.</li>
+            <li>Use the Availability panel to check weekly hours before overloading faculty.</li>
+            <li>When ready: Submit → HOD approve → Academic Office approve.</li>
+          </ol>
         </section>
 
         <Card>

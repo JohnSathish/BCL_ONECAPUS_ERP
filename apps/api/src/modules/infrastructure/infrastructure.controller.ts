@@ -149,7 +149,14 @@ export class InfrastructureController {
   }
 
   @Get('rooms')
-  @RequireAnyPermission('infrastructure:view', 'org:read', 'academic:read')
+  @RequireAnyPermission(
+    'infrastructure:view',
+    'org:read',
+    'academic:read',
+    'staff:assign-subjects',
+    'academic:timetable:manage',
+    'shift:timetable:manage',
+  )
   rooms(@CurrentUser() user: JwtUser, @Query() query: InfrastructureQueryDto) {
     return this.service.listRooms(user.tid, query);
   }
