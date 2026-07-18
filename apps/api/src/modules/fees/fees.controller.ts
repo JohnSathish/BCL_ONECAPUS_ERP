@@ -393,7 +393,12 @@ export class FeesController {
   }
 
   @Get('settlement-reconciliation/dashboard')
-  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
   settlementReconDashboard(
     @CurrentUser() user: JwtUser,
     @Query('batchId') batchId?: string,
@@ -401,8 +406,24 @@ export class FeesController {
     return this.settlementRecon.dashboard(user.tid, batchId);
   }
 
+  @Get('settlement-reconciliation/executive')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
+  settlementExecutiveSummary(@CurrentUser() user: JwtUser) {
+    return this.settlementRecon.executiveSummary(user.tid);
+  }
+
   @Get('settlement-reconciliation/batches')
-  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
   listSettlementBatches(
     @CurrentUser() user: JwtUser,
     @Query('limit') limit?: string,
@@ -414,13 +435,23 @@ export class FeesController {
   }
 
   @Get('settlement-reconciliation/batches/:id')
-  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
   getSettlementBatch(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.settlementRecon.getBatchSummary(user.tid, id);
   }
 
   @Get('settlement-reconciliation/lines')
-  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
   listSettlementLines(
     @CurrentUser() user: JwtUser,
     @Query('batchId') batchId?: string,
@@ -437,7 +468,7 @@ export class FeesController {
   }
 
   @Get('settlement-reconciliation/payments/search')
-  @RequireAnyPermission('fees:read', 'fees:manage')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'fees:reconcile')
   searchSettlementPayments(
     @CurrentUser() user: JwtUser,
     @Query('q') q?: string,
@@ -451,7 +482,7 @@ export class FeesController {
   }
 
   @Get('settlement-reconciliation/template')
-  @RequireAnyPermission('fees:read', 'fees:manage')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'fees:reconcile')
   settlementTemplate(@Res() res: Response) {
     const file = this.settlementRecon.csvTemplate();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -463,7 +494,12 @@ export class FeesController {
   }
 
   @Get('settlement-reconciliation/export')
-  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
   async exportSettlementRecon(
     @CurrentUser() user: JwtUser,
     @Query('batchId') batchId?: string,
@@ -486,8 +522,33 @@ export class FeesController {
     res!.send(file.content);
   }
 
+  @Get('settlement-reconciliation/export.pdf')
+  @RequireAnyPermission(
+    'fees:read',
+    'fees:manage',
+    'fees:reconcile',
+    'reports:read',
+  )
+  async exportSettlementReconPdf(
+    @CurrentUser() user: JwtUser,
+    @Query('batchId') batchId?: string,
+    @Query('report') report?: 'daily' | 'exceptions' | 'all',
+    @Res() res?: Response,
+  ) {
+    const file = await this.settlementRecon.exportPdf(user.tid, {
+      batchId,
+      report,
+    });
+    res!.setHeader('Content-Type', 'application/pdf');
+    res!.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res!.send(file.buffer);
+  }
+
   @Post('settlement-reconciliation/import')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -509,7 +570,7 @@ export class FeesController {
   }
 
   @Post('settlement-reconciliation/batches/:id/match')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   rematchSettlementBatch(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -517,8 +578,17 @@ export class FeesController {
     return this.settlementRecon.runAutoMatch(user.tid, id);
   }
 
+  @Post('settlement-reconciliation/batches/:id/bank-match')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
+  bankMatchSettlementBatch(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.settlementRecon.runBankThreeWayMatch(user.tid, id);
+  }
+
   @Post('settlement-reconciliation/lines/:id/reconcile')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   markSettlementLineReconciled(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -528,7 +598,7 @@ export class FeesController {
   }
 
   @Post('settlement-reconciliation/lines/:id/manual-review')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   markSettlementLineManualReview(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -537,8 +607,18 @@ export class FeesController {
     return this.settlementRecon.markManualReview(user, id, body?.remarks);
   }
 
+  @Post('settlement-reconciliation/lines/:id/chargeback')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
+  markSettlementLineChargeback(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body?: { remarks?: string },
+  ) {
+    return this.settlementRecon.markChargeback(user, id, body?.remarks);
+  }
+
   @Post('settlement-reconciliation/lines/:id/link')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   linkSettlementLinePayment(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -556,7 +636,7 @@ export class FeesController {
   }
 
   @Patch('settlement-reconciliation/lines/:id/remarks')
-  @RequirePermissions('fees:manage')
+  @RequireAnyPermission('fees:manage', 'fees:reconcile')
   updateSettlementLineRemarks(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,

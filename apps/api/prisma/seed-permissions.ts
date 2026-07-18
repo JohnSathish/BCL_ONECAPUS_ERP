@@ -259,6 +259,12 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Collect cash fee payments at the desk',
   },
   {
+    slug: 'fees:reconcile',
+    resource: 'fees',
+    action: 'reconcile',
+    description: 'Import and reconcile fee gateway settlements',
+  },
+  {
     slug: 'payment-gateway:read',
     resource: 'payment-gateway',
     action: 'read',

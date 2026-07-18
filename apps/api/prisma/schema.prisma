@@ -7585,6 +7585,10 @@ model FeeSettlementLine {
   paymentId             String?   @map("payment_id") @db.Uuid
   receiptId             String?   @map("receipt_id") @db.Uuid
   amountDifference      Decimal?  @map("amount_difference") @db.Decimal(12, 2)
+  /// PENDING | MATCHED | UNMATCHED | AMOUNT_MISMATCH
+  bankMatchStatus       String?   @map("bank_match_status")
+  bankStatementLineId   String?   @map("bank_statement_line_id") @db.Uuid
+  bankAmountDifference  Decimal?  @map("bank_amount_difference") @db.Decimal(12, 2)
   remarks               String?
   reviewedById          String?   @map("reviewed_by_id") @db.Uuid
   reviewedAt            DateTime? @map("reviewed_at")
@@ -7601,6 +7605,7 @@ model FeeSettlementLine {
   @@index([tenantId, gatewayOrderId])
   @@index([tenantId, utr])
   @@index([tenantId, receiptNo])
+  @@index([tenantId, bankMatchStatus])
   @@map("fee_settlement_lines")
   @@schema("finance")
 }

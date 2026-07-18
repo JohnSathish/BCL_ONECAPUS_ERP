@@ -7,6 +7,7 @@ export const FEE_SETTLEMENT_MATCH_STATUSES = [
   'UNMATCHED',
   'MANUAL_REVIEW',
   'SETTLEMENT_PENDING',
+  'CHARGEBACK',
 ] as const;
 
 export type FeeSettlementMatchStatus =
@@ -37,6 +38,7 @@ export const EXCEPTION_MATCH_STATUSES: FeeSettlementMatchStatus[] = [
   'UNMATCHED',
   'MANUAL_REVIEW',
   'SETTLEMENT_PENDING',
+  'CHARGEBACK',
 ];
 
 export const MATCH_STATUS_LABELS: Record<FeeSettlementMatchStatus, string> = {
@@ -48,6 +50,7 @@ export const MATCH_STATUS_LABELS: Record<FeeSettlementMatchStatus, string> = {
   UNMATCHED: 'Unmatched',
   MANUAL_REVIEW: 'Manual review',
   SETTLEMENT_PENDING: 'Settlement pending',
+  CHARGEBACK: 'Chargeback / refund',
 };
 
 /** Normalized header → field. Generic aliases apply to all providers. */

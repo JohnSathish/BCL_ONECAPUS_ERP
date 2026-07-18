@@ -536,6 +536,7 @@ async function main() {
     'fees:read',
     'fees:manage',
     'fees:cash:collect',
+    'fees:reconcile',
     'payment-gateway:read',
     'payment-gateway:manage',
     'accounts:read',

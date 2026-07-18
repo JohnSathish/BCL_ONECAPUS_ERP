@@ -27,6 +27,7 @@ export type FeeSettlementDashboard = {
     amountMismatch: number;
     duplicates: number;
     settlementPending: number;
+    chargebacks: number;
     totalGross: number;
     totalFees: number;
     totalTax: number;
@@ -34,6 +35,26 @@ export type FeeSettlementDashboard = {
   };
   byStatus: Record<string, { count: number; amount: number }>;
   recentBatches: FeeSettlementBatch[];
+};
+
+export type FeeSettlementExecutive = {
+  asOf: string;
+  headline: {
+    collectionsGross: number;
+    collectionsNet: number;
+    gatewayFees: number;
+    taxGst: number;
+    matchRatePct: number;
+    openExceptions: number;
+    chargebacks: number;
+    settlementPending: number;
+    threeWayMatched: number;
+    bankUnmatched: number;
+    bankAmountMismatch: number;
+  };
+  byStatus: Record<string, { count: number; amount: number }>;
+  recentBatches: FeeSettlementBatch[];
+  attentionNeeded: boolean;
 };
 
 export type FeeSettlementPaymentHit = {
@@ -69,6 +90,8 @@ export type FeeSettlementLine = {
   matchMethod?: string | null;
   paymentId?: string | null;
   amountDifference?: number | null;
+  bankMatchStatus?: string | null;
+  bankAmountDifference?: number | null;
   remarks?: string | null;
   payment?: {
     id: string;
@@ -85,6 +108,13 @@ export async function fetchSettlementDashboard(batchId?: string) {
   const { data } = await api.get<FeeSettlementDashboard>(
     '/v1/fees/settlement-reconciliation/dashboard',
     { params: batchId ? { batchId } : undefined },
+  );
+  return data;
+}
+
+export async function fetchSettlementExecutive() {
+  const { data } = await api.get<FeeSettlementExecutive>(
+    '/v1/fees/settlement-reconciliation/executive',
   );
   return data;
 }
@@ -146,6 +176,13 @@ export async function rematchSettlementBatch(batchId: string) {
   return data;
 }
 
+export async function bankMatchSettlementBatch(batchId: string) {
+  const { data } = await api.post<{ matched: number; unmatched: number }>(
+    `/v1/fees/settlement-reconciliation/batches/${batchId}/bank-match`,
+  );
+  return data;
+}
+
 export async function markSettlementLineReconciled(lineId: string, remarks?: string) {
   const { data } = await api.post<FeeSettlementLine>(
     `/v1/fees/settlement-reconciliation/lines/${lineId}/reconcile`,
@@ -157,6 +194,14 @@ export async function markSettlementLineReconciled(lineId: string, remarks?: str
 export async function markSettlementLineManualReview(lineId: string, remarks?: string) {
   const { data } = await api.post<FeeSettlementLine>(
     `/v1/fees/settlement-reconciliation/lines/${lineId}/manual-review`,
+    { remarks },
+  );
+  return data;
+}
+
+export async function markSettlementLineChargeback(lineId: string, remarks?: string) {
+  const { data } = await api.post<FeeSettlementLine>(
+    `/v1/fees/settlement-reconciliation/lines/${lineId}/chargeback`,
     { remarks },
   );
   return data;
@@ -211,6 +256,21 @@ export async function downloadSettlementReconExport(params?: {
         ? `fee-recon-daily-${stamp}.csv`
         : `fee-recon-${stamp}.csv`;
   triggerDownload(res.data, name);
+}
+
+export async function downloadSettlementReconPdf(params?: {
+  batchId?: string;
+  report?: 'daily' | 'exceptions' | 'all';
+}) {
+  const res = await api.get('/v1/fees/settlement-reconciliation/export.pdf', {
+    params: {
+      batchId: params?.batchId,
+      report: params?.report ?? 'all',
+    },
+    responseType: 'blob',
+  });
+  const stamp = new Date().toISOString().slice(0, 10);
+  triggerDownload(res.data, `fee-recon-${params?.report ?? 'all'}-${stamp}.pdf`);
 }
 
 function triggerDownload(blob: Blob, filename: string) {

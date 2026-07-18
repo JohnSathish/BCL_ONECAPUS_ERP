@@ -12,12 +12,16 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   downloadSettlementReconExport,
+  downloadSettlementReconPdf,
   downloadSettlementTemplate,
   fetchSettlementBatches,
   fetchSettlementDashboard,
+  fetchSettlementExecutive,
   fetchSettlementLines,
   importSettlementCsv,
+  bankMatchSettlementBatch,
   linkSettlementLinePayment,
+  markSettlementLineChargeback,
   markSettlementLineManualReview,
   markSettlementLineReconciled,
   rematchSettlementBatch,
@@ -44,6 +48,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   DUPLICATE: 'destructive',
   MANUAL_REVIEW: 'outline',
   SETTLEMENT_PENDING: 'outline',
+  CHARGEBACK: 'destructive',
 };
 
 export function FeeSettlementReconciliationPanel() {
@@ -60,6 +65,11 @@ export function FeeSettlementReconciliationPanel() {
   const dashQ = useQuery({
     queryKey: ['fee-settlement-recon', 'dashboard', batchId || 'all'],
     queryFn: () => fetchSettlementDashboard(batchId || undefined),
+  });
+
+  const execQ = useQuery({
+    queryKey: ['fee-settlement-recon', 'executive'],
+    queryFn: fetchSettlementExecutive,
   });
 
   const batchesQ = useQuery({
@@ -97,7 +107,16 @@ export function FeeSettlementReconciliationPanel() {
   const rematchMut = useMutation({
     mutationFn: (id: string) => rematchSettlementBatch(id),
     onSuccess: () => {
-      setMessage('Auto-match completed (includes unsettled ERP scan)');
+      setMessage('Auto-match completed (unsettled ERP, chargebacks, bank UTR)');
+      invalidate();
+    },
+    onError: (err) => setMessage(apiErrorMessage(err)),
+  });
+
+  const bankMatchMut = useMutation({
+    mutationFn: (id: string) => bankMatchSettlementBatch(id),
+    onSuccess: (res) => {
+      setMessage(`Bank UTR match · matched ${res.matched} · open ${res.unmatched}`);
       invalidate();
     },
     onError: (err) => setMessage(apiErrorMessage(err)),
@@ -114,6 +133,16 @@ export function FeeSettlementReconciliationPanel() {
     mutationFn: ({ id, remarks }: { id: string; remarks?: string }) =>
       markSettlementLineManualReview(id, remarks),
     onSuccess: () => invalidate(),
+    onError: (err) => setMessage(apiErrorMessage(err)),
+  });
+
+  const chargebackMut = useMutation({
+    mutationFn: ({ id, remarks }: { id: string; remarks?: string }) =>
+      markSettlementLineChargeback(id, remarks),
+    onSuccess: () => {
+      setMessage('Marked as chargeback');
+      invalidate();
+    },
     onError: (err) => setMessage(apiErrorMessage(err)),
   });
 
@@ -141,8 +170,10 @@ export function FeeSettlementReconciliationPanel() {
   const busy =
     importMut.isPending ||
     rematchMut.isPending ||
+    bankMatchMut.isPending ||
     reconcileMut.isPending ||
     reviewMut.isPending ||
+    chargebackMut.isPending ||
     linkMut.isPending;
 
   const statusOptions = useMemo(
@@ -156,17 +187,62 @@ export function FeeSettlementReconciliationPanel() {
       'UNMATCHED',
       'MANUAL_REVIEW',
       'SETTLEMENT_PENDING',
+      'CHARGEBACK',
     ],
     [],
   );
 
+  const headline = execQ.data?.headline;
+
   return (
     <div className="space-y-6">
+      {headline ? (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Leadership recon summary</h2>
+              <p className="text-sm text-muted-foreground">
+                Match rate, exceptions, chargebacks, and bank UTR 3-way status.
+                {execQ.data?.attentionNeeded
+                  ? ' Attention needed on open exceptions.'
+                  : ' No urgent exceptions.'}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                void downloadSettlementReconPdf({
+                  batchId: batchId || undefined,
+                  report: 'all',
+                })
+              }
+            >
+              <Download className="mr-1 h-4 w-4" />
+              PDF pack
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            <Kpi label="Match rate" value={`${headline.matchRatePct}%`} />
+            <Kpi label="Open exceptions" value={String(headline.openExceptions)} />
+            <Kpi label="Chargebacks" value={String(headline.chargebacks)} />
+            <Kpi label="Settlement pending" value={String(headline.settlementPending)} />
+            <Kpi label="3-way matched" value={String(headline.threeWayMatched)} />
+            <Kpi label="Bank unmatched" value={String(headline.bankUnmatched)} />
+            <Kpi label="Bank amount mismatch" value={String(headline.bankAmountMismatch)} />
+            <Kpi label="Gross" value={formatInr(headline.collectionsGross)} />
+            <Kpi label="Net" value={formatInr(headline.collectionsNet)} />
+            <Kpi label="Gateway fees" value={formatInr(headline.gatewayFees)} />
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-lg font-semibold">Fee settlement reconciliation</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Import gateway settlement CSV/Excel, auto-match ERP payments, flag unsettled ERP rows, and
-          clear exceptions. Provider preset improves fee/GST/net column mapping.
+          Import gateway settlement CSV/Excel, auto-match ERP payments, flag unsettled ERP rows /
+          chargebacks, and match UTRs to bank statements.
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -210,16 +286,27 @@ export function FeeSettlementReconciliationPanel() {
             Template
           </Button>
           {batchId ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => rematchMut.mutate(batchId)}
-            >
-              <RefreshCw className="mr-1 h-4 w-4" />
-              Re-run match
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => rematchMut.mutate(batchId)}
+              >
+                <RefreshCw className="mr-1 h-4 w-4" />
+                Re-run match
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => bankMatchMut.mutate(batchId)}
+              >
+                Bank UTR match
+              </Button>
+            </>
           ) : null}
           <Button
             type="button"
@@ -232,7 +319,7 @@ export function FeeSettlementReconciliationPanel() {
               })
             }
           >
-            Export daily
+            Export daily CSV
           </Button>
           <Button
             type="button"
@@ -245,7 +332,20 @@ export function FeeSettlementReconciliationPanel() {
               })
             }
           >
-            Export exceptions
+            Export exceptions CSV
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void downloadSettlementReconPdf({
+                batchId: batchId || undefined,
+                report: 'exceptions',
+              })
+            }
+          >
+            Exceptions PDF
           </Button>
         </div>
 
@@ -271,6 +371,7 @@ export function FeeSettlementReconciliationPanel() {
           <Kpi label="Matched" value={String(kpis?.matched ?? 0)} />
           <Kpi label="Exceptions" value={String(kpis?.exceptions ?? 0)} />
           <Kpi label="Settlement pending" value={String(kpis?.settlementPending ?? 0)} />
+          <Kpi label="Chargebacks" value={String(kpis?.chargebacks ?? 0)} />
           <Kpi label="Unmatched" value={String(kpis?.unmatched ?? 0)} />
           <Kpi label="Gross" value={formatInr(kpis?.totalGross ?? 0)} />
           <Kpi label="Gateway fees" value={formatInr(kpis?.totalFees ?? 0)} />
@@ -352,6 +453,7 @@ export function FeeSettlementReconciliationPanel() {
                 <tr>
                   <th className="px-2 py-2">#</th>
                   <th className="px-2 py-2">Status</th>
+                  <th className="px-2 py-2">Bank</th>
                   <th className="px-2 py-2">Gateway / UTR</th>
                   <th className="px-2 py-2">Gross / Fee / Tax / Net</th>
                   <th className="px-2 py-2">ERP payment</th>
@@ -378,6 +480,12 @@ export function FeeSettlementReconciliationPanel() {
                     }
                     onReview={() =>
                       reviewMut.mutate({
+                        id: line.id,
+                        remarks: remarksDraft[line.id] ?? line.remarks,
+                      })
+                    }
+                    onChargeback={() =>
+                      chargebackMut.mutate({
                         id: line.id,
                         remarks: remarksDraft[line.id] ?? line.remarks,
                       })
@@ -441,6 +549,7 @@ function SettlementLineRow({
   onRemarksValue,
   onReconcile,
   onReview,
+  onChargeback,
   onLink,
   onSaveRemarks,
   onPickPayment,
@@ -455,6 +564,7 @@ function SettlementLineRow({
   onRemarksValue: (v: string) => void;
   onReconcile: () => void;
   onReview: () => void;
+  onChargeback: () => void;
   onLink: () => void;
   onSaveRemarks: () => void;
   onPickPayment: (hit: FeeSettlementPaymentHit) => void;
@@ -473,6 +583,22 @@ function SettlementLineRow({
         <Badge variant={STATUS_VARIANT[line.matchStatus] ?? 'secondary'}>{line.matchStatus}</Badge>
         {line.matchMethod ? (
           <p className="mt-1 text-xs text-muted-foreground">via {line.matchMethod}</p>
+        ) : null}
+      </td>
+      <td className="px-2 py-3">
+        <Badge
+          variant={
+            line.bankMatchStatus === 'MATCHED'
+              ? 'default'
+              : line.bankMatchStatus === 'AMOUNT_MISMATCH' || line.bankMatchStatus === 'UNMATCHED'
+                ? 'destructive'
+                : 'secondary'
+          }
+        >
+          {line.bankMatchStatus ?? '—'}
+        </Badge>
+        {line.bankAmountDifference != null && Math.abs(line.bankAmountDifference) > 0.01 ? (
+          <p className="mt-1 text-xs text-amber-700">{formatInr(line.bankAmountDifference)}</p>
         ) : null}
       </td>
       <td className="px-2 py-3">
@@ -537,6 +663,15 @@ function SettlementLineRow({
             </Button>
             <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onReview}>
               Manual review
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={busy || line.matchStatus === 'CHARGEBACK'}
+              onClick={onChargeback}
+            >
+              Chargeback
             </Button>
           </div>
           {!line.paymentId ? (

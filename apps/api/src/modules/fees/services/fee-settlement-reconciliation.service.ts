@@ -325,6 +325,7 @@ export class FeeSettlementReconciliationService {
         amountMismatch: byStatus.AMOUNT_MISMATCH?.count ?? 0,
         duplicates: byStatus.DUPLICATE?.count ?? 0,
         settlementPending: byStatus.SETTLEMENT_PENDING?.count ?? 0,
+        chargebacks: byStatus.CHARGEBACK?.count ?? 0,
         totalGross,
         totalFees,
         totalTax,
@@ -419,6 +420,10 @@ export class FeeSettlementReconciliationService {
         netAmount: Number(line.netAmount),
         amountDifference:
           line.amountDifference == null ? null : Number(line.amountDifference),
+        bankAmountDifference:
+          line.bankAmountDifference == null
+            ? null
+            : Number(line.bankAmountDifference),
         payment: payment
           ? {
               ...payment,
@@ -630,6 +635,8 @@ export class FeeSettlementReconciliationService {
     }
 
     await this.flagUnsettledErpPayments(tenantId, batchId, usedPaymentIds);
+    await this.detectChargebacks(tenantId, batchId);
+    await this.runBankThreeWayMatch(tenantId, batchId);
     await this.refreshBatchCounts(tenantId, batchId);
     return this.getBatchSummary(tenantId, batchId);
   }
@@ -856,16 +863,17 @@ export class FeeSettlementReconciliationService {
   }
 
   async findFinanceUserIds(tenantId: string): Promise<string[]> {
-    const permission = await this.db().permission.findFirst({
-      where: { slug: 'fees:manage' },
+    const permissions = await this.db().permission.findMany({
+      where: { slug: { in: ['fees:manage', 'fees:reconcile'] } },
       select: { id: true },
     });
-    if (!permission) return [];
+    if (!permissions.length) return [];
+    const permissionIds = permissions.map((p: any) => p.id);
 
     const userIds = new Set<string>();
     const rolePerms = await this.db().rolePermission.findMany({
       where: {
-        permissionId: permission.id,
+        permissionId: { in: permissionIds },
         role: { tenantId, deletedAt: null },
       },
       select: { roleId: true },
@@ -881,7 +889,7 @@ export class FeeSettlementReconciliationService {
 
     const direct = await this.db().userPermission.findMany({
       where: {
-        permissionId: permission.id,
+        permissionId: { in: permissionIds },
         user: { tenantId, deletedAt: null },
       },
       select: { userId: true },
@@ -1302,5 +1310,388 @@ export class FeeSettlementReconciliationService {
       content,
       filename: 'fee-settlement-template.csv',
     };
+  }
+
+  async markChargeback(user: JwtUser, lineId: string, remarks?: string) {
+    const line = await this.db().feeSettlementLine.findFirst({
+      where: { tenantId: user.tid, id: lineId },
+    });
+    if (!line) throw new NotFoundException('Settlement line not found');
+
+    const updated = await this.db().feeSettlementLine.update({
+      where: { id: lineId },
+      data: {
+        matchStatus: 'CHARGEBACK',
+        remarks:
+          remarks ??
+          line.remarks ??
+          'Marked as chargeback / refunded settlement',
+        reviewedById: user.sub,
+        reviewedAt: new Date(),
+      },
+    });
+    if (line.paymentId) {
+      await this.db().paymentTransaction.update({
+        where: { id: line.paymentId },
+        data: { reconStatus: 'EXCEPTION' },
+      });
+    }
+    await this.refreshBatchCounts(user.tid, line.batchId);
+    const [enriched] = await this.enrichLines(user.tid, [updated]);
+    return enriched;
+  }
+
+  async detectChargebacks(tenantId: string, batchId: string) {
+    const lines = await this.db().feeSettlementLine.findMany({
+      where: {
+        tenantId,
+        batchId,
+        paymentId: { not: null },
+        matchStatus: {
+          notIn: ['CHARGEBACK', 'RECONCILED'],
+        },
+      },
+      select: { id: true, paymentId: true },
+      take: 10_000,
+    });
+    const paymentIds = lines
+      .map((l: any) => l.paymentId)
+      .filter(Boolean) as string[];
+    if (!paymentIds.length) return { flagged: 0 };
+
+    const refunds = await this.db().paymentTransaction.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { paymentMode: { in: ['REFUND', 'CHARGEBACK'] } },
+          { status: { in: ['REFUNDED', 'REVERSED'] } },
+        ],
+      },
+      select: { id: true, metadata: true, amount: true },
+      take: 5_000,
+    });
+
+    const refundedOriginalIds = new Set<string>();
+    for (const refund of refunds) {
+      const meta = (refund.metadata ?? {}) as Record<string, unknown>;
+      const originalId = meta.originalPaymentId;
+      if (typeof originalId === 'string' && paymentIds.includes(originalId)) {
+        refundedOriginalIds.add(originalId);
+      }
+    }
+
+    const refundedReceipts = await this.db().feeReceipt.findMany({
+      where: {
+        tenantId,
+        paymentId: { in: paymentIds },
+        status: { in: ['REFUNDED', 'PARTIALLY_REFUNDED'] },
+      },
+      select: { paymentId: true },
+    });
+    for (const r of refundedReceipts) {
+      if (r.paymentId) refundedOriginalIds.add(r.paymentId);
+    }
+
+    let flagged = 0;
+    for (const line of lines) {
+      if (!line.paymentId || !refundedOriginalIds.has(line.paymentId)) continue;
+      await this.db().feeSettlementLine.update({
+        where: { id: line.id },
+        data: {
+          matchStatus: 'CHARGEBACK',
+          remarks: 'Auto-detected refund / chargeback against ERP payment',
+        },
+      });
+      await this.db().paymentTransaction.update({
+        where: { id: line.paymentId },
+        data: { reconStatus: 'EXCEPTION' },
+      });
+      flagged += 1;
+    }
+    return { flagged };
+  }
+
+  /**
+   * Match settlement UTRs to accounting bank statement lines (3-way: ERP ↔ gateway ↔ bank).
+   */
+  async runBankThreeWayMatch(tenantId: string, batchId: string) {
+    const lines = await this.db().feeSettlementLine.findMany({
+      where: {
+        tenantId,
+        batchId,
+        matchStatus: { not: 'SETTLEMENT_PENDING' },
+      },
+      select: {
+        id: true,
+        utr: true,
+        netAmount: true,
+        grossAmount: true,
+        settlementDate: true,
+      },
+      take: 20_000,
+    });
+
+    const utrs = [
+      ...new Set(
+        lines
+          .map((l: any) =>
+            String(l.utr ?? '')
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
+      ),
+    ];
+    if (!utrs.length) {
+      for (const line of lines) {
+        await this.db().feeSettlementLine.update({
+          where: { id: line.id },
+          data: {
+            bankMatchStatus: line.utr ? 'UNMATCHED' : 'PENDING',
+            bankStatementLineId: null,
+            bankAmountDifference: null,
+          },
+        });
+      }
+      return { matched: 0, unmatched: lines.length };
+    }
+
+    const bankLines = await this.db().accountingBankStatementLine.findMany({
+      where: {
+        tenantId,
+        referenceNo: { not: null },
+      },
+      select: {
+        id: true,
+        referenceNo: true,
+        creditAmount: true,
+        debitAmount: true,
+        lineDate: true,
+      },
+      take: 20_000,
+    });
+
+    const byRef = new Map<string, any[]>();
+    for (const bl of bankLines) {
+      const key = String(bl.referenceNo ?? '')
+        .trim()
+        .toLowerCase();
+      if (!key) continue;
+      if (!byRef.has(key)) byRef.set(key, []);
+      byRef.get(key)!.push(bl);
+    }
+
+    let matched = 0;
+    let unmatched = 0;
+    for (const line of lines) {
+      const utr = String(line.utr ?? '')
+        .trim()
+        .toLowerCase();
+      if (!utr) {
+        await this.db().feeSettlementLine.update({
+          where: { id: line.id },
+          data: {
+            bankMatchStatus: 'PENDING',
+            bankStatementLineId: null,
+            bankAmountDifference: null,
+          },
+        });
+        continue;
+      }
+      const candidates = byRef.get(utr) ?? [];
+      if (!candidates.length) {
+        unmatched += 1;
+        await this.db().feeSettlementLine.update({
+          where: { id: line.id },
+          data: {
+            bankMatchStatus: 'UNMATCHED',
+            bankStatementLineId: null,
+            bankAmountDifference: null,
+          },
+        });
+        continue;
+      }
+      const settlementAmt = Number(line.netAmount || line.grossAmount || 0);
+      const bank = candidates[0];
+      const bankAmt = Math.max(
+        Number(bank.creditAmount ?? 0),
+        Number(bank.debitAmount ?? 0),
+      );
+      const diff = Math.round((settlementAmt - bankAmt) * 100) / 100;
+      const status = Math.abs(diff) > 0.5 ? 'AMOUNT_MISMATCH' : 'MATCHED';
+      if (status === 'MATCHED') matched += 1;
+      else unmatched += 1;
+      await this.db().feeSettlementLine.update({
+        where: { id: line.id },
+        data: {
+          bankMatchStatus: status,
+          bankStatementLineId: bank.id,
+          bankAmountDifference: diff,
+        },
+      });
+    }
+    return { matched, unmatched };
+  }
+
+  async executiveSummary(tenantId: string) {
+    const dash = await this.dashboard(tenantId);
+    const lines = await this.db().feeSettlementLine.findMany({
+      where: { tenantId },
+      select: {
+        matchStatus: true,
+        bankMatchStatus: true,
+        grossAmount: true,
+        netAmount: true,
+        feeCharges: true,
+        taxAmount: true,
+      },
+      take: 20_000,
+    });
+
+    const threeWayOk = lines.filter(
+      (l: any) =>
+        ['MATCHED', 'RECONCILED'].includes(l.matchStatus) &&
+        l.bankMatchStatus === 'MATCHED',
+    ).length;
+    const bankUnmatched = lines.filter(
+      (l: any) => l.bankMatchStatus === 'UNMATCHED',
+    ).length;
+    const bankMismatch = lines.filter(
+      (l: any) => l.bankMatchStatus === 'AMOUNT_MISMATCH',
+    ).length;
+
+    const matchRate =
+      dash.kpis.totalLines > 0
+        ? Math.round((dash.kpis.matched / dash.kpis.totalLines) * 1000) / 10
+        : 100;
+
+    return {
+      asOf: new Date().toISOString(),
+      headline: {
+        collectionsGross: dash.kpis.totalGross,
+        collectionsNet: dash.kpis.totalNet,
+        gatewayFees: dash.kpis.totalFees,
+        taxGst: dash.kpis.totalTax,
+        matchRatePct: matchRate,
+        openExceptions: dash.kpis.exceptions,
+        chargebacks: dash.kpis.chargebacks ?? 0,
+        settlementPending: dash.kpis.settlementPending ?? 0,
+        threeWayMatched: threeWayOk,
+        bankUnmatched,
+        bankAmountMismatch: bankMismatch,
+      },
+      byStatus: dash.byStatus,
+      recentBatches: dash.recentBatches,
+      attentionNeeded: dash.kpis.exceptions > 0,
+    };
+  }
+
+  async exportPdf(
+    tenantId: string,
+    query: { batchId?: string; report?: 'daily' | 'exceptions' | 'all' },
+  ) {
+    const report = query.report ?? 'all';
+    const summary = await this.executiveSummary(tenantId);
+    const lines = await this.listLines(tenantId, {
+      batchId: query.batchId,
+      exceptionsOnly: report === 'exceptions',
+      limit: 500,
+    });
+
+    const kpi = summary.headline;
+    const rowHtml = lines
+      .map(
+        (l: any) => `<tr>
+        <td>${l.lineNo}</td>
+        <td>${l.matchStatus}</td>
+        <td>${l.bankMatchStatus ?? '—'}</td>
+        <td>${l.gatewayPaymentId || l.gatewayTransactionId || '—'}</td>
+        <td>${l.utr || '—'}</td>
+        <td class="num">₹${Number(l.grossAmount).toLocaleString('en-IN')}</td>
+        <td class="num">₹${Number(l.feeCharges).toLocaleString('en-IN')}</td>
+        <td class="num">₹${Number(l.taxAmount).toLocaleString('en-IN')}</td>
+        <td class="num">₹${Number(l.netAmount).toLocaleString('en-IN')}</td>
+        <td>${l.payment?.transactionNo ?? '—'}</td>
+        <td>${l.payment?.studentName ?? '—'}</td>
+      </tr>`,
+      )
+      .join('');
+
+    const title =
+      report === 'exceptions'
+        ? 'Fee Settlement Exceptions'
+        : report === 'daily'
+          ? 'Daily Fee Settlement Reconciliation'
+          : 'Fee Settlement Reconciliation Pack';
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+      body{font-family:Arial,sans-serif;padding:24px;font-size:11px;color:#111}
+      h1{font-size:18px;margin:0 0 8px}
+      .meta{color:#555;margin-bottom:16px}
+      .kpis{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+      .kpi{border:1px solid #ddd;border-radius:6px;padding:8px 12px;min-width:120px}
+      .kpi b{display:block;font-size:14px}
+      table{width:100%;border-collapse:collapse;margin-top:8px}
+      th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}
+      th{background:#f3f4f6}
+      .num{text-align:right}
+    </style></head><body>
+      <h1>${title}</h1>
+      <div class="meta">Generated ${new Date().toLocaleString('en-IN')} · Lines shown: ${lines.length}</div>
+      <div class="kpis">
+        <div class="kpi">Gross<b>₹${kpi.collectionsGross.toLocaleString('en-IN')}</b></div>
+        <div class="kpi">Net<b>₹${kpi.collectionsNet.toLocaleString('en-IN')}</b></div>
+        <div class="kpi">Fees<b>₹${kpi.gatewayFees.toLocaleString('en-IN')}</b></div>
+        <div class="kpi">Tax/GST<b>₹${kpi.taxGst.toLocaleString('en-IN')}</b></div>
+        <div class="kpi">Match rate<b>${kpi.matchRatePct}%</b></div>
+        <div class="kpi">Exceptions<b>${kpi.openExceptions}</b></div>
+        <div class="kpi">Chargebacks<b>${kpi.chargebacks}</b></div>
+        <div class="kpi">3-way OK<b>${kpi.threeWayMatched}</b></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>ERP match</th><th>Bank</th><th>Gateway</th><th>UTR</th>
+          <th>Gross</th><th>Fee</th><th>Tax</th><th>Net</th><th>Txn</th><th>Student</th>
+        </tr></thead>
+        <tbody>${rowHtml || '<tr><td colspan="11">No rows</td></tr>'}</tbody>
+      </table>
+    </body></html>`;
+
+    const buffer = await this.htmlToPdf(html);
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      format: 'pdf' as const,
+      buffer,
+      filename: `fee-recon-${report}-${stamp}.pdf`,
+    };
+  }
+
+  private async htmlToPdf(html: string) {
+    const puppeteer = await import('puppeteer');
+    const browser = await puppeteer.default.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+      ],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'load' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        landscape: true,
+        printBackground: true,
+        margin: { top: '12mm', right: '8mm', bottom: '12mm', left: '8mm' },
+      });
+      const buffer = Buffer.from(pdf);
+      if (buffer.length < 500) {
+        throw new Error('PDF generation produced an empty document');
+      }
+      return buffer;
+    } finally {
+      await browser.close();
+    }
   }
 }
