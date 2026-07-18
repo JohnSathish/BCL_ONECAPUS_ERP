@@ -515,6 +515,57 @@ export class CampusCompetitionsController {
     return this.scoring.reportsCsv(user, id);
   }
 
+  @Get('meets/:id/reports/heat-sheets')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  heatSheets(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.heatSheets(user, id);
+  }
+
+  @Get('meets/:id/reports/check-in')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  checkInReport(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.checkInReport(user, id);
+  }
+
+  @Get('meets/:id/reports/check-in.csv')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  checkInReportCsv(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.checkInReportCsv(user, id);
+  }
+
+  @Get('meets/:id/reports/volunteers.csv')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+  )
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  volunteersReportCsv(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.volunteersReportCsv(user, id);
+  }
+
+  @Get('meets/:id/reports/ledger.csv')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+  )
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  ledgerReportCsv(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.scoring.ledgerReportCsv(user, id);
+  }
+
   @Post('meets/:id/certificates/participation')
   @RequireAnyPermission(
     'campus-competitions:certificates',

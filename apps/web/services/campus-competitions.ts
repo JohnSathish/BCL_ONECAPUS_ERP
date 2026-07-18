@@ -408,6 +408,90 @@ export async function downloadMeetReportCsv(meetId: string) {
   downloadBlob(res.data as Blob, `competition-meet-${meetId}.csv`);
 }
 
+export async function fetchMeetReportSummary(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/reports/summary`);
+  return data as {
+    meet: { id: string; name: string; status: string };
+    events: number;
+    participants: number;
+    publishedResults: number;
+    checkedIn: number;
+    checkInRate: number;
+    volunteers: number;
+    fixtures: number;
+    medals: { gold: number; silver: number; bronze: number };
+    leaderboard: LeaderboardRow[];
+  };
+}
+
+export async function fetchHeatSheets(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/reports/heat-sheets`);
+  return data as {
+    meetId: string;
+    sheets: Array<{
+      event: {
+        id: string;
+        name: string;
+        entryMode: string;
+        scheduledAt?: string | null;
+        venue?: string;
+      };
+      fixtures: Array<{
+        id: string;
+        round: string;
+        heatNumber?: number | null;
+        bracketSlot?: number | null;
+        scheduledAt?: string | null;
+        entries: Array<{
+          entryId: string;
+          lane: number;
+          bibNumber?: string | null;
+          label: string;
+          houseCode?: string | null;
+        }>;
+      }>;
+    }>;
+  };
+}
+
+export async function fetchCheckInReport(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/reports/check-in`);
+  return data as {
+    meetId: string;
+    totalEntries: number;
+    totalCheckedIn: number;
+    rate: number;
+    events: Array<{
+      eventId: string;
+      eventName: string;
+      entries: number;
+      checkedIn: number;
+      rate: number;
+    }>;
+  };
+}
+
+export async function downloadCheckInReportCsv(meetId: string) {
+  const res = await api.get(`${base}/meets/${meetId}/reports/check-in.csv`, {
+    responseType: 'blob',
+  });
+  downloadBlob(res.data as Blob, `competition-checkin-${meetId}.csv`);
+}
+
+export async function downloadVolunteersReportCsv(meetId: string) {
+  const res = await api.get(`${base}/meets/${meetId}/reports/volunteers.csv`, {
+    responseType: 'blob',
+  });
+  downloadBlob(res.data as Blob, `competition-volunteers-${meetId}.csv`);
+}
+
+export async function downloadLedgerReportCsv(meetId: string) {
+  const res = await api.get(`${base}/meets/${meetId}/reports/ledger.csv`, {
+    responseType: 'blob',
+  });
+  downloadBlob(res.data as Blob, `competition-ledger-${meetId}.csv`);
+}
+
 export async function fetchMyHouse() {
   const { data } = await api.get(`${base}/me/house`);
   return data;

@@ -930,9 +930,11 @@ export class CompetitionScoringService {
   async reportsSummary(user: JwtUser, meetId: string) {
     const meet = await this.meets.getMeet(user, meetId);
     const leaderboard = await this.leaderboard(user, meetId);
-    const events = await this.db().competitionEvent.count({
+    const events = await this.db().competitionEvent.findMany({
       where: { tenantId: user.tid, meetId, deletedAt: null },
+      select: { id: true },
     });
+    const eventIds = events.map((e: { id: string }) => e.id);
     const participants = await this.db().competitionEntry.count({
       where: {
         tenantId: user.tid,
@@ -947,11 +949,46 @@ export class CompetitionScoringService {
         event: { meetId },
       },
     });
+    const checkedIn = eventIds.length
+      ? await this.db().competitionEntryCheckIn.count({
+          where: { tenantId: user.tid, eventId: { in: eventIds } },
+        })
+      : 0;
+    const volunteers = await this.db().competitionMeetVolunteer.count({
+      where: { tenantId: user.tid, meetId },
+    });
+    const fixtures = eventIds.length
+      ? await this.db().competitionFixture.count({
+          where: { tenantId: user.tid, eventId: { in: eventIds } },
+        })
+      : 0;
+    const medals = await this.db().competitionMedal.groupBy({
+      by: ['metal'],
+      where: { tenantId: user.tid, meetId },
+      _count: { _all: true },
+    });
+    const medalCounts = { gold: 0, silver: 0, bronze: 0 };
+    for (const row of medals as Array<{
+      metal: string;
+      _count: { _all: number };
+    }>) {
+      const key = row.metal?.toLowerCase?.() as 'gold' | 'silver' | 'bronze';
+      if (key in medalCounts) medalCounts[key] = row._count._all;
+    }
+
     return {
       meet: { id: meet.id, name: meet.name, status: meet.status },
-      events,
+      events: events.length,
       participants,
       publishedResults,
+      checkedIn,
+      checkInRate:
+        participants > 0
+          ? Math.round((checkedIn / participants) * 1000) / 10
+          : 0,
+      volunteers,
+      fixtures,
+      medals: medalCounts,
       leaderboardVersion: meet.leaderboardVersion,
       leaderboard,
     };
@@ -964,6 +1001,244 @@ export class CompetitionScoringService {
       .map(
         (r) =>
           `${r.rank},"${r.name}",${r.code},${r.points},${r.medals.gold},${r.medals.silver},${r.medals.bronze}`,
+      )
+      .join('\n');
+    return header + lines + '\n';
+  }
+
+  async heatSheets(user: JwtUser, meetId: string) {
+    await this.meets.getMeet(user, meetId);
+    const events = await this.db().competitionEvent.findMany({
+      where: { tenantId: user.tid, meetId, deletedAt: null },
+      orderBy: [{ scheduledAt: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        entryMode: true,
+        scheduledAt: true,
+        venue: true,
+        status: true,
+      },
+    });
+    const sheets = [];
+    for (const event of events) {
+      const [fixtures, entries] = await Promise.all([
+        this.db().competitionFixture.findMany({
+          where: { tenantId: user.tid, eventId: event.id },
+          orderBy: [
+            { heatNumber: 'asc' },
+            { bracketSlot: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        }),
+        this.db().competitionEntry.findMany({
+          where: {
+            tenantId: user.tid,
+            eventId: event.id,
+            status: 'REGISTERED',
+          },
+          include: {
+            house: {
+              select: { id: true, name: true, code: true, color: true },
+            },
+            team: { select: { id: true, name: true } },
+          },
+          orderBy: { registeredAt: 'asc' },
+        }),
+      ]);
+      const byId = new Map(entries.map((e: { id: string }) => [e.id, e]));
+      sheets.push({
+        event,
+        fixtures: fixtures.map(
+          (fx: {
+            id: string;
+            round: string;
+            heatNumber?: number | null;
+            bracketSlot?: number | null;
+            scheduledAt?: Date | null;
+            status: string;
+            entryIds: unknown;
+          }) => {
+            const ids = Array.isArray(fx.entryIds)
+              ? (fx.entryIds as string[])
+              : [];
+            return {
+              id: fx.id,
+              round: fx.round,
+              heatNumber: fx.heatNumber,
+              bracketSlot: fx.bracketSlot,
+              scheduledAt: fx.scheduledAt,
+              status: fx.status,
+              entries: ids.map((id, idx) => {
+                const en = byId.get(id) as
+                  | {
+                      id: string;
+                      bibNumber?: string | null;
+                      lane?: number | null;
+                      house?: { name: string; code: string } | null;
+                      team?: { name: string } | null;
+                    }
+                  | undefined;
+                return {
+                  entryId: id,
+                  lane: en?.lane ?? idx + 1,
+                  bibNumber: en?.bibNumber ?? null,
+                  label: en?.team?.name ?? en?.house?.name ?? id.slice(0, 8),
+                  houseCode: en?.house?.code ?? null,
+                };
+              }),
+            };
+          },
+        ),
+      });
+    }
+    return { meetId, sheets };
+  }
+
+  async checkInReport(user: JwtUser, meetId: string) {
+    await this.meets.getMeet(user, meetId);
+    const events = await this.db().competitionEvent.findMany({
+      where: { tenantId: user.tid, meetId, deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    });
+    const rows = [];
+    let totalEntries = 0;
+    let totalCheckedIn = 0;
+    for (const event of events) {
+      const entries = await this.db().competitionEntry.findMany({
+        where: {
+          tenantId: user.tid,
+          eventId: event.id,
+          status: 'REGISTERED',
+        },
+        include: {
+          house: { select: { name: true, code: true } },
+          team: { select: { name: true } },
+          checkIns: true,
+        },
+        orderBy: { registeredAt: 'asc' },
+      });
+      const checkedIn = entries.filter(
+        (e: { checkIns: unknown[] }) => (e.checkIns?.length ?? 0) > 0,
+      ).length;
+      totalEntries += entries.length;
+      totalCheckedIn += checkedIn;
+      rows.push({
+        eventId: event.id,
+        eventName: event.name,
+        entries: entries.length,
+        checkedIn,
+        rate:
+          entries.length > 0
+            ? Math.round((checkedIn / entries.length) * 1000) / 10
+            : 0,
+        details: entries.map(
+          (e: {
+            id: string;
+            bibNumber?: string | null;
+            house?: { name: string; code: string } | null;
+            team?: { name: string } | null;
+            checkIns: Array<{ method: string; markedAt: Date }>;
+          }) => ({
+            entryId: e.id,
+            bibNumber: e.bibNumber,
+            label: e.team?.name ?? e.house?.name ?? e.id.slice(0, 8),
+            houseCode: e.house?.code ?? null,
+            checkedIn: (e.checkIns?.length ?? 0) > 0,
+            method: e.checkIns?.[0]?.method ?? null,
+            markedAt: e.checkIns?.[0]?.markedAt ?? null,
+          }),
+        ),
+      });
+    }
+    return {
+      meetId,
+      totalEntries,
+      totalCheckedIn,
+      rate:
+        totalEntries > 0
+          ? Math.round((totalCheckedIn / totalEntries) * 1000) / 10
+          : 0,
+      events: rows,
+    };
+  }
+
+  async checkInReportCsv(user: JwtUser, meetId: string) {
+    const report = await this.checkInReport(user, meetId);
+    const header =
+      'Event,Entries,CheckedIn,Rate%,Bib,House,Label,CheckedIn,Method,MarkedAt\n';
+    const lines: string[] = [];
+    for (const ev of report.events) {
+      if (!ev.details.length) {
+        lines.push(
+          `"${ev.eventName}",${ev.entries},${ev.checkedIn},${ev.rate},,,,,,`,
+        );
+        continue;
+      }
+      for (const d of ev.details) {
+        lines.push(
+          `"${ev.eventName}",${ev.entries},${ev.checkedIn},${ev.rate},${d.bibNumber ?? ''},${d.houseCode ?? ''},"${d.label}",${d.checkedIn ? 'YES' : 'NO'},${d.method ?? ''},${d.markedAt ? new Date(d.markedAt).toISOString() : ''}`,
+        );
+      }
+    }
+    return header + lines.join('\n') + '\n';
+  }
+
+  async volunteersReportCsv(user: JwtUser, meetId: string) {
+    const volunteers = await this.meets.listVolunteers(user, meetId);
+    const events = await this.db().competitionEvent.findMany({
+      where: { tenantId: user.tid, meetId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    const eventName = new Map(
+      events.map((e: { id: string; name: string }) => [e.id, e.name]),
+    );
+    const header = 'Role,PersonType,Name,Code,Event,Notes\n';
+    const lines = volunteers
+      .map(
+        (v: {
+          role: string;
+          personType: string;
+          displayName: string;
+          personCode?: string | null;
+          eventId?: string | null;
+          notes?: string;
+        }) =>
+          `${v.role},${v.personType},"${v.displayName}",${v.personCode ?? ''},"${v.eventId ? (eventName.get(v.eventId) ?? '') : 'All'}","${(v.notes ?? '').replace(/"/g, '""')}"`,
+      )
+      .join('\n');
+    return header + lines + '\n';
+  }
+
+  async ledgerReportCsv(user: JwtUser, meetId: string) {
+    await this.meets.getMeet(user, meetId);
+    const rows = await this.db().housePointLedger.findMany({
+      where: { tenantId: user.tid, meetId },
+      include: {
+        house: { select: { name: true, code: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const events = await this.db().competitionEvent.findMany({
+      where: { tenantId: user.tid, meetId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    const eventName = new Map(
+      events.map((e: { id: string; name: string }) => [e.id, e.name]),
+    );
+    const header = 'When,House,Code,Delta,BalanceAfter,Reason,Event\n';
+    const lines = rows
+      .map(
+        (r: {
+          createdAt: Date;
+          house?: { name: string; code: string } | null;
+          delta: number;
+          balanceAfter: number;
+          reason: string;
+          eventId?: string | null;
+        }) =>
+          `${new Date(r.createdAt).toISOString()},"${r.house?.name ?? ''}",${r.house?.code ?? ''},${r.delta},${r.balanceAfter},"${(r.reason ?? '').replace(/"/g, '""')}","${r.eventId ? (eventName.get(r.eventId) ?? '') : ''}"`,
       )
       .join('\n');
     return header + lines + '\n';

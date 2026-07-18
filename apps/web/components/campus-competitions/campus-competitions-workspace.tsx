@@ -29,18 +29,24 @@ import {
   createMeet,
   createTrophy,
   declareHouseOfYear,
+  downloadCheckInReportCsv,
+  downloadLedgerReportCsv,
   downloadMeetReportCsv,
+  downloadVolunteersReportCsv,
   ensureDisplayToken,
   ensureEventCheckInToken,
   fetchChampionshipStandings,
+  fetchCheckInReport,
   fetchEventCheckIns,
   fetchEventEntries,
   fetchEventFixtures,
   fetchEventResults,
+  fetchHeatSheets,
   fetchHouse,
   fetchHouses,
   fetchLiveBoard,
   fetchMeet,
+  fetchMeetReportSummary,
   fetchMeetTypes,
   fetchMeetVolunteers,
   fetchMeets,
@@ -189,6 +195,16 @@ export function CampusCompetitionsWorkspace() {
     queryKey: ['campus-competitions', 'volunteers', selectedMeetId],
     queryFn: () => fetchMeetVolunteers(selectedMeetId),
     enabled: Boolean(selectedMeetId) && tab === 'live',
+  });
+  const reportSummaryQ = useQuery({
+    queryKey: ['campus-competitions', 'report-summary', selectedMeetId],
+    queryFn: () => fetchMeetReportSummary(selectedMeetId),
+    enabled: Boolean(selectedMeetId) && tab === 'reports',
+  });
+  const checkInReportQ = useQuery({
+    queryKey: ['campus-competitions', 'check-in-report', selectedMeetId],
+    queryFn: () => fetchCheckInReport(selectedMeetId),
+    enabled: Boolean(selectedMeetId) && tab === 'reports',
   });
 
   useCompetitionRealtime(selectedMeetId || null, {
@@ -2185,56 +2201,255 @@ export function CampusCompetitionsWorkspace() {
       ) : null}
 
       {tab === 'reports' ? (
-        <StcPanel
-          title="Certificates & reports"
-          description="Reuse Certificate Engine for participation and place awards"
-        >
-          {!selectedMeetId ? (
-            <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() =>
-                  void issueParticipationCertificates(selectedMeetId)
-                    .then((r) =>
+        <div className="space-y-4">
+          <StcPanel title="Meet summary" description="Live snapshot for the selected meet">
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
+            ) : reportSummaryQ.isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {(
+                  [
+                    ['Events', reportSummaryQ.data?.events ?? 0],
+                    ['Entries', reportSummaryQ.data?.participants ?? 0],
+                    [
+                      'Check-in',
+                      `${reportSummaryQ.data?.checkedIn ?? 0} (${reportSummaryQ.data?.checkInRate ?? 0}%)`,
+                    ],
+                    ['Published results', reportSummaryQ.data?.publishedResults ?? 0],
+                    ['Fixtures', reportSummaryQ.data?.fixtures ?? 0],
+                    ['Volunteers', reportSummaryQ.data?.volunteers ?? 0],
+                    [
+                      'Medals',
+                      `G${reportSummaryQ.data?.medals?.gold ?? 0} S${reportSummaryQ.data?.medals?.silver ?? 0} B${reportSummaryQ.data?.medals?.bronze ?? 0}`,
+                    ],
+                    ['Meet status', reportSummaryQ.data?.meet?.status ?? '—'],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel
+            title="Check-in by event"
+            description="Attendance rates after RFID / QR desk ops"
+          >
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet first.</p>
+            ) : checkInReportQ.isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (checkInReportQ.data?.events ?? []).length === 0 ? (
+              <p className="text-sm text-slate-500">No events on this meet.</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-600">
+                  Overall {checkInReportQ.data?.totalCheckedIn ?? 0}/
+                  {checkInReportQ.data?.totalEntries ?? 0} ({checkInReportQ.data?.rate ?? 0}%)
+                </p>
+                {(checkInReportQ.data?.events ?? []).map((ev) => (
+                  <div
+                    key={ev.eventId}
+                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">{ev.eventName}</span>
+                    <span className="text-slate-600">
+                      {ev.checkedIn}/{ev.entries} · {ev.rate}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel
+            title="Certificates & downloads"
+            description="Print packs and CSV exports for day-of and post-meet"
+          >
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet from the Meets tab first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void issueParticipationCertificates(selectedMeetId)
+                      .then((r) =>
+                        setMessage({
+                          tone: 'ok',
+                          text: `Issued ${r.issued} participation certificates`,
+                        }),
+                      )
+                      .catch((e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }))
+                  }
+                >
+                  Issue participation certs
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void issuePlaceCertificates(selectedMeetId)
+                      .then((r) =>
+                        setMessage({
+                          tone: 'ok',
+                          text: `Issued ${r.issued} place certificates`,
+                        }),
+                      )
+                      .catch((e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }))
+                  }
+                >
+                  Issue place certs
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void fetchHeatSheets(selectedMeetId)
+                      .then((pack) => {
+                        const meetName = reportSummaryQ.data?.meet?.name ?? 'Meet';
+                        const body = pack.sheets
+                          .map((sheet) => {
+                            const fxHtml =
+                              sheet.fixtures.length === 0
+                                ? '<p>No fixtures generated.</p>'
+                                : sheet.fixtures
+                                    .map((fx) => {
+                                      const rows = fx.entries
+                                        .map(
+                                          (en) =>
+                                            `<tr><td>${en.lane}</td><td>${en.bibNumber ?? ''}</td><td>${en.label}</td><td>${en.houseCode ?? ''}</td></tr>`,
+                                        )
+                                        .join('');
+                                      return `<h3>${fx.round}${fx.heatNumber != null ? ` · Heat ${fx.heatNumber}` : ''}${fx.bracketSlot != null ? ` · Slot ${fx.bracketSlot}` : ''}</h3>
+                                        <table><thead><tr><th>Lane</th><th>Bib</th><th>Entry</th><th>House</th></tr></thead>
+                                        <tbody>${rows}</tbody></table>`;
+                                    })
+                                    .join('');
+                            return `<section><h2>${sheet.event.name}</h2>${fxHtml}</section>`;
+                          })
+                          .join('<hr/>');
+                        const html = `<!doctype html><html><head><title>Heat sheets</title>
+                          <style>body{font-family:sans-serif;padding:24px}h2{margin-top:24px}table{border-collapse:collapse;width:100%;margin:8px 0 20px}
+                          th,td{border:1px solid #ccc;padding:6px;text-align:left}section{page-break-inside:avoid}</style></head>
+                          <body><h1>${meetName} — Heat sheets</h1>${body}<script>window.print()</script></body></html>`;
+                        const w = window.open('', '_blank');
+                        if (w) {
+                          w.document.write(html);
+                          w.document.close();
+                        }
+                      })
+                      .catch((e) =>
+                        setMessage({
+                          tone: 'err',
+                          text: apiErrorMessage(e, 'Heat sheets failed'),
+                        }),
+                      )
+                  }
+                >
+                  Print heat sheets
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void downloadMeetReportCsv(selectedMeetId).catch((e) =>
+                      setMessage({ tone: 'err', text: apiErrorMessage(e, 'CSV failed') }),
+                    )
+                  }
+                >
+                  Leaderboard CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void downloadCheckInReportCsv(selectedMeetId).catch((e) =>
                       setMessage({
-                        tone: 'ok',
-                        text: `Issued ${r.issued} participation certificates`,
+                        tone: 'err',
+                        text: apiErrorMessage(e, 'Check-in CSV failed'),
                       }),
                     )
-                    .catch((e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }))
-                }
-              >
-                Issue participation certs
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void issuePlaceCertificates(selectedMeetId)
-                    .then((r) =>
-                      setMessage({ tone: 'ok', text: `Issued ${r.issued} place certificates` }),
+                  }
+                >
+                  Check-in CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void downloadVolunteersReportCsv(selectedMeetId).catch((e) =>
+                      setMessage({
+                        tone: 'err',
+                        text: apiErrorMessage(e, 'Volunteers CSV failed'),
+                      }),
                     )
-                    .catch((e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }))
-                }
-              >
-                Issue place certs
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void downloadMeetReportCsv(selectedMeetId).catch((e) =>
-                    setMessage({ tone: 'err', text: apiErrorMessage(e, 'CSV failed') }),
-                  )
-                }
-              >
-                Download leaderboard CSV
-              </Button>
-            </div>
-          )}
-        </StcPanel>
+                  }
+                >
+                  Volunteers CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void downloadLedgerReportCsv(selectedMeetId).catch((e) =>
+                      setMessage({
+                        tone: 'err',
+                        text: apiErrorMessage(e, 'Ledger CSV failed'),
+                      }),
+                    )
+                  }
+                >
+                  Points ledger CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void fetchMeetVolunteers(selectedMeetId)
+                      .then((rows) => {
+                        const meetName = reportSummaryQ.data?.meet?.name ?? 'Meet';
+                        const tr = rows
+                          .map(
+                            (v) =>
+                              `<tr><td>${v.role}</td><td>${v.personType}</td><td>${v.displayName}</td><td>${v.personCode ?? ''}</td><td>${v.notes ?? ''}</td></tr>`,
+                          )
+                          .join('');
+                        const html = `<!doctype html><html><head><title>Volunteers</title>
+                          <style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}
+                          th,td{border:1px solid #ccc;padding:8px;text-align:left}</style></head>
+                          <body><h1>${meetName} — Volunteer roster</h1>
+                          <table><thead><tr><th>Role</th><th>Type</th><th>Name</th><th>Code</th><th>Notes</th></tr></thead>
+                          <tbody>${tr || '<tr><td colspan="5">No volunteers</td></tr>'}</tbody></table>
+                          <script>window.print()</script></body></html>`;
+                        const w = window.open('', '_blank');
+                        if (w) {
+                          w.document.write(html);
+                          w.document.close();
+                        }
+                      })
+                      .catch((e) =>
+                        setMessage({
+                          tone: 'err',
+                          text: apiErrorMessage(e, 'Volunteer print failed'),
+                        }),
+                      )
+                  }
+                >
+                  Print volunteer roster
+                </Button>
+              </div>
+            )}
+          </StcPanel>
+        </div>
       ) : null}
     </div>
   );
