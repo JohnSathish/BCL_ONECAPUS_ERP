@@ -715,7 +715,7 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'timetable',
         permissions: [...P.timetable],
         activePattern:
-          '^/admin/academics/(?:timetable|teaching-allocation|teaching-subject-groups)(?:/.*)?$',
+          '^/admin/academics/(?:timetable|teaching-allocation|department-workload|teaching-subject-groups)(?:/.*)?$',
         children: [
           { label: 'Dashboard', href: '/admin/academics/timetable', permissions: [...P.timetable] },
           {
@@ -732,6 +732,11 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Teaching Allocation',
             href: '/admin/academics/teaching-allocation',
             permissions: [...P.timetable],
+          },
+          {
+            label: 'Department Workload',
+            href: '/admin/academics/department-workload',
+            permissions: [...P.timetable, 'staff:assign-subjects'],
           },
           {
             label: 'Bulk Import / Export',

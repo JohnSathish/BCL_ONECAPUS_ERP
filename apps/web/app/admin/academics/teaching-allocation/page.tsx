@@ -97,7 +97,15 @@ export default function TeachingAllocationPage() {
           <h1 className="mt-2 text-2xl font-semibold">FYUGP Teaching Allocation</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             HODs provide faculty, initials, workload, rooms, lab, and combined-class inputs. The
-            central timetable engine uses these rows to generate stream master routines.
+            central timetable engine uses these rows to generate stream master routines. For
+            interactive faculty/room assignment with clash checks, use{' '}
+            <a
+              className="font-medium text-primary underline-offset-2 hover:underline"
+              href="/admin/academics/department-workload"
+            >
+              Department Workload
+            </a>
+            ; keep Excel for import/export only.
           </p>
         </section>
 

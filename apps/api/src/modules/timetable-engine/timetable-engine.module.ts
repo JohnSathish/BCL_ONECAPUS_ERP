@@ -16,6 +16,7 @@ import { TimetableRoutineExcelService } from './timetable-routine-excel.service'
 import { TimetableSlotRuleService } from './timetable-slot-rule.service';
 import { TimetableStreamMasterService } from './timetable-stream-master.service';
 import { TimetableWorkloadService } from './timetable-workload.service';
+import { TimetableDepartmentWorkloadService } from './timetable-department-workload.service';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { TimetableWorkloadService } from './timetable-workload.service';
     TimetableStreamMasterService,
     TimetableSlotRuleService,
     TimetableReadinessService,
+    TimetableDepartmentWorkloadService,
   ],
   exports: [TimetableEngineService],
 })

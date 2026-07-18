@@ -20,6 +20,7 @@ import { TimetableRoutineExcelService } from './timetable-routine-excel.service'
 import { TimetableSlotRuleService } from './timetable-slot-rule.service';
 import { TimetableStreamMasterService } from './timetable-stream-master.service';
 import { TeachingSubjectGroupService } from './teaching-subject-group.service';
+import { TimetableDepartmentWorkloadService } from './timetable-department-workload.service';
 import { StudentAttendanceService } from '../student-attendance/student-attendance.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { CacheService } from '../../shared/cache/cache.service';
@@ -103,6 +104,7 @@ export class TimetableEngineService {
     private readonly attendance: StudentAttendanceService,
     private readonly communication: CommunicationTriggerService,
     private readonly cache: CacheService,
+    private readonly departmentWorkload: TimetableDepartmentWorkloadService,
   ) {}
 
   listPlans(user: JwtUser, filters: PlanFilters = {}) {
@@ -396,10 +398,21 @@ export class TimetableEngineService {
       departmentId?: string;
     },
   ) {
-    return this.allocations.listRows(
-      user.tid,
-      this.scopeDepartmentFilter(user, filters),
-    );
+    return this.scopedTeachingAllocations(user, filters);
+  }
+
+  private async scopedTeachingAllocations(
+    user: JwtUser,
+    filters: {
+      academicYearId?: string;
+      streamId?: string;
+      shiftId?: string;
+      semesterMode?: string;
+      departmentId?: string;
+    },
+  ) {
+    const scoped = await this.scopeDepartmentFilter(user, filters);
+    return this.allocations.listRows(user.tid, scoped);
   }
 
   async saveTeachingAllocation(user: JwtUser, dto: any) {
@@ -407,10 +420,13 @@ export class TimetableEngineService {
     return this.allocations.saveRow(user.tid, dto);
   }
 
-  submitTeachingAllocations(
+  async submitTeachingAllocations(
     user: JwtUser,
     dto: { sectionIds: string[]; status?: string },
   ) {
+    for (const sectionId of dto.sectionIds ?? []) {
+      await this.assertDepartmentAllocationAccess(user, sectionId);
+    }
     return this.allocations.submitRows(
       user.tid,
       dto.sectionIds ?? [],
@@ -418,7 +434,51 @@ export class TimetableEngineService {
     );
   }
 
-  autoAssignTeachingAllocations(
+  departmentWorkloadSheet(
+    user: JwtUser,
+    filters: {
+      planId?: string;
+      departmentId?: string;
+      semesterMode?: string;
+      shiftId?: string;
+      academicYearId?: string;
+    },
+  ) {
+    return this.departmentWorkload.listSheet(user, filters);
+  }
+
+  departmentWorkloadPlans(
+    user: JwtUser,
+    filters: {
+      academicYearId?: string;
+      shiftId?: string;
+      semesterMode?: string;
+    },
+  ) {
+    return this.departmentWorkload.listPlans(user, filters);
+  }
+
+  assignDepartmentWorkload(user: JwtUser, dto: any) {
+    return this.departmentWorkload.assign(user, dto);
+  }
+
+  facultyWorkloadAvailability(
+    user: JwtUser,
+    staffProfileId: string,
+    filters?: { planId?: string; semesterMode?: string },
+  ) {
+    return this.departmentWorkload.facultyAvailability(
+      user,
+      staffProfileId,
+      filters,
+    );
+  }
+
+  transitionDepartmentWorkload(user: JwtUser, dto: any) {
+    return this.departmentWorkload.transitionStatus(user, dto);
+  }
+
+  async autoAssignTeachingAllocations(
     user: JwtUser,
     dto: {
       academicYearId?: string;
@@ -428,10 +488,8 @@ export class TimetableEngineService {
       departmentId?: string;
     },
   ) {
-    return this.allocations.autoAssign(
-      user.tid,
-      this.scopeDepartmentFilter(user, dto),
-    );
+    const scoped = await this.scopeDepartmentFilter(user, dto);
+    return this.allocations.autoAssign(user.tid, scoped);
   }
 
   clonePreviousRoutine(
@@ -472,14 +530,12 @@ export class TimetableEngineService {
     return this.allocationExcel.commitAllocationUpload(user.tid, buffer);
   }
 
-  allocationReadiness(
+  async allocationReadiness(
     user: JwtUser,
     filters: Record<string, string | undefined>,
   ) {
-    return this.readinessService.readiness(
-      user.tid,
-      this.scopeDepartmentFilter(user, filters),
-    );
+    const scoped = await this.scopeDepartmentFilter(user, filters);
+    return this.readinessService.readiness(user.tid, scoped);
   }
 
   validationCenter(user: JwtUser, planId: string) {
@@ -1488,12 +1544,27 @@ export class TimetableEngineService {
     );
   }
 
-  private scopeDepartmentFilter<T extends { departmentId?: string }>(
+  private async scopeDepartmentFilter<T extends { departmentId?: string }>(
     user: JwtUser,
     filters: T,
-  ): T {
+  ): Promise<T> {
     if (this.isCentralTimetableUser(user)) return filters;
-    return filters;
+    const headed = await this.allocations.departmentIdsForUser(
+      user.tid,
+      user.sub,
+    );
+    if (!headed.length) {
+      throw new BadRequestException('No headed department found for this user');
+    }
+    if (filters.departmentId && !headed.includes(filters.departmentId)) {
+      throw new BadRequestException(
+        'HOD can view only their own department allocations',
+      );
+    }
+    return {
+      ...filters,
+      departmentId: filters.departmentId ?? headed[0],
+    };
   }
 
   private async assertDepartmentAllocationAccess(

@@ -629,3 +629,138 @@ export async function commitTeachingAllocationUpload(file: File) {
   const { data } = await api.post('/v1/timetable/teaching-allocations/commit-upload', form);
   return data as { committed: number };
 }
+
+export type DepartmentWorkloadRow = {
+  id: string;
+  entryId?: string | null;
+  offeringSectionId?: string | null;
+  dayOfWeek?: number | null;
+  dayName?: string | null;
+  periodNo?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  subjectSlot?: string | null;
+  fyugpCategory?: string | null;
+  subjectCode?: string | null;
+  subjectName?: string | null;
+  semester?: number | null;
+  sectionCode?: string | null;
+  departmentId?: string | null;
+  department?: string | null;
+  staffProfileId?: string | null;
+  staffName?: string | null;
+  classroomId?: string | null;
+  classroomCode?: string | null;
+  weeklyHours?: number | null;
+  maxWeeklyHours?: number | null;
+  assignedWeeklyHours?: number | null;
+  workloadStatus?: string | null;
+  status?: string | null;
+  source?: string | null;
+};
+
+export type DepartmentWorkloadSheet = {
+  mode: 'SLOTS' | 'SUBJECTS';
+  plan: {
+    id: string;
+    name: string;
+    status: string;
+    approvalState: string;
+  } | null;
+  departmentIds: string[];
+  rows: DepartmentWorkloadRow[];
+};
+
+export type FacultyWorkloadAvailability = {
+  staffProfileId: string;
+  staffName: string;
+  employeeCode?: string | null;
+  shortCode?: string | null;
+  department?: string | null;
+  employmentType?: string | null;
+  maxWeeklyHours: number;
+  assignedWeeklyHours: number;
+  remainingHours: number;
+  workloadStatus: string;
+  assignedSubjects: Array<{
+    offeringSectionId: string;
+    subjectCode?: string | null;
+    subjectName?: string | null;
+    semester?: number | null;
+    weeklyHours: number;
+    category?: string | null;
+  }>;
+  occupiedSlots: Array<{
+    entryId: string;
+    planId: string;
+    dayOfWeek: number;
+    dayName: string;
+    periodNo?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    subjectName?: string | null;
+    classroomCode?: string | null;
+  }>;
+};
+
+export async function fetchDepartmentWorkloadPlans(params?: {
+  academicYearId?: string;
+  shiftId?: string;
+  semesterMode?: string;
+}) {
+  const { data } = await api.get('/v1/timetable/department-workload/plans', { params });
+  return data as Array<{
+    id: string;
+    name: string;
+    status: string;
+    approvalState: string;
+    academicYearId?: string | null;
+    shiftId?: string | null;
+    semesterMode?: string;
+    updatedAt?: string;
+  }>;
+}
+
+export async function fetchDepartmentWorkloadSheet(params?: {
+  planId?: string;
+  departmentId?: string;
+  semesterMode?: string;
+  shiftId?: string;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/timetable/department-workload', { params });
+  return data as DepartmentWorkloadSheet;
+}
+
+export async function assignDepartmentWorkload(payload: {
+  entryId?: string;
+  offeringSectionId?: string;
+  staffProfileId?: string | null;
+  classroomId?: string | null;
+  workloadHours?: number | null;
+  status?: string;
+}) {
+  const { data } = await api.post('/v1/timetable/department-workload/assign', payload);
+  return data;
+}
+
+export async function fetchFacultyWorkloadAvailability(
+  staffProfileId: string,
+  params?: { planId?: string; semesterMode?: string },
+) {
+  const { data } = await api.get(
+    `/v1/timetable/department-workload/faculty/${staffProfileId}/availability`,
+    { params },
+  );
+  return data as FacultyWorkloadAvailability;
+}
+
+export async function transitionDepartmentWorkloadStatus(payload: {
+  sectionIds?: string[];
+  entryIds?: string[];
+  planId?: string;
+  status: string;
+}) {
+  const { data } = await api.post('/v1/timetable/department-workload/status', payload);
+  return data as { updated: number; status: string };
+}

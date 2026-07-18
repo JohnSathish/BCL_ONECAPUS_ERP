@@ -555,6 +555,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: [...MODULE_PERMISSIONS.timetable],
   },
   {
+    prefix: '/admin/academics/department-workload',
+    permissions: [...MODULE_PERMISSIONS.timetable, 'staff:assign-subjects'],
+  },
+  {
     prefix: '/admin/academics/teaching-subject-groups',
     permissions: [...MODULE_PERMISSIONS.timetable],
   },

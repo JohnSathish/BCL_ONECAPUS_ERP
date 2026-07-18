@@ -132,9 +132,93 @@ export class TimetableEngineController {
   }
 
   @Post('teaching-allocations/submit')
-  @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
   submitTeachingAllocations(@CurrentUser() user: JwtUser, @Body() dto: any) {
     return this.timetable.submitTeachingAllocations(user, dto);
+  }
+
+  @Get('department-workload/plans')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  departmentWorkloadPlans(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('semesterMode') semesterMode?: string,
+  ) {
+    return this.timetable.departmentWorkloadPlans(user, {
+      academicYearId,
+      shiftId,
+      semesterMode,
+    });
+  }
+
+  @Get('department-workload')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  departmentWorkloadSheet(
+    @CurrentUser() user: JwtUser,
+    @Query('planId') planId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('semesterMode') semesterMode?: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.timetable.departmentWorkloadSheet(user, {
+      planId,
+      departmentId,
+      semesterMode,
+      shiftId,
+      academicYearId,
+    });
+  }
+
+  @Post('department-workload/assign')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  assignDepartmentWorkload(@CurrentUser() user: JwtUser, @Body() dto: any) {
+    return this.timetable.assignDepartmentWorkload(user, dto);
+  }
+
+  @Get('department-workload/faculty/:staffProfileId/availability')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  facultyWorkloadAvailability(
+    @CurrentUser() user: JwtUser,
+    @Param('staffProfileId') staffProfileId: string,
+    @Query('planId') planId?: string,
+    @Query('semesterMode') semesterMode?: string,
+  ) {
+    return this.timetable.facultyWorkloadAvailability(user, staffProfileId, {
+      planId,
+      semesterMode,
+    });
+  }
+
+  @Post('department-workload/status')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  transitionDepartmentWorkload(@CurrentUser() user: JwtUser, @Body() dto: any) {
+    return this.timetable.transitionDepartmentWorkload(user, dto);
   }
 
   @Post('teaching-allocations/auto-assign')
