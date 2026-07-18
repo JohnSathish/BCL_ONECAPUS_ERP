@@ -12855,6 +12855,7 @@ model CompetitionHouse {
   ledger       HousePointLedger[]
   medals       CompetitionMedal[]
   media        CompetitionMedia[]
+  trophyAwards CompetitionTrophyAward[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -12950,9 +12951,11 @@ model CompetitionMeet {
   certificateLinks CompetitionCertificateLink[]
   media        CompetitionMedia[]
   announcements CompetitionAnnouncement[]
+  trophyAwards CompetitionTrophyAward[]
 
   @@index([tenantId, status])
   @@index([tenantId, meetType, startsAt])
+  @@index([tenantId, academicYearId])
   @@map("competition_meets")
   @@schema("academic")
 }
@@ -13261,6 +13264,55 @@ model CompetitionAnnouncement {
 
   @@index([tenantId, meetId, createdAt])
   @@map("competition_announcements")
+  @@schema("academic")
+}
+
+model CompetitionTrophy {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  code        String
+  trophyType  String    @default("CUP") @map("trophy_type")
+  description String    @default("")
+  status      String    @default("AVAILABLE")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  awards CompetitionTrophyAward[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("competition_trophies")
+  @@schema("academic")
+}
+
+model CompetitionTrophyAward {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  trophyId       String    @map("trophy_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  meetId         String?   @map("meet_id") @db.Uuid
+  houseId        String?   @map("house_id") @db.Uuid
+  studentId      String?   @map("student_id") @db.Uuid
+  awardType      String    @map("award_type")
+  title          String    @default("")
+  notes          String    @default("")
+  awardedAt      DateTime  @default(now()) @map("awarded_at")
+  awardedById    String?   @map("awarded_by_id") @db.Uuid
+  returnedAt     DateTime? @map("returned_at")
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  trophy CompetitionTrophy @relation(fields: [trophyId], references: [id], onDelete: Restrict)
+  house  CompetitionHouse? @relation(fields: [houseId], references: [id], onDelete: SetNull)
+  meet   CompetitionMeet?  @relation(fields: [meetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId, awardType])
+  @@index([tenantId, trophyId])
+  @@index([tenantId, houseId])
+  @@map("competition_trophy_awards")
   @@schema("academic")
 }
 

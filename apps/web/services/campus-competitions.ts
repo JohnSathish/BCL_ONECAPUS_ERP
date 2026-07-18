@@ -141,6 +141,7 @@ export async function createMeet(payload: {
   endsAt: string;
   venue?: string;
   theme?: string;
+  academicYearId?: string;
 }) {
   const { data } = await api.post(`${base}/meets`, payload);
   return data as CompetitionMeet;
@@ -361,5 +362,96 @@ export async function updatePointRules(
   },
 ) {
   const { data } = await api.put(`${base}/meets/${meetId}/point-rules`, payload);
+  return data;
+}
+
+export type ChampionshipStandings = {
+  academicYearId: string;
+  meetCount: number;
+  meets: Array<{ id: string; name: string; status: string; meetType: string }>;
+  standings: Array<{
+    id: string;
+    name: string;
+    code: string;
+    color: string;
+    points: number;
+    rank: number;
+    medals: { gold: number; silver: number; bronze: number };
+  }>;
+  houseOfYear: {
+    id: string;
+    name: string;
+    code: string;
+    color: string;
+    points: number;
+    rank: number;
+  } | null;
+  awards: Array<{
+    id: string;
+    awardType: string;
+    title: string;
+    trophy?: { name: string; code: string; trophyType: string } | null;
+    house?: { name: string; code: string; color: string } | null;
+  }>;
+};
+
+export type CompetitionTrophy = {
+  id: string;
+  name: string;
+  code: string;
+  trophyType: string;
+  status: string;
+  description?: string;
+  awards?: Array<{
+    id: string;
+    house?: { name: string; code: string } | null;
+  }>;
+};
+
+export async function fetchChampionshipStandings(academicYearId: string) {
+  const { data } = await api.get(`${base}/championship/${academicYearId}/standings`);
+  return data as ChampionshipStandings;
+}
+
+export async function declareHouseOfYear(
+  academicYearId: string,
+  payload?: { houseId?: string; trophyId?: string; meetId?: string },
+) {
+  const { data } = await api.post(
+    `${base}/championship/${academicYearId}/declare-house-of-year`,
+    payload ?? {},
+  );
+  return data;
+}
+
+export async function fetchTrophies(status?: string) {
+  const { data } = await api.get(`${base}/trophies`, { params: { status } });
+  return data as CompetitionTrophy[];
+}
+
+export async function createTrophy(payload: {
+  name: string;
+  code: string;
+  trophyType?: string;
+  description?: string;
+}) {
+  const { data } = await api.post(`${base}/trophies`, payload);
+  return data as CompetitionTrophy;
+}
+
+export async function awardTrophy(payload: {
+  trophyId: string;
+  academicYearId: string;
+  awardType: string;
+  houseId?: string;
+  meetId?: string;
+  title?: string;
+}) {
+  const { data } = await api.post(`${base}/trophies/award`, payload);
+  return data;
+}
+
+export async function returnTrophyAward(awardId: string) {
+  const { data } = await api.post(`${base}/trophy-awards/${awardId}/return`, {});
   return data;
 }

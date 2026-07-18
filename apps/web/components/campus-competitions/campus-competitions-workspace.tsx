@@ -14,6 +14,7 @@ import {
   StcStatusBadge,
 } from '@/components/short-term-courses/stc-shared';
 import { useCompetitionRealtime } from '@/hooks/use-competition-realtime';
+import { fetchAcademicYears } from '@/services/organization';
 import {
   approveResults,
   autoAllocateHouses,
@@ -21,8 +22,11 @@ import {
   createEvent,
   createHouse,
   createMeet,
+  createTrophy,
+  declareHouseOfYear,
   downloadMeetReportCsv,
   ensureDisplayToken,
+  fetchChampionshipStandings,
   fetchEventEntries,
   fetchEventResults,
   fetchHouses,
@@ -30,6 +34,7 @@ import {
   fetchMeet,
   fetchMeetTypes,
   fetchMeets,
+  fetchTrophies,
   generateFixtures,
   issueParticipationCertificates,
   issuePlaceCertificates,
@@ -42,7 +47,7 @@ import {
 } from '@/services/campus-competitions';
 import { apiErrorMessage } from '@/utils/api-error';
 
-type Tab = 'houses' | 'meets' | 'scoring' | 'live' | 'reports';
+type Tab = 'houses' | 'meets' | 'scoring' | 'live' | 'championship' | 'reports';
 
 export function CampusCompetitionsWorkspace() {
   const qc = useQueryClient();
@@ -52,10 +57,31 @@ export function CampusCompetitionsWorkspace() {
   const [scoreEventId, setScoreEventId] = useState('');
   const [announceText, setAnnounceText] = useState('');
   const [tvUrl, setTvUrl] = useState('');
+  const [champYearId, setChampYearId] = useState('');
+  const [trophyForm, setTrophyForm] = useState({
+    name: '',
+    code: '',
+    trophyType: 'CUP',
+  });
+  const [awardTrophyId, setAwardTrophyId] = useState('');
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
     queryFn: () => fetchHouses(),
+  });
+  const yearsQ = useQuery({
+    queryKey: ['organization', 'academic-years'],
+    queryFn: fetchAcademicYears,
+  });
+  const trophiesQ = useQuery({
+    queryKey: ['campus-competitions', 'trophies'],
+    queryFn: () => fetchTrophies(),
+    enabled: tab === 'championship',
+  });
+  const champQ = useQuery({
+    queryKey: ['campus-competitions', 'championship', champYearId],
+    queryFn: () => fetchChampionshipStandings(champYearId),
+    enabled: Boolean(champYearId) && tab === 'championship',
   });
   const meetsQ = useQuery({
     queryKey: ['campus-competitions', 'meets'],
@@ -129,6 +155,7 @@ export function CampusCompetitionsWorkspace() {
     endsAt: '',
     venue: '',
     theme: '',
+    academicYearId: '',
   });
   const [eventName, setEventName] = useState('');
   const [entryMode, setEntryMode] = useState('INDIVIDUAL');
@@ -165,7 +192,11 @@ export function CampusCompetitionsWorkspace() {
   });
 
   const createMeetMut = useMutation({
-    mutationFn: () => createMeet(meetForm),
+    mutationFn: () =>
+      createMeet({
+        ...meetForm,
+        academicYearId: meetForm.academicYearId || undefined,
+      }),
     onSuccess: (meet: CompetitionMeet) => {
       setMessage({ tone: 'ok', text: 'Meet created with default categories and point rules.' });
       setSelectedMeetId(meet.id);
@@ -234,6 +265,7 @@ export function CampusCompetitionsWorkspace() {
         ['meets', 'Meets', Trophy],
         ['scoring', 'Scoring', Award],
         ['live', 'Live ops', Radio],
+        ['championship', 'Championship', Trophy],
         ['reports', 'Reports', Award],
       ] as const,
     [],
@@ -419,6 +451,21 @@ export function CampusCompetitionsWorkspace() {
                   value={meetForm.theme}
                   onChange={(e) => setMeetForm((f) => ({ ...f, theme: e.target.value }))}
                 />
+              </div>
+              <div>
+                <Label>Academic year</Label>
+                <select
+                  className="mt-1.5 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={meetForm.academicYearId}
+                  onChange={(e) => setMeetForm((f) => ({ ...f, academicYearId: e.target.value }))}
+                >
+                  <option value="">Select year</option>
+                  {(yearsQ.data ?? []).map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <Button
@@ -879,6 +926,170 @@ export function CampusCompetitionsWorkspace() {
 
           <StcPanel title="Live board" description="Realtime via Socket.IO + fallback poll">
             <CompetitionLiveScoreboard board={liveQ.data} loading={liveQ.isLoading} />
+          </StcPanel>
+        </div>
+      ) : null}
+
+      {tab === 'championship' ? (
+        <div className="space-y-4">
+          <StcPanel
+            title="Annual championship"
+            description="Year standings from all meets linked to an academic year"
+          >
+            <div className="mb-4 flex flex-wrap gap-2">
+              <select
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={champYearId}
+                onChange={(e) => setChampYearId(e.target.value)}
+              >
+                <option value="">Select academic year</option>
+                {(yearsQ.data ?? []).map((y) => (
+                  <option key={y.id} value={y.id}>
+                    {y.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                disabled={!champYearId}
+                onClick={() =>
+                  void declareHouseOfYear(champYearId, {
+                    trophyId: awardTrophyId || undefined,
+                  })
+                    .then((r) => {
+                      setMessage({
+                        tone: 'ok',
+                        text: `House of the Year: ${r.house?.name ?? 'declared'}`,
+                      });
+                      void qc.invalidateQueries({
+                        queryKey: ['campus-competitions', 'championship'],
+                      });
+                      void qc.invalidateQueries({
+                        queryKey: ['campus-competitions', 'trophies'],
+                      });
+                    })
+                    .catch((e) =>
+                      setMessage({
+                        tone: 'err',
+                        text: apiErrorMessage(e, 'Declare failed'),
+                      }),
+                    )
+                }
+              >
+                Declare House of the Year
+              </Button>
+            </div>
+            {!champYearId ? (
+              <p className="text-sm text-slate-500">Pick an academic year to view standings.</p>
+            ) : champQ.isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  {champQ.data?.meetCount ?? 0} meets · leader:{' '}
+                  {champQ.data?.houseOfYear?.name ?? '—'}
+                </p>
+                {(champQ.data?.standings ?? []).map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 font-semibold text-slate-500">#{row.rank}</span>
+                      <span
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: row.color }}
+                      />
+                      <div>
+                        <p className="font-semibold">{row.name}</p>
+                        <p className="text-xs text-slate-500">
+                          G{row.medals.gold} S{row.medals.silver} B{row.medals.bronze}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{row.points}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel title="Trophy inventory" description="Cups, shields, plaques">
+            <div className="mb-4 grid gap-2 md:grid-cols-4">
+              <Input
+                placeholder="Name"
+                value={trophyForm.name}
+                onChange={(e) => setTrophyForm((f) => ({ ...f, name: e.target.value }))}
+              />
+              <Input
+                placeholder="Code"
+                value={trophyForm.code}
+                onChange={(e) => setTrophyForm((f) => ({ ...f, code: e.target.value }))}
+              />
+              <select
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={trophyForm.trophyType}
+                onChange={(e) => setTrophyForm((f) => ({ ...f, trophyType: e.target.value }))}
+              >
+                <option value="CUP">Cup</option>
+                <option value="SHIELD">Shield</option>
+                <option value="PLAQUE">Plaque</option>
+                <option value="MEDAL_SET">Medal set</option>
+              </select>
+              <Button
+                type="button"
+                disabled={!trophyForm.name || !trophyForm.code}
+                onClick={() =>
+                  void createTrophy(trophyForm)
+                    .then(() => {
+                      setTrophyForm({ name: '', code: '', trophyType: 'CUP' });
+                      setMessage({ tone: 'ok', text: 'Trophy added.' });
+                      void qc.invalidateQueries({
+                        queryKey: ['campus-competitions', 'trophies'],
+                      });
+                    })
+                    .catch((e) => setMessage({ tone: 'err', text: apiErrorMessage(e, 'Failed') }))
+                }
+              >
+                Add trophy
+              </Button>
+            </div>
+            <div className="mb-3">
+              <Label>Trophy for House of the Year (optional)</Label>
+              <select
+                className="mt-1.5 w-full max-w-md rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={awardTrophyId}
+                onChange={(e) => setAwardTrophyId(e.target.value)}
+              >
+                <option value="">None</option>
+                {(trophiesQ.data ?? [])
+                  .filter((t) => t.status === 'AVAILABLE')
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.code})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              {(trophiesQ.data ?? []).map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {t.name} · {t.trophyType}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {t.code}
+                      {t.awards?.[0]?.house ? ` · held by ${t.awards[0].house.name}` : ''}
+                    </p>
+                  </div>
+                  <StcStatusBadge status={t.status} />
+                </div>
+              ))}
+            </div>
           </StcPanel>
         </div>
       ) : null}

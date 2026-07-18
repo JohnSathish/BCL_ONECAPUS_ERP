@@ -33,6 +33,7 @@ import {
   UpsertPointRulesDto,
   UpsertResultsDto,
 } from './dto/campus-competitions.dto';
+import { CompetitionChampionshipService } from './services/competition-championship.service';
 import { CompetitionHousesService } from './services/competition-houses.service';
 import { CompetitionMeetsService } from './services/competition-meets.service';
 import { CompetitionScoringService } from './services/competition-scoring.service';
@@ -43,6 +44,7 @@ export class CampusCompetitionsController {
     private readonly houses: CompetitionHousesService,
     private readonly meets: CompetitionMeetsService,
     private readonly scoring: CompetitionScoringService,
+    private readonly championship: CompetitionChampionshipService,
   ) {}
 
   @Public()
@@ -545,5 +547,103 @@ export class CampusCompetitionsController {
     @Param('eventId') eventId: string,
   ) {
     return this.scoring.approveAndPublishResults(user, eventId);
+  }
+
+  @Get('championship/:academicYearId/standings')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:self',
+    'student:portal:self',
+  )
+  yearStandings(
+    @CurrentUser() user: JwtUser,
+    @Param('academicYearId') academicYearId: string,
+  ) {
+    return this.championship.yearStandings(user, academicYearId);
+  }
+
+  @Post('championship/:academicYearId/declare-house-of-year')
+  @RequirePermissions('campus-competitions:manage')
+  declareHouseOfYear(
+    @CurrentUser() user: JwtUser,
+    @Param('academicYearId') academicYearId: string,
+    @Body()
+    body: {
+      houseId?: string;
+      trophyId?: string;
+      meetId?: string;
+      studentRecipientIds?: string[];
+    },
+  ) {
+    return this.championship.declareHouseOfYear(user, academicYearId, body);
+  }
+
+  @Get('trophies')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+  )
+  listTrophies(@CurrentUser() user: JwtUser, @Query('status') status?: string) {
+    return this.championship.listTrophies(user, status);
+  }
+
+  @Post('trophies')
+  @RequirePermissions('campus-competitions:manage')
+  createTrophy(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      name: string;
+      code: string;
+      trophyType?: string;
+      description?: string;
+    },
+  ) {
+    return this.championship.createTrophy(user, body);
+  }
+
+  @Patch('trophies/:id')
+  @RequirePermissions('campus-competitions:manage')
+  updateTrophy(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      name?: string;
+      trophyType?: string;
+      description?: string;
+      status?: string;
+    },
+  ) {
+    return this.championship.updateTrophy(user, id, body);
+  }
+
+  @Post('trophies/award')
+  @RequirePermissions('campus-competitions:manage')
+  awardTrophy(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      trophyId: string;
+      academicYearId: string;
+      awardType: string;
+      houseId?: string;
+      studentId?: string;
+      meetId?: string;
+      title?: string;
+      notes?: string;
+    },
+  ) {
+    return this.championship.awardTrophy(user, body);
+  }
+
+  @Post('trophy-awards/:awardId/return')
+  @RequirePermissions('campus-competitions:manage')
+  returnTrophy(
+    @CurrentUser() user: JwtUser,
+    @Param('awardId') awardId: string,
+  ) {
+    return this.championship.returnTrophy(user, awardId);
   }
 }

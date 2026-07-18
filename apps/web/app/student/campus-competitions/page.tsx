@@ -16,6 +16,7 @@ import {
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useCompetitionRealtime } from '@/hooks/use-competition-realtime';
 import {
+  fetchChampionshipStandings,
   fetchHouseDashboard,
   fetchLiveBoard,
   fetchMeet,
@@ -25,6 +26,7 @@ import {
   fetchOpenMeets,
   registerForEvent,
 } from '@/services/campus-competitions';
+import { fetchAcademicYears } from '@/services/organization';
 import { apiErrorMessage } from '@/utils/api-error';
 
 export default function StudentCampusCompetitionsPage() {
@@ -32,11 +34,22 @@ export default function StudentCampusCompetitionsPage() {
   const qc = useQueryClient();
   const [message, setMessage] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [selectedMeetId, setSelectedMeetId] = useState('');
+  const [champYearId, setChampYearId] = useState('');
 
   const houseQ = useQuery({
     queryKey: ['campus-competitions', 'my-house'],
     queryFn: fetchMyHouse,
     enabled: Boolean(session),
+  });
+  const yearsQ = useQuery({
+    queryKey: ['organization', 'academic-years'],
+    queryFn: fetchAcademicYears,
+    enabled: Boolean(session),
+  });
+  const champQ = useQuery({
+    queryKey: ['campus-competitions', 'championship', champYearId],
+    queryFn: () => fetchChampionshipStandings(champYearId),
+    enabled: Boolean(session && champYearId),
   });
   const openQ = useQuery({
     queryKey: ['campus-competitions', 'open'],
@@ -238,6 +251,52 @@ export default function StudentCampusCompetitionsPage() {
                     className="h-3 w-3 rounded-full"
                     style={{ backgroundColor: m.house?.color ?? '#94a3b8' }}
                   />
+                </div>
+              ))}
+            </div>
+          )}
+        </StcPanel>
+
+        <StcPanel
+          title="Annual championship"
+          icon={Trophy}
+          description="House points across the year"
+        >
+          <div className="mb-3">
+            <select
+              className="w-full max-w-md rounded-md border border-slate-200 px-3 py-2 text-sm"
+              value={champYearId}
+              onChange={(e) => setChampYearId(e.target.value)}
+            >
+              <option value="">Select academic year</option>
+              {(yearsQ.data ?? []).map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {!champYearId ? (
+            <p className="text-sm text-slate-500">Pick a year to see championship standings.</p>
+          ) : champQ.isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+          ) : (
+            <div className="space-y-2">
+              {champQ.data?.houseOfYear ? (
+                <p className="text-sm text-slate-600">
+                  Current leader: <strong>{champQ.data.houseOfYear.name}</strong> (
+                  {champQ.data.houseOfYear.points} pts)
+                </p>
+              ) : null}
+              {(champQ.data?.standings ?? []).slice(0, 8).map((row) => (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
+                >
+                  <span>
+                    #{row.rank} {row.name}
+                  </span>
+                  <span className="font-semibold tabular-nums">{row.points}</span>
                 </div>
               ))}
             </div>

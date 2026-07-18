@@ -892,6 +892,41 @@ export class CompetitionScoringService {
     return issue;
   }
 
+  async issueChampionHouseCertificate(
+    user: JwtUser,
+    input: {
+      meet: { id: string; name: string };
+      houseId: string;
+      houseName: string;
+      studentId: string;
+      academicYearId: string;
+    },
+  ) {
+    this.requireCertificates(user);
+    const dup = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT ccl.id
+      FROM academic.competition_certificate_links ccl
+      INNER JOIN academic.certificate_issues ci ON ci.id = ccl.certificate_issue_id
+      WHERE ccl.tenant_id = ${user.tid}::uuid
+        AND ccl.meet_id = ${input.meet.id}::uuid
+        AND ccl.certificate_type = 'CHAMPION_HOUSE'
+        AND ci.student_id = ${input.studentId}::uuid
+      LIMIT 1
+    `;
+    if (dup.length) return { skipped: true };
+
+    const category = await this.resolveParticipationCategory(user.tid);
+    return this.issueOneCertificate(user, {
+      meet: input.meet,
+      categoryId: category.id,
+      studentId: input.studentId,
+      eventName: 'House of the Year',
+      houseName: input.houseName,
+      certificateType: 'CHAMPION_HOUSE',
+      title: 'HOUSE OF THE YEAR',
+    });
+  }
+
   async reportsSummary(user: JwtUser, meetId: string) {
     const meet = await this.meets.getMeet(user, meetId);
     const leaderboard = await this.leaderboard(user, meetId);
