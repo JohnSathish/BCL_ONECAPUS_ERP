@@ -100,6 +100,29 @@ export function fetchCompetitionAcademicYears() {
   >('/v1/campus-competitions/academic-years');
 }
 
+export function fetchMyCompetitionSchedule() {
+  return apiFetch<
+    Array<{
+      entryId: string;
+      bibNumber?: string | null;
+      lane?: number | null;
+      event?: {
+        id: string;
+        name: string;
+        meet?: { id: string; name: string } | null;
+      } | null;
+      fixtures: Array<{
+        id: string;
+        round: string;
+        heatNumber?: number | null;
+        bracketSlot?: number | null;
+        scheduledAt?: string | null;
+        status: string;
+      }>;
+    }>
+  >('/v1/campus-competitions/me/schedule');
+}
+
 export function fetchChampionshipStandings(academicYearId: string) {
   return apiFetch<{
     meetCount: number;

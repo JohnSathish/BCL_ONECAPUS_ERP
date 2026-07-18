@@ -19,6 +19,7 @@ import {
   allocateByKeys,
   approveResults,
   assignEventBibs,
+  assignMeetVolunteer,
   autoAllocateHouses,
   checkInEvent,
   createAnnouncement,
@@ -41,14 +42,17 @@ import {
   fetchLiveBoard,
   fetchMeet,
   fetchMeetTypes,
+  fetchMeetVolunteers,
   fetchMeets,
   fetchTrophies,
+  fetchVolunteerRoles,
   generateFixtures,
   importHouseAllocations,
   issueParticipationCertificates,
   issuePlaceCertificates,
   mergeHouses,
   removeHouseCoordinator,
+  removeMeetVolunteer,
   seedDefaultHouses,
   setHouseStatus,
   setLiveEvent,
@@ -99,6 +103,13 @@ export function CampusCompetitionsWorkspace() {
     role: 'FACULTY_COORDINATOR',
   });
   const [mergeIntoId, setMergeIntoId] = useState('');
+  const [volForm, setVolForm] = useState({
+    personKey: '',
+    role: 'GENERAL',
+    personType: 'STAFF',
+    eventId: '',
+    notes: '',
+  });
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
@@ -168,6 +179,16 @@ export function CampusCompetitionsWorkspace() {
     queryKey: ['campus-competitions', 'results', scoreEventId],
     queryFn: () => fetchEventResults(scoreEventId),
     enabled: Boolean(scoreEventId) && tab === 'scoring',
+  });
+  const volunteerRolesQ = useQuery({
+    queryKey: ['campus-competitions', 'volunteer-roles'],
+    queryFn: fetchVolunteerRoles,
+    enabled: tab === 'live',
+  });
+  const volunteersQ = useQuery({
+    queryKey: ['campus-competitions', 'volunteers', selectedMeetId],
+    queryFn: () => fetchMeetVolunteers(selectedMeetId),
+    enabled: Boolean(selectedMeetId) && tab === 'live',
   });
 
   useCompetitionRealtime(selectedMeetId || null, {
@@ -1865,6 +1886,130 @@ export function CampusCompetitionsWorkspace() {
                     </Button>
                   </div>
                 </div>
+              </div>
+            )}
+          </StcPanel>
+
+          <StcPanel
+            title="Day-of volunteers"
+            description="Marshal, timekeeper, check-in desk, and more"
+          >
+            {!selectedMeetId ? (
+              <p className="text-sm text-slate-500">Select a meet first.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    className="max-w-[160px]"
+                    placeholder="Employee / enrollment"
+                    value={volForm.personKey}
+                    onChange={(e) => setVolForm((f) => ({ ...f, personKey: e.target.value }))}
+                  />
+                  <select
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={volForm.personType}
+                    onChange={(e) => setVolForm((f) => ({ ...f, personType: e.target.value }))}
+                  >
+                    <option value="STAFF">Staff</option>
+                    <option value="STUDENT">Student</option>
+                  </select>
+                  <select
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={volForm.role}
+                    onChange={(e) => setVolForm((f) => ({ ...f, role: e.target.value }))}
+                  >
+                    {(volunteerRolesQ.data ?? [{ code: 'GENERAL', label: 'General' }]).map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={volForm.eventId}
+                    onChange={(e) => setVolForm((f) => ({ ...f, eventId: e.target.value }))}
+                  >
+                    <option value="">All events</option>
+                    {(selectedMeet?.events ?? []).map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    type="button"
+                    disabled={!volForm.personKey.trim()}
+                    onClick={() =>
+                      void assignMeetVolunteer(selectedMeetId, {
+                        personKey: volForm.personKey.trim(),
+                        personType: volForm.personType,
+                        role: volForm.role,
+                        eventId: volForm.eventId || undefined,
+                        notes: volForm.notes || undefined,
+                      })
+                        .then(() => {
+                          setMessage({ tone: 'ok', text: 'Volunteer assigned.' });
+                          setVolForm((f) => ({ ...f, personKey: '', notes: '' }));
+                          void qc.invalidateQueries({
+                            queryKey: ['campus-competitions', 'volunteers', selectedMeetId],
+                          });
+                        })
+                        .catch((e) =>
+                          setMessage({
+                            tone: 'err',
+                            text: apiErrorMessage(e, 'Assign failed'),
+                          }),
+                        )
+                    }
+                  >
+                    Assign
+                  </Button>
+                </div>
+                {(volunteersQ.data ?? []).length === 0 ? (
+                  <p className="text-sm text-slate-500">No volunteers assigned yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {(volunteersQ.data ?? []).map((v) => (
+                      <div
+                        key={v.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {v.displayName} · {v.role}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {v.personType}
+                            {v.personCode ? ` · ${v.personCode}` : ''}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          type="button"
+                          onClick={() =>
+                            void removeMeetVolunteer(v.id)
+                              .then(() => {
+                                setMessage({ tone: 'ok', text: 'Volunteer removed.' });
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'volunteers', selectedMeetId],
+                                });
+                              })
+                              .catch((e) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(e, 'Remove failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </StcPanel>

@@ -638,3 +638,67 @@ export async function publicEventCheckIn(
   }
   return res.json();
 }
+
+export async function fetchVolunteerRoles() {
+  const { data } = await api.get(`${base}/volunteer-roles`);
+  return data as Array<{ code: string; label: string }>;
+}
+
+export async function fetchMeetVolunteers(meetId: string) {
+  const { data } = await api.get(`${base}/meets/${meetId}/volunteers`);
+  return data as Array<{
+    id: string;
+    role: string;
+    personType: string;
+    displayName: string;
+    personCode?: string | null;
+    eventId?: string | null;
+    notes?: string;
+  }>;
+}
+
+export async function assignMeetVolunteer(
+  meetId: string,
+  payload: {
+    role: string;
+    personKey?: string;
+    personType?: string;
+    eventId?: string;
+    notes?: string;
+  },
+) {
+  const { data } = await api.post(`${base}/meets/${meetId}/volunteers`, payload);
+  return data;
+}
+
+export async function removeMeetVolunteer(volunteerId: string) {
+  const { data } = await api.delete(`${base}/volunteers/${volunteerId}`);
+  return data;
+}
+
+export async function fetchMySchedule() {
+  const { data } = await api.get(`${base}/me/schedule`);
+  return data as Array<{
+    entryId: string;
+    bibNumber?: string | null;
+    lane?: number | null;
+    qrPassToken?: string | null;
+    house?: { name: string; code: string; color: string } | null;
+    event?: {
+      id: string;
+      name: string;
+      status: string;
+      scheduledAt?: string | null;
+      venue?: string;
+      meet?: { id: string; name: string; status: string; venue?: string } | null;
+    } | null;
+    fixtures: Array<{
+      id: string;
+      round: string;
+      heatNumber?: number | null;
+      bracketSlot?: number | null;
+      scheduledAt?: string | null;
+      status: string;
+    }>;
+  }>;
+}

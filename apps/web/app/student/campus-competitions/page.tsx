@@ -23,6 +23,7 @@ import {
   fetchMyEntries,
   fetchMyHouse,
   fetchMyMedals,
+  fetchMySchedule,
   fetchOpenMeets,
   registerForEvent,
 } from '@/services/campus-competitions';
@@ -59,6 +60,11 @@ export default function StudentCampusCompetitionsPage() {
   const mineQ = useQuery({
     queryKey: ['campus-competitions', 'mine'],
     queryFn: fetchMyEntries,
+    enabled: Boolean(session),
+  });
+  const scheduleQ = useQuery({
+    queryKey: ['campus-competitions', 'my-schedule'],
+    queryFn: fetchMySchedule,
     enabled: Boolean(session),
   });
   const medalsQ = useQuery({
@@ -190,6 +196,42 @@ export default function StudentCampusCompetitionsPage() {
                   </div>
                 </div>
               ) : null}
+            </div>
+          )}
+        </StcPanel>
+
+        <StcPanel title="My schedule" icon={Trophy} description="Heats, lanes, and rounds">
+          {scheduleQ.isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+          ) : (scheduleQ.data ?? []).length === 0 ? (
+            <p className="text-sm text-slate-500">No scheduled heats yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {(scheduleQ.data ?? []).map((row) => (
+                <div
+                  key={row.entryId}
+                  className="rounded-xl border border-slate-200 px-3 py-2 space-y-1"
+                >
+                  <p className="font-medium">{row.event?.name ?? 'Event'}</p>
+                  <p className="text-xs text-slate-500">
+                    {row.event?.meet?.name ?? '—'}
+                    {row.bibNumber ? ` · Bib ${row.bibNumber}` : ''}
+                    {row.lane != null ? ` · Lane ${row.lane}` : ''}
+                  </p>
+                  {(row.fixtures ?? []).length === 0 ? (
+                    <p className="text-xs text-slate-400">Fixtures not generated yet.</p>
+                  ) : (
+                    row.fixtures.map((fx) => (
+                      <p key={fx.id} className="text-xs text-slate-600">
+                        {fx.round}
+                        {fx.heatNumber != null ? ` · Heat ${fx.heatNumber}` : ''}
+                        {fx.bracketSlot != null ? ` · Slot ${fx.bracketSlot}` : ''}
+                        {fx.scheduledAt ? ` · ${new Date(fx.scheduledAt).toLocaleString()}` : ''}
+                      </p>
+                    ))
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </StcPanel>

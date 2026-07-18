@@ -19,6 +19,7 @@ import {
   fetchMyCompetitionEntries,
   fetchMyCompetitionHouse,
   fetchMyCompetitionMedals,
+  fetchMyCompetitionSchedule,
   fetchOpenCompetitionMeets,
   registerForCompetitionEvent,
   type CompetitionEntry,
@@ -58,20 +59,41 @@ export default function CampusCompetitionsScreen() {
     }>
   >([]);
   const [houseOfYear, setHouseOfYear] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<
+    Array<{
+      entryId: string;
+      bibNumber?: string | null;
+      lane?: number | null;
+      event?: {
+        id: string;
+        name: string;
+        meet?: { id: string; name: string } | null;
+      } | null;
+      fixtures: Array<{
+        id: string;
+        round: string;
+        heatNumber?: number | null;
+        bracketSlot?: number | null;
+        scheduledAt?: string | null;
+      }>;
+    }>
+  >([]);
 
   const load = useCallback(async () => {
     try {
-      const [h, open, mine, myMedals, ay] = await Promise.all([
+      const [h, open, mine, myMedals, ay, sched] = await Promise.all([
         fetchMyCompetitionHouse().catch(() => null),
         fetchOpenCompetitionMeets().catch(() => []),
         fetchMyCompetitionEntries().catch(() => []),
         fetchMyCompetitionMedals().catch(() => []),
         fetchCompetitionAcademicYears().catch(() => []),
+        fetchMyCompetitionSchedule().catch(() => []),
       ]);
       setHouse(h);
       setMeets(open ?? []);
       setEntries(mine ?? []);
       setMedals(myMedals ?? []);
+      setSchedule(sched ?? []);
       setYears(ay ?? []);
       const yearId = champYearId ?? ay?.find((y) => y.isPrimarySession)?.id ?? ay?.[0]?.id ?? null;
       if (!champYearId && yearId) {
@@ -180,6 +202,33 @@ export default function CampusCompetitionsScreen() {
                 </Text>
               ) : null}
             </View>
+          )}
+
+          <Text style={styles.heading}>My schedule</Text>
+          {schedule.length === 0 ? (
+            <Text style={styles.empty}>No heats scheduled yet.</Text>
+          ) : (
+            schedule.map((row) => (
+              <View key={row.entryId} style={styles.card}>
+                <Text style={styles.title}>{row.event?.name ?? 'Event'}</Text>
+                <Text style={styles.meta}>
+                  {row.event?.meet?.name ?? '—'}
+                  {row.bibNumber ? ` · Bib ${row.bibNumber}` : ''}
+                  {row.lane != null ? ` · Lane ${row.lane}` : ''}
+                </Text>
+                {(row.fixtures ?? []).length === 0 ? (
+                  <Text style={styles.meta}>Fixtures pending</Text>
+                ) : (
+                  row.fixtures.map((fx) => (
+                    <Text key={fx.id} style={styles.meta}>
+                      {fx.round}
+                      {fx.heatNumber != null ? ` · Heat ${fx.heatNumber}` : ''}
+                      {fx.bracketSlot != null ? ` · Slot ${fx.bracketSlot}` : ''}
+                    </Text>
+                  ))
+                )}
+              </View>
+            ))
           )}
 
           <Text style={styles.heading}>My events</Text>
