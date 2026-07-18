@@ -15,6 +15,7 @@ import {
   HOUSE_COORDINATOR_ROLES,
   MEET_STATUSES,
   MEET_TYPES,
+  MEET_VOLUNTEER_ROLES,
 } from '../domain/competition.constants';
 
 export class UpsertHouseDto {
@@ -356,4 +357,33 @@ export class UpsertResultsDto {
   @IsOptional()
   @IsBoolean()
   publish?: boolean;
+}
+
+export class AssignVolunteerDto {
+  @IsIn([...MEET_VOLUNTEER_ROLES])
+  role!: string;
+
+  @IsOptional()
+  @IsIn(['STAFF', 'STUDENT'])
+  personType?: string;
+
+  @IsOptional()
+  @IsString()
+  personKey?: string;
+
+  @IsOptional()
+  @IsUUID()
+  staffId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  studentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

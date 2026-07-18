@@ -32,6 +32,16 @@ export const HOUSE_COORDINATOR_ROLES = [
   'FACULTY_COORDINATOR',
 ] as const;
 
+export const MEET_VOLUNTEER_ROLES = [
+  'MARSHAL',
+  'TIMEKEEPER',
+  'JUDGE_ASSISTANT',
+  'CHECK_IN_DESK',
+  'ANNOUNCER',
+  'FIRST_AID',
+  'GENERAL',
+] as const;
+
 export const DEFAULT_POINT_RULES = {
   firstPoints: 10,
   secondPoints: 7,

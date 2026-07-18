@@ -14,6 +14,7 @@ import {
 } from '../domain/competition.constants';
 import type {
   AssignBibsDto,
+  AssignVolunteerDto,
   CreateTeamDto,
   GenerateFixturesDto,
   RegisterEntryDto,
@@ -22,6 +23,7 @@ import type {
   UpsertMeetDto,
   UpsertPointRulesDto,
 } from '../dto/campus-competitions.dto';
+import { MEET_VOLUNTEER_ROLES } from '../domain/competition.constants';
 import { CompetitionHousesService } from './competition-houses.service';
 import { CompetitionRealtimePublisher } from './competition-realtime.publisher';
 
@@ -619,6 +621,287 @@ export class CompetitionMeetsService {
       }
     }
     return rows;
+  }
+
+  listVolunteerRoles() {
+    return MEET_VOLUNTEER_ROLES.map((code) => ({
+      code,
+      label: code
+        .split('_')
+        .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
+        .join(' '),
+    }));
+  }
+
+  async listVolunteers(user: JwtUser, meetId: string) {
+    await this.getMeet(user, meetId);
+    const rows = await this.db().competitionMeetVolunteer.findMany({
+      where: { tenantId: user.tid, meetId },
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    });
+    const staffIds = rows
+      .map((r: { staffId?: string | null }) => r.staffId)
+      .filter(Boolean) as string[];
+    const studentIds = rows
+      .map((r: { studentId?: string | null }) => r.studentId)
+      .filter(Boolean) as string[];
+    const [staffRows, studentRows] = await Promise.all([
+      staffIds.length
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId: user.tid, id: { in: staffIds } },
+            select: { id: true, employeeCode: true, fullName: true },
+          })
+        : Promise.resolve([]),
+      studentIds.length
+        ? this.prisma.student.findMany({
+            where: { tenantId: user.tid, id: { in: studentIds } },
+            select: {
+              id: true,
+              enrollmentNumber: true,
+              masterProfile: { select: { fullName: true } },
+              user: { select: { displayName: true } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    const staffById = new Map(staffRows.map((s) => [s.id, s]));
+    const studentById = new Map(studentRows.map((s) => [s.id, s]));
+    return rows.map(
+      (r: {
+        id: string;
+        role: string;
+        personType: string;
+        staffId?: string | null;
+        studentId?: string | null;
+        eventId?: string | null;
+        notes: string;
+      }) => {
+        const staff = r.staffId ? staffById.get(r.staffId) : null;
+        const student = r.studentId ? studentById.get(r.studentId) : null;
+        return {
+          ...r,
+          displayName:
+            staff?.fullName ??
+            student?.masterProfile?.fullName ??
+            student?.user?.displayName ??
+            staff?.employeeCode ??
+            student?.enrollmentNumber ??
+            'Unknown',
+          personCode: staff?.employeeCode ?? student?.enrollmentNumber ?? null,
+        };
+      },
+    );
+  }
+
+  async assignVolunteer(
+    user: JwtUser,
+    meetId: string,
+    dto: AssignVolunteerDto,
+  ) {
+    this.requireManage(user);
+    await this.getMeet(user, meetId);
+    if (dto.eventId) {
+      const event = await this.db().competitionEvent.findFirst({
+        where: {
+          id: dto.eventId,
+          meetId,
+          tenantId: user.tid,
+          deletedAt: null,
+        },
+      });
+      if (!event) throw new NotFoundException('Event not found for meet');
+    }
+
+    let personType = dto.personType ?? 'STAFF';
+    let staffId = dto.staffId ?? null;
+    let studentId = dto.studentId ?? null;
+
+    if (dto.personKey?.trim()) {
+      const key = dto.personKey.trim();
+      if (personType === 'STUDENT') {
+        const student = await this.prisma.student.findFirst({
+          where: {
+            tenantId: user.tid,
+            deletedAt: null,
+            OR: [
+              { enrollmentNumber: { equals: key, mode: 'insensitive' } },
+              { admissionNumber: { equals: key, mode: 'insensitive' } },
+              { rollNumber: { equals: key, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!student) throw new NotFoundException('Student not found for key');
+        studentId = student.id;
+        staffId = null;
+      } else {
+        const staff = await this.prisma.staffProfile.findFirst({
+          where: {
+            tenantId: user.tid,
+            OR: [
+              { id: key },
+              { employeeCode: { equals: key, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!staff) {
+          const student = await this.prisma.student.findFirst({
+            where: {
+              tenantId: user.tid,
+              deletedAt: null,
+              OR: [
+                { enrollmentNumber: { equals: key, mode: 'insensitive' } },
+                { admissionNumber: { equals: key, mode: 'insensitive' } },
+                { rollNumber: { equals: key, mode: 'insensitive' } },
+              ],
+            },
+            select: { id: true },
+          });
+          if (student) {
+            personType = 'STUDENT';
+            studentId = student.id;
+            staffId = null;
+          } else {
+            throw new NotFoundException('Person not found for key');
+          }
+        } else {
+          staffId = staff.id;
+          studentId = null;
+        }
+      }
+    }
+
+    if (!staffId && !studentId) {
+      throw new BadRequestException(
+        'personKey, staffId, or studentId required',
+      );
+    }
+
+    const existing = await this.db().competitionMeetVolunteer.findFirst({
+      where: {
+        tenantId: user.tid,
+        meetId,
+        role: dto.role,
+        ...(staffId ? { staffId } : { studentId }),
+        eventId: dto.eventId ?? null,
+      },
+    });
+    if (existing) {
+      return this.db().competitionMeetVolunteer.update({
+        where: { id: existing.id },
+        data: { notes: dto.notes?.trim() ?? existing.notes },
+      });
+    }
+
+    return this.db().competitionMeetVolunteer.create({
+      data: {
+        tenantId: user.tid,
+        meetId,
+        eventId: dto.eventId ?? null,
+        personType,
+        staffId,
+        studentId,
+        role: dto.role,
+        notes: dto.notes?.trim() ?? '',
+        assignedById: user.sub,
+      },
+    });
+  }
+
+  async removeVolunteer(user: JwtUser, volunteerId: string) {
+    this.requireManage(user);
+    const row = await this.db().competitionMeetVolunteer.findFirst({
+      where: { id: volunteerId, tenantId: user.tid },
+    });
+    if (!row) throw new NotFoundException('Volunteer not found');
+    await this.db().competitionMeetVolunteer.delete({
+      where: { id: volunteerId },
+    });
+    return { ok: true };
+  }
+
+  async mySchedule(user: JwtUser) {
+    const studentId = await this.houses.resolveStudentId(user);
+    const entries = await this.db().competitionEntry.findMany({
+      where: { tenantId: user.tid, studentId, status: 'REGISTERED' },
+      include: {
+        house: { select: { id: true, name: true, code: true, color: true } },
+        event: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            scheduledAt: true,
+            venue: true,
+            meet: {
+              select: { id: true, name: true, status: true, venue: true },
+            },
+          },
+        },
+      },
+      orderBy: { registeredAt: 'desc' },
+      take: 100,
+    });
+
+    const eventIds = [
+      ...new Set(entries.map((e: { eventId: string }) => e.eventId)),
+    ];
+    const fixtures =
+      eventIds.length === 0
+        ? []
+        : await this.db().competitionFixture.findMany({
+            where: { tenantId: user.tid, eventId: { in: eventIds } },
+            orderBy: [
+              { heatNumber: 'asc' },
+              { bracketSlot: 'asc' },
+              { createdAt: 'asc' },
+            ],
+          });
+
+    return entries.map(
+      (entry: {
+        id: string;
+        bibNumber?: string | null;
+        lane?: number | null;
+        qrPassToken?: string | null;
+        eventId: string;
+        house: unknown;
+        event: unknown;
+      }) => {
+        const mine = fixtures.filter((fx: { entryIds: unknown }) => {
+          const ids = Array.isArray(fx.entryIds)
+            ? (fx.entryIds as string[])
+            : [];
+          return ids.includes(entry.id);
+        });
+        return {
+          entryId: entry.id,
+          bibNumber: entry.bibNumber,
+          lane: entry.lane,
+          qrPassToken: entry.qrPassToken,
+          house: entry.house,
+          event: entry.event,
+          fixtures: mine.map(
+            (fx: {
+              id: string;
+              round: string;
+              heatNumber?: number | null;
+              bracketSlot?: number | null;
+              scheduledAt?: Date | null;
+              status: string;
+            }) => ({
+              id: fx.id,
+              round: fx.round,
+              heatNumber: fx.heatNumber,
+              bracketSlot: fx.bracketSlot,
+              scheduledAt: fx.scheduledAt,
+              status: fx.status,
+            }),
+          ),
+        };
+      },
+    );
   }
 
   async ensureDisplayToken(user: JwtUser, meetId: string) {

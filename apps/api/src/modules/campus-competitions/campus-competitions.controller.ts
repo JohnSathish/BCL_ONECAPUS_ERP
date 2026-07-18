@@ -21,6 +21,7 @@ import {
   AllocateByKeysDto,
   AllocateStudentsDto,
   AssignBibsDto,
+  AssignVolunteerDto,
   AutoAllocateDto,
   BulkTransferDto,
   CreateTeamDto,
@@ -281,6 +282,12 @@ export class CampusCompetitionsController {
     return this.meets.myEntries(user);
   }
 
+  @Get('me/schedule')
+  @RequireAnyPermission('campus-competitions:self', 'student:portal:self')
+  mySchedule(@CurrentUser() user: JwtUser) {
+    return this.meets.mySchedule(user);
+  }
+
   @Get('me/medals')
   @RequireAnyPermission('campus-competitions:self', 'student:portal:self')
   myMedals(@CurrentUser() user: JwtUser, @Query('meetId') meetId?: string) {
@@ -397,6 +404,44 @@ export class CampusCompetitionsController {
   @RequirePermissions('campus-competitions:manage')
   ensureDisplayToken(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.meets.ensureDisplayToken(user, id);
+  }
+
+  @Get('volunteer-roles')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+  )
+  volunteerRoles() {
+    return this.meets.listVolunteerRoles();
+  }
+
+  @Get('meets/:id/volunteers')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  listVolunteers(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.meets.listVolunteers(user, id);
+  }
+
+  @Post('meets/:id/volunteers')
+  @RequirePermissions('campus-competitions:manage')
+  assignVolunteer(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AssignVolunteerDto,
+  ) {
+    return this.meets.assignVolunteer(user, id, dto);
+  }
+
+  @Delete('volunteers/:volunteerId')
+  @RequirePermissions('campus-competitions:manage')
+  removeVolunteer(
+    @CurrentUser() user: JwtUser,
+    @Param('volunteerId') volunteerId: string,
+  ) {
+    return this.meets.removeVolunteer(user, volunteerId);
   }
 
   @Post('meets/:id/live-event')
