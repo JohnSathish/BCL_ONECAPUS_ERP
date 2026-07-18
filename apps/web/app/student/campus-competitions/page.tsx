@@ -203,24 +203,40 @@ export default function StudentCampusCompetitionsPage() {
             <div className="space-y-2">
               {myEntries.map((entry) => {
                 const published = entry.results?.find((r) => r.status === 'PUBLISHED');
+                const checkedIn = (entry.checkIns?.length ?? 0) > 0;
                 return (
-                  <button
+                  <div
                     key={entry.id}
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
-                    onClick={() => {
-                      if (entry.event?.meet?.id) setSelectedMeetId(entry.event.meet.id);
-                    }}
+                    className="rounded-xl border border-slate-200 px-3 py-2 space-y-2"
                   >
-                    <div>
-                      <p className="font-medium">{entry.event?.name ?? 'Event'}</p>
-                      <p className="text-xs text-slate-500">
-                        {entry.event?.meet?.name ?? '—'}
-                        {published ? ` · Place #${published.position}` : ''}
-                      </p>
-                    </div>
-                    <StcStatusBadge status={entry.status} />
-                  </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-left hover:bg-slate-50"
+                      onClick={() => {
+                        if (entry.event?.meet?.id) setSelectedMeetId(entry.event.meet.id);
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium">{entry.event?.name ?? 'Event'}</p>
+                        <p className="text-xs text-slate-500">
+                          {entry.event?.meet?.name ?? '—'}
+                          {published ? ` · Place #${published.position}` : ''}
+                          {checkedIn ? ' · Checked in' : ''}
+                        </p>
+                      </div>
+                      <StcStatusBadge status={entry.status} />
+                    </button>
+                    {entry.qrPassToken ? (
+                      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Check-in QR pass
+                        </p>
+                        <p className="mt-1 break-all font-mono text-sm text-slate-800">
+                          {entry.qrPassToken}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>

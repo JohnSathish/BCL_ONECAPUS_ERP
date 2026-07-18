@@ -156,6 +156,7 @@ export default function CampusCompetitionsScreen() {
           ) : (
             entries.map((entry) => {
               const published = entry.results?.find((r) => r.status === 'PUBLISHED');
+              const checkedIn = (entry.checkIns?.length ?? 0) > 0;
               return (
                 <Pressable
                   key={entry.id}
@@ -168,7 +169,13 @@ export default function CampusCompetitionsScreen() {
                   <Text style={styles.meta}>
                     {entry.event?.meet?.name ?? '—'}
                     {published ? ` · Place #${published.position}` : ''}
+                    {checkedIn ? ' · Checked in' : ''}
                   </Text>
+                  {entry.qrPassToken ? (
+                    <Text style={styles.pass} selectable>
+                      Pass: {entry.qrPassToken}
+                    </Text>
+                  ) : null}
                 </Pressable>
               );
             })
@@ -281,6 +288,15 @@ const styles = StyleSheet.create({
   swatch: { width: 28, height: 28, borderRadius: 14, marginBottom: 6 },
   title: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
   meta: { fontSize: 13, color: '#64748b' },
+  pass: {
+    marginTop: 6,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    padding: 8,
+    borderRadius: 8,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

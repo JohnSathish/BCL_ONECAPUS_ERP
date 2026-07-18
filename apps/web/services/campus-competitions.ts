@@ -291,7 +291,9 @@ export async function fetchMyEntries() {
     id: string;
     status: string;
     bibNumber?: string | null;
+    qrPassToken?: string | null;
     house?: { id: string; name: string; code: string; color: string } | null;
+    checkIns?: Array<{ method: string; markedAt: string }>;
     event?: {
       id: string;
       name: string;
@@ -454,4 +456,57 @@ export async function awardTrophy(payload: {
 export async function returnTrophyAward(awardId: string) {
   const { data } = await api.post(`${base}/trophy-awards/${awardId}/return`, {});
   return data;
+}
+
+export async function fetchEventCheckIns(eventId: string) {
+  const { data } = await api.get(`${base}/events/${eventId}/check-ins`);
+  return data as Array<{
+    entryId: string;
+    studentId: string | null;
+    bibNumber: string | null;
+    qrPassToken: string | null;
+    house?: { name: string; code: string; color: string } | null;
+    checkedIn: boolean;
+    checkIn?: { method: string; markedAt: string; scanCode?: string | null } | null;
+  }>;
+}
+
+export async function checkInEvent(
+  eventId: string,
+  payload: {
+    entryId?: string;
+    qrPassToken?: string;
+    scanCode?: string;
+    rfidNumber?: string;
+    method?: string;
+  },
+) {
+  const { data } = await api.post(`${base}/events/${eventId}/check-in`, payload);
+  return data as { alreadyCheckedIn: boolean; checkIn: unknown; entry: unknown };
+}
+
+export async function ensureEventCheckInToken(eventId: string) {
+  const { data } = await api.post(`${base}/events/${eventId}/check-in-token`, {});
+  return data as { id: string; checkInToken?: string | null; name: string };
+}
+
+export async function publicEventCheckIn(
+  eventId: string,
+  token: string,
+  payload: { scanCode?: string; qrPassToken?: string; rfidNumber?: string },
+) {
+  const { getApiBaseUrl } = await import('@/lib/http/env');
+  const res = await fetch(
+    `${getApiBaseUrl()}/v1/campus-competitions/public/events/${encodeURIComponent(eventId)}/check-in?token=${encodeURIComponent(token)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Check-in failed');
+  }
+  return res.json();
 }

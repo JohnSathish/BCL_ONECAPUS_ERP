@@ -18,6 +18,7 @@ import { fetchAcademicYears } from '@/services/organization';
 import {
   approveResults,
   autoAllocateHouses,
+  checkInEvent,
   createAnnouncement,
   createEvent,
   createHouse,
@@ -26,7 +27,9 @@ import {
   declareHouseOfYear,
   downloadMeetReportCsv,
   ensureDisplayToken,
+  ensureEventCheckInToken,
   fetchChampionshipStandings,
+  fetchEventCheckIns,
   fetchEventEntries,
   fetchEventResults,
   fetchHouses,
@@ -64,6 +67,8 @@ export function CampusCompetitionsWorkspace() {
     trophyType: 'CUP',
   });
   const [awardTrophyId, setAwardTrophyId] = useState('');
+  const [scanCode, setScanCode] = useState('');
+  const [kioskUrl, setKioskUrl] = useState('');
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
@@ -82,6 +87,12 @@ export function CampusCompetitionsWorkspace() {
     queryKey: ['campus-competitions', 'championship', champYearId],
     queryFn: () => fetchChampionshipStandings(champYearId),
     enabled: Boolean(champYearId) && tab === 'championship',
+  });
+  const checkInsQ = useQuery({
+    queryKey: ['campus-competitions', 'check-ins', scoreEventId],
+    queryFn: () => fetchEventCheckIns(scoreEventId),
+    enabled: Boolean(scoreEventId) && tab === 'scoring',
+    refetchInterval: 8_000,
   });
   const meetsQ = useQuery({
     queryKey: ['campus-competitions', 'meets'],
@@ -652,6 +663,102 @@ export function CampusCompetitionsWorkspace() {
 
                 {scoreEventId ? (
                   <>
+                    <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 space-y-3">
+                      <p className="text-sm font-semibold">RFID / QR check-in</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          className="max-w-xs"
+                          placeholder="Scan RFID / QR / enrollment"
+                          value={scanCode}
+                          onChange={(e) => setScanCode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && scanCode.trim()) {
+                              void checkInEvent(scoreEventId, { scanCode: scanCode.trim() })
+                                .then((r) => {
+                                  setMessage({
+                                    tone: 'ok',
+                                    text: r.alreadyCheckedIn ? 'Already checked in' : 'Checked in',
+                                  });
+                                  setScanCode('');
+                                  void qc.invalidateQueries({
+                                    queryKey: ['campus-competitions', 'check-ins', scoreEventId],
+                                  });
+                                })
+                                .catch((err) =>
+                                  setMessage({
+                                    tone: 'err',
+                                    text: apiErrorMessage(err, 'Check-in failed'),
+                                  }),
+                                );
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!scanCode.trim()}
+                          onClick={() =>
+                            void checkInEvent(scoreEventId, { scanCode: scanCode.trim() })
+                              .then((r) => {
+                                setMessage({
+                                  tone: 'ok',
+                                  text: r.alreadyCheckedIn ? 'Already checked in' : 'Checked in',
+                                });
+                                setScanCode('');
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'check-ins', scoreEventId],
+                                });
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Check-in failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Check in
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void ensureEventCheckInToken(scoreEventId)
+                              .then((ev) => {
+                                if (ev.checkInToken && typeof window !== 'undefined') {
+                                  const url = `${window.location.origin}/kiosk/competitions/${scoreEventId}?token=${ev.checkInToken}`;
+                                  setKioskUrl(url);
+                                  setMessage({ tone: 'ok', text: 'Kiosk URL ready.' });
+                                }
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Token failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Kiosk URL
+                        </Button>
+                      </div>
+                      {kioskUrl ? (
+                        <a
+                          className="break-all text-xs text-sky-700 underline"
+                          href={kioskUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {kioskUrl}
+                        </a>
+                      ) : null}
+                      <p className="text-xs text-slate-600">
+                        Checked in: {(checkInsQ.data ?? []).filter((c) => c.checkedIn).length}/
+                        {(checkInsQ.data ?? []).length}
+                      </p>
+                    </div>
+
                     <div className="space-y-2">
                       {(Array.isArray(entriesQ.data) ? entriesQ.data : []).map(
                         (entry: {

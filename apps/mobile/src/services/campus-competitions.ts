@@ -32,6 +32,8 @@ export type LeaderboardRow = {
 export type CompetitionEntry = {
   id: string;
   status: string;
+  qrPassToken?: string | null;
+  checkIns?: Array<{ method: string; markedAt: string }>;
   event?: {
     id: string;
     name: string;

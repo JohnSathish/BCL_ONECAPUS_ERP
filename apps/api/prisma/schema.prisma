@@ -13013,6 +13013,7 @@ model CompetitionEvent {
   scheduledAt      DateTime? @map("scheduled_at")
   judgeStaffId     String?   @map("judge_staff_id") @db.Uuid
   status           String    @default("SCHEDULED")
+  checkInToken     String?   @unique @map("check_in_token")
   metadata         Json      @default("{}")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -13041,6 +13042,7 @@ model CompetitionEntry {
   entryType  String    @default("INDIVIDUAL") @map("entry_type")
   status     String    @default("REGISTERED")
   bibNumber  String?   @map("bib_number")
+  qrPassToken String?  @unique @map("qr_pass_token")
   lane       Int?
   nominatedById String? @map("nominated_by_id") @db.Uuid
   registeredAt DateTime @default(now()) @map("registered_at")
@@ -13052,11 +13054,31 @@ model CompetitionEntry {
   house   CompetitionHouse  @relation(fields: [houseId], references: [id], onDelete: Restrict)
   team    CompetitionTeam?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
   results CompetitionResult[]
+  checkIns CompetitionEntryCheckIn[]
 
   @@index([tenantId, eventId, status])
   @@index([tenantId, houseId])
   @@index([tenantId, studentId])
   @@map("competition_entries")
+  @@schema("academic")
+}
+
+model CompetitionEntryCheckIn {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  entryId    String   @unique @map("entry_id") @db.Uuid
+  eventId    String   @map("event_id") @db.Uuid
+  method     String   @default("QR")
+  scanCode   String?  @map("scan_code")
+  markedAt   DateTime @default(now()) @map("marked_at")
+  markedById String?  @map("marked_by_id") @db.Uuid
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry CompetitionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventId, markedAt])
+  @@map("competition_entry_check_ins")
   @@schema("academic")
 }
 

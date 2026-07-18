@@ -34,6 +34,7 @@ import {
   UpsertResultsDto,
 } from './dto/campus-competitions.dto';
 import { CompetitionChampionshipService } from './services/competition-championship.service';
+import { CompetitionCheckInService } from './services/competition-check-in.service';
 import { CompetitionHousesService } from './services/competition-houses.service';
 import { CompetitionMeetsService } from './services/competition-meets.service';
 import { CompetitionScoringService } from './services/competition-scoring.service';
@@ -45,12 +46,29 @@ export class CampusCompetitionsController {
     private readonly meets: CompetitionMeetsService,
     private readonly scoring: CompetitionScoringService,
     private readonly championship: CompetitionChampionshipService,
+    private readonly checkIns: CompetitionCheckInService,
   ) {}
 
   @Public()
   @Get('display/:token/live')
   publicLiveBoard(@Param('token') token: string) {
     return this.scoring.publicLiveBoard(token);
+  }
+
+  @Public()
+  @Post('public/events/:eventId/check-in')
+  publicCheckIn(
+    @Param('eventId') eventId: string,
+    @Query('token') token: string,
+    @Body()
+    body: {
+      entryId?: string;
+      qrPassToken?: string;
+      scanCode?: string;
+      rfidNumber?: string;
+    },
+  ) {
+    return this.checkIns.publicCheckIn(eventId, token ?? '', body);
   }
 
   @Get('meet-types')
@@ -645,5 +663,50 @@ export class CampusCompetitionsController {
     @Param('awardId') awardId: string,
   ) {
     return this.championship.returnTrophy(user, awardId);
+  }
+
+  @Get('events/:eventId/check-ins')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:score',
+    'campus-competitions:manage',
+  )
+  listCheckIns(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.checkIns.listCheckIns(user, eventId);
+  }
+
+  @Post('events/:eventId/check-in')
+  @RequireAnyPermission(
+    'campus-competitions:score',
+    'campus-competitions:manage',
+  )
+  checkIn(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+    @Body()
+    body: {
+      entryId?: string;
+      qrPassToken?: string;
+      scanCode?: string;
+      rfidNumber?: string;
+      method?: string;
+    },
+  ) {
+    return this.checkIns.checkIn(user, eventId, body);
+  }
+
+  @Post('events/:eventId/check-in-token')
+  @RequireAnyPermission(
+    'campus-competitions:score',
+    'campus-competitions:manage',
+  )
+  ensureCheckInToken(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.checkIns.ensureEventCheckInToken(user, eventId);
   }
 }

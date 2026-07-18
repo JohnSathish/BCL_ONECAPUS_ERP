@@ -308,7 +308,15 @@ export class CompetitionMeetsService {
         status: 'REGISTERED',
       },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (!existing.qrPassToken) {
+        return this.db().competitionEntry.update({
+          where: { id: existing.id },
+          data: { qrPassToken: `CC:${randomUUID().replace(/-/g, '')}` },
+        });
+      }
+      return existing;
+    }
 
     return this.db().competitionEntry.create({
       data: {
@@ -318,6 +326,7 @@ export class CompetitionMeetsService {
         studentId,
         entryType: 'INDIVIDUAL',
         nominatedById: isSelf ? null : user.sub,
+        qrPassToken: `CC:${randomUUID().replace(/-/g, '')}`,
       },
     });
   }
@@ -359,6 +368,7 @@ export class CompetitionMeetsService {
         teamId: team.id,
         entryType: 'TEAM',
         nominatedById: user.sub,
+        qrPassToken: `CC:${randomUUID().replace(/-/g, '')}`,
       },
     });
 
@@ -483,10 +493,11 @@ export class CompetitionMeetsService {
 
   async myEntries(user: JwtUser) {
     const studentId = await this.houses.resolveStudentId(user);
-    return this.db().competitionEntry.findMany({
+    const rows = await this.db().competitionEntry.findMany({
       where: { tenantId: user.tid, studentId },
       include: {
         house: { select: { id: true, name: true, code: true, color: true } },
+        checkIns: true,
         event: {
           select: {
             id: true,
@@ -521,6 +532,17 @@ export class CompetitionMeetsService {
       orderBy: { registeredAt: 'desc' },
       take: 100,
     });
+
+    for (const row of rows) {
+      if (!row.qrPassToken) {
+        row.qrPassToken = `CC:${randomUUID().replace(/-/g, '')}`;
+        await this.db().competitionEntry.update({
+          where: { id: row.id },
+          data: { qrPassToken: row.qrPassToken },
+        });
+      }
+    }
+    return rows;
   }
 
   async ensureDisplayToken(user: JwtUser, meetId: string) {
