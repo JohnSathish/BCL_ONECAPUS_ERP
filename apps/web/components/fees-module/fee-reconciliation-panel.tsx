@@ -76,6 +76,16 @@ export function FeeReconciliationPanel() {
       <p className="mt-4 text-sm">
         Grand total collected: <strong>{formatInr(data.grandTotal ?? 0)}</strong>
       </p>
+      <p className="mt-3 text-sm">
+        For gateway settlement matching (CSV import, UTR / txn match, exceptions), open{' '}
+        <a
+          href="/admin/fees/reconciliation"
+          className="font-medium text-primary underline-offset-2 hover:underline"
+        >
+          Fee Reconciliation
+        </a>
+        .
+      </p>
     </div>
   );
 }

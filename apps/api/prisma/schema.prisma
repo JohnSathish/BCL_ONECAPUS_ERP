@@ -7191,14 +7191,21 @@ model PaymentTransaction {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  allocations PaymentAllocation[]
-  ledger      StudentFeeLedgerEntry[]
-  receipts    FeeReceipt[]
-  gatewayLogs PaymentGatewayLog[]
+  /// UNRECONCILED | MATCHED | RECONCILED | EXCEPTION
+  reconStatus String @default("UNRECONCILED") @map("recon_status")
+
+  allocations     PaymentAllocation[]
+  ledger          StudentFeeLedgerEntry[]
+  receipts        FeeReceipt[]
+  gatewayLogs     PaymentGatewayLog[]
+  settlementLines FeeSettlementLine[]
 
   @@unique([tenantId, transactionNo])
   @@index([tenantId, studentId, status])
   @@index([tenantId, provider, providerOrderId])
+  @@index([tenantId, providerPaymentId])
+  @@index([tenantId, externalReference])
+  @@index([tenantId, reconStatus])
   @@map("payment_transactions")
   @@schema("finance")
 }
@@ -7524,6 +7531,77 @@ model ExternalFeePayment {
   @@index([tenantId, paymentSource, status])
   @@index([tenantId, transactionDate])
   @@map("external_fee_payments")
+  @@schema("finance")
+}
+
+/// Gateway settlement file import batch (Razorpay / BillDesk / Atom / Cashfree style CSV).
+model FeeSettlementBatch {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  provider        String    @default("GENERIC")
+  fileName        String?   @map("file_name")
+  settlementDate  DateTime? @map("settlement_date") @db.Date
+  status          String    @default("IMPORTED") // IMPORTED | MATCHED | CLOSED
+  rowCount        Int       @default(0) @map("row_count")
+  matchedCount    Int       @default(0) @map("matched_count")
+  exceptionCount  Int       @default(0) @map("exception_count")
+  reconciledCount Int       @default(0) @map("reconciled_count")
+  importedById    String?   @map("imported_by_id") @db.Uuid
+  remarks         String?
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  lines FeeSettlementLine[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, provider, status])
+  @@map("fee_settlement_batches")
+  @@schema("finance")
+}
+
+/// One row from a gateway settlement file, matched to ERP PaymentTransaction when possible.
+model FeeSettlementLine {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  batchId               String    @map("batch_id") @db.Uuid
+  lineNo                Int       @default(0) @map("line_no")
+  gatewayTransactionId  String?   @map("gateway_transaction_id")
+  gatewayPaymentId      String?   @map("gateway_payment_id")
+  gatewayOrderId        String?   @map("gateway_order_id")
+  utr                   String?
+  receiptNo             String?   @map("receipt_no")
+  studentIdentifier     String?   @map("student_identifier")
+  grossAmount           Decimal   @default(0) @map("gross_amount") @db.Decimal(12, 2)
+  feeCharges            Decimal   @default(0) @map("fee_charges") @db.Decimal(12, 2)
+  taxAmount             Decimal   @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  netAmount             Decimal   @default(0) @map("net_amount") @db.Decimal(12, 2)
+  settlementDate        DateTime? @map("settlement_date") @db.Date
+  currency              String    @default("INR")
+  /// PENDING | MATCHED | RECONCILED | AMOUNT_MISMATCH | DUPLICATE | UNMATCHED | MANUAL_REVIEW | SETTLEMENT_PENDING
+  matchStatus           String    @default("PENDING") @map("match_status")
+  /// TXN_ID | GATEWAY_REF | UTR | RECEIPT | STUDENT_AMOUNT_DATE | MANUAL
+  matchMethod           String?   @map("match_method")
+  paymentId             String?   @map("payment_id") @db.Uuid
+  receiptId             String?   @map("receipt_id") @db.Uuid
+  amountDifference      Decimal?  @map("amount_difference") @db.Decimal(12, 2)
+  remarks               String?
+  reviewedById          String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt            DateTime? @map("reviewed_at")
+  rawRow                Json?     @map("raw_row")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  batch   FeeSettlementBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  payment PaymentTransaction? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, batchId, matchStatus])
+  @@index([tenantId, paymentId])
+  @@index([tenantId, gatewayPaymentId])
+  @@index([tenantId, gatewayOrderId])
+  @@index([tenantId, utr])
+  @@index([tenantId, receiptNo])
+  @@map("fee_settlement_lines")
   @@schema("finance")
 }
 

@@ -35,6 +35,7 @@ import { StudentFeeSummaryService } from './services/student-fee-summary.service
 import { ExternalFeePaymentService } from './services/external-fee-payment.service';
 import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
 import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
+import { FeeSettlementReconciliationService } from './services/fee-settlement-reconciliation.service';
 import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 
 @Module({
@@ -78,6 +79,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
     ScholarshipSchemeService,
     FeeReceiptPdfProcessor,
     FeeOrphanDemandService,
+    FeeSettlementReconciliationService,
   ],
   exports: [
     FeeStructureService,

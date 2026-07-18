@@ -87,6 +87,7 @@ import { FeePaymentRequestService } from './services/fee-payment-request.service
 import { FeeReversalService } from './services/fee-reversal.service';
 import { ExternalFeePaymentService } from './services/external-fee-payment.service';
 import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
+import { FeeSettlementReconciliationService } from './services/fee-settlement-reconciliation.service';
 
 @ApiBearerAuth()
 @ApiTags('fees')
@@ -121,6 +122,7 @@ export class FeesController {
     private readonly scholarships: ScholarshipSchemeService,
     private readonly tenantResolution: TenantResolutionService,
     private readonly orphanDemands: FeeOrphanDemandService,
+    private readonly settlementRecon: FeeSettlementReconciliationService,
   ) {}
 
   @Get('dashboard')
@@ -388,6 +390,165 @@ export class FeesController {
     @Query() query: ReportsQueryDto,
   ) {
     return this.reports.reconciliation(user.tid, query);
+  }
+
+  @Get('settlement-reconciliation/dashboard')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  settlementReconDashboard(
+    @CurrentUser() user: JwtUser,
+    @Query('batchId') batchId?: string,
+  ) {
+    return this.settlementRecon.dashboard(user.tid, batchId);
+  }
+
+  @Get('settlement-reconciliation/batches')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  listSettlementBatches(
+    @CurrentUser() user: JwtUser,
+    @Query('limit') limit?: string,
+  ) {
+    return this.settlementRecon.listBatches(
+      user.tid,
+      limit ? Number(limit) : undefined,
+    );
+  }
+
+  @Get('settlement-reconciliation/batches/:id')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  getSettlementBatch(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.settlementRecon.getBatchSummary(user.tid, id);
+  }
+
+  @Get('settlement-reconciliation/lines')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  listSettlementLines(
+    @CurrentUser() user: JwtUser,
+    @Query('batchId') batchId?: string,
+    @Query('matchStatus') matchStatus?: string,
+    @Query('exceptionsOnly') exceptionsOnly?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.settlementRecon.listLines(user.tid, {
+      batchId,
+      matchStatus,
+      exceptionsOnly: exceptionsOnly === '1' || exceptionsOnly === 'true',
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Get('settlement-reconciliation/template')
+  @RequireAnyPermission('fees:read', 'fees:manage')
+  settlementTemplate(@Res() res: Response) {
+    const file = this.settlementRecon.csvTemplate();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.content);
+  }
+
+  @Get('settlement-reconciliation/export')
+  @RequireAnyPermission('fees:read', 'fees:manage', 'reports:read')
+  async exportSettlementRecon(
+    @CurrentUser() user: JwtUser,
+    @Query('batchId') batchId?: string,
+    @Query('matchStatus') matchStatus?: string,
+    @Query('exceptionsOnly') exceptionsOnly?: string,
+    @Query('report') report?: 'daily' | 'exceptions' | 'all',
+    @Res() res?: Response,
+  ) {
+    const file = await this.settlementRecon.exportCsv(user.tid, {
+      batchId,
+      matchStatus,
+      exceptionsOnly: exceptionsOnly === '1' || exceptionsOnly === 'true',
+      report,
+    });
+    res!.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res!.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res!.send(file.content);
+  }
+
+  @Post('settlement-reconciliation/import')
+  @RequirePermissions('fees:manage')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 12 * 1024 * 1024 },
+    }),
+  )
+  importSettlementCsv(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('provider') provider?: string,
+    @Body('remarks') remarks?: string,
+    @Body('autoMatch') autoMatch?: string,
+  ) {
+    return this.settlementRecon.importCsv(user, file, {
+      provider,
+      remarks,
+      autoMatch: autoMatch !== '0' && autoMatch !== 'false',
+    });
+  }
+
+  @Post('settlement-reconciliation/batches/:id/match')
+  @RequirePermissions('fees:manage')
+  rematchSettlementBatch(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.settlementRecon.runAutoMatch(user.tid, id);
+  }
+
+  @Post('settlement-reconciliation/lines/:id/reconcile')
+  @RequirePermissions('fees:manage')
+  markSettlementLineReconciled(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body?: { remarks?: string },
+  ) {
+    return this.settlementRecon.markReconciled(user, id, body?.remarks);
+  }
+
+  @Post('settlement-reconciliation/lines/:id/manual-review')
+  @RequirePermissions('fees:manage')
+  markSettlementLineManualReview(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body?: { remarks?: string },
+  ) {
+    return this.settlementRecon.markManualReview(user, id, body?.remarks);
+  }
+
+  @Post('settlement-reconciliation/lines/:id/link')
+  @RequirePermissions('fees:manage')
+  linkSettlementLinePayment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { paymentId: string; remarks?: string },
+  ) {
+    if (!body?.paymentId) {
+      throw new BadRequestException('paymentId is required');
+    }
+    return this.settlementRecon.linkPayment(
+      user,
+      id,
+      body.paymentId,
+      body.remarks,
+    );
+  }
+
+  @Patch('settlement-reconciliation/lines/:id/remarks')
+  @RequirePermissions('fees:manage')
+  updateSettlementLineRemarks(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { remarks: string },
+  ) {
+    return this.settlementRecon.updateRemarks(user, id, body?.remarks ?? '');
   }
 
   @Post('payments/initiate')

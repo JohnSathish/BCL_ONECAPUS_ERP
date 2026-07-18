@@ -1244,6 +1244,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['fees:manage'],
           },
           {
+            label: 'Fee Reconciliation',
+            href: '/admin/fees/reconciliation',
+            permissions: ['fees:read', 'fees:manage', 'reports:read'],
+          },
+          {
             label: 'Scholarships & Concessions',
             href: '/admin/fees/scholarships',
             permissions: ['fees:manage'],
