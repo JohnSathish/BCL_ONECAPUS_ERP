@@ -101,6 +101,31 @@ export class TransferStudentDto {
   reason?: string;
 }
 
+export class AllocateByKeysDto {
+  @IsUUID()
+  houseId!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  studentKeys!: string[];
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+}
+
+export class TransferByKeyDto {
+  @IsString()
+  studentKey!: string;
+
+  @IsUUID()
+  toHouseId!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class BulkTransferDto {
   @IsArray()
   @IsUUID('4', { each: true })
@@ -112,6 +137,17 @@ export class BulkTransferDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+export class AssignBibsDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  startFrom?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean;
 }
 
 export class UpsertMeetDto {
@@ -237,10 +273,16 @@ export class CreateTeamDto {
   @IsString()
   name!: string;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TeamMemberDto)
-  members!: TeamMemberDto[];
+  members?: TeamMemberDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  memberKeys?: string[];
 }
 
 export class TeamMemberDto {

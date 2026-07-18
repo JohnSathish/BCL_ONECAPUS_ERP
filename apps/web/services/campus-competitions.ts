@@ -129,6 +129,93 @@ export async function autoAllocateHouses(payload?: { academicYearId?: string }) 
   return data;
 }
 
+export async function seedDefaultHouses() {
+  const { data } = await api.post(`${base}/houses/seed-defaults`, {});
+  return data as {
+    created: CompetitionHouse[];
+    skipped: CompetitionHouse[];
+    houses: CompetitionHouse[];
+  };
+}
+
+export async function fetchHouse(houseId: string) {
+  const { data } = await api.get(`${base}/houses/${houseId}`);
+  return data as CompetitionHouse & {
+    memberships: Array<{
+      id: string;
+      studentId: string;
+      status: string;
+      allocatedAt: string;
+      student?: {
+        id: string;
+        enrollmentNumber: string;
+        rollNumber?: string | null;
+        fullName: string;
+      } | null;
+    }>;
+  };
+}
+
+export async function setHouseStatus(houseId: string, status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') {
+  const { data } = await api.post(`${base}/houses/${houseId}/status`, { status });
+  return data as CompetitionHouse;
+}
+
+export async function allocateByKeys(payload: {
+  houseId: string;
+  studentKeys: string[];
+  academicYearId?: string;
+}) {
+  const { data } = await api.post(`${base}/allocations/by-keys`, payload);
+  return data as { allocated: number };
+}
+
+export async function importHouseAllocations(
+  rows: Array<{ studentKey: string; houseCode: string }>,
+) {
+  const { data } = await api.post(`${base}/allocations/import`, { rows });
+  return data as { imported: number };
+}
+
+export async function transferByKey(payload: {
+  studentKey: string;
+  toHouseId: string;
+  reason?: string;
+}) {
+  const { data } = await api.post(`${base}/transfers/by-key`, payload);
+  return data;
+}
+
+export async function fetchEventFixtures(eventId: string) {
+  const { data } = await api.get(`${base}/events/${eventId}/fixtures`);
+  return data as Array<{
+    id: string;
+    round: string;
+    heatNumber?: number | null;
+    bracketSlot?: number | null;
+    entryIds: string[] | unknown;
+    status: string;
+  }>;
+}
+
+export async function assignEventBibs(
+  eventId: string,
+  payload?: { startFrom?: number; force?: boolean },
+) {
+  const { data } = await api.post(`${base}/events/${eventId}/assign-bibs`, payload ?? {});
+  return data as { assigned: number };
+}
+
+export async function createCompetitionTeam(payload: {
+  eventId: string;
+  houseId: string;
+  name: string;
+  memberKeys: string[];
+}) {
+  const { data } = await api.post(`${base}/teams`, payload);
+  return data;
+}
+
 export async function fetchMeets(status?: string) {
   const { data } = await api.get(`${base}/meets`, { params: { status } });
   return data as CompetitionMeet[];

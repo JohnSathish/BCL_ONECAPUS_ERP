@@ -7,9 +7,11 @@ import {
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
+  AllocateByKeysDto,
   AllocateStudentsDto,
   AutoAllocateDto,
   BulkTransferDto,
+  TransferByKeyDto,
   TransferStudentDto,
   UpsertCoordinatorDto,
   UpsertHouseDto,
@@ -82,6 +84,30 @@ export class CompetitionHousesService {
     });
   }
 
+  private async findStudentByKey(tenantId: string, key: string) {
+    const raw = key.trim();
+    if (!raw) return null;
+    return this.prisma.student.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { enrollmentNumber: { equals: raw, mode: 'insensitive' } },
+          { admissionNumber: { equals: raw, mode: 'insensitive' } },
+          { rollNumber: { equals: raw, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        enrollmentNumber: true,
+        rollNumber: true,
+        admissionNumber: true,
+        masterProfile: { select: { fullName: true } },
+        user: { select: { displayName: true } },
+      },
+    });
+  }
+
   async getHouse(user: JwtUser, houseId: string) {
     const house = await this.db().competitionHouse.findFirst({
       where: { id: houseId, tenantId: user.tid, deletedAt: null },
@@ -95,7 +121,86 @@ export class CompetitionHousesService {
       },
     });
     if (!house) throw new NotFoundException('House not found');
-    return house;
+
+    const studentIds = (house.memberships as Array<{ studentId: string }>).map(
+      (m) => m.studentId,
+    );
+    const students =
+      studentIds.length === 0
+        ? []
+        : await this.prisma.student.findMany({
+            where: { tenantId: user.tid, id: { in: studentIds } },
+            select: {
+              id: true,
+              enrollmentNumber: true,
+              rollNumber: true,
+              admissionNumber: true,
+              masterProfile: { select: { fullName: true } },
+              user: { select: { displayName: true } },
+            },
+          });
+    const byId = new Map(students.map((s) => [s.id, s]));
+    return {
+      ...house,
+      memberships: (house.memberships as Array<{ studentId: string }>).map(
+        (m) => {
+          const s = byId.get(m.studentId);
+          return {
+            ...m,
+            student: s
+              ? {
+                  id: s.id,
+                  enrollmentNumber: s.enrollmentNumber,
+                  rollNumber: s.rollNumber,
+                  admissionNumber: s.admissionNumber,
+                  fullName:
+                    s.masterProfile?.fullName ??
+                    s.user?.displayName ??
+                    s.enrollmentNumber,
+                }
+              : null,
+          };
+        },
+      ),
+    };
+  }
+
+  async seedDefaultHouses(user: JwtUser) {
+    this.requireManage(user);
+    const defaults = [
+      { name: 'Blue', code: 'BLUE', color: '#2563eb', motto: 'Unity' },
+      { name: 'Red', code: 'RED', color: '#dc2626', motto: 'Courage' },
+      { name: 'Green', code: 'GREEN', color: '#16a34a', motto: 'Growth' },
+      { name: 'Yellow', code: 'YELLOW', color: '#ca8a04', motto: 'Spirit' },
+    ];
+    const created = [];
+    const skipped = [];
+    for (const row of defaults) {
+      const existing = await this.db().competitionHouse.findFirst({
+        where: { tenantId: user.tid, code: row.code, deletedAt: null },
+      });
+      if (existing) {
+        skipped.push(existing);
+        continue;
+      }
+      created.push(
+        await this.db().competitionHouse.create({
+          data: {
+            tenantId: user.tid,
+            name: row.name,
+            code: row.code,
+            color: row.color,
+            motto: row.motto,
+            status: 'ACTIVE',
+          },
+        }),
+      );
+    }
+    await this.audit(user, 'house.seed_defaults', {
+      entityType: 'house',
+      metadata: { created: created.length, skipped: skipped.length },
+    });
+    return { created, skipped, houses: await this.listHouses(user) };
   }
 
   async createHouse(user: JwtUser, dto: UpsertHouseDto) {
@@ -447,18 +552,7 @@ export class CompetitionHousesService {
         results.push({ ...row, status: 'HOUSE_NOT_FOUND' });
         continue;
       }
-      const student = await this.prisma.student.findFirst({
-        where: {
-          tenantId: user.tid,
-          deletedAt: null,
-          OR: [
-            { enrollmentNumber: row.studentKey },
-            { admissionNumber: row.studentKey },
-            { rollNumber: row.studentKey },
-          ],
-        },
-        select: { id: true },
-      });
+      const student = await this.findStudentByKey(user.tid, row.studentKey);
       if (!student) {
         results.push({ ...row, status: 'STUDENT_NOT_FOUND' });
         continue;
@@ -488,6 +582,54 @@ export class CompetitionHousesService {
       imported: results.filter((r) => r.status === 'OK').length,
       results,
     };
+  }
+
+  async allocateByKeys(user: JwtUser, dto: AllocateByKeysDto) {
+    this.requireAllocate(user);
+    await this.getHouse(user, dto.houseId);
+    const keys = [
+      ...new Set(dto.studentKeys.map((k) => k.trim()).filter(Boolean)),
+    ];
+    const studentIds: string[] = [];
+    const results: Array<{
+      studentKey: string;
+      status: string;
+      studentId?: string;
+    }> = [];
+    for (const key of keys) {
+      const student = await this.findStudentByKey(user.tid, key);
+      if (!student) {
+        results.push({ studentKey: key, status: 'STUDENT_NOT_FOUND' });
+        continue;
+      }
+      studentIds.push(student.id);
+      results.push({
+        studentKey: key,
+        studentId: student.id,
+        status: 'RESOLVED',
+      });
+    }
+    if (!studentIds.length) {
+      return { allocated: 0, results };
+    }
+    const allocated = await this.allocateStudents(user, {
+      houseId: dto.houseId,
+      studentIds,
+      academicYearId: dto.academicYearId,
+    });
+    return { ...allocated, resolveResults: results };
+  }
+
+  async transferByKey(user: JwtUser, dto: TransferByKeyDto) {
+    const student = await this.findStudentByKey(user.tid, dto.studentKey);
+    if (!student) {
+      throw new NotFoundException('Student not found for key');
+    }
+    return this.transferStudent(user, {
+      studentId: student.id,
+      toHouseId: dto.toHouseId,
+      reason: dto.reason,
+    });
   }
 
   async transferStudent(user: JwtUser, dto: TransferStudentDto) {

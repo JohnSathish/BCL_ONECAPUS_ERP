@@ -220,6 +220,7 @@ export default function StudentCampusCompetitionsPage() {
                         <p className="font-medium">{entry.event?.name ?? 'Event'}</p>
                         <p className="text-xs text-slate-500">
                           {entry.event?.meet?.name ?? '—'}
+                          {entry.bibNumber ? ` · Bib ${entry.bibNumber}` : ''}
                           {published ? ` · Place #${published.position}` : ''}
                           {checkedIn ? ' · Checked in' : ''}
                         </p>

@@ -168,6 +168,7 @@ export default function CampusCompetitionsScreen() {
                   <Text style={styles.title}>{entry.event?.name ?? 'Event'}</Text>
                   <Text style={styles.meta}>
                     {entry.event?.meet?.name ?? '—'}
+                    {entry.bibNumber ? ` · Bib ${entry.bibNumber}` : ''}
                     {published ? ` · Place #${published.position}` : ''}
                     {checkedIn ? ' · Checked in' : ''}
                   </Text>

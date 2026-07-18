@@ -16,10 +16,13 @@ import {
 import { useCompetitionRealtime } from '@/hooks/use-competition-realtime';
 import { fetchAcademicYears } from '@/services/organization';
 import {
+  allocateByKeys,
   approveResults,
+  assignEventBibs,
   autoAllocateHouses,
   checkInEvent,
   createAnnouncement,
+  createCompetitionTeam,
   createEvent,
   createHouse,
   createMeet,
@@ -31,7 +34,9 @@ import {
   fetchChampionshipStandings,
   fetchEventCheckIns,
   fetchEventEntries,
+  fetchEventFixtures,
   fetchEventResults,
+  fetchHouse,
   fetchHouses,
   fetchLiveBoard,
   fetchMeet,
@@ -39,10 +44,14 @@ import {
   fetchMeets,
   fetchTrophies,
   generateFixtures,
+  importHouseAllocations,
   issueParticipationCertificates,
   issuePlaceCertificates,
+  seedDefaultHouses,
+  setHouseStatus,
   setLiveEvent,
   submitResultsForApproval,
+  transferByKey,
   transitionMeetStatus,
   updatePointRules,
   upsertResults,
@@ -69,10 +78,28 @@ export function CampusCompetitionsWorkspace() {
   const [awardTrophyId, setAwardTrophyId] = useState('');
   const [scanCode, setScanCode] = useState('');
   const [kioskUrl, setKioskUrl] = useState('');
+  const [selectedHouseId, setSelectedHouseId] = useState('');
+  const [pasteKeys, setPasteKeys] = useState('');
+  const [importCsv, setImportCsv] = useState('');
+  const [transferKey, setTransferKey] = useState('');
+  const [transferHouseId, setTransferHouseId] = useState('');
+  const [opsEventId, setOpsEventId] = useState('');
+  const [fixtureEventId, setFixtureEventId] = useState('');
+  const [teamForm, setTeamForm] = useState({
+    eventId: '',
+    houseId: '',
+    name: '',
+    memberKeys: '',
+  });
 
   const housesQ = useQuery({
     queryKey: ['campus-competitions', 'houses'],
     queryFn: () => fetchHouses(),
+  });
+  const houseDetailQ = useQuery({
+    queryKey: ['campus-competitions', 'house', selectedHouseId],
+    queryFn: () => fetchHouse(selectedHouseId),
+    enabled: Boolean(selectedHouseId) && tab === 'houses',
   });
   const yearsQ = useQuery({
     queryKey: ['organization', 'academic-years'],
@@ -88,11 +115,22 @@ export function CampusCompetitionsWorkspace() {
     queryFn: () => fetchChampionshipStandings(champYearId),
     enabled: Boolean(champYearId) && tab === 'championship',
   });
+  const activeCheckInEventId = tab === 'live' ? opsEventId : scoreEventId;
   const checkInsQ = useQuery({
-    queryKey: ['campus-competitions', 'check-ins', scoreEventId],
-    queryFn: () => fetchEventCheckIns(scoreEventId),
-    enabled: Boolean(scoreEventId) && tab === 'scoring',
+    queryKey: ['campus-competitions', 'check-ins', activeCheckInEventId],
+    queryFn: () => fetchEventCheckIns(activeCheckInEventId),
+    enabled: Boolean(activeCheckInEventId) && (tab === 'scoring' || tab === 'live'),
     refetchInterval: 8_000,
+  });
+  const fixturesQ = useQuery({
+    queryKey: ['campus-competitions', 'fixtures', fixtureEventId],
+    queryFn: () => fetchEventFixtures(fixtureEventId),
+    enabled: Boolean(fixtureEventId) && tab === 'meets',
+  });
+  const fixtureEntriesQ = useQuery({
+    queryKey: ['campus-competitions', 'entries', fixtureEventId, 'fixtures'],
+    queryFn: () => fetchEventEntries(fixtureEventId),
+    enabled: Boolean(fixtureEventId) && tab === 'meets',
   });
   const meetsQ = useQuery({
     queryKey: ['campus-competitions', 'meets'],
@@ -312,96 +350,348 @@ export function CampusCompetitionsWorkspace() {
       ) : null}
 
       {tab === 'houses' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <StcPanel title="Create house" description="Unlimited houses with colour branding">
-            <div className="space-y-3">
-              <div>
-                <Label>Name</Label>
-                <Input
-                  value={houseForm.name}
-                  onChange={(e) => setHouseForm((f) => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StcPanel title="Create house" description="Unlimited houses with colour branding">
+              <div className="space-y-3">
                 <div>
-                  <Label>Code</Label>
+                  <Label>Name</Label>
                   <Input
-                    value={houseForm.code}
-                    onChange={(e) => setHouseForm((f) => ({ ...f, code: e.target.value }))}
+                    value={houseForm.name}
+                    onChange={(e) => setHouseForm((f) => ({ ...f, name: e.target.value }))}
                   />
                 </div>
-                <div>
-                  <Label>Color</Label>
-                  <Input
-                    type="color"
-                    value={houseForm.color}
-                    onChange={(e) => setHouseForm((f) => ({ ...f, color: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Motto</Label>
-                <Input
-                  value={houseForm.motto}
-                  onChange={(e) => setHouseForm((f) => ({ ...f, motto: e.target.value }))}
-                />
-              </div>
-              <Button
-                type="button"
-                disabled={!houseForm.name || !houseForm.code || createHouseMut.isPending}
-                onClick={() => createHouseMut.mutate()}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Create house
-              </Button>
-            </div>
-          </StcPanel>
-
-          <StcPanel
-            title="Houses"
-            description="Allocate students evenly across active houses"
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                disabled={autoAllocMut.isPending || houses.length < 2}
-                onClick={() => autoAllocMut.mutate()}
-              >
-                Auto-allocate
-              </Button>
-            }
-          >
-            {housesQ.isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-            ) : houses.length === 0 ? (
-              <StcEmptyState
-                icon={Home}
-                title="No houses yet"
-                description="Create Blue / Red / Green / Yellow or named houses."
-              />
-            ) : (
-              <div className="space-y-2">
-                {houses.map((h) => (
-                  <div
-                    key={h.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: h.color }} />
-                      <div>
-                        <p className="font-medium text-slate-900">{h.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {h.code} · {h._count?.memberships ?? 0} members
-                        </p>
-                      </div>
-                    </div>
-                    <StcStatusBadge status={h.status} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Code</Label>
+                    <Input
+                      value={houseForm.code}
+                      onChange={(e) => setHouseForm((f) => ({ ...f, code: e.target.value }))}
+                    />
                   </div>
-                ))}
+                  <div>
+                    <Label>Color</Label>
+                    <Input
+                      type="color"
+                      value={houseForm.color}
+                      onChange={(e) => setHouseForm((f) => ({ ...f, color: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Motto</Label>
+                  <Input
+                    value={houseForm.motto}
+                    onChange={(e) => setHouseForm((f) => ({ ...f, motto: e.target.value }))}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  disabled={!houseForm.name || !houseForm.code || createHouseMut.isPending}
+                  onClick={() => createHouseMut.mutate()}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Create house
+                </Button>
               </div>
-            )}
-          </StcPanel>
+            </StcPanel>
+
+            <StcPanel
+              title="Houses"
+              description="Allocate students evenly across active houses"
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  {houses.length === 0 ? (
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={() =>
+                        void seedDefaultHouses()
+                          .then((r) => {
+                            setMessage({
+                              tone: 'ok',
+                              text: `Seeded ${r.created?.length ?? 0} houses.`,
+                            });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'houses'],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Seed failed'),
+                            }),
+                          )
+                      }
+                    >
+                      Seed Blue/Red/Green/Yellow
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    disabled={autoAllocMut.isPending || houses.length < 2}
+                    onClick={() => autoAllocMut.mutate()}
+                  >
+                    Auto-allocate
+                  </Button>
+                </div>
+              }
+            >
+              {housesQ.isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              ) : houses.length === 0 ? (
+                <StcEmptyState
+                  icon={Home}
+                  title="No houses yet"
+                  description="Seed Blue / Red / Green / Yellow or create named houses."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {houses.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left ${
+                        selectedHouseId === h.id
+                          ? 'border-sky-300 bg-sky-50'
+                          : 'border-slate-200 bg-white'
+                      }`}
+                      onClick={() => setSelectedHouseId(h.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="h-4 w-4 rounded-full"
+                          style={{ backgroundColor: h.color }}
+                        />
+                        <div>
+                          <p className="font-medium text-slate-900">{h.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {h.code} · {h._count?.memberships ?? 0} members
+                          </p>
+                        </div>
+                      </div>
+                      <StcStatusBadge status={h.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </StcPanel>
+          </div>
+
+          {selectedHouseId ? (
+            <StcPanel
+              title={houseDetailQ.data?.name ?? 'House detail'}
+              description="Roster, allocate, and status"
+              actions={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onClick={() =>
+                    void setHouseStatus(
+                      selectedHouseId,
+                      houseDetailQ.data?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+                    )
+                      .then(() => {
+                        setMessage({ tone: 'ok', text: 'House status updated.' });
+                        void qc.invalidateQueries({ queryKey: ['campus-competitions', 'houses'] });
+                        void qc.invalidateQueries({
+                          queryKey: ['campus-competitions', 'house', selectedHouseId],
+                        });
+                      })
+                      .catch((e) =>
+                        setMessage({ tone: 'err', text: apiErrorMessage(e, 'Status failed') }),
+                      )
+                  }
+                >
+                  Toggle {houseDetailQ.data?.status === 'ACTIVE' ? 'Inactive' : 'Active'}
+                </Button>
+              }
+            >
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <div>
+                    <Label>Paste enrollments / rolls (one per line)</Label>
+                    <textarea
+                      className="mt-1.5 min-h-[100px] w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      value={pasteKeys}
+                      onChange={(e) => setPasteKeys(e.target.value)}
+                      placeholder="ENR001&#10;ENR002"
+                    />
+                    <Button
+                      className="mt-2"
+                      size="sm"
+                      type="button"
+                      disabled={!pasteKeys.trim()}
+                      onClick={() => {
+                        const keys = pasteKeys
+                          .split(/[\n,]+/)
+                          .map((k) => k.trim())
+                          .filter(Boolean);
+                        void allocateByKeys({ houseId: selectedHouseId, studentKeys: keys })
+                          .then((r) => {
+                            setMessage({
+                              tone: 'ok',
+                              text: `Allocated ${r.allocated ?? 0} students.`,
+                            });
+                            setPasteKeys('');
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'houses'],
+                            });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'house', selectedHouseId],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Allocate failed'),
+                            }),
+                          );
+                      }}
+                    >
+                      Allocate to this house
+                    </Button>
+                  </div>
+                  <div>
+                    <Label>CSV import (enrollment,HOUSECODE)</Label>
+                    <textarea
+                      className="mt-1.5 min-h-[80px] w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      value={importCsv}
+                      onChange={(e) => setImportCsv(e.target.value)}
+                      placeholder="ENR001,BLUE&#10;ENR002,RED"
+                    />
+                    <Button
+                      className="mt-2"
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      disabled={!importCsv.trim()}
+                      onClick={() => {
+                        const rows = importCsv
+                          .split('\n')
+                          .map((line) => line.trim())
+                          .filter(Boolean)
+                          .map((line) => {
+                            const [studentKey, houseCode] = line.split(/[,;\t]/);
+                            return {
+                              studentKey: (studentKey ?? '').trim(),
+                              houseCode: (houseCode ?? '').trim(),
+                            };
+                          })
+                          .filter((r) => r.studentKey && r.houseCode);
+                        void importHouseAllocations(rows)
+                          .then((r) => {
+                            setMessage({
+                              tone: 'ok',
+                              text: `Imported ${r.imported ?? 0} allocations.`,
+                            });
+                            setImportCsv('');
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'houses'],
+                            });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'house', selectedHouseId],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Import failed'),
+                            }),
+                          );
+                      }}
+                    >
+                      Import CSV
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[140px] flex-1">
+                      <Label>Transfer enrollment</Label>
+                      <Input
+                        value={transferKey}
+                        onChange={(e) => setTransferKey(e.target.value)}
+                        placeholder="Enrollment / roll"
+                      />
+                    </div>
+                    <div className="min-w-[140px]">
+                      <Label>To house</Label>
+                      <select
+                        className="mt-1.5 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={transferHouseId}
+                        onChange={(e) => setTransferHouseId(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        {houses.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            {h.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="button"
+                      disabled={!transferKey.trim() || !transferHouseId}
+                      onClick={() =>
+                        void transferByKey({
+                          studentKey: transferKey.trim(),
+                          toHouseId: transferHouseId,
+                        })
+                          .then(() => {
+                            setMessage({ tone: 'ok', text: 'Student transferred.' });
+                            setTransferKey('');
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'houses'],
+                            });
+                            void qc.invalidateQueries({
+                              queryKey: ['campus-competitions', 'house'],
+                            });
+                          })
+                          .catch((e) =>
+                            setMessage({
+                              tone: 'err',
+                              text: apiErrorMessage(e, 'Transfer failed'),
+                            }),
+                          )
+                      }
+                    >
+                      Transfer
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold">
+                    Roster ({houseDetailQ.data?.memberships?.length ?? 0})
+                  </p>
+                  {houseDetailQ.isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (houseDetailQ.data?.memberships?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-slate-500">No members yet.</p>
+                  ) : (
+                    <div className="max-h-80 space-y-1 overflow-y-auto">
+                      {(houseDetailQ.data?.memberships ?? []).map((m) => (
+                        <div
+                          key={m.id}
+                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                        >
+                          <p className="font-medium">
+                            {m.student?.fullName ?? m.studentId.slice(0, 8)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {m.student?.enrollmentNumber ?? '—'}
+                            {m.student?.rollNumber ? ` · Roll ${m.student.rollNumber}` : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </StcPanel>
+          ) : null}
         </div>
       ) : null}
 
@@ -589,6 +879,85 @@ export function CampusCompetitionsWorkspace() {
                 </Button>
               </div>
 
+              <div className="mb-4 space-y-2 rounded-xl border border-slate-200 p-3">
+                <p className="text-sm font-semibold">Nominate team</p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <select
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={teamForm.eventId}
+                    onChange={(e) => setTeamForm((f) => ({ ...f, eventId: e.target.value }))}
+                  >
+                    <option value="">Team event</option>
+                    {(selectedMeet.events ?? [])
+                      .filter((ev) => ev.entryMode === 'TEAM')
+                      .map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.name}
+                        </option>
+                      ))}
+                  </select>
+                  <select
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={teamForm.houseId}
+                    onChange={(e) => setTeamForm((f) => ({ ...f, houseId: e.target.value }))}
+                  >
+                    <option value="">House</option>
+                    {houses.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    placeholder="Team name"
+                    value={teamForm.name}
+                    onChange={(e) => setTeamForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Member enrollments (comma/newline)"
+                    value={teamForm.memberKeys}
+                    onChange={(e) => setTeamForm((f) => ({ ...f, memberKeys: e.target.value }))}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  type="button"
+                  disabled={
+                    !teamForm.eventId ||
+                    !teamForm.houseId ||
+                    !teamForm.name.trim() ||
+                    !teamForm.memberKeys.trim()
+                  }
+                  onClick={() => {
+                    const memberKeys = teamForm.memberKeys
+                      .split(/[\n,]+/)
+                      .map((k) => k.trim())
+                      .filter(Boolean);
+                    void createCompetitionTeam({
+                      eventId: teamForm.eventId,
+                      houseId: teamForm.houseId,
+                      name: teamForm.name.trim(),
+                      memberKeys,
+                    })
+                      .then(() => {
+                        setMessage({ tone: 'ok', text: 'Team nominated.' });
+                        setTeamForm({ eventId: '', houseId: '', name: '', memberKeys: '' });
+                        void qc.invalidateQueries({
+                          queryKey: ['campus-competitions', 'meet', selectedMeetId],
+                        });
+                      })
+                      .catch((e) =>
+                        setMessage({
+                          tone: 'err',
+                          text: apiErrorMessage(e, 'Team create failed'),
+                        }),
+                      );
+                  }}
+                >
+                  Create team entry
+                </Button>
+              </div>
+
               <div className="space-y-2">
                 {(selectedMeet.events ?? []).map((ev) => (
                   <div
@@ -601,28 +970,141 @@ export function CampusCompetitionsWorkspace() {
                         {ev.entryMode} · {ev._count?.entries ?? 0} entries
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={() =>
-                        void generateFixtures(ev.id, ev.entryMode === 'TEAM' ? 'KNOCKOUT' : 'HEATS')
-                          .then(() =>
-                            setMessage({ tone: 'ok', text: `Fixtures generated for ${ev.name}` }),
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          setFixtureEventId(ev.id);
+                          void generateFixtures(
+                            ev.id,
+                            ev.entryMode === 'TEAM' ? 'KNOCKOUT' : 'HEATS',
                           )
-                          .catch((e) =>
-                            setMessage({
-                              tone: 'err',
-                              text: apiErrorMessage(e, 'Fixture generation failed'),
-                            }),
-                          )
-                      }
-                    >
-                      Generate fixtures
-                    </Button>
+                            .then(() => {
+                              setMessage({
+                                tone: 'ok',
+                                text: `Fixtures generated for ${ev.name}`,
+                              });
+                              void qc.invalidateQueries({
+                                queryKey: ['campus-competitions', 'fixtures', ev.id],
+                              });
+                              void qc.invalidateQueries({
+                                queryKey: ['campus-competitions', 'entries', ev.id],
+                              });
+                            })
+                            .catch((e) =>
+                              setMessage({
+                                tone: 'err',
+                                text: apiErrorMessage(e, 'Fixture generation failed'),
+                              }),
+                            );
+                        }}
+                      >
+                        Generate fixtures
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={() => setFixtureEventId(ev.id)}
+                      >
+                        View fixtures
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={() =>
+                          void ensureEventCheckInToken(ev.id)
+                            .then((event) => {
+                              if (event.checkInToken && typeof window !== 'undefined') {
+                                const url = `${window.location.origin}/kiosk/competitions/${ev.id}?token=${event.checkInToken}`;
+                                setKioskUrl(url);
+                                setMessage({ tone: 'ok', text: 'Kiosk URL ready.' });
+                              }
+                            })
+                            .catch((e) =>
+                              setMessage({
+                                tone: 'err',
+                                text: apiErrorMessage(e, 'Kiosk token failed'),
+                              }),
+                            )
+                        }
+                      >
+                        Kiosk
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {fixtureEventId ? (
+                <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-3">
+                  <p className="text-sm font-semibold">
+                    Fixtures ·{' '}
+                    {(selectedMeet.events ?? []).find((e) => e.id === fixtureEventId)?.name ??
+                      fixtureEventId.slice(0, 8)}
+                  </p>
+                  {fixturesQ.isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (fixturesQ.data ?? []).length === 0 ? (
+                    <p className="text-sm text-slate-500">No fixtures yet — generate first.</p>
+                  ) : (
+                    (fixturesQ.data ?? []).map((fx) => {
+                      const ids = Array.isArray(fx.entryIds) ? (fx.entryIds as string[]) : [];
+                      const byId = new Map(
+                        (Array.isArray(fixtureEntriesQ.data) ? fixtureEntriesQ.data : []).map(
+                          (en: {
+                            id: string;
+                            bibNumber?: string | null;
+                            lane?: number | null;
+                            house?: { name?: string } | null;
+                            team?: { name?: string } | null;
+                          }) => [en.id, en],
+                        ),
+                      );
+                      return (
+                        <div
+                          key={fx.id}
+                          className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm"
+                        >
+                          <p className="font-medium">
+                            {fx.round}
+                            {fx.heatNumber != null ? ` · Heat ${fx.heatNumber}` : ''}
+                            {fx.bracketSlot != null ? ` · Slot ${fx.bracketSlot}` : ''}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {ids
+                              .map((id) => {
+                                const en = byId.get(id);
+                                if (!en) return id.slice(0, 6);
+                                return [
+                                  en.team?.name ?? en.house?.name ?? 'Entry',
+                                  en.bibNumber ? `bib ${en.bibNumber}` : null,
+                                  en.lane != null ? `lane ${en.lane}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ');
+                              })
+                              .join(' | ')}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                  {kioskUrl ? (
+                    <a
+                      className="break-all text-xs text-sky-700 underline"
+                      href={kioskUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {kioskUrl}
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
             </StcPanel>
           ) : null}
         </div>
@@ -742,6 +1224,61 @@ export function CampusCompetitionsWorkspace() {
                         >
                           Kiosk URL
                         </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void assignEventBibs(scoreEventId)
+                              .then((r) => {
+                                setMessage({
+                                  tone: 'ok',
+                                  text: `Assigned ${r.assigned ?? 0} bibs.`,
+                                });
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'entries', scoreEventId],
+                                });
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'check-ins', scoreEventId],
+                                });
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Bib assign failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Assign bibs
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const rows = checkInsQ.data ?? [];
+                            const html = `<!doctype html><html><head><title>Event roster</title>
+                              <style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}
+                              th,td{border:1px solid #ccc;padding:8px;text-align:left}</style></head><body>
+                              <h1>Check-in roster</h1>
+                              <table><thead><tr><th>Bib</th><th>House</th><th>QR pass</th><th>In</th></tr></thead>
+                              <tbody>${rows
+                                .map(
+                                  (r) =>
+                                    `<tr><td>${r.bibNumber ?? ''}</td><td>${r.house?.name ?? ''}</td><td>${r.qrPassToken ?? ''}</td><td>${r.checkedIn ? 'Yes' : ''}</td></tr>`,
+                                )
+                                .join('')}</tbody></table>
+                              <script>window.print()</script></body></html>`;
+                            const w = window.open('', '_blank');
+                            if (w) {
+                              w.document.write(html);
+                              w.document.close();
+                            }
+                          }}
+                        >
+                          Print roster
+                        </Button>
                       </div>
                       {kioskUrl ? (
                         <a
@@ -764,8 +1301,10 @@ export function CampusCompetitionsWorkspace() {
                         (entry: {
                           id: string;
                           bibNumber?: string | null;
+                          lane?: number | null;
                           studentId?: string | null;
                           house?: { name?: string; code?: string } | null;
+                          team?: { name?: string } | null;
                         }) => (
                           <div
                             key={entry.id}
@@ -773,8 +1312,9 @@ export function CampusCompetitionsWorkspace() {
                           >
                             <div>
                               <p className="font-medium">
-                                {entry.house?.name ?? 'Entry'}
+                                {entry.team?.name ?? entry.house?.name ?? 'Entry'}
                                 {entry.bibNumber ? ` · Bib ${entry.bibNumber}` : ''}
+                                {entry.lane != null ? ` · Lane ${entry.lane}` : ''}
                               </p>
                               <p className="text-xs text-slate-500">
                                 {entry.house?.code ?? '—'}
@@ -988,6 +1528,159 @@ export function CampusCompetitionsWorkspace() {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 space-y-3">
+                  <p className="text-sm font-semibold">RFID / QR check-in</p>
+                  <select
+                    className="w-full max-w-md rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={opsEventId}
+                    onChange={(e) => setOpsEventId(e.target.value)}
+                  >
+                    <option value="">Select event</option>
+                    {(selectedMeet?.events ?? []).map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name}
+                      </option>
+                    ))}
+                  </select>
+                  {opsEventId ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          className="max-w-xs"
+                          placeholder="Scan RFID / QR / enrollment"
+                          value={scanCode}
+                          onChange={(e) => setScanCode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && scanCode.trim()) {
+                              void checkInEvent(opsEventId, { scanCode: scanCode.trim() })
+                                .then((r) => {
+                                  setMessage({
+                                    tone: 'ok',
+                                    text: r.alreadyCheckedIn ? 'Already checked in' : 'Checked in',
+                                  });
+                                  setScanCode('');
+                                  void qc.invalidateQueries({
+                                    queryKey: ['campus-competitions', 'check-ins', opsEventId],
+                                  });
+                                })
+                                .catch((err) =>
+                                  setMessage({
+                                    tone: 'err',
+                                    text: apiErrorMessage(err, 'Check-in failed'),
+                                  }),
+                                );
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!scanCode.trim()}
+                          onClick={() =>
+                            void checkInEvent(opsEventId, { scanCode: scanCode.trim() })
+                              .then((r) => {
+                                setMessage({
+                                  tone: 'ok',
+                                  text: r.alreadyCheckedIn ? 'Already checked in' : 'Checked in',
+                                });
+                                setScanCode('');
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'check-ins', opsEventId],
+                                });
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Check-in failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Check in
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void ensureEventCheckInToken(opsEventId)
+                              .then((ev) => {
+                                if (ev.checkInToken && typeof window !== 'undefined') {
+                                  const url = `${window.location.origin}/kiosk/competitions/${opsEventId}?token=${ev.checkInToken}`;
+                                  setKioskUrl(url);
+                                  setMessage({ tone: 'ok', text: 'Kiosk URL ready.' });
+                                }
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Token failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Kiosk URL
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void assignEventBibs(opsEventId)
+                              .then((r) => {
+                                setMessage({
+                                  tone: 'ok',
+                                  text: `Assigned ${r.assigned ?? 0} bibs.`,
+                                });
+                                void qc.invalidateQueries({
+                                  queryKey: ['campus-competitions', 'check-ins', opsEventId],
+                                });
+                              })
+                              .catch((err) =>
+                                setMessage({
+                                  tone: 'err',
+                                  text: apiErrorMessage(err, 'Bib assign failed'),
+                                }),
+                              )
+                          }
+                        >
+                          Assign bibs
+                        </Button>
+                      </div>
+                      {kioskUrl ? (
+                        <a
+                          className="break-all text-xs text-sky-700 underline"
+                          href={kioskUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {kioskUrl}
+                        </a>
+                      ) : null}
+                      <p className="text-xs text-slate-600">
+                        Checked in: {(checkInsQ.data ?? []).filter((c) => c.checkedIn).length}/
+                        {(checkInsQ.data ?? []).length}
+                      </p>
+                      <div className="max-h-48 space-y-1 overflow-y-auto">
+                        {(checkInsQ.data ?? []).map((c) => (
+                          <div
+                            key={c.entryId}
+                            className="flex justify-between rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+                          >
+                            <span>
+                              {c.house?.name ?? 'Entry'}
+                              {c.bibNumber ? ` · Bib ${c.bibNumber}` : ''}
+                            </span>
+                            <span className={c.checkedIn ? 'text-emerald-700' : 'text-slate-400'}>
+                              {c.checkedIn ? 'In' : '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
 
                 <div>

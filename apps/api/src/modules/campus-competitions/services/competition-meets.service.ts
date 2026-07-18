@@ -13,6 +13,7 @@ import {
   categoriesForMeetType,
 } from '../domain/competition.constants';
 import type {
+  AssignBibsDto,
   CreateTeamDto,
   GenerateFixturesDto,
   RegisterEntryDto,
@@ -339,6 +340,38 @@ export class CompetitionMeetsService {
     }
     await this.houses.getHouse(user, dto.houseId);
 
+    let members = dto.members ?? [];
+    if (!members.length && dto.memberKeys?.length) {
+      members = [];
+      for (let i = 0; i < dto.memberKeys.length; i++) {
+        const key = dto.memberKeys[i].trim();
+        if (!key) continue;
+        const student = await this.prisma.student.findFirst({
+          where: {
+            tenantId: user.tid,
+            deletedAt: null,
+            OR: [
+              { enrollmentNumber: { equals: key, mode: 'insensitive' } },
+              { admissionNumber: { equals: key, mode: 'insensitive' } },
+              { rollNumber: { equals: key, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!student) {
+          throw new BadRequestException(`Student not found: ${key}`);
+        }
+        members.push({
+          studentId: student.id,
+          role: i === 0 ? 'CAPTAIN' : 'MEMBER',
+          sequence: i + 1,
+        });
+      }
+    }
+    if (!members.length) {
+      throw new BadRequestException('members or memberKeys required');
+    }
+
     const team = await this.db().competitionTeam.create({
       data: {
         tenantId: user.tid,
@@ -348,7 +381,7 @@ export class CompetitionMeetsService {
       },
     });
 
-    for (const member of dto.members) {
+    for (const member of members) {
       await this.db().competitionTeamMember.create({
         data: {
           tenantId: user.tid,
@@ -392,6 +425,43 @@ export class CompetitionMeetsService {
     });
   }
 
+  listFixtures(user: JwtUser, eventId: string) {
+    return this.db().competitionFixture.findMany({
+      where: { tenantId: user.tid, eventId },
+      orderBy: [
+        { heatNumber: 'asc' },
+        { bracketSlot: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+  }
+
+  async assignBibs(user: JwtUser, eventId: string, dto: AssignBibsDto) {
+    this.requireManage(user);
+    await this.getEvent(user, eventId);
+    const entries = await this.db().competitionEntry.findMany({
+      where: { tenantId: user.tid, eventId, status: 'REGISTERED' },
+      orderBy: { registeredAt: 'asc' },
+    });
+    let next = dto.startFrom ?? 1;
+    const updated = [];
+    for (const entry of entries) {
+      if (entry.bibNumber && !dto.force) {
+        updated.push(entry);
+        continue;
+      }
+      const bib = String(next);
+      next += 1;
+      updated.push(
+        await this.db().competitionEntry.update({
+          where: { id: entry.id },
+          data: { bibNumber: bib },
+        }),
+      );
+    }
+    return { assigned: updated.length, entries: updated };
+  }
+
   async generateFixtures(
     user: JwtUser,
     eventId: string,
@@ -420,6 +490,12 @@ export class CompetitionMeetsService {
       let heat = 1;
       for (let i = 0; i < entries.length; i += heatSize) {
         const chunk = entries.slice(i, i + heatSize);
+        for (let lane = 0; lane < chunk.length; lane++) {
+          await this.db().competitionEntry.update({
+            where: { id: chunk[lane].id },
+            data: { lane: lane + 1 },
+          });
+        }
         fixtures.push(
           await this.db().competitionFixture.create({
             data: {

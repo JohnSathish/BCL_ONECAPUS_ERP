@@ -18,12 +18,15 @@ import {
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import {
+  AllocateByKeysDto,
   AllocateStudentsDto,
+  AssignBibsDto,
   AutoAllocateDto,
   BulkTransferDto,
   CreateTeamDto,
   GenerateFixturesDto,
   RegisterEntryDto,
+  TransferByKeyDto,
   TransferStudentDto,
   TransitionMeetStatusDto,
   UpsertCoordinatorDto,
@@ -95,6 +98,12 @@ export class CampusCompetitionsController {
   @RequirePermissions('campus-competitions:manage')
   createHouse(@CurrentUser() user: JwtUser, @Body() dto: UpsertHouseDto) {
     return this.houses.createHouse(user, dto);
+  }
+
+  @Post('houses/seed-defaults')
+  @RequirePermissions('campus-competitions:manage')
+  seedDefaultHouses(@CurrentUser() user: JwtUser) {
+    return this.houses.seedDefaultHouses(user);
   }
 
   @Get('houses/:id')
@@ -200,6 +209,15 @@ export class CampusCompetitionsController {
     return this.houses.importAllocations(user, body.rows ?? []);
   }
 
+  @Post('allocations/by-keys')
+  @RequireAnyPermission(
+    'campus-competitions:allocate',
+    'campus-competitions:manage',
+  )
+  allocateByKeys(@CurrentUser() user: JwtUser, @Body() dto: AllocateByKeysDto) {
+    return this.houses.allocateByKeys(user, dto);
+  }
+
   @Post('transfers')
   @RequireAnyPermission(
     'campus-competitions:allocate',
@@ -207,6 +225,15 @@ export class CampusCompetitionsController {
   )
   transfer(@CurrentUser() user: JwtUser, @Body() dto: TransferStudentDto) {
     return this.houses.transferStudent(user, dto);
+  }
+
+  @Post('transfers/by-key')
+  @RequireAnyPermission(
+    'campus-competitions:allocate',
+    'campus-competitions:manage',
+  )
+  transferByKey(@CurrentUser() user: JwtUser, @Body() dto: TransferByKeyDto) {
+    return this.houses.transferByKey(user, dto);
   }
 
   @Post('transfers/bulk')
@@ -497,6 +524,19 @@ export class CampusCompetitionsController {
     return this.meets.createTeam(user, dto);
   }
 
+  @Get('events/:eventId/fixtures')
+  @RequireAnyPermission(
+    'campus-competitions:read',
+    'campus-competitions:manage',
+    'campus-competitions:score',
+  )
+  listFixtures(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.meets.listFixtures(user, eventId);
+  }
+
   @Post('events/:eventId/fixtures')
   @RequirePermissions('campus-competitions:manage')
   generateFixtures(
@@ -505,6 +545,16 @@ export class CampusCompetitionsController {
     @Body() dto: GenerateFixturesDto,
   ) {
     return this.meets.generateFixtures(user, eventId, dto);
+  }
+
+  @Post('events/:eventId/assign-bibs')
+  @RequirePermissions('campus-competitions:manage')
+  assignBibs(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+    @Body() dto: AssignBibsDto,
+  ) {
+    return this.meets.assignBibs(user, eventId, dto ?? {});
   }
 
   @Get('events/:eventId/results')
