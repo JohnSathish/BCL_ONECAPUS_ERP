@@ -28,15 +28,16 @@ export class StudentProfileUpdatePolicyService {
   }
 
   async ensureDefaults(tenantId: string) {
-    const existing = await this.db().studentProfileUpdatePolicy.count({
-      where: {
-        tenantId,
-        NOT: { sectionKey: '__settings__' },
-      },
-    });
-    if (existing === 0) {
+    const existing = await this.fetchFieldPolicies(tenantId);
+    const existingKeys = new Set(
+      existing.map((r: any) => `${r.sectionKey}::${r.fieldKey}`),
+    );
+    const missing = DEFAULT_PROFILE_UPDATE_POLICIES.filter(
+      (row) => !existingKeys.has(`${row.sectionKey}::${row.fieldKey}`),
+    );
+    if (missing.length) {
       await this.db().studentProfileUpdatePolicy.createMany({
-        data: DEFAULT_PROFILE_UPDATE_POLICIES.map((row) => ({
+        data: missing.map((row) => ({
           tenantId,
           sectionKey: row.sectionKey,
           fieldKey: row.fieldKey,
@@ -47,8 +48,9 @@ export class StudentProfileUpdatePolicyService {
         })),
         skipDuplicates: true,
       });
+      return this.fetchFieldPolicies(tenantId);
     }
-    return this.fetchFieldPolicies(tenantId);
+    return existing;
   }
 
   async list(tenantId: string) {

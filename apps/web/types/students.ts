@@ -36,7 +36,8 @@ export type StudentDirectoryRow = {
   rfidNumber?: string | null;
   fullName: string;
   displayFullName?: string;
-  email: string;
+  email: string | null;
+  loginEmail?: string | null;
   mobileNumber?: string | null;
   abcId?: string | null;
   programVersionId?: string | null;

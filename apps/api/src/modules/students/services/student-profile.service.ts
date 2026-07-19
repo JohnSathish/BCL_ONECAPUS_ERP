@@ -10,7 +10,7 @@ import { StudentProfileSectionsService } from './student-profile-sections.servic
 import { StudentDirectoryEnrichmentService } from './student-directory-enrichment.service';
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import type { UpdateStudentProfileDto } from '../dto/students.dto';
-import { isSyntheticStudentEmail } from '../student-credentials.util';
+import { resolveStudentContactEmail } from '../student-credentials.util';
 
 const profileInclude = {
   masterProfile: true,
@@ -190,16 +190,10 @@ export class StudentProfileService {
       nationalId: student.masterProfile?.nationalId,
       maritalStatus: student.masterProfile?.maritalStatus,
       studentStatus: student.masterProfile?.studentStatus ?? 'STUDYING',
-      email: (() => {
-        const profileEmail = student.masterProfile?.email?.trim();
-        if (profileEmail && !isSyntheticStudentEmail(profileEmail)) {
-          return profileEmail;
-        }
-        const loginEmail = student.user.email?.trim();
-        return loginEmail && !isSyntheticStudentEmail(loginEmail)
-          ? loginEmail
-          : (profileEmail ?? null);
-      })(),
+      email: resolveStudentContactEmail(
+        student.masterProfile?.email,
+        student.user.email,
+      ),
       departmentId: student.departmentId ?? student.department?.id ?? null,
       departmentName: student.department?.name ?? null,
       bloodGroupLookupId: student.masterProfile?.bloodGroupLookupId,
@@ -299,6 +293,7 @@ export class StudentProfileService {
       masterProfile: {
         fullName: string;
         mobileNumber: string | null;
+        email?: string | null;
         admissionStatus: string;
         photoPath?: string | null;
         studentStatus?: string;
@@ -351,7 +346,11 @@ export class StudentProfileService {
       rfidNumber: student.rfidNumber ?? null,
       abcId: student.abcAccount?.abcId ?? null,
       fullName: student.masterProfile?.fullName ?? student.user.email,
-      email: student.user.email,
+      email: resolveStudentContactEmail(
+        student.masterProfile?.email,
+        student.user.email,
+      ),
+      loginEmail: student.user.email,
       mobileNumber: student.masterProfile?.mobileNumber,
       programme: student.programVersion?.program.name,
       programmeCode: student.programVersion?.program.code,

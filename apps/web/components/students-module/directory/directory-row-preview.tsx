@@ -100,8 +100,8 @@ export function DirectoryRowPreview({ row, expanded }: Props) {
         </h4>
         <dl className="space-y-1">
           <InfoRow label="Aadhaar" value={profile.data?.nationalId ?? '—'} />
-          <InfoRow label="Email" value={row.email} />
-          <InfoRow label="Mobile" value={row.mobileNumber} />
+          <InfoRow label="Email" value={profile.data?.email ?? row.email} />
+          <InfoRow label="Mobile" value={profile.data?.mobileNumber ?? row.mobileNumber} />
           <InfoRow
             label="Guardian"
             value={

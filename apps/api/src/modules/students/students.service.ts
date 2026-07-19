@@ -517,6 +517,11 @@ export class StudentsService {
           },
           {
             masterProfile: {
+              email: { contains: searchTerm, mode: 'insensitive' },
+            },
+          },
+          {
+            masterProfile: {
               fullName: { contains: searchTerm, mode: 'insensitive' },
             },
           },
@@ -736,7 +741,7 @@ export class StudentsService {
           row.enrollmentNumber,
           row.rollNumber ?? '',
           row.fullName,
-          row.email,
+          row.email ?? '',
           row.mobileNumber ?? '',
           row.programme ?? '',
           row.semester,

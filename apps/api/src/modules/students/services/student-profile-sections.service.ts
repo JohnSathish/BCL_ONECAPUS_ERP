@@ -30,7 +30,10 @@ import type {
 import { AcademicChangeHistoryService } from '../academic-change-history/academic-change-history.service';
 import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
 import { Class12SubjectsService } from './class12-subjects.service';
-import { isSyntheticStudentEmail } from '../student-credentials.util';
+import {
+  isSyntheticStudentEmail,
+  resolveStudentContactEmail,
+} from '../student-credentials.util';
 
 const extendedProfileInclude = {
   masterProfile: true,
@@ -326,16 +329,10 @@ export class StudentProfileSectionsService {
           universityRegistrationNumber: student.universityRegistrationNumber,
           rollNumber: student.rollNumber,
           fullName: student.masterProfile?.fullName,
-          email: (() => {
-            const profileEmail = student.masterProfile?.email?.trim();
-            if (profileEmail && !isSyntheticStudentEmail(profileEmail)) {
-              return profileEmail;
-            }
-            const loginEmail = student.user.email?.trim();
-            return loginEmail && !isSyntheticStudentEmail(loginEmail)
-              ? loginEmail
-              : profileEmail || null;
-          })(),
+          email: resolveStudentContactEmail(
+            student.masterProfile?.email,
+            student.user.email,
+          ),
           mobileNumber: student.masterProfile?.mobileNumber,
           dateOfBirth: student.masterProfile?.dateOfBirth,
           gender: student.masterProfile?.gender,

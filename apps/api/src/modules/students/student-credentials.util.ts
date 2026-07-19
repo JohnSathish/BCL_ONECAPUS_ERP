@@ -16,6 +16,25 @@ export function isSyntheticStudentEmail(
   return Boolean(email?.trim().toLowerCase().endsWith('@students.local'));
 }
 
+/**
+ * Canonical contact email for display across mobile, admin profile, and directory.
+ * Prefer StudentProfile.email; fall back to User.email (login) when profile is empty/synthetic.
+ */
+export function resolveStudentContactEmail(
+  profileEmail: string | null | undefined,
+  loginEmail: string | null | undefined,
+): string | null {
+  const profile = profileEmail?.trim() || null;
+  if (profile && !isSyntheticStudentEmail(profile)) {
+    return profile;
+  }
+  const login = loginEmail?.trim() || null;
+  if (login && !isSyntheticStudentEmail(login)) {
+    return login;
+  }
+  return profile ?? login;
+}
+
 /** Compact roll/enrollment for tolerant matching (BA25-888 ≈ BA25888 ≈ ba25_888). */
 export function compactStudentId(value: string | null | undefined): string {
   return (value ?? '')

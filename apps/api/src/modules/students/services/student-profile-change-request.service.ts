@@ -13,6 +13,7 @@ import {
   PROFILE_COMPLETION_CHECKS,
   STUDENT_EDITABLE_SECTIONS,
 } from '../domain/profile-update-policy.defaults';
+import { isSyntheticStudentEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
 
@@ -982,6 +983,9 @@ export class StudentProfileChangeRequestService {
           where: { studentId },
           data: data as any,
         });
+        if (field === 'email' && typeof data.email === 'string' && data.email) {
+          await this.softSyncLoginEmail(tenantId, studentId, data.email);
+        }
       }
     } else if (
       section === 'bank' &&
@@ -1236,5 +1240,51 @@ export class StudentProfileChangeRequestService {
       };
     }
     return { title: 'Profile Completion', rows: dash.students };
+  }
+
+  /**
+   * Best-effort login sync after personal email apply.
+   * Never fails the profile write — contact email on StudentProfile is canonical.
+   * Skips when the address is already used by another account.
+   */
+  private async softSyncLoginEmail(
+    tenantId: string,
+    studentId: string,
+    contactEmail: string,
+  ) {
+    const normalized = contactEmail.trim().toLowerCase();
+    if (!normalized || isSyntheticStudentEmail(normalized)) return;
+
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId, deletedAt: null },
+      select: {
+        userId: true,
+        user: { select: { id: true, email: true } },
+      },
+    });
+    if (!student?.user) return;
+
+    const currentLogin = student.user.email.trim().toLowerCase();
+    if (currentLogin === normalized) return;
+
+    const taken = await this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        email: { equals: normalized, mode: 'insensitive' },
+        deletedAt: null,
+        NOT: { id: student.userId },
+      },
+      select: { id: true },
+    });
+    if (taken) return;
+
+    try {
+      await this.prisma.user.update({
+        where: { id: student.userId },
+        data: { email: normalized },
+      });
+    } catch {
+      // Unique race or other constraint — leave login as-is.
+    }
   }
 }

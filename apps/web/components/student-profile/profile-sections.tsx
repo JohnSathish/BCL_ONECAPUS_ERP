@@ -175,7 +175,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
             ['Admission Number', 'admissionNumber'],
             ['Enrollment / Admission No.', 'enrollmentNumber'],
             ['Full Name', 'fullName'],
-            ['Email', 'email'],
+            ['Personal email', 'email'],
             ['Mobile', 'mobileNumber'],
             ['Date of Birth', 'dateOfBirth'],
             ['Gender', 'gender'],
