@@ -59,6 +59,9 @@ export type FeeReceiptHtmlInput = {
   transactionRef: string;
   utrNumber?: string | null;
   collectedBy: string;
+  /** Authorized fee collection center (Net Café / CSC) when paid via center portal. */
+  collectionCenterName?: string | null;
+  operatorName?: string | null;
   verifyUrl: string;
 };
 
@@ -637,6 +640,16 @@ function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
           ${data.utrNumber ? `<div class="kv"><span class="k">UTR</span><span class="v">${escapeHtml(data.utrNumber)}</span></div>` : ''}
           <div class="kv"><span class="k">Payment Date</span><span class="v">${formatReceiptDateTime(paidAt)}</span></div>
           <div class="kv"><span class="k">Collected By</span><span class="v">${escapeHtml(data.collectedBy)}</span></div>
+          ${
+            data.operatorName
+              ? `<div class="kv"><span class="k">Operator</span><span class="v">${escapeHtml(data.operatorName)}</span></div>`
+              : ''
+          }
+          ${
+            data.collectionCenterName
+              ? `<div class="kv"><span class="k">Net Café</span><span class="v">${escapeHtml(data.collectionCenterName)}</span></div>`
+              : ''
+          }
           <div class="kv"><span class="k">Status</span><span class="v ${statusClass}">${escapeHtml(data.paymentStatus)}</span></div>
         </div>
       </div>
@@ -1065,6 +1078,16 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
             ${data.utrNumber ? `<p class="field"><strong>UTR No.:</strong> <span>${escapeHtml(data.utrNumber)}</span></p>` : ''}
             <p class="field"><strong>Payment Date/Time:</strong> <span>${paidAtText}</span></p>
             <p class="field"><strong>Collected By:</strong> <span>${escapeHtml(data.collectedBy)}</span></p>
+            ${
+              data.operatorName
+                ? `<p class="field"><strong>Operator:</strong> <span>${escapeHtml(data.operatorName)}</span></p>`
+                : ''
+            }
+            ${
+              data.collectionCenterName
+                ? `<p class="field"><strong>Net Café:</strong> <span>${escapeHtml(data.collectionCenterName)}</span></p>`
+                : ''
+            }
             <p class="field"><strong>Payment Status:</strong> <span class="${statusClass}">${escapeHtml(data.paymentStatus)}</span></p>
           </div>
         </div>

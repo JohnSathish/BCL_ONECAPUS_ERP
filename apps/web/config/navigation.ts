@@ -1239,6 +1239,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['fees:manage', 'fees:read', 'fees:cash:collect'],
           },
           {
+            label: 'Authorized Collection Centers',
+            href: '/admin/fees/collection-centers',
+            permissions: ['fees:manage', 'fees:read'],
+          },
+          {
             label: 'Finance Setup Center',
             href: '/admin/fees/collections',
             permissions: ['fees:manage', 'fees:read'],

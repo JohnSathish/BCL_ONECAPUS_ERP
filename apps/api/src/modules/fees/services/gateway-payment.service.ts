@@ -71,7 +71,12 @@ export class GatewayPaymentService {
         status: 'INITIATED',
         amount: dto.amount,
         unallocatedAmount: dto.amount,
-        metadata: { demandIds: dto.demandIds ?? [], channel: 'STUDENT_PORTAL' },
+        collectedById: user.sub,
+        metadata: {
+          demandIds: dto.demandIds ?? [],
+          channel: dto.channel ?? 'STUDENT_PORTAL',
+          ...(dto.metadata ?? {}),
+        },
       },
     });
 
@@ -82,8 +87,18 @@ export class GatewayPaymentService {
       notes: { studentId: dto.studentId, paymentId: payment.id },
     });
 
-    const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
-    const returnUrl = `${webOrigin}/student/fees?atomReturn=1&paymentId=${payment.id}`;
+    const webOrigin =
+      dto.channel === 'CENTER_PORTAL'
+        ? (process.env.PAY_PORTAL_ORIGIN ??
+          process.env.WEB_ORIGIN ??
+          'http://localhost:3000')
+        : (process.env.WEB_ORIGIN ?? 'http://localhost:3000');
+    const returnPath = dto.returnPath?.startsWith('/')
+      ? dto.returnPath
+      : dto.channel === 'CENTER_PORTAL'
+        ? '/fee-collection-portal/pay/return'
+        : '/student/fees';
+    const returnUrl = `${webOrigin}${returnPath}${returnPath.includes('?') ? '&' : '?'}atomReturn=1&paymentId=${payment.id}`;
 
     if (
       checkout.mode !== 'SAFE_MOCK' &&
@@ -1132,13 +1147,13 @@ export class GatewayPaymentService {
 
     void this.queue.enqueueFeeReceiptPdf({ tenantId, receiptId: receipt.id });
 
+    const paymentMeta = (payment.metadata ?? {}) as Record<string, unknown>;
+    const notifyChannels: Array<'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH'> =
+      paymentMeta.collectedVia === 'CENTER_PORTAL'
+        ? ['EMAIL', 'SMS', 'IN_APP', 'PUSH']
+        : ['EMAIL', 'IN_APP', 'PUSH'];
     void this.receiptNotify
-      .sendReceipt(
-        tenantId,
-        receipt.id,
-        ['EMAIL', 'IN_APP', 'PUSH'],
-        collectedById,
-      )
+      .sendReceipt(tenantId, receipt.id, notifyChannels, collectedById)
       .catch(() => undefined);
 
     await this.confirmShortTermEnrollments(

@@ -303,6 +303,19 @@ export class GatewayPaymentDto {
     'CCAVENUE',
   ])
   provider?: string;
+
+  /** Optional channel tag (STUDENT_PORTAL | CENTER_PORTAL | DESK). */
+  @IsOptional()
+  @IsString()
+  channel?: string;
+
+  /** Optional post-payment return path on the web origin. */
+  @IsOptional()
+  @IsString()
+  returnPath?: string;
+
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 }
 
 export class ConcessionDto {

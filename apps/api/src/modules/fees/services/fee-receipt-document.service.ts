@@ -263,6 +263,9 @@ export class FeeReceiptDocumentService {
       utrNumber,
       collectedBy:
         collector?.displayName ?? collector?.email ?? 'Finance Office',
+      collectionCenterName:
+        (paymentMeta.collectionCenterName as string) ?? null,
+      operatorName: (paymentMeta.operatorName as string) ?? null,
       verifyUrl,
     };
   }

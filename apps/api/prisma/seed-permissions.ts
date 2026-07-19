@@ -253,6 +253,18 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Manage fee structures and payments',
   },
   {
+    slug: 'fees:collection-center:self',
+    resource: 'fees',
+    action: 'collection-center:self',
+    description: 'Access own fee collection center portal',
+  },
+  {
+    slug: 'fees:collection-center:pay',
+    resource: 'fees',
+    action: 'collection-center:pay',
+    description: 'Collect student fees via authorized center portal',
+  },
+  {
     slug: 'fees:cash:collect',
     resource: 'fees',
     action: 'cash:collect',

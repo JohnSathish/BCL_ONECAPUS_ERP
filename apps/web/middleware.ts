@@ -23,6 +23,10 @@ function isAlumniHost(host: string) {
   return hostname(host).startsWith('alumni.');
 }
 
+function isPayHost(host: string) {
+  return hostname(host).startsWith('pay.');
+}
+
 function handleCareerHost(request: NextRequest) {
   return handleSubdomainRewrite(request, '/careers-portal', '/careers-portal', [
     '/admin',
@@ -221,6 +225,72 @@ function handleLibraryHost(request: NextRequest) {
   ]);
 }
 
+function handlePayHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const portalPath = '/fee-collection-portal';
+  const loginPath = '/fee-collection-portal/login';
+
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/uploads') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  const refreshCookie = request.cookies.get('nep_refresh')?.value;
+  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
+  const isPublic =
+    pathname === '/fee-collection-portal/register' ||
+    pathname.startsWith('/fee-collection-portal/register/') ||
+    pathname === '/fee-collection-portal/verify' ||
+    pathname.startsWith('/fee-collection-portal/verify/') ||
+    pathname === '/register' ||
+    pathname.startsWith('/register/') ||
+    pathname === '/verify' ||
+    pathname.startsWith('/verify/');
+  const isLogin =
+    pathname === '/login' || pathname === loginPath || pathname.startsWith(`${loginPath}/`);
+
+  if (!hasRefreshCookie && !isPublic && !isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = loginPath;
+    return NextResponse.redirect(url);
+  }
+
+  if (hasRefreshCookie && isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = portalPath;
+    return NextResponse.redirect(url);
+  }
+
+  if (pathname === '/register' || pathname.startsWith('/register/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/register/, `${portalPath}/register`);
+    return NextResponse.rewrite(url);
+  }
+
+  if (pathname === '/verify' || pathname.startsWith('/verify/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/verify/, `${portalPath}/verify`);
+    return NextResponse.rewrite(url);
+  }
+
+  return handleSubdomainRewrite(request, portalPath, loginPath, [
+    '/admin',
+    '/student',
+    '/staff',
+    '/parent',
+    '/shift',
+    '/library-desk',
+    '/admissions-portal',
+    '/careers-portal',
+    '/alumni-portal',
+    '/journals-portal',
+  ]);
+}
+
 function handleSubdomainRewrite(
   request: NextRequest,
   basePath: string,
@@ -278,6 +348,10 @@ export async function middleware(request: NextRequest) {
 
   if (isLibraryHost(host)) {
     return handleLibraryHost(request);
+  }
+
+  if (isPayHost(host)) {
+    return handlePayHost(request);
   }
 
   if (isJournalHost(host)) {

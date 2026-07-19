@@ -40,6 +40,8 @@ export const STUDENT_PORTAL_ROLES = new Set(['student']);
 
 export const LIBRARY_DESK_ROLES = new Set(['library-operator']);
 
+export const FEE_COLLECTION_CENTER_ROLES = new Set(['fee-collection-center']);
+
 export const PRINCIPAL_DESK_ROLES = new Set(['principal', 'vice-principal', 'erp-administrator']);
 
 export const APPLICANT_PORTAL_ROLES = new Set(['applicant']);
@@ -52,6 +54,14 @@ export function canAccessApplicantPortal(roles: string[], permissions: string[] 
 export function canAccessLibraryDesk(roles: string[], permissions: string[] = []) {
   if (roles.some((r) => LIBRARY_DESK_ROLES.has(r))) return true;
   return permissions.includes('library:access-desk');
+}
+
+export function canAccessFeeCollectionPortal(roles: string[], permissions: string[] = []) {
+  if (roles.some((r) => FEE_COLLECTION_CENTER_ROLES.has(r))) return true;
+  return (
+    permissions.includes('fees:collection-center:self') ||
+    permissions.includes('fees:collection-center:pay')
+  );
 }
 
 export function canAccessPrincipalDesk(roles: string[], permissions: string[] = []) {
@@ -105,6 +115,12 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
   ) {
     return '/platform';
   }
+  if (
+    canAccessFeeCollectionPortal(roles, permissions) &&
+    !canAccessAdminPortal(roles, permissions)
+  ) {
+    return '/fee-collection-portal';
+  }
   if (canAccessLibraryDesk(roles, permissions) && !canAccessAdminPortal(roles, permissions)) {
     return '/library-desk';
   }
@@ -150,6 +166,11 @@ export function canAccessPath(roles: string[], path: string, permissions: string
   if (path.startsWith('/library-desk')) {
     return canAccessLibraryDesk(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
+  if (path.startsWith('/fee-collection-portal')) {
+    return (
+      canAccessFeeCollectionPortal(roles, permissions) || canAccessAdminPortal(roles, permissions)
+    );
+  }
   if (path.startsWith('/principal-desk')) {
     return canAccessPrincipalDesk(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
@@ -167,6 +188,9 @@ export function canAccessPath(roles: string[], path: string, permissions: string
     '/request-demo',
     '/careers-portal',
     '/kiosk',
+    '/fee-collection-portal/register',
+    '/fee-collection-portal/verify',
+    '/fee-collection-portal/login',
   ];
   return publicPrefixes.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`),

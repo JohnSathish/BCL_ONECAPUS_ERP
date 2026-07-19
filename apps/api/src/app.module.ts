@@ -54,6 +54,7 @@ import { StudentAttendanceModule } from './modules/student-attendance/student-at
 import { InfrastructureModule } from './modules/infrastructure/infrastructure.module';
 import { TimetableEngineModule } from './modules/timetable-engine/timetable-engine.module';
 import { FeesModule } from './modules/fees/fees.module';
+import { FeeCollectionCentersModule } from './modules/fee-collection-centers/fee-collection-center.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { ExaminationsModule } from './modules/examinations/examinations.module';
@@ -149,6 +150,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     StudentAttendanceModule,
     InfrastructureModule,
     FeesModule,
+    FeeCollectionCentersModule,
     PaymentGatewayModule,
     AccountingModule,
     ExaminationsModule,

@@ -38,6 +38,8 @@ export const STUDENT_PORTAL_ROLES = new Set(['student']);
 
 export const LIBRARY_DESK_ROLES = new Set(['library-operator']);
 
+export const FEE_COLLECTION_CENTER_ROLES = new Set(['fee-collection-center']);
+
 export const PRINCIPAL_DESK_ROLES = new Set([
   'principal',
   'vice-principal',
@@ -57,6 +59,17 @@ export function canAccessLibraryDesk(
 ) {
   if (roles.some((role) => LIBRARY_DESK_ROLES.has(role))) return true;
   return permissions.includes('library:access-desk');
+}
+
+export function canAccessFeeCollectionPortal(
+  roles: string[],
+  permissions: string[] = [],
+) {
+  if (roles.some((role) => FEE_COLLECTION_CENTER_ROLES.has(role))) return true;
+  return (
+    permissions.includes('fees:collection-center:self') ||
+    permissions.includes('fees:collection-center:pay')
+  );
 }
 
 export function canAccessPrincipalDesk(
@@ -127,6 +140,12 @@ export function resolveHomePath(roles: string[], permissions: string[] = []) {
     return '/platform';
   }
   if (
+    canAccessFeeCollectionPortal(roles, permissions) &&
+    !canAccessAdminPortal(roles, permissions)
+  ) {
+    return '/fee-collection-portal';
+  }
+  if (
     canAccessLibraryDesk(roles, permissions) &&
     !canAccessAdminPortal(roles, permissions)
   ) {
@@ -189,6 +208,12 @@ export function canAccessPath(
       canAccessAdminPortal(roles, permissions)
     );
   }
+  if (path.startsWith('/fee-collection-portal')) {
+    return (
+      canAccessFeeCollectionPortal(roles, permissions) ||
+      canAccessAdminPortal(roles, permissions)
+    );
+  }
   if (path.startsWith('/principal-desk')) {
     return (
       canAccessPrincipalDesk(roles, permissions) ||
@@ -211,6 +236,9 @@ export function canAccessPath(
     '/request-demo',
     '/careers-portal',
     '/kiosk',
+    '/fee-collection-portal/register',
+    '/fee-collection-portal/verify',
+    '/fee-collection-portal/login',
   ];
   return publicPrefixes.some(
     (prefix) =>

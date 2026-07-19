@@ -7254,6 +7254,103 @@ model FeeReceipt {
   @@schema("finance")
 }
 
+/// Authorized Net Café / CSC fee collection center (external portal operators).
+model FeeCollectionCenter {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  businessName         String    @map("business_name")
+  ownerName            String    @map("owner_name")
+  gstNumber            String?   @map("gst_number")
+  panNumber            String?   @map("pan_number")
+  aadhaarNumber        String?   @map("aadhaar_number")
+  mobileNumber         String    @map("mobile_number")
+  email                String
+  addressLine          String    @map("address_line")
+  district             String
+  state                String
+  pincode              String
+  /// PENDING_APPROVAL | APPROVED | REJECTED | SUSPENDED | BLOCKED
+  status               String    @default("PENDING_APPROVAL")
+  emailVerifiedAt      DateTime? @map("email_verified_at")
+  mobileVerifiedAt     DateTime? @map("mobile_verified_at")
+  emailVerifyTokenHash String?   @map("email_verify_token_hash")
+  otpHash              String?   @map("otp_hash")
+  otpExpiresAt         DateTime? @map("otp_expires_at")
+  rejectedReason       String?   @map("rejected_reason")
+  approvedAt           DateTime? @map("approved_at")
+  approvedById         String?   @map("approved_by_id") @db.Uuid
+  suspendedAt          DateTime? @map("suspended_at")
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  operators FeeCollectionCenterOperator[]
+  documents FeeCollectionCenterDocument[]
+  audits    FeeCollectionCenterAuditLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, email])
+  @@map("fee_collection_centers")
+  @@schema("finance")
+}
+
+model FeeCollectionCenterOperator {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  centerId     String    @map("center_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  displayName  String    @map("display_name")
+  isPrimary    Boolean   @default(true) @map("is_primary")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  center FeeCollectionCenter @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, centerId])
+  @@map("fee_collection_center_operators")
+  @@schema("finance")
+}
+
+model FeeCollectionCenterDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  centerId     String   @map("center_id") @db.Uuid
+  /// SHOP_PHOTO | GOVT_ID | TRADE_LICENSE
+  documentType String   @map("document_type")
+  fileName     String   @map("file_name")
+  storagePath  String   @map("storage_path")
+  mimeType     String?  @map("mime_type")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  center FeeCollectionCenter @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, centerId])
+  @@map("fee_collection_center_documents")
+  @@schema("finance")
+}
+
+model FeeCollectionCenterAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  centerId  String?  @map("center_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  details   Json     @default("{}")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  center FeeCollectionCenter? @relation(fields: [centerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, centerId, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@map("fee_collection_center_audit_logs")
+  @@schema("finance")
+}
+
 /// NEHU Semester Examination Fee — session window (Odd/Even cycle).
 model ExamFeeSession {
   id                   String    @id @default(uuid()) @db.Uuid

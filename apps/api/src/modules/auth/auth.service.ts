@@ -135,6 +135,29 @@ export class AuthService {
     return ageMs > passwordExpiryDays * 24 * 60 * 60 * 1000;
   }
 
+  /** Fee collection centers may only sign in when APPROVED + email verified. */
+  private async assertFeeCollectionCenterLogin(
+    tenantId: string,
+    userId: string,
+  ) {
+    const db = this.prisma as unknown as Record<string, any>;
+    const op = await db.feeCollectionCenterOperator.findFirst({
+      where: { tenantId, userId, deletedAt: null },
+      include: { center: true },
+    });
+    if (!op?.center || op.center.deletedAt) {
+      throw new ForbiddenException('Not a fee collection center operator.');
+    }
+    if (op.center.status !== 'APPROVED') {
+      throw new ForbiddenException(
+        `Center status is ${op.center.status}. Login is allowed only after college approval.`,
+      );
+    }
+    if (!op.center.emailVerifiedAt) {
+      throw new ForbiddenException('Verify your email before login.');
+    }
+  }
+
   private async recordLoginEvent(input: {
     tenantId: string;
     userId?: string | null;
@@ -889,6 +912,11 @@ export class AuthService {
           ? 'Your account has been restricted. Please contact your college administrator for help.'
           : 'Your account is not active yet. Please contact your college administrator.',
       );
+    }
+
+    const roleSlugsEarly = user.roles.map((r) => r.role.slug);
+    if (roleSlugsEarly.includes('fee-collection-center')) {
+      await this.assertFeeCollectionCenterLogin(tenant.id, user.id);
     }
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, normalizedEmail);
