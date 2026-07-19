@@ -31,7 +31,7 @@ import { AcademicChangeHistoryService } from '../academic-change-history/academi
 import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
 import { Class12SubjectsService } from './class12-subjects.service';
 import {
-  isSyntheticStudentEmail,
+  isTemporaryStudentLoginEmail,
   resolveStudentContactEmail,
 } from '../student-credentials.util';
 
@@ -564,7 +564,8 @@ export class StudentProfileSectionsService {
         ? undefined
         : (() => {
             const normalized = dto.email.trim().toLowerCase();
-            if (!normalized || isSyntheticStudentEmail(normalized)) return null;
+            if (!normalized || isTemporaryStudentLoginEmail(normalized))
+              return null;
             return normalized;
           })();
 
@@ -737,8 +738,9 @@ export class StudentProfileSectionsService {
 
   /**
    * Contact email lives on StudentProfile. Login identity (User.email) is updated
-   * only when the address is free — otherwise roll/synthetic login is preserved
-   * so profile saves do not fail with a generic unique-constraint 500.
+   * when the address is free. Temporary college logins (@students.local /
+   * @student.*) are always replaceable; permanent logins are protected if the
+   * new address is already taken.
    */
   private async syncStudentLoginEmail(
     tx: Prisma.TransactionClient,
@@ -747,6 +749,7 @@ export class StudentProfileSectionsService {
     contactEmail: string | null,
   ) {
     if (!contactEmail) return;
+    if (isTemporaryStudentLoginEmail(contactEmail)) return;
 
     const student = await tx.student.findUnique({
       where: { id: studentId },
@@ -758,12 +761,13 @@ export class StudentProfileSectionsService {
     if (!student?.user) return;
 
     const currentLogin = student.user.email.trim().toLowerCase();
-    if (currentLogin === contactEmail) return;
+    const nextLogin = contactEmail.trim().toLowerCase();
+    if (currentLogin === nextLogin) return;
 
     const taken = await tx.user.findFirst({
       where: {
         tenantId,
-        email: { equals: contactEmail, mode: 'insensitive' },
+        email: { equals: nextLogin, mode: 'insensitive' },
         deletedAt: null,
         NOT: { id: student.userId },
       },
@@ -771,8 +775,8 @@ export class StudentProfileSectionsService {
     });
 
     if (taken) {
-      // Keep existing login (often @students.local). Contact email still saves on profile.
-      if (!isSyntheticStudentEmail(currentLogin)) {
+      // Keep temporary login; contact email still saves on profile.
+      if (!isTemporaryStudentLoginEmail(currentLogin)) {
         throw new ConflictException(
           'This email is already used by another account. Update was blocked to protect the existing login email.',
         );
@@ -783,14 +787,14 @@ export class StudentProfileSectionsService {
     try {
       await tx.user.update({
         where: { id: student.userId },
-        data: { email: contactEmail },
+        data: { email: nextLogin },
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        if (!isSyntheticStudentEmail(currentLogin)) {
+        if (!isTemporaryStudentLoginEmail(currentLogin)) {
           throw new ConflictException(
             'This email is already used by another account.',
           );

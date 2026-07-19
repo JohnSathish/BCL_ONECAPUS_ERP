@@ -13,7 +13,7 @@ import {
   PROFILE_COMPLETION_CHECKS,
   STUDENT_EDITABLE_SECTIONS,
 } from '../domain/profile-update-policy.defaults';
-import { isSyntheticStudentEmail } from '../student-credentials.util';
+import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
 
@@ -1243,8 +1243,8 @@ export class StudentProfileChangeRequestService {
   }
 
   /**
-   * Best-effort login sync after personal email apply.
-   * Never fails the profile write — contact email on StudentProfile is canonical.
+   * Promote personal email to login when the college login was temporary
+   * (@students.local / @student.*). Never fails the profile write.
    * Skips when the address is already used by another account.
    */
   private async softSyncLoginEmail(
@@ -1253,7 +1253,7 @@ export class StudentProfileChangeRequestService {
     contactEmail: string,
   ) {
     const normalized = contactEmail.trim().toLowerCase();
-    if (!normalized || isSyntheticStudentEmail(normalized)) return;
+    if (!normalized || isTemporaryStudentLoginEmail(normalized)) return;
 
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },

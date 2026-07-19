@@ -274,7 +274,7 @@ export default function CompleteProfileScreen() {
         },
       ]);
       setMessage(
-        'Personal details submitted. Auto-approve fields apply immediately; Aadhaar awaits office verification.',
+        'Personal details saved. Your email can be used for login (along with roll number). Aadhaar still awaits office verification.',
       );
       await refresh();
     } catch (e) {

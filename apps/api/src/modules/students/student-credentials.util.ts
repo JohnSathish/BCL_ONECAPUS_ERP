@@ -17,19 +17,36 @@ export function isSyntheticStudentEmail(
 }
 
 /**
+ * College-provisioned temporary student login addresses that should be replaced
+ * when the student adds a real personal email.
+ * Examples: user@students.local, ba25895@student.donboscocollege.ac.in
+ */
+export function isTemporaryStudentLoginEmail(
+  email: string | null | undefined,
+): boolean {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized.endsWith('@students.local')) return true;
+  const at = normalized.indexOf('@');
+  if (at < 0) return false;
+  const domain = normalized.slice(at + 1);
+  return domain === 'student' || domain.startsWith('student.');
+}
+
+/**
  * Canonical contact email for display across mobile, admin profile, and directory.
- * Prefer StudentProfile.email; fall back to User.email (login) when profile is empty/synthetic.
+ * Prefer StudentProfile.email; fall back to User.email (login) when profile is empty/temp.
  */
 export function resolveStudentContactEmail(
   profileEmail: string | null | undefined,
   loginEmail: string | null | undefined,
 ): string | null {
   const profile = profileEmail?.trim() || null;
-  if (profile && !isSyntheticStudentEmail(profile)) {
+  if (profile && !isTemporaryStudentLoginEmail(profile)) {
     return profile;
   }
   const login = loginEmail?.trim() || null;
-  if (login && !isSyntheticStudentEmail(login)) {
+  if (login && !isTemporaryStudentLoginEmail(login)) {
     return login;
   }
   return profile ?? login;

@@ -626,15 +626,42 @@ export class AuthService {
 
     const trimmed = loginId.trim();
     if (trimmed.includes('@')) {
-      return this.prisma.user.findFirst({
+      const email = trimmed.toLowerCase();
+      const byUserEmail = await this.prisma.user.findFirst({
         where: {
           tenantId,
-          email: trimmed.toLowerCase(),
+          email,
           deletedAt: null,
           isActive: true,
         },
         include,
       });
+      if (byUserEmail) return byUserEmail;
+
+      // Personal email on StudentProfile (after Complete Profile) — even if
+      // User.email is still a temporary @student.* college address.
+      const byProfileEmail = await this.prisma.student.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          masterProfile: {
+            email: { equals: email, mode: 'insensitive' },
+          },
+        },
+        select: { userId: true },
+      });
+      if (byProfileEmail?.userId) {
+        return this.prisma.user.findFirst({
+          where: {
+            id: byProfileEmail.userId,
+            tenantId,
+            deletedAt: null,
+            isActive: true,
+          },
+          include,
+        });
+      }
+      return null;
     }
 
     const key = trimmed.toUpperCase();
