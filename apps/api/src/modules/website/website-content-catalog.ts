@@ -160,7 +160,6 @@ export const FOOTER_MENU_CATALOG: CatalogMenuNode[] = [
   { label: 'Research', url: '/research/cell' },
   { label: 'IQAC', url: '/iqac' },
   { label: 'NAAC', url: '/naac' },
-  { label: 'Online Admission', url: '/admission/apply' },
   { label: 'Notice Board', url: '/news' },
   { label: 'Downloads', url: '/downloads' },
   { label: 'Contact Us', url: '/contact' },

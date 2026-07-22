@@ -12,6 +12,17 @@ type Props = {
   footer?: HomepageFooterContent;
 };
 
+function uniqueLinks(links: Array<{ label: string; href: string }>) {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = `${link.href}::${link.label}`;
+    if (seen.has(key) || seen.has(link.href)) return false;
+    seen.add(key);
+    seen.add(link.href);
+    return true;
+  });
+}
+
 function Multiline({ value }: { value: string }) {
   return value.split(/\n+/).map((line) => (
     <span key={line}>
@@ -24,10 +35,11 @@ function Multiline({ value }: { value: string }) {
 export async function SiteFooter({ footer }: Props) {
   const content = footer ?? seedHomepageCmsContent.footer;
   const cmsFooterNav = await getFooterNavigation();
-  const exploreLinks =
+  const exploreLinks = uniqueLinks(
     cmsFooterNav.length > 0
       ? cmsFooterNav.map((item) => ({ label: item.label, href: item.href }))
-      : content.exploreLinks;
+      : content.exploreLinks,
+  );
 
   const brandTagline = content.brandTagline ?? 'Igniting minds, shaping futures';
   const collegeName = content.collegeName ?? 'Don Bosco College, Tura';
@@ -162,7 +174,7 @@ export async function SiteFooter({ footer }: Props) {
         <div className="footer-nav-col">
           <h3>Explore</h3>
           {exploreLinks.map((link) => (
-            <Link key={link.href} href={link.href}>
+            <Link key={`${link.label}:${link.href}`} href={link.href}>
               {link.label}
             </Link>
           ))}
@@ -171,7 +183,7 @@ export async function SiteFooter({ footer }: Props) {
         <div className="footer-quick-links">
           <h3>Quick links</h3>
           {quickLinks.map((link) => (
-            <Link key={link.href} href={link.href}>
+            <Link key={`${link.label}:${link.href}`} href={link.href}>
               {link.label}
             </Link>
           ))}
