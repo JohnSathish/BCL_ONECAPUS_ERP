@@ -15,6 +15,7 @@ import {
   FileText,
   Fingerprint,
   GitBranch,
+  Globe,
   GraduationCap,
   HelpCircle,
   Home,
@@ -1915,6 +1916,89 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'journals',
         permissions: [...P.journals],
         activePattern: '^/admin/journals(?:/.*)?$',
+      },
+      {
+        label: 'Website CMS',
+        icon: Globe,
+        href: '/admin/website',
+        module: 'website',
+        permissions: [...P.website],
+        activePattern: '^/admin/website(?:/.*)?$',
+        children: [
+          { label: 'Dashboard', href: '/admin/website', permissions: [...P.website] },
+          {
+            label: 'Pages',
+            href: '/admin/website/pages',
+            permissions: ['website:read', 'website:edit', 'website:manage'],
+          },
+          {
+            label: 'News',
+            href: '/admin/website/news',
+            permissions: [
+              'website:news:read',
+              'website:news:edit',
+              'website:read',
+              'website:edit',
+              'website:manage',
+            ],
+          },
+          {
+            label: 'Notice Board',
+            href: '/admin/website/notices',
+            permissions: [
+              'website:notices:read',
+              'website:notices:edit',
+              'website:read',
+              'website:edit',
+              'website:manage',
+            ],
+          },
+          {
+            label: 'Menus',
+            href: '/admin/website/navigation',
+            permissions: ['website:edit', 'website:manage', 'tenant:manage'],
+          },
+          {
+            label: 'Homepage Builder',
+            href: '/admin/website/homepage',
+            permissions: ['website:edit', 'website:manage', 'tenant:manage'],
+          },
+          {
+            label: 'Departments',
+            href: '/admin/website/departments',
+            permissions: [
+              'website:read',
+              'website:edit',
+              'website:departments:edit',
+              'website:manage',
+            ],
+          },
+          {
+            label: 'Hero Slider',
+            href: '/admin/website/hero',
+            permissions: ['website:read', 'website:edit', 'website:media', 'website:manage'],
+          },
+          {
+            label: 'Media',
+            href: '/admin/website/media',
+            permissions: ['website:read', 'website:media', 'website:manage'],
+          },
+          {
+            label: 'SEO',
+            href: '/admin/website/seo',
+            permissions: ['website:seo', 'website:edit', 'website:manage'],
+          },
+          {
+            label: 'Publishing',
+            href: '/admin/website/publishing',
+            permissions: ['website:publish', 'website:manage', 'tenant:manage'],
+          },
+          {
+            label: 'Site & Theme',
+            href: '/admin/website/settings',
+            permissions: ['website:edit', 'website:manage', 'tenant:manage'],
+          },
+        ],
       },
       {
         label: 'Hostel',

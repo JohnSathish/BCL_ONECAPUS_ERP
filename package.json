@@ -5,14 +5,15 @@
   "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/api",
-    "apps/web"
+    "apps/web",
+    "apps/college-web"
   ],
   "scripts": {
     "dev": "npm run dev:clean",
     "dev:turbo": "turbo dev",
     "dev:infra": "node scripts/dev-infra.mjs",
     "dev:setup": "npm run dev:infra && npm run db:migrate && npm run db:seed",
-    "dev:free-ports": "npx --yes kill-port 3000 3001",
+    "dev:free-ports": "npx --yes kill-port 3000 3001 3002",
     "dev:clean": "npm run dev:infra && npm run dev:free-ports && node -e \"process.env.API_HOST='127.0.0.1'; require('child_process').spawn('npx', ['turbo', 'dev'], { stdio: 'inherit', shell: true, env: process.env })\"",
     "dev:lan": "node scripts/dev-lan.mjs",
     "build": "turbo build",
@@ -48,5 +49,9 @@
   },
   "dependencies": {
     "@prisma/client": "^7.8.0"
+  },
+  "overrides": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
   }
 }

@@ -1,0 +1,31 @@
+import { Module } from '@nestjs/common';
+import { StorageModule } from '../../shared/storage/storage.module';
+import { TenantsModule } from '../tenants/tenants.module';
+import { WebsiteAdminController } from './website-admin.controller';
+import { WebsiteAdminService } from './website-admin.service';
+import { WebsiteAcademicService } from './website-academic.service';
+import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
+import { WebsiteManagementController } from './website-management.controller';
+import { WebsitePublicController } from './website-public.controller';
+import { WebsiteService } from './website.service';
+
+@Module({
+  imports: [StorageModule, TenantsModule],
+  controllers: [
+    WebsiteManagementController,
+    WebsiteAdminController,
+    WebsitePublicController,
+  ],
+  providers: [
+    WebsiteService,
+    WebsiteAdminService,
+    WebsiteAcademicService,
+    WebsiteCmsEnterpriseService,
+  ],
+  exports: [
+    WebsiteService,
+    WebsiteAcademicService,
+    WebsiteCmsEnterpriseService,
+  ],
+})
+export class WebsiteModule {}

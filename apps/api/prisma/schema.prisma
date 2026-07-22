@@ -1634,6 +1634,7 @@ model Department {
   recruitmentVacancies RecruitmentVacancy[]
   shiftDepartmentConfigs ShiftDepartmentConfig[]
   departmentActivities DepartmentActivity[]
+  websiteProfile   WebsiteDepartmentProfile?
 
   @@index([tenantId])
   @@index([institutionId])
@@ -3215,6 +3216,14 @@ model StaffProfile {
   qualification             String?
   specialization            String?
   experienceYears           Int?      @map("experience_years")
+  showOnWebsite             Boolean   @default(false) @map("show_on_website")
+  websiteSlug               String?   @map("website_slug")
+  publicEmail               String?   @map("public_email")
+  publicPhone               String?   @map("public_phone")
+  officeLocation            String?   @map("office_location")
+  googleScholarUrl          String?   @map("google_scholar_url")
+  orcidUrl                  String?   @map("orcid_url")
+  researchAreas             String?   @map("research_areas")
   portalUserId              String?   @unique @map("portal_user_id") @db.Uuid
   addressJson               Json?     @map("address_json")
   emergencyContactJson      Json?     @map("emergency_contact_json")
@@ -3275,6 +3284,7 @@ model StaffProfile {
   primaryTeachingSubjectGroups TeachingSubjectGroup[] @relation("TeachingSubjectGroupPrimaryStaff")
 
   @@unique([tenantId, employeeCode])
+  @@unique([tenantId, websiteSlug])
   @@unique([campusId, shortCode])
   @@index([tenantId])
   @@index([departmentId])
@@ -3283,6 +3293,7 @@ model StaffProfile {
   @@index([status])
   @@index([shortCode])
   @@index([tenantId, biometricId])
+  @@index([tenantId, showOnWebsite])
   @@map("staff_profiles")
   @@schema("academic")
 }
@@ -14071,6 +14082,432 @@ model Journal {
   @@unique([tenantId, slug])
   @@index([tenantId, status])
   @@map("journals")
+  @@schema("academic")
+}
+
+model WebsiteSite {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @unique @map("tenant_id") @db.Uuid
+  name          String
+  slug          String
+  status        String   @default("ACTIVE")
+  primaryDomain String?  @map("primary_domain")
+  logoUrl       String?  @map("logo_url")
+  faviconUrl    String?  @map("favicon_url")
+  settingsJson  Json     @default("{}") @map("settings_json")
+  createdById   String?  @map("created_by_id") @db.Uuid
+  updatedById   String?  @map("updated_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  pages       WebsitePage[]
+  mediaAssets WebsiteMediaAsset[]
+  mediaFolders WebsiteMediaFolder[]
+  heroSlides  WebsiteHeroSlide[]
+  notices     WebsiteNotice[]
+  homepageSections WebsiteHomepageSection[]
+  redirects   WebsiteRedirect[]
+  menus       WebsiteMenu[]
+  contentTypes WebsiteContentType[]
+  contentEntries WebsiteContentEntry[]
+  previewTokens WebsitePreviewToken[]
+  revisions WebsiteRevision[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("website_sites")
+  @@schema("academic")
+}
+
+model WebsiteHeroSlide {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  altText     String   @default("") @map("alt_text")
+  desktopUrl  String   @map("desktop_url")
+  mobileUrl   String?  @map("mobile_url")
+  mediaId     String?  @map("media_id") @db.Uuid
+  mobileMediaId String? @map("mobile_media_id") @db.Uuid
+  position    Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, position])
+  @@index([siteId, isActive, position])
+  @@map("website_hero_slides")
+  @@schema("academic")
+}
+
+model WebsiteDepartmentProfile {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  departmentId        String   @unique @map("department_id") @db.Uuid
+  slug                String
+  category            String   @default("ARTS")
+  tagline             String   @default("")
+  aboutText           String   @default("") @map("about_text") @db.Text
+  aboutHtml           String   @default("") @map("about_html") @db.Text
+  bannerUrl           String?  @map("banner_url")
+  galleryJson         Json     @default("[]") @map("gallery_json")
+  contactEmail        String?  @map("contact_email")
+  contactPhone        String?  @map("contact_phone")
+  officeLocation      String?  @map("office_location")
+  establishedYear     Int?     @map("established_year")
+  showOnWebsite       Boolean  @default(false) @map("show_on_website")
+  displayOrder        Int      @default(0) @map("display_order")
+  featuredFacultyIds  Json?    @map("featured_faculty_ids")
+  downloadsJson       Json     @default("[]") @map("downloads_json")
+  hodMessage          String   @default("") @map("hod_message") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, showOnWebsite])
+  @@index([tenantId, category])
+  @@map("website_department_profiles")
+  @@schema("academic")
+}
+
+model WebsitePage {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  siteId              String    @map("site_id") @db.Uuid
+  path                String
+  title               String
+  status              String    @default("DRAFT")
+  template            String    @default("DEFAULT")
+  currentRevisionId   String?   @unique @map("current_revision_id") @db.Uuid
+  publishedRevisionId String?   @unique @map("published_revision_id") @db.Uuid
+  publishedAt         DateTime? @map("published_at")
+  scheduledAt         DateTime? @map("scheduled_at")
+  publishedSections   Json      @default("[]") @map("published_sections")
+  deletedAt           DateTime? @map("deleted_at")
+  deletedById         String?   @map("deleted_by_id") @db.Uuid
+  createdById         String?   @map("created_by_id") @db.Uuid
+  updatedById         String?   @map("updated_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  site              WebsiteSite          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  revisions         WebsitePageRevision[] @relation("WebsitePageRevisions")
+  sections          WebsitePageSection[]
+  previewTokens     WebsitePreviewToken[]
+  currentRevision   WebsitePageRevision? @relation("WebsiteCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  publishedRevision WebsitePageRevision? @relation("WebsitePublishedRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
+
+  @@unique([siteId, path])
+  @@index([tenantId, siteId, status])
+  @@index([siteId, publishedAt])
+  @@index([tenantId, siteId, deletedAt])
+  @@map("website_pages")
+  @@schema("academic")
+}
+
+model WebsitePageSection {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  pageId    String   @map("page_id") @db.Uuid
+  type      String
+  label     String
+  heading   String?
+  bodyHtml  String?  @map("body_html")
+  settings  Json     @default("{}")
+  position  Int      @default(0)
+  isVisible Boolean  @default(true) @map("is_visible")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  page WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, pageId, position])
+  @@map("website_page_sections")
+  @@schema("academic")
+}
+
+model WebsitePageRevision {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  pageId         String   @map("page_id") @db.Uuid
+  revisionNumber Int      @map("revision_number")
+  title          String
+  excerpt        String?
+  bodyHtml       String   @default("") @map("body_html")
+  seoTitle       String?  @map("seo_title")
+  seoDescription String?  @map("seo_description")
+  seoKeywords    String[] @default([]) @map("seo_keywords")
+  canonicalUrl   String?  @map("canonical_url")
+  ogImageUrl     String?  @map("og_image_url")
+  robots         String?
+  changeNote     String?  @map("change_note")
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  page             WebsitePage  @relation("WebsitePageRevisions", fields: [pageId], references: [id], onDelete: Cascade)
+  currentForPage   WebsitePage? @relation("WebsiteCurrentRevision")
+  publishedForPage WebsitePage? @relation("WebsitePublishedRevision")
+
+  @@unique([pageId, revisionNumber])
+  @@index([tenantId, pageId, createdAt])
+  @@map("website_page_revisions")
+  @@schema("academic")
+}
+
+model WebsiteMediaFolder {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  siteId    String   @map("site_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  site     WebsiteSite         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent   WebsiteMediaFolder? @relation("WebsiteMediaFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children WebsiteMediaFolder[] @relation("WebsiteMediaFolderTree")
+  assets   WebsiteMediaAsset[]
+
+  @@index([tenantId, siteId, parentId])
+  @@map("website_media_folders")
+  @@schema("academic")
+}
+
+model WebsiteMediaAsset {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  siteId      String    @map("site_id") @db.Uuid
+  folderId    String?   @map("folder_id") @db.Uuid
+  kind        String    @default("IMAGE")
+  storageKey  String    @map("storage_key")
+  publicUrl   String    @map("public_url")
+  fileName    String    @map("file_name")
+  mimeType    String    @map("mime_type")
+  bytes       Int
+  altText     String?   @map("alt_text")
+  caption     String?
+  tags        String[]  @default([])
+  deletedAt   DateTime? @map("deleted_at")
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  site   WebsiteSite         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  folder WebsiteMediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@unique([siteId, storageKey])
+  @@index([tenantId, siteId, kind])
+  @@index([tenantId, siteId, deletedAt])
+  @@map("website_media_assets")
+  @@schema("academic")
+}
+
+model WebsiteMenu {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  siteId    String   @map("site_id") @db.Uuid
+  name      String
+  location  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  site  WebsiteSite       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  items WebsiteMenuItem[]
+
+  @@unique([siteId, location])
+  @@index([tenantId, siteId])
+  @@map("website_menus")
+  @@schema("academic")
+}
+
+model WebsiteMenuItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  menuId    String   @map("menu_id") @db.Uuid
+  label     String
+  url       String
+  target    String   @default("_self")
+  linkType  String   @default("CUSTOM") @map("link_type")
+  linkRef   String?  @map("link_ref")
+  position  Int      @default(0)
+  parentId  String?  @map("parent_id") @db.Uuid
+  isVisible Boolean  @default(true) @map("is_visible")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menu     WebsiteMenu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parent   WebsiteMenuItem?  @relation("WebsiteMenuTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children WebsiteMenuItem[] @relation("WebsiteMenuTree")
+
+  @@index([tenantId, menuId, position])
+  @@index([parentId])
+  @@map("website_menu_items")
+  @@schema("academic")
+}
+
+model WebsiteContentType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  name        String
+  slug        String
+  description String?
+  fields      Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site    WebsiteSite          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  entries WebsiteContentEntry[]
+
+  @@unique([siteId, slug])
+  @@index([tenantId, siteId])
+  @@map("website_content_types")
+  @@schema("academic")
+}
+
+model WebsiteContentEntry {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  siteId        String    @map("site_id") @db.Uuid
+  contentTypeId String    @map("content_type_id") @db.Uuid
+  title         String
+  slug          String
+  status        String    @default("DRAFT")
+  data          Json      @default("{}")
+  publishedAt   DateTime? @map("published_at")
+  scheduledAt   DateTime? @map("scheduled_at")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedById   String?   @map("deleted_by_id") @db.Uuid
+  createdById   String?   @map("created_by_id") @db.Uuid
+  updatedById   String?   @map("updated_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  site        WebsiteSite        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  contentType WebsiteContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([contentTypeId, slug])
+  @@index([tenantId, siteId, status])
+  @@index([scheduledAt, status])
+  @@index([tenantId, siteId, deletedAt])
+  @@map("website_content_entries")
+  @@schema("academic")
+}
+
+model WebsiteNotice {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  siteId         String    @map("site_id") @db.Uuid
+  title          String
+  slug           String
+  bodyHtml       String    @default("") @map("body_html") @db.Text
+  category       String    @default("GENERAL")
+  departmentId   String?   @map("department_id") @db.Uuid
+  priority       String    @default("NORMAL")
+  publishAt      DateTime? @map("publish_at")
+  expireAt       DateTime? @map("expire_at")
+  attachmentUrl  String?   @map("attachment_url")
+  attachmentName String?   @map("attachment_name")
+  showOnHomepage Boolean   @default(true) @map("show_on_homepage")
+  isVisible      Boolean   @default(true) @map("is_visible")
+  status         String    @default("DRAFT")
+  deletedAt      DateTime? @map("deleted_at")
+  deletedById    String?   @map("deleted_by_id") @db.Uuid
+  createdById    String?   @map("created_by_id") @db.Uuid
+  updatedById    String?   @map("updated_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@index([tenantId, siteId, status, deletedAt, publishAt])
+  @@index([siteId, showOnHomepage, status, deletedAt])
+  @@map("website_notices")
+  @@schema("academic")
+}
+
+model WebsiteHomepageSection {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  siteId       String   @map("site_id") @db.Uuid
+  sectionKey   String   @map("section_key")
+  label        String   @default("")
+  enabled      Boolean  @default(true)
+  position     Int      @default(0)
+  settingsJson Json     @default("{}") @map("settings_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, sectionKey])
+  @@index([tenantId, siteId, position])
+  @@map("website_homepage_sections")
+  @@schema("academic")
+}
+
+model WebsitePreviewToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  siteId    String    @map("site_id") @db.Uuid
+  pageId    String?   @map("page_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  page WebsitePage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, expiresAt])
+  @@map("website_preview_tokens")
+  @@schema("academic")
+}
+
+model WebsiteRevision {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  siteId     String   @map("site_id") @db.Uuid
+  entityId   String   @map("entity_id") @db.Uuid
+  entityType String   @map("entity_type")
+  version    Int
+  action     String
+  snapshot   Json
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorName  String?  @map("actor_name")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, version])
+  @@index([tenantId, siteId, createdAt])
+  @@map("website_revisions")
+  @@schema("academic")
+}
+
+model WebsiteRedirect {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  fromPath    String   @map("from_path")
+  toPath      String   @map("to_path")
+  statusCode  Int      @default(301) @map("status_code")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, fromPath])
+  @@index([tenantId, siteId, isActive])
+  @@map("website_redirects")
   @@schema("academic")
 }
 

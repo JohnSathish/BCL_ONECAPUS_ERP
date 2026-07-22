@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Quick production update — pull latest code, rebuild web+api, restart stack.
+# Quick production update — rebuild the ERP, API, worker, and college website.
 # Run on VPS: bash scripts/deploy/vps-update.sh
 set -euo pipefail
 
@@ -69,10 +69,10 @@ fi
 echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
-echo "Rebuilding web + api + worker…"
+echo "Rebuilding ERP, API, worker, and college website…"
 # Use Docker layer cache when possible; npm ci retries are in each Dockerfile .npmrc.
-# For a full clean rebuild: COMPOSE build --no-cache web api worker
-"${COMPOSE[@]}" build web api worker
+# For a full clean rebuild: COMPOSE build --no-cache web api worker college-web
+"${COMPOSE[@]}" build web api worker college-web
 
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis
@@ -94,6 +94,16 @@ echo "Granting student profile verification permissions (idempotent)…"
 
 echo "Starting API and waiting until healthy…"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
+
+echo "Starting college website…"
+"${COMPOSE[@]}" up -d college-web
+if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+  && [[ -f /etc/letsencrypt/live/donboscocollege.ac.in/fullchain.pem ]] \
+  && ensure_college_web; then
+  cp nginx/nginx.combined-dbc.ssl.conf nginx/nginx.conf
+  COLLEGE_HEALTHY=1
+  "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
+fi
 
 echo "Starting web, worker, nginx…"
 if [[ "$COLLEGE_HEALTHY" -eq 1 ]] || docker ps --format '{{.Names}}' | grep -qx 'donboscocollege-web'; then

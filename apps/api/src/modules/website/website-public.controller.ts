@@ -1,0 +1,191 @@
+import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
+import { Public } from '../../common/decorators/public.decorator';
+import { extractRequestHost } from '../../common/utils/request-host';
+import { TenantResolutionService } from '../tenants/tenant-resolution.service';
+import { WebsiteAdminService } from './website-admin.service';
+import { WebsiteAcademicService } from './website-academic.service';
+import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
+import { WebsiteService } from './website.service';
+
+@ApiTags('website-public')
+@Controller({ path: 'website/public', version: '1' })
+export class WebsitePublicController {
+  constructor(
+    private readonly website: WebsiteService,
+    private readonly admin: WebsiteAdminService,
+    private readonly tenants: TenantResolutionService,
+    private readonly academic: WebsiteAcademicService,
+    private readonly enterprise: WebsiteCmsEnterpriseService,
+  ) {}
+
+  private async resolveTenant(req: Request, tenantSlug?: string) {
+    if (tenantSlug?.trim()) return this.tenants.resolveSlug(tenantSlug);
+    return this.tenants.resolveHost(extractRequestHost(req));
+  }
+
+  @Public()
+  @Get('site')
+  async site(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.getPublicSite(tenant.id);
+  }
+
+  @Public()
+  @Get('hero-slides')
+  async heroSlides(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.admin.listPublicHeroSlides(tenant.id);
+  }
+
+  @Public()
+  @Get('homepage')
+  async homepage(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.getPublicHomepage(tenant.id);
+  }
+
+  @Public()
+  @Get('notices')
+  async notices(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.listPublicNotices(tenant.id);
+  }
+
+  @Public()
+  @Get('menus')
+  async menus(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+    @Query('location') location?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.listPublicMenus(tenant.id, location);
+  }
+
+  @Public()
+  @Get('events/upcoming')
+  async upcomingEvents(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.listUpcomingEvents(tenant.id);
+  }
+
+  @Public()
+  @Get('seo/sitemap-entries')
+  async sitemapEntries(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.listSitemapEntries(tenant.id);
+  }
+
+  @Public()
+  @Get('page')
+  async page(
+    @Req() req: Request,
+    @Query('path') path: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.getPublicPage(tenant.id, path || '/');
+  }
+
+  @Public()
+  @Get('pages')
+  async pages(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.listPublicPages(tenant.id);
+  }
+
+  @Public()
+  @Get('redirect')
+  async redirect(
+    @Req() req: Request,
+    @Query('path') path: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.findPublicRedirect(tenant.id, path);
+  }
+
+  @Public()
+  @Get('preview')
+  preview(@Query('token') token: string) {
+    return this.admin.resolvePreview(token);
+  }
+
+  @Public()
+  @Get('preview/:token')
+  async previewHtml(@Param('token') token: string, @Res() response: Response) {
+    const html = await this.admin.renderPreviewHtml(token);
+    response.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; font-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    );
+    response.setHeader('Cache-Control', 'no-store, private');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.type('html').send(html);
+  }
+
+  @Public()
+  @Get('content/:typeSlug')
+  async content(
+    @Req() req: Request,
+    @Param('typeSlug') typeSlug: string,
+    @Query('entry') entrySlug?: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.admin.publicContent(tenant.id, typeSlug, entrySlug);
+  }
+
+  @Public()
+  @Get('academic/departments')
+  async academicDepartments(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+    @Query('q') q?: string,
+    @Query('category') category?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.academic.listDepartments(tenant.id, { q, category });
+  }
+
+  @Public()
+  @Get('academic/departments/:slug')
+  async academicDepartment(
+    @Req() req: Request,
+    @Param('slug') slug: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.academic.getDepartment(tenant.id, slug);
+  }
+
+  @Public()
+  @Get('academic/faculty/:slug')
+  async academicFaculty(
+    @Req() req: Request,
+    @Param('slug') slug: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.academic.getFaculty(tenant.id, slug);
+  }
+
+  @Public()
+  @Get('academic/search')
+  async academicSearch(
+    @Req() req: Request,
+    @Query('q') q?: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.academic.search(tenant.id, q);
+  }
+}

@@ -14,6 +14,7 @@ const MAX_BYTES_BY_KIND: Record<ImageUploadKind, number> = {
   profile: 5 * 1024 * 1024,
   'principal-photo': 5 * 1024 * 1024,
   'careers-hero': 5 * 1024 * 1024,
+  'website-hero': 5 * 1024 * 1024,
 };
 
 const PNG = [0x89, 0x50, 0x4e, 0x47];
@@ -75,7 +76,8 @@ export type ImageUploadKind =
   | 'favicon'
   | 'profile'
   | 'principal-photo'
-  | 'careers-hero';
+  | 'careers-hero'
+  | 'website-hero';
 
 export function validateBrandingImage(
   file: Express.Multer.File | undefined,

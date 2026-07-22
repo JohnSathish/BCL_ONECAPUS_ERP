@@ -204,6 +204,20 @@ export const MODULE_PERMISSIONS = {
     'journals:portal:author',
     'journals:portal:reviewer',
   ],
+  website: [
+    'website:read',
+    'website:edit',
+    'website:publish',
+    'website:media',
+    'website:manage',
+    'website:news:read',
+    'website:news:edit',
+    'website:notices:read',
+    'website:notices:edit',
+    'website:departments:edit',
+    'website:seo',
+    'website:review',
+  ],
   hostel: ['hostel:read', 'hostel:manage'],
   research: ['research:read', 'research:manage'],
   integrations: ['integrations:read', 'integrations:manage'],
@@ -474,6 +488,12 @@ export const ERP_MODULES: ErpModule[] = [
     defaultHome: '/admin/journals',
   },
   {
+    id: 'website',
+    label: 'Website CMS',
+    permissions: MODULE_PERMISSIONS.website,
+    defaultHome: '/admin/website',
+  },
+  {
     id: 'hostel',
     label: 'Hostel',
     permissions: MODULE_PERMISSIONS.hostel,
@@ -610,6 +630,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   {
     prefix: '/admin/journals',
     permissions: [...MODULE_PERMISSIONS.journals],
+  },
+  {
+    prefix: '/admin/website',
+    permissions: [...MODULE_PERMISSIONS.website],
   },
   {
     prefix: '/admin/hostel',

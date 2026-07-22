@@ -70,6 +70,22 @@ services:
     depends_on:
       - api
 
+  college-web:
+    container_name: donboscocollege-web
+    build:
+      context: .
+      dockerfile: apps/college-web/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_ORIGIN: http://api:3001
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SITE_URL: http://localhost:3002
+    ports:
+      - '3002:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
   worker:
     build:
       context: .
@@ -102,6 +118,8 @@ services:
       api:
         condition: service_healthy
       web:
+        condition: service_started
+      college-web:
         condition: service_started
 
 volumes:

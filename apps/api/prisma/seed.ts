@@ -20,6 +20,7 @@ import { seedDonBoscoFeeCycles } from './seeds/fee-cycle.seed';
 import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
 import { seedDbcCommittees } from './seeds/seed-dbc-committees';
 import { seedNaacIqac } from './seeds/seed-naac-iqac';
+import { seedWebsiteCms } from './seeds/website.seed';
 import { SEED_PERMISSIONS as PERMISSIONS } from './seed-permissions';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
 
@@ -288,6 +289,11 @@ async function main() {
     'official-documents:publish',
     'official-documents:archive',
     'official-documents:settings',
+    'website:read',
+    'website:edit',
+    'website:manage',
+    'website:publish',
+    'website:media',
   ]);
   await upsertRole('academic-admin', 'Academic Admin', [
     'academic:read',
@@ -3409,6 +3415,8 @@ async function main() {
   }
 
   await seedNehuFyugpTemplate(tenant.id, adminUser.id);
+  const websiteSeed = await seedWebsiteCms(prisma, tenant.id, adminUser.id);
+  console.log('Website CMS seeded:', websiteSeed.created, 'new pages');
   await seedDonBoscoFeeCycles(prisma, tenant.id, adminUser.id);
   await seedDonBoscoMonthlyPlans(prisma, tenant.id);
   const governanceSeed = await seedDbcCommittees(

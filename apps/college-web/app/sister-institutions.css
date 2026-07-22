@@ -1,0 +1,152 @@
+.sister-institutions {
+  padding-block: clamp(40px, 5vw, 64px);
+  background: #f4f6f9;
+  border-bottom: 4px solid var(--navy);
+}
+
+.sister-institutions-inner {
+  display: grid;
+  gap: 28px;
+}
+
+.sister-institutions-head {
+  text-align: center;
+}
+
+.sister-institutions-head h2 {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--font-sans), Inter, sans-serif;
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.sister-institutions-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sister-institutions-rule {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin: 14px auto 0;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.sister-institutions-viewport {
+  overflow: hidden;
+}
+
+.sister-institutions-track {
+  display: flex;
+  gap: 16px;
+}
+
+.sister-institutions-slide {
+  flex: 0 0 min(100%, 200px);
+  min-width: 0;
+}
+
+.sister-institutions-card {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  padding: 18px 16px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(11, 46, 89, 0.1);
+  box-shadow: 0 8px 22px rgba(6, 31, 61, 0.06);
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+a.sister-institutions-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(197, 164, 107, 0.55);
+  box-shadow: 0 12px 28px rgba(6, 31, 61, 0.1);
+}
+
+.sister-institutions-logo {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 72px;
+}
+
+.sister-institutions-logo img {
+  width: auto;
+  max-width: 132px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.sister-institutions-logo strong {
+  font-size: 13px;
+  color: var(--navy);
+}
+
+.sister-institutions-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.sister-institutions-controls > button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--navy);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sister-institutions-controls > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sister-institutions-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.sister-institutions-dots button {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #c9d3e0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sister-institutions-dots button.is-active {
+  width: 20px;
+  background: var(--gold);
+}
+
+@media (min-width: 900px) {
+  .sister-institutions-slide {
+    flex: 0 0 calc((100% - 64px) / 5);
+  }
+}
+
+@media (max-width: 899px) and (min-width: 640px) {
+  .sister-institutions-slide {
+    flex: 0 0 calc((100% - 32px) / 3);
+  }
+}
+
+@media (max-width: 639px) {
+  .sister-institutions-slide {
+    flex: 0 0 calc((100% - 16px) / 2);
+  }
+}

@@ -1,0 +1,68 @@
+/* Coat of Arms — compact, full-width copy */
+.coat-of-arms{
+  background:linear-gradient(105deg,#061f3d 0%,#0b2e59 55%,#123a6b 100%);
+  color:#fff;
+  padding:28px 0;
+}
+.coat-of-arms-grid{
+  display:grid;
+  grid-template-columns:120px minmax(0,1fr);
+  gap:22px;
+  align-items:center;
+}
+.coat-of-arms-logo{
+  display:grid;
+  place-items:center;
+  width:120px;
+  height:120px;
+  max-width:120px;
+  padding:6px;
+  border-radius:50%;
+  overflow:hidden;
+  background:radial-gradient(circle at center,#fff 0%,#f4f1ea 62%,rgba(244,180,0,.28) 100%);
+  box-shadow:0 10px 24px rgba(0,0,0,.25),0 0 0 2px rgba(244,180,0,.45);
+}
+.coat-of-arms-logo img{
+  width:100%;
+  height:auto;
+  object-fit:contain;
+}
+.coat-of-arms-copy .eyebrow{
+  display:inline-block;
+  margin-bottom:4px;
+  font-size:11px;
+}
+.coat-of-arms-copy h2{
+  margin:0 0 8px;
+  font-family:var(--font-serif),Libre Baskerville,Georgia,serif;
+  font-size:clamp(22px,2.2vw,28px);
+  font-weight:700;
+  line-height:1.15;
+  color:#fff;
+}
+.coat-of-arms-copy p{
+  margin:0;
+  width:100%;
+  max-width:none;
+  font-family:var(--font-sans),Inter,sans-serif;
+  font-size:13.5px;
+  font-weight:400;
+  line-height:1.6;
+  color:#d5e0eb;
+}
+
+@media(max-width:760px){
+  .coat-of-arms{padding:22px 0}
+  .coat-of-arms-grid{
+    grid-template-columns:88px minmax(0,1fr);
+    gap:14px;
+    align-items:flex-start;
+  }
+  .coat-of-arms-logo{
+    width:88px;
+    height:88px;
+    max-width:88px;
+  }
+  .coat-of-arms-copy h2{font-size:20px}
+  .coat-of-arms-copy p{font-size:13px;line-height:1.55}
+}
