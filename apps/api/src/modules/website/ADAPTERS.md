@@ -2,6 +2,17 @@
 
 Institution websites are **CMS-first**. ERP modules are optional adapters declared per tenant in `WebsiteSite.settingsJson.sources`.
 
+## Content safety (migrations / seed / import)
+
+`importWebsiteContent`, `seedDefaults`, and `ensureHomepageLayout` are **fill-missing only**:
+
+- Existing `settingsJson.homepage` (footer, research links, coat of arms, sister institutions, etc.) is never replaced with code defaults.
+- Homepage section `enabled` / `position` are preserved (editors own layout).
+- Pages, menu items, hero slides, news, notices, and CPT entries are created only when missing.
+- Website Settings saves **merge** branding fields into `settingsJson` and must not wipe homepage CMS.
+
+Code defaults in `DEFAULT_HOMEPAGE_CONTENT` apply only to brand-new empty sites.
+
 ## Contract
 
 ```ts

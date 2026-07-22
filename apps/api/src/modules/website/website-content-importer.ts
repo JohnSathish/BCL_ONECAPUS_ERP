@@ -78,7 +78,8 @@ async function upsertMenuTree(
 
 /**
  * Idempotent import of the public website catalogue into Website CMS tables.
- * Safe to run multiple times — skips existing paths / menu items / entries.
+ * Safe to run after migrations / deploys: creates missing rows only and never
+ * overwrites saved homepage content, menus items, pages, or section toggles.
  */
 export async function importWebsiteContent(
   prisma: PrismaClient,
@@ -244,18 +245,24 @@ export async function importWebsiteContent(
     }
   }
 
-  // Homepage layout sections
+  // Homepage layout — create missing sections only; never reset toggles/order.
   for (const [position, item] of HOMEPAGE_SECTION_CATALOG.entries()) {
-    await prisma.websiteHomepageSection.upsert({
+    const existing = await prisma.websiteHomepageSection.findUnique({
       where: {
         siteId_sectionKey: { siteId: site.id, sectionKey: item.key },
       },
-      update: {
-        label: item.label,
-        position,
-        ...(item.key === 'upcomingEvents' ? { enabled: false } : {}),
-      },
-      create: {
+    });
+    if (existing) {
+      if (existing.label !== item.label) {
+        await prisma.websiteHomepageSection.update({
+          where: { id: existing.id },
+          data: { label: item.label },
+        });
+      }
+      continue;
+    }
+    await prisma.websiteHomepageSection.create({
+      data: {
         tenantId,
         siteId: site.id,
         sectionKey: item.key,
@@ -267,13 +274,26 @@ export async function importWebsiteContent(
     });
   }
 
-  // Settings: homepage content, gallery, stats
+  // Settings: fill missing keys only — never restore defaults over saved CMS content.
   const settings =
     site.settingsJson &&
     typeof site.settingsJson === 'object' &&
     !Array.isArray(site.settingsJson)
       ? (site.settingsJson as Record<string, unknown>)
       : {};
+  const existingHub =
+    settings.informationHub &&
+    typeof settings.informationHub === 'object' &&
+    !Array.isArray(settings.informationHub)
+      ? (settings.informationHub as Record<string, unknown>)
+      : {};
+  const existingLeadership =
+    existingHub.leadership &&
+    typeof existingHub.leadership === 'object' &&
+    !Array.isArray(existingHub.leadership)
+      ? (existingHub.leadership as Record<string, unknown>)
+      : null;
+
   const nextSettings: Record<string, unknown> = {
     ...settings,
     homepage: settings.homepage ?? DEFAULT_HOMEPAGE_CONTENT,
@@ -284,10 +304,12 @@ export async function importWebsiteContent(
     gallery:
       Array.isArray(settings.gallery) && settings.gallery.length
         ? settings.gallery
-        : GALLERY_SEED,
+        : settings.gallery === undefined
+          ? GALLERY_SEED
+          : settings.gallery,
     informationHub: {
-      ...((settings.informationHub as Record<string, unknown>) ?? {}),
-      leadership: {
+      ...existingHub,
+      leadership: existingLeadership ?? {
         message: DEFAULT_HOMEPAGE_CONTENT.principal.message,
         name: DEFAULT_HOMEPAGE_CONTENT.principal.name,
         role: DEFAULT_HOMEPAGE_CONTENT.principal.role,
@@ -331,11 +353,8 @@ export async function importWebsiteContent(
       where: {
         siteId_slug: { siteId: site.id, slug: contentType.slug },
       },
-      update: {
-        name: contentType.name,
-        description: contentType.description,
-        fields: contentType.fields as unknown as Prisma.InputJsonValue,
-      },
+      // Do not overwrite editor-customized CPT schemas on re-import.
+      update: {},
       create: {
         tenantId,
         siteId: site.id,

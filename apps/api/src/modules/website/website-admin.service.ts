@@ -238,7 +238,10 @@ export class WebsiteAdminService {
 
   async updateSettings(user: JwtUser, dto: WebsiteSettingsDto) {
     const site = await this.website.getOrCreateSite(user.tid, user.sub);
+    const current = this.asRecord(site.settingsJson);
+    // Merge branding fields into existing settingsJson — never wipe homepage CMS.
     const settings = {
+      ...current,
       tagline: dto.tagline ?? null,
       description: dto.description ?? null,
       primaryColor: dto.primaryColor,
@@ -256,7 +259,7 @@ export class WebsiteAdminService {
         name: dto.siteName.trim(),
         logoUrl: dto.logoUrl ?? null,
         faviconUrl: dto.faviconUrl ?? null,
-        settingsJson: settings,
+        settingsJson: settings as Prisma.InputJsonValue,
         updatedById: user.sub,
       },
     });

@@ -158,7 +158,7 @@ export class WebsiteCmsEnterpriseService {
     });
     const byKey = new Map(existing.map((row) => [row.sectionKey, row]));
 
-    // Create any missing catalog rows, then sync canonical order / flags.
+    // Create missing catalog rows only — never reset editor toggles or order.
     for (const [position, item] of HOMEPAGE_SECTION_CATALOG.entries()) {
       const current = byKey.get(item.key);
       if (!current) {
@@ -177,32 +177,18 @@ export class WebsiteCmsEnterpriseService {
         continue;
       }
 
-      const patch: {
-        position: number;
-        label: string;
-        enabled?: boolean;
-      } = {
-        position,
-        label: item.label,
-      };
-
-      // Permanently disable the standalone Upcoming Events block (events live beside Principal).
-      if (item.key === 'upcomingEvents') {
+      const patch: { label?: string; enabled?: boolean } = {};
+      if (current.label !== item.label) patch.label = item.label;
+      // Keep Upcoming Events folded into Principal hub (one-time policy).
+      if (item.key === 'upcomingEvents' && current.enabled) {
         patch.enabled = false;
       }
-      // Why Choose Us must stay visible by default after CMS layout seeds.
-      if (item.key === 'campusLife' && item.defaultEnabled) {
-        patch.enabled = true;
+      if (Object.keys(patch).length) {
+        await this.prisma.websiteHomepageSection.update({
+          where: { id: current.id },
+          data: patch,
+        });
       }
-      // About College must stay enabled.
-      if (item.key === 'aboutCollege' && item.defaultEnabled) {
-        patch.enabled = true;
-      }
-
-      await this.prisma.websiteHomepageSection.update({
-        where: { id: current.id },
-        data: patch,
-      });
     }
 
     const rows = await this.prisma.websiteHomepageSection.findMany({
@@ -210,9 +196,13 @@ export class WebsiteCmsEnterpriseService {
       orderBy: { position: 'asc' },
     });
 
-    // Ensure editable homepage content defaults exist once.
-    const settings = this.asRecord(site.settingsJson);
+    // Seed homepage editable content once — never overwrite saved CMS content.
+    const fresh = await this.prisma.websiteSite.findUniqueOrThrow({
+      where: { id: site.id },
+    });
+    const settings = this.asRecord(fresh.settingsJson);
     if (!this.asRecord(settings.homepage)) {
+      const hub = this.asRecord(settings.informationHub) ?? {};
       await this.prisma.websiteSite.update({
         where: { id: site.id },
         data: {
@@ -220,8 +210,8 @@ export class WebsiteCmsEnterpriseService {
             ...settings,
             homepage: DEFAULT_HOMEPAGE_CONTENT,
             informationHub: {
-              ...(this.asRecord(settings.informationHub) ?? {}),
-              leadership: {
+              ...hub,
+              leadership: this.asRecord(hub.leadership) ?? {
                 message: DEFAULT_HOMEPAGE_CONTENT.principal.message,
                 name: DEFAULT_HOMEPAGE_CONTENT.principal.name,
                 role: DEFAULT_HOMEPAGE_CONTENT.principal.role,
@@ -233,9 +223,11 @@ export class WebsiteCmsEnterpriseService {
                   DEFAULT_HOMEPAGE_CONTENT.principal.leadershipHref,
               },
             },
-            aboutCollege: DEFAULT_HOMEPAGE_CONTENT.aboutCollege,
-            footerWidgets: DEFAULT_HOMEPAGE_CONTENT.footer,
-            stats: DEFAULT_HOMEPAGE_CONTENT.statistics,
+            aboutCollege:
+              settings.aboutCollege ?? DEFAULT_HOMEPAGE_CONTENT.aboutCollege,
+            footerWidgets:
+              settings.footerWidgets ?? DEFAULT_HOMEPAGE_CONTENT.footer,
+            stats: settings.stats ?? DEFAULT_HOMEPAGE_CONTENT.statistics,
           } as Prisma.InputJsonValue,
         },
       });

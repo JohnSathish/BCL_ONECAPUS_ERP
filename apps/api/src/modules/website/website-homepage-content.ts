@@ -373,7 +373,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
   },
   coatOfArms: {
     title: 'Coat of Arms',
-    body: 'Our emblem reflects faith, learning and service—the Salesian heritage that guides Don Bosco College, Tura.',
+    body: 'The Coat of Arms of the college contains the motto of the college, “In Pursuit of Excellence” and three distinct components – sun, eagle and mountains. The radiant sun is the source, the giver that bestows light, energy, inspiration and divine guidance. The soaring eagle is the seeker that looks for all that is good, noble and uplifting in the world of knowledge, skills and values. The green mountains and valleys represent the process whereby the seeker ascends, descends and strives until he/she arrives at the top. True to our motto, we are passionate about excellence in every sphere of our academic, professional and social life.',
     imageSrc: '/images/college-logo.png',
     imageAlt: 'Don Bosco College Tura coat of arms',
   },
