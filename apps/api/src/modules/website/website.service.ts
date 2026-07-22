@@ -22,6 +22,7 @@ import type {
   UpsertWebsiteRedirectDto,
 } from './dto/website.dto';
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
+import { importWebsiteContent } from './website-content-importer';
 
 const PAGE_WITH_REVISIONS = {
   currentRevision: true,
@@ -523,7 +524,6 @@ export class WebsiteService {
   }
 
   async seedDefaults(user: JwtUser) {
-    const { importWebsiteContent } = await import('./website-content-importer');
     const result = await importWebsiteContent(this.prisma, user.tid, user.sub);
     return {
       site: await this.getOrCreateSite(user.tid, user.sub),
