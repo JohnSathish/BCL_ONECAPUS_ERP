@@ -259,7 +259,7 @@ export async function SiteFooter({ footer, headerCtas }: Props) {
 
       <div className="footer-bottom shell">
         <div className="footer-meta">
-          <p>
+          <p suppressHydrationWarning>
             © {new Date().getFullYear()} {content.copyright}. All rights reserved.
           </p>
           <VisitorsCount />
