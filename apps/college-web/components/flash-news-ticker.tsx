@@ -10,7 +10,14 @@ type Props = {
   label?: string;
 };
 
-function FlashItem({ item }: { item: FlashAnnouncement }) {
+function FlashItem({
+  item,
+  inert = false,
+}: {
+  item: FlashAnnouncement;
+  /** Duplicate marquee copy — keep out of tab order. */
+  inert?: boolean;
+}) {
   const body = (
     <>
       <Megaphone aria-hidden className="flash-news-item-icon" />
@@ -19,8 +26,12 @@ function FlashItem({ item }: { item: FlashAnnouncement }) {
     </>
   );
 
-  if (!item.href) {
-    return <span className="flash-news-item">{body}</span>;
+  if (!item.href || inert) {
+    return (
+      <span className="flash-news-item" aria-hidden={inert || undefined}>
+        {body}
+      </span>
+    );
   }
 
   const external = /^https?:\/\//i.test(item.href);
@@ -64,7 +75,6 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [loopWidth, setLoopWidth] = useState(0);
-  const [needsMarquee, setNeedsMarquee] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const resumeTimer = useRef<number | null>(null);
@@ -106,27 +116,38 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
       const nodes = track.querySelectorAll<HTMLElement>('[data-flash-set="0"]');
       if (nodes.length < items.length) {
         setLoopWidth(0);
-        setNeedsMarquee(false);
         return;
       }
       let width = 0;
       for (let i = 0; i < items.length; i += 1) {
         width += nodes[i].getBoundingClientRect().width;
       }
-      // include gaps between items (28px) + trailing gap before the loop restarts
-      width += Math.max(0, items.length) * 28;
-      const viewportWidth = viewport.getBoundingClientRect().width;
+      // gaps between items (28px) + trailing gap before the duplicated set
+      width += items.length * 28;
       setLoopWidth(width);
-      // Only marquee-duplicate when the unique set overflows the bar.
-      // Otherwise 2 short items would appear as A, B, A, B in one view.
-      setNeedsMarquee(width > viewportWidth + 8);
     };
 
-    measure();
-    const observer = new ResizeObserver(measure);
+    let raf1 = 0;
+    let raf2 = 0;
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(measure);
+      });
+    };
+
+    scheduleMeasure();
+    const observer = new ResizeObserver(scheduleMeasure);
     observer.observe(track);
     observer.observe(viewport);
-    return () => observer.disconnect();
+    void document.fonts?.ready?.then(scheduleMeasure);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      observer.disconnect();
+    };
   }, [items]);
 
   useEffect(() => () => clearResume(), []);
@@ -137,49 +158,42 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
     return <StaticTicker items={items} label={label} />;
   }
 
+  // Always marquee when 2+ items so linked announcements keep scrolling.
+  // Pause only on hover/touch — focus-pause was freezing the bar after a URL
+  // was added (links become focusable and never resumed cleanly).
   const durationSec = loopWidth > 0 ? Math.max(18, loopWidth / 42) : 28;
-  // Second copy is only for seamless CSS loop — aria-hidden so screen readers
-  // hear each announcement once.
-  const copies = needsMarquee ? 2 : 1;
 
   return (
     <aside
-      className={`flash-news-bar${paused && needsMarquee ? ' is-paused' : ''}`}
+      className={`flash-news-bar${paused ? ' is-paused' : ''}`}
       aria-label={label}
-      onMouseEnter={needsMarquee ? pause : undefined}
-      onMouseLeave={needsMarquee ? scheduleResume : undefined}
-      onFocusCapture={needsMarquee ? pause : undefined}
-      onBlurCapture={
-        needsMarquee
-          ? (event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                scheduleResume();
-              }
-            }
-          : undefined
-      }
-      onTouchStart={needsMarquee ? pause : undefined}
-      onTouchEnd={needsMarquee ? scheduleResume : undefined}
+      onMouseEnter={pause}
+      onMouseLeave={scheduleResume}
+      onTouchStart={pause}
+      onTouchEnd={scheduleResume}
     >
       <div className="flash-news-label">
         <Megaphone aria-hidden />
         <span className="flash-news-label-full">Announcements</span>
         <span className="flash-news-label-short">Flash</span>
       </div>
-      <div className={`flash-news-viewport${needsMarquee ? '' : ' is-static'}`} ref={viewportRef}>
+      <div className="flash-news-viewport" ref={viewportRef}>
         <div
-          className={`flash-news-track${needsMarquee ? ' is-marquee' : ''}`}
+          className="flash-news-track is-marquee"
           ref={trackRef}
           style={
-            needsMarquee && loopWidth > 0
+            loopWidth > 0
               ? {
                   ['--flash-loop' as string]: `${loopWidth}px`,
                   animationDuration: `${durationSec}s`,
                 }
-              : undefined
+              : {
+                  ['--flash-loop' as string]: '50%',
+                  animationDuration: `${durationSec}s`,
+                }
           }
         >
-          {Array.from({ length: copies }, (_, copyIndex) =>
+          {Array.from({ length: 2 }, (_, copyIndex) =>
             items.map((item) => (
               <div
                 key={`${item.id}-c${copyIndex}`}
@@ -188,7 +202,7 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
                 data-flash-set={copyIndex}
                 aria-hidden={copyIndex > 0}
               >
-                <FlashItem item={item} />
+                <FlashItem item={item} inert={copyIndex > 0} />
               </div>
             )),
           )}
