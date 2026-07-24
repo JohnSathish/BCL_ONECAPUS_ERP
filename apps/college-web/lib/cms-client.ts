@@ -10,15 +10,33 @@ export const safeTenant = () => {
   return undefined;
 };
 
+/**
+ * Absolute Nest `/api` base for server-side CMS fetches.
+ * Prefer Docker-internal origin; never return a relative `/api` (SSR cannot resolve it).
+ */
 export const cmsBase = () => {
   const internal = process.env.API_INTERNAL_ORIGIN?.replace(/\/+$/, '');
   if (internal && /^https?:\/\/[^/]+$/i.test(internal)) return `${internal}/api`;
+
   const configured = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '');
   if (configured && /^https?:\/\//i.test(configured)) {
     return configured.endsWith('/api') ? configured : `${configured}/api`;
   }
+
+  // Absolute ERP / web API when college-web is only given a relative `/api`.
+  const erpOrigin = (
+    process.env.ERP_API_ORIGIN ??
+    process.env.WEB_ORIGIN ??
+    process.env.NEXT_PUBLIC_ERP_LOGIN_URL?.replace(/\/login\/?$/i, '')
+  )?.replace(/\/+$/, '');
+  if (erpOrigin && /^https?:\/\/[^/]+$/i.test(erpOrigin)) {
+    return `${erpOrigin}/api`;
+  }
+
   if (process.env.NODE_ENV !== 'production') return 'http://127.0.0.1:3001/api';
-  return undefined;
+
+  // Compose service name used by docker-compose.prod.yml
+  return 'http://api:3001/api';
 };
 
 export const cmsUrl = (endpoint: string, query: Record<string, string> = {}) => {
@@ -48,7 +66,10 @@ export async function fetchCms(
   timeoutMs = 4500,
 ): Promise<unknown | null> {
   const url = cmsUrl(endpoint, query);
-  if (!url) return null;
+  if (!url) {
+    console.warn(`[college-web] CMS ${endpoint} skipped — no API base URL`);
+    return null;
+  }
   try {
     const response = await fetch(url, {
       headers: cmsHeaders(),
@@ -59,9 +80,7 @@ export async function fetchCms(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
-      if (process.env.NODE_ENV !== 'production' && response.status !== 404) {
-        console.warn(`[college-web] CMS ${endpoint} responded ${response.status}`);
-      }
+      console.warn(`[college-web] CMS ${endpoint} responded ${response.status} (${url.origin})`);
       return null;
     }
     const payload = (await response.json()) as unknown;
@@ -70,9 +89,7 @@ export async function fetchCms(
     }
     return payload;
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[college-web] CMS ${endpoint} unavailable`, error);
-    }
+    console.warn(`[college-web] CMS ${endpoint} unavailable`, error);
     return null;
   }
 }

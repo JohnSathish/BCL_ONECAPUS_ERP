@@ -800,27 +800,27 @@ export class WebsiteService {
     tenantId: string,
     query: ListWebsiteFyugInterestsQueryDto = {},
   ) {
-    const site = await this.getOrCreateSite(tenantId);
+    await this.getOrCreateSite(tenantId);
     const skip = query.skip ?? 0;
     const take = query.take ?? 50;
+    // Scope by tenant only — site recreation must not hide imported rows.
+    const where = { tenantId };
     const [items, total] = await Promise.all([
       this.prisma.websiteFyugInterest.findMany({
-        where: { tenantId, siteId: site.id },
+        where,
         orderBy: [{ applicationNumber: 'desc' }, { createdAt: 'desc' }],
         skip,
         take,
       }),
-      this.prisma.websiteFyugInterest.count({
-        where: { tenantId, siteId: site.id },
-      }),
+      this.prisma.websiteFyugInterest.count({ where }),
     ]);
     return { items, total, skip, take };
   }
 
   async getFyugInterestStats(tenantId: string) {
-    const site = await this.getOrCreateSite(tenantId);
+    await this.getOrCreateSite(tenantId);
     const rows = await this.prisma.websiteFyugInterest.findMany({
-      where: { tenantId, siteId: site.id },
+      where: { tenantId },
       select: {
         applyingHonoursIn: true,
         majorCourse: true,
@@ -943,9 +943,9 @@ export class WebsiteService {
   }
 
   async exportFyugInterestsExcel(tenantId: string): Promise<Buffer> {
-    const site = await this.getOrCreateSite(tenantId);
+    await this.getOrCreateSite(tenantId);
     const rows = await this.prisma.websiteFyugInterest.findMany({
-      where: { tenantId, siteId: site.id },
+      where: { tenantId },
       orderBy: [{ applicationNumber: 'asc' }, { createdAt: 'asc' }],
     });
     const stats = await this.getFyugInterestStats(tenantId);

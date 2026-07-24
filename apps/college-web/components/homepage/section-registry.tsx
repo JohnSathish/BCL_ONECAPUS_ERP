@@ -10,7 +10,6 @@ import {
   Trophy,
 } from 'lucide-react';
 import { AboutCollegeSection } from '@/components/about-college';
-import { FlashNewsTickerSection } from '@/components/flash-news-ticker-section';
 import { Gallery } from '@/components/interactive';
 import { HeroSlider } from '@/components/hero-slider';
 import { InformationHub } from '@/components/information-hub';
@@ -59,26 +58,47 @@ function heroFromPayload(payload: Record<string, unknown>, fallback: HeroSlide[]
   return mapped.length ? mapped : fallback;
 }
 
+function noticeBadgeFromRow(row: Record<string, unknown>): HubNotice['badge'] {
+  if (row.priority === 'URGENT') return 'URGENT';
+  if (typeof row.badge === 'string') {
+    const badge = row.badge.toUpperCase();
+    if (badge === 'URGENT' || badge === 'PDF' || badge === 'HOLIDAY' || badge === 'NEW') {
+      return badge;
+    }
+  }
+  const category = typeof row.category === 'string' ? row.category.toUpperCase() : '';
+  if (category.includes('HOLIDAY')) return 'HOLIDAY';
+  if (typeof row.attachmentUrl === 'string' && row.attachmentUrl.trim()) return 'PDF';
+  if (category === 'URGENT') return 'URGENT';
+  return 'NEW';
+}
+
 function noticesFromPayload(payload: Record<string, unknown>, fallback: HubNotice[]): HubNotice[] {
   const notices = payload.notices;
-  if (!Array.isArray(notices) || !notices.length) return fallback;
-  const mapped: HubNotice[] = [];
-  for (const row of notices) {
-    if (!isRecord(row) || typeof row.id !== 'string' || typeof row.title !== 'string') continue;
-    mapped.push({
-      id: row.id,
-      title: row.title,
-      badge: 'NEW',
-      publishedAt:
-        typeof row.publishAt === 'string'
-          ? row.publishAt.slice(0, 10)
-          : new Date().toISOString().slice(0, 10),
-      href: `/notices/${typeof row.slug === 'string' ? row.slug : row.id}`,
-      attachmentHref: typeof row.attachmentUrl === 'string' ? row.attachmentUrl : undefined,
-      urgent: row.priority === 'URGENT',
-    });
+  // Empty CMS array is intentional — do not resurrect demo seed notices.
+  if (Array.isArray(notices)) {
+    const mapped: HubNotice[] = [];
+    for (const row of notices) {
+      if (!isRecord(row) || typeof row.id !== 'string' || typeof row.title !== 'string') continue;
+      const badge = noticeBadgeFromRow(row);
+      mapped.push({
+        id: row.id,
+        title: row.title,
+        badge,
+        publishedAt:
+          typeof row.publishAt === 'string'
+            ? row.publishAt.slice(0, 10)
+            : typeof row.createdAt === 'string'
+              ? row.createdAt.slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+        href: `/notices/${typeof row.slug === 'string' ? row.slug : row.id}`,
+        attachmentHref: typeof row.attachmentUrl === 'string' ? row.attachmentUrl : undefined,
+        urgent: row.priority === 'URGENT' || badge === 'URGENT',
+      });
+    }
+    return mapped;
   }
-  return mapped;
+  return fallback;
 }
 
 export function HomepageSectionRenderer({
@@ -183,12 +203,8 @@ export function HomepageSectionRenderer({
       return <InformationHub hub={{ ...hub, notices }} mode="notices" />;
     }
     case 'aboutCollege':
-      return (
-        <>
-          <FlashNewsTickerSection />
-          <AboutCollegeSection about={content.aboutCollege} />
-        </>
-      );
+      // Announcements ticker is rendered once from the homepage shell (above About).
+      return <AboutCollegeSection about={content.aboutCollege} />;
     case 'departments':
       return <DepartmentsShowcase departments={academicDepartments} />;
     case 'programmes':

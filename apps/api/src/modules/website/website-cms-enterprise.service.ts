@@ -184,6 +184,10 @@ export class WebsiteCmsEnterpriseService {
       if (item.key === 'upcomingEvents' && current.enabled) {
         patch.enabled = false;
       }
+      // Departments showcase must stay on once catalog exists.
+      if (item.key === 'departments' && !current.enabled) {
+        patch.enabled = true;
+      }
       if (Object.keys(patch).length) {
         await this.prisma.websiteHomepageSection.update({
           where: { id: current.id },
@@ -707,9 +711,14 @@ export class WebsiteCmsEnterpriseService {
           orderBy: { position: 'asc' },
         })
       : [];
-    const events = sections.some((s) => s.sectionKey === 'upcomingEvents')
-      ? await this.listUpcomingEvents(tenantId)
-      : [];
+    // Upcoming Events live inside the Principal hub; the standalone
+    // `upcomingEvents` section is kept disabled by policy, so load events
+    // whenever Principal (or the legacy events slot) is enabled.
+    const events =
+      sections.some((s) => s.sectionKey === 'principalMessage') ||
+      sections.some((s) => s.sectionKey === 'upcomingEvents')
+        ? await this.listUpcomingEvents(tenantId)
+        : [];
     const news = sections.some((s) => s.sectionKey === 'news')
       ? await this.listPublicNews(tenantId)
       : [];

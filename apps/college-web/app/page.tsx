@@ -4,6 +4,7 @@ import {
   HomepageResearchAndLinks,
   HomepageSectionRenderer,
 } from '@/components/homepage/section-registry';
+import { FlashNewsTickerSection } from '@/components/flash-news-ticker-section';
 import { getCollegeContent } from '@/lib/content';
 import { listAcademicDepartments } from '@/lib/academic-departments';
 import { getHeroSlides } from '@/lib/hero-slides';
@@ -45,9 +46,16 @@ export default async function HomePage() {
     });
   }
 
+  // Production: never show demo seed events/notices — only CMS/ERP data.
+  const useDemoFallbacks = process.env.NODE_ENV !== 'production';
   const hub = {
     ...content.informationHub,
-    upcomingEvents: cmsEvents.length ? cmsEvents : content.informationHub.upcomingEvents,
+    upcomingEvents: cmsEvents.length
+      ? cmsEvents
+      : useDemoFallbacks
+        ? content.informationHub.upcomingEvents
+        : [],
+    notices: useDemoFallbacks ? content.informationHub.notices : [],
   };
 
   const sections = (homepage?.sections ?? [])
@@ -73,6 +81,7 @@ export default async function HomePage() {
           heroSlides={heroSlides}
           hub={hub}
         />
+        <FlashNewsTickerSection />
         <HomepageSectionRenderer
           section={{
             id: 'aboutCollege',
@@ -246,16 +255,25 @@ export default async function HomePage() {
 
   return (
     <main id="main">
-      {sections.map((section) => (
-        <HomepageSectionRenderer
-          key={section.id}
-          section={section}
-          content={content}
-          academicDepartments={academicDepartments}
-          heroSlides={heroSlides}
-          hub={hub}
-        />
-      ))}
+      {sections
+        .map((section) => (
+          <HomepageSectionRenderer
+            key={section.id}
+            section={section}
+            content={content}
+            academicDepartments={academicDepartments}
+            heroSlides={heroSlides}
+            hub={hub}
+          />
+        ))
+        .flatMap((node, index) => {
+          const section = sections[index];
+          // Place announcements ticker immediately after the hero.
+          if (section?.sectionKey === 'hero') {
+            return [node, <FlashNewsTickerSection key="flash-announcements" />];
+          }
+          return [node];
+        })}
     </main>
   );
 }

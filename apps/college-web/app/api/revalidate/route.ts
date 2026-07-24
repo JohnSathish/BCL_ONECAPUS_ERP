@@ -21,6 +21,9 @@ export async function POST(request: Request) {
 
   revalidateTag('website-cms');
   revalidateTag('website-hero');
+  revalidateTag('website-departments');
   paths.forEach((path) => revalidatePath(path));
+  // Department listing and detail pages
+  revalidatePath('/departments');
   return NextResponse.json({ ok: true, paths, revalidatedAt: new Date().toISOString() });
 }

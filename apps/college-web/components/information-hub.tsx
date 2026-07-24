@@ -136,9 +136,11 @@ function EventsCard({ hub }: { hub: InformationHubContent }) {
         ) : null}
 
         <AutoScrollTicker label="Upcoming events ticker" speedPx={26}>
-          {scrollEvents.map((event) => (
-            <EventRow key={event.id} event={event} />
-          ))}
+          {scrollEvents.length ? (
+            scrollEvents.map((event) => <EventRow key={event.id} event={event} />)
+          ) : (
+            <p className="info-empty">No upcoming events published yet.</p>
+          )}
         </AutoScrollTicker>
       </div>
       <footer className="info-card-foot info-card-foot-navy">
@@ -184,9 +186,13 @@ function NoticesCard({ hub }: { hub: InformationHubContent }) {
         ) : null}
 
         <AutoScrollTicker label="Notice board ticker" speedPx={24}>
-          {scrollNotices.map((notice) => (
-            <NoticeRow key={notice.id} notice={notice} noticesHref={hub.noticesHref} />
-          ))}
+          {scrollNotices.length || urgentNotices.length ? (
+            scrollNotices.map((notice) => (
+              <NoticeRow key={notice.id} notice={notice} noticesHref={hub.noticesHref} />
+            ))
+          ) : (
+            <p className="info-empty">No notices published yet.</p>
+          )}
         </AutoScrollTicker>
       </div>
       <footer className="info-card-foot info-card-foot-navy">

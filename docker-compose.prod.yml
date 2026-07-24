@@ -97,6 +97,7 @@ services:
     environment:
       NODE_ENV: production
       API_INTERNAL_ORIGIN: http://api:3001
+      ERP_API_ORIGIN: ${ERP_API_ORIGIN:-https://erp.donboscocollege.ac.in}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
       NEXT_PUBLIC_SITE_URL: ${COLLEGE_SITE_URL:-https://donboscocollege.ac.in}
       NEXT_PUBLIC_ERP_LOGIN_URL: ${NEXT_PUBLIC_ERP_LOGIN_URL:-https://erp.donboscocollege.ac.in/login}

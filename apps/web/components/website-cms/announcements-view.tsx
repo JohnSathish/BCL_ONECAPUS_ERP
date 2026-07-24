@@ -12,12 +12,17 @@ import {
   createWebsiteAnnouncement,
   deleteWebsiteAnnouncement,
   fetchWebsiteAnnouncements,
+  revalidateWebsite,
   updateWebsiteAnnouncement,
   uploadWebsiteDocument,
   uploadWebsiteMedia,
 } from '@/services/website-cms';
 import type { WebsiteAnnouncement } from '@/types/website-cms';
 import { apiErrorMessage } from '@/utils/api-error';
+
+function refreshPublicAnnouncements() {
+  void revalidateWebsite(['/', '/announcements']).catch(() => undefined);
+}
 
 type Props = {
   onMessage: (message: string) => void;
@@ -104,6 +109,7 @@ export function AnnouncementsView({ onMessage }: Props) {
       onMessage(editingId ? 'Announcement updated.' : 'Announcement created as draft.');
       resetForm();
       void queryClient.invalidateQueries({ queryKey: ['website', 'announcements'] });
+      refreshPublicAnnouncements();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not save announcement')),
   });
@@ -114,6 +120,7 @@ export function AnnouncementsView({ onMessage }: Props) {
     onSuccess: () => {
       onMessage('Announcement updated.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'announcements'] });
+      refreshPublicAnnouncements();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not update announcement')),
   });
@@ -123,6 +130,7 @@ export function AnnouncementsView({ onMessage }: Props) {
     onSuccess: () => {
       onMessage('Announcement moved to trash.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'announcements'] });
+      refreshPublicAnnouncements();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not trash announcement')),
   });

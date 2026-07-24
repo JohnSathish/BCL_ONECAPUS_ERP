@@ -1589,6 +1589,7 @@ function DepartmentsPublishView({ onMessage }: { onMessage: (message: string) =>
       onMessage(
         `Published ${result.departmentsPublished} departments and ${result.staffPublished} faculty profiles to the website.`,
       );
+      void revalidateWebsite(['/', '/departments']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not publish departments')),
   });
@@ -1615,6 +1616,7 @@ function DepartmentsPublishView({ onMessage }: { onMessage: (message: string) =>
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['website', 'academic-departments'] });
       onMessage('Department website profile updated.');
+      void revalidateWebsite(['/', '/departments']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not update department')),
   });
@@ -1650,11 +1652,12 @@ function DepartmentsPublishView({ onMessage }: { onMessage: (message: string) =>
             disabled={saveSource.isPending}
             onClick={() => saveSource.mutate('ERP')}
           >
-            Sync from ERP
+            Use ERP source
           </Button>
           <p className="text-sm text-muted-foreground">
-            Source: {sourceMode}. Creates website profiles, sets public slugs, and marks teaching
-            staff as visible.
+            Source: {sourceMode}. Use <strong>Publish all</strong> (or per-row Publish) to show
+            departments on the public site. “Use ERP source” only sets the content mode — it does
+            not publish.
           </p>
         </CompactCardBody>
       </CompactCard>
@@ -2099,6 +2102,7 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
     onSuccess: () => {
       onMessage('Calendar website visibility saved. Homepage Upcoming Events reads this adapter.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'calendar-items'] });
+      void revalidateWebsite(['/', '/academics/calendar']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not save calendar items')),
   });
@@ -2536,9 +2540,20 @@ function FyugInterestView() {
       <CompactCard>
         <CompactCardHeader
           title="FYUG 4th-year interest registrations"
-          description={`${rows.data.total} registration${rows.data.total === 1 ? '' : 's'} for Fourth-Year Honours 2026.`}
+          description={`${rows.data.total} registration${rows.data.total === 1 ? '' : 's'} for Fourth-Year Honours 2026 (public form / Excel import — not ERP semester-7 enrolments).`}
         />
         <CompactCardBody className="space-y-2">
+          {!rows.data.total ? (
+            <p className="rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+              No FYUG interest rows for this college tenant yet. New submissions arrive from{' '}
+              <code className="text-xs">/admission/fyug-2026</code>. To load the legacy Excel
+              (Fourth-Year Honours 2026), run on the API host:{' '}
+              <code className="text-xs">
+                npx tsx scripts/import-fyug-interest-xlsx.ts --tenant=demo
+              </code>
+              .
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -2657,6 +2672,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
       setBodyHtml('');
       onMessage('Notice created as draft.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'notices'] });
+      void revalidateWebsite(['/', '/notices']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not create notice')),
   });
@@ -2666,6 +2682,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     onSuccess: () => {
       onMessage('Notice updated.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'notices'] });
+      void revalidateWebsite(['/', '/notices']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not update notice')),
   });
@@ -2674,6 +2691,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     onSuccess: () => {
       onMessage('Notice moved to trash.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'notices'] });
+      void revalidateWebsite(['/', '/notices']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not trash notice')),
   });
