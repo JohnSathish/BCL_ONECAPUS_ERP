@@ -25,5 +25,16 @@ export function prismaSchemaDriftMessage(error: unknown): string | null {
     return 'Database schema is outdated (missing column). Run migrations and rebuild the API.';
   }
 
+  if (error.code === 'P2002') {
+    const target = (error.meta as { target?: string[] | string } | undefined)
+      ?.target;
+    const fields = Array.isArray(target)
+      ? target.join(', ')
+      : typeof target === 'string'
+        ? target
+        : 'unique field';
+    return `A record with the same ${fields} already exists. Change the title/slug and try again.`;
+  }
+
   return null;
 }

@@ -2088,15 +2088,26 @@ function SeoSuiteView({ onMessage }: { onMessage: (message: string) => void }) {
   );
 }
 
+function rowKey(row: Record<string, unknown>, index: number) {
+  return String(row.id ?? index);
+}
+
 function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) => void }) {
   const queryClient = useQueryClient();
   const items = useQuery({
     queryKey: ['website', 'calendar-items'],
     queryFn: fetchWebsiteCalendarItems,
   });
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [category, setCategory] = useState('Academic');
+  const resetForm = () => {
+    setEditingKey(null);
+    setTitle('');
+    setDate('');
+    setCategory('Academic');
+  };
   const save = useMutation({
     mutationFn: (next: Array<Record<string, unknown>>) => updateWebsiteCalendarItems(next),
     onSuccess: () => {
@@ -2113,9 +2124,13 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
       <CompactCard>
         <CompactCardHeader
           title="Academic Calendar → Website"
-          description="Mark ERP/calendar items for the public site. Homepage does not use a separate CMS event form."
+          description={
+            editingKey
+              ? 'Editing an existing event. Save changes or cancel to add a new one.'
+              : 'Homepage Upcoming Events only (short list). This is not a full month-by-month year planner handbook.'
+          }
         />
-        <CompactCardBody className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
+        <CompactCardBody className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">
           <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -2131,30 +2146,33 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
             disabled={!title || !date || save.isPending}
             onClick={() =>
               save.mutate(
-                [
-                  ...rows,
-                  {
-                    id: `cal-${Date.now()}`,
-                    title,
-                    date,
-                    category,
-                    showOnWebsite: true,
-                    featured: false,
-                    source: 'ERP',
-                  },
-                ],
-                {
-                  onSuccess: () => {
-                    setTitle('');
-                    setDate('');
-                    setCategory('Academic');
-                  },
-                },
+                editingKey
+                  ? rows.map((item, i) =>
+                      rowKey(item, i) === editingKey ? { ...item, title, date, category } : item,
+                    )
+                  : [
+                      ...rows,
+                      {
+                        id: `cal-${Date.now()}`,
+                        title,
+                        date,
+                        category,
+                        showOnWebsite: true,
+                        featured: false,
+                        source: 'ERP',
+                      },
+                    ],
+                { onSuccess: resetForm },
               )
             }
           >
-            Add / sync item
+            {editingKey ? 'Save changes' : 'Add / sync item'}
           </Button>
+          {editingKey ? (
+            <Button variant="outline" onClick={resetForm}>
+              Cancel
+            </Button>
+          ) : null}
         </CompactCardBody>
       </CompactCard>
       <CompactCard>
@@ -2162,7 +2180,7 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
         <CompactCardBody className="space-y-2">
           {rows.map((row, index) => (
             <div
-              key={String(row.id ?? index)}
+              key={rowKey(row, index)}
               className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
             >
               <div>
@@ -2173,6 +2191,20 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
                 </p>
               </div>
               <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingKey(rowKey(row, index));
+                    setTitle(String(row.title ?? ''));
+                    setDate(String(row.date ?? '').slice(0, 10));
+                    setCategory(String(row.category ?? 'Academic'));
+                    if (typeof window !== 'undefined')
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  Edit
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -2191,7 +2223,12 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => save.mutate(rows.filter((_, i) => i !== index))}
+                  onClick={() =>
+                    save.mutate(
+                      rows.filter((_, i) => i !== index),
+                      { onSuccess: resetForm },
+                    )
+                  }
                 >
                   Remove
                 </Button>
@@ -2668,10 +2705,26 @@ function FyugInterestView() {
 function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
   const queryClient = useQueryClient();
   const notices = useQuery({ queryKey: ['website', 'notices'], queryFn: fetchWebsiteNotices });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<(typeof NOTICE_CATEGORIES)[number]>('GENERAL');
   const [priority, setPriority] = useState<(typeof NOTICE_PRIORITIES)[number]>('NORMAL');
   const [bodyHtml, setBodyHtml] = useState('');
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle('');
+    setCategory('GENERAL');
+    setPriority('NORMAL');
+    setBodyHtml('');
+  };
+  const loadForEdit = (notice: WebsiteNotice) => {
+    setEditingId(notice.id);
+    setTitle(notice.title ?? '');
+    setCategory((notice.category as (typeof NOTICE_CATEGORIES)[number]) ?? 'GENERAL');
+    setPriority((notice.priority as (typeof NOTICE_PRIORITIES)[number]) ?? 'NORMAL');
+    setBodyHtml(notice.bodyHtml ?? '');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const create = useMutation({
     mutationFn: () =>
       createWebsiteNotice({
@@ -2684,13 +2737,28 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
         isVisible: true,
       }),
     onSuccess: () => {
-      setTitle('');
-      setBodyHtml('');
+      resetForm();
       onMessage('Notice created as draft.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'notices'] });
       void revalidateWebsite(['/', '/notices']).catch(() => undefined);
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not create notice')),
+  });
+  const saveEdit = useMutation({
+    mutationFn: () =>
+      updateWebsiteNotice(editingId as string, {
+        title: title.trim(),
+        category,
+        priority,
+        bodyHtml,
+      }),
+    onSuccess: () => {
+      resetForm();
+      onMessage('Notice updated.');
+      void queryClient.invalidateQueries({ queryKey: ['website', 'notices'] });
+      void revalidateWebsite(['/', '/notices']).catch(() => undefined);
+    },
+    onError: (error) => onMessage(apiErrorMessage(error, 'Could not update notice')),
   });
   const update = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<WebsiteNotice> }) =>
@@ -2718,8 +2786,12 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     <div className="space-y-4">
       <CompactCard>
         <CompactCardHeader
-          title="Add notice"
-          description="Notice Board — publish circulars with priority and expiry."
+          title={editingId ? 'Edit notice' : 'Add notice'}
+          description={
+            editingId
+              ? 'Editing an existing notice. Save changes or cancel to start a new one.'
+              : 'Notice Board — publish circulars with priority and expiry.'
+          }
         />
         <CompactCardBody className="grid gap-3 md:grid-cols-2">
           <Input
@@ -2748,6 +2820,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
           </select>
           <div className="md:col-span-2">
             <RichTextEditor
+              key={editingId ?? 'new-notice'}
               value={bodyHtml}
               onChange={setBodyHtml}
               onUploadImage={async (file) => {
@@ -2756,13 +2829,20 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
               }}
             />
           </div>
-          <Button
-            className="w-fit"
-            disabled={!title.trim() || create.isPending}
-            onClick={() => create.mutate()}
-          >
-            Create draft
-          </Button>
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <Button
+              className="w-fit"
+              disabled={!title.trim() || create.isPending || saveEdit.isPending}
+              onClick={() => (editingId ? saveEdit.mutate() : create.mutate())}
+            >
+              {editingId ? 'Save changes' : 'Create draft'}
+            </Button>
+            {editingId ? (
+              <Button variant="outline" className="w-fit" onClick={resetForm}>
+                Cancel edit
+              </Button>
+            ) : null}
+          </div>
         </CompactCardBody>
       </CompactCard>
       <CompactCard>
@@ -2781,6 +2861,9 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => loadForEdit(notice)}>
+                  Edit
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"

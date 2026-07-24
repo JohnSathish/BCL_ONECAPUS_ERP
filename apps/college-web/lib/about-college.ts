@@ -38,7 +38,7 @@ export const seedAboutCollege: AboutCollegeContent = {
   stats: [
     { id: 'founded', label: 'Year Established', value: 1987 },
     { id: 'programmes', label: 'Programmes Offered', value: 15, suffix: '+' },
-    { id: 'students', label: 'Students', value: 2200, suffix: '+' },
+    { id: 'students', label: 'Students', value: 3100, suffix: '+' },
     { id: 'faculty', label: 'Faculty Members', value: 140, suffix: '+' },
     { id: 'departments', label: 'Departments', value: 15 },
     { id: 'naac', label: 'NAAC Accredited', value: 0, prefix: 'B Grade' },
@@ -90,6 +90,16 @@ export function mergeAboutCollege(...values: unknown[]): AboutCollegeContent {
     portraitAlt: merged.portraitAlt ?? seedAboutCollege.portraitAlt,
     readMoreHref: merged.readMoreHref ?? seedAboutCollege.readMoreHref,
     tourHref: merged.tourHref ?? seedAboutCollege.tourHref,
-    stats: merged.stats?.length ? merged.stats : seedAboutCollege.stats,
+    stats: normalizeAboutStats(merged.stats?.length ? merged.stats : seedAboutCollege.stats),
   };
+}
+
+/** Bump outdated handbook figures when CMS still stores the previous count. */
+function normalizeAboutStats(stats: AboutStat[]): AboutStat[] {
+  return stats.map((stat) => {
+    if (stat.id === 'students' && Number(stat.value) === 2200) {
+      return { ...stat, value: 3100, suffix: stat.suffix ?? '+' };
+    }
+    return stat;
+  });
 }

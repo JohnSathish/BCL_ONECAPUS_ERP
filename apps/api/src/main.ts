@@ -19,6 +19,11 @@ async function bootstrap() {
     { rawBody: true },
   );
 
+  // CMS rich text (announcements/notices with inline images as URLs) can exceed
+  // Express's default 100kb JSON limit; keep below nginx client_max_body_size.
+  app.useBodyParser('json', { limit: '5mb' });
+  app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
+
   app.useStaticAssets(resolveUploadRoot(), {
     prefix: '/uploads/',
     maxAge: '7d',

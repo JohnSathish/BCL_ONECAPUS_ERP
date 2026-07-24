@@ -114,7 +114,7 @@ export const seedHomepageSpotlight: HomepageSpotlightContent = {
     { id: 'exam', label: 'Exam Schedule', href: '/examination' },
   ],
   spotlightStats: [
-    { value: 2200, suffix: '+', label: 'Students' },
+    { value: 3100, suffix: '+', label: 'Students' },
     { value: 140, suffix: '+', label: 'Faculty' },
     { value: 35, suffix: '+', label: 'Departments' },
     { value: 39, suffix: '+', label: 'Years of Excellence' },

@@ -483,37 +483,52 @@ export class WebsiteCmsEnterpriseService {
     const site = await this.website.getOrCreateSite(user.tid, user.sub);
     const title = dto.title.trim();
     if (!title) throw new BadRequestException('Title is required');
-    const slug = (dto.slug?.trim() || this.slugify(title)).toLowerCase();
+    const baseSlug = (dto.slug?.trim() || this.slugify(title)).toLowerCase();
+    if (!baseSlug)
+      throw new BadRequestException(
+        'Could not build a URL slug from the title',
+      );
     const status = (dto.status ?? 'DRAFT').toUpperCase();
     if (!['DRAFT', 'PUBLISHED'].includes(status)) {
       throw new BadRequestException('Invalid announcement status');
     }
     const linkUrl = this.normalizeAnnouncementLinkUrl(dto.linkUrl);
-    const row = await this.prisma.websiteAnnouncement.create({
-      data: {
-        tenantId: user.tid,
-        siteId: site.id,
-        title,
-        slug,
-        summary: (dto.summary ?? '').trim(),
-        bodyHtml: sanitizeWebsiteHtml(dto.bodyHtml ?? ''),
-        featuredImageUrl: dto.featuredImageUrl ?? null,
-        featuredImageAlt: dto.featuredImageAlt?.trim() || null,
-        attachmentUrl: dto.attachmentUrl ?? null,
-        attachmentName: dto.attachmentName ?? null,
-        linkUrl,
-        isPinned: dto.isPinned ?? false,
-        showOnTicker: dto.showOnTicker ?? true,
-        showOnHomepage: dto.showOnHomepage ?? true,
-        isVisible: dto.isVisible ?? true,
-        publishAt: dto.publishAt ? new Date(dto.publishAt) : new Date(),
-        expireAt: dto.expireAt ? new Date(dto.expireAt) : null,
-        status,
-        createdById: user.sub,
-        updatedById: user.sub,
-      },
-    });
-    return this.mapAnnouncement(row);
+    const bodyHtml = sanitizeWebsiteHtml(dto.bodyHtml ?? '');
+    if (bodyHtml.length > 400_000) {
+      throw new BadRequestException(
+        'Announcement body is too large. Insert images with the toolbar (upload), not by pasting huge pictures.',
+      );
+    }
+    const slug = await this.uniqueAnnouncementSlug(site.id, baseSlug);
+    try {
+      const row = await this.prisma.websiteAnnouncement.create({
+        data: {
+          tenantId: user.tid,
+          siteId: site.id,
+          title,
+          slug,
+          summary: (dto.summary ?? '').trim(),
+          bodyHtml,
+          featuredImageUrl: dto.featuredImageUrl ?? null,
+          featuredImageAlt: dto.featuredImageAlt?.trim() || null,
+          attachmentUrl: dto.attachmentUrl ?? null,
+          attachmentName: dto.attachmentName ?? null,
+          linkUrl,
+          isPinned: dto.isPinned ?? false,
+          showOnTicker: dto.showOnTicker ?? true,
+          showOnHomepage: dto.showOnHomepage ?? true,
+          isVisible: dto.isVisible ?? true,
+          publishAt: dto.publishAt ? new Date(dto.publishAt) : new Date(),
+          expireAt: dto.expireAt ? new Date(dto.expireAt) : null,
+          status,
+          createdById: user.sub,
+          updatedById: user.sub,
+        },
+      });
+      return this.mapAnnouncement(row);
+    } catch (error) {
+      this.rethrowAnnouncementWriteError(error);
+    }
   }
 
   async updateAnnouncement(
@@ -548,53 +563,62 @@ export class WebsiteCmsEnterpriseService {
         throw new BadRequestException('Invalid announcement status');
       }
     }
-    const updated = await this.prisma.websiteAnnouncement.update({
-      where: { id: existing.id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.slug !== undefined
-          ? { slug: dto.slug.trim().toLowerCase() }
-          : {}),
-        ...(dto.summary !== undefined ? { summary: dto.summary.trim() } : {}),
-        ...(dto.bodyHtml !== undefined
-          ? { bodyHtml: sanitizeWebsiteHtml(dto.bodyHtml) }
-          : {}),
-        ...(dto.featuredImageUrl !== undefined
-          ? { featuredImageUrl: dto.featuredImageUrl }
-          : {}),
-        ...(dto.featuredImageAlt !== undefined
-          ? { featuredImageAlt: dto.featuredImageAlt?.trim() || null }
-          : {}),
-        ...(dto.attachmentUrl !== undefined
-          ? { attachmentUrl: dto.attachmentUrl }
-          : {}),
-        ...(dto.attachmentName !== undefined
-          ? { attachmentName: dto.attachmentName }
-          : {}),
-        ...(dto.linkUrl !== undefined
-          ? { linkUrl: this.normalizeAnnouncementLinkUrl(dto.linkUrl) }
-          : {}),
-        ...(dto.isPinned !== undefined ? { isPinned: dto.isPinned } : {}),
-        ...(dto.showOnTicker !== undefined
-          ? { showOnTicker: dto.showOnTicker }
-          : {}),
-        ...(dto.showOnHomepage !== undefined
-          ? { showOnHomepage: dto.showOnHomepage }
-          : {}),
-        ...(dto.isVisible !== undefined ? { isVisible: dto.isVisible } : {}),
-        ...(dto.publishAt !== undefined
-          ? { publishAt: dto.publishAt ? new Date(dto.publishAt) : null }
-          : {}),
-        ...(dto.expireAt !== undefined
-          ? { expireAt: dto.expireAt ? new Date(dto.expireAt) : null }
-          : {}),
-        ...(dto.status !== undefined
-          ? { status: dto.status.toUpperCase() }
-          : {}),
-        updatedById: user.sub,
-      },
-    });
-    return this.mapAnnouncement(updated);
+    if (dto.bodyHtml !== undefined && dto.bodyHtml.length > 400_000) {
+      throw new BadRequestException(
+        'Announcement body is too large. Insert images with the toolbar (upload), not by pasting huge pictures.',
+      );
+    }
+    try {
+      const updated = await this.prisma.websiteAnnouncement.update({
+        where: { id: existing.id },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+          ...(dto.slug !== undefined
+            ? { slug: dto.slug.trim().toLowerCase() }
+            : {}),
+          ...(dto.summary !== undefined ? { summary: dto.summary.trim() } : {}),
+          ...(dto.bodyHtml !== undefined
+            ? { bodyHtml: sanitizeWebsiteHtml(dto.bodyHtml) }
+            : {}),
+          ...(dto.featuredImageUrl !== undefined
+            ? { featuredImageUrl: dto.featuredImageUrl }
+            : {}),
+          ...(dto.featuredImageAlt !== undefined
+            ? { featuredImageAlt: dto.featuredImageAlt?.trim() || null }
+            : {}),
+          ...(dto.attachmentUrl !== undefined
+            ? { attachmentUrl: dto.attachmentUrl }
+            : {}),
+          ...(dto.attachmentName !== undefined
+            ? { attachmentName: dto.attachmentName }
+            : {}),
+          ...(dto.linkUrl !== undefined
+            ? { linkUrl: this.normalizeAnnouncementLinkUrl(dto.linkUrl) }
+            : {}),
+          ...(dto.isPinned !== undefined ? { isPinned: dto.isPinned } : {}),
+          ...(dto.showOnTicker !== undefined
+            ? { showOnTicker: dto.showOnTicker }
+            : {}),
+          ...(dto.showOnHomepage !== undefined
+            ? { showOnHomepage: dto.showOnHomepage }
+            : {}),
+          ...(dto.isVisible !== undefined ? { isVisible: dto.isVisible } : {}),
+          ...(dto.publishAt !== undefined
+            ? { publishAt: dto.publishAt ? new Date(dto.publishAt) : null }
+            : {}),
+          ...(dto.expireAt !== undefined
+            ? { expireAt: dto.expireAt ? new Date(dto.expireAt) : null }
+            : {}),
+          ...(dto.status !== undefined
+            ? { status: dto.status.toUpperCase() }
+            : {}),
+          updatedById: user.sub,
+        },
+      });
+      return this.mapAnnouncement(updated);
+    } catch (error) {
+      this.rethrowAnnouncementWriteError(error);
+    }
   }
 
   async trashAnnouncement(user: JwtUser, announcementId: string) {
@@ -1470,6 +1494,45 @@ export class WebsiteCmsEnterpriseService {
       throw new BadRequestException('Link URL must use http or https');
     }
     return parsed.toString();
+  }
+
+  private async uniqueAnnouncementSlug(siteId: string, baseSlug: string) {
+    let slug = baseSlug.slice(0, 80);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const existing = await this.prisma.websiteAnnouncement.findFirst({
+        where: { siteId, slug, deletedAt: null },
+        select: { id: true },
+      });
+      if (!existing) return slug;
+      const suffix = `-${attempt + 2}`;
+      slug = `${baseSlug.slice(0, Math.max(1, 80 - suffix.length))}${suffix}`;
+    }
+    return `${baseSlug.slice(0, 70)}-${Date.now().toString(36)}`;
+  }
+
+  private rethrowAnnouncementWriteError(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new BadRequestException(
+        'An announcement with a similar title already exists. Change the title slightly and try again.',
+      );
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2022'
+    ) {
+      throw new BadRequestException(
+        'Database is missing the announcement link_url column. Run migrations on the server, then retry.',
+      );
+    }
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException(
+        'Announcement could not be saved (invalid data). If you just deployed, rebuild the API and run migrations.',
+      );
+    }
+    throw error;
   }
 
   private slugify(value: string) {

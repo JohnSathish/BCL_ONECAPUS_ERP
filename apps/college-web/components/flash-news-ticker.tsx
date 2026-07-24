@@ -39,9 +39,32 @@ function FlashItem({ item }: { item: FlashAnnouncement }) {
   );
 }
 
+function StaticTicker({ items, label }: { items: FlashAnnouncement[]; label: string }) {
+  return (
+    <aside className="flash-news-bar" aria-label={label}>
+      <div className="flash-news-label">
+        <Megaphone aria-hidden />
+        <span className="flash-news-label-full">Announcements</span>
+        <span className="flash-news-label-short">Flash</span>
+      </div>
+      <div className="flash-news-viewport is-static">
+        <div className="flash-news-track">
+          {items.map((item) => (
+            <div key={item.id} className="flash-news-slot" data-flash-item="true">
+              <FlashItem item={item} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [loopWidth, setLoopWidth] = useState(0);
+  const [needsMarquee, setNeedsMarquee] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const resumeTimer = useRef<number | null>(null);
@@ -76,24 +99,33 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
 
   useEffect(() => {
     const track = trackRef.current;
-    if (!track) return;
+    const viewport = viewportRef.current;
+    if (!track || !viewport || !items.length) return;
+
     const measure = () => {
-      const nodes = track.querySelectorAll<HTMLElement>('[data-flash-item="true"]');
-      if (nodes.length < items.length || !items.length) {
+      const nodes = track.querySelectorAll<HTMLElement>('[data-flash-set="0"]');
+      if (nodes.length < items.length) {
         setLoopWidth(0);
+        setNeedsMarquee(false);
         return;
       }
       let width = 0;
       for (let i = 0; i < items.length; i += 1) {
         width += nodes[i].getBoundingClientRect().width;
       }
-      // include gaps between items (28px each)
+      // include gaps between items (28px) + trailing gap before the loop restarts
       width += Math.max(0, items.length) * 28;
+      const viewportWidth = viewport.getBoundingClientRect().width;
       setLoopWidth(width);
+      // Only marquee-duplicate when the unique set overflows the bar.
+      // Otherwise 2 short items would appear as A, B, A, B in one view.
+      setNeedsMarquee(width > viewportWidth + 8);
     };
+
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(track);
+    observer.observe(viewport);
     return () => observer.disconnect();
   }, [items]);
 
@@ -102,55 +134,44 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
   if (!items.length) return null;
 
   if (reducedMotion || items.length === 1) {
-    return (
-      <aside className="flash-news-bar" aria-label={label}>
-        <div className="flash-news-label">
-          <Megaphone aria-hidden />
-          <span className="flash-news-label-full">Announcements</span>
-          <span className="flash-news-label-short">Flash</span>
-        </div>
-        <div className="flash-news-viewport is-static">
-          <div className="flash-news-track">
-            {items.map((item) => (
-              <div key={item.id} className="flash-news-slot" data-flash-item="true">
-                <FlashItem item={item} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </aside>
-    );
+    return <StaticTicker items={items} label={label} />;
   }
 
   const durationSec = loopWidth > 0 ? Math.max(18, loopWidth / 42) : 28;
-  const loop = [...items, ...items];
+  // Second copy is only for seamless CSS loop — aria-hidden so screen readers
+  // hear each announcement once.
+  const copies = needsMarquee ? 2 : 1;
 
   return (
     <aside
-      className={`flash-news-bar${paused ? ' is-paused' : ''}`}
+      className={`flash-news-bar${paused && needsMarquee ? ' is-paused' : ''}`}
       aria-label={label}
-      onMouseEnter={pause}
-      onMouseLeave={scheduleResume}
-      onFocusCapture={pause}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          scheduleResume();
-        }
-      }}
-      onTouchStart={pause}
-      onTouchEnd={scheduleResume}
+      onMouseEnter={needsMarquee ? pause : undefined}
+      onMouseLeave={needsMarquee ? scheduleResume : undefined}
+      onFocusCapture={needsMarquee ? pause : undefined}
+      onBlurCapture={
+        needsMarquee
+          ? (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                scheduleResume();
+              }
+            }
+          : undefined
+      }
+      onTouchStart={needsMarquee ? pause : undefined}
+      onTouchEnd={needsMarquee ? scheduleResume : undefined}
     >
       <div className="flash-news-label">
         <Megaphone aria-hidden />
         <span className="flash-news-label-full">Announcements</span>
         <span className="flash-news-label-short">Flash</span>
       </div>
-      <div className="flash-news-viewport">
+      <div className={`flash-news-viewport${needsMarquee ? '' : ' is-static'}`} ref={viewportRef}>
         <div
-          className="flash-news-track is-marquee"
+          className={`flash-news-track${needsMarquee ? ' is-marquee' : ''}`}
           ref={trackRef}
           style={
-            loopWidth > 0
+            needsMarquee && loopWidth > 0
               ? {
                   ['--flash-loop' as string]: `${loopWidth}px`,
                   animationDuration: `${durationSec}s`,
@@ -158,16 +179,19 @@ export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
               : undefined
           }
         >
-          {loop.map((item, index) => (
-            <div
-              key={`${item.id}-${index}`}
-              className="flash-news-slot"
-              data-flash-item="true"
-              aria-hidden={index >= items.length}
-            >
-              <FlashItem item={item} />
-            </div>
-          ))}
+          {Array.from({ length: copies }, (_, copyIndex) =>
+            items.map((item) => (
+              <div
+                key={`${item.id}-c${copyIndex}`}
+                className="flash-news-slot"
+                data-flash-item="true"
+                data-flash-set={copyIndex}
+                aria-hidden={copyIndex > 0}
+              >
+                <FlashItem item={item} />
+              </div>
+            )),
+          )}
         </div>
       </div>
     </aside>

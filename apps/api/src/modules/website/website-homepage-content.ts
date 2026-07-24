@@ -245,7 +245,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     stats: [
       { id: 'founded', label: 'Year Established', value: 1987 },
       { id: 'programmes', label: 'Programmes Offered', value: 15, suffix: '+' },
-      { id: 'students', label: 'Students', value: 2200, suffix: '+' },
+      { id: 'students', label: 'Students', value: 3100, suffix: '+' },
       { id: 'faculty', label: 'Faculty Members', value: 140, suffix: '+' },
       { id: 'departments', label: 'Departments', value: 15 },
       { id: 'naac', label: 'NAAC Accredited', value: 0, prefix: 'B Grade' },
@@ -287,7 +287,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     ],
   },
   statistics: [
-    { value: '2200+', label: 'Students' },
+    { value: '3100+', label: 'Students' },
     { value: '140+', label: 'Faculty members' },
     { value: '35+', label: 'Departments' },
     { value: '39+', label: 'Years of excellence' },

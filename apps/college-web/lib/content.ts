@@ -95,7 +95,7 @@ const img = (id: string, width = 1200) =>
 
 export const seedContent: CollegeContent = {
   stats: [
-    { value: '2200+', label: 'Students' },
+    { value: '3100+', label: 'Students' },
     { value: '140+', label: 'Faculty members' },
     { value: '35+', label: 'Departments' },
     { value: '39+', label: 'Years of excellence' },

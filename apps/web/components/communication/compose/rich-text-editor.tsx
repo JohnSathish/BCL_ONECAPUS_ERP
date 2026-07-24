@@ -24,7 +24,35 @@ type Props = {
 
 export function RichTextEditor({ value, onChange, className, onUploadImage }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const onUploadImageRef = useRef(onUploadImage);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  useEffect(() => {
+    onUploadImageRef.current = onUploadImage;
+  }, [onUploadImage]);
+
+  const insertUploadedImage = async (file: File) => {
+    const upload = onUploadImageRef.current;
+    const ed = editorRef.current;
+    if (!upload || !ed) return;
+    setUploadingImage(true);
+    try {
+      const url = await upload(file);
+      if (url?.trim()) {
+        ed.chain()
+          .focus()
+          .setImage({
+            src: url.trim(),
+            alt: file.name.replace(/\.[^.]+$/, '') || 'Image',
+          })
+          .run();
+      }
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const editor = useEditor({
     extensions: [
@@ -49,8 +77,33 @@ export function RichTextEditor({ value, onChange, className, onUploadImage }: Pr
         class:
           'prose prose-sm dark:prose-invert max-w-none min-h-[180px] px-3 py-2 focus:outline-none',
       },
+      handlePaste: (_view, event) => {
+        if (!onUploadImageRef.current) return false;
+        const items = Array.from(event.clipboardData?.items ?? []);
+        const imageItem = items.find((item) => item.type.startsWith('image/'));
+        if (!imageItem) return false;
+        const file = imageItem.getAsFile();
+        if (!file) return false;
+        event.preventDefault();
+        void insertUploadedImage(file);
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        if (!onUploadImageRef.current) return false;
+        const file = Array.from(event.dataTransfer?.files ?? []).find((f) =>
+          f.type.startsWith('image/'),
+        );
+        if (!file) return false;
+        event.preventDefault();
+        void insertUploadedImage(file);
+        return true;
+      },
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -67,24 +120,10 @@ export function RichTextEditor({ value, onChange, className, onUploadImage }: Pr
     editor.chain().focus().setImage({ src: url.trim() }).run();
   };
 
-  const onPickImage = async (file: File | null) => {
+  const onPickImage = (file: File | null) => {
     if (!file || !onUploadImage) return;
-    setUploadingImage(true);
-    try {
-      const url = await onUploadImage(file);
-      if (url?.trim()) {
-        editor
-          .chain()
-          .focus()
-          .setImage({ src: url.trim(), alt: file.name.replace(/\.[^.]+$/, '') })
-          .run();
-      }
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    void insertUploadedImage(file);
   };
-
   return (
     <div
       className={cn(

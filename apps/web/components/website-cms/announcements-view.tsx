@@ -84,10 +84,21 @@ export function AnnouncementsView({ onMessage }: Props) {
     setExpireAt(toLocalInput(row.expireAt));
     setIsPinned(row.isPinned);
     setShowOnTicker(row.showOnTicker);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const save = useMutation({
     mutationFn: async () => {
+      if (/src=["']data:image\//i.test(bodyHtml)) {
+        throw new Error(
+          'The content still has a pasted image. Use the image button (or paste again after this update) so the picture uploads to Media first, then save.',
+        );
+      }
+      if (bodyHtml.length > 400_000) {
+        throw new Error(
+          'Announcement body is too large. Prefer the image toolbar upload over pasting large pictures.',
+        );
+      }
       const payload = {
         title: title.trim(),
         summary: summary.trim(),
@@ -216,6 +227,10 @@ export function AnnouncementsView({ onMessage }: Props) {
                 }
               }}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use the image button (or paste/drop) so photos upload to Media. Do not paste huge
+              screenshots as raw data — that blocks saving.
+            </p>
           </div>
 
           <div className="space-y-2 rounded-md border border-border p-3">
