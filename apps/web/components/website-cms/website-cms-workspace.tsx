@@ -2130,18 +2130,27 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
           <Button
             disabled={!title || !date || save.isPending}
             onClick={() =>
-              save.mutate([
-                ...rows,
+              save.mutate(
+                [
+                  ...rows,
+                  {
+                    id: `cal-${Date.now()}`,
+                    title,
+                    date,
+                    category,
+                    showOnWebsite: true,
+                    featured: false,
+                    source: 'ERP',
+                  },
+                ],
                 {
-                  id: `cal-${Date.now()}`,
-                  title,
-                  date,
-                  category,
-                  showOnWebsite: true,
-                  featured: false,
-                  source: 'ERP',
+                  onSuccess: () => {
+                    setTitle('');
+                    setDate('');
+                    setCategory('Academic');
+                  },
                 },
-              ])
+              )
             }
           >
             Add / sync item
