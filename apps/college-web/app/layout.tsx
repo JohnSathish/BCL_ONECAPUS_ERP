@@ -59,6 +59,15 @@ export const metadata: Metadata = {
     'A premier institution of higher education in Tura, Meghalaya, committed to academic excellence, character formation and holistic development.',
   keywords: ['Don Bosco College Tura', 'college in Meghalaya', 'higher education Tura'],
   alternates: { canonical: '/' },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-48.png', type: 'image/png', sizes: '48x48' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/favicon.ico',
+  },
   robots: {
     index: true,
     follow: true,

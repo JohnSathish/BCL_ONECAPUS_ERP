@@ -278,3 +278,42 @@ export type WebsiteFyugInterestStats = {
   byState: { label: string; value: number }[];
   byGender: { label: string; value: number }[];
 };
+
+export type AcademicPlannerDay = {
+  id: string;
+  date: string;
+  dayOfWeek: string;
+  dayOfMonth: number;
+  statusLabel: string;
+  description: string;
+  isWorkingDay: boolean;
+  isHighlighted: boolean;
+};
+
+export type AcademicPlannerMonth = {
+  key: string;
+  year: number;
+  month: number;
+  title: string;
+  workingDays: number;
+  days: AcademicPlannerDay[];
+};
+
+export type AcademicPlannerYear = {
+  id: string;
+  title: string;
+  slug: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  isVisible: boolean;
+  dayCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AcademicPlannerYearDetail = AcademicPlannerYear & {
+  months: AcademicPlannerMonth[];
+  selectedMonthKey: string;
+  selectedMonth: AcademicPlannerMonth | null;
+};

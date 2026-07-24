@@ -14135,6 +14135,8 @@ model WebsiteSite {
   revisions WebsiteRevision[]
   bloodDonors WebsiteBloodDonor[]
   fyugInterests WebsiteFyugInterest[]
+  academicPlannerYears WebsiteAcademicPlannerYear[]
+  academicPlannerDays WebsiteAcademicPlannerDay[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -14489,6 +14491,61 @@ model WebsiteAnnouncement {
   @@index([siteId, isPinned, publishAt])
   @@index([siteId, showOnTicker, status, deletedAt])
   @@map("website_announcements")
+  @@schema("academic")
+}
+
+/// Handbook-style academic year planner (month tables with Class / events / working days).
+model WebsiteAcademicPlannerYear {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  siteId      String    @map("site_id") @db.Uuid
+  title       String
+  slug        String
+  startDate   DateTime  @map("start_date") @db.Date
+  endDate     DateTime  @map("end_date") @db.Date
+  status      String    @default("DRAFT")
+  isVisible   Boolean   @default(true) @map("is_visible")
+  deletedAt   DateTime? @map("deleted_at")
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  days WebsiteAcademicPlannerDay[]
+
+  @@unique([siteId, slug])
+  @@index([tenantId, siteId, status, deletedAt])
+  @@map("website_academic_planner_years")
+  @@schema("academic")
+}
+
+model WebsiteAcademicPlannerDay {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  siteId        String    @map("site_id") @db.Uuid
+  yearId        String    @map("year_id") @db.Uuid
+  date          DateTime  @db.Date
+  /// Display label in the status column (e.g. Class, Holiday). Blank for Sundays often.
+  statusLabel   String    @default("Class") @map("status_label")
+  description   String    @default("") @db.Text
+  isWorkingDay  Boolean   @default(true) @map("is_working_day")
+  /// Grey row highlight (typically Sundays / holidays).
+  isHighlighted Boolean   @default(false) @map("is_highlighted")
+  deletedAt     DateTime? @map("deleted_at")
+  createdById   String?   @map("created_by_id") @db.Uuid
+  updatedById   String?   @map("updated_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year WebsiteAcademicPlannerYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([yearId, date])
+  @@index([tenantId, siteId, date])
+  @@index([yearId, date])
+  @@map("website_academic_planner_days")
   @@schema("academic")
 }
 

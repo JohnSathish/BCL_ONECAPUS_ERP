@@ -54,7 +54,7 @@ export function PublicFeePortalShell({
         <div className="pfp-hero-inner">
           <div className="pfp-hero-brand">
             <Image
-              src="/branding/college-logo.png"
+              src="/branding/basecode-labs-logo.png"
               alt="Don Bosco College Tura"
               width={88}
               height={88}

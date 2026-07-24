@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { AnnouncementsView } from '@/components/website-cms/announcements-view';
+import { AcademicYearPlannerView } from '@/components/website-cms/academic-year-planner-view';
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -129,6 +130,7 @@ export type WebsiteCmsSection =
   | 'faculty'
   | 'programmes'
   | 'calendar'
+  | 'year-planner'
   | 'gallery'
   | 'documents'
   | 'videos'
@@ -224,6 +226,7 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'footer' ? <FooterWidgetsView onMessage={setMessage} /> : null}
           {section === 'seo' ? <SeoSuiteView onMessage={setMessage} /> : null}
           {section === 'calendar' ? <CalendarVisibilityView onMessage={setMessage} /> : null}
+          {section === 'year-planner' ? <AcademicYearPlannerView onMessage={setMessage} /> : null}
           {section === 'gallery' ? <LifeAtCampusEditor onMessage={setMessage} /> : null}
           {section === 'documents' || section === 'videos' ? (
             <MediaCollectionsView kind={section} onMessage={setMessage} />
@@ -2127,7 +2130,7 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
           description={
             editingKey
               ? 'Editing an existing event. Save changes or cancel to add a new one.'
-              : 'Homepage Upcoming Events only (short list). This is not a full month-by-month year planner handbook.'
+              : 'Homepage Upcoming Events only (short list). For the full handbook year planner, use Year Planner.'
           }
         />
         <CompactCardBody className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">

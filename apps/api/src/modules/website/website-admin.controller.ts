@@ -46,6 +46,7 @@ import { WebsiteAcademicService } from './website-academic.service';
 import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteService } from './website.service';
 import { WebsiteFyugInterestDocumentService } from './services/website-fyug-interest-document.service';
+import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
 
 @ApiBearerAuth()
 @ApiTags('website-admin')
@@ -57,6 +58,7 @@ export class WebsiteAdminController {
     private readonly academic: WebsiteAcademicService,
     private readonly enterprise: WebsiteCmsEnterpriseService,
     private readonly fyugDocuments: WebsiteFyugInterestDocumentService,
+    private readonly planner: WebsiteAcademicPlannerService,
   ) {}
 
   @Get('dashboard')
@@ -592,6 +594,126 @@ export class WebsiteAdminController {
     @Body() body: { items: Array<Record<string, unknown>> },
   ) {
     return this.enterprise.updateCalendarItems(user, body.items ?? []);
+  }
+
+  @Get('academic-planner/years')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  listPlannerYears(@CurrentUser() user: JwtUser) {
+    return this.planner.listYears(user.tid);
+  }
+
+  @Post('academic-planner/years')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  createPlannerYear(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      title: string;
+      slug?: string;
+      startDate: string;
+      endDate: string;
+      status?: string;
+    },
+  ) {
+    return this.planner.createYear(user, body);
+  }
+
+  @Get('academic-planner/years/:yearId')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  getPlannerYear(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.planner.getYearDetail(user.tid, yearId, month);
+  }
+
+  @Patch('academic-planner/years/:yearId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  updatePlannerYear(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+    @Body()
+    body: Partial<{
+      title: string;
+      slug: string;
+      startDate: string;
+      endDate: string;
+      status: string;
+      isVisible: boolean;
+    }>,
+  ) {
+    return this.planner.updateYear(user, yearId, body);
+  }
+
+  @Delete('academic-planner/years/:yearId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  trashPlannerYear(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+  ) {
+    return this.planner.trashYear(user, yearId);
+  }
+
+  @Post('academic-planner/years/:yearId/ensure-month')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  ensurePlannerMonth(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+    @Body() body: { year: number; month: number },
+  ) {
+    return this.planner.ensureMonth(user, yearId, body.year, body.month);
+  }
+
+  @Post('academic-planner/years/:yearId/ensure-all-months')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  ensurePlannerAllMonths(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+  ) {
+    return this.planner.ensureAllMonths(user, yearId);
+  }
+
+  @Put('academic-planner/years/:yearId/months/:monthKey')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  savePlannerMonth(
+    @CurrentUser() user: JwtUser,
+    @Param('yearId') yearId: string,
+    @Param('monthKey') monthKey: string,
+    @Body()
+    body: {
+      days: Array<{
+        id?: string;
+        date: string;
+        statusLabel?: string;
+        description?: string;
+        isWorkingDay?: boolean;
+        isHighlighted?: boolean;
+      }>;
+    },
+  ) {
+    return this.planner.updateMonthDays(
+      user,
+      yearId,
+      monthKey,
+      body.days ?? [],
+    );
+  }
+
+  @Patch('academic-planner/days/:dayId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  updatePlannerDay(
+    @CurrentUser() user: JwtUser,
+    @Param('dayId') dayId: string,
+    @Body()
+    body: Partial<{
+      statusLabel: string;
+      description: string;
+      isWorkingDay: boolean;
+      isHighlighted: boolean;
+    }>,
+  ) {
+    return this.planner.updateDay(user, dayId, body);
   }
 
   @Get('content-sources')

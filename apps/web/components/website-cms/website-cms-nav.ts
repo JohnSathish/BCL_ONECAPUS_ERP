@@ -109,8 +109,15 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
   },
   {
     id: 'calendar',
-    label: 'Academic Calendar',
+    label: 'Upcoming Events',
     href: '/admin/website/calendar',
+    icon: CalendarDays,
+    group: 'academic',
+  },
+  {
+    id: 'year-planner',
+    label: 'Year Planner',
+    href: '/admin/website/year-planner',
     icon: CalendarDays,
     group: 'academic',
   },

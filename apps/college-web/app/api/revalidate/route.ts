@@ -25,5 +25,6 @@ export async function POST(request: Request) {
   paths.forEach((path) => revalidatePath(path));
   // Department listing and detail pages
   revalidatePath('/departments');
+  revalidatePath('/academics/calendar');
   return NextResponse.json({ ok: true, paths, revalidatedAt: new Date().toISOString() });
 }

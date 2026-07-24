@@ -9,6 +9,7 @@ import { WebsiteManagementController } from './website-management.controller';
 import { WebsitePublicController } from './website-public.controller';
 import { WebsiteService } from './website.service';
 import { WebsiteFyugInterestDocumentService } from './services/website-fyug-interest-document.service';
+import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
 
 @Module({
   imports: [StorageModule, TenantsModule],
@@ -23,12 +24,14 @@ import { WebsiteFyugInterestDocumentService } from './services/website-fyug-inte
     WebsiteAcademicService,
     WebsiteCmsEnterpriseService,
     WebsiteFyugInterestDocumentService,
+    WebsiteAcademicPlannerService,
   ],
   exports: [
     WebsiteService,
     WebsiteAcademicService,
     WebsiteCmsEnterpriseService,
     WebsiteFyugInterestDocumentService,
+    WebsiteAcademicPlannerService,
   ],
 })
 export class WebsiteModule {}

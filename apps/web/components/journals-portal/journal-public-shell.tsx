@@ -30,7 +30,7 @@ import type { UserPreferences } from '@/types/branding';
 
 const NAVY = '#0B1F3A';
 const TOPBAR = '#000B1E';
-const DEFAULT_LOGO = '/branding/college-logo.png';
+const DEFAULT_LOGO = '/branding/basecode-labs-logo.png';
 
 function resolveAuthorLabel(displayName?: string | null, email?: string | null) {
   const name = displayName?.trim() || '';

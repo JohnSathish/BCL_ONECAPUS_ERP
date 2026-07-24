@@ -265,6 +265,86 @@ export const fetchWebsiteCalendarItems = () =>
 export const updateWebsiteCalendarItems = (items: Array<Record<string, unknown>>) =>
   api.put(`${base}/calendar-items`, { items }).then((response) => response.data);
 
+export const fetchAcademicPlannerYears = () =>
+  api
+    .get<import('@/types/website-cms').AcademicPlannerYear[]>(`${base}/academic-planner/years`)
+    .then((response) => response.data);
+
+export const createAcademicPlannerYear = (payload: {
+  title: string;
+  slug?: string;
+  startDate: string;
+  endDate: string;
+  status?: string;
+}) =>
+  api
+    .post<
+      import('@/types/website-cms').AcademicPlannerYear
+    >(`${base}/academic-planner/years`, payload)
+    .then((response) => response.data);
+
+export const fetchAcademicPlannerYear = (yearId: string, month?: string) =>
+  api
+    .get<
+      import('@/types/website-cms').AcademicPlannerYearDetail
+    >(`${base}/academic-planner/years/${yearId}`, { params: month ? { month } : undefined })
+    .then((response) => response.data);
+
+export const updateAcademicPlannerYear = (
+  yearId: string,
+  payload: Partial<{
+    title: string;
+    slug: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    isVisible: boolean;
+  }>,
+) =>
+  api
+    .patch<
+      import('@/types/website-cms').AcademicPlannerYear
+    >(`${base}/academic-planner/years/${yearId}`, payload)
+    .then((response) => response.data);
+
+export const trashAcademicPlannerYear = (yearId: string) =>
+  api.delete(`${base}/academic-planner/years/${yearId}`).then((response) => response.data);
+
+export const ensureAcademicPlannerMonth = (
+  yearId: string,
+  payload: { year: number; month: number },
+) =>
+  api
+    .post<
+      import('@/types/website-cms').AcademicPlannerYearDetail
+    >(`${base}/academic-planner/years/${yearId}/ensure-month`, payload)
+    .then((response) => response.data);
+
+export const ensureAcademicPlannerAllMonths = (yearId: string) =>
+  api
+    .post<
+      import('@/types/website-cms').AcademicPlannerYearDetail
+    >(`${base}/academic-planner/years/${yearId}/ensure-all-months`)
+    .then((response) => response.data);
+
+export const saveAcademicPlannerMonth = (
+  yearId: string,
+  monthKey: string,
+  days: Array<{
+    id?: string;
+    date: string;
+    statusLabel?: string;
+    description?: string;
+    isWorkingDay?: boolean;
+    isHighlighted?: boolean;
+  }>,
+) =>
+  api
+    .put<
+      import('@/types/website-cms').AcademicPlannerYearDetail
+    >(`${base}/academic-planner/years/${yearId}/months/${monthKey}`, { days })
+    .then((response) => response.data);
+
 export const fetchWebsiteContentSources = () =>
   api.get<Record<string, unknown>>(`${base}/content-sources`).then((response) => response.data);
 

@@ -24,4 +24,5 @@ export function resolveUploadAssetUrl(path?: string | null): string | undefined 
 /** @deprecated Use resolveUploadAssetUrl */
 export const resolveBrandingAssetUrl = resolveUploadAssetUrl;
 
-export const DEFAULT_LOGIN_LOGO = '/branding/college-logo.png';
+export const DEFAULT_LOGIN_LOGO = '/branding/basecode-labs-logo.png';
+export const DEFAULT_FAVICON = '/branding/basecode-labs-logo.png';

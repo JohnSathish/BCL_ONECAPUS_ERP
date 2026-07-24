@@ -8,7 +8,7 @@ import { Menu, X } from 'lucide-react';
 import { fetchAlumniPortalInfo } from '@/services/alumni-portal';
 import { cn } from '@/utils/cn';
 
-const DEFAULT_LOGO_URL = '/branding/college-logo.png';
+const DEFAULT_LOGO_URL = '/branding/basecode-labs-logo.png';
 
 const NAV = [
   { href: '/alumni-portal', label: 'Home', exact: true },

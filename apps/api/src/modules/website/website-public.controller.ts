@@ -22,6 +22,7 @@ import { WebsiteAdminService } from './website-admin.service';
 import { WebsiteAcademicService } from './website-academic.service';
 import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteService } from './website.service';
+import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
 import {
   CreateWebsiteBloodDonorDto,
   CreateWebsiteFyugInterestDto,
@@ -36,6 +37,7 @@ export class WebsitePublicController {
     private readonly tenants: TenantResolutionService,
     private readonly academic: WebsiteAcademicService,
     private readonly enterprise: WebsiteCmsEnterpriseService,
+    private readonly planner: WebsiteAcademicPlannerService,
   ) {}
 
   private async resolveTenant(req: Request, tenantSlug?: string) {
@@ -120,6 +122,21 @@ export class WebsitePublicController {
   ) {
     const tenant = await this.resolveTenant(req, tenantSlug);
     return this.enterprise.listUpcomingEvents(tenant.id);
+  }
+
+  @Public()
+  @Get('academic-planner')
+  async academicPlanner(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+    @Query('slug') slug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    const row = await this.planner.getPublicPlanner(tenant.id, slug);
+    if (!row) {
+      throw new NotFoundException('Academic calendar is not published yet');
+    }
+    return row;
   }
 
   @Public()
