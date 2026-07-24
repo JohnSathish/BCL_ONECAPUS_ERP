@@ -3,7 +3,7 @@ export type Testimonial = {
   quote: string;
   name: string;
   department: string;
-  graduationYear: number;
+  graduationYear?: number;
   /** Optional current role / location line */
   status?: string;
   /** Real portrait URL when available; otherwise initials avatar is used */
@@ -17,6 +17,37 @@ export type Testimonial = {
  * student/alumni stories and portraits. Prefer real photos via CMS.
  */
 export const seedTestimonials: Testimonial[] = [
+  {
+    id: 'thangboi-singto',
+    name: 'Thangboi Singto',
+    department: 'M.P.Ed.',
+    status: 'Football Coach, Indian Super League',
+    rating: 5,
+    quote:
+      'Don Bosco College Tura has been a pioneer and leader in imparting quality education to thousands of students of Garo Hills and beyond. I feel very proud and privileged to be an alumni of this great institution. The college has played a significant role in shaping me to what I have become as a professional football coach. May the college continue to grow and contribute to the upliftment of the society. Best regards to all.',
+  },
+  {
+    id: 'dorang-dekamra-m-sangma',
+    name: 'Sri Dorang Dekamra M Sangma',
+    department: 'Alumnus',
+    status: 'WQM&S Coordinator under JJM in PHE',
+    photoSrc: '/images/testimonials/dorang-dekamra-m-sangma.png',
+    photoAlt: 'Sri Dorang Dekamra M Sangma',
+    rating: 5,
+    quote:
+      'Don Bosco College, Tura is a dynamic institution providing holistic development to its students and it caters to both learning and extracurricular activities, thus giving each student an opportunity to shine in their own field.',
+  },
+  {
+    id: 'subhankar-paul',
+    name: 'Dr. Subhankar Paul',
+    department: 'Alumnus',
+    status: 'MBBS, DNB General Surgery, FMAS, MRCS Edinburgh',
+    photoSrc: '/images/testimonials/subhankar-paul.png',
+    photoAlt: 'Dr. Subhankar Paul',
+    rating: 5,
+    quote:
+      'There is so much more for all of us to achieve and do in life, and I can sincerely say that I found the right transition from school to a career in Science on the picturesque hilltop of Don Bosco College.',
+  },
   {
     id: 'jemina-sangma',
     name: 'Jemina M. Sangma',
@@ -70,7 +101,8 @@ export const seedTestimonials: Testimonial[] = [
 ];
 
 export function testimonialRoleLine(item: Testimonial): string {
-  return `${item.department}, Class of ${item.graduationYear}`;
+  if (item.graduationYear) return `${item.department}, Class of ${item.graduationYear}`;
+  return item.department;
 }
 
 export function initialsFromName(name: string): string {

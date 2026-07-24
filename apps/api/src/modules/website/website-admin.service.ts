@@ -176,7 +176,7 @@ export class WebsiteAdminService {
             key: 'graduationYear',
             label: 'Graduation year',
             type: 'text',
-            required: true,
+            required: false,
           },
           {
             key: 'status',

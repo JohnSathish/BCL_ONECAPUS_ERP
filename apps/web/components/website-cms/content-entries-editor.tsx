@@ -37,7 +37,7 @@ const CPT_DEFAULTS: Record<
     fields: [
       { key: 'quote', label: 'Quote', type: 'richText', required: true },
       { key: 'department', label: 'Department', type: 'text', required: true },
-      { key: 'graduationYear', label: 'Graduation year', type: 'text', required: true },
+      { key: 'graduationYear', label: 'Graduation year', type: 'text', required: false },
       { key: 'status', label: 'Current status', type: 'text', required: false },
       { key: 'photoSrc', label: 'Photo URL', type: 'image', required: false },
       { key: 'rating', label: 'Rating', type: 'text', required: false },

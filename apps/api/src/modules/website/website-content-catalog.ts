@@ -360,7 +360,7 @@ export const CONTENT_TYPE_CATALOG = [
         key: 'graduationYear',
         label: 'Graduation year',
         type: 'text',
-        required: true,
+        required: false,
       },
       { key: 'status', label: 'Current status', type: 'text', required: false },
       { key: 'photoSrc', label: 'Photo URL', type: 'image', required: false },

@@ -453,6 +453,36 @@ export async function importWebsiteContent(
     if (!testimonialCount) {
       const seeds = [
         {
+          title: 'Thangboi Singto',
+          slug: 'thangboi-singto',
+          quote:
+            'Don Bosco College Tura has been a pioneer and leader in imparting quality education to thousands of students of Garo Hills and beyond. I feel very proud and privileged to be an alumni of this great institution. The college has played a significant role in shaping me to what I have become as a professional football coach. May the college continue to grow and contribute to the upliftment of the society. Best regards to all.',
+          department: 'M.P.Ed.',
+          graduationYear: '',
+          status: 'Football Coach, Indian Super League',
+          photoSrc: '',
+        },
+        {
+          title: 'Sri Dorang Dekamra M Sangma',
+          slug: 'dorang-dekamra-m-sangma',
+          quote:
+            'Don Bosco College, Tura is a dynamic institution providing holistic development to its students and it caters to both learning and extracurricular activities, thus giving each student an opportunity to shine in their own field.',
+          department: 'Alumnus',
+          graduationYear: '',
+          status: 'WQM&S Coordinator under JJM in PHE',
+          photoSrc: '/images/testimonials/dorang-dekamra-m-sangma.png',
+        },
+        {
+          title: 'Dr. Subhankar Paul',
+          slug: 'subhankar-paul',
+          quote:
+            'There is so much more for all of us to achieve and do in life, and I can sincerely say that I found the right transition from school to a career in Science on the picturesque hilltop of Don Bosco College.',
+          department: 'Alumnus',
+          graduationYear: '',
+          status: 'MBBS, DNB General Surgery, FMAS, MRCS Edinburgh',
+          photoSrc: '/images/testimonials/subhankar-paul.png',
+        },
+        {
           title: 'Jemina M. Sangma',
           slug: 'jemina-sangma',
           quote:
@@ -460,6 +490,7 @@ export async function importWebsiteContent(
           department: 'B.Sc. Botany',
           graduationYear: '2021',
           status: 'Pursuing M.Sc. in Plant Ecology, NEHU, Shillong',
+          photoSrc: '',
         },
         {
           title: 'Anita Ch. Marak',
@@ -469,6 +500,7 @@ export async function importWebsiteContent(
           department: 'B.A. Education',
           graduationYear: '2018',
           status: 'Alumna · Secondary school educator, Tura',
+          photoSrc: '',
         },
         {
           title: 'Ricky R. Sangma',
@@ -478,6 +510,7 @@ export async function importWebsiteContent(
           department: 'B.Com.',
           graduationYear: '2023',
           status: 'Student leader · Department of Commerce',
+          photoSrc: '',
         },
       ];
       for (const row of seeds) {
@@ -495,6 +528,7 @@ export async function importWebsiteContent(
               department: row.department,
               graduationYear: row.graduationYear,
               status: row.status,
+              ...(row.photoSrc ? { photoSrc: row.photoSrc } : {}),
             },
             createdById: actorId,
             updatedById: actorId,

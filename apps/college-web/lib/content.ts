@@ -50,35 +50,94 @@ export type CollegeContent = {
   homepageCms: HomepageCmsContent;
 };
 
+function stripHtml(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseGraduationYear(value: unknown, roleFallback = ''): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 1900) return value;
+  if (typeof value === 'string') {
+    const match = value.match(/\d{4}/);
+    if (match) return Number(match[0]);
+  }
+  const roleMatch = roleFallback.match(/Class of\s+(\d{4})/i);
+  return roleMatch ? Number(roleMatch[1]) : undefined;
+}
+
 function normalizeTestimonials(value: unknown): Testimonial[] | undefined {
   if (!Array.isArray(value) || !value.length) return undefined;
   const rows: Testimonial[] = [];
   value.forEach((row, index) => {
-    if (!isRecord(row) || typeof row.quote !== 'string' || typeof row.name !== 'string') return;
+    if (!isRecord(row)) return;
+    const rawQuote =
+      typeof row.quote === 'string' ? row.quote : typeof row.body === 'string' ? row.body : '';
+    const quote = stripHtml(rawQuote);
+    const name =
+      typeof row.name === 'string' ? row.name : typeof row.title === 'string' ? row.title : '';
+    if (!quote || !name) return;
     const role = typeof row.role === 'string' ? row.role : '';
-    const yearMatch = role.match(/Class of\s+(\d{4})/i);
     const department =
       typeof row.department === 'string'
         ? row.department
         : role.replace(/,?\s*Class of\s+\d{4}/i, '').trim() || 'Don Bosco College';
+    const ratingRaw = row.rating;
+    const rating =
+      typeof ratingRaw === 'number'
+        ? ratingRaw
+        : typeof ratingRaw === 'string' && ratingRaw.trim()
+          ? Number(ratingRaw)
+          : 5;
     rows.push({
-      id: typeof row.id === 'string' ? row.id : `cms-${index}-${row.name}`,
-      quote: row.quote,
-      name: row.name,
+      id:
+        typeof row.id === 'string'
+          ? row.id
+          : typeof row.slug === 'string'
+            ? row.slug
+            : `cms-${index}-${name}`,
+      quote,
+      name,
       department,
-      graduationYear:
-        typeof row.graduationYear === 'number'
-          ? row.graduationYear
-          : yearMatch
-            ? Number(yearMatch[1])
-            : new Date().getFullYear(),
+      graduationYear: parseGraduationYear(row.graduationYear, role),
       status: typeof row.status === 'string' ? row.status : role || undefined,
       photoSrc: typeof row.photoSrc === 'string' ? row.photoSrc : null,
       photoAlt: typeof row.photoAlt === 'string' ? row.photoAlt : undefined,
-      rating: typeof row.rating === 'number' ? row.rating : 5,
+      rating: Number.isFinite(rating) ? rating : 5,
     });
   });
   return rows.length ? rows : undefined;
+}
+
+/** Prefer published CMS Testimonials CPT entries when available. */
+async function getPublicTestimonials(): Promise<Testimonial[]> {
+  const rows = await fetchCms('content/testimonials', {}, 60, 8000);
+  if (!Array.isArray(rows) || !rows.length) return [];
+  const mapped = rows.map((row) => {
+    if (!isRecord(row)) return null;
+    const data = isRecord(row.data) ? row.data : {};
+    return {
+      id: typeof row.slug === 'string' ? row.slug : typeof row.id === 'string' ? row.id : undefined,
+      slug: typeof row.slug === 'string' ? row.slug : undefined,
+      title: typeof row.title === 'string' ? row.title : undefined,
+      name: typeof row.title === 'string' ? row.title : undefined,
+      quote: data.quote,
+      department: data.department,
+      graduationYear: data.graduationYear,
+      status: data.status,
+      photoSrc: data.photoSrc,
+      photoAlt: data.photoAlt,
+      rating: data.rating,
+    };
+  });
+  return normalizeTestimonials(mapped) ?? [];
 }
 export type CmsPage = {
   title: string;
@@ -260,12 +319,13 @@ function mergeCandidates(...values: unknown[]): Partial<CollegeContent> {
 export async function getCollegeContent(): Promise<CollegeContent> {
   // Soft-merge: site / optional home page / news / notices independently.
   // A missing page?path=/ must not discard site settings or notices.
-  const [site, home, homepage, cmsNews, cmsNotices] = await Promise.all([
+  const [site, home, homepage, cmsNews, cmsNotices, cmsTestimonials] = await Promise.all([
     fetchCms('site', {}, 60),
     fetchCms('page', { path: '/' }, 120),
     fetchCms('homepage', {}, 60),
     getPublicNews(),
     getPublicNotices(),
+    getPublicTestimonials(),
   ]);
   const siteRecord = isRecord(site) ? site : {};
   const homeRecord = isRecord(home) ? home : {};
@@ -354,7 +414,11 @@ export async function getCollegeContent(): Promise<CollegeContent> {
           ? data.news
           : seedContent.news,
     departments: data.departments?.length ? data.departments : seedContent.departments,
-    testimonials: data.testimonials?.length ? data.testimonials : seedContent.testimonials,
+    testimonials: cmsTestimonials.length
+      ? cmsTestimonials
+      : data.testimonials?.length
+        ? data.testimonials
+        : seedContent.testimonials,
     gallery: (() => {
       const fromCms = isRecord(homepageContent.lifeAtCampus) ? homepageContent.lifeAtCampus : null;
       const cmsItems = Array.isArray(fromCms?.items) ? fromCms.items : null;
