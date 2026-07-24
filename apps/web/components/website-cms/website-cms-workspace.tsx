@@ -1207,13 +1207,24 @@ function HeroSliderView({ onMessage }: { onMessage: (message: string) => void })
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: ['website', 'hero-slides'] });
 
+  const bumpPublicSite = () => {
+    void revalidateWebsite(['/'])
+      .then(() => onMessage('Public homepage cache refreshed.'))
+      .catch(() =>
+        onMessage(
+          'Saved in CMS. If the live site is stale, restart college-web or configure WEBSITE_REVALIDATE_WEBHOOK_URL.',
+        ),
+      );
+  };
+
   const create = useMutation({
     mutationFn: () => createWebsiteHeroSlide(file!, altText || file!.name),
     onSuccess: () => {
       setFile(null);
       setAltText('');
-      onMessage('Hero slide added. It appears on the public homepage within a few minutes.');
+      onMessage('Hero slide added.');
       invalidate();
+      bumpPublicSite();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Hero slide upload failed')),
   });
@@ -1224,6 +1235,7 @@ function HeroSliderView({ onMessage }: { onMessage: (message: string) => void })
     onSuccess: () => {
       onMessage('Hero slide order saved.');
       invalidate();
+      bumpPublicSite();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not reorder hero slides')),
   });
@@ -1231,7 +1243,10 @@ function HeroSliderView({ onMessage }: { onMessage: (message: string) => void })
   const update = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<WebsiteHeroSlide> }) =>
       updateWebsiteHeroSlide(id, payload),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      bumpPublicSite();
+    },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not update hero slide')),
   });
 
@@ -1241,6 +1256,7 @@ function HeroSliderView({ onMessage }: { onMessage: (message: string) => void })
     onSuccess: () => {
       onMessage('Mobile crop uploaded.');
       invalidate();
+      bumpPublicSite();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Mobile image upload failed')),
   });
@@ -1250,6 +1266,7 @@ function HeroSliderView({ onMessage }: { onMessage: (message: string) => void })
     onSuccess: () => {
       onMessage('Hero slide removed.');
       invalidate();
+      bumpPublicSite();
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not delete hero slide')),
   });

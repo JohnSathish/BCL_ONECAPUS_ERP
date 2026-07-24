@@ -50,6 +50,11 @@ const cmsBase = () => {
 
 const absoluteUrl = absoluteMediaUrl;
 
+const cmsHeaders = () => {
+  const host = process.env.COLLEGE_CMS_HOST?.trim().toLowerCase();
+  return host && /^[a-z0-9.-]+(?::\d+)?$/.test(host) ? { 'x-forwarded-host': host } : undefined;
+};
+
 export async function getHeroSlides(): Promise<HeroSlide[]> {
   const base = cmsBase();
   if (!base) return fallbackHeroSlides;
@@ -60,6 +65,7 @@ export async function getHeroSlides(): Promise<HeroSlide[]> {
     if (tenant) url.searchParams.set('tenant', tenant);
 
     const response = await fetch(url, {
+      headers: cmsHeaders(),
       // Always refresh in local/dev so CMS uploads appear immediately.
       ...(process.env.NODE_ENV !== 'production'
         ? { cache: 'no-store' as const }

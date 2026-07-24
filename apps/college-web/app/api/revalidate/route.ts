@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   }
 
   revalidateTag('website-cms');
+  revalidateTag('website-hero');
   paths.forEach((path) => revalidatePath(path));
   return NextResponse.json({ ok: true, paths, revalidatedAt: new Date().toISOString() });
 }
