@@ -420,9 +420,25 @@ export const downloadWebsiteFyugInterestPdf = async (
   applicationNumber?: string | null,
 ) => {
   const { downloadBlob } = await import('@/utils/download-blob');
-  const { data } = await api.get(`${base}/fyug-interest/${id}/application.pdf`, {
+  const response = await api.get(`${base}/fyug-interest/${id}/application.pdf`, {
     responseType: 'blob',
   });
+  const data = response.data as Blob;
+  const contentType = String(response.headers?.['content-type'] ?? data.type ?? '');
+  if (contentType.includes('application/json') || data.type.includes('json')) {
+    const text = await data.text();
+    let message = 'Could not generate PDF';
+    try {
+      const parsed = JSON.parse(text) as { message?: string; detail?: string };
+      message = parsed.message || parsed.detail || message;
+    } catch {
+      // keep default
+    }
+    throw new Error(message);
+  }
+  if (data.size < 100) {
+    throw new Error('PDF response was empty. Try again in a moment.');
+  }
   const name = applicationNumber || id.slice(0, 8);
-  downloadBlob(data as Blob, `fyug-application-${name}.pdf`);
+  downloadBlob(data, `fyug-application-${name}.pdf`);
 };

@@ -2627,8 +2627,15 @@ function FyugInterestView() {
                             setMessage('');
                             try {
                               await downloadWebsiteFyugInterestPdf(row.id, row.applicationNumber);
-                            } catch {
-                              setMessage(`Could not download PDF for ${row.fullName}.`);
+                            } catch (error) {
+                              const detail =
+                                error instanceof Error && error.message
+                                  ? error.message
+                                  : apiErrorMessage(
+                                      error,
+                                      `Could not download PDF for ${row.fullName}.`,
+                                    );
+                              setMessage(detail);
                             } finally {
                               setBusyId(null);
                             }

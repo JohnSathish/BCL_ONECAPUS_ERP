@@ -25,7 +25,20 @@ RUN npm run build:docker
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache wget su-exec \
+# System Chromium for Puppeteer PDFs (npm ci uses --ignore-scripts, so no bundled Chrome).
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV CHROME_BIN=/usr/bin/chromium
+RUN apk add --no-cache \
+  wget \
+  su-exec \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont \
+  font-noto \
   && addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules

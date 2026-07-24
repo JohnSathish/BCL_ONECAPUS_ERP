@@ -2,6 +2,8 @@ import 'server-only';
 
 import { fetchCms, isRecord } from '@/lib/cms-client';
 import { listPublicAnnouncements } from '@/lib/announcements';
+import { seedContent } from '@/lib/content';
+import { seedInformationHub } from '@/lib/information-hub';
 import { getPublicNews } from '@/lib/news';
 import { getPublicNotices } from '@/lib/notices';
 
@@ -50,9 +52,22 @@ function mapContentEntries(rows: unknown[]): FlashAnnouncement[] {
   return items;
 }
 
+function pushUnique(
+  merged: FlashAnnouncement[],
+  seen: Set<string>,
+  item: FlashAnnouncement,
+  limit: number,
+) {
+  const key = item.title.trim().toLowerCase();
+  if (!key || seen.has(key) || merged.length >= limit) return;
+  seen.add(key);
+  merged.push(item);
+}
+
 /**
  * Prefer dedicated WebsiteAnnouncement records for the ticker.
- * Fall back to legacy CPT flash-news, notices, then news.
+ * Fall back to legacy CPT flash-news, notices, news, then college seed copy
+ * so the homepage bar is never blank while CMS content is being published.
  */
 export async function getFlashAnnouncements(limit = 12): Promise<FlashAnnouncement[]> {
   const [announcements, flash, notices, news] = await Promise.all([
@@ -62,7 +77,15 @@ export async function getFlashAnnouncements(limit = 12): Promise<FlashAnnounceme
     getPublicNews(),
   ]);
 
-  const fromAnnouncements: FlashAnnouncement[] = announcements.map((item) => ({
+  // If nothing is marked for ticker, still show any published announcements.
+  const announcementPool =
+    announcements.length > 0
+      ? announcements
+      : await listPublicAnnouncements().catch(
+          () => [] as Awaited<ReturnType<typeof listPublicAnnouncements>>,
+        );
+
+  const fromAnnouncements: FlashAnnouncement[] = announcementPool.map((item) => ({
     id: `announcement-${item.id}`,
     title: item.title,
     href: item.href,
@@ -86,11 +109,37 @@ export async function getFlashAnnouncements(limit = 12): Promise<FlashAnnounceme
   const merged: FlashAnnouncement[] = [];
   const seen = new Set<string>();
   for (const item of [...fromAnnouncements, ...fromFlash, ...fromNotices, ...fromNews]) {
-    const key = item.title.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    merged.push(item);
-    if (merged.length >= limit) break;
+    pushUnique(merged, seen, item, limit);
   }
+
+  if (!merged.length) {
+    for (const notice of seedInformationHub.notices) {
+      pushUnique(
+        merged,
+        seen,
+        {
+          id: `seed-notice-${notice.id}`,
+          title: notice.title,
+          href: notice.href,
+          isNew: notice.badge === 'NEW' || Boolean(notice.urgent),
+        },
+        limit,
+      );
+    }
+    for (const item of seedContent.news.slice(0, 8)) {
+      pushUnique(
+        merged,
+        seen,
+        {
+          id: `seed-news-${item.slug}`,
+          title: item.title,
+          href: `/news/${item.slug}`,
+          isNew: isRecent(item.date),
+        },
+        limit,
+      );
+    }
+  }
+
   return merged;
 }

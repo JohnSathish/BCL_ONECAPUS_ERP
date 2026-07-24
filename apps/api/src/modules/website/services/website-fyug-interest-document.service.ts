@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import QRCode from 'qrcode';
-import puppeteer from 'puppeteer';
+import { launchPdfBrowser } from '../../../common/pdf/launch-browser';
 import { PrismaService } from '../../../database/prisma.service';
 import { resolveUploadRoot } from '../../../common/uploads/upload-paths';
 
@@ -40,6 +45,8 @@ export type FyugInterestRecord = {
 
 @Injectable()
 export class WebsiteFyugInterestDocumentService {
+  private readonly logger = new Logger(WebsiteFyugInterestDocumentService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getInterest(tenantId: string, id: string): Promise<FyugInterestRecord> {
@@ -54,25 +61,37 @@ export class WebsiteFyugInterestDocumentService {
   async renderPdfBuffer(tenantId: string, id: string): Promise<Buffer> {
     const row = await this.getInterest(tenantId, id);
     const html = await this.buildHtml(row);
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    });
+    let browser;
+    try {
+      browser = await launchPdfBrowser();
+    } catch (error) {
+      this.logger.error(
+        `FYUG PDF browser launch failed for ${id}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw new InternalServerErrorException(
+        'PDF engine is unavailable on the server. Install Chromium or set PUPPETEER_EXECUTABLE_PATH.',
+      );
+    }
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'load' });
+      await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
       });
       return Buffer.from(pdf);
+    } catch (error) {
+      this.logger.error(
+        `FYUG PDF render failed for ${id}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw new InternalServerErrorException(
+        'Could not generate the application PDF. Please try again.',
+      );
     } finally {
-      await browser.close();
+      await browser.close().catch(() => undefined);
     }
   }
 
