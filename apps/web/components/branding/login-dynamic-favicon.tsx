@@ -5,31 +5,49 @@ import { DEFAULT_FAVICON, resolveBrandingAssetUrl } from '@/lib/branding-asset';
 
 type Props = {
   faviconUrl?: string;
+  /** When true (default), always use BCL product favicon on login. */
+  forceProductBrand?: boolean;
 };
 
 function applyFavicon(href: string) {
-  let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
-  if (!link) {
-    link = document.createElement('link');
+  const links = Array.from(
+    document.querySelectorAll<HTMLLinkElement>("link[rel='icon'], link[rel='shortcut icon']"),
+  );
+  if (!links.length) {
+    const link = document.createElement('link');
     link.rel = 'icon';
     document.head.appendChild(link);
+    links.push(link);
   }
-  link.href = href;
+  for (const link of links) {
+    link.type = 'image/png';
+    link.href = href;
+  }
 }
 
-export function LoginDynamicFavicon({ faviconUrl }: Props) {
+/**
+ * Sets the browser tab icon on login.
+ * Product login (BCL OneCampus) always uses the BaseCode Labs mark unless
+ * forceProductBrand is false and a working tenant favicon URL is provided.
+ */
+export function LoginDynamicFavicon({ faviconUrl, forceProductBrand = true }: Props) {
   useEffect(() => {
+    if (forceProductBrand) {
+      applyFavicon(`${DEFAULT_FAVICON}?v=bcl`);
+      return;
+    }
+
     const tenantHref = resolveBrandingAssetUrl(faviconUrl);
     if (!tenantHref) {
-      applyFavicon(DEFAULT_FAVICON);
+      applyFavicon(`${DEFAULT_FAVICON}?v=bcl`);
       return;
     }
 
     const probe = new Image();
     probe.onload = () => applyFavicon(tenantHref);
-    probe.onerror = () => applyFavicon(DEFAULT_FAVICON);
+    probe.onerror = () => applyFavicon(`${DEFAULT_FAVICON}?v=bcl`);
     probe.src = tenantHref;
-  }, [faviconUrl]);
+  }, [faviconUrl, forceProductBrand]);
 
   return null;
 }

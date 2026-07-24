@@ -13,13 +13,15 @@ const geistMono = GeistMono;
 export const metadata: Metadata = {
   title: 'BCL OneCampus ERP',
   description: 'One unified platform for the entire campus ecosystem',
+  applicationName: 'BCL OneCampus ERP',
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon.png', type: 'image/png', sizes: '512x512' },
       { url: '/branding/basecode-labs-logo.png', type: 'image/png' },
     ],
     apple: [{ url: '/branding/basecode-labs-logo.png', type: 'image/png' }],
-    shortcut: '/favicon.png',
+    shortcut: '/favicon.ico',
   },
 };
 
