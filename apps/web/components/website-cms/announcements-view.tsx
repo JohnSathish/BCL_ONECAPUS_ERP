@@ -49,6 +49,7 @@ export function AnnouncementsView({ onMessage }: Props) {
   const [featuredImageAlt, setFeaturedImageAlt] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [attachmentName, setAttachmentName] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
   const [expireAt, setExpireAt] = useState('');
   const [isPinned, setIsPinned] = useState(false);
   const [showOnTicker, setShowOnTicker] = useState(true);
@@ -63,6 +64,7 @@ export function AnnouncementsView({ onMessage }: Props) {
     setFeaturedImageAlt('');
     setAttachmentUrl('');
     setAttachmentName('');
+    setLinkUrl('');
     setExpireAt('');
     setIsPinned(false);
     setShowOnTicker(true);
@@ -78,6 +80,7 @@ export function AnnouncementsView({ onMessage }: Props) {
     setFeaturedImageAlt(row.featuredImageAlt || '');
     setAttachmentUrl(row.attachmentUrl || '');
     setAttachmentName(row.attachmentName || '');
+    setLinkUrl(row.linkUrl || '');
     setExpireAt(toLocalInput(row.expireAt));
     setIsPinned(row.isPinned);
     setShowOnTicker(row.showOnTicker);
@@ -93,6 +96,7 @@ export function AnnouncementsView({ onMessage }: Props) {
         featuredImageAlt: featuredImageAlt || null,
         attachmentUrl: attachmentUrl || null,
         attachmentName: attachmentName || null,
+        linkUrl: linkUrl.trim() || null,
         expireAt: expireAt ? new Date(expireAt).toISOString() : null,
         isPinned,
         showOnTicker,
@@ -178,7 +182,7 @@ export function AnnouncementsView({ onMessage }: Props) {
       <CompactCard>
         <CompactCardHeader
           title={editingId ? 'Edit announcement' : 'Add announcement'}
-          description="Campus announcements with optional featured image, PDF, expiry, and pin-to-top."
+          description="Campus announcements with optional link URL, featured image, PDF, expiry, and pin-to-top."
         />
         <CompactCardBody className="grid gap-3 md:grid-cols-2">
           <Input
@@ -263,6 +267,20 @@ export function AnnouncementsView({ onMessage }: Props) {
             ) : null}
           </div>
 
+          <label className="md:col-span-2 text-sm">
+            Link URL (optional)
+            <Input
+              className="mt-1"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com/page or /news/my-post"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              When set, clicking this announcement on the ticker or listing opens this URL instead
+              of the announcement detail page.
+            </span>
+          </label>
+
           <label className="text-sm">
             Expiry date (optional)
             <Input
@@ -344,6 +362,7 @@ export function AnnouncementsView({ onMessage }: Props) {
                   ) : null}
                   <div className="mt-1 flex flex-wrap gap-1">
                     {row.isPinned ? <Badge variant="secondary">Pinned</Badge> : null}
+                    {row.linkUrl ? <Badge variant="outline">Link</Badge> : null}
                     {row.attachmentUrl ? <Badge variant="outline">PDF</Badge> : null}
                     {row.featuredImageUrl ? <Badge variant="outline">Image</Badge> : null}
                   </div>

@@ -470,6 +470,7 @@ export class WebsiteCmsEnterpriseService {
       featuredImageAlt?: string | null;
       attachmentUrl?: string | null;
       attachmentName?: string | null;
+      linkUrl?: string | null;
       isPinned?: boolean;
       showOnTicker?: boolean;
       showOnHomepage?: boolean;
@@ -487,6 +488,7 @@ export class WebsiteCmsEnterpriseService {
     if (!['DRAFT', 'PUBLISHED'].includes(status)) {
       throw new BadRequestException('Invalid announcement status');
     }
+    const linkUrl = this.normalizeAnnouncementLinkUrl(dto.linkUrl);
     const row = await this.prisma.websiteAnnouncement.create({
       data: {
         tenantId: user.tid,
@@ -499,6 +501,7 @@ export class WebsiteCmsEnterpriseService {
         featuredImageAlt: dto.featuredImageAlt?.trim() || null,
         attachmentUrl: dto.attachmentUrl ?? null,
         attachmentName: dto.attachmentName ?? null,
+        linkUrl,
         isPinned: dto.isPinned ?? false,
         showOnTicker: dto.showOnTicker ?? true,
         showOnHomepage: dto.showOnHomepage ?? true,
@@ -525,6 +528,7 @@ export class WebsiteCmsEnterpriseService {
       featuredImageAlt: string | null;
       attachmentUrl: string | null;
       attachmentName: string | null;
+      linkUrl: string | null;
       isPinned: boolean;
       showOnTicker: boolean;
       showOnHomepage: boolean;
@@ -566,6 +570,9 @@ export class WebsiteCmsEnterpriseService {
           : {}),
         ...(dto.attachmentName !== undefined
           ? { attachmentName: dto.attachmentName }
+          : {}),
+        ...(dto.linkUrl !== undefined
+          ? { linkUrl: this.normalizeAnnouncementLinkUrl(dto.linkUrl) }
           : {}),
         ...(dto.isPinned !== undefined ? { isPinned: dto.isPinned } : {}),
         ...(dto.showOnTicker !== undefined
@@ -1395,6 +1402,7 @@ export class WebsiteCmsEnterpriseService {
     featuredImageAlt: string | null;
     attachmentUrl: string | null;
     attachmentName: string | null;
+    linkUrl: string | null;
     isPinned: boolean;
     showOnTicker: boolean;
     showOnHomepage: boolean;
@@ -1406,6 +1414,7 @@ export class WebsiteCmsEnterpriseService {
     createdAt: Date;
     updatedAt: Date;
   }) {
+    const linkUrl = row.linkUrl?.trim() || null;
     return {
       id: row.id,
       title: row.title,
@@ -1416,6 +1425,7 @@ export class WebsiteCmsEnterpriseService {
       featuredImageAlt: row.featuredImageAlt,
       attachmentUrl: row.attachmentUrl,
       attachmentName: row.attachmentName,
+      linkUrl,
       isPinned: row.isPinned,
       showOnTicker: row.showOnTicker,
       showOnHomepage: row.showOnHomepage,
@@ -1426,12 +1436,40 @@ export class WebsiteCmsEnterpriseService {
       deletedAt: row.deletedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      href: `/announcements/${row.slug}`,
+      href: linkUrl || `/announcements/${row.slug}`,
       isNew:
         Boolean(row.publishAt) &&
         Date.now() - new Date(row.publishAt!).getTime() <=
           21 * 24 * 60 * 60 * 1000,
     };
+  }
+
+  /** Allow same-site paths or http(s) URLs for announcement click-through. */
+  private normalizeAnnouncementLinkUrl(value?: string | null): string | null {
+    const raw = (value ?? '').trim();
+    if (!raw) return null;
+    if (raw.startsWith('/') && !raw.startsWith('//')) {
+      if (raw.length > 2000) {
+        throw new BadRequestException('Link URL is too long');
+      }
+      return raw;
+    }
+    let candidate = raw;
+    if (!/^https?:\/\//i.test(candidate)) {
+      candidate = `https://${candidate}`;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      throw new BadRequestException(
+        'Link URL must be a valid http(s) address or site path (e.g. /news)',
+      );
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new BadRequestException('Link URL must use http or https');
+    }
+    return parsed.toString();
   }
 
   private slugify(value: string) {

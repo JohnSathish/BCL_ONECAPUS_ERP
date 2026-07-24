@@ -13,6 +13,7 @@ export type PublicAnnouncement = {
   featuredImageAlt: string;
   attachmentUrl: string;
   attachmentName: string;
+  linkUrl: string | null;
   isPinned: boolean;
   publishAt: string;
   expireAt: string | null;
@@ -25,6 +26,12 @@ function mapRow(row: unknown): PublicAnnouncement | null {
   const slug = typeof row.slug === 'string' ? row.slug : row.id;
   const featuredRaw = typeof row.featuredImageUrl === 'string' ? row.featuredImageUrl : '';
   const attachmentRaw = typeof row.attachmentUrl === 'string' ? row.attachmentUrl : '';
+  const linkUrl =
+    typeof row.linkUrl === 'string' && row.linkUrl.trim()
+      ? row.linkUrl.trim()
+      : typeof row.href === 'string' && row.href.trim() && !row.href.startsWith('/announcements/')
+        ? row.href.trim()
+        : null;
   const publishAt =
     typeof row.publishAt === 'string'
       ? row.publishAt
@@ -47,10 +54,15 @@ function mapRow(row: unknown): PublicAnnouncement | null {
       typeof row.attachmentName === 'string' && row.attachmentName.trim()
         ? row.attachmentName
         : 'Download PDF',
+    linkUrl,
     isPinned: row.isPinned === true,
     publishAt,
     expireAt: typeof row.expireAt === 'string' ? row.expireAt : null,
-    href: typeof row.href === 'string' ? row.href : `/announcements/${slug}`,
+    href:
+      linkUrl ||
+      (typeof row.href === 'string' && row.href.trim()
+        ? row.href.trim()
+        : `/announcements/${slug}`),
     isNew: row.isNew === true,
   };
 }

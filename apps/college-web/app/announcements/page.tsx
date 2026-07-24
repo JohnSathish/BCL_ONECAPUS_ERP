@@ -34,18 +34,39 @@ export default async function AnnouncementsIndexPage() {
           <div className="announcement-grid">
             {items.map((item) => {
               const image = absolutizeMediaUrl(item.featuredImageUrl) || item.featuredImageUrl;
+              const external = /^https?:\/\//i.test(item.href);
+              const TitleLink = external ? (
+                <a href={item.href} target="_blank" rel="noopener noreferrer">
+                  {item.title}
+                </a>
+              ) : (
+                <Link href={item.href}>{item.title}</Link>
+              );
+              const Media = image ? (
+                external ? (
+                  <a
+                    href={item.href}
+                    className="announcement-card-media"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image} alt={item.featuredImageAlt} />
+                  </a>
+                ) : (
+                  <Link href={item.href} className="announcement-card-media">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image} alt={item.featuredImageAlt} />
+                  </Link>
+                )
+              ) : (
+                <div className="announcement-card-media is-placeholder" aria-hidden>
+                  <Megaphone />
+                </div>
+              );
               return (
                 <article className="announcement-card" key={item.id}>
-                  {image ? (
-                    <Link href={item.href} className="announcement-card-media">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image} alt={item.featuredImageAlt} />
-                    </Link>
-                  ) : (
-                    <div className="announcement-card-media is-placeholder" aria-hidden>
-                      <Megaphone />
-                    </div>
-                  )}
+                  {Media}
                   <div className="announcement-card-body">
                     <div className="announcement-card-meta">
                       {item.isPinned ? (
@@ -62,14 +83,23 @@ export default async function AnnouncementsIndexPage() {
                         })}
                       </time>
                     </div>
-                    <h2>
-                      <Link href={item.href}>{item.title}</Link>
-                    </h2>
+                    <h2>{TitleLink}</h2>
                     {item.summary ? <p>{item.summary}</p> : null}
                     <div className="announcement-card-actions">
-                      <Link className="text-link" href={item.href}>
-                        Read more <ArrowRight aria-hidden />
-                      </Link>
+                      {external ? (
+                        <a
+                          className="text-link"
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open link <ArrowRight aria-hidden />
+                        </a>
+                      ) : (
+                        <Link className="text-link" href={item.href}>
+                          Read more <ArrowRight aria-hidden />
+                        </Link>
+                      )}
                       {item.attachmentUrl ? (
                         <a
                           className="text-link"

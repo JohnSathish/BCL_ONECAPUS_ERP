@@ -14467,6 +14467,7 @@ model WebsiteAnnouncement {
   featuredImageAlt  String?   @map("featured_image_alt")
   attachmentUrl     String?   @map("attachment_url")
   attachmentName    String?   @map("attachment_name")
+  linkUrl           String?   @map("link_url")
   isPinned          Boolean   @default(false) @map("is_pinned")
   showOnTicker      Boolean   @default(true) @map("show_on_ticker")
   showOnHomepage    Boolean   @default(true) @map("show_on_homepage")

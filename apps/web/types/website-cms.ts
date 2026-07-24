@@ -56,6 +56,8 @@ export type WebsiteAnnouncement = {
   featuredImageAlt?: string | null;
   attachmentUrl?: string | null;
   attachmentName?: string | null;
+  /** Optional click-through URL (ticker / cards). Falls back to /announcements/:slug. */
+  linkUrl?: string | null;
   isPinned: boolean;
   showOnTicker: boolean;
   showOnHomepage: boolean;

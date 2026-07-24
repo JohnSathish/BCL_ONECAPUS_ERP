@@ -19,15 +19,24 @@ function FlashItem({ item }: { item: FlashAnnouncement }) {
     </>
   );
 
-  if (item.href) {
+  if (!item.href) {
+    return <span className="flash-news-item">{body}</span>;
+  }
+
+  const external = /^https?:\/\//i.test(item.href);
+  if (external) {
     return (
-      <Link className="flash-news-item" href={item.href}>
+      <a className="flash-news-item" href={item.href} target="_blank" rel="noopener noreferrer">
         {body}
-      </Link>
+      </a>
     );
   }
 
-  return <span className="flash-news-item">{body}</span>;
+  return (
+    <Link className="flash-news-item" href={item.href}>
+      {body}
+    </Link>
+  );
 }
 
 export function FlashNewsTicker({ items, label = 'Announcements' }: Props) {
