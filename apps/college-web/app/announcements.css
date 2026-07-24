@@ -101,6 +101,13 @@
 }
 .announcement-detail-pdf{margin:20px 0}
 .announcement-detail-body{margin-bottom:18px}
+.announcement-detail-body img{
+  display:block;
+  max-width:100%;
+  height:auto;
+  margin:14px 0;
+  border-radius:10px;
+}
 
 @media (max-width:980px){
   .announcement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}

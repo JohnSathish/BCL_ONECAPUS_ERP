@@ -198,7 +198,24 @@ export function AnnouncementsView({ onMessage }: Props) {
             placeholder="Short summary (ticker / card)"
           />
           <div className="md:col-span-2">
-            <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
+            <RichTextEditor
+              key={editingId ?? 'new-announcement'}
+              value={bodyHtml}
+              onChange={setBodyHtml}
+              onUploadImage={async (file) => {
+                try {
+                  const media = await uploadWebsiteMedia(
+                    file,
+                    title.trim() || file.name || 'Announcement image',
+                  );
+                  onMessage('Image inserted into content.');
+                  return media.publicUrl;
+                } catch (error) {
+                  onMessage(apiErrorMessage(error, 'Could not upload image'));
+                  throw error;
+                }
+              }}
+            />
           </div>
 
           <div className="space-y-2 rounded-md border border-border p-3">

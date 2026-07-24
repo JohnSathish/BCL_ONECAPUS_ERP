@@ -2738,7 +2738,14 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
             ))}
           </select>
           <div className="md:col-span-2">
-            <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
+            <RichTextEditor
+              value={bodyHtml}
+              onChange={setBodyHtml}
+              onUploadImage={async (file) => {
+                const media = await uploadWebsiteMedia(file, title.trim() || 'Notice image');
+                return media.publicUrl;
+              }}
+            />
           </div>
           <Button
             className="w-fit"
