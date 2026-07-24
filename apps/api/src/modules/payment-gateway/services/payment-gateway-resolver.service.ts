@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { PaymentGatewayFactory } from '../payment-gateway.factory';
@@ -107,27 +108,41 @@ export class PaymentGatewayResolverService {
       );
     }
 
-    const order = await adapter.createOrder(credentials, {
-      amountPaise: Math.round(input.amount * 100),
-      currency: input.currency ?? 'INR',
-      receipt: input.receipt,
-      notes: input.notes,
-    });
+    try {
+      const order = await adapter.createOrder(credentials, {
+        amountPaise: Math.round(input.amount * 100),
+        currency: input.currency ?? 'INR',
+        receipt: input.receipt,
+        notes: input.notes,
+      });
 
-    return {
-      provider: providerCode as CheckoutSession['provider'],
-      orderId: order.orderId,
-      amount: input.amount,
-      currency: input.currency ?? 'INR',
-      keyId: credentials.keyId,
-      mode: mode === 'LIVE' ? 'LIVE' : 'TEST',
-      paymentSessionId: order.paymentSessionId,
-      checkoutUrl: order.checkoutUrl,
-      bdOrderId: order.bdOrderId,
-      authToken: order.authToken,
-      atomTokenId: order.atomTokenId,
-      merchantId: credentials.merchantId ?? undefined,
-    };
+      return {
+        provider: providerCode as CheckoutSession['provider'],
+        orderId: order.orderId,
+        amount: input.amount,
+        currency: input.currency ?? 'INR',
+        keyId: credentials.keyId,
+        mode: mode === 'LIVE' ? 'LIVE' : 'TEST',
+        paymentSessionId: order.paymentSessionId,
+        checkoutUrl: order.checkoutUrl,
+        bdOrderId: order.bdOrderId,
+        authToken: order.authToken,
+        atomTokenId: order.atomTokenId,
+        merchantId: credentials.merchantId ?? undefined,
+      };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ServiceUnavailableException
+      ) {
+        throw error;
+      }
+      const reason =
+        error instanceof Error ? error.message : 'Unknown gateway error';
+      throw new ServiceUnavailableException(
+        `Online payment could not be started (${providerCode}): ${reason}`,
+      );
+    }
   }
 
   async verifyPayment(

@@ -151,11 +151,41 @@ export default async function HomePage() {
         />
         <HomepageSectionRenderer
           section={{
+            id: 'studentSupport',
+            sectionKey: 'studentSupport',
+            label: 'Student Support & Activities',
+            enabled: true,
+            position: 6,
+            settings: {},
+            payload: {},
+          }}
+          content={content}
+          academicDepartments={academicDepartments}
+          heroSlides={heroSlides}
+          hub={hub}
+        />
+        <HomepageSectionRenderer
+          section={{
+            id: 'shortTermCourses',
+            sectionKey: 'shortTermCourses',
+            label: 'Short Term Courses',
+            enabled: true,
+            position: 7,
+            settings: {},
+            payload: {},
+          }}
+          content={content}
+          academicDepartments={academicDepartments}
+          heroSlides={heroSlides}
+          hub={hub}
+        />
+        <HomepageSectionRenderer
+          section={{
             id: 'news',
             sectionKey: 'news',
             label: 'News',
             enabled: true,
-            position: 6,
+            position: 8,
             settings: {},
             payload: {},
           }}
@@ -170,7 +200,7 @@ export default async function HomePage() {
             sectionKey: 'gallery',
             label: 'Gallery',
             enabled: true,
-            position: 7,
+            position: 9,
             settings: {},
             payload: {},
           }}
@@ -186,7 +216,7 @@ export default async function HomePage() {
             sectionKey: 'testimonials',
             label: 'Testimonials',
             enabled: true,
-            position: 8,
+            position: 10,
             settings: {},
             payload: {},
           }}
@@ -201,7 +231,7 @@ export default async function HomePage() {
             sectionKey: 'placement',
             label: 'Placement',
             enabled: true,
-            position: 9,
+            position: 11,
             settings: {},
             payload: {},
           }}

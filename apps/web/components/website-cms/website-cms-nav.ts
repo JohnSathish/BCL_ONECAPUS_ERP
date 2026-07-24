@@ -22,6 +22,7 @@ import {
   FileStack,
   Quote,
   Zap,
+  Droplets,
 } from 'lucide-react';
 
 export type WebsiteCmsNavItem = {
@@ -48,6 +49,20 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     label: 'Notice Board',
     href: '/admin/website/notices',
     icon: Megaphone,
+    group: 'content',
+  },
+  {
+    id: 'blood-donors',
+    label: 'Blood Donors',
+    href: '/admin/website/blood-donors',
+    icon: Droplets,
+    group: 'content',
+  },
+  {
+    id: 'fyug-interest',
+    label: 'FYUG Interest',
+    href: '/admin/website/fyug-interest',
+    icon: GraduationCap,
     group: 'content',
   },
   {
@@ -106,7 +121,13 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     icon: ImageIcon,
     group: 'media',
   },
-  { id: 'gallery', label: 'Gallery', href: '/admin/website/gallery', icon: Images, group: 'media' },
+  {
+    id: 'gallery',
+    label: 'Life at Campus',
+    href: '/admin/website/gallery',
+    icon: Images,
+    group: 'media',
+  },
   {
     id: 'documents',
     label: 'Documents',

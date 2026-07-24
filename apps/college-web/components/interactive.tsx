@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronDown, ChevronLeft, ChevronRight, Menu, Search, X } from 'lucide-react';
@@ -13,6 +13,9 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
+import { NavMegaMenu } from '@/components/nav-mega-menu';
+import type { HomepageHeaderCtas } from '@/lib/homepage-cms-content';
+import { seedHomepageCmsContent } from '@/lib/homepage-cms-content';
 import { navigation as seedNavigation } from '@/lib/navigation';
 
 type NewsItem = {
@@ -26,23 +29,72 @@ type NewsItem = {
 type NavGroup = { label: string; items: ReadonlyArray<readonly [string, string]> };
 type UtilityLink = { label: string; href: string };
 
+function isExternalHref(href: string) {
+  return /^https?:\/\//i.test(href);
+}
+
+function PlayStoreMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path fill="#EA4335" d="M3.6 2.3c-.4.2-.6.6-.6 1.1v17.2c0 .5.2.9.6 1.1l9.6-9.7L3.6 2.3z" />
+      <path fill="#FBBC04" d="M14.7 13.5 12.1 12l-8.5 8.6 11.1-7.1z" />
+      <path fill="#4285F4" d="M21.2 10.3 17 7.6l-2.9 2.9 2.9 2.9 4.2-2.7c.7-.4.7-1.4 0-1.8z" />
+      <path fill="#34A853" d="M12.1 12 17 7.6 5.9 1.4 12.1 12z" />
+    </svg>
+  );
+}
+
+const HeaderCtaLink = forwardRef<
+  HTMLAnchorElement,
+  {
+    href: string;
+    className?: string;
+    children: React.ReactNode;
+    onClick?: () => void;
+  }
+>(function HeaderCtaLink({ href, className, children, onClick }, ref) {
+  if (isExternalHref(href)) {
+    return (
+      <a
+        ref={ref}
+        className={className}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link ref={ref} className={className} href={href} onClick={onClick}>
+      {children}
+    </Link>
+  );
+});
+
 const defaultUtility: UtilityLink[] = [
   { label: 'Students', href: '/students' },
   { label: 'Staff', href: '/staff' },
   { label: 'Alumni', href: '/alumni' },
   { label: 'Careers', href: '/careers' },
+  { label: 'DBC Blood Donors', href: '/blood-donors' },
   { label: 'Contact', href: '/contact' },
 ];
 
 export function Header({
   navigation = seedNavigation,
   utilityLinks = defaultUtility,
+  headerCtas = seedHomepageCmsContent.headerCtas,
 }: {
   navigation?: readonly NavGroup[];
   utilityLinks?: readonly UtilityLink[];
+  headerCtas?: HomepageHeaderCtas;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<string | null>(null);
+  const { erpLogin, onlineAdmission, mobileApp } = headerCtas;
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => {
@@ -53,7 +105,11 @@ export function Header({
     <header className="site-header">
       <div className="utility">
         <div className="shell utility-inner">
-          <span>UGC Recognised · NAAC ‘B’ Grade</span>
+          <div className="utility-meta">
+            <span className="utility-aishe">College AISHE Code: C-16361</span>
+            <a href="mailto:principal@donboscocollege.ac.in">principal@donboscocollege.ac.in</a>
+            <a href="tel:+919402152496">+91 9402152496</a>
+          </div>
           <nav aria-label="Utility">
             {utilityLinks.map((link) => (
               <Link key={link.href} href={link.href}>
@@ -63,61 +119,69 @@ export function Header({
           </nav>
         </div>
       </div>
-      <div className="shell nav-row">
-        <Link className="brand" href="/" aria-label="Don Bosco College Tura home">
-          <Image src="/images/college-logo.png" width={64} height={64} alt="" priority />
-          <span>
-            <strong>DON BOSCO COLLEGE</strong>
-            <b>TURA</b>
-            <em>“In Pursuit of Excellence”</em>
-          </span>
-        </Link>
-        <nav className="desktop-nav" aria-label="Main navigation">
-          <Link href="/">Home</Link>
-          {navigation.map((group) => (
-            <div
-              className="nav-group"
-              key={group.label}
-              onMouseEnter={() => setActive(group.label)}
-              onMouseLeave={() => setActive(null)}
-            >
-              <button
-                aria-expanded={active === group.label}
-                onClick={() => setActive(active === group.label ? null : group.label)}
-              >
-                {group.label}
-                <ChevronDown size={14} />
-              </button>
-              {active === group.label && (
-                <div className="mega">
-                  <p>{group.label}</p>
-                  {group.items.map(([label, href]) => (
-                    <Link key={href} href={href}>
-                      {label}
-                      <span>→</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          <Link href="/iqac">IQAC</Link>
-          <Link href="/naac">NAAC</Link>
-        </nav>
-        <div className="nav-actions">
-          <Link className="icon-button" href="/search" aria-label="Search">
-            <Search size={19} />
+      <div className="brand-bar">
+        <div className="shell brand-bar-inner">
+          <Link className="brand" href="/" aria-label="Don Bosco College Tura home">
+            <Image src="/images/college-logo.png" width={72} height={72} alt="" priority />
+            <span>
+              <strong>DON BOSCO COLLEGE</strong>
+              <b>TURA</b>
+              <em>“In Pursuit of Excellence”</em>
+            </span>
           </Link>
-          <Button asChild className="compact desktop-only">
-            <Link href="/erp">ERP Login</Link>
-          </Button>
-          <button
-            className="icon-button mobile-menu"
-            aria-label="Open navigation"
-            onClick={() => setOpen(true)}
-          >
-            <Menu />
-          </button>
+          <div className="brand-actions">
+            <HeaderCtaLink className="nav-erp desktop-only" href={erpLogin.href}>
+              {erpLogin.label}
+            </HeaderCtaLink>
+            <Button asChild variant="gold" className="compact desktop-only">
+              <HeaderCtaLink href={onlineAdmission.href}>{onlineAdmission.label}</HeaderCtaLink>
+            </Button>
+            <button
+              className="icon-button mobile-menu brand-menu"
+              aria-label="Open navigation"
+              onClick={() => setOpen(true)}
+            >
+              <Menu />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="nav-bar">
+        <div className="shell nav-bar-inner">
+          <nav className="desktop-nav" aria-label="Main navigation">
+            <Link href="/">Home</Link>
+            {navigation.map((group) => (
+              <div
+                className="nav-group"
+                key={group.label}
+                onMouseEnter={() => setActive(group.label)}
+                onMouseLeave={() => setActive(null)}
+              >
+                <button
+                  className={active === group.label ? 'is-open' : undefined}
+                  aria-expanded={active === group.label}
+                  onClick={() => setActive(active === group.label ? null : group.label)}
+                >
+                  {group.label}
+                  <ChevronDown size={14} />
+                </button>
+                {active === group.label ? (
+                  <NavMegaMenu label={group.label} items={group.items} />
+                ) : null}
+              </div>
+            ))}
+            <Link href="/iqac">IQAC</Link>
+            <Link href="/naac">NAAC</Link>
+          </nav>
+          <div className="nav-actions">
+            <HeaderCtaLink className="nav-app" href={mobileApp.href}>
+              <PlayStoreMark className="nav-app-icon" />
+              <span>{mobileApp.label}</span>
+            </HeaderCtaLink>
+            <Link className="icon-button" href="/search" aria-label="Search">
+              <Search size={19} />
+            </Link>
+          </div>
         </div>
       </div>
       <div className="affiliation-bar">
@@ -168,10 +232,31 @@ export function Header({
                   </AccordionItem>
                 ))}
               </Accordion>
-              <Link href="/iqac">IQAC</Link>
-              <Link href="/naac">NAAC</Link>
+              <Link href="/iqac" onClick={() => setOpen(false)}>
+                IQAC
+              </Link>
+              <Link href="/naac" onClick={() => setOpen(false)}>
+                NAAC
+              </Link>
+              <HeaderCtaLink
+                className="nav-app"
+                href={mobileApp.href}
+                onClick={() => setOpen(false)}
+              >
+                <PlayStoreMark className="nav-app-icon" />
+                <span>{mobileApp.label}</span>
+              </HeaderCtaLink>
+              <HeaderCtaLink
+                className="nav-erp"
+                href={erpLogin.href}
+                onClick={() => setOpen(false)}
+              >
+                {erpLogin.label}
+              </HeaderCtaLink>
               <Button asChild variant="gold">
-                <Link href="/admission/apply">Apply now</Link>
+                <HeaderCtaLink href={onlineAdmission.href} onClick={() => setOpen(false)}>
+                  {onlineAdmission.label}
+                </HeaderCtaLink>
               </Button>
             </aside>
           </>,
@@ -286,8 +371,23 @@ export function Gallery({ images }: { images: { src: string; alt: string; label:
     <>
       <div className="gallery-grid">
         {images.map((image, i) => (
-          <button key={image.src} onClick={() => setSelected(i)} className={`gallery-${i + 1}`}>
-            <Image src={image.src} alt={image.alt} fill sizes="(max-width: 700px) 100vw, 33vw" />
+          <button
+            key={`${image.label}-${image.src}-${i}`}
+            onClick={() => setSelected(i)}
+            className={`gallery-${i + 1}`}
+            type="button"
+          >
+            <Image
+              src={image.src}
+              alt={image.alt}
+              fill
+              sizes="(max-width: 700px) 100vw, 33vw"
+              unoptimized={
+                image.src.startsWith('http') ||
+                image.src.startsWith('/uploads/') ||
+                image.src.includes('127.0.0.1')
+              }
+            />
             <span>{image.label}</span>
           </button>
         ))}
@@ -297,7 +397,17 @@ export function Gallery({ images }: { images: { src: string; alt: string; label:
           <button aria-label="Close gallery" onClick={() => setSelected(null)}>
             <X />
           </button>
-          <Image src={images[selected].src} alt={images[selected].alt} fill sizes="90vw" />
+          <Image
+            src={images[selected].src}
+            alt={images[selected].alt}
+            fill
+            sizes="90vw"
+            unoptimized={
+              images[selected].src.startsWith('http') ||
+              images[selected].src.startsWith('/uploads/') ||
+              images[selected].src.includes('127.0.0.1')
+            }
+          />
         </div>
       )}
     </>

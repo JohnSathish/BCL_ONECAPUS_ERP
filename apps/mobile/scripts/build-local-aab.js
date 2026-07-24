@@ -29,9 +29,33 @@ const skipClean = process.env.SKIP_PREBUILD_CLEAN === '1';
 const allowDebug = process.env.ALLOW_DEBUG_RELEASE_SIGNING === '1';
 
 const keystoreProps = path.join(root, 'android', 'keystore.properties');
-if (!fs.existsSync(keystoreProps) && !allowDebug) {
+const credentialsJson = path.join(root, 'credentials.json');
+let downloadedCredentialEnv = {};
+if (fs.existsSync(credentialsJson)) {
+  const credentials = JSON.parse(fs.readFileSync(credentialsJson, 'utf8'));
+  const keystore = credentials.android?.keystore;
+  if (keystore) {
+    const keystorePath = path.resolve(root, keystore.keystorePath);
+    if (!fs.existsSync(keystorePath)) {
+      console.error(`Downloaded Android keystore is missing: ${keystorePath}`);
+      process.exit(1);
+    }
+    downloadedCredentialEnv = {
+      MYAPP_UPLOAD_STORE_FILE: keystorePath,
+      MYAPP_UPLOAD_STORE_PASSWORD: keystore.keystorePassword,
+      MYAPP_UPLOAD_KEY_ALIAS: keystore.keyAlias,
+      MYAPP_UPLOAD_KEY_PASSWORD: keystore.keyPassword,
+    };
+  }
+}
+const hasUploadCredentials =
+  fs.existsSync(keystoreProps) ||
+  Object.values(downloadedCredentialEnv).every(
+    (value) => typeof value === 'string' && value.length > 0,
+  );
+if (!hasUploadCredentials && !allowDebug) {
   console.error(
-    'Missing android/keystore.properties (upload key). Copy keystore.properties.example or use EAS:\n' +
+    'Missing credentials.json or android/keystore.properties (upload key). Download EAS credentials or use EAS:\n' +
       '  npm run build:prod:android\n' +
       'For smoke only: ALLOW_DEBUG_RELEASE_SIGNING=1 npm run build:aab',
   );
@@ -49,6 +73,7 @@ if (!fs.existsSync(googleServices)) {
 
 const env = {
   ...process.env,
+  ...downloadedCredentialEnv,
   JAVA_HOME: javaHome,
   PATH: `${path.join(javaHome, 'bin')}${path.delimiter}${process.env.PATH || ''}`,
   LOCAL_NATIVE_RELEASE: '1',
@@ -88,6 +113,94 @@ fs.writeFileSync(
 `,
 );
 
+/**
+ * Expo prebuild --clean regenerates app/build.gradle with debug release signing.
+ * Re-inject upload-keystore wiring when local upload credentials are present.
+ */
+function ensureUploadSigningInGradle() {
+  const appGradle = path.join(root, 'android', 'app', 'build.gradle');
+  if (!fs.existsSync(appGradle)) return;
+  let text = fs.readFileSync(appGradle, 'utf8');
+  if (text.includes('hasUploadKeystore')) {
+    console.log('Upload keystore signing already present in app/build.gradle');
+    return;
+  }
+  if (!hasUploadCredentials && !allowDebug) {
+    console.error(
+      'app/build.gradle missing upload signing and local upload credentials are absent.',
+    );
+    process.exit(1);
+  }
+  if (!text.includes('hasUploadKeystore') && hasUploadCredentials) {
+    const inject = `
+// Upload keystore for Play Store (never commit the .jks).
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def uploadStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE') ?: keystoreProperties['MYAPP_UPLOAD_STORE_FILE'] ?: findProperty('MYAPP_UPLOAD_STORE_FILE')
+def uploadStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_STORE_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+def uploadKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS') ?: keystoreProperties['MYAPP_UPLOAD_KEY_ALIAS'] ?: findProperty('MYAPP_UPLOAD_KEY_ALIAS')
+def uploadKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD') ?: keystoreProperties['MYAPP_UPLOAD_KEY_PASSWORD'] ?: findProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+def uploadStore = uploadStoreFile ? rootProject.file(uploadStoreFile) : null
+def hasUploadKeystore = uploadStore?.exists() && uploadStorePassword && uploadKeyAlias && uploadKeyPassword
+`;
+    text = text.replace(/\ndef jscFlavor = /, `${inject}\ndef jscFlavor = `);
+    if (!text.includes('signingConfigs {')) {
+      console.error('Could not locate signingConfigs in app/build.gradle');
+      process.exit(1);
+    }
+    text = text.replace(/signingConfigs \{\s*debug \{[\s\S]*?\}(\s*)\}/, (block) => {
+      if (block.includes('release {')) return block;
+      return block.replace(
+        /(\s*)\}(\s*)$/,
+        `$1    release {
+$1        if (hasUploadKeystore) {
+$1            storeFile uploadStore
+$1            storePassword uploadStorePassword
+$1            keyAlias uploadKeyAlias
+$1            keyPassword uploadKeyPassword
+$1        }
+$1    }
+$1}$2`,
+      );
+    });
+    const buildTypesStart = text.indexOf('    buildTypes {');
+    const packagingOptionsStart = text.indexOf('    packagingOptions {', buildTypesStart);
+    if (buildTypesStart === -1 || packagingOptionsStart === -1) {
+      console.error('Could not locate buildTypes in app/build.gradle');
+      process.exit(1);
+    }
+    const buildTypesBlock = text.slice(buildTypesStart, packagingOptionsStart);
+    const signedBuildTypesBlock = buildTypesBlock.replace(
+      /(\n        release \{[\s\S]*?)signingConfig signingConfigs\.debug/,
+      `$1${[
+        'if (hasUploadKeystore) {',
+        '                signingConfig signingConfigs.release',
+        "            } else if (findProperty('ALLOW_DEBUG_RELEASE_SIGNING') == 'true') {",
+        '                signingConfig signingConfigs.debug',
+        '            } else {',
+        '                throw new GradleException(',
+        "                    'Release signing requires android/keystore.properties '",
+        "                    + '(see keystore.properties.example) or set MYAPP_UPLOAD_* env vars, '",
+        "                    + 'or ALLOW_DEBUG_RELEASE_SIGNING=true for local smoke only.')",
+        '            }',
+      ].join('\n')}`,
+    );
+    if (signedBuildTypesBlock === buildTypesBlock) {
+      console.error('Could not replace debug release signing in app/build.gradle');
+      process.exit(1);
+    }
+    text =
+      text.slice(0, buildTypesStart) + signedBuildTypesBlock + text.slice(packagingOptionsStart);
+    fs.writeFileSync(appGradle, text);
+    console.log('Patched app/build.gradle → upload keystore release signing');
+  }
+}
+
+ensureUploadSigningInGradle();
+
 const appGradle = path.join(root, 'android', 'app', 'build.gradle');
 if (fs.existsSync(appGradle)) {
   let gradleText = fs.readFileSync(appGradle, 'utf8');
@@ -121,8 +234,8 @@ const aabPath = path.join(
 const distDir = path.join(root, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
 if (fs.existsSync(aabPath)) {
-  const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.0-vc20.aab');
-  const destR8 = path.join(distDir, 'onecampus-v20-sdk35.aab');
+  const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.1-vc21.aab');
+  const destR8 = path.join(distDir, 'onecampus-v21-sdk35.aab');
   fs.copyFileSync(aabPath, dest);
   fs.copyFileSync(aabPath, destR8);
   console.log('\nAAB:', aabPath);

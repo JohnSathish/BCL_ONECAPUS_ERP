@@ -45,6 +45,7 @@ export async function fetchCms(
   endpoint: string,
   query?: Record<string, string>,
   revalidate = 300,
+  timeoutMs = 4500,
 ): Promise<unknown | null> {
   const url = cmsUrl(endpoint, query);
   if (!url) return null;
@@ -55,7 +56,7 @@ export async function fetchCms(
       ...(process.env.NODE_ENV !== 'production'
         ? { cache: 'no-store' as const }
         : { next: { revalidate, tags: ['website-cms'] } }),
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       if (process.env.NODE_ENV !== 'production' && response.status !== 404) {

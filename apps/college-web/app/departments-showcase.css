@@ -102,12 +102,15 @@
 }
 .dept-card-compact .dept-card-media{
   position:relative;
-  height:84px;
-  min-height:84px;
-  max-height:84px;
+  height:96px;
+  min-height:96px;
+  max-height:96px;
   overflow:hidden;
   border-radius:14px 14px 0 0;
   background:linear-gradient(145deg,#0b2e59,#123a6b);
+}
+.dept-card-compact .dept-card-media.is-icon-header{
+  background-image:none;
 }
 .dept-card-compact .dept-card-media img{
   width:100%;
@@ -120,21 +123,55 @@
   position:absolute;
   inset:0;
   display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:8px;
-  padding:10px 12px;
-  background:linear-gradient(180deg,transparent 10%,rgba(6,31,61,.82) 100%);
+  align-items:center;
+  gap:12px;
+  padding:14px 14px 16px;
   color:#fff;
+}
+.dept-card-icon{
+  flex-shrink:0;
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.88);
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.12);
+}
+.dept-card-icon svg{
+  width:22px;
+  height:22px;
+  color:#fff;
+  stroke-width:1.75;
+}
+.dept-card-media-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
 }
 .dept-card-media-bar h3{
   margin:0;
   font-family:var(--font-serif),Libre Baskerville,Georgia,serif;
-  font-size:16px;
+  font-size:17px;
   font-weight:700;
-  line-height:1.2;
+  line-height:1.15;
+  color:#fff;
 }
-.dept-card-media-bar span{
+.dept-card-category-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:3px 9px;
+  border-radius:999px;
+  background:rgba(244,180,0,.95);
+  color:#061f3d;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.dept-card-media-bar span:not(.dept-card-icon):not(.dept-card-category-pill){
   flex-shrink:0;
   padding:3px 8px;
   border-radius:999px;
@@ -432,11 +469,42 @@
   inset:0;
   opacity:.42;
 }
+.dept-page-hero-media.is-icon-hero{
+  opacity:1;
+  display:grid;
+  place-items:center end;
+  padding-right:clamp(16px,8vw,72px);
+  pointer-events:none;
+}
+.dept-page-hero-media.is-icon-hero::after{
+  content:none;
+}
+.dept-page-hero-icon{
+  width:clamp(88px,14vw,132px);
+  height:clamp(88px,14vw,132px);
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,.35);
+  background:rgba(255,255,255,.12);
+  display:grid;
+  place-items:center;
+}
+.dept-page-hero-icon svg{
+  width:48%;
+  height:48%;
+  color:rgba(255,255,255,.92);
+  stroke-width:1.5;
+}
 .dept-page-hero-media::after{
   content:"";
   position:absolute;
   inset:0;
   background:linear-gradient(90deg,rgba(6,31,61,.88) 0%,rgba(11,46,89,.72) 55%,rgba(11,46,89,.45) 100%);
+}
+.dept-page-hero-media.is-icon-hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(105deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,.08) 48%,rgba(0,0,0,.02) 100%);
 }
 .dept-page-hero-media img{width:100%;height:100%;object-fit:cover}
 .dept-page-hero-copy{

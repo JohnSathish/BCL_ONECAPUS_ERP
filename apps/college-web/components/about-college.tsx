@@ -30,6 +30,11 @@ const statIcons = {
   naac: Award,
 } as const;
 
+/** Keep honorific + name on one line (avoid "St." wrapping alone). */
+function keepSaintNameTogether(text: string) {
+  return text.replace(/St\.\s+John\s+Bosco/gi, 'St.\u00A0John\u00A0Bosco');
+}
+
 function useInViewOnce() {
   const ref = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
@@ -122,8 +127,38 @@ function AboutDescription({ text }: { text: string }) {
   );
 }
 
+function YearsExperienceSeal({ years = 39 }: { years?: number }) {
+  const ringText = 'YEARS OF EXPERIENCE • YEARS OF EXPERIENCE • ';
+  return (
+    <div className="about-experience-seal" aria-label={`${years}+ years of experience`}>
+      <div className="about-experience-seal-core" aria-hidden>
+        <strong>
+          {years}
+          <span>+</span>
+        </strong>
+      </div>
+      <svg className="about-experience-seal-ring" viewBox="0 0 200 200" aria-hidden>
+        <defs>
+          <path
+            id="about-exp-circle"
+            d="M 100,100 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0"
+          />
+        </defs>
+        <circle cx="100" cy="100" r="96" className="about-experience-seal-disk" />
+        <text className="about-experience-seal-text">
+          <textPath href="#about-exp-circle" startOffset="0%">
+            {ringText}
+          </textPath>
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 export function AboutCollegeSection({ about }: Props) {
   const { ref, visible } = useInViewOnce();
+  const founded = about.stats.find((stat) => stat.id === 'founded')?.value ?? 1987;
+  const years = Math.max(1, new Date().getFullYear() - founded);
 
   return (
     <Reveal>
@@ -145,12 +180,12 @@ export function AboutCollegeSection({ about }: Props) {
 
             <div className="about-college-copy">
               <p className="about-college-kicker">{about.eyebrow}</p>
-              <h2 id="about-college-heading">{about.subtitle}</h2>
+              <h2 id="about-college-heading">{keepSaintNameTogether(about.subtitle)}</h2>
               <AboutDescription text={about.description} />
               <blockquote className="about-college-quote">
                 <Quote aria-hidden />
                 <p>“{about.quote}”</p>
-                <cite>— {about.quoteAttribution}</cite>
+                <cite>— {keepSaintNameTogether(about.quoteAttribution)}</cite>
               </blockquote>
             </div>
 
@@ -160,6 +195,7 @@ export function AboutCollegeSection({ about }: Props) {
                   <AnimatedStat key={stat.id} stat={stat} active={visible} />
                 ))}
               </div>
+              <YearsExperienceSeal years={years} />
               <div className="about-college-actions">
                 <Link className="button gold-button" href={about.readMoreHref}>
                   Discover more <ArrowRight aria-hidden />

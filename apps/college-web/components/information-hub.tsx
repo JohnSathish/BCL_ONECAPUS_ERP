@@ -27,16 +27,23 @@ const COLLEGE_MISSION =
   'To provide an education that is participatory in nature, intellectual competence, multi-skill oriented, value based and socially committed for the development of persons and enrichment of society.';
 
 function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?: boolean }) {
-  const { day, month } = eventDateParts(event.date);
+  const { day, month, weekday } = eventDateParts(event.date);
   const style = eventCategoryStyles[event.category];
   const remaining = Math.max(0, daysUntil(event.date));
   const happeningToday = highlightToday || isSameDay(event.date);
   const content = (
     <>
-      <span className={`info-event-date${happeningToday ? ' is-today' : ''}`} aria-hidden>
-        <strong>{day}</strong>
-        <small>{month}</small>
-      </span>
+      <time
+        className={`info-event-date${happeningToday ? ' is-today' : ''}`}
+        dateTime={event.date}
+        aria-label={new Date(event.date).toLocaleDateString('en-IN', { dateStyle: 'full' })}
+      >
+        <span className="info-event-date-month">{month}</span>
+        <span className="info-event-date-body">
+          <strong>{day}</strong>
+          <small>{weekday}</small>
+        </span>
+      </time>
       <span className="info-event-copy">
         <span className="info-badge" style={{ background: style.bg, color: style.color }}>
           {event.category}

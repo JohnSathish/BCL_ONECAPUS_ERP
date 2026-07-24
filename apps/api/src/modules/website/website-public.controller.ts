@@ -1,5 +1,19 @@
-import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { extractRequestHost } from '../../common/utils/request-host';
@@ -8,6 +22,10 @@ import { WebsiteAdminService } from './website-admin.service';
 import { WebsiteAcademicService } from './website-academic.service';
 import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteService } from './website.service';
+import {
+  CreateWebsiteBloodDonorDto,
+  CreateWebsiteFyugInterestDto,
+} from './dto/website.dto';
 
 @ApiTags('website-public')
 @Controller({ path: 'website/public', version: '1' })
@@ -51,6 +69,36 @@ export class WebsitePublicController {
   async notices(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
     const tenant = await this.resolveTenant(req, tenantSlug);
     return this.enterprise.listPublicNotices(tenant.id);
+  }
+
+  @Public()
+  @Get('announcements')
+  async announcements(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+    @Query('ticker') ticker?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.listPublicAnnouncements(tenant.id, {
+      ticker: ticker === '1' || ticker === 'true',
+    });
+  }
+
+  @Public()
+  @Get('announcements/:slug')
+  async announcementBySlug(
+    @Req() req: Request,
+    @Param('slug') slug: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    const row = await this.enterprise.listPublicAnnouncements(tenant.id, {
+      slug,
+    });
+    if (!row) {
+      throw new NotFoundException('Announcement not found');
+    }
+    return row;
   }
 
   @Public()
@@ -142,6 +190,35 @@ export class WebsitePublicController {
   ) {
     const tenant = await this.resolveTenant(req, tenantSlug);
     return this.admin.publicContent(tenant.id, typeSlug, entrySlug);
+  }
+
+  @Public()
+  @Post('blood-donors')
+  async createBloodDonor(
+    @Req() req: Request,
+    @Body() body: CreateWebsiteBloodDonorDto,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.createPublicBloodDonor(tenant.id, body);
+  }
+
+  @Public()
+  @Post('fyug-interest')
+  @UseInterceptors(
+    FileInterceptor('photograph', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  async createFyugInterest(
+    @Req() req: Request,
+    @Body() body: CreateWebsiteFyugInterestDto,
+    @UploadedFile() photograph: Express.Multer.File | undefined,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.createPublicFyugInterest(tenant.id, body, photograph);
   }
 
   @Public()

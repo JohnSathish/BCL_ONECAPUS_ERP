@@ -9,11 +9,11 @@ export type { ProposalTemplateContext } from './proposal-template.types';
 
 const DEFAULT_COPY: Record<string, string> = {
   executiveSummary:
-    'BCL OneCampus ERP is a unified academic and administration operating system purpose-built for colleges and universities. It digitizes every mission-critical function from admissions to examinations, finance, HR, and analytics in one governed platform — eliminating Excel dependency, manual registers, and fragmented reporting.',
+    'BCL OneCampus ERP is a unified academic and administration operating system purpose-built for colleges and universities. It digitizes every mission-critical function — admissions, NEP/FYUGP academics, examinations, fees & finance, HR, library, governance, NAAC/IQAC, official documents, research journals, college website CMS, Principal Desk analytics, and student/faculty mobile apps — in one governed platform. The result: less paperwork, faster decisions, and a modern public face for the institution.',
   implementation:
-    'The implementation model combines process mapping, master data onboarding, role-based training, pilot execution, and institution-wide go-live with measurable adoption checkpoints across all departments.',
+    'The implementation model combines process mapping, master data onboarding, role-based training, pilot execution, and institution-wide go-live with measurable adoption checkpoints across academic, finance, examination, website, and leadership teams.',
   support:
-    'Support includes onboarding specialists, product success managers, SLA-backed issue resolution, release communications, quarterly governance reviews, and annual maintenance covering software updates, security patches, and database maintenance.',
+    'Support includes onboarding specialists, product success managers, SLA-backed issue resolution, release communications, quarterly governance reviews, and annual maintenance covering software updates, security patches, website/CMS content enablement, and database maintenance.',
 };
 
 export function resolveCopy(overrides?: Record<string, string>) {

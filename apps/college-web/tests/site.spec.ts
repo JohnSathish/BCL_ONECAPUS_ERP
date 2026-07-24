@@ -48,11 +48,11 @@ test('mobile drawer opens and navigates', async ({ page }, testInfo) => {
 
 test('contact form reports unconfigured delivery clearly', async ({ page }) => {
   await page.goto('/contact');
-  await page.getByLabel('Name').fill('Test Visitor');
-  await page.getByLabel('Email', { exact: true }).fill('visitor@example.com');
-  await page.getByLabel('Subject').fill('Campus visit');
+  await page.getByLabel('Full Name').fill('Test Visitor');
+  await page.getByLabel('Email Address').fill('visitor@example.com');
+  await page.getByLabel('Subject').selectOption('Campus visit');
   await page.getByLabel('Message').fill('I would like to arrange a visit to the campus.');
-  await page.getByRole('button', { name: 'Send message' }).click();
+  await page.getByRole('button', { name: /Send Message/i }).click();
   await expect(
     page.getByText('Online message delivery is not configured. Please email the college directly.'),
   ).toBeVisible();

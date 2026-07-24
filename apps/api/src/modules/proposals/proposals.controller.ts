@@ -69,7 +69,7 @@ export class ProposalsController {
     const perStudentSubscriptionRate = 100;
     return {
       institutionName: 'Don Bosco College, Tura',
-      proposalVersion: '1.0',
+      proposalVersion: '2.2',
       studentStrength,
       perStudentSubscriptionRate,
       contactPerson: 'Dr (Fr) Jogesh B Sangma',
@@ -77,12 +77,16 @@ export class ProposalsController {
       contactPhone: '+91-9678402086',
       addressLine:
         'Don Bosco College Tura, Sampalgre, West Garo Hills, Meghalaya 794002',
-      primaryColor: '#1E40AF',
-      secondaryColor: '#2563EB',
+      primaryColor: '#0B2E59',
+      secondaryColor: '#C79A2B',
       proposalTheme: 'don-bosco',
       pricingLines: buildSubscriptionPricing(
         studentStrength,
         perStudentSubscriptionRate,
+        {
+          implementationAmount: 0,
+          supportAmount: 0,
+        },
       ),
       sectionKeys: PROPOSAL_SECTIONS.map((s) => ({
         key: s.key,

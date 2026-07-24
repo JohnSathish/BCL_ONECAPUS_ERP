@@ -15,6 +15,7 @@ import {
 } from './website-cms.registry';
 import {
   DEFAULT_HOMEPAGE_CONTENT,
+  applyHomepageContentPatch,
   normalizePrincipalHref,
   resolveHomepageContent,
   type WebsiteHomepageContent,
@@ -437,6 +438,220 @@ export class WebsiteCmsEnterpriseService {
     return this.mapNotice(updated);
   }
 
+  async listAnnouncements(tenantId: string, opts?: { trash?: boolean }) {
+    const site = await this.website.getOrCreateSite(tenantId);
+    const rows = await this.prisma.websiteAnnouncement.findMany({
+      where: {
+        tenantId,
+        siteId: site.id,
+        deletedAt: opts?.trash ? { not: null } : null,
+      },
+      orderBy: [
+        { isPinned: 'desc' },
+        { publishAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+    return rows.map((row) => this.mapAnnouncement(row));
+  }
+
+  async createAnnouncement(
+    user: JwtUser,
+    dto: {
+      title: string;
+      slug?: string;
+      summary?: string;
+      bodyHtml?: string;
+      featuredImageUrl?: string | null;
+      featuredImageAlt?: string | null;
+      attachmentUrl?: string | null;
+      attachmentName?: string | null;
+      isPinned?: boolean;
+      showOnTicker?: boolean;
+      showOnHomepage?: boolean;
+      isVisible?: boolean;
+      publishAt?: string | null;
+      expireAt?: string | null;
+      status?: string;
+    },
+  ) {
+    const site = await this.website.getOrCreateSite(user.tid, user.sub);
+    const title = dto.title.trim();
+    if (!title) throw new BadRequestException('Title is required');
+    const slug = (dto.slug?.trim() || this.slugify(title)).toLowerCase();
+    const status = (dto.status ?? 'DRAFT').toUpperCase();
+    if (!['DRAFT', 'PUBLISHED'].includes(status)) {
+      throw new BadRequestException('Invalid announcement status');
+    }
+    const row = await this.prisma.websiteAnnouncement.create({
+      data: {
+        tenantId: user.tid,
+        siteId: site.id,
+        title,
+        slug,
+        summary: (dto.summary ?? '').trim(),
+        bodyHtml: sanitizeWebsiteHtml(dto.bodyHtml ?? ''),
+        featuredImageUrl: dto.featuredImageUrl ?? null,
+        featuredImageAlt: dto.featuredImageAlt?.trim() || null,
+        attachmentUrl: dto.attachmentUrl ?? null,
+        attachmentName: dto.attachmentName ?? null,
+        isPinned: dto.isPinned ?? false,
+        showOnTicker: dto.showOnTicker ?? true,
+        showOnHomepage: dto.showOnHomepage ?? true,
+        isVisible: dto.isVisible ?? true,
+        publishAt: dto.publishAt ? new Date(dto.publishAt) : new Date(),
+        expireAt: dto.expireAt ? new Date(dto.expireAt) : null,
+        status,
+        createdById: user.sub,
+        updatedById: user.sub,
+      },
+    });
+    return this.mapAnnouncement(row);
+  }
+
+  async updateAnnouncement(
+    user: JwtUser,
+    announcementId: string,
+    dto: Partial<{
+      title: string;
+      slug: string;
+      summary: string;
+      bodyHtml: string;
+      featuredImageUrl: string | null;
+      featuredImageAlt: string | null;
+      attachmentUrl: string | null;
+      attachmentName: string | null;
+      isPinned: boolean;
+      showOnTicker: boolean;
+      showOnHomepage: boolean;
+      isVisible: boolean;
+      publishAt: string | null;
+      expireAt: string | null;
+      status: string;
+    }>,
+  ) {
+    const existing = await this.prisma.websiteAnnouncement.findFirst({
+      where: { id: announcementId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Announcement not found');
+    if (dto.status !== undefined) {
+      const status = dto.status.toUpperCase();
+      if (!['DRAFT', 'PUBLISHED'].includes(status)) {
+        throw new BadRequestException('Invalid announcement status');
+      }
+    }
+    const updated = await this.prisma.websiteAnnouncement.update({
+      where: { id: existing.id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+        ...(dto.slug !== undefined
+          ? { slug: dto.slug.trim().toLowerCase() }
+          : {}),
+        ...(dto.summary !== undefined ? { summary: dto.summary.trim() } : {}),
+        ...(dto.bodyHtml !== undefined
+          ? { bodyHtml: sanitizeWebsiteHtml(dto.bodyHtml) }
+          : {}),
+        ...(dto.featuredImageUrl !== undefined
+          ? { featuredImageUrl: dto.featuredImageUrl }
+          : {}),
+        ...(dto.featuredImageAlt !== undefined
+          ? { featuredImageAlt: dto.featuredImageAlt?.trim() || null }
+          : {}),
+        ...(dto.attachmentUrl !== undefined
+          ? { attachmentUrl: dto.attachmentUrl }
+          : {}),
+        ...(dto.attachmentName !== undefined
+          ? { attachmentName: dto.attachmentName }
+          : {}),
+        ...(dto.isPinned !== undefined ? { isPinned: dto.isPinned } : {}),
+        ...(dto.showOnTicker !== undefined
+          ? { showOnTicker: dto.showOnTicker }
+          : {}),
+        ...(dto.showOnHomepage !== undefined
+          ? { showOnHomepage: dto.showOnHomepage }
+          : {}),
+        ...(dto.isVisible !== undefined ? { isVisible: dto.isVisible } : {}),
+        ...(dto.publishAt !== undefined
+          ? { publishAt: dto.publishAt ? new Date(dto.publishAt) : null }
+          : {}),
+        ...(dto.expireAt !== undefined
+          ? { expireAt: dto.expireAt ? new Date(dto.expireAt) : null }
+          : {}),
+        ...(dto.status !== undefined
+          ? { status: dto.status.toUpperCase() }
+          : {}),
+        updatedById: user.sub,
+      },
+    });
+    return this.mapAnnouncement(updated);
+  }
+
+  async trashAnnouncement(user: JwtUser, announcementId: string) {
+    const existing = await this.prisma.websiteAnnouncement.findFirst({
+      where: { id: announcementId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Announcement not found');
+    await this.prisma.websiteAnnouncement.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), deletedById: user.sub },
+    });
+    return { ok: true };
+  }
+
+  async restoreAnnouncement(user: JwtUser, announcementId: string) {
+    const existing = await this.prisma.websiteAnnouncement.findFirst({
+      where: {
+        id: announcementId,
+        tenantId: user.tid,
+        deletedAt: { not: null },
+      },
+    });
+    if (!existing)
+      throw new NotFoundException('Announcement not found in trash');
+    const updated = await this.prisma.websiteAnnouncement.update({
+      where: { id: existing.id },
+      data: { deletedAt: null, deletedById: null, updatedById: user.sub },
+    });
+    return this.mapAnnouncement(updated);
+  }
+
+  async listPublicAnnouncements(
+    tenantId: string,
+    opts?: { ticker?: boolean; homepage?: boolean; slug?: string },
+  ) {
+    const site = await this.prisma.websiteSite.findFirst({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+    if (!site) return opts?.slug ? null : [];
+    const now = new Date();
+    const where = {
+      tenantId,
+      siteId: site.id,
+      deletedAt: null,
+      status: 'PUBLISHED',
+      isVisible: true,
+      ...(opts?.ticker ? { showOnTicker: true } : {}),
+      ...(opts?.homepage ? { showOnHomepage: true } : {}),
+      ...(opts?.slug ? { slug: opts.slug } : {}),
+      OR: [{ publishAt: null }, { publishAt: { lte: now } }],
+      AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
+    };
+    if (opts?.slug) {
+      const row = await this.prisma.websiteAnnouncement.findFirst({ where });
+      return row ? this.mapAnnouncement(row) : null;
+    }
+    const rows = await this.prisma.websiteAnnouncement.findMany({
+      where,
+      orderBy: [
+        { isPinned: 'desc' },
+        { publishAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: opts?.ticker ? 20 : 50,
+    });
+    return rows.map((row) => this.mapAnnouncement(row));
+  }
+
   async listPublicNotices(tenantId: string, opts?: { homepage?: boolean }) {
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },
@@ -557,48 +772,25 @@ export class WebsiteCmsEnterpriseService {
   ) {
     const site = await this.website.getOrCreateSite(user.tid, user.sub);
     const settings = this.asRecord(site.settingsJson);
-    const current = resolveHomepageContent(settings);
-    const nextHomepage = {
-      ...current,
-      ...patch,
-      principal: {
-        ...current.principal,
-        ...(patch.principal ?? {}),
-        messageHref: normalizePrincipalHref(
-          patch.principal?.messageHref ?? current.principal.messageHref,
-        ),
-      },
-      aboutCollege: { ...current.aboutCollege, ...(patch.aboutCollege ?? {}) },
-      visionMission: {
-        ...current.visionMission,
-        ...(patch.visionMission ?? {}),
-      },
-      hero: { ...current.hero, ...(patch.hero ?? {}) },
-      whyChooseUs: { ...current.whyChooseUs, ...(patch.whyChooseUs ?? {}) },
-      footer: { ...current.footer, ...(patch.footer ?? {}) },
-      coatOfArms: { ...current.coatOfArms, ...(patch.coatOfArms ?? {}) },
-      researchLinks: {
-        ...current.researchLinks,
-        ...(patch.researchLinks ?? {}),
-      },
-      sisterInstitutions: {
-        ...current.sisterInstitutions,
-        ...(patch.sisterInstitutions ?? {}),
-        items:
-          patch.sisterInstitutions?.items ?? current.sisterInstitutions.items,
-      },
-      sectionChrome: {
-        ...current.sectionChrome,
-        ...(patch.sectionChrome ?? {}),
-      },
-      statistics: patch.statistics ?? current.statistics,
-    };
-    // Keep informationHub / aboutCollege mirrors in sync for older readers
-    const nextSettings = {
+    const storedHomepage = this.asRecord(settings.homepage) ?? {};
+    const nextHomepageStored = applyHomepageContentPatch(storedHomepage, patch);
+    const nextHomepage = resolveHomepageContent({
       ...settings,
-      homepage: nextHomepage,
-      informationHub: {
-        ...(this.asRecord(settings.informationHub) ?? {}),
+      homepage: nextHomepageStored,
+    });
+
+    const nextSettings: Record<string, unknown> = {
+      ...settings,
+      homepage: nextHomepageStored,
+    };
+
+    // Only rewrite mirrored blobs for sections that were actually patched.
+    // Previously every save materialised defaults into principal + informationHub,
+    // which made Principal's Message flip back to the short stub.
+    if (patch.principal) {
+      const hub = this.asRecord(settings.informationHub) ?? {};
+      nextSettings.informationHub = {
+        ...hub,
         leadership: {
           message: nextHomepage.principal.message,
           name: nextHomepage.principal.name,
@@ -609,14 +801,36 @@ export class WebsiteCmsEnterpriseService {
           messageHref: nextHomepage.principal.messageHref,
           leadershipHref: nextHomepage.principal.leadershipHref,
         },
-      },
-      aboutCollege: nextHomepage.aboutCollege,
-      visionMission: nextHomepage.visionMission,
-      stats: nextHomepage.statistics,
-      footerWidgets: nextHomepage.footer,
-      whyChooseUs: nextHomepage.whyChooseUs,
-      heroChrome: nextHomepage.hero,
-    };
+      };
+    }
+    if (patch.aboutCollege) {
+      nextSettings.aboutCollege = nextHomepage.aboutCollege;
+    }
+    if (patch.visionMission) {
+      nextSettings.visionMission = nextHomepage.visionMission;
+    }
+    if (patch.statistics) {
+      nextSettings.stats = nextHomepage.statistics;
+    }
+    if (patch.footer) {
+      nextSettings.footerWidgets = nextHomepage.footer;
+    }
+    if (patch.whyChooseUs) {
+      nextSettings.whyChooseUs = nextHomepage.whyChooseUs;
+    }
+    if (patch.hero) {
+      nextSettings.heroChrome = nextHomepage.hero;
+    }
+    if (patch.lifeAtCampus) {
+      // Keep legacy settings.gallery in sync for older public readers.
+      nextSettings.gallery = nextHomepage.lifeAtCampus.items.map((item) => ({
+        src: item.src,
+        alt: item.alt,
+        label: item.label,
+        ...(item.href ? { href: item.href } : {}),
+      }));
+    }
+
     await this.prisma.websiteSite.update({
       where: { id: site.id },
       data: { settingsJson: nextSettings as Prisma.InputJsonValue },
@@ -685,7 +899,7 @@ export class WebsiteCmsEnterpriseService {
         status: 'PUBLISHED',
         deletedAt: null,
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 12,
     });
     return rows.map((row) => ({
@@ -917,9 +1131,15 @@ export class WebsiteCmsEnterpriseService {
     };
     if (hook) {
       try {
+        const secret =
+          process.env.WEBSITE_REVALIDATE_SECRET?.trim() ||
+          process.env.REVALIDATE_SECRET?.trim();
         await fetch(hook, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            ...(secret ? { 'x-revalidate-secret': secret } : {}),
+          },
           body: JSON.stringify(payload),
         });
       } catch {
@@ -1153,6 +1373,55 @@ export class WebsiteCmsEnterpriseService {
       deletedAt: row.deletedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+    };
+  }
+
+  private mapAnnouncement(row: {
+    id: string;
+    title: string;
+    slug: string;
+    summary: string;
+    bodyHtml: string;
+    featuredImageUrl: string | null;
+    featuredImageAlt: string | null;
+    attachmentUrl: string | null;
+    attachmentName: string | null;
+    isPinned: boolean;
+    showOnTicker: boolean;
+    showOnHomepage: boolean;
+    isVisible: boolean;
+    publishAt: Date | null;
+    expireAt: Date | null;
+    status: string;
+    deletedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: row.id,
+      title: row.title,
+      slug: row.slug,
+      summary: row.summary,
+      bodyHtml: row.bodyHtml,
+      featuredImageUrl: row.featuredImageUrl,
+      featuredImageAlt: row.featuredImageAlt,
+      attachmentUrl: row.attachmentUrl,
+      attachmentName: row.attachmentName,
+      isPinned: row.isPinned,
+      showOnTicker: row.showOnTicker,
+      showOnHomepage: row.showOnHomepage,
+      isVisible: row.isVisible,
+      publishAt: row.publishAt,
+      expireAt: row.expireAt,
+      status: row.status,
+      deletedAt: row.deletedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      href: `/announcements/${row.slug}`,
+      isNew:
+        Boolean(row.publishAt) &&
+        Date.now() - new Date(row.publishAt!).getTime() <=
+          21 * 24 * 60 * 60 * 1000,
     };
   }
 

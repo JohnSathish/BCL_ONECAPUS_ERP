@@ -182,7 +182,10 @@ export async function createNttDataAtomToken(
     const parts = text.split('&');
     const encPart = parts.find((p) => p.startsWith('encData='));
     if (!encPart) {
-      throw new Error('Unexpected NTT DATA auth response.');
+      const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 160);
+      throw new Error(
+        `Unexpected NTT DATA auth response${snippet ? `: ${snippet}` : '.'} Check Atom merchant id, keys, and Test vs Live mode.`,
+      );
     }
     const encResp = decodeURIComponent(encPart.split('=').slice(1).join('='));
     parsed = nttDataDecrypt(encResp, creds.decKey);

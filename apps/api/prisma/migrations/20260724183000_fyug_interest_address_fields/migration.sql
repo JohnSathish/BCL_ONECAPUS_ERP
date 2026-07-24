@@ -1,0 +1,4 @@
+ALTER TABLE "academic"."website_fyug_interests"
+  ADD COLUMN IF NOT EXISTS "district" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS "pin_code" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS "blood_group" TEXT NOT NULL DEFAULT '';

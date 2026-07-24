@@ -18,6 +18,7 @@ import {
 
 function resolveReceiptVerifyBaseUrl(): string {
   const candidates = [
+    process.env.PAY_PORTAL_ORIGIN,
     process.env.WEB_ORIGIN,
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.OFFICIAL_DOCUMENT_VERIFY_URL,
@@ -28,7 +29,7 @@ function resolveReceiptVerifyBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_LOGIN_HOST?.trim()) {
     return `https://${process.env.NEXT_PUBLIC_LOGIN_HOST.trim()}`;
   }
-  return 'https://erp.donboscocollege.ac.in';
+  return 'https://pay.donboscocollege.ac.in';
 }
 
 @Injectable()
@@ -217,7 +218,7 @@ export class FeeReceiptDocumentService {
       : null;
 
     const branding = await resolveFeeReceiptBranding(this.db(), tenantId);
-    const verifyUrl = `${resolveReceiptVerifyBaseUrl()}/verify/receipt/${receipt.receiptNo}`;
+    const verifyUrl = `${resolveReceiptVerifyBaseUrl()}/public-fee-pay/verify?receiptNo=${encodeURIComponent(receipt.receiptNo)}`;
     const payment = receipt.payment;
     const paymentMeta = (payment?.metadata ?? {}) as Record<string, unknown>;
     const transactionRef =

@@ -206,6 +206,48 @@ export const restoreWebsiteNotice = (id: string) =>
     .post<import('@/types/website-cms').WebsiteNotice>(`${base}/notices/${id}/restore`)
     .then((response) => response.data);
 
+export const fetchWebsiteAnnouncements = () =>
+  api
+    .get<import('@/types/website-cms').WebsiteAnnouncement[]>(`${base}/announcements`)
+    .then((response) => response.data);
+
+export const createWebsiteAnnouncement = (
+  payload: Partial<import('@/types/website-cms').WebsiteAnnouncement>,
+) =>
+  api
+    .post<import('@/types/website-cms').WebsiteAnnouncement>(`${base}/announcements`, payload)
+    .then((response) => response.data);
+
+export const updateWebsiteAnnouncement = (
+  id: string,
+  payload: Partial<import('@/types/website-cms').WebsiteAnnouncement>,
+) =>
+  api
+    .patch<
+      import('@/types/website-cms').WebsiteAnnouncement
+    >(`${base}/announcements/${id}`, payload)
+    .then((response) => response.data);
+
+export const deleteWebsiteAnnouncement = (id: string) =>
+  api.delete(`${base}/announcements/${id}`).then((response) => response.data);
+
+export const restoreWebsiteAnnouncement = (id: string) =>
+  api
+    .post<import('@/types/website-cms').WebsiteAnnouncement>(`${base}/announcements/${id}/restore`)
+    .then((response) => response.data);
+
+export const uploadWebsiteDocument = (file: File, altText = '') => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('altText', altText);
+  form.append('kind', 'DOCUMENT');
+  return api
+    .post<import('@/types/website-cms').WebsiteMediaAsset>(`${base}/media`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((response) => response.data);
+};
+
 export const duplicateWebsitePage = (id: string) =>
   api.post(`${base}/pages/${id}/duplicate`).then((response) => response.data);
 
@@ -345,3 +387,42 @@ export const publishAllWebsiteAcademicDepartments = () =>
   api
     .post<{ departmentsPublished: number; staffPublished: number }>(`${base}/academic/publish-all`)
     .then((response) => response.data);
+
+export const fetchWebsiteBloodDonors = (params?: { skip?: number; take?: number }) =>
+  api
+    .get<import('@/types/website-cms').WebsiteBloodDonorList>(`${base}/blood-donors`, {
+      params,
+    })
+    .then((response) => response.data);
+
+export const fetchWebsiteFyugInterests = (params?: { skip?: number; take?: number }) =>
+  api
+    .get<import('@/types/website-cms').WebsiteFyugInterestList>(`${base}/fyug-interest`, {
+      params,
+    })
+    .then((response) => response.data);
+
+export const fetchWebsiteFyugInterestStats = () =>
+  api
+    .get<import('@/types/website-cms').WebsiteFyugInterestStats>(`${base}/fyug-interest/stats`)
+    .then((response) => response.data);
+
+export const downloadWebsiteFyugInterestExcel = async () => {
+  const { downloadBlob } = await import('@/utils/download-blob');
+  const { data } = await api.get(`${base}/fyug-interest/export.xlsx`, {
+    responseType: 'blob',
+  });
+  downloadBlob(data as Blob, 'fyug-interest-registrations.xlsx');
+};
+
+export const downloadWebsiteFyugInterestPdf = async (
+  id: string,
+  applicationNumber?: string | null,
+) => {
+  const { downloadBlob } = await import('@/utils/download-blob');
+  const { data } = await api.get(`${base}/fyug-interest/${id}/application.pdf`, {
+    responseType: 'blob',
+  });
+  const name = applicationNumber || id.slice(0, 8);
+  downloadBlob(data as Blob, `fyug-application-${name}.pdf`);
+};

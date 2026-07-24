@@ -68,6 +68,7 @@ export async function getUtilityNavigation(): Promise<NavItem[]> {
     { label: 'Staff', href: '/staff' },
     { label: 'Alumni', href: '/alumni' },
     { label: 'Careers', href: '/careers' },
+    { label: 'DBC Blood Donors', href: '/blood-donors' },
     { label: 'Contact', href: '/contact' },
   ];
   const menus = await fetchCms('menus', { location: 'UTILITY' }, 120);

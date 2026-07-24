@@ -2,16 +2,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowRight,
-  BookOpen,
   BriefcaseBusiness,
   FlaskConical,
   GraduationCap,
   HeartHandshake,
   Landmark,
-  Microscope,
   Trophy,
 } from 'lucide-react';
 import { AboutCollegeSection } from '@/components/about-college';
+import { FlashNewsTickerSection } from '@/components/flash-news-ticker-section';
 import { Gallery } from '@/components/interactive';
 import { HeroSlider } from '@/components/hero-slider';
 import { InformationHub } from '@/components/information-hub';
@@ -19,8 +18,11 @@ import { DepartmentsShowcase } from '@/components/departments-showcase';
 import { NewsEventsSection } from '@/components/news-events-section';
 import { PrincipalMessageSection } from '@/components/principal-message-section';
 import { SisterInstitutions } from '@/components/sister-institutions';
+import { StudentSupportSection } from '@/components/student-support-section';
+import { ShortTermCoursesSection } from '@/components/short-term-courses-section';
 import { VoicesOfBosco } from '@/components/voices-of-bosco';
 import { WhyChooseUs } from '@/components/why-choose-us';
+import { ImportantLinksSection } from '@/components/important-links';
 import type { CollegeContent } from '@/lib/content';
 import type { HomepageSectionPayload } from '@/lib/homepage';
 import type { DepartmentCard } from '@/lib/academic-types';
@@ -181,7 +183,12 @@ export function HomepageSectionRenderer({
       return <InformationHub hub={{ ...hub, notices }} mode="notices" />;
     }
     case 'aboutCollege':
-      return <AboutCollegeSection about={content.aboutCollege} />;
+      return (
+        <>
+          <FlashNewsTickerSection />
+          <AboutCollegeSection about={content.aboutCollege} />
+        </>
+      );
     case 'departments':
       return <DepartmentsShowcase departments={academicDepartments} />;
     case 'programmes':
@@ -199,19 +206,32 @@ export function HomepageSectionRenderer({
       );
     case 'campusLife':
       return <WhyChooseUs content={content.homepageCms.whyChooseUs} />;
+    case 'studentSupport':
+      return <StudentSupportSection />;
+    case 'shortTermCourses':
+      return <ShortTermCoursesSection />;
     case 'testimonials':
       return <VoicesOfBosco items={content.testimonials} />;
-    case 'gallery':
+    case 'gallery': {
+      const life = content.homepageCms.lifeAtCampus;
+      const images = (life.items?.length ? life.items : content.gallery).map((image) => ({
+        src: absolutizeMediaUrl(image.src) || image.src,
+        alt: image.alt,
+        label: image.label,
+      }));
       return (
-        <section className="section shell">
+        <section className="section shell" aria-labelledby="life-at-campus-heading">
           <div className="center-heading">
-            <span className="eyebrow">Life at Don Bosco</span>
-            <h2 className="display">A campus full of possibility</h2>
-            <p>Every corner holds a story of learning, friendship and discovery.</p>
+            <span className="eyebrow">{life.eyebrow || 'Life at Don Bosco'}</span>
+            <h2 id="life-at-campus-heading" className="display">
+              {life.title || 'A campus full of possibility'}
+            </h2>
+            {life.subtitle ? <p>{life.subtitle}</p> : null}
           </div>
-          <Gallery images={content.gallery} />
+          <Gallery images={images} />
         </section>
       );
+    }
     case 'coatOfArms':
       return <HomepageCoatOfArms content={content.homepageCms.coatOfArms} />;
     case 'researchLinks':
@@ -296,14 +316,6 @@ export function HomepageResearchAndLinks({
     ],
   };
   const featured = research.links.slice(0, 3);
-  const moreLinks =
-    research.links.length > 3
-      ? research.links.slice(3)
-      : [
-          { label: 'UGC', href: 'https://www.ugc.gov.in/' },
-          { label: 'NEHU', href: 'https://www.nehu.ac.in/' },
-          { label: 'AISHE', href: 'https://aishe.gov.in/' },
-        ];
 
   const renderCard = (link: { label: string; href: string; description?: string }) => {
     const inner = (
@@ -342,29 +354,7 @@ export function HomepageResearchAndLinks({
           <div className="research-cards">{featured.map(renderCard)}</div>
         </div>
       </section>
-      <section className="section shell important">
-        <div className="center-heading">
-          <span className="eyebrow">At your fingertips</span>
-          <h2 className="display">Important links</h2>
-        </div>
-        <div className="external-links">
-          {moreLinks.map((link) =>
-            link.href.startsWith('http') ? (
-              <a href={link.href} key={link.href} target="_blank" rel="noopener noreferrer">
-                <Landmark />
-                <span>{link.label}</span>
-                <ArrowRight />
-              </a>
-            ) : (
-              <Link href={link.href} key={link.href}>
-                <Landmark />
-                <span>{link.label}</span>
-                <ArrowRight />
-              </Link>
-            ),
-          )}
-        </div>
-      </section>
+      <ImportantLinksSection />
     </>
   );
 }

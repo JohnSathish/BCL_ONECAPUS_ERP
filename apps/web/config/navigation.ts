@@ -1954,6 +1954,27 @@ export const ADMIN_NAV: NavGroup[] = [
             ],
           },
           {
+            label: 'Announcements',
+            href: '/admin/website/announcements',
+            permissions: [
+              'website:announcements:read',
+              'website:announcements:edit',
+              'website:read',
+              'website:edit',
+              'website:manage',
+            ],
+          },
+          {
+            label: 'Blood Donors',
+            href: '/admin/website/blood-donors',
+            permissions: ['website:read', 'website:edit', 'website:manage'],
+          },
+          {
+            label: 'FYUG Interest',
+            href: '/admin/website/fyug-interest',
+            permissions: ['website:read', 'website:edit', 'website:manage'],
+          },
+          {
             label: 'Menus',
             href: '/admin/website/navigation',
             permissions: ['website:edit', 'website:manage', 'tenant:manage'],

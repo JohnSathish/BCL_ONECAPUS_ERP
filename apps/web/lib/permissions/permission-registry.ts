@@ -160,6 +160,8 @@ export const MODULE_PERMISSIONS = {
     'website:news:edit',
     'website:notices:read',
     'website:notices:edit',
+    'website:announcements:read',
+    'website:announcements:edit',
     'website:departments:edit',
     'website:seo',
     'website:review',

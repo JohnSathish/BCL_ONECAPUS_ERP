@@ -15,7 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { getAcademicFaculty } from '@/lib/academic-departments';
-import { shortDepartmentName } from '@/lib/department-banners';
+import { shortDepartmentName } from '@/lib/department-visuals';
 
 type Props = { params: Promise<{ slug: string; staffSlug: string }> };
 

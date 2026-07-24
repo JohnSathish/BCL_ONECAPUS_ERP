@@ -1,12 +1,16 @@
-import { Module, forwardRef } from '@nestjs/common';
+﻿import { Module, forwardRef } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { CourseDeliveryFeeService } from '../../common/services/course-delivery-fee.service';
 import { AccountingModule } from '../accounting/accounting.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { AuthModule } from '../auth/auth.module';
 import { CacheModule } from '../../shared/cache/cache.module';
 import { StorageModule } from '../../shared/storage/storage.module';
 import { FeesController } from './fees.controller';
+import { PublicFeePayController } from './public-fee-pay.controller';
 import { FeeCycleConfigService } from './services/fee-cycle-config.service';
 import { FeeCycleEngineService } from './services/fee-cycle-engine.service';
 import { FeeEnforcementService } from './services/fee-enforcement.service';
@@ -36,6 +40,7 @@ import { ExternalFeePaymentService } from './services/external-fee-payment.servi
 import { FeeReceiptPdfProcessor } from './processors/fee-receipt-pdf.processor';
 import { FeeOrphanDemandService } from './services/fee-orphan-demand.service';
 import { FeeSettlementReconciliationService } from './services/fee-settlement-reconciliation.service';
+import { PublicFeePayService } from './services/public-fee-pay.service';
 import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 
 @Module({
@@ -44,11 +49,19 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
     CommunicationModule,
     LicensingModule,
     TenantsModule,
+    AuthModule,
     CacheModule,
     StorageModule,
     forwardRef(() => PaymentGatewayModule),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+      }),
+    }),
   ],
-  controllers: [FeesController],
+  controllers: [FeesController, PublicFeePayController],
   providers: [
     CourseDeliveryFeeService,
     FeeStructureService,
@@ -80,6 +93,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
     FeeReceiptPdfProcessor,
     FeeOrphanDemandService,
     FeeSettlementReconciliationService,
+    PublicFeePayService,
   ],
   exports: [
     FeeStructureService,
@@ -96,6 +110,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
     GatewayPaymentService,
     PaymentCollectionService,
     FeeReceiptDocumentService,
+    PublicFeePayService,
   ],
 })
 export class FeesModule {}

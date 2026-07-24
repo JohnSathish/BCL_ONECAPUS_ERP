@@ -50,6 +50,12 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
     AuthQrService,
     AuthRfidService,
   ],
-  exports: [AuthService, MfaService, StepUpService, LoginAttemptService],
+  exports: [
+    AuthService,
+    MfaService,
+    StepUpService,
+    LoginAttemptService,
+    ChallengeService,
+  ],
 })
 export class AuthModule {}

@@ -1,0 +1,123 @@
+/* Flash / announcements ticker — above About College */
+.flash-news-bar{
+  display:flex;
+  align-items:stretch;
+  width:100%;
+  min-height:42px;
+  background:var(--navy);
+  color:#fff;
+  overflow:hidden;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.flash-news-label{
+  position:relative;
+  z-index:2;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:0 34px 0 18px;
+  background:linear-gradient(105deg,#f08a28 0%,#e35d3a 55%,#d64545 100%);
+  clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.flash-news-label-short{display:none}
+.flash-news-label svg{
+  width:15px;
+  height:15px;
+  flex-shrink:0;
+}
+.flash-news-viewport{
+  flex:1;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  overflow:hidden;
+  mask-image:linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+.flash-news-viewport.is-static{
+  mask-image:none;
+  overflow-x:auto;
+}
+.flash-news-track{
+  display:flex;
+  align-items:center;
+  gap:28px;
+  width:max-content;
+  padding-inline:18px;
+}
+.flash-news-track.is-marquee{
+  animation-name:flash-news-marquee;
+  animation-timing-function:linear;
+  animation-iteration-count:infinite;
+  will-change:transform;
+}
+.flash-news-bar.is-paused .flash-news-track.is-marquee{
+  animation-play-state:paused;
+}
+@keyframes flash-news-marquee{
+  from{transform:translateX(0)}
+  to{transform:translateX(calc(-1 * var(--flash-loop, 50%)))}
+}
+.flash-news-slot{
+  flex:0 0 auto;
+}
+.flash-news-item{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  color:#fff;
+  font-size:13px;
+  font-weight:600;
+  line-height:1.2;
+  white-space:nowrap;
+  max-width:min(70vw, 520px);
+}
+a.flash-news-item:hover .flash-news-item-title{
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+.flash-news-item-icon{
+  width:14px;
+  height:14px;
+  flex-shrink:0;
+  opacity:.85;
+  color:#f4b400;
+}
+.flash-news-item-title{
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.flash-news-new{
+  flex-shrink:0;
+  display:inline-flex;
+  align-items:center;
+  min-height:18px;
+  padding:0 6px;
+  border-radius:4px;
+  background:#e11d48;
+  color:#fff;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+@media (max-width:760px){
+  .flash-news-label{
+    padding:0 28px 0 14px;
+    font-size:10px;
+    gap:6px;
+  }
+  .flash-news-label-full{display:none}
+  .flash-news-label-short{display:inline}
+  .flash-news-item{font-size:12.5px;max-width:78vw}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .flash-news-track.is-marquee{animation:none!important}
+}

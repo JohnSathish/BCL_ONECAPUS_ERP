@@ -49,6 +49,17 @@ export type HomepageFooterContent = {
   badges: Array<{ label: string; value: string }>;
 };
 
+export type HomepageHeaderCtaButton = {
+  label: string;
+  href: string;
+};
+
+export type HomepageHeaderCtas = {
+  erpLogin: HomepageHeaderCtaButton;
+  onlineAdmission: HomepageHeaderCtaButton;
+  mobileApp: HomepageHeaderCtaButton;
+};
+
 export type HomepageCoatOfArms = {
   title: string;
   body: string;
@@ -75,6 +86,21 @@ export type HomepageSisterInstitutions = {
   items: HomepageSisterInstitution[];
 };
 
+export type HomepageLifeAtCampusItem = {
+  id: string;
+  src: string;
+  alt: string;
+  label: string;
+  href?: string;
+};
+
+export type HomepageLifeAtCampus = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  items: HomepageLifeAtCampusItem[];
+};
+
 export type HomepageVisionMission = {
   eyebrow: string;
   title: string;
@@ -92,11 +118,13 @@ export type HomepageCmsContent = {
   hero: HomepageHeroChrome;
   whyChooseUs: HomepageWhyChooseUs;
   footer: HomepageFooterContent;
+  headerCtas: HomepageHeaderCtas;
   coatOfArms: HomepageCoatOfArms;
   researchLinks: HomepageResearchLinks;
   visionMission: HomepageVisionMission;
   principalHighlights: Array<{ label: string; value: string }>;
   sisterInstitutions: HomepageSisterInstitutions;
+  lifeAtCampus: HomepageLifeAtCampus;
 };
 
 export const seedHomepageCmsContent: HomepageCmsContent = {
@@ -236,7 +264,7 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
     address: 'Tura, West Garo Hills\nMeghalaya - 794101',
     copyright: 'Don Bosco College, Tura',
     exploreLinks: [
-      { label: 'About the College', href: '/about/history' },
+      { label: 'About the College', href: '/about' },
       { label: 'Programmes', href: '/academics/programmes' },
       { label: 'Admissions', href: '/admission/apply' },
       { label: 'Research', href: '/research/cell' },
@@ -253,6 +281,20 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
       { label: 'UGC', value: 'Recognised' },
       { label: 'NEHU', value: 'Affiliated' },
     ],
+  },
+  headerCtas: {
+    erpLogin: {
+      label: 'ERP Login',
+      href: 'https://erp.donboscocollege.ac.in',
+    },
+    onlineAdmission: {
+      label: 'Online Admission',
+      href: '/admission/apply',
+    },
+    mobileApp: {
+      label: 'Mobile App',
+      href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+    },
   },
   coatOfArms: {
     title: 'Coat of Arms',
@@ -284,6 +326,11 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
       { label: 'IQAC', href: '/iqac', description: 'Quality assurance' },
       { label: 'NAAC', href: '/naac' },
       { label: 'Downloads', href: '/downloads' },
+      {
+        label: 'ERP Login',
+        href: 'https://erp.donboscocollege.ac.in',
+        description: 'Staff & student portal',
+      },
     ],
   },
   visionMission: {
@@ -311,10 +358,95 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
     subtitle: 'Collaborating institutions under the same management',
     items: [
       {
-        id: 'dbc-logo',
-        name: 'Don Bosco College, Tura',
-        logoUrl: '/images/college-logo.png',
-        href: 'https://donboscocollege.ac.in',
+        id: 'dbc-bongaigaon',
+        name: 'Don Bosco College, Bongaigaon (DBC)',
+        logoUrl: '/images/sister-institutions/dbc-bongaigaon.jpg',
+        href: 'https://donboscocollege.ac.in/',
+      },
+      {
+        id: 'dbim',
+        name: 'Don Bosco Institute of Management (DBIM)',
+        logoUrl: '/images/sister-institutions/dbim.png',
+        href: 'https://dbim.ac.in/',
+      },
+      {
+        id: 'dbc-tura-linkage',
+        name: 'Don Bosco College, Tura — sister linkage',
+        logoUrl: '/images/sister-institutions/dbc-tura-linkage.png',
+        href: 'https://donboscocollege.ac.in/',
+      },
+      {
+        id: 'don-bosco-university',
+        name: 'Don Bosco University',
+        logoUrl: '/images/sister-institutions/don-bosco-university.png',
+        href: 'https://www.dbuniversity.ac.in/',
+      },
+      {
+        id: 'salesian-province-ing',
+        name: 'Salesian Province of Guwahati (ING)',
+        logoUrl: '/images/sister-institutions/salesian-province-ing.jpg',
+        href: 'https://donboscoindia.org/',
+      },
+      {
+        id: 'salesians-sdb',
+        name: 'Salesians of Don Bosco (SDB)',
+        logoUrl: '/images/sister-institutions/salesians-sdb.png',
+        href: 'https://www.sdb.org/',
+      },
+      {
+        id: 'st-anthonys-shillong',
+        name: "St. Anthony's College, Shillong",
+        logoUrl: '/images/sister-institutions/st-anthonys-shillong.png',
+        href: 'https://anthonys.ac.in/',
+      },
+    ],
+  },
+  lifeAtCampus: {
+    eyebrow: 'Life at Don Bosco',
+    title: 'A campus full of possibility',
+    subtitle: 'Every corner holds a story of learning, friendship and discovery.',
+    items: [
+      {
+        id: 'ncc',
+        src: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=1200&q=82',
+        alt: 'NCC cadets participating in a college programme',
+        label: 'NCC',
+      },
+      {
+        id: 'nss',
+        src: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=82',
+        alt: 'NSS student volunteers serving the community',
+        label: 'NSS',
+      },
+      {
+        id: 'sports',
+        src: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students participating in college sports',
+        label: 'Sports',
+      },
+      {
+        id: 'cultural',
+        src: 'https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students performing during a cultural event',
+        label: 'Cultural Events',
+      },
+      {
+        id: 'labs',
+        src: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students learning in a science laboratory',
+        label: 'Labs',
+      },
+      {
+        id: 'library',
+        src: 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students studying in the college library',
+        label: 'Library',
+      },
+      {
+        id: 'hostel',
+        src: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Comfortable student hostel facilities',
+        label: 'Hostel',
       },
     ],
   },
@@ -322,6 +454,36 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeCollegeHeaderCtas(value: unknown): HomepageHeaderCtas {
+  const defaults = seedHomepageCmsContent.headerCtas;
+  const source = isRecord(value) ? value : {};
+  const pick = (
+    preferred: unknown,
+    legacy: unknown,
+    fallback: HomepageHeaderCtaButton,
+  ): HomepageHeaderCtaButton => {
+    for (const candidate of [preferred, legacy]) {
+      if (!isRecord(candidate)) continue;
+      const label = typeof candidate.label === 'string' ? candidate.label.trim() : '';
+      const href = typeof candidate.href === 'string' ? candidate.href.trim() : '';
+      if (label || href) {
+        return { label: label || fallback.label, href: href || fallback.href };
+      }
+    }
+    return { ...fallback };
+  };
+  const secondary = isRecord(source.secondary) ? source.secondary : null;
+  const secondaryHref = secondary && typeof secondary.href === 'string' ? secondary.href : '';
+  const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
+    `${typeof secondary?.label === 'string' ? secondary.label : ''} ${secondaryHref}`,
+  );
+  return {
+    erpLogin: pick(source.erpLogin, secondaryLooksLikeApp ? null : secondary, defaults.erpLogin),
+    onlineAdmission: pick(source.onlineAdmission, source.primary, defaults.onlineAdmission),
+    mobileApp: pick(source.mobileApp, secondaryLooksLikeApp ? secondary : null, defaults.mobileApp),
+  };
 }
 
 export function readHomepageCmsContent(value: unknown): Partial<HomepageCmsContent> {
@@ -338,6 +500,9 @@ export function readHomepageCmsContent(value: unknown): Partial<HomepageCmsConte
       : isRecord(source.footerWidgets)
         ? (source.footerWidgets as HomepageFooterContent)
         : undefined,
+    headerCtas: isRecord(source.headerCtas)
+      ? normalizeCollegeHeaderCtas(source.headerCtas)
+      : undefined,
     coatOfArms: isRecord(source.coatOfArms) ? (source.coatOfArms as HomepageCoatOfArms) : undefined,
     researchLinks: isRecord(source.researchLinks)
       ? (source.researchLinks as HomepageResearchLinks)
@@ -345,6 +510,16 @@ export function readHomepageCmsContent(value: unknown): Partial<HomepageCmsConte
     sisterInstitutions: isRecord(source.sisterInstitutions)
       ? (source.sisterInstitutions as HomepageSisterInstitutions)
       : undefined,
+    lifeAtCampus: isRecord(source.lifeAtCampus)
+      ? (source.lifeAtCampus as HomepageLifeAtCampus)
+      : Array.isArray(source.gallery)
+        ? {
+            eyebrow: seedHomepageCmsContent.lifeAtCampus.eyebrow,
+            title: seedHomepageCmsContent.lifeAtCampus.title,
+            subtitle: seedHomepageCmsContent.lifeAtCampus.subtitle,
+            items: source.gallery as HomepageLifeAtCampusItem[],
+          }
+        : undefined,
     visionMission: isRecord(source.visionMission)
       ? (source.visionMission as HomepageVisionMission)
       : undefined,
@@ -363,6 +538,7 @@ export function mergeHomepageCmsContent(...values: unknown[]): HomepageCmsConten
     hero: merged.hero ?? seedHomepageCmsContent.hero,
     whyChooseUs: merged.whyChooseUs ?? seedHomepageCmsContent.whyChooseUs,
     footer: merged.footer ?? seedHomepageCmsContent.footer,
+    headerCtas: normalizeCollegeHeaderCtas(merged.headerCtas),
     coatOfArms: merged.coatOfArms ?? seedHomepageCmsContent.coatOfArms,
     researchLinks: merged.researchLinks ?? seedHomepageCmsContent.researchLinks,
     visionMission: merged.visionMission ?? seedHomepageCmsContent.visionMission,
@@ -382,5 +558,18 @@ export function mergeHomepageCmsContent(...values: unknown[]): HomepageCmsConten
               : seedHomepageCmsContent.sisterInstitutions.items,
           }
         : seedHomepageCmsContent.sisterInstitutions,
+    lifeAtCampus:
+      merged.lifeAtCampus?.items?.length ||
+      merged.lifeAtCampus?.title ||
+      merged.lifeAtCampus?.eyebrow
+        ? {
+            eyebrow: merged.lifeAtCampus.eyebrow ?? seedHomepageCmsContent.lifeAtCampus.eyebrow,
+            title: merged.lifeAtCampus.title ?? seedHomepageCmsContent.lifeAtCampus.title,
+            subtitle: merged.lifeAtCampus.subtitle ?? seedHomepageCmsContent.lifeAtCampus.subtitle,
+            items: merged.lifeAtCampus.items?.length
+              ? merged.lifeAtCampus.items
+              : seedHomepageCmsContent.lifeAtCampus.items,
+          }
+        : seedHomepageCmsContent.lifeAtCampus,
   };
 }

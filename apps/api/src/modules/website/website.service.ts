@@ -2,20 +2,29 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import ExcelJS from 'exceljs';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { resolveUploadRoot } from '../../common/uploads/upload-paths';
 import { validateDocumentUpload } from '../../common/uploads/file-upload.validator';
-import { validateBrandingImage } from '../../common/uploads/image-upload.validator';
+import {
+  validateBrandingImage,
+  extensionForMime,
+} from '../../common/uploads/image-upload.validator';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import type {
+  CreateWebsiteBloodDonorDto,
+  CreateWebsiteFyugInterestDto,
   CreateWebsitePageDto,
+  ListWebsiteBloodDonorsQueryDto,
+  ListWebsiteFyugInterestsQueryDto,
   ListWebsitePagesQueryDto,
   UpdateWebsitePageDto,
   UpdateWebsiteSiteDto,
@@ -24,6 +33,8 @@ import type {
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
 import { importWebsiteContent } from './website-content-importer';
 
+const FYUG_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
 const PAGE_WITH_REVISIONS = {
   currentRevision: true,
   publishedRevision: true,
@@ -31,6 +42,8 @@ const PAGE_WITH_REVISIONS = {
 
 @Injectable()
 export class WebsiteService {
+  private readonly logger = new Logger(WebsiteService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -472,13 +485,11 @@ export class WebsiteService {
       seoDescription: page.publishedRevision.seoDescription,
       seoKeywords: page.publishedRevision.seoKeywords,
       sections: Array.isArray(page.publishedSections)
-        ? page.publishedSections.filter(
-            (section) =>
-              !section ||
-              typeof section !== 'object' ||
-              !('isVisible' in section) ||
-              section.isVisible !== false,
-          )
+        ? page.publishedSections.filter((section: unknown) => {
+            if (!section || typeof section !== 'object') return true;
+            if (!('isVisible' in section)) return true;
+            return (section as { isVisible?: unknown }).isVisible !== false;
+          })
         : [],
       publishedAt: page.publishedAt,
       updatedAt: page.updatedAt,
@@ -498,12 +509,20 @@ export class WebsiteService {
       orderBy: { path: 'asc' },
     });
     return pages
-      .filter((page) => page.publishedRevision)
+      .filter(
+        (
+          page,
+        ): page is (typeof pages)[number] & {
+          publishedRevision: NonNullable<
+            (typeof pages)[number]['publishedRevision']
+          >;
+        } => Boolean(page.publishedRevision),
+      )
       .map((page) => ({
         id: page.id,
         path: page.path,
-        title: page.publishedRevision!.title,
-        excerpt: page.publishedRevision!.excerpt,
+        title: page.publishedRevision.title,
+        excerpt: page.publishedRevision.excerpt,
         publishedAt: page.publishedAt,
         updatedAt: page.updatedAt,
       }));
@@ -547,6 +566,715 @@ export class WebsiteService {
       );
     }
     return slug;
+  }
+
+  async createPublicBloodDonor(
+    tenantId: string,
+    dto: CreateWebsiteBloodDonorDto,
+  ) {
+    if (dto.company) {
+      throw new BadRequestException('Automated submission rejected');
+    }
+    if (!dto.eligible) {
+      throw new BadRequestException(
+        'Please confirm you are eligible to donate blood',
+      );
+    }
+
+    const site = await this.getOrCreateSite(tenantId);
+    const lastDonationDate = dto.lastDonationDate
+      ? new Date(`${dto.lastDonationDate}T00:00:00.000Z`)
+      : null;
+
+    const row = await this.prisma.websiteBloodDonor.create({
+      data: {
+        tenantId,
+        siteId: site.id,
+        fullName: dto.fullName.trim(),
+        dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
+        gender: dto.gender,
+        phone: dto.phone.trim(),
+        email: dto.email.trim().toLowerCase(),
+        preferredContact: dto.preferredContact ?? 'Email',
+        bloodGroup: dto.bloodGroup,
+        lastDonationDate,
+        streetAddress: dto.streetAddress?.trim() ?? '',
+        city: dto.city?.trim() ?? '',
+        state: dto.state?.trim() ?? '',
+        pincode: dto.pincode?.trim() ?? '',
+        medicalNotes: dto.medicalNotes?.trim() ?? '',
+        eligible: true,
+        status: 'NEW',
+      },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    void this.deliverBloodDonorNotice(row.id, dto).catch((error: unknown) => {
+      this.logger.warn(
+        `Blood donor notification failed for ${row.id}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    });
+
+    return {
+      id: row.id,
+      status: 'accepted' as const,
+      createdAt: row.createdAt,
+    };
+  }
+
+  async listBloodDonors(
+    tenantId: string,
+    query: ListWebsiteBloodDonorsQueryDto = {},
+  ) {
+    const site = await this.getOrCreateSite(tenantId);
+    const skip = query.skip ?? 0;
+    const take = query.take ?? 50;
+    const [items, total] = await Promise.all([
+      this.prisma.websiteBloodDonor.findMany({
+        where: { tenantId, siteId: site.id },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        select: {
+          id: true,
+          fullName: true,
+          dateOfBirth: true,
+          gender: true,
+          phone: true,
+          email: true,
+          preferredContact: true,
+          bloodGroup: true,
+          lastDonationDate: true,
+          streetAddress: true,
+          city: true,
+          state: true,
+          pincode: true,
+          medicalNotes: true,
+          eligible: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.websiteBloodDonor.count({
+        where: { tenantId, siteId: site.id },
+      }),
+    ]);
+    return { items, total, skip, take };
+  }
+
+  async createPublicFyugInterest(
+    tenantId: string,
+    dto: CreateWebsiteFyugInterestDto,
+    photograph?: Express.Multer.File,
+  ) {
+    if (dto.company) {
+      throw new BadRequestException('Automated submission rejected');
+    }
+    if (!dto.declarationAccepted) {
+      throw new BadRequestException(
+        'Please accept the declaration to continue',
+      );
+    }
+    if (dto.hasBackPapers) {
+      throw new BadRequestException(
+        'Applicants having back papers are not eligible for admission into the Fourth-Year Undergraduate Honours Programme',
+      );
+    }
+
+    const site = await this.getOrCreateSite(tenantId);
+    let photographUrl: string | null = null;
+    let photographKey: string | null = null;
+
+    if (photograph) {
+      if (photograph.mimetype?.toLowerCase() === 'image/svg+xml') {
+        throw new BadRequestException('SVG photographs are not allowed');
+      }
+      if (photograph.size > FYUG_PHOTO_MAX_BYTES) {
+        throw new BadRequestException('Photograph must be 2MB or smaller');
+      }
+      const mime = (photograph.mimetype ?? '').toLowerCase();
+      if (
+        !['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mime)
+      ) {
+        throw new BadRequestException('Photograph must be PNG, JPG, or WEBP');
+      }
+      const buf = photograph.buffer;
+      const isPng =
+        buf.length >= 4 &&
+        buf[0] === 0x89 &&
+        buf[1] === 0x50 &&
+        buf[2] === 0x4e &&
+        buf[3] === 0x47;
+      const isJpeg =
+        buf.length >= 3 &&
+        buf[0] === 0xff &&
+        buf[1] === 0xd8 &&
+        buf[2] === 0xff;
+      const isWebp =
+        buf.length > 12 &&
+        buf.toString('ascii', 0, 4) === 'RIFF' &&
+        buf.toString('ascii', 8, 12) === 'WEBP';
+      if (!isPng && !isJpeg && !isWebp) {
+        throw new BadRequestException(
+          'Photograph content is not a valid image',
+        );
+      }
+      const ext = extensionForMime(mime);
+      photographKey = `website/${tenantId}/${site.id}/fyug/${randomUUID()}.${ext}`;
+      const stored = await this.storage.put(photographKey, photograph.buffer, {
+        contentType: mime,
+        cacheControl: 'private, max-age=31536000',
+      });
+      photographUrl = stored.url ?? `/uploads/${photographKey}`;
+      if (!stored.url) {
+        const uploadPath = join(resolveUploadRoot(), photographKey);
+        await mkdir(dirname(uploadPath), { recursive: true });
+        await writeFile(uploadPath, photograph.buffer);
+      }
+    } else {
+      throw new BadRequestException('Applicant photograph is required');
+    }
+
+    const whatsapp = (dto.whatsapp?.trim() || dto.mobile.trim()).slice(0, 30);
+    const applicationNumber = await this.nextFyugApplicationNumber(site.id);
+
+    const row = await this.prisma.websiteFyugInterest.create({
+      data: {
+        tenantId,
+        siteId: site.id,
+        applicationNumber,
+        academicSession: '2026-2027',
+        fullName: dto.fullName.trim().toUpperCase(),
+        photographUrl,
+        photographKey,
+        gender: dto.gender,
+        dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
+        mobile: dto.mobile.trim(),
+        whatsapp,
+        email: dto.email.trim().toLowerCase(),
+        state: dto.state.trim(),
+        district: dto.district?.trim() ?? '',
+        pinCode: dto.pinCode?.trim() ?? '',
+        bloodGroup: dto.bloodGroup?.trim() ?? '',
+        fatherName: dto.fatherName.trim(),
+        fatherMobile: dto.fatherMobile.trim(),
+        motherName: dto.motherName.trim(),
+        motherMobile: dto.motherMobile.trim(),
+        collegeLastAttended: dto.collegeLastAttended.trim(),
+        affiliatedUniversity: dto.affiliatedUniversity.trim(),
+        majorCourse: dto.majorCourse.trim(),
+        minorCourse: dto.minorCourse.trim(),
+        applyingHonoursIn: dto.applyingHonoursIn.trim(),
+        cuetScore: dto.cuetScore?.trim() ?? '',
+        cgpaSemesterV: dto.cgpaSemesterV?.trim() ?? '',
+        percentageSemesterV: dto.percentageSemesterV?.trim() ?? '',
+        hasBackPapers: false,
+        backPaperDetails: '',
+        declarationAccepted: true,
+        signatureName: dto.signatureName.trim(),
+        status: 'SUBMITTED',
+      },
+      select: {
+        id: true,
+        applicationNumber: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      id: row.id,
+      applicationNumber: row.applicationNumber,
+      status: 'accepted' as const,
+      createdAt: row.createdAt,
+    };
+  }
+
+  async listFyugInterests(
+    tenantId: string,
+    query: ListWebsiteFyugInterestsQueryDto = {},
+  ) {
+    const site = await this.getOrCreateSite(tenantId);
+    const skip = query.skip ?? 0;
+    const take = query.take ?? 50;
+    const [items, total] = await Promise.all([
+      this.prisma.websiteFyugInterest.findMany({
+        where: { tenantId, siteId: site.id },
+        orderBy: [{ applicationNumber: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.websiteFyugInterest.count({
+        where: { tenantId, siteId: site.id },
+      }),
+    ]);
+    return { items, total, skip, take };
+  }
+
+  async getFyugInterestStats(tenantId: string) {
+    const site = await this.getOrCreateSite(tenantId);
+    const rows = await this.prisma.websiteFyugInterest.findMany({
+      where: { tenantId, siteId: site.id },
+      select: {
+        applyingHonoursIn: true,
+        majorCourse: true,
+        collegeLastAttended: true,
+        state: true,
+        gender: true,
+        status: true,
+        hasBackPapers: true,
+        createdAt: true,
+      },
+    });
+
+    const startOfToday = this.startOfDayInIndia(new Date());
+    let today = 0;
+    let eligible = 0;
+    let rejected = 0;
+    let pending = 0;
+    let approved = 0;
+
+    const honours = new Map<string, number>();
+    const majors = new Map<string, number>();
+    const colleges = new Map<string, number>();
+    const states = new Map<string, number>();
+    const genders = new Map<string, number>();
+
+    for (const row of rows) {
+      if (row.createdAt >= startOfToday) today += 1;
+      if (!row.hasBackPapers) eligible += 1;
+      const status = (row.status || '').toUpperCase();
+      if (status === 'APPROVED') approved += 1;
+      else if (status === 'REJECTED') rejected += 1;
+      else pending += 1;
+
+      this.bumpCount(
+        honours,
+        this.cleanLabel(row.applyingHonoursIn, 'Unspecified'),
+      );
+      this.bumpCount(majors, this.cleanLabel(row.majorCourse, 'Unspecified'));
+      this.bumpCount(
+        colleges,
+        this.normalizeCollegeName(row.collegeLastAttended),
+      );
+      this.bumpCount(states, this.cleanLabel(row.state, 'Unspecified'));
+      this.bumpCount(genders, this.cleanLabel(row.gender, 'Unspecified'));
+    }
+
+    const toSeries = (map: Map<string, number>, limit?: number) => {
+      const items = [...map.entries()]
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+      return typeof limit === 'number' ? items.slice(0, limit) : items;
+    };
+
+    return {
+      total: rows.length,
+      today,
+      eligible,
+      rejected,
+      pending,
+      approved,
+      byHonours: toSeries(honours),
+      byMajor: toSeries(majors),
+      byCollege: toSeries(colleges, 12),
+      byState: toSeries(states),
+      byGender: toSeries(genders),
+    };
+  }
+
+  private bumpCount(map: Map<string, number>, key: string) {
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+
+  private cleanLabel(value: string | null | undefined, fallback: string) {
+    const cleaned = (value ?? '').replace(/\s+/g, ' ').trim();
+    return cleaned || fallback;
+  }
+
+  private normalizeCollegeName(value: string | null | undefined) {
+    const raw = this.cleanLabel(value, 'Unspecified').toLowerCase();
+    if (raw.includes('don bosco') && raw.includes('tura')) {
+      return 'Don Bosco College, Tura';
+    }
+    if (
+      raw.includes('loyola') &&
+      (raw.includes('williamnagar') || raw.includes('william nagar'))
+    ) {
+      return 'Loyola College, Williamnagar';
+    }
+    if (raw.includes('mendipathar')) {
+      return 'Mendipathar College';
+    }
+    if (raw.includes('tia') && raw.includes('college')) {
+      return "Tura's International Academy (TIA)";
+    }
+    // Title-case remaining names while preserving common punctuation.
+    return raw
+      .split(' ')
+      .map((part) => {
+        if (!part) return part;
+        if (part === 'nehu' || part === 'tia') return part.toUpperCase();
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(' ')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s*/g, ', ');
+  }
+
+  private startOfDayInIndia(now: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+    const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+    const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+    // Midnight IST = previous day 18:30 UTC.
+    return new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+  }
+
+  async exportFyugInterestsExcel(tenantId: string): Promise<Buffer> {
+    const site = await this.getOrCreateSite(tenantId);
+    const rows = await this.prisma.websiteFyugInterest.findMany({
+      where: { tenantId, siteId: site.id },
+      orderBy: [{ applicationNumber: 'asc' }, { createdAt: 'asc' }],
+    });
+    const stats = await this.getFyugInterestStats(tenantId);
+    const generatedAt = new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'BCL OneCampus ERP';
+    workbook.created = new Date();
+    workbook.lastModifiedBy = 'Website CMS';
+
+    const navy: ExcelJS.Fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF0B2E59' },
+    };
+    const zebra: ExcelJS.Fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF1F5F9' },
+    };
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+    };
+
+    const styleHeaderCells = (
+      row: ExcelJS.Row,
+      fromCol: number,
+      toCol: number,
+    ) => {
+      row.height = 22;
+      for (let i = fromCol; i <= toCol; i += 1) {
+        const cell = row.getCell(i);
+        cell.fill = navy;
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: 'center',
+          wrapText: true,
+        };
+        cell.border = thinBorder;
+      }
+    };
+
+    const styleDataCells = (
+      row: ExcelJS.Row,
+      fromCol: number,
+      toCol: number,
+      odd: boolean,
+    ) => {
+      for (let i = fromCol; i <= toCol; i += 1) {
+        const cell = row.getCell(i);
+        cell.border = thinBorder;
+        cell.alignment = { vertical: 'middle' };
+        if (odd) cell.fill = zebra;
+      }
+    };
+
+    const writeCountBlock = (
+      sheet: ExcelJS.Worksheet,
+      startRow: number,
+      startCol: number,
+      title: string,
+      items: { label: string; value: number }[],
+    ) => {
+      const titleCell = sheet.getCell(startRow, startCol);
+      titleCell.value = title;
+      titleCell.font = { bold: true, size: 12, color: { argb: 'FF0B2E59' } };
+      sheet.getCell(startRow + 1, startCol).value = 'Category';
+      sheet.getCell(startRow + 1, startCol + 1).value = 'Count';
+      styleHeaderCells(sheet.getRow(startRow + 1), startCol, startCol + 1);
+      items.forEach((item, index) => {
+        const r = startRow + 2 + index;
+        sheet.getCell(r, startCol).value = item.label;
+        sheet.getCell(r, startCol + 1).value = item.value;
+        styleDataCells(
+          sheet.getRow(r),
+          startCol,
+          startCol + 1,
+          index % 2 === 1,
+        );
+      });
+      return startRow + 2 + Math.max(items.length, 1) + 1;
+    };
+
+    // --- Summary sheet ---
+    const summary = workbook.addWorksheet('Summary', {
+      views: [{ state: 'frozen', ySplit: 4 }],
+    });
+    summary.getColumn(1).width = 34;
+    summary.getColumn(2).width = 12;
+    summary.getColumn(3).width = 3;
+    summary.getColumn(4).width = 34;
+    summary.getColumn(5).width = 12;
+
+    summary.mergeCells('A1:E1');
+    summary.getCell('A1').value = 'Don Bosco College, Tura';
+    summary.getCell('A1').font = {
+      bold: true,
+      size: 14,
+      color: { argb: 'FF0B2E59' },
+    };
+    summary.mergeCells('A2:E2');
+    summary.getCell('A2').value =
+      'FYUG 4th-year Interest Registrations — Summary';
+    summary.getCell('A2').font = { bold: true, size: 12 };
+    summary.mergeCells('A3:E3');
+    summary.getCell('A3').value =
+      `Fourth-Year Honours 2026 · ${stats.total} registrations · Generated ${generatedAt}`;
+    summary.getCell('A3').font = { size: 10, color: { argb: 'FF64748B' } };
+
+    const kpiLabels: [string, number][] = [
+      ['Total applied', stats.total],
+      ['Today', stats.today],
+      ['Eligible (no back papers)', stats.eligible],
+      ['Pending', stats.pending],
+      ['Approved', stats.approved],
+      ['Rejected', stats.rejected],
+    ];
+    summary.getCell('A5').value = 'Overview';
+    summary.getCell('A5').font = {
+      bold: true,
+      size: 12,
+      color: { argb: 'FF0B2E59' },
+    };
+    summary.getCell('A6').value = 'Metric';
+    summary.getCell('B6').value = 'Count';
+    styleHeaderCells(summary.getRow(6), 1, 2);
+    kpiLabels.forEach(([label, value], index) => {
+      const r = 7 + index;
+      summary.getCell(r, 1).value = label;
+      summary.getCell(r, 2).value = value;
+      styleDataCells(summary.getRow(r), 1, 2, index % 2 === 1);
+    });
+
+    let leftRow = 7 + kpiLabels.length + 2;
+    leftRow = writeCountBlock(
+      summary,
+      leftRow,
+      1,
+      'Honours-wise',
+      stats.byHonours,
+    );
+    leftRow = writeCountBlock(
+      summary,
+      leftRow,
+      1,
+      'Major subject',
+      stats.byMajor,
+    );
+    leftRow = writeCountBlock(summary, leftRow, 1, 'State-wise', stats.byState);
+    writeCountBlock(summary, leftRow, 1, 'Gender-wise', stats.byGender);
+    writeCountBlock(
+      summary,
+      5,
+      4,
+      'College-wise (normalised)',
+      stats.byCollege,
+    );
+
+    // --- Registrations sheet ---
+    const sheet = workbook.addWorksheet('Registrations', {
+      views: [{ state: 'frozen', xSplit: 3, ySplit: 4 }],
+    });
+    const columns: Array<{ header: string; key: string; width: number }> = [
+      { header: '#', key: 'serial', width: 6 },
+      { header: 'Application No', key: 'applicationNumber', width: 16 },
+      { header: 'Name', key: 'fullName', width: 28 },
+      { header: 'Gender', key: 'gender', width: 10 },
+      { header: 'Date of Birth', key: 'dateOfBirth', width: 14 },
+      { header: 'Mobile', key: 'mobile', width: 14 },
+      { header: 'WhatsApp', key: 'whatsapp', width: 14 },
+      { header: 'Email', key: 'email', width: 32 },
+      { header: 'State', key: 'state', width: 14 },
+      { header: 'District', key: 'district', width: 16 },
+      { header: 'PIN Code', key: 'pinCode', width: 10 },
+      { header: 'Blood Group', key: 'bloodGroup', width: 12 },
+      { header: 'College (as entered)', key: 'collegeRaw', width: 28 },
+      { header: 'College (normalised)', key: 'collegeNorm', width: 28 },
+      {
+        header: 'Affiliated University',
+        key: 'affiliatedUniversity',
+        width: 18,
+      },
+      { header: 'Major', key: 'majorCourse', width: 18 },
+      { header: 'Minor', key: 'minorCourse', width: 18 },
+      { header: 'Honours Applied', key: 'applyingHonoursIn', width: 18 },
+      { header: 'CUET Score', key: 'cuetScore', width: 12 },
+      { header: 'CGPA (Sem V)', key: 'cgpaSemesterV', width: 12 },
+      { header: 'Percentage (Sem V)', key: 'percentageSemesterV', width: 14 },
+      { header: 'Back Papers', key: 'hasBackPapers', width: 12 },
+      { header: 'Back Paper Details', key: 'backPaperDetails', width: 24 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Remarks', key: 'remarks', width: 20 },
+      { header: 'Father Name', key: 'fatherName', width: 22 },
+      { header: 'Father Mobile', key: 'fatherMobile', width: 14 },
+      { header: 'Mother Name', key: 'motherName', width: 22 },
+      { header: 'Mother Mobile', key: 'motherMobile', width: 14 },
+      { header: 'Typed Signature', key: 'signatureName', width: 22 },
+      { header: 'Academic Session', key: 'academicSession', width: 16 },
+      { header: 'Submitted At (IST)', key: 'createdAt', width: 20 },
+      { header: 'Photo URL', key: 'photographUrl', width: 40 },
+    ];
+    sheet.columns = columns.map((col) => ({ key: col.key, width: col.width }));
+
+    sheet.mergeCells(1, 1, 1, columns.length);
+    sheet.getCell(1, 1).value =
+      'Don Bosco College, Tura — FYUG 4th-year Interest Registrations';
+    sheet.getCell(1, 1).font = {
+      bold: true,
+      size: 14,
+      color: { argb: 'FF0B2E59' },
+    };
+    sheet.mergeCells(2, 1, 2, columns.length);
+    sheet.getCell(2, 1).value =
+      `${rows.length} registration${rows.length === 1 ? '' : 's'} · Generated ${generatedAt}`;
+    sheet.getCell(2, 1).font = { size: 10, color: { argb: 'FF64748B' } };
+    sheet.getRow(3).height = 8;
+
+    const headerRow = sheet.getRow(4);
+    columns.forEach((col, index) => {
+      headerRow.getCell(index + 1).value = col.header;
+    });
+    styleHeaderCells(headerRow, 1, columns.length);
+
+    rows.forEach((row, index) => {
+      const excelRow = sheet.addRow({
+        serial: index + 1,
+        applicationNumber: row.applicationNumber ?? '',
+        fullName: row.fullName,
+        gender: row.gender,
+        dateOfBirth: row.dateOfBirth.toISOString().slice(0, 10),
+        mobile: row.mobile,
+        whatsapp: row.whatsapp,
+        email: row.email,
+        state: row.state,
+        district: row.district,
+        pinCode: row.pinCode,
+        bloodGroup: row.bloodGroup,
+        collegeRaw: row.collegeLastAttended,
+        collegeNorm: this.normalizeCollegeName(row.collegeLastAttended),
+        affiliatedUniversity: row.affiliatedUniversity,
+        majorCourse: row.majorCourse,
+        minorCourse: row.minorCourse,
+        applyingHonoursIn: row.applyingHonoursIn,
+        cuetScore: row.cuetScore,
+        cgpaSemesterV: row.cgpaSemesterV,
+        percentageSemesterV: row.percentageSemesterV,
+        hasBackPapers: row.hasBackPapers ? 'Yes' : 'No',
+        backPaperDetails: row.backPaperDetails,
+        status: row.status,
+        remarks: row.remarks,
+        fatherName: row.fatherName,
+        fatherMobile: row.fatherMobile,
+        motherName: row.motherName,
+        motherMobile: row.motherMobile,
+        signatureName: row.signatureName,
+        academicSession: row.academicSession,
+        createdAt: row.createdAt.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+        }),
+        photographUrl: row.photographUrl ?? '',
+      });
+      styleDataCells(excelRow, 1, columns.length, index % 2 === 1);
+      excelRow.getCell(1).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+      };
+    });
+
+    sheet.autoFilter = {
+      from: { row: 4, column: 1 },
+      to: { row: Math.max(4, 4 + rows.length), column: columns.length },
+    };
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  async nextFyugApplicationNumber(siteId: string): Promise<string> {
+    const year = new Date().getFullYear().toString().slice(-2);
+    const prefix = `FYUG${year}-`;
+    const latest = await this.prisma.websiteFyugInterest.findFirst({
+      where: {
+        siteId,
+        applicationNumber: { startsWith: prefix },
+      },
+      orderBy: { applicationNumber: 'desc' },
+      select: { applicationNumber: true },
+    });
+    let next = 1;
+    if (latest?.applicationNumber) {
+      const match = latest.applicationNumber.match(/(\d+)$/);
+      if (match) next = Number.parseInt(match[1], 10) + 1;
+    }
+    return `${prefix}${String(next).padStart(6, '0')}`;
+  }
+
+  private async deliverBloodDonorNotice(
+    id: string,
+    payload: CreateWebsiteBloodDonorDto,
+  ) {
+    const endpoint = process.env.COLLEGE_FORMS_URL?.replace(/\/+$/, '');
+    if (!endpoint) return;
+    const recipient = process.env.COLLEGE_CONTACT_RECIPIENT?.trim();
+    const response = await fetch(`${endpoint}/blood-donor`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(process.env.COLLEGE_FORMS_TOKEN
+          ? { authorization: `Bearer ${process.env.COLLEGE_FORMS_TOKEN}` }
+          : {}),
+      },
+      body: JSON.stringify({
+        id,
+        ...payload,
+        company: undefined,
+        ...(recipient ? { recipient } : {}),
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) {
+      throw new Error(`Form delivery responded ${response.status}`);
+    }
   }
 
   private normalizeDomain(value: string) {

@@ -37,7 +37,6 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="onecampus"/>
-        <data android:scheme="edu.onecampus.mobile"/>
         <data android:scheme="exp+onecampus-mobile"/>
       </intent-filter>
     </activity>

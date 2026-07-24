@@ -1,21 +1,20 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
   BookOpen,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  GraduationCap,
   HandHeart,
+  Newspaper,
   Trophy,
-  Users,
 } from 'lucide-react';
+import { NewsFeaturedMedia } from '@/components/news-featured-media';
+import { newsCategoryIcon } from '@/lib/news-media';
 
 type NewsItem = {
   slug: string;
@@ -28,17 +27,6 @@ type NewsItem = {
 
 type Props = {
   items: NewsItem[];
-};
-
-const categoryIcons: Record<string, LucideIcon> = {
-  Campus: Users,
-  'College Life': Users,
-  Admissions: GraduationCap,
-  Academic: BookOpen,
-  Examination: BookOpen,
-  Achievements: Trophy,
-  Service: HandHeart,
-  'Field Visit': CalendarDays,
 };
 
 const highlights = [
@@ -67,15 +55,19 @@ export function NewsEventsSection({ items }: Props) {
   });
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [selected, setSelected] = useState(0);
+  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
   const sync = useCallback(() => {
     if (!embla) return;
     setCanPrev(embla.canScrollPrev());
     setCanNext(embla.canScrollNext());
+    setSelected(embla.selectedScrollSnap());
   }, [embla]);
 
   useEffect(() => {
     if (!embla) return;
+    setScrollSnaps(embla.scrollSnapList());
     sync();
     embla.on('select', sync);
     embla.on('reInit', sync);
@@ -91,8 +83,11 @@ export function NewsEventsSection({ items }: Props) {
     <section className="news-events" aria-labelledby="news-events-heading">
       <div className="shell news-events-inner">
         <header className="news-events-head">
-          <span className="news-events-kicker">Stay updated</span>
+          <span className="news-events-emblem" aria-hidden>
+            <Newspaper />
+          </span>
           <h2 id="news-events-heading">News &amp; Events</h2>
+          <span className="news-events-rule" aria-hidden />
           <p>
             Discover the latest happenings, achievements, and activities at Don Bosco College, Tura.
           </p>
@@ -113,22 +108,26 @@ export function NewsEventsSection({ items }: Props) {
             <div className="news-events-track">
               {items.map((item) => {
                 const { day, month, year } = dateParts(item.date);
-                const Icon = categoryIcons[item.category] ?? CalendarDays;
+                const Icon = newsCategoryIcon(item.category);
                 return (
                   <article className="news-events-card" key={item.slug}>
                     <div className="news-events-media">
-                      <Image src={item.image} alt="" fill sizes="(max-width: 760px) 85vw, 280px" />
+                      <NewsFeaturedMedia
+                        image={item.image}
+                        title={item.title}
+                        slug={item.slug}
+                        category={item.category}
+                        sizes="(max-width: 760px) 85vw, 280px"
+                      />
                       <time className="news-events-date" dateTime={item.date}>
                         <strong>{day}</strong>
                         <span>
-                          {month}
-                          <br />
-                          {year}
+                          {month} {year}
                         </span>
                       </time>
                       <span className="news-events-category">
                         <Icon aria-hidden />
-                        {item.category}
+                        {item.category || 'News & Events'}
                       </span>
                     </div>
                     <div className="news-events-body">
@@ -154,6 +153,22 @@ export function NewsEventsSection({ items }: Props) {
             <ChevronRight aria-hidden />
           </button>
         </div>
+
+        {scrollSnaps.length > 1 ? (
+          <div className="news-events-dots" role="tablist" aria-label="News slides">
+            {scrollSnaps.map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                role="tab"
+                aria-selected={selected === index}
+                aria-label={`Go to slide ${index + 1}`}
+                className={selected === index ? 'is-active' : undefined}
+                onClick={() => embla?.scrollTo(index)}
+              />
+            ))}
+          </div>
+        ) : null}
 
         <div className="news-events-cta">
           <Link className="news-events-all" href="/news">

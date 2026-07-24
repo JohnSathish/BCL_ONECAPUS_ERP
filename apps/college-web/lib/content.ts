@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { mergeAboutCollege, type AboutCollegeContent, seedAboutCollege } from '@/lib/about-college';
-import { fetchCms, isRecord } from '@/lib/cms-client';
+import { fetchCms, isRecord, cmsBase } from '@/lib/cms-client';
 import {
   mergeHomepageSpotlight,
   type HomepageSpotlightContent,
@@ -31,6 +31,11 @@ export type NewsItem = {
   excerpt: string;
   image: string;
   body: string[];
+  bodyHtml?: string;
+  author?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  featured?: boolean;
 };
 export type CollegeContent = {
   stats: { value: string; label: string }[];
@@ -300,10 +305,20 @@ export async function getCollegeContent(): Promise<CollegeContent> {
   // Prefer homepage.content.principal for leadership when present
   if (isRecord(homepageContent.principal)) {
     const principal = homepageContent.principal;
+    const cmsMessage =
+      typeof principal.message === 'string' && principal.message.trim() ? principal.message : null;
+    // Ignore the old short CMS stub so authentic seed / hub copy can win.
+    const isLegacyStub =
+      cmsMessage &&
+      cmsMessage.trim() ===
+        [
+          'Dear Staff and Students,',
+          'Welcome to Don Bosco College, Tura. Education here is not only about degrees—it is about forming competent, compassionate and committed citizens.',
+          'I invite every student to pursue excellence with humility, and every parent to walk with us in this Salesian mission.',
+        ].join('\n\n');
     hubBase.leadership = {
       ...hubBase.leadership,
-      message:
-        typeof principal.message === 'string' ? principal.message : hubBase.leadership.message,
+      message: cmsMessage && !isLegacyStub ? cmsMessage : hubBase.leadership.message,
       name: typeof principal.name === 'string' ? principal.name : hubBase.leadership.name,
       role: typeof principal.role === 'string' ? principal.role : hubBase.leadership.role,
       tenure: typeof principal.tenure === 'string' ? principal.tenure : hubBase.leadership.tenure,
@@ -329,10 +344,36 @@ export async function getCollegeContent(): Promise<CollegeContent> {
   hubBase.leadership.messageHref = normalizePrincipalMessageHref(hubBase.leadership.messageHref);
   return {
     stats: data.stats?.length ? data.stats : seedContent.stats,
-    news: cmsNews.length ? cmsNews : data.news?.length ? data.news : seedContent.news,
+    // Prefer CMS news when the API is configured. Never silently replace an
+    // empty/failed CMS response with demo seed articles (that looked like imports vanished).
+    news: cmsNews.length
+      ? cmsNews
+      : cmsBase()
+        ? []
+        : data.news?.length
+          ? data.news
+          : seedContent.news,
     departments: data.departments?.length ? data.departments : seedContent.departments,
     testimonials: data.testimonials?.length ? data.testimonials : seedContent.testimonials,
-    gallery: data.gallery?.length ? data.gallery : seedContent.gallery,
+    gallery: (() => {
+      const fromCms = isRecord(homepageContent.lifeAtCampus) ? homepageContent.lifeAtCampus : null;
+      const cmsItems = Array.isArray(fromCms?.items) ? fromCms.items : null;
+      if (cmsItems?.length) {
+        return cmsItems
+          .map((item) => {
+            if (!isRecord(item)) return null;
+            const src = typeof item.src === 'string' ? item.src : '';
+            if (!src) return null;
+            return {
+              src,
+              alt: typeof item.alt === 'string' ? item.alt : 'Campus life',
+              label: typeof item.label === 'string' ? item.label : 'Campus',
+            };
+          })
+          .filter((item): item is CollegeContent['gallery'][number] => Boolean(item));
+      }
+      return data.gallery?.length ? data.gallery : seedContent.gallery;
+    })(),
     principalIntroduction: data.principalIntroduction || seedContent.principalIntroduction,
     spotlight: mergeHomepageSpotlight(
       settings,

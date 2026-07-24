@@ -55,6 +55,9 @@ services:
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
       FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
       FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      # College CMS publish → college-web ISR (internal Docker network, not public nginx /api)
+      WEBSITE_REVALIDATE_WEBHOOK_URL: ${WEBSITE_REVALIDATE_WEBHOOK_URL:-http://donboscocollege-web:3000/api/revalidate}
+      WEBSITE_REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage
@@ -89,11 +92,23 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
         NEXT_PUBLIC_SITE_URL: ${COLLEGE_SITE_URL:-https://donboscocollege.ac.in}
+        NEXT_PUBLIC_TENANT_SLUG: ${COLLEGE_TENANT_SLUG:-demo}
+        NEXT_PUBLIC_ERP_LOGIN_URL: ${NEXT_PUBLIC_ERP_LOGIN_URL:-https://erp.donboscocollege.ac.in/login}
     environment:
       NODE_ENV: production
       API_INTERNAL_ORIGIN: http://api:3001
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
       NEXT_PUBLIC_SITE_URL: ${COLLEGE_SITE_URL:-https://donboscocollege.ac.in}
+      NEXT_PUBLIC_ERP_LOGIN_URL: ${NEXT_PUBLIC_ERP_LOGIN_URL:-https://erp.donboscocollege.ac.in/login}
+      COLLEGE_TENANT_SLUG: ${COLLEGE_TENANT_SLUG:-demo}
+      COLLEGE_CMS_HOST: ${COLLEGE_CMS_HOST:-donboscocollege.ac.in}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+      COLLEGE_FORMS_URL: ${COLLEGE_FORMS_URL:-}
+      COLLEGE_FORMS_TOKEN: ${COLLEGE_FORMS_TOKEN:-}
+      COLLEGE_CONTACT_RECIPIENT: ${COLLEGE_CONTACT_RECIPIENT:-info@donboscocollege.ac.in}
+      VISITOR_COUNT_BASE: ${VISITOR_COUNT_BASE:-12847}
+    volumes:
+      - college_web_data:/app/.data
 
   worker:
     restart: unless-stopped
@@ -137,3 +152,4 @@ volumes:
   nep_uploads: {}
   nep_storage: {}
   nep_backups: {}
+  college_web_data: {}

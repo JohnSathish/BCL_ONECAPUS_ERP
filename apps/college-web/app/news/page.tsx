@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { NewsFeaturedMedia } from '@/components/news-featured-media';
 import { Pagination } from '@/components/pagination';
 import { getCollegeContent } from '@/lib/content';
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: 'Latest news, achievements and campus events from Don Bosco College, Tura.',
 };
 
-const PAGE_SIZE = 4;
+const PAGE_SIZE = 9;
 
 export default async function NewsIndexPage({
   searchParams,
@@ -48,7 +48,13 @@ export default async function NewsIndexPage({
           {pageItems.map((item) => (
             <article className="news-index-card" key={item.slug}>
               <Link href={`/news/${item.slug}`} className="news-index-media">
-                <Image src={item.image} alt="" fill sizes="(max-width: 760px) 100vw, 360px" />
+                <NewsFeaturedMedia
+                  image={item.image}
+                  title={item.title}
+                  slug={item.slug}
+                  category={item.category}
+                  sizes="(max-width: 760px) 100vw, 360px"
+                />
               </Link>
               <div className="news-index-body">
                 <span className="eyebrow">

@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
+import { AnnouncementsView } from '@/components/website-cms/announcements-view';
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -42,6 +43,11 @@ import {
   duplicateWebsitePage,
   fetchWebsiteAcademicDepartments,
   fetchWebsiteAppearance,
+  fetchWebsiteBloodDonors,
+  fetchWebsiteFyugInterests,
+  fetchWebsiteFyugInterestStats,
+  downloadWebsiteFyugInterestExcel,
+  downloadWebsiteFyugInterestPdf,
   fetchWebsiteCalendarItems,
   fetchWebsiteContentSources,
   fetchWebsiteContentTypes,
@@ -100,6 +106,7 @@ import {
 } from '@/lib/website/homepage-sections';
 import { ContentEntriesEditor } from './content-entries-editor';
 import { HomepageContentEditors } from './homepage-content-editors';
+import { LifeAtCampusEditor } from './life-at-campus-editor';
 import { ReorderableList } from './reorderable-list';
 import { WEBSITE_CMS_GROUPS, WEBSITE_CMS_NAV } from './website-cms-nav';
 
@@ -127,7 +134,9 @@ export type WebsiteCmsSection =
   | 'videos'
   | 'theme'
   | 'footer'
-  | 'seo';
+  | 'seo'
+  | 'blood-donors'
+  | 'fyug-interest';
 
 export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection }) {
   useRequireAuth();
@@ -192,7 +201,12 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
             </div>
           ) : null}
           {section === 'dashboard' ? <DashboardView onMessage={setMessage} /> : null}
-          {section === 'settings' ? <SettingsView onMessage={setMessage} /> : null}
+          {section === 'settings' ? (
+            <>
+              <SettingsView onMessage={setMessage} />
+              <HeaderCtasView onMessage={setMessage} />
+            </>
+          ) : null}
           {section === 'pages' ? <PagesView onMessage={setMessage} /> : null}
           {section === 'navigation' ? <NavigationView onMessage={setMessage} /> : null}
           {section === 'content' ? <ContentTypesView onMessage={setMessage} /> : null}
@@ -201,19 +215,23 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'departments' ? <DepartmentsPublishView onMessage={setMessage} /> : null}
           {section === 'publishing' ? <PublishingView onMessage={setMessage} /> : null}
           {section === 'notices' ? <NoticesView onMessage={setMessage} /> : null}
+          {section === 'announcements' ? <AnnouncementsView onMessage={setMessage} /> : null}
+          {section === 'blood-donors' ? <BloodDonorsView /> : null}
+          {section === 'fyug-interest' ? <FyugInterestView /> : null}
           {section === 'news' ? <NewsEntriesView onMessage={setMessage} /> : null}
           {section === 'homepage' ? <HomepageBuilderView onMessage={setMessage} /> : null}
           {section === 'theme' ? <ThemeView onMessage={setMessage} /> : null}
           {section === 'footer' ? <FooterWidgetsView onMessage={setMessage} /> : null}
           {section === 'seo' ? <SeoSuiteView onMessage={setMessage} /> : null}
           {section === 'calendar' ? <CalendarVisibilityView onMessage={setMessage} /> : null}
-          {section === 'gallery' || section === 'documents' || section === 'videos' ? (
+          {section === 'gallery' ? <LifeAtCampusEditor onMessage={setMessage} /> : null}
+          {section === 'documents' || section === 'videos' ? (
             <MediaCollectionsView kind={section} onMessage={setMessage} />
           ) : null}
           {section === 'faculty' || section === 'programmes' ? (
             <AcademicSourceView section={section} onMessage={setMessage} />
           ) : null}
-          {['announcements', 'flash-news', 'testimonials'].includes(section) ? (
+          {['flash-news', 'testimonials'].includes(section) ? (
             <CptModuleView slug={section} onMessage={setMessage} />
           ) : null}
         </div>
@@ -1731,6 +1749,142 @@ function ThemeView({ onMessage }: { onMessage: (message: string) => void }) {
   );
 }
 
+function HeaderCtasView({ onMessage }: { onMessage: (message: string) => void }) {
+  const queryClient = useQueryClient();
+  const content = useQuery({
+    queryKey: ['website', 'homepage-content'],
+    queryFn: fetchWebsiteHomepageContent,
+  });
+  const [draft, setDraft] = useState({
+    erpLabel: 'ERP Login',
+    erpHref: 'https://erp.donboscocollege.ac.in',
+    admissionLabel: 'Online Admission',
+    admissionHref: '/admission/apply',
+    appLabel: 'Mobile App',
+    appHref:
+      'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+  });
+  useEffect(() => {
+    const headerCtas = content.data?.headerCtas;
+    if (!headerCtas || typeof headerCtas !== 'object') return;
+    const value = headerCtas as {
+      erpLogin?: { label?: string; href?: string };
+      onlineAdmission?: { label?: string; href?: string };
+      mobileApp?: { label?: string; href?: string };
+      secondary?: { label?: string; href?: string };
+      primary?: { label?: string; href?: string };
+    };
+    const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
+      `${value.secondary?.label ?? ''} ${value.secondary?.href ?? ''}`,
+    );
+    setDraft({
+      erpLabel:
+        value.erpLogin?.label?.trim() ||
+        (!secondaryLooksLikeApp ? value.secondary?.label?.trim() : '') ||
+        'ERP Login',
+      erpHref:
+        value.erpLogin?.href?.trim() ||
+        (!secondaryLooksLikeApp ? value.secondary?.href?.trim() : '') ||
+        'https://erp.donboscocollege.ac.in',
+      admissionLabel:
+        value.onlineAdmission?.label?.trim() || value.primary?.label?.trim() || 'Online Admission',
+      admissionHref:
+        value.onlineAdmission?.href?.trim() || value.primary?.href?.trim() || '/admission/apply',
+      appLabel:
+        value.mobileApp?.label?.trim() ||
+        (secondaryLooksLikeApp ? value.secondary?.label?.trim() : '') ||
+        'Mobile App',
+      appHref:
+        value.mobileApp?.href?.trim() ||
+        (secondaryLooksLikeApp ? value.secondary?.href?.trim() : '') ||
+        'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+    });
+  }, [content.data]);
+  const save = useMutation({
+    mutationFn: () =>
+      updateWebsiteHomepageContent({
+        headerCtas: {
+          erpLogin: {
+            label: draft.erpLabel.trim() || 'ERP Login',
+            href: draft.erpHref.trim(),
+          },
+          onlineAdmission: {
+            label: draft.admissionLabel.trim() || 'Online Admission',
+            href: draft.admissionHref.trim(),
+          },
+          mobileApp: {
+            label: draft.appLabel.trim() || 'Mobile App',
+            href: draft.appHref.trim(),
+          },
+        },
+      }),
+    onSuccess: () => {
+      onMessage('Header button URLs saved.');
+      void queryClient.invalidateQueries({ queryKey: ['website', 'homepage-content'] });
+      void queryClient.invalidateQueries({ queryKey: ['website', 'appearance'] });
+    },
+    onError: (error) => onMessage(apiErrorMessage(error, 'Could not save header buttons')),
+  });
+  if (!content.data) return <QueryState loading={content.isLoading} error={content.error} />;
+  return (
+    <CompactCard>
+      <CompactCardHeader
+        title="Header buttons"
+        description="ERP Login and Online Admission sit on the navy brand bar. Mobile App (with Play Store icon) sits on the white nav bar next to search. All labels and URLs are editable here."
+      />
+      <CompactCardBody className="grid gap-3 md:grid-cols-2">
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">ERP Login label</span>
+          <Input
+            value={draft.erpLabel}
+            onChange={(event) => setDraft({ ...draft, erpLabel: event.target.value })}
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">ERP Login URL</span>
+          <Input
+            value={draft.erpHref}
+            onChange={(event) => setDraft({ ...draft, erpHref: event.target.value })}
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">Online Admission label</span>
+          <Input
+            value={draft.admissionLabel}
+            onChange={(event) => setDraft({ ...draft, admissionLabel: event.target.value })}
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">Online Admission URL</span>
+          <Input
+            value={draft.admissionHref}
+            onChange={(event) => setDraft({ ...draft, admissionHref: event.target.value })}
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">Mobile App label</span>
+          <Input
+            value={draft.appLabel}
+            onChange={(event) => setDraft({ ...draft, appLabel: event.target.value })}
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">Mobile App / Play Store URL</span>
+          <Input
+            value={draft.appHref}
+            onChange={(event) => setDraft({ ...draft, appHref: event.target.value })}
+          />
+        </label>
+        <div className="md:col-span-2">
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>
+            Save header buttons
+          </Button>
+        </div>
+      </CompactCardBody>
+    </CompactCard>
+  );
+}
+
 function FooterWidgetsView({ onMessage }: { onMessage: (message: string) => void }) {
   const queryClient = useQueryClient();
   const content = useQuery({
@@ -2197,6 +2351,270 @@ function CptModuleView({
 }) {
   const typeSlug = slug === 'flash-news' ? 'flash-news' : slug;
   return <ContentEntriesEditor typeSlug={typeSlug} onMessage={onMessage} />;
+}
+
+function BloodDonorsView() {
+  const donors = useQuery({
+    queryKey: ['website', 'blood-donors'],
+    queryFn: () => fetchWebsiteBloodDonors({ take: 100 }),
+  });
+
+  if (!donors.data) return <QueryState loading={donors.isLoading} error={donors.error} />;
+
+  return (
+    <CompactCard>
+      <CompactCardHeader
+        title="Blood donor registrations"
+        description={`${donors.data.total} registration${donors.data.total === 1 ? '' : 's'} from the public college website.`}
+      />
+      <CompactCardBody className="space-y-2">
+        {!donors.data.items.length ? (
+          <p className="text-sm text-muted-foreground">No blood donor registrations yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2 font-semibold">Name</th>
+                  <th className="px-2 py-2 font-semibold">Blood group</th>
+                  <th className="px-2 py-2 font-semibold">Phone</th>
+                  <th className="px-2 py-2 font-semibold">Email</th>
+                  <th className="px-2 py-2 font-semibold">Preferred</th>
+                  <th className="px-2 py-2 font-semibold">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donors.data.items.map((donor) => (
+                  <tr key={donor.id} className="border-b border-border/70 align-top">
+                    <td className="px-2 py-2 font-medium text-foreground">{donor.fullName}</td>
+                    <td className="px-2 py-2">
+                      <Badge variant="secondary">{donor.bloodGroup}</Badge>
+                    </td>
+                    <td className="px-2 py-2 text-muted-foreground">{donor.phone}</td>
+                    <td className="px-2 py-2 text-muted-foreground">{donor.email}</td>
+                    <td className="px-2 py-2 text-muted-foreground">{donor.preferredContact}</td>
+                    <td className="px-2 py-2 text-muted-foreground">
+                      {new Date(donor.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CompactCardBody>
+    </CompactCard>
+  );
+}
+
+function FyugInterestStatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function FyugInterestCountBox({
+  title,
+  items,
+  empty,
+}: {
+  title: string;
+  items: { label: string; value: number }[];
+  empty: string;
+}) {
+  return (
+    <CompactCard>
+      <CompactCardHeader title={title} />
+      <CompactCardBody>
+        {items.length ? (
+          <ul className="divide-y divide-border/70">
+            {items.map((item) => (
+              <li
+                key={item.label}
+                className="flex items-center justify-between gap-3 py-1.5 text-sm"
+              >
+                <span className="min-w-0 truncate text-foreground">{item.label}</span>
+                <span className="shrink-0 tabular-nums font-semibold text-foreground">
+                  {item.value}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        )}
+      </CompactCardBody>
+    </CompactCard>
+  );
+}
+
+function FyugInterestView() {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [message, setMessage] = useState('');
+  const rows = useQuery({
+    queryKey: ['website', 'fyug-interest'],
+    queryFn: () => fetchWebsiteFyugInterests({ take: 500 }),
+  });
+  const stats = useQuery({
+    queryKey: ['website', 'fyug-interest', 'stats'],
+    queryFn: fetchWebsiteFyugInterestStats,
+  });
+
+  if (!rows.data) return <QueryState loading={rows.isLoading} error={rows.error} />;
+
+  const s = stats.data;
+
+  return (
+    <div className="space-y-4">
+      {s ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <FyugInterestStatCard label="Total applied" value={s.total} />
+            <FyugInterestStatCard label="Today" value={s.today} />
+            <FyugInterestStatCard label="Eligible" value={s.eligible} />
+            <FyugInterestStatCard label="Rejected" value={s.rejected} />
+            <FyugInterestStatCard label="Pending" value={s.pending} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <FyugInterestCountBox
+              title="Honours-wise"
+              items={s.byHonours}
+              empty="No honours data yet."
+            />
+            <FyugInterestCountBox
+              title="College-wise"
+              items={s.byCollege}
+              empty="No college data yet."
+            />
+            <FyugInterestCountBox
+              title="Major subject"
+              items={s.byMajor}
+              empty="No major subject data yet."
+            />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <FyugInterestCountBox
+                title="State-wise"
+                items={s.byState}
+                empty="No state data yet."
+              />
+              <FyugInterestCountBox
+                title="Gender-wise"
+                items={s.byGender}
+                empty="No gender data yet."
+              />
+            </div>
+          </div>
+        </>
+      ) : stats.isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading registration summary…</p>
+      ) : stats.error ? (
+        <p className="text-sm text-destructive">Could not load registration summary.</p>
+      ) : null}
+
+      <CompactCard>
+        <CompactCardHeader
+          title="FYUG 4th-year interest registrations"
+          description={`${rows.data.total} registration${rows.data.total === 1 ? '' : 's'} for Fourth-Year Honours 2026.`}
+        />
+        <CompactCardBody className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={exporting || !rows.data.items.length}
+              onClick={async () => {
+                setExporting(true);
+                setMessage('');
+                try {
+                  await downloadWebsiteFyugInterestExcel();
+                  setMessage('Excel report downloaded.');
+                } catch {
+                  setMessage('Could not download Excel report.');
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              {exporting ? 'Preparing…' : 'Download Excel report'}
+            </Button>
+            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+          </div>
+          {!rows.data.items.length ? (
+            <p className="text-sm text-muted-foreground">No FYUG interest registrations yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-left text-sm">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2 font-semibold">App No</th>
+                    <th className="px-2 py-2 font-semibold">Name</th>
+                    <th className="px-2 py-2 font-semibold">Honours</th>
+                    <th className="px-2 py-2 font-semibold">Major / Minor</th>
+                    <th className="px-2 py-2 font-semibold">Mobile</th>
+                    <th className="px-2 py-2 font-semibold">Email</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
+                    <th className="px-2 py-2 font-semibold">Submitted</th>
+                    <th className="px-2 py-2 font-semibold">PDF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.data.items.map((row) => (
+                    <tr key={row.id} className="border-b border-border/70 align-top">
+                      <td className="px-2 py-2 font-medium text-foreground">
+                        {row.applicationNumber || '—'}
+                      </td>
+                      <td className="px-2 py-2 font-medium text-foreground">{row.fullName}</td>
+                      <td className="px-2 py-2">
+                        <Badge variant="secondary">{row.applyingHonoursIn}</Badge>
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {row.majorCourse} / {row.minorCourse}
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">{row.mobile}</td>
+                      <td className="px-2 py-2 text-muted-foreground">{row.email}</td>
+                      <td className="px-2 py-2">
+                        <Badge variant="outline">{row.status}</Badge>
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyId === row.id}
+                          onClick={async () => {
+                            setBusyId(row.id);
+                            setMessage('');
+                            try {
+                              await downloadWebsiteFyugInterestPdf(row.id, row.applicationNumber);
+                            } catch {
+                              setMessage(`Could not download PDF for ${row.fullName}.`);
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          {busyId === row.id ? '…' : 'PDF'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CompactCardBody>
+      </CompactCard>
+    </div>
+  );
 }
 
 function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {

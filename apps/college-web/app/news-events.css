@@ -42,18 +42,34 @@
   height:1px;
   background:linear-gradient(90deg,transparent,var(--gold),transparent);
 }
+.news-events-emblem{
+  display:inline-grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  margin:0 auto 8px;
+  color:var(--navy);
+}
+.news-events-emblem svg{width:28px;height:28px;stroke-width:1.75}
+.news-events-rule{
+  display:block;
+  width:56px;
+  height:3px;
+  margin:10px auto 0;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--gold-dark),var(--gold));
+}
 .news-events-head h2{
-  margin:10px 0 8px;
+  margin:0;
   font-family:var(--font-serif),Libre Baskerville,Georgia,serif;
   font-size:clamp(28px,3vw,38px);
   font-weight:700;
   letter-spacing:.02em;
-  text-transform:uppercase;
   color:var(--navy);
   line-height:1.15;
 }
 .news-events-head p{
-  margin:0;
+  margin:12px 0 0;
   font-family:var(--font-sans),Inter,sans-serif;
   font-size:14.5px;
   line-height:1.6;
@@ -92,8 +108,45 @@
   position:relative;
   aspect-ratio:16/11;
   background:#d9e2ec;
+  overflow:hidden;
 }
-.news-events-media img{object-fit:cover}
+.news-featured-media{
+  position:absolute;
+  inset:0;
+}
+.news-featured-media img,
+.news-events-media img,
+.news-index-media img,
+.news-detail-image img{
+  object-fit:cover;
+}
+.news-featured-placeholder{
+  display:grid;
+  place-items:center;
+  background:linear-gradient(160deg,var(--ph-from) 0%,var(--ph-to) 100%);
+}
+.news-featured-placeholder.tone-navy{
+  --ph-from:#0b2e59;
+  --ph-to:#163f73;
+}
+.news-featured-placeholder.tone-green{
+  --ph-from:#1f5c45;
+  --ph-to:#2f7a5c;
+}
+.news-featured-placeholder.tone-purple{
+  --ph-from:#4a3d6e;
+  --ph-to:#63538a;
+}
+.news-featured-placeholder.tone-brown{
+  --ph-from:#8a5a2b;
+  --ph-to:#a8733c;
+}
+.news-featured-placeholder-icon{
+  width:64px;
+  height:64px;
+  color:rgba(255,255,255,.28);
+  stroke-width:1.35;
+}
 .news-events-date{
   position:absolute;
   top:10px;
@@ -101,29 +154,30 @@
   z-index:1;
   display:grid;
   place-items:center;
-  min-width:48px;
-  padding:6px 7px;
+  min-width:52px;
+  padding:7px 8px;
   border-radius:8px;
-  background:rgba(11,46,89,.92);
-  color:#fff;
+  background:rgba(255,255,255,.96);
+  color:var(--navy);
   text-align:center;
   line-height:1.05;
-  box-shadow:0 8px 18px rgba(6,31,61,.28);
+  box-shadow:0 8px 18px rgba(6,31,61,.18);
 }
 .news-events-date strong{
   display:block;
   font-family:var(--font-sans),Inter,sans-serif;
   font-size:18px;
-  font-weight:700;
+  font-weight:750;
 }
 .news-events-date span{
   display:block;
   margin-top:2px;
   font-size:9px;
-  font-weight:600;
+  font-weight:700;
   letter-spacing:.04em;
   text-transform:uppercase;
-  color:#d7e2ec;
+  color:var(--navy);
+  opacity:.78;
 }
 .news-events-category{
   position:absolute;
@@ -136,7 +190,7 @@
   max-width:calc(100% - 20px);
   padding:5px 10px;
   border-radius:999px;
-  background:rgba(11,46,89,.92);
+  background:rgba(6,31,61,.88);
   color:#fff;
   font-family:var(--font-sans),Inter,sans-serif;
   font-size:10px;
@@ -210,6 +264,26 @@
 .news-events-arrow:disabled{opacity:.35;cursor:default}
 .news-events-arrow svg{width:20px;height:20px}
 
+.news-events-dots{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  margin:18px 0 0;
+}
+.news-events-dots button{
+  width:8px;
+  height:8px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:rgba(11,46,89,.22);
+  cursor:pointer;
+}
+.news-events-dots button.is-active{
+  background:var(--navy);
+  transform:scale(1.15);
+}
+
 .news-events-cta{
   display:flex;
   justify-content:center;
@@ -255,8 +329,17 @@
   display:block;
   aspect-ratio:16/10;
   background:#d9e2ec;
+  overflow:hidden;
 }
 .news-index-media img{object-fit:cover}
+.news-detail-image{
+  position:relative;
+  aspect-ratio:16/9;
+  margin:0 0 1.5rem;
+  border-radius:16px;
+  overflow:hidden;
+  background:#d9e2ec;
+}
 .news-index-body{padding:16px;display:flex;flex-direction:column;gap:8px;flex:1}
 .news-index-body h2{margin:0;font-size:18px;line-height:1.35;color:var(--navy)}
 .news-index-body p{margin:0;color:var(--muted);font-size:14px;line-height:1.55}

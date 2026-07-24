@@ -109,7 +109,45 @@ export class WebsiteAdminService {
             type: 'image',
             required: false,
           },
+          {
+            key: 'imageThumb',
+            label: 'Featured thumbnail',
+            type: 'image',
+            required: false,
+          },
+          {
+            key: 'gallery',
+            label: 'Gallery images',
+            type: 'json',
+            required: false,
+          },
           { key: 'category', label: 'Category', type: 'text', required: false },
+          { key: 'author', label: 'Author', type: 'text', required: false },
+          { key: 'tags', label: 'Tags', type: 'json', required: false },
+          {
+            key: 'seoTitle',
+            label: 'SEO meta title',
+            type: 'text',
+            required: false,
+          },
+          {
+            key: 'seoDescription',
+            label: 'SEO description',
+            type: 'text',
+            required: false,
+          },
+          {
+            key: 'featured',
+            label: 'Featured news',
+            type: 'boolean',
+            required: false,
+          },
+          {
+            key: 'sourceUrl',
+            label: 'Original source URL',
+            type: 'text',
+            required: false,
+          },
         ],
       },
       {
@@ -762,8 +800,9 @@ export class WebsiteAdminService {
     user: JwtUser,
     file: Express.Multer.File | undefined,
     altText?: string,
+    kind: 'IMAGE' | 'DOCUMENT' = 'IMAGE',
   ) {
-    const row = await this.website.uploadMedia(user, file, 'IMAGE', altText);
+    const row = await this.website.uploadMedia(user, file, kind, altText);
     return this.mapMedia(row);
   }
 
@@ -1099,19 +1138,45 @@ export class WebsiteAdminService {
           contentTypeId: contentType.id,
           slug: this.slugify(entrySlug),
           status: 'PUBLISHED',
+          deletedAt: null,
         },
       });
       if (!entry) throw new NotFoundException('Content entry not found');
       return entry;
     }
-    return this.prisma.websiteContentEntry.findMany({
+    const rows = await this.prisma.websiteContentEntry.findMany({
       where: {
         tenantId,
         contentTypeId: contentType.id,
         status: 'PUBLISHED',
+        deletedAt: null,
       },
       orderBy: { publishedAt: 'desc' },
     });
+    // List payloads omit full HTML bodies so college-web can load all cards
+    // without timing out; single-entry requests still return the full body.
+    if (contentType.slug === 'news') {
+      return rows.map((row) => {
+        const data = this.asRecord(row.data);
+        const lite: Record<string, unknown> = { ...data };
+        delete lite.body;
+        delete lite.bodyHtml;
+        delete lite.gallery;
+        return {
+          ...row,
+          data: {
+            ...lite,
+            summary:
+              typeof lite.summary === 'string'
+                ? lite.summary
+                : typeof lite.excerpt === 'string'
+                  ? lite.excerpt
+                  : '',
+          },
+        };
+      });
+    }
+    return rows;
   }
 
   async publish(user: JwtUser, dto: PublishWebsiteDto) {

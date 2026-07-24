@@ -50,7 +50,10 @@ export function HomepageContentEditors({ onMessage }: { onMessage: (message: str
   const [draft, setDraft] = useState<HomepageContent | null>(null);
 
   useEffect(() => {
-    if (query.data) setDraft(query.data as HomepageContent);
+    if (!query.data) return;
+    // Only hydrate from the server when we have no local draft yet — never
+    // clobber in-progress principal/other edits when another tab invalidates the query.
+    setDraft((current) => current ?? (query.data as HomepageContent));
   }, [query.data]);
 
   const save = useMutation({
@@ -377,7 +380,7 @@ export function HomepageContentEditors({ onMessage }: { onMessage: (message: str
       <CompactCard>
         <CompactCardHeader
           title="Research & important links"
-          description="First three links appear as featured research cards. Remaining links show under Important links."
+          description="First three links appear as featured research cards. Remaining links show under Important links (add ERP Login and other shortcuts here)."
         />
         <CompactCardBody className="grid gap-3">
           <Field
@@ -549,6 +552,18 @@ export function HomepageContentEditors({ onMessage }: { onMessage: (message: str
               Add logo
             </Button>
           </div>
+        </CompactCardBody>
+      </CompactCard>
+
+      <CompactCard>
+        <CompactCardHeader
+          title="Life at Campus gallery"
+          description="Homepage mosaic images (NCC, NSS, Sports, etc.) are edited on the dedicated Life at Campus page."
+        />
+        <CompactCardBody>
+          <Button asChild variant="outline" size="sm">
+            <a href="/admin/website/gallery">Open Life at Campus editor</a>
+          </Button>
         </CompactCardBody>
       </CompactCard>
     </div>

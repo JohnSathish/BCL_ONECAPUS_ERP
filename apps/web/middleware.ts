@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isAdmissionsLoginPath, isAdmissionsPublicPath } from '@/lib/admissions-portal-routes';
+import { isProductionCollegeHost } from '@/lib/demo-login';
 import { extractJournalSlugFromHost, isJournalHost } from '@/lib/journals-host';
 
 function hostname(host: string) {
@@ -227,8 +228,7 @@ function handleLibraryHost(request: NextRequest) {
 
 function handlePayHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const portalPath = '/fee-collection-portal';
-  const loginPath = '/fee-collection-portal/login';
+  const portalPath = '/public-fee-pay';
 
   if (
     pathname.startsWith('/_next') ||
@@ -239,45 +239,40 @@ function handlePayHost(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const refreshCookie = request.cookies.get('nep_refresh')?.value;
-  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
-  const isPublic =
-    pathname === '/fee-collection-portal/register' ||
-    pathname.startsWith('/fee-collection-portal/register/') ||
-    pathname === '/fee-collection-portal/verify' ||
-    pathname.startsWith('/fee-collection-portal/verify/') ||
+  // Legacy café / ERP entry points → public pay home
+  if (
+    pathname.startsWith('/fee-collection-portal') ||
+    pathname.startsWith('/centers') ||
+    pathname === '/login' ||
+    pathname.startsWith('/login/') ||
     pathname === '/register' ||
-    pathname.startsWith('/register/') ||
-    pathname === '/verify' ||
-    pathname.startsWith('/verify/');
-  const isLogin =
-    pathname === '/login' || pathname === loginPath || pathname.startsWith(`${loginPath}/`);
-
-  if (!hasRefreshCookie && !isPublic && !isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = loginPath;
-    return NextResponse.redirect(url);
-  }
-
-  if (hasRefreshCookie && isLogin) {
+    pathname.startsWith('/register/')
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = portalPath;
     return NextResponse.redirect(url);
   }
 
-  if (pathname === '/register' || pathname.startsWith('/register/')) {
+  // QR / legacy verify path
+  if (pathname.startsWith('/verify/receipt/')) {
+    const receiptNo = pathname.replace('/verify/receipt/', '');
     const url = request.nextUrl.clone();
-    url.pathname = pathname.replace(/^\/register/, `${portalPath}/register`);
-    return NextResponse.rewrite(url);
+    url.pathname = `${portalPath}/verify`;
+    url.searchParams.set('receiptNo', receiptNo);
+    return NextResponse.redirect(url);
   }
 
   if (pathname === '/verify' || pathname.startsWith('/verify/')) {
     const url = request.nextUrl.clone();
-    url.pathname = pathname.replace(/^\/verify/, `${portalPath}/verify`);
+    url.pathname = `${portalPath}/verify`;
     return NextResponse.rewrite(url);
   }
 
-  return handleSubdomainRewrite(request, portalPath, loginPath, [
+  if (pathname.startsWith(portalPath)) {
+    return NextResponse.next();
+  }
+
+  const blocked = [
     '/admin',
     '/student',
     '/staff',
@@ -288,7 +283,28 @@ function handlePayHost(request: NextRequest) {
     '/careers-portal',
     '/alumni-portal',
     '/journals-portal',
-  ]);
+    '/principal-desk',
+  ];
+  for (const prefix of blocked) {
+    if (pathname.startsWith(prefix)) {
+      const url = request.nextUrl.clone();
+      url.pathname = portalPath;
+      return NextResponse.redirect(url);
+    }
+  }
+
+  const url = request.nextUrl.clone();
+  if (pathname === '/' || pathname === '') {
+    url.pathname = portalPath;
+    return NextResponse.rewrite(url);
+  }
+  if (pathname === '/return' || pathname.startsWith('/return/')) {
+    url.pathname = pathname.replace(/^\/return/, `${portalPath}/return`);
+    return NextResponse.rewrite(url);
+  }
+
+  url.pathname = `${portalPath}${pathname}`;
+  return NextResponse.rewrite(url);
 }
 
 function handleSubdomainRewrite(
@@ -356,6 +372,14 @@ export async function middleware(request: NextRequest) {
 
   if (isJournalHost(host)) {
     return handleJournalHost(request);
+  }
+
+  // College ERP host: skip BCL marketing landing — staff expect login first.
+  const { pathname } = request.nextUrl;
+  if (pathname === '/' && isProductionCollegeHost(hostname(host))) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();

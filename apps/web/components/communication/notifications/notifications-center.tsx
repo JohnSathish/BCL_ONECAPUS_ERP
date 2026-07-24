@@ -165,7 +165,7 @@ export function NotificationsCenter({
         {selected ? (
           <NotificationDetail
             notification={selected}
-            openLink={openLink}
+            openLink={openLink ?? null}
             inboxPath={inboxPath}
             onDismiss={() => dismiss.mutate(selected.id)}
             onArchive={() => archive.mutate(selected.id)}

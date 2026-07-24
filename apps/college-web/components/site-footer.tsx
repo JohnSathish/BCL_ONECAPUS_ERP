@@ -3,14 +3,53 @@ import Link from 'next/link';
 import { ArrowRight, Award, Clock3, Landmark, Mail, MapPin, Phone } from 'lucide-react';
 import { NewsletterForm } from '@/components/newsletter-form';
 import { VisitorsCount } from '@/components/visitors-count';
-import type { HomepageFooterContent } from '@/lib/homepage-cms-content';
+import type { HomepageFooterContent, HomepageHeaderCtas } from '@/lib/homepage-cms-content';
 import { seedHomepageCmsContent } from '@/lib/homepage-cms-content';
 import { getFooterNavigation } from '@/lib/menus';
 import { quickLinks } from '@/lib/quick-links';
 
 type Props = {
   footer?: HomepageFooterContent;
+  headerCtas?: HomepageHeaderCtas;
 };
+
+function isExternalHref(href: string) {
+  return /^https?:\/\//i.test(href) || href.startsWith('//');
+}
+
+function FooterCtaLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (isExternalHref(href)) {
+    return (
+      <a className={className} href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link className={className} href={href}>
+      {children}
+    </Link>
+  );
+}
+
+function PlayStoreMark() {
+  return (
+    <svg className="footer-cta-play" viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path fill="#EA4335" d="M3.6 2.3c-.4.2-.6.6-.6 1.1v17.2c0 .5.2.9.6 1.1l9.6-9.7L3.6 2.3z" />
+      <path fill="#FBBC04" d="M14.7 13.5 12.1 12l-8.5 8.6 11.1-7.1z" />
+      <path fill="#4285F4" d="M21.2 10.3 17 7.6l-2.9 2.9 2.9 2.9 4.2-2.7c.7-.4.7-1.4 0-1.8z" />
+      <path fill="#34A853" d="M12.1 12 17 7.6 5.9 1.4 12.1 12z" />
+    </svg>
+  );
+}
 
 function uniqueLinks(links: Array<{ label: string; href: string }>) {
   const seen = new Set<string>();
@@ -32,8 +71,9 @@ function Multiline({ value }: { value: string }) {
   ));
 }
 
-export async function SiteFooter({ footer }: Props) {
+export async function SiteFooter({ footer, headerCtas }: Props) {
   const content = footer ?? seedHomepageCmsContent.footer;
+  const ctas = headerCtas ?? seedHomepageCmsContent.headerCtas;
   const cmsFooterNav = await getFooterNavigation();
   const exploreLinks = uniqueLinks(
     cmsFooterNav.length > 0
@@ -205,6 +245,15 @@ export async function SiteFooter({ footer }: Props) {
             <Clock3 aria-hidden /> Office hours: {officeHours}
           </p>
           <NewsletterForm />
+          <div className="footer-cta-row" aria-label="App and portal links">
+            <FooterCtaLink className="footer-cta footer-cta-app" href={ctas.mobileApp.href}>
+              <PlayStoreMark />
+              <span>{ctas.mobileApp.label}</span>
+            </FooterCtaLink>
+            <FooterCtaLink className="footer-cta footer-cta-erp" href={ctas.erpLogin.href}>
+              <span>{ctas.erpLogin.label}</span>
+            </FooterCtaLink>
+          </div>
         </div>
       </div>
 

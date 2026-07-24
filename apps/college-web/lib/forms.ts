@@ -19,6 +19,98 @@ export const newsletterSchema = z.object({
   company: honeypot,
 });
 
+export const bloodDonorSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(120),
+    dateOfBirth: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid date of birth'),
+    gender: z.enum(['Male', 'Female', 'Other']),
+    phone: z.string().trim().min(8).max(30),
+    email: z.email().max(254),
+    preferredContact: z.enum(['Email', 'Phone', 'WhatsApp']).default('Email'),
+    bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']),
+    lastDonationDate: z.string().trim().max(32).optional().default(''),
+    streetAddress: z.string().trim().max(200).optional().default(''),
+    city: z.string().trim().max(80).optional().default(''),
+    state: z.string().trim().max(80).optional().default(''),
+    pincode: z.string().trim().max(12).optional().default(''),
+    medicalNotes: z.string().trim().max(2000).optional().default(''),
+    eligible: z.boolean(),
+    company: honeypot,
+  })
+  .superRefine((value, ctx) => {
+    if (value.lastDonationDate && !/^\d{4}-\d{2}-\d{2}$/.test(value.lastDonationDate)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['lastDonationDate'],
+        message: 'Enter a valid last donation date',
+      });
+    }
+    if (!value.eligible) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['eligible'],
+        message: 'Please confirm you are eligible to donate blood',
+      });
+    }
+  });
+
+export const fyugInterestSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(160),
+    gender: z.enum(['Male', 'Female']),
+    dateOfBirth: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid date of birth'),
+    mobile: z.string().trim().min(8).max(30),
+    whatsapp: z.string().trim().max(30).optional().default(''),
+    whatsappSameAsMobile: z.boolean().optional().default(true),
+    email: z.email().max(254),
+    state: z.string().trim().min(2).max(80),
+    district: z.string().trim().min(2, 'Enter your district').max(120),
+    pinCode: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'Enter a valid 6-digit PIN code'),
+    bloodGroup: z.string().trim().max(10).optional().default(''),
+    fatherName: z.string().trim().min(2).max(120),
+    fatherMobile: z.string().trim().min(8).max(30),
+    motherName: z.string().trim().min(2).max(120),
+    motherMobile: z.string().trim().min(8).max(30),
+    collegeLastAttended: z.string().trim().min(2).max(200),
+    affiliatedUniversity: z.string().trim().min(2).max(200),
+    majorCourse: z.string().trim().min(2).max(80),
+    minorCourse: z.string().trim().min(2).max(80),
+    applyingHonoursIn: z.string().trim().min(2).max(80),
+    cuetScore: z.string().trim().max(40).optional().default(''),
+    cgpaSemesterV: z.string().trim().max(20).optional().default(''),
+    percentageSemesterV: z.string().trim().max(20).optional().default(''),
+    hasBackPapers: z.enum(['Yes', 'No']),
+    declarationAccepted: z.boolean(),
+    signatureName: z.string().trim().min(2).max(160),
+    company: honeypot,
+  })
+  .superRefine((value, ctx) => {
+    if (value.hasBackPapers === 'Yes') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['hasBackPapers'],
+        message:
+          'Applicants with back papers are not eligible for the Fourth-Year Honours Programme',
+      });
+    }
+    if (!value.declarationAccepted) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['declarationAccepted'],
+        message: 'Please accept the declaration to continue',
+      });
+    }
+  });
+
 type Bucket = { count: number; resetsAt: number };
 const buckets = new Map<string, Bucket>();
 
@@ -45,7 +137,7 @@ export async function requestPayload(request: Request): Promise<unknown> {
 }
 
 export async function deliverForm(
-  kind: 'contact' | 'newsletter',
+  kind: 'contact' | 'newsletter' | 'blood-donor',
   payload: Record<string, unknown>,
 ) {
   const endpoint = process.env.COLLEGE_FORMS_URL?.replace(/\/+$/, '');
@@ -59,7 +151,10 @@ export async function deliverForm(
         ? { authorization: `Bearer ${process.env.COLLEGE_FORMS_TOKEN}` }
         : {}),
     },
-    body: JSON.stringify({ ...payload, ...(kind === 'contact' && recipient ? { recipient } : {}) }),
+    body: JSON.stringify({
+      ...payload,
+      ...((kind === 'contact' || kind === 'blood-donor') && recipient ? { recipient } : {}),
+    }),
     signal: AbortSignal.timeout(6000),
     cache: 'no-store',
   });

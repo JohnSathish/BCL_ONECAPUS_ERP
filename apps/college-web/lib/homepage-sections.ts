@@ -12,6 +12,8 @@ export const HOMEPAGE_SECTION_KEYS = [
   'departments',
   'programmes',
   'campusLife',
+  'studentSupport',
+  'shortTermCourses',
   'news',
   'gallery',
   'coatOfArms',

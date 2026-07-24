@@ -15,17 +15,13 @@ import {
 } from 'lucide-react';
 import type { AcademicCategory, DepartmentCard, PublicFacultyCard } from '@/lib/academic-types';
 import { CATEGORY_LABELS } from '@/lib/academic-types';
-import { departmentBannerUrl, shortDepartmentName } from '@/lib/department-banners';
+import { departmentIcon, departmentVisual, shortDepartmentName } from '@/lib/department-visuals';
 
 type Props = {
   departments: DepartmentCard[];
 };
 
 const filters: AcademicCategory[] = ['ALL', 'ARTS', 'SCIENCE', 'COMMERCE', 'PROFESSIONAL'];
-
-function departmentBanner(department: DepartmentCard) {
-  return departmentBannerUrl(department);
-}
 
 function shortName(name: string) {
   return shortDepartmentName(name);
@@ -93,17 +89,21 @@ function FacultyAvatarStack({
 function DepartmentCompactCard({ department }: { department: DepartmentCard }) {
   const category =
     CATEGORY_LABELS[department.category as Exclude<AcademicCategory, 'ALL'>] ?? department.category;
-  const banner = departmentBanner(department);
+  const visual = departmentVisual(department);
+  const Icon = departmentIcon(visual.icon);
   const programmeCount = department.stats.programmeCount || department.programmes.length;
 
   return (
     <article className="dept-card dept-card-compact">
-      <div className="dept-card-media">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={banner} alt="" />
+      <div className="dept-card-media is-icon-header" style={{ backgroundColor: visual.color }}>
         <div className="dept-card-media-bar">
-          <h3>{shortName(department.name)}</h3>
-          <span>{category}</span>
+          <span className="dept-card-icon" aria-hidden>
+            <Icon />
+          </span>
+          <div className="dept-card-media-copy">
+            <h3>{shortName(department.name)}</h3>
+            <span className="dept-card-category-pill">{category}</span>
+          </div>
         </div>
         <Link className="dept-card-hover-cta" href={department.href}>
           View Department <ArrowRight aria-hidden />

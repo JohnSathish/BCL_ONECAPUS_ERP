@@ -11,9 +11,10 @@ import {
   Ip,
   Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { ClsService } from 'nestjs-cls';
 import {
   CurrentUser,
   type JwtUser,
@@ -23,6 +24,7 @@ import {
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { CLS_TENANT_ID } from '../../common/cls/cls.constants';
 import { extractClientIp } from '../../common/utils/request-host';
 import { FeeCollectionCenterService } from './fee-collection-center.service';
 import {
@@ -36,6 +38,7 @@ import {
 } from './dto/fee-collection-center.dto';
 import { GatewayPaymentService } from '../fees/services/gateway-payment.service';
 import { FeeReceiptDocumentService } from '../fees/services/fee-receipt-document.service';
+import { TenantResolutionService } from '../tenants/tenant-resolution.service';
 
 @ApiTags('fee-collection-centers')
 @Controller({ path: 'fee-collection-centers', version: '1' })
@@ -44,13 +47,38 @@ export class FeeCollectionCenterController {
     private readonly centers: FeeCollectionCenterService,
     private readonly gateways: GatewayPaymentService,
     private readonly receiptDocs: FeeReceiptDocumentService,
+    private readonly cls: ClsService,
+    private readonly tenantResolution: TenantResolutionService,
   ) {}
 
-  private tenantId(req: { tenantId?: string }) {
-    if (!req.tenantId) {
+  private resolveHost(req: Request): string {
+    const loginHost = String(req.headers['x-login-host'] ?? '').trim();
+    if (loginHost) return loginHost;
+    const fromHeaders = this.tenantResolution.extractHostFromHeaders(
+      req.headers.host,
+      req.headers['x-forwarded-host'],
+    );
+    if (
+      !fromHeaders ||
+      fromHeaders === 'localhost' ||
+      fromHeaders === '127.0.0.1' ||
+      fromHeaders === 'pay.localhost'
+    ) {
+      return 'demo.localhost';
+    }
+    return fromHeaders;
+  }
+
+  private async resolveTenantId(req: Request): Promise<string> {
+    const fromCls = this.cls.get<string>(CLS_TENANT_ID);
+    if (fromCls) return fromCls;
+
+    const host = this.resolveHost(req);
+    const tenant = await this.tenantResolution.resolveHost(host);
+    if (!tenant) {
       throw new BadRequestException('Tenant context required');
     }
-    return req.tenantId;
+    return tenant.id;
   }
 
   private clientMeta(req: any, ip: string, userAgent?: string) {
@@ -63,14 +91,15 @@ export class FeeCollectionCenterController {
   @Public()
   @Throttle({ default: { limit: 8, ttl: 900_000 } })
   @Post('register')
-  register(
+  async register(
     @Body() dto: RegisterFeeCollectionCenterDto,
-    @Req() req: { tenantId?: string },
+    @Req() req: Request,
     @Ip() ip: string,
     @Headers('user-agent') userAgent?: string,
   ) {
+    const tenantId = await this.resolveTenantId(req);
     return this.centers.register(
-      this.tenantId(req),
+      tenantId,
       dto,
       this.clientMeta(req, ip, userAgent),
     );
@@ -79,25 +108,17 @@ export class FeeCollectionCenterController {
   @Public()
   @Throttle({ default: { limit: 20, ttl: 900_000 } })
   @Post('verify-email')
-  verifyEmail(
-    @Body() dto: VerifyCenterEmailDto,
-    @Req() req: { tenantId?: string },
-  ) {
-    return this.centers.verifyEmail(
-      this.tenantId(req),
-      dto.centerId,
-      dto.token,
-    );
+  async verifyEmail(@Body() dto: VerifyCenterEmailDto, @Req() req: Request) {
+    const tenantId = await this.resolveTenantId(req);
+    return this.centers.verifyEmail(tenantId, dto.centerId, dto.token);
   }
 
   @Public()
   @Throttle({ default: { limit: 20, ttl: 900_000 } })
   @Post('verify-otp')
-  verifyOtp(
-    @Body() dto: VerifyCenterOtpDto,
-    @Req() req: { tenantId?: string },
-  ) {
-    return this.centers.verifyOtp(this.tenantId(req), dto.centerId, dto.otp);
+  async verifyOtp(@Body() dto: VerifyCenterOtpDto, @Req() req: Request) {
+    const tenantId = await this.resolveTenantId(req);
+    return this.centers.verifyOtp(tenantId, dto.centerId, dto.otp);
   }
 
   @ApiBearerAuth()

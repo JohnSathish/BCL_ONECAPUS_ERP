@@ -2,7 +2,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 
-export const FEE_RECEIPT_TEMPLATE_VERSION = 'v5';
+export const FEE_RECEIPT_TEMPLATE_VERSION = 'v6';
 
 export type ReceiptTemplateFormat = 'full' | 'half' | 'thermal';
 
@@ -1130,7 +1130,7 @@ export async function resolveFeeReceiptBranding(
     addressLine: (branding?.address as string | null) ?? null,
     affiliationLine,
     accreditationLine,
-    motto: isDbc ? 'Wisdom · Love · Service' : null,
+    motto: isDbc ? 'In Pursuit of Excellence' : null,
     establishedYear: isDbc ? '1970' : null,
     logoSrc,
     logoPlaceholder: isDbc

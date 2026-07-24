@@ -98,6 +98,25 @@ export type HomepageFooterContent = {
   badges: Array<{ label: string; value: string }>;
 };
 
+/** Brand-bar + nav CTAs on the public college site header. */
+export type HomepageHeaderCtaButton = {
+  label: string;
+  href: string;
+};
+
+export type HomepageHeaderCtasContent = {
+  /** Outlined brand-bar button */
+  erpLogin: HomepageHeaderCtaButton;
+  /** Gold brand-bar button */
+  onlineAdmission: HomepageHeaderCtaButton;
+  /** Play Store download (nav bar / drawer) */
+  mobileApp: HomepageHeaderCtaButton;
+  /** @deprecated Prefer erpLogin / onlineAdmission / mobileApp */
+  secondary?: HomepageHeaderCtaButton;
+  /** @deprecated Prefer onlineAdmission */
+  primary?: HomepageHeaderCtaButton;
+};
+
 export type HomepageCoatOfArmsContent = {
   title: string;
   body: string;
@@ -124,6 +143,21 @@ export type HomepageSisterInstitutionsContent = {
   items: HomepageSisterInstitution[];
 };
 
+export type HomepageLifeAtCampusItem = {
+  id: string;
+  src: string;
+  alt: string;
+  label: string;
+  href?: string;
+};
+
+export type HomepageLifeAtCampusContent = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  items: HomepageLifeAtCampusItem[];
+};
+
 export type HomepageSectionChrome = {
   title?: string;
   subtitle?: string;
@@ -146,20 +180,44 @@ export type WebsiteHomepageContent = {
     highlights: HomepageWhyFeature[];
   };
   footer: HomepageFooterContent;
+  headerCtas: HomepageHeaderCtasContent;
   coatOfArms: HomepageCoatOfArmsContent;
   researchLinks: HomepageResearchLinksContent;
   sisterInstitutions: HomepageSisterInstitutionsContent;
+  lifeAtCampus: HomepageLifeAtCampusContent;
   sectionChrome: Partial<Record<string, HomepageSectionChrome>>;
 };
+
+/** Former short placeholder — must never overwrite a real principal message on save. */
+export const LEGACY_PRINCIPAL_MESSAGE_STUB = [
+  'Dear Staff and Students,',
+  'Welcome to Don Bosco College, Tura. Education here is not only about degrees—it is about forming competent, compassionate and committed citizens.',
+  'I invite every student to pursue excellence with humility, and every parent to walk with us in this Salesian mission.',
+].join('\n\n');
+
+const DEFAULT_PRINCIPAL_CARD_MESSAGE = [
+  'Dear Staff and Students,',
+  'Warm greetings from Don Bosco College, Tura.',
+  'True to its motto, “In Pursuit of Excellence,” Don Bosco College has been striving relentlessly for the last 39 years to prepare competent and socially committed young people so that they can take their rightful place in society. No doubt, higher education is the engine of human civilization. It drives societal progress, powers the global economy through research and innovation, and instils critical thinking and cultural awareness needed to navigate a complex world.',
+  'My dear students, today you are in the lap of such a higher educational institution, and with the introduction of the NEP Curriculum, you are being given a greater opportunity to equip yourselves with the knowledge and skills required to face the challenges of the world.',
+].join('\n\n');
+
+const DEFAULT_PRINCIPAL_FULL_MESSAGE = [
+  'Dear Staff and Students,',
+  'Warm greetings from Don Bosco College, Tura.',
+  'True to its motto, “In Pursuit of Excellence,” Don Bosco College has been striving relentlessly for the last 39 years to prepare competent and socially committed young people so that they can take “their rightful place in society.” No doubt, higher education is the engine of human civilization. It drives societal progress, powers the global economy through research and innovation, and instils critical thinking and cultural awareness needed to navigate a complex world.',
+  'My dear students, today you are in the lap of such a higher educational institution, and with the introduction of the NEP Curriculum, you are being given a greater opportunity to equip yourselves with the knowledge and skills required to face the challenges of the world. Hence, seize every opportunity to enter the library and lecture hall, and engage in serious research, analytical thinking, dialogue, and debate. However, such academic pursuits require hard work, sacrifice, discipline, serious thinking, and reflection. It is a struggle indeed. But remember what the Greek philosopher Aristotle said: “The roots of education are bitter, but the fruit is sweet.”',
+  'Once you are engaged in such an academic pursuit with honesty and sincerity, why should you not clear competitive examinations such as CUET, CAT, SSC, CGL, IIT JAM, UPSC, MPSC, ACS, Banking, and other related examinations? After the completion of your studies, why should you not be a preferred candidate for employment or for higher studies?',
+  'The ball is in your court. Therefore,\n“Study while others are sleeping;\nwork while others are loafing;\nprepare while others are playing;\nand dream while others are wishing.”\n(William Arthur Ward).',
+].join('\n\n');
 
 export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
   principal: {
     name: 'Dr. Fr. Jogesh B. Sangma',
     role: 'Principal',
     tenure: 'Serving since 2018',
-    message:
-      'Dear Staff and Students,\n\nWelcome to Don Bosco College, Tura. Education here is not only about degrees—it is about forming competent, compassionate and committed citizens.\n\nI invite every student to pursue excellence with humility, and every parent to walk with us in this Salesian mission.',
-    fullMessage: '',
+    message: DEFAULT_PRINCIPAL_CARD_MESSAGE,
+    fullMessage: DEFAULT_PRINCIPAL_FULL_MESSAGE,
     portraitSrc: '/images/principal-jogesh-sangma.png',
     portraitAlt: 'Dr. Fr. Jogesh B. Sangma, Principal',
     messageHref: '/about/principal',
@@ -186,7 +244,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     tourHref: '/about/history',
     stats: [
       { id: 'founded', label: 'Year Established', value: 1987 },
-      { id: 'programmes', label: 'Programmes Offered', value: 18, suffix: '+' },
+      { id: 'programmes', label: 'Programmes Offered', value: 15, suffix: '+' },
       { id: 'students', label: 'Students', value: 2200, suffix: '+' },
       { id: 'faculty', label: 'Faculty Members', value: 140, suffix: '+' },
       { id: 'departments', label: 'Departments', value: 15 },
@@ -371,6 +429,20 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
       { label: 'NEHU', value: 'Affiliated' },
     ],
   },
+  headerCtas: {
+    erpLogin: {
+      label: 'ERP Login',
+      href: 'https://erp.donboscocollege.ac.in',
+    },
+    onlineAdmission: {
+      label: 'Online Admission',
+      href: '/admission/apply',
+    },
+    mobileApp: {
+      label: 'Mobile App',
+      href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+    },
+  },
   coatOfArms: {
     title: 'Coat of Arms',
     body: 'The Coat of Arms of the college contains the motto of the college, “In Pursuit of Excellence” and three distinct components – sun, eagle and mountains. The radiant sun is the source, the giver that bestows light, energy, inspiration and divine guidance. The soaring eagle is the seeker that looks for all that is good, noble and uplifting in the world of knowledge, skills and values. The green mountains and valleys represent the process whereby the seeker ascends, descends and strives until he/she arrives at the top. True to our motto, we are passionate about excellence in every sphere of our academic, professional and social life.',
@@ -405,6 +477,11 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
       { label: 'IQAC', href: '/iqac', description: 'Quality assurance' },
       { label: 'NAAC', href: '/naac' },
       { label: 'Downloads', href: '/downloads' },
+      {
+        label: 'ERP Login',
+        href: 'https://erp.donboscocollege.ac.in',
+        description: 'Staff & student portal',
+      },
     ],
   },
   sisterInstitutions: {
@@ -412,10 +489,96 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     subtitle: 'Collaborating institutions under the same management',
     items: [
       {
-        id: 'dbc-logo',
-        name: 'Don Bosco College, Tura',
-        logoUrl: '/images/college-logo.png',
-        href: 'https://donboscocollege.ac.in',
+        id: 'dbc-bongaigaon',
+        name: 'Don Bosco College, Bongaigaon (DBC)',
+        logoUrl: '/images/sister-institutions/dbc-bongaigaon.jpg',
+        href: 'https://donboscocollege.ac.in/',
+      },
+      {
+        id: 'dbim',
+        name: 'Don Bosco Institute of Management (DBIM)',
+        logoUrl: '/images/sister-institutions/dbim.png',
+        href: 'https://dbim.ac.in/',
+      },
+      {
+        id: 'dbc-tura-linkage',
+        name: 'Don Bosco College, Tura — sister linkage',
+        logoUrl: '/images/sister-institutions/dbc-tura-linkage.png',
+        href: 'https://donboscocollege.ac.in/',
+      },
+      {
+        id: 'don-bosco-university',
+        name: 'Don Bosco University',
+        logoUrl: '/images/sister-institutions/don-bosco-university.png',
+        href: 'https://www.dbuniversity.ac.in/',
+      },
+      {
+        id: 'salesian-province-ing',
+        name: 'Salesian Province of Guwahati (ING)',
+        logoUrl: '/images/sister-institutions/salesian-province-ing.jpg',
+        href: 'https://donboscoindia.org/',
+      },
+      {
+        id: 'salesians-sdb',
+        name: 'Salesians of Don Bosco (SDB)',
+        logoUrl: '/images/sister-institutions/salesians-sdb.png',
+        href: 'https://www.sdb.org/',
+      },
+      {
+        id: 'st-anthonys-shillong',
+        name: "St. Anthony's College, Shillong",
+        logoUrl: '/images/sister-institutions/st-anthonys-shillong.png',
+        href: 'https://anthonys.ac.in/',
+      },
+    ],
+  },
+  lifeAtCampus: {
+    eyebrow: 'Life at Don Bosco',
+    title: 'A campus full of possibility',
+    subtitle:
+      'Every corner holds a story of learning, friendship and discovery.',
+    items: [
+      {
+        id: 'ncc',
+        src: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=1200&q=82',
+        alt: 'NCC cadets participating in a college programme',
+        label: 'NCC',
+      },
+      {
+        id: 'nss',
+        src: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=82',
+        alt: 'NSS student volunteers serving the community',
+        label: 'NSS',
+      },
+      {
+        id: 'sports',
+        src: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students participating in college sports',
+        label: 'Sports',
+      },
+      {
+        id: 'cultural',
+        src: 'https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students performing during a cultural event',
+        label: 'Cultural Events',
+      },
+      {
+        id: 'labs',
+        src: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students learning in a science laboratory',
+        label: 'Labs',
+      },
+      {
+        id: 'library',
+        src: 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Students studying in the college library',
+        label: 'Library',
+      },
+      {
+        id: 'hostel',
+        src: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1200&q=82',
+        alt: 'Comfortable student hostel facilities',
+        label: 'Hostel',
       },
     ],
   },
@@ -426,7 +589,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function mergeDeep<T extends Record<string, unknown>>(
+export function mergeDeep<T extends Record<string, unknown>>(
   base: T,
   patch: unknown,
 ): T {
@@ -444,15 +607,207 @@ function mergeDeep<T extends Record<string, unknown>>(
   return next as T;
 }
 
+function normalizePrincipalMessage(message: unknown): string {
+  if (typeof message !== 'string' || !message.trim()) {
+    return DEFAULT_HOMEPAGE_CONTENT.principal.message;
+  }
+  const trimmed = message.trim();
+  if (trimmed === LEGACY_PRINCIPAL_MESSAGE_STUB.trim()) {
+    return DEFAULT_HOMEPAGE_CONTENT.principal.message;
+  }
+  return message;
+}
+
+/**
+ * Apply a partial homepage CMS patch onto the *stored* homepage object.
+ * Never materializes unrelated code defaults into persistence (that was
+ * overwriting Principal's Message whenever footer/research/etc. were saved).
+ */
+export function applyHomepageContentPatch(
+  storedHomepage: unknown,
+  patch: Partial<WebsiteHomepageContent>,
+): Record<string, unknown> {
+  const stored = isRecord(storedHomepage) ? { ...storedHomepage } : {};
+  const next = { ...stored };
+
+  const assignObject = (key: keyof WebsiteHomepageContent, value: unknown) => {
+    if (value === undefined) return;
+    const previous = next[key as string];
+    if (isRecord(previous) && isRecord(value) && !Array.isArray(value)) {
+      next[key as string] = mergeDeep(previous, value);
+    } else {
+      next[key as string] = value;
+    }
+  };
+
+  if (patch.principal) {
+    const previous = isRecord(next.principal) ? next.principal : {};
+    next.principal = {
+      ...previous,
+      ...patch.principal,
+      message: normalizePrincipalMessage(
+        patch.principal.message ?? previous.message,
+      ),
+      messageHref: normalizePrincipalHref(
+        patch.principal.messageHref ?? previous.messageHref,
+      ),
+    };
+  } else if (isRecord(next.principal)) {
+    next.principal = {
+      ...next.principal,
+      message: normalizePrincipalMessage(next.principal.message),
+    };
+  }
+
+  assignObject('aboutCollege', patch.aboutCollege);
+  assignObject('visionMission', patch.visionMission);
+  assignObject('hero', patch.hero);
+  assignObject('whyChooseUs', patch.whyChooseUs);
+  assignObject('footer', patch.footer);
+  assignObject('headerCtas', patch.headerCtas);
+  assignObject('coatOfArms', patch.coatOfArms);
+  assignObject('researchLinks', patch.researchLinks);
+  if (patch.sisterInstitutions) {
+    const previous = isRecord(next.sisterInstitutions)
+      ? next.sisterInstitutions
+      : {};
+    next.sisterInstitutions = {
+      ...previous,
+      ...patch.sisterInstitutions,
+      items:
+        patch.sisterInstitutions.items ??
+        (Array.isArray(previous.items) ? previous.items : []),
+    };
+  }
+  if (patch.lifeAtCampus) {
+    const previous = isRecord(next.lifeAtCampus) ? next.lifeAtCampus : {};
+    next.lifeAtCampus = {
+      ...previous,
+      ...patch.lifeAtCampus,
+      items:
+        patch.lifeAtCampus.items ??
+        (Array.isArray(previous.items) ? previous.items : []),
+    };
+  }
+  assignObject('sectionChrome', patch.sectionChrome);
+  if (patch.statistics !== undefined) {
+    next.statistics = patch.statistics;
+  }
+
+  return next;
+}
+
 export function resolveHomepageContent(
   settingsJson: unknown,
 ): WebsiteHomepageContent {
   const settings = isRecord(settingsJson) ? settingsJson : {};
-  const homepage = isRecord(settings.homepage) ? settings.homepage : {};
-  return mergeDeep(
+  const homepage = isRecord(settings.homepage) ? { ...settings.homepage } : {};
+  // Migrate legacy top-level settings.gallery into lifeAtCampus when CMS never saved it.
+  if (
+    !isRecord(homepage.lifeAtCampus) &&
+    Array.isArray(settings.gallery) &&
+    settings.gallery.length
+  ) {
+    homepage.lifeAtCampus = {
+      eyebrow: DEFAULT_HOMEPAGE_CONTENT.lifeAtCampus.eyebrow,
+      title: DEFAULT_HOMEPAGE_CONTENT.lifeAtCampus.title,
+      subtitle: DEFAULT_HOMEPAGE_CONTENT.lifeAtCampus.subtitle,
+      items: settings.gallery
+        .map((row, index) => {
+          if (!isRecord(row)) return null;
+          const src = typeof row.src === 'string' ? row.src : '';
+          if (!src) return null;
+          return {
+            id:
+              typeof row.id === 'string' && row.id.trim()
+                ? row.id
+                : `gallery-${index + 1}`,
+            src,
+            alt:
+              typeof row.alt === 'string' && row.alt.trim()
+                ? row.alt
+                : typeof row.label === 'string'
+                  ? row.label
+                  : 'Campus life',
+            label:
+              typeof row.label === 'string' && row.label.trim()
+                ? row.label
+                : 'Campus',
+            ...(typeof row.href === 'string' && row.href.trim()
+              ? { href: row.href }
+              : {}),
+          };
+        })
+        .filter(Boolean),
+    };
+  }
+  const resolved = mergeDeep(
     DEFAULT_HOMEPAGE_CONTENT as unknown as Record<string, unknown>,
     homepage,
   ) as unknown as WebsiteHomepageContent;
+  resolved.headerCtas = normalizeHeaderCtas(resolved.headerCtas);
+  resolved.principal.message = normalizePrincipalMessage(
+    resolved.principal.message,
+  );
+  if (!resolved.principal.fullMessage?.trim()) {
+    resolved.principal.fullMessage =
+      DEFAULT_HOMEPAGE_CONTENT.principal.fullMessage;
+  }
+  if (!Array.isArray(resolved.lifeAtCampus.items)) {
+    resolved.lifeAtCampus.items = DEFAULT_HOMEPAGE_CONTENT.lifeAtCampus.items;
+  }
+  return resolved;
+}
+
+export function normalizeHeaderCtas(value: unknown): HomepageHeaderCtasContent {
+  const defaults = DEFAULT_HOMEPAGE_CONTENT.headerCtas;
+  const source = isRecord(value) ? value : {};
+  const button = (
+    preferred: unknown,
+    fallbackA: unknown,
+    fallbackB: HomepageHeaderCtaButton,
+  ): HomepageHeaderCtaButton => {
+    const candidates = [preferred, fallbackA];
+    for (const candidate of candidates) {
+      if (!isRecord(candidate)) continue;
+      const label =
+        typeof candidate.label === 'string' ? candidate.label.trim() : '';
+      const href =
+        typeof candidate.href === 'string' ? candidate.href.trim() : '';
+      if (label || href) {
+        return {
+          label: label || fallbackB.label,
+          href: href || fallbackB.href,
+        };
+      }
+    }
+    return { ...fallbackB };
+  };
+
+  const secondary = isRecord(source.secondary) ? source.secondary : null;
+  const secondaryHref =
+    secondary && typeof secondary.href === 'string' ? secondary.href : '';
+  const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
+    `${typeof secondary?.label === 'string' ? secondary.label : ''} ${secondaryHref}`,
+  );
+
+  return {
+    erpLogin: button(
+      source.erpLogin,
+      secondaryLooksLikeApp ? null : secondary,
+      defaults.erpLogin,
+    ),
+    onlineAdmission: button(
+      source.onlineAdmission,
+      source.primary,
+      defaults.onlineAdmission,
+    ),
+    mobileApp: button(
+      source.mobileApp,
+      secondaryLooksLikeApp ? secondary : null,
+      defaults.mobileApp,
+    ),
+  };
 }
 
 export function normalizePrincipalHref(value: unknown): string {

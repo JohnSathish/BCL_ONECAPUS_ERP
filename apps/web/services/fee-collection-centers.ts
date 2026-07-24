@@ -1,4 +1,5 @@
 import { publicClient } from '@/lib/http/public-client';
+import { getLoginRequestHeaders } from '@/lib/login-host';
 import { api } from '@/services/api';
 
 export type CenterRegisterPayload = {
@@ -89,7 +90,9 @@ export type FeeCollectionCenterRow = {
 };
 
 export async function registerFeeCollectionCenter(payload: CenterRegisterPayload) {
-  const { data } = await publicClient.post('/v1/fee-collection-centers/register', payload);
+  const { data } = await publicClient.post('/v1/fee-collection-centers/register', payload, {
+    headers: getLoginRequestHeaders(),
+  });
   return data as {
     centerId: string;
     status: string;
@@ -100,18 +103,26 @@ export async function registerFeeCollectionCenter(payload: CenterRegisterPayload
 }
 
 export async function verifyCenterEmail(centerId: string, token: string) {
-  const { data } = await publicClient.post('/v1/fee-collection-centers/verify-email', {
-    centerId,
-    token,
-  });
+  const { data } = await publicClient.post(
+    '/v1/fee-collection-centers/verify-email',
+    {
+      centerId,
+      token,
+    },
+    { headers: getLoginRequestHeaders() },
+  );
   return data as { verified: boolean };
 }
 
 export async function verifyCenterOtp(centerId: string, otp: string) {
-  const { data } = await publicClient.post('/v1/fee-collection-centers/verify-otp', {
-    centerId,
-    otp,
-  });
+  const { data } = await publicClient.post(
+    '/v1/fee-collection-centers/verify-otp',
+    {
+      centerId,
+      otp,
+    },
+    { headers: getLoginRequestHeaders() },
+  );
   return data as { verified: boolean };
 }
 

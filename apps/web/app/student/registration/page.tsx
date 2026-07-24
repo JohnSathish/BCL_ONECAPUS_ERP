@@ -451,8 +451,8 @@ function StudentRegistrationContent() {
                 ? ` (₹${meData.feeClearance.outstandingAmount})`
                 : ''}
               . Clear registration fees before submitting.
-              {(meData?.feeClearance?.reasons ?? []).length
-                ? ` ${meData!.feeClearance!.reasons.join('; ')}`
+              {meData?.feeClearance?.reasons?.length
+                ? ` ${meData.feeClearance.reasons.join('; ')}`
                 : ''}
             </p>
           ) : null}

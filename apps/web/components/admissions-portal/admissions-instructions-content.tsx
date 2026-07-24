@@ -111,7 +111,7 @@ export function AdmissionsInstructionsContent({
           <p className="text-[#2563eb]">Email: {settings.helpDesk.email}</p>
         ) : null}
         <p className="mt-3 text-xs text-slate-600">
-          ADMISSIONS OFFICE · Meghalaya — 794002 · Ph. 03651-222361 · principaldbct@gmail.com
+          ADMISSIONS OFFICE · Meghalaya — 794002 · Mob. +91 9402152496 · principaldbct@gmail.com
         </p>
       </section>
     </div>

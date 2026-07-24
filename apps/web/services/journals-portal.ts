@@ -477,7 +477,7 @@ export async function createAdminArticle(
     abstract?: string;
     keywords?: string[];
     pageRange?: string;
-    authors?: Array<{ fullName: string; affiliation?: string }>;
+    authors?: Array<{ fullName: string; affiliation?: string; isCorresponding?: boolean }>;
   },
 ) {
   const { data } = await api.post(`/v1/journals/${journalId}/articles`, body);

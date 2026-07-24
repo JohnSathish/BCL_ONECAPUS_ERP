@@ -26,6 +26,11 @@ type LoginFormProps = {
   postLoginPath?: string;
   /** Full page navigation — reliable on kiosk gate PCs (avoids RSC client fetch). */
   hardRedirect?: boolean;
+  /**
+   * Auth card only (no marketing hero). Use for subdomain portals
+   * such as pay / library where the full ERP splash looks wrong.
+   */
+  compact?: boolean;
 };
 
 function resolveSafeNextPath(raw: string | null | undefined): string | undefined {
@@ -38,7 +43,11 @@ function resolveSafeNextPath(raw: string | null | undefined): string | undefined
   return path;
 }
 
-export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProps) {
+export function LoginForm({
+  postLoginPath,
+  hardRedirect = false,
+  compact = false,
+}: LoginFormProps) {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const setPrefs = useAuthStore((s) => s.setPrefs);
@@ -268,6 +277,38 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
     [setValue],
   );
 
+  const authCard = (
+    <LoginAuthCard
+      context={context}
+      contextLoading={contextLoading}
+      contextError={contextError}
+      waitingForApi={apiWaiting}
+      challenge={challenge}
+      challengeLoading={challengeLoading}
+      onRefreshChallenge={loadChallenge}
+      register={register}
+      handleSubmit={handleSubmit}
+      onSubmit={onSubmit}
+      errors={errors}
+      isSubmitting={isSubmitting}
+      formError={error}
+      formInfo={info}
+      verificationError={verificationError}
+      passwordValue={passwordValue}
+      challengeAnswer={challengeAnswer}
+      onFillDemoCredentials={fillDemoCredentials}
+    />
+  );
+
+  if (compact) {
+    return (
+      <>
+        <LoginDynamicFavicon faviconUrl={context?.institution.faviconUrl} />
+        <div className="mx-auto w-full max-w-md px-1 py-2">{authCard}</div>
+      </>
+    );
+  }
+
   return (
     <>
       <LoginDynamicFavicon faviconUrl={context?.institution.faviconUrl} />
@@ -283,26 +324,7 @@ export function LoginForm({ postLoginPath, hardRedirect = false }: LoginFormProp
             theme={context?.theme}
             loginBackgroundStyle={context?.loginBackgroundStyle}
           >
-            <LoginAuthCard
-              context={context}
-              contextLoading={contextLoading}
-              contextError={contextError}
-              waitingForApi={apiWaiting}
-              challenge={challenge}
-              challengeLoading={challengeLoading}
-              onRefreshChallenge={loadChallenge}
-              register={register}
-              handleSubmit={handleSubmit}
-              onSubmit={onSubmit}
-              errors={errors}
-              isSubmitting={isSubmitting}
-              formError={error}
-              formInfo={info}
-              verificationError={verificationError}
-              passwordValue={passwordValue}
-              challengeAnswer={challengeAnswer}
-              onFillDemoCredentials={fillDemoCredentials}
-            />
+            {authCard}
           </LoginAuthPanel>
         }
       />

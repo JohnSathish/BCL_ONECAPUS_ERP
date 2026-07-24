@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'donboscocollege.ac.in' },
+      { protocol: 'https', hostname: 'www.donboscocollege.ac.in' },
+      { protocol: 'https', hostname: 'erp.donboscocollege.ac.in' },
       { protocol: 'https', hostname: 'upload.wikimedia.org' },
       { protocol: 'http', hostname: '127.0.0.1' },
       { protocol: 'http', hostname: 'localhost' },

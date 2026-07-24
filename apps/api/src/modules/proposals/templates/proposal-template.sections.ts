@@ -94,8 +94,8 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
         `<h2>Letter of Submission</h2>
         <p>To,<br/><strong>The Principal</strong><br/>${ctx.institutionName}<br/>${ctx.addressLine}</p>
         <p>Dear ${ctx.contactPerson},</p>
-        <p>We are honoured to submit this enterprise proposal for implementing <strong>BCL OneCampus ERP</strong> at ${ctx.institutionName}. Your institution's commitment to academic excellence and administrative modernization aligns with our vision of building governed, scalable, and future-ready campus platforms.</p>
-        <p>This proposal outlines a practical digital transformation roadmap — from admissions and academics to finance, examinations, mobile engagement, and leadership analytics — designed to reduce manual dependency and strengthen institutional governance.</p>
+        <p>We are honoured to submit this updated enterprise proposal for implementing <strong>BCL OneCampus ERP</strong> at ${ctx.institutionName}. Your institution's commitment to academic excellence, NAAC quality culture, and public digital presence aligns with our vision of building governed, scalable, and future-ready campus platforms.</p>
+        <p>This proposal outlines a complete digital transformation roadmap — covering admissions, NEP/FYUGP academics, examinations, fees &amp; finance, HR, library, governance, official documents, research journals, the college website CMS, Principal Desk leadership analytics, and student/faculty mobile apps — designed to reduce manual dependency and strengthen institutional governance.</p>
         <p>${ctx.companyName} brings higher-education domain expertise, proven implementation methodology, and long-term partnership support. We look forward to partnering with ${ctx.institutionName}.</p>
         <p style="margin-top:18px;">Sincerely,<br/><strong>${ctx.companyName}</strong><br/>${ctx.companyEmail} · ${ctx.companyPhone}<br/>${ctx.companyWebsite}</p>`,
       ),
@@ -119,9 +119,9 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
           </ul></div>
           <div class="card card-compact"><h3>Proposed Solution &amp; Benefits</h3><ul>
             <li>Unified BCL OneCampus ERP platform</li>
-            <li>End-to-end automation workflows</li>
-            <li>Student, faculty &amp; parent mobile apps</li>
-            <li>Secure centralized database &amp; instant reports</li>
+            <li>End-to-end automation across academics, fees &amp; exams</li>
+            <li>Student &amp; faculty mobile apps + Principal Desk</li>
+            <li>College website CMS, NAAC/IQAC &amp; journals support</li>
           </ul></div>
         </div>
         <div class="grid-3 no-break" style="margin-top:8px;">
@@ -174,11 +174,17 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
             ],
             ['NEHU Compatible', 'Examination and academic workflows for NEHU'],
             [
+              'Morning & Day Shift Ready',
+              'Built for multi-shift college operations',
+            ],
+            [
               'Modular & Cloud Ready',
               'Progressive rollout with secure hosting',
             ],
-            ['Mobile Apps', 'Student, faculty & parent engagement'],
-            ['Enterprise Reports', 'PDF, Excel & dashboard analytics'],
+            ['Mobile Apps', 'Student & faculty engagement on Android'],
+            ['Website CMS', 'Public college site managed from the ERP'],
+            ['NAAC / IQAC Ready', 'Evidence vault, AQAR & governance trail'],
+            ['Enterprise Reports', '200+ reports · PDF, Excel & dashboards'],
           ]
             .map(([t, d]) => moduleCard('✓', t, d))
             .join('')}
@@ -203,7 +209,7 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
           <div class="arch-core">BCL OneCampus ERP</div>
           <div class="flow-arrow">↓</div>
           <div class="arch-row">
-            ${['Backend Services', 'PostgreSQL', 'Cloud Backup', 'Reports', 'Mobile Apps', 'AI Assistant'].map((r) => `<div class="arch-box">${r}</div>`).join('')}
+            ${['Backend Services', 'PostgreSQL', 'Cloud Backup', 'Reports', 'Mobile Apps', 'Website CMS', 'AI Assistant'].map((r) => `<div class="arch-box">${r}</div>`).join('')}
           </div>
         </div>
 
@@ -212,28 +218,170 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
           ${[
             ['📝', 'Admissions'],
             ['👥', 'Student Mgmt'],
-            ['📚', 'Academics'],
+            ['📚', 'Academics / NEP'],
             ['🗺️', 'Curriculum'],
             ['📋', 'Registration'],
             ['✅', 'Attendance'],
             ['📊', 'Examinations'],
             ['💰', 'Fee Mgmt'],
             ['🏦', 'Finance'],
-            ['👔', 'HR'],
-            ['📄', 'Documents'],
+            ['👔', 'HR & Payroll'],
+            ['📄', 'Official Docs'],
             ['🎖️', 'Certificates'],
-            ['📈', 'Reports'],
-            ['📉', 'Analytics'],
+            ['📖', 'Library'],
+            ['🏛️', 'Governance'],
+            ['🏅', 'NAAC / IQAC'],
+            ['🌐', 'Website CMS'],
+            ['📰', 'News & Notices'],
+            ['🔬', 'Journals'],
             ['🤖', 'AI Assistant'],
             ['📱', 'Mobile Apps'],
-            ['🏛️', 'Governance'],
-            ['📖', 'Library'],
+            ['📈', 'Reports'],
+            ['🧭', 'Principal Desk'],
+            ['🏠', 'Hostel'],
+            ['🚌', 'Transport'],
           ]
             .map(
               ([icon, title]) =>
                 `<div class="card card-compact module-tile"><div class="card-icon">${icon}</div><strong>${title}</strong></div>`,
             )
             .join('')}
+        </div>`,
+      ),
+  },
+  {
+    key: 'modules-detail-1',
+    tocTitle: 'Module Details (Part 1)',
+    aliases: ['module-catalogue', 'modules-detail'],
+    render: (ctx) =>
+      page(
+        ctx,
+        0,
+        'Module Details (Part 1)',
+        `<h2>Detailed Module Catalogue</h2>
+        <p class="small">Each module below is part of BCL OneCampus ERP for ${ctx.institutionName}. Concise descriptions are provided for Principal-level review.</p>
+        <div class="grid-2" style="margin-top:8px;">
+          ${[
+            [
+              'Admissions',
+              'Online applications, document & payment verification, merit processing, intake analytics, and admission-to-enrolment workflow.',
+            ],
+            [
+              'Student Management',
+              'Central student directory, profiles, bulk import/export, photos, promotion, transfer, re-admission, and ABC ID capture.',
+            ],
+            [
+              'Academics / NEP',
+              'NEP 2020 FYUGP academic engine with major/minor/MDC/AEC/SEC/VAC structures, credit ledger, and Morning & Day shift support.',
+            ],
+            [
+              'Curriculum',
+              'Programme and course structures, curriculum mapping, syllabus repository, and outcome-linked academic planning.',
+            ],
+            [
+              'Registration',
+              'Semester subject registration with seat rules, FCFS allocation where applicable, and registration status tracking.',
+            ],
+            [
+              'Attendance',
+              'Student and staff attendance capture, shift-wise analytics, defaulter visibility, and biometric-ready staff attendance.',
+            ],
+            [
+              'Examinations',
+              'IA planning, timetable, mark entry, admit cards, result analytics, and NEHU-compatible university submission exports.',
+            ],
+            [
+              'Fee Management',
+              'Fee structures, demand, collection, scholarships, concessions, student ledger, online pay, defaulters, and fee reconciliation.',
+            ],
+            [
+              'Finance & Accounts',
+              'Chart of accounts, vouchers, cash/bank books, ledger, trial balance, I&E, balance sheet, budgets, vendors, and bank reconciliation.',
+            ],
+            [
+              'HR & Payroll',
+              'Staff directory, recruitment, leave, substitutes, attendance, service records, appraisal, and payroll/payslip workflows.',
+            ],
+            [
+              'Official Documents',
+              'Institutional notices, circulars, office orders, templates, e-signature workflow, and controlled document archive.',
+            ],
+            [
+              'Certificates',
+              'Bonafide, transfer, conduct and related certificates, ID card designer, bulk print, and public verification support.',
+            ],
+          ]
+            .map(([t, d]) => moduleCard('▸', t, d))
+            .join('')}
+        </div>`,
+      ),
+  },
+  {
+    key: 'modules-detail-2',
+    tocTitle: 'Module Details (Part 2)',
+    render: (ctx) =>
+      page(
+        ctx,
+        0,
+        'Module Details (Part 2)',
+        `<h2>Detailed Module Catalogue <span class="small">(continued)</span></h2>
+        <div class="grid-2">
+          ${[
+            [
+              'Library',
+              'Catalogue, issue/return, fines, digital/research resources, and NAAC-oriented library reporting.',
+            ],
+            [
+              'Governance',
+              'Committees, meetings, action-taken reports, governance notices, and leadership oversight of institutional bodies.',
+            ],
+            [
+              'NAAC / IQAC',
+              'Criteria tracking, evidence vault, AQAR readiness, DVV support, achievements, MoUs, and quality dashboards.',
+            ],
+            [
+              'Website CMS',
+              'College website content management — pages, menus, media, SEO, homepage builder, and controlled publishing from the ERP.',
+            ],
+            [
+              'News & Notices',
+              'News, notice board, announcements, flash news, and public communication updates for students and visitors.',
+            ],
+            [
+              'Journals',
+              'Peer-reviewed journal workflows: manuscript submission, review, revisions, production, DOI/metadata, and author dashboards.',
+            ],
+            [
+              'AI Assistant',
+              'Natural-language institutional queries for fee, attendance, admissions, and report insights with permission-aware answers.',
+            ],
+            [
+              'Mobile Apps',
+              'Android apps for students and faculty — attendance, fees, results, timetable, leave, notices, and push notifications.',
+            ],
+            [
+              'Reports',
+              '200+ institutional reports across admissions, academics, fees, exams, finance, and departments — PDF and Excel export.',
+            ],
+            [
+              'Principal Desk',
+              'Leadership command center for strength, fees, attendance, exams, leave approvals, committees, NAAC pulse, and notices.',
+            ],
+            [
+              'Hostel',
+              'Hostel operations including room allocation, occupancy visibility, and hostel fee linkage where configured.',
+            ],
+            [
+              'Transport',
+              'Transport route and vehicle operations support for campus commuting and related administrative tracking.',
+            ],
+          ]
+            .map(([t, d]) => moduleCard('▸', t, d))
+            .join('')}
+        </div>
+        <div class="card card-compact no-break" style="margin-top:10px;">
+          <h3>Dedicated Research Journal Websites</h3>
+          <p>In addition to the Journals module inside OneCampus, BaseCode Labs is developing <strong>dedicated public websites</strong> for the college research journals — including <strong>Transient</strong> and other journal portals — with branded author/reader experience, submission entry points, and editorial visibility aligned to each journal’s identity.</p>
         </div>`,
       ),
   },
@@ -247,29 +395,37 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
         0,
         'Academic, Fees & Finance',
         `<h2>Academic Module</h2>
-        <p>Complete student lifecycle management from admission through graduation with NEP-aligned academic structures.</p>
+        <p>Complete student lifecycle management from admission through graduation with NEP 2020 / FYUGP-aligned academic structures, ABC ID support, and Morning &amp; Day shift operations.</p>
         <div class="chip-row">
-          ${['Admission', 'Registration', 'Promotion', 'Attendance', 'Examination', 'Graduation'].map(chip).join('')}
+          ${['Online Admissions', 'Student Information', 'NEP Academic Engine', 'Curriculum Mapping', 'Subject Registration', 'Morning & Day Shift', 'Promotion', 'Attendance', 'Timetable', 'Internal Assessment', 'Examination', 'Result Processing', 'Transcript & Grade Card', 'ABC ID'].map(chip).join('')}
         </div>
         <div class="grid-2" style="margin-top:8px;">
-          <div class="card card-compact"><h3>Student Profile</h3><p>Academics, attendance, fee, and examination insights in one profile.</p></div>
-          <div class="card card-compact"><h3>Academic Dashboard</h3><p>Program-wise analytics, performance trends, and progress tracking.</p></div>
+          <div class="card card-compact"><h3>Student Lifecycle</h3><ul>
+            <li>Online applications, merit &amp; document verification</li>
+            <li>Directory, bulk import, photos, transfer &amp; re-admission</li>
+            <li>Programme, curriculum &amp; semester management</li>
+            <li>Timetable engine, LMS, assignments &amp; quizzes</li>
+            <li>Question bank, syllabus repository &amp; OBE hooks</li>
+          </ul></div>
+          <div class="card card-compact"><h3>Academic Dashboard</h3><p>Program-wise analytics, performance trends, credit ledger visibility, and progress tracking for HODs and leadership.</p></div>
         </div>
 
         <h2 style="margin-top:12px;">Fee Management</h2>
         <div class="grid-2">
           <div class="card card-compact"><h3>Capabilities</h3><ul>
-            <li>Fee structure &amp; monthly plans</li>
+            <li>Fee structure — admission, semester &amp; examination fees</li>
             <li>Demand generation &amp; collection center</li>
             <li>Scholarships, concessions &amp; student ledger</li>
-            <li>Online payment, receipts &amp; defaulter intelligence</li>
+            <li>Online payment, receipts &amp; daily collection reports</li>
+            <li>Fee defaulter intelligence &amp; examination / back-paper fees</li>
+            <li><strong>Fee reconciliation</strong> — match collections, demands, ledger balances, and bank / gateway settlements for accurate period closing</li>
           </ul></div>
-          <div class="card card-compact"><h3>Fee Collection Intelligence</h3><p>Track real-time collections, dues, concessions, and cashflow trends across periods.</p></div>
+          <div class="card card-compact"><h3>Fee Collection Intelligence</h3><p>Track real-time collections, dues, concessions, and cashflow trends across periods — visible to accounts and the Principal Desk. Reconciliation tools help accounts verify that what was demanded, collected, and settled is consistent and audit-ready.</p></div>
         </div>
 
         <h2 style="margin-top:12px;">Finance &amp; Accounts</h2>
         <div class="chip-row">
-          ${['Chart of Accounts', 'Vouchers', 'Cash / Bank Book', 'General Ledger', 'Trial Balance', 'Income & Expenditure', 'Balance Sheet', 'Budgets', 'Expenses', 'Vendors', 'Bank Reconciliation'].map(chip).join('')}
+          ${['Chart of Accounts', 'Vouchers', 'Cash Book', 'Bank Book', 'General Ledger', 'Trial Balance', 'Income & Expenditure', 'Balance Sheet', 'Budgets', 'Vendors', 'Expense Tracking', 'Bank Reconciliation', 'Financial Reports'].map(chip).join('')}
         </div>`,
       ),
   },
@@ -291,37 +447,110 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
             <li>Mark entry, defaulter tracking, and result analytics</li>
             <li>University submission exports (NEHU compatible)</li>
           </ul>
-          <div class="card card-compact"><h3>Examination Analytics</h3><p>Result distribution, defaulter patterns, and performance intelligence by semester.</p></div>
+          <div class="card card-compact"><h3>Examination Analytics</h3><p>Result distribution, defaulter patterns, and performance intelligence by semester for academic leadership.</p></div>
         </div>
 
-        <h2 style="margin-top:10px;">Mobile Applications</h2>
+        <h2 style="margin-top:10px;">Mobile Applications (Android)</h2>
         <div class="grid-2">
           <div class="card card-compact"><h3>Student App</h3><ul>
             <li>Attendance, timetable &amp; academic calendar</li>
-            <li>Fee payment, receipts &amp; results</li>
-            <li>Notices, notifications &amp; LMS access</li>
+            <li>Fee payment, receipts, results &amp; exam fees</li>
+            <li>Library, leave, certificates &amp; assignments</li>
+            <li>Syllabus, notices, push notifications &amp; QR/RFID login</li>
           </ul></div>
           <div class="card card-compact"><h3>Faculty App</h3><ul>
             <li>Attendance marking &amp; marks entry</li>
             <li>Timetable, teaching load &amp; leave</li>
-            <li>Circulars, assignments &amp; student lists</li>
+            <li>Payroll / payslips &amp; circulars</li>
+            <li>Student roster &amp; push preferences</li>
           </ul></div>
         </div>
 
-        <h2 style="margin-top:10px;">Principal Dashboard</h2>
+        <h2 style="margin-top:10px;">Principal Desk</h2>
+        <p>A leadership command center for institutional health without requiring full admin complexity.</p>
         <div class="grid-3">
           ${[
             ['Student Strength', ctx.studentStrength.toLocaleString('en-IN')],
             ['Admissions', 'Live intake tracking'],
             ['Fee Collection', 'Daily & monthly trends'],
             ['Attendance', 'Shift-wise analytics'],
-            ['Department Performance', 'Comparative KPIs'],
-            ['Budget Utilization', 'Spend vs allocation'],
+            ['Exams & Results', 'IA & semester visibility'],
+            ['Leave Approvals', 'Staff & student workflows'],
+            ['Committees / Events', 'Governance overview'],
+            ['NAAC Readiness', 'Evidence & quality pulse'],
+            ['Notices', 'Institutional communications'],
           ]
             .map(
               ([k, v]) =>
                 `<div class="card card-compact"><div class="small">${k}</div><div class="kpi kpi-sm">${v}</div></div>`,
             )
+            .join('')}
+        </div>`,
+      ),
+  },
+  {
+    key: 'website-governance',
+    tocTitle: 'Website, Journals & Governance',
+    aliases: ['website', 'journals', 'naac', 'governance'],
+    render: (ctx) =>
+      page(
+        ctx,
+        0,
+        'Website, Journals & Governance',
+        `<h2>College Website CMS</h2>
+        <p>A modern public website for ${ctx.institutionName}, managed from the ERP — so notices, news, and institutional pages stay accurate without depending on external vendors for every edit.</p>
+        <div class="grid-2">
+          <div class="card card-compact"><h3>Public Website</h3><ul>
+            <li>Homepage builder, hero slider &amp; branding</li>
+            <li>About Us, Administration, Academics &amp; Campus Life</li>
+            <li>News, notice board, announcements &amp; gallery</li>
+            <li>Departments, faculty profiles &amp; programmes</li>
+            <li>Governing Body, Organogram, IQAC, NAAC, NIRF, AISHE &amp; more</li>
+            <li>Contact forms, newsletter &amp; ERP login link</li>
+          </ul></div>
+          <div class="card card-compact"><h3>CMS Controls</h3><ul>
+            <li>Pages, media library &amp; document uploads</li>
+            <li>Menus, SEO, publishing &amp; revisions</li>
+            <li>FYUG interest / admission enquiry capture</li>
+            <li>Blood donor registry &amp; public forms</li>
+            <li>Role-based editors with publish workflow</li>
+          </ul></div>
+        </div>
+
+        <h2 style="margin-top:12px;">Research Journals &amp; Dedicated Journal Websites</h2>
+        <div class="grid-2">
+          <div class="card card-compact"><h3>Journals Module (ERP)</h3><ul>
+            <li>Manuscript submission &amp; author dashboard</li>
+            <li>Peer review, revisions &amp; editorial decisions</li>
+            <li>Production workflow &amp; issue publishing</li>
+            <li>DOI / metadata &amp; OAI harvesting support</li>
+          </ul></div>
+          <div class="card card-compact"><h3>Dedicated Journal Websites</h3><ul>
+            <li><strong>Transient</strong> — dedicated public journal website under development</li>
+            <li>Additional college journal website(s) with journal-specific branding</li>
+            <li>Author guidelines, archives, and submission entry points</li>
+            <li>Integrated with OneCampus journal editorial workflows</li>
+          </ul></div>
+        </div>
+        <p class="small" style="margin-top:6px;">This gives ${ctx.institutionName} both a strong public research presence and a governed back-office for peer review and publication.</p>
+
+        <h2 style="margin-top:12px;">Governance, NAAC / IQAC &amp; Official Documents</h2>
+        <div class="grid-3">
+          ${[
+            ['Governance', 'Committees, meetings, ATR &amp; notices'],
+            ['NAAC / IQAC', 'Criteria, evidence vault, AQAR &amp; DVV'],
+            [
+              'Official Documents',
+              'Notices, circulars, office orders &amp; e-sign',
+            ],
+            [
+              'HR &amp; Payroll',
+              'Leave, substitutes, appraisal &amp; payslips',
+            ],
+            ['Library', 'Catalogue, circulation &amp; NAAC reports'],
+            ['Campus Ops', 'Hostel, transport, inventory &amp; helpdesk'],
+          ]
+            .map(([t, d]) => moduleCard('✓', t, d))
             .join('')}
         </div>`,
       ),
@@ -439,6 +668,9 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
       const total =
         subscriptionTotal +
         otherLines.reduce((sum, line) => sum + line.amount, 0);
+      const exampleStrength = 2020;
+      const exampleTotal = exampleStrength * ctx.perStudentSubscriptionRate;
+      const monthlyPerStudent = ctx.perStudentSubscriptionRate / 12;
       return page(
         ctx,
         0,
@@ -449,27 +681,51 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
           <tbody>
             <tr>
               <td>Annual ERP Subscription</td>
-              <td>₹${ctx.perStudentSubscriptionRate.toLocaleString('en-IN')} × ${ctx.studentStrength.toLocaleString('en-IN')} students</td>
+              <td>₹${ctx.perStudentSubscriptionRate.toLocaleString('en-IN')} × ${ctx.studentStrength.toLocaleString('en-IN')} students (approx.)</td>
               <td>${inr(subscriptionTotal)}</td>
             </tr>
-            ${otherLines.map((l) => `<tr><td>${l.label}</td><td>Annual / One-time</td><td>${inr(l.amount)}</td></tr>`).join('')}
-            <tr><th colspan="2">Total Commercial Value</th><th>${inr(total)}</th></tr>
+            ${otherLines
+              .map(
+                (l) =>
+                  `<tr><td>${l.label}</td><td>${l.amount === 0 ? 'Included in annual subscription' : 'Annual / One-time'}</td><td>${inr(l.amount)}</td></tr>`,
+              )
+              .join('')}
+            <tr><th colspan="2">Total Annual Commercial Value</th><th>${inr(total)}</th></tr>
           </tbody>
         </table>
-        <div class="grid-2" style="margin-top:8px;">
+
+        <div class="card card-compact no-break" style="margin-top:10px;">
+          <h3>Calculation</h3>
           <ul>
-            <li>Full ERP access for authorized users</li>
-            <li>Student, Faculty &amp; Parent mobile apps</li>
-            <li>Software updates &amp; feature enhancements</li>
-            <li>Technical support &amp; database maintenance</li>
-            <li>Security updates &amp; user training sessions</li>
+            <li><strong>${exampleStrength.toLocaleString('en-IN')} Students × ₹${ctx.perStudentSubscriptionRate.toLocaleString('en-IN')} = ${inr(exampleTotal)}</strong> per Academic Year</li>
+            <li><strong>Average Cost per Student per Month:</strong> ₹${ctx.perStudentSubscriptionRate.toLocaleString('en-IN')} ÷ 12 = <strong>₹${monthlyPerStudent.toFixed(2)}</strong> per student per month</li>
+            <li>The annual subscription will be <strong>recalculated each academic year</strong> based on the officially enrolled student strength.</li>
           </ul>
+        </div>
+
+        <div class="grid-2" style="margin-top:8px;">
+          <div class="card card-compact"><h3>Annual Subscription Includes</h3><ul>
+            <li>Unlimited ERP usage for authorized users</li>
+            <li>Student &amp; Faculty mobile applications</li>
+            <li>College website CMS &amp; public site</li>
+            <li>Software maintenance, bug fixes &amp; security updates</li>
+            <li>Technical support &amp; database maintenance</li>
+            <li>Feature improvements &amp; user training / documentation</li>
+            <li>Implementation, onboarding &amp; go-live support</li>
+          </ul></div>
           <div class="card card-compact">
             <div class="small">Per-Student Rate</div>
             <div class="kpi kpi-sm">${inr(ctx.perStudentSubscriptionRate)}</div>
             <div class="small" style="margin-top:6px;">Estimated Students</div>
             <div class="kpi kpi-sm">${ctx.studentStrength.toLocaleString('en-IN')}</div>
+            <div class="small" style="margin-top:6px;">Total Annual Subscription</div>
+            <div class="kpi kpi-sm">${inr(subscriptionTotal)}</div>
           </div>
+        </div>
+
+        <h2 style="margin-top:10px;">Commercial Terms</h2>
+        <div class="chip-row">
+          ${['Annual subscription model', 'Billing per enrolled student / academic year', `Rate ₹${ctx.perStudentSubscriptionRate}/student`, 'Support included in active subscription', 'Feature enhancements included where applicable'].map(chip).join('')}
         </div>
 
         <h2 style="margin-top:10px;">Return on Investment</h2>
@@ -481,8 +737,18 @@ export const PROPOSAL_SECTIONS: ProposalSectionDef[] = [
               ['Records', 'Manual registers', 'Paperless workflows'],
               ['Operations', 'Duplicate work', 'Automated processes'],
               ['Reporting', 'Slow manual reports', 'Instant PDF/Excel reports'],
-              ['Access', 'Office-bound', 'Mobile access anywhere'],
-              ['Leadership', 'Delayed visibility', 'Real-time dashboard'],
+              ['Access', 'Office-bound', 'Mobile + web anywhere'],
+              [
+                'Public Website',
+                'Vendor-dependent updates',
+                'In-house CMS publishing',
+              ],
+              ['Leadership', 'Delayed visibility', 'Real-time Principal Desk'],
+              [
+                'Accreditation',
+                'Scattered evidence',
+                'NAAC/IQAC vault & trail',
+              ],
             ]
               .map(
                 ([a, no, yes]) =>

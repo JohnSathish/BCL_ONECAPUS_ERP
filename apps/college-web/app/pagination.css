@@ -1,12 +1,13 @@
-/* Compact page chrome + pagination */
+/* Compact page chrome + pagination — aligned with college navy/gold */
 .site-pagination{
   display:flex;
   flex-wrap:wrap;
   align-items:center;
   justify-content:center;
   gap:10px;
-  margin-top:28px;
-  padding-top:8px;
+  margin-top:32px;
+  padding-top:18px;
+  border-top:1px solid rgba(11,46,89,.1);
 }
 .site-pagination-btn,
 .site-pagination-page{
@@ -14,26 +15,31 @@
   align-items:center;
   justify-content:center;
   gap:4px;
-  min-height:38px;
-  padding:0 12px;
-  border-radius:10px;
-  border:1px solid rgba(11,46,89,.12);
+  min-height:40px;
+  padding:0 14px;
+  border-radius:12px;
+  border:1px solid rgba(11,46,89,.14);
   background:#fff;
   color:var(--navy);
+  font-family:var(--font-sans),Inter,sans-serif;
   font-size:13px;
   font-weight:700;
+  letter-spacing:.02em;
   text-decoration:none;
-  transition:background .15s ease,border-color .15s ease,color .15s ease;
+  box-shadow:0 4px 12px rgba(6,31,61,.04);
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease;
 }
 .site-pagination-btn svg{width:15px;height:15px}
 .site-pagination-btn:hover,
 .site-pagination-page:hover{
-  border-color:rgba(11,46,89,.28);
+  border-color:rgba(11,46,89,.3);
   background:#f4f7fb;
+  transform:translateY(-1px);
 }
 .site-pagination-btn.is-disabled{
   opacity:.45;
   pointer-events:none;
+  box-shadow:none;
 }
 .site-pagination-pages{
   display:flex;
@@ -44,12 +50,18 @@
   list-style:none;
 }
 .site-pagination-page{
-  min-width:38px;
+  min-width:40px;
   padding:0 10px;
 }
 .site-pagination-page.is-current{
   background:var(--navy);
   border-color:var(--navy);
+  color:#fff;
+  box-shadow:0 8px 18px rgba(11,46,89,.22);
+}
+.site-pagination-page.is-current:hover{
+  background:var(--navy-dark);
+  border-color:var(--navy-dark);
   color:#fff;
 }
 

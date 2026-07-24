@@ -114,14 +114,60 @@ export async function generateWebsiteQrCodeDataUri(
 export function buildSubscriptionPricing(
   studentStrength: number,
   perStudentRate: number,
+  options?: {
+    includeImplementation?: boolean;
+    includeSupport?: boolean;
+    implementationAmount?: number;
+    supportAmount?: number;
+  },
 ) {
   const subscription = studentStrength * perStudentRate;
-  return [
+  const lines = [
     {
       label: `Annual ERP Subscription (₹${perStudentRate.toLocaleString('en-IN')}/student/academic year)`,
       amount: subscription,
     },
-    { label: 'Implementation & Onboarding (one-time)', amount: 250000 },
-    { label: 'Support & Success Program', amount: 180000 },
   ];
+  if (options?.includeImplementation !== false) {
+    const amount = options?.implementationAmount;
+    if (amount === undefined || amount > 0) {
+      lines.push({
+        label: 'Implementation & Onboarding (one-time)',
+        amount: amount ?? 250000,
+      });
+    } else {
+      lines.push({
+        label: 'Implementation & Onboarding (one-time)',
+        amount: 0,
+      });
+    }
+  }
+  if (options?.includeSupport !== false) {
+    const amount = options?.supportAmount;
+    if (amount === undefined || amount > 0) {
+      lines.push({
+        label: 'Support & Success Program',
+        amount: amount ?? 180000,
+      });
+    } else {
+      lines.push({
+        label: 'Support & Success Program',
+        amount: 0,
+      });
+    }
+  }
+  return lines;
+}
+
+/** Don Bosco College commercial package: subscription only. */
+export function buildDbcSubscriptionPricing(
+  studentStrength = 2200,
+  perStudentRate = 100,
+) {
+  return buildSubscriptionPricing(studentStrength, perStudentRate, {
+    includeImplementation: true,
+    includeSupport: true,
+    implementationAmount: 0,
+    supportAmount: 0,
+  });
 }

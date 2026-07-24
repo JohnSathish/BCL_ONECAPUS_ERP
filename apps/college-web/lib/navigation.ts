@@ -2,10 +2,19 @@ export const navigation = [
   {
     label: 'About Us',
     items: [
-      ['Our Heritage', '/about/history'],
-      ['Vision & Mission', '/about/vision-mission'],
-      ['Principal’s Desk', '/about/principal'],
       ['Administration', '/about/administration'],
+      ['History', '/about/history'],
+      ['Vision & Mission', '/about/vision-mission'],
+      ['Objectives', '/about/objectives'],
+      ['Philosophy', '/about/philosophy'],
+      ['Management', '/about/management'],
+      ['Affiliation', '/about/affiliation'],
+      ['Founder', '/about/founder'],
+      ['Our Rector Major', '/about/rector-major'],
+      ['DB Higher Education', '/about/db-higher-education'],
+      ['Former Principals', '/about/former-principals'],
+      ['Former Vice Principals', '/about/former-vice-principals'],
+      ['Principal’s Desk', '/about/principal'],
     ],
   },
   {
@@ -21,6 +30,7 @@ export const navigation = [
     label: 'Admission',
     items: [
       ['Apply Online', '/admission/apply'],
+      ['FYUG 4th Year Interest', '/admission/fyug-2026'],
       ['Prospectus', '/admission/prospectus'],
       ['Eligibility', '/admission/eligibility'],
       ['Scholarships', '/admission/scholarships'],

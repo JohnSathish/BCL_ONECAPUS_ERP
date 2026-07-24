@@ -8,6 +8,7 @@ import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteManagementController } from './website-management.controller';
 import { WebsitePublicController } from './website-public.controller';
 import { WebsiteService } from './website.service';
+import { WebsiteFyugInterestDocumentService } from './services/website-fyug-interest-document.service';
 
 @Module({
   imports: [StorageModule, TenantsModule],
@@ -21,11 +22,13 @@ import { WebsiteService } from './website.service';
     WebsiteAdminService,
     WebsiteAcademicService,
     WebsiteCmsEnterpriseService,
+    WebsiteFyugInterestDocumentService,
   ],
   exports: [
     WebsiteService,
     WebsiteAcademicService,
     WebsiteCmsEnterpriseService,
+    WebsiteFyugInterestDocumentService,
   ],
 })
 export class WebsiteModule {}

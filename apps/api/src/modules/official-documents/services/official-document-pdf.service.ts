@@ -299,7 +299,7 @@ const OFFICE_BY_ROLE: Record<string, string> = {
   HR: 'Human Resources Office',
 };
 
-const LANDLINE_DEFAULT = '03651-222361';
+const PHONE_DEFAULT = '+91 9402152496';
 const WEBSITE_DEFAULT = 'www.donboscocollege.ac.in';
 
 @Injectable()
@@ -333,7 +333,10 @@ export class OfficialDocumentPdfService {
     const match = contactLine?.match(
       /(?:Ph\.?|Phone|Landline)\s*:?\s*([0-9+\-\s]{8,})/i,
     );
-    return match?.[1]?.trim() || LANDLINE_DEFAULT;
+    const value = match?.[1]?.trim() || null;
+    // Retired college landline — never surface it on new documents.
+    if (value && /03651[\s-]*222361/.test(value)) return null;
+    return value;
   }
 
   /**
@@ -352,7 +355,8 @@ export class OfficialDocumentPdfService {
     const mobile =
       issuer?.phone?.trim() ||
       this.extractLabeled(letterhead.contactLine, 'Mobile') ||
-      '+91 94021 52496';
+      this.extractLabeled(letterhead.contactLine, 'Phone') ||
+      PHONE_DEFAULT;
     const email =
       issuer?.email?.trim() ||
       this.extractLabeled(letterhead.contactLine, 'Email') ||
@@ -576,7 +580,7 @@ export class OfficialDocumentPdfService {
         tenant?.branding?.displayName ?? tenant?.name ?? 'Don Bosco College',
       addressLine:
         tenant?.branding?.address?.trim() || 'Tura, Meghalaya – 794002',
-      contactLine: `Phone: ${LANDLINE_DEFAULT} | Mobile: +91 94021 52496 | Email: principaldbct@gmail.com | Website: ${WEBSITE_DEFAULT}`,
+      contactLine: `Phone: ${PHONE_DEFAULT} | Email: principaldbct@gmail.com | Website: ${WEBSITE_DEFAULT}`,
       logoPath: brandingLogo,
     };
   }

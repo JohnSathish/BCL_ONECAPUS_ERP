@@ -317,7 +317,7 @@ function PublicPageShell({
       <div className="px-4">{children}</div>
       <footer className="mx-auto mt-8 max-w-2xl text-center text-xs text-slate-600">
         <p>ADMISSIONS OFFICE · Meghalaya — 794002</p>
-        <p>Ph. 03651-222361 · Mob. 9436308357</p>
+        <p>Mob. +91 9402152496</p>
         <p className="mt-1 text-[#2563eb]">principaldbct@gmail.com · www.donboscocollege.ac.in</p>
       </footer>
     </div>

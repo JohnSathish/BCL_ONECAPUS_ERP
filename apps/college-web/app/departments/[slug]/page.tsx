@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { getAcademicDepartment } from '@/lib/academic-departments';
 import { CATEGORY_LABELS, type AcademicCategory } from '@/lib/academic-types';
-import { departmentBannerUrl, shortDepartmentName } from '@/lib/department-banners';
+import { departmentIcon, departmentVisual, shortDepartmentName } from '@/lib/department-visuals';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -89,17 +89,19 @@ export default async function DepartmentDetailPage({ params }: Props) {
   const categoryLabel =
     CATEGORY_LABELS[department.category as Exclude<AcademicCategory, 'ALL'>] ?? department.category;
   const shortName = shortDepartmentName(department.name);
-  const banner = departmentBannerUrl(department);
+  const visual = departmentVisual(department);
+  const DeptIcon = departmentIcon(visual.icon);
   const showTagline = isUsefulTagline(department.tagline, department.name);
   const hasProgrammes =
     Object.keys(department.programmesByLevel || {}).length > 0 || department.programmes.length > 0;
 
   return (
     <main id="main" className="dept-detail-page">
-      <section className="dept-page-hero">
-        <div className="dept-page-hero-media" aria-hidden>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner} alt="" />
+      <section className="dept-page-hero" style={{ backgroundColor: visual.color }}>
+        <div className="dept-page-hero-media is-icon-hero" aria-hidden>
+          <span className="dept-page-hero-icon">
+            <DeptIcon />
+          </span>
         </div>
         <div className="shell dept-page-hero-copy">
           <div className="breadcrumbs dept-page-crumbs">

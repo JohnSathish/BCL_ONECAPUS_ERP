@@ -1494,6 +1494,18 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Create and edit website notices',
   },
   {
+    slug: 'website:announcements:read',
+    resource: 'website',
+    action: 'announcements:read',
+    description: 'View website announcements',
+  },
+  {
+    slug: 'website:announcements:edit',
+    resource: 'website',
+    action: 'announcements:edit',
+    description: 'Create and edit website announcements',
+  },
+  {
     slug: 'website:departments:edit',
     resource: 'website',
     action: 'departments:edit',

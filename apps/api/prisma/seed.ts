@@ -89,11 +89,27 @@ async function main() {
     },
   });
 
+  await prisma.tenantDomain.upsert({
+    where: { host: 'pay.demo.localhost' },
+    update: { tenantId: tenant.id, verified: true, deletedAt: null },
+    create: {
+      tenantId: tenant.id,
+      host: 'pay.demo.localhost',
+      verified: true,
+    },
+  });
+
   const productionHosts = [
+    'donboscocollege.ac.in',
+    'www.donboscocollege.ac.in',
     'erp.donboscocollege.ac.in',
     'admissions.donboscocollege.ac.in',
     'library.donboscocollege.ac.in',
     'career.donboscocollege.ac.in',
+    'pay.donboscocollege.ac.in',
+    'alumni.donboscocollege.ac.in',
+    'transient.donboscocollege.ac.in',
+    'source.donboscocollege.ac.in',
   ];
   for (const host of productionHosts) {
     await prisma.tenantDomain.upsert({

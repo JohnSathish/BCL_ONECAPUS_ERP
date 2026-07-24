@@ -1038,7 +1038,17 @@ export function BoardExamSection({
           inputClassName={inputClass}
           onBoardChange={(boardName) => setForm((f) => ({ ...f, boardName }))}
           onStreamChange={(stream) => setForm((f) => ({ ...f, stream }))}
-          onSubjectMarksChange={(subjectMarks) => setForm((f) => ({ ...f, subjectMarks }))}
+          onSubjectMarksChange={(subjectMarks) =>
+            setForm((f) => ({
+              ...f,
+              subjectMarks: subjectMarks.map((mark) => ({
+                subjectName: mark.subjectName,
+                marksObtained: mark.marksObtained ?? undefined,
+                maxMarks: mark.maxMarks ?? undefined,
+                grade: mark.grade ?? undefined,
+              })),
+            }))
+          }
         />
       </div>
     </SectionCard>

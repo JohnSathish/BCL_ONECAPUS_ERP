@@ -127,7 +127,10 @@ export class ProposalGeneratorService {
     const perStudentSubscriptionRate = dto.perStudentSubscriptionRate ?? 100;
     const pricingLines = dto.pricingLines?.length
       ? dto.pricingLines
-      : buildSubscriptionPricing(studentStrength, perStudentSubscriptionRate);
+      : buildSubscriptionPricing(studentStrength, perStudentSubscriptionRate, {
+          implementationAmount: 0,
+          supportAmount: 0,
+        });
     const websiteQrCodeDataUri =
       qrCodeDataUri ??
       (await generateWebsiteQrCodeDataUri(BCL_COMPANY.website));
@@ -141,7 +144,7 @@ export class ProposalGeneratorService {
           month: 'long',
           year: 'numeric',
         }),
-      proposalVersion: dto.proposalVersion ?? '1.0',
+      proposalVersion: dto.proposalVersion ?? '2.2',
       studentStrength,
       perStudentSubscriptionRate,
       contactPerson: dto.contactPerson ?? 'Dr (Fr) Jogesh B Sangma',
@@ -157,9 +160,9 @@ export class ProposalGeneratorService {
         dto.addressLine ??
         branding?.address ??
         'Don Bosco College Tura, Sampalgre, West Garo Hills, Meghalaya 794002',
-      primaryColor: dto.primaryColor ?? branding?.primaryColor ?? '#1E40AF',
-      secondaryColor: dto.secondaryColor ?? '#2563EB',
-      proposalTheme: dto.proposalTheme ?? 'modern-blue',
+      primaryColor: dto.primaryColor ?? branding?.primaryColor ?? '#0B2E59',
+      secondaryColor: dto.secondaryColor ?? '#C79A2B',
+      proposalTheme: dto.proposalTheme ?? 'don-bosco',
       backgroundImageUrl: backgroundImageDataUri,
       mobileScreenshotUrl: mobileScreenshotDataUri,
       principalDashboardScreenshotUrl: resolvePrincipalDashboardDataUri(),

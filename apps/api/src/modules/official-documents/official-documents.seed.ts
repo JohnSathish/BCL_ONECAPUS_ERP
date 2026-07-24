@@ -7,7 +7,7 @@ const DEFAULT_ISSUERS = [
     roleCode: 'PRINCIPAL',
     name: 'Fr. Principal SDB',
     designation: 'Principal cum Secretary',
-    phone: '+91 94021 52496',
+    phone: '+91 9402152496',
     email: 'principaldbct@gmail.com',
     refPrefix: 'DBCT/PR',
     sortOrder: 1,
@@ -52,7 +52,7 @@ const DEFAULT_ISSUERS = [
 ];
 
 const DEFAULT_WEBSITE = 'www.donboscocollege.ac.in';
-const DEFAULT_LETTERHEAD_CONTACT = `Phone: 03651-222361 | Mobile: +91 94021 52496 | Email: principaldbct@gmail.com | Website: ${DEFAULT_WEBSITE}`;
+const DEFAULT_LETTERHEAD_CONTACT = `Phone: +91 9402152496 | Email: principaldbct@gmail.com | Website: ${DEFAULT_WEBSITE}`;
 
 const DEFAULT_TEMPLATES = [
   {

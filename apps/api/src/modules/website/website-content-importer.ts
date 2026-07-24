@@ -230,11 +230,17 @@ export async function importWebsiteContent(
           [...spec.tree],
           null,
         );
+      } else {
+        menuItemsCreated += await upsertMenuTree(
+          prisma,
+          tenantId,
+          menu.id,
+          [...spec.tree],
+          null,
+        );
       }
-    } else if (
-      (spec.location === 'UTILITY' || spec.location === 'FOOTER') &&
-      itemCount < spec.tree.length
-    ) {
+    } else {
+      // Fill missing catalogue items without wiping custom edits
       menuItemsCreated += await upsertMenuTree(
         prisma,
         tenantId,
@@ -246,7 +252,7 @@ export async function importWebsiteContent(
   }
 
   // Homepage layout — create missing sections only; never reset toggles/order.
-  for (const [position, item] of HOMEPAGE_SECTION_CATALOG.entries()) {
+  for (const [catalogPosition, item] of HOMEPAGE_SECTION_CATALOG.entries()) {
     const existing = await prisma.websiteHomepageSection.findUnique({
       where: {
         siteId_sectionKey: { siteId: site.id, sectionKey: item.key },
@@ -261,6 +267,44 @@ export async function importWebsiteContent(
       }
       continue;
     }
+
+    let position = catalogPosition;
+    if (item.key === 'studentSupport' || item.key === 'shortTermCourses') {
+      const anchorKey = item.key === 'studentSupport' ? 'news' : 'news';
+      const preferAfter =
+        item.key === 'shortTermCourses'
+          ? await prisma.websiteHomepageSection.findUnique({
+              where: {
+                siteId_sectionKey: {
+                  siteId: site.id,
+                  sectionKey: 'studentSupport',
+                },
+              },
+            })
+          : null;
+      const news = await prisma.websiteHomepageSection.findUnique({
+        where: {
+          siteId_sectionKey: { siteId: site.id, sectionKey: anchorKey },
+        },
+      });
+      const insertAt = preferAfter
+        ? preferAfter.position + 1
+        : news
+          ? news.position
+          : catalogPosition;
+      position = insertAt;
+      const later = await prisma.websiteHomepageSection.findMany({
+        where: { siteId: site.id, position: { gte: insertAt } },
+        select: { id: true, position: true },
+      });
+      for (const row of later) {
+        await prisma.websiteHomepageSection.update({
+          where: { id: row.id },
+          data: { position: row.position + 1 },
+        });
+      }
+    }
+
     await prisma.websiteHomepageSection.create({
       data: {
         tenantId,

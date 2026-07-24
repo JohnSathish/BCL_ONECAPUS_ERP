@@ -7362,6 +7362,26 @@ model FeeCollectionCenterAuditLog {
   @@schema("finance")
 }
 
+/// Public pay.donboscocollege.ac.in portal — search/payment attempt audit (no ERP session).
+model PublicFeePayAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  action     String
+  studentId  String?  @map("student_id") @db.Uuid
+  paymentId  String?  @map("payment_id") @db.Uuid
+  identifier String?  @map("identifier_hash")
+  outcome    String?
+  details    Json     @default("{}")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, action, createdAt])
+  @@index([tenantId, studentId, createdAt])
+  @@map("public_fee_pay_audit_logs")
+  @@schema("finance")
+}
+
 /// NEHU Semester Examination Fee — session window (Odd/Even cycle).
 model ExamFeeSession {
   id                   String    @id @default(uuid()) @db.Uuid
@@ -14105,6 +14125,7 @@ model WebsiteSite {
   mediaFolders WebsiteMediaFolder[]
   heroSlides  WebsiteHeroSlide[]
   notices     WebsiteNotice[]
+  announcements WebsiteAnnouncement[]
   homepageSections WebsiteHomepageSection[]
   redirects   WebsiteRedirect[]
   menus       WebsiteMenu[]
@@ -14112,6 +14133,8 @@ model WebsiteSite {
   contentEntries WebsiteContentEntry[]
   previewTokens WebsitePreviewToken[]
   revisions WebsiteRevision[]
+  bloodDonors WebsiteBloodDonor[]
+  fyugInterests WebsiteFyugInterest[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -14432,6 +14455,42 @@ model WebsiteNotice {
   @@schema("academic")
 }
 
+model WebsiteAnnouncement {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  siteId            String    @map("site_id") @db.Uuid
+  title             String
+  slug              String
+  summary           String    @default("")
+  bodyHtml          String    @default("") @map("body_html") @db.Text
+  featuredImageUrl  String?   @map("featured_image_url")
+  featuredImageAlt  String?   @map("featured_image_alt")
+  attachmentUrl     String?   @map("attachment_url")
+  attachmentName    String?   @map("attachment_name")
+  isPinned          Boolean   @default(false) @map("is_pinned")
+  showOnTicker      Boolean   @default(true) @map("show_on_ticker")
+  showOnHomepage    Boolean   @default(true) @map("show_on_homepage")
+  isVisible         Boolean   @default(true) @map("is_visible")
+  publishAt         DateTime? @map("publish_at")
+  expireAt          DateTime? @map("expire_at")
+  status            String    @default("DRAFT")
+  deletedAt         DateTime? @map("deleted_at")
+  deletedById       String?   @map("deleted_by_id") @db.Uuid
+  createdById       String?   @map("created_by_id") @db.Uuid
+  updatedById       String?   @map("updated_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@index([tenantId, siteId, status, deletedAt, publishAt])
+  @@index([siteId, isPinned, publishAt])
+  @@index([siteId, showOnTicker, status, deletedAt])
+  @@map("website_announcements")
+  @@schema("academic")
+}
+
 model WebsiteHomepageSection {
   id           String   @id @default(uuid()) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
@@ -14508,6 +14567,86 @@ model WebsiteRedirect {
   @@unique([siteId, fromPath])
   @@index([tenantId, siteId, isActive])
   @@map("website_redirects")
+  @@schema("academic")
+}
+
+model WebsiteBloodDonor {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  siteId            String    @map("site_id") @db.Uuid
+  fullName          String    @map("full_name")
+  dateOfBirth       DateTime  @map("date_of_birth") @db.Date
+  gender            String
+  phone             String
+  email             String
+  preferredContact  String    @default("Email") @map("preferred_contact")
+  bloodGroup        String    @map("blood_group")
+  lastDonationDate  DateTime? @map("last_donation_date") @db.Date
+  streetAddress     String    @default("") @map("street_address")
+  city              String    @default("")
+  state             String    @default("")
+  pincode           String    @default("")
+  medicalNotes      String    @default("") @map("medical_notes") @db.Text
+  eligible          Boolean   @default(true)
+  status            String    @default("NEW")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, createdAt])
+  @@index([siteId, bloodGroup])
+  @@index([siteId, email])
+  @@map("website_blood_donors")
+  @@schema("academic")
+}
+
+model WebsiteFyugInterest {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  siteId               String    @map("site_id") @db.Uuid
+  applicationNumber    String?   @map("application_number")
+  academicSession      String    @default("2026-2027") @map("academic_session")
+  fullName             String    @map("full_name")
+  photographUrl        String?   @map("photograph_url")
+  photographKey        String?   @map("photograph_key")
+  gender               String
+  dateOfBirth          DateTime  @map("date_of_birth") @db.Date
+  mobile               String
+  whatsapp             String    @default("")
+  email                String
+  state                String
+  district             String    @default("")
+  pinCode              String    @default("") @map("pin_code")
+  bloodGroup           String    @default("") @map("blood_group")
+  fatherName           String    @map("father_name")
+  fatherMobile         String    @map("father_mobile")
+  motherName           String    @map("mother_name")
+  motherMobile         String    @map("mother_mobile")
+  collegeLastAttended  String    @map("college_last_attended")
+  affiliatedUniversity String    @map("affiliated_university")
+  majorCourse          String    @map("major_course")
+  minorCourse          String    @map("minor_course")
+  applyingHonoursIn    String    @map("applying_honours_in")
+  cuetScore            String    @default("") @map("cuet_score")
+  cgpaSemesterV        String    @default("") @map("cgpa_semester_v")
+  percentageSemesterV  String    @default("") @map("percentage_semester_v")
+  hasBackPapers        Boolean   @default(false) @map("has_back_papers")
+  backPaperDetails     String    @default("") @map("back_paper_details")
+  declarationAccepted  Boolean   @default(true) @map("declaration_accepted")
+  signatureName        String    @map("signature_name")
+  remarks              String    @default("")
+  status               String    @default("SUBMITTED")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, applicationNumber])
+  @@index([tenantId, siteId, createdAt])
+  @@index([siteId, applyingHonoursIn])
+  @@index([siteId, email])
+  @@map("website_fyug_interests")
   @@schema("academic")
 }
 

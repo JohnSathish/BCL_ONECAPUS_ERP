@@ -21,6 +21,8 @@ export function useStudentDashboard(options?: { enabled?: boolean }) {
     qrPass: query.data?.qrPass,
     isLoading: query.isLoading,
     isError: query.isError,
+    error: query.error,
+    isFetching: query.isFetching,
     refetch: query.refetch,
   };
 }

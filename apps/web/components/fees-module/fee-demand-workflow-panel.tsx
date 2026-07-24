@@ -30,7 +30,7 @@ type WorkflowCard = {
 
 export function FeeDemandWorkflowPanel({ compact = false }: { compact?: boolean }) {
   const cyclesQ = useQuery({ queryKey: ['fee-cycles'], queryFn: () => fetchFeeCycles() });
-  const plansQ = useQuery({ queryKey: ['monthly-plans'], queryFn: fetchMonthlyPlans });
+  const plansQ = useQuery({ queryKey: ['monthly-plans'], queryFn: () => fetchMonthlyPlans() });
   const structuresQ = useQuery({
     queryKey: ['fees', 'structures'],
     queryFn: () => fetchFeeStructures(),

@@ -7,11 +7,14 @@ import {
   Patch,
   Post,
   Put,
+  Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import {
   CurrentUser,
@@ -34,10 +37,15 @@ import {
   WebsiteSectionDto,
   WebsiteSettingsDto,
 } from './dto/website-admin.dto';
+import {
+  ListWebsiteBloodDonorsQueryDto,
+  ListWebsiteFyugInterestsQueryDto,
+} from './dto/website.dto';
 import { WebsiteAdminService } from './website-admin.service';
 import { WebsiteAcademicService } from './website-academic.service';
 import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteService } from './website.service';
+import { WebsiteFyugInterestDocumentService } from './services/website-fyug-interest-document.service';
 
 @ApiBearerAuth()
 @ApiTags('website-admin')
@@ -48,6 +56,7 @@ export class WebsiteAdminController {
     private readonly website: WebsiteService,
     private readonly academic: WebsiteAcademicService,
     private readonly enterprise: WebsiteCmsEnterpriseService,
+    private readonly fyugDocuments: WebsiteFyugInterestDocumentService,
   ) {}
 
   @Get('dashboard')
@@ -202,8 +211,14 @@ export class WebsiteAdminController {
     @CurrentUser() user: JwtUser,
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body('altText') altText?: string,
+    @Body('kind') kind?: string,
   ) {
-    return this.admin.uploadMedia(user, file, altText);
+    return this.admin.uploadMedia(
+      user,
+      file,
+      altText,
+      kind?.toUpperCase() === 'DOCUMENT' ? 'DOCUMENT' : 'IMAGE',
+    );
   }
 
   @Patch('media/:mediaId')
@@ -467,6 +482,85 @@ export class WebsiteAdminController {
     return this.enterprise.restoreNotice(user, noticeId);
   }
 
+  @Get('announcements')
+  @RequireAnyPermission(
+    'website:read',
+    'website:announcements:read',
+    'website:announcements:edit',
+    'website:manage',
+  )
+  announcements(@CurrentUser() user: JwtUser) {
+    return this.enterprise.listAnnouncements(user.tid);
+  }
+
+  @Get('announcements/trash')
+  @RequireAnyPermission(
+    'website:read',
+    'website:announcements:read',
+    'website:announcements:edit',
+    'website:manage',
+  )
+  announcementsTrash(@CurrentUser() user: JwtUser) {
+    return this.enterprise.listAnnouncements(user.tid, { trash: true });
+  }
+
+  @Post('announcements')
+  @RequireAnyPermission(
+    'website:announcements:edit',
+    'website:edit',
+    'website:manage',
+  )
+  createAnnouncement(
+    @CurrentUser() user: JwtUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.enterprise.createAnnouncement(user, body as never);
+  }
+
+  @Patch('announcements/:announcementId')
+  @RequireAnyPermission(
+    'website:announcements:edit',
+    'website:edit',
+    'website:manage',
+  )
+  updateAnnouncement(
+    @CurrentUser() user: JwtUser,
+    @Param('announcementId') announcementId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.enterprise.updateAnnouncement(
+      user,
+      announcementId,
+      body as never,
+    );
+  }
+
+  @Delete('announcements/:announcementId')
+  @RequireAnyPermission(
+    'website:announcements:edit',
+    'website:edit',
+    'website:manage',
+  )
+  trashAnnouncement(
+    @CurrentUser() user: JwtUser,
+    @Param('announcementId') announcementId: string,
+  ) {
+    return this.enterprise.trashAnnouncement(user, announcementId);
+  }
+
+  @Post('announcements/:announcementId/restore')
+  @RequireAnyPermission(
+    'website:announcements:edit',
+    'website:edit',
+    'website:manage',
+  )
+  restoreAnnouncement(
+    @CurrentUser() user: JwtUser,
+    @Param('announcementId') announcementId: string,
+  ) {
+    return this.enterprise.restoreAnnouncement(user, announcementId);
+  }
+
   @Post('pages/:pageId/duplicate')
   @RequireAnyPermission('website:edit', 'website:manage')
   duplicatePage(@CurrentUser() user: JwtUser, @Param('pageId') pageId: string) {
@@ -586,5 +680,65 @@ export class WebsiteAdminController {
   @RequireAnyPermission('website:edit', 'website:manage', 'website:seo')
   redirects(@CurrentUser() user: JwtUser) {
     return this.website.listRedirects(user.tid);
+  }
+
+  @Get('blood-donors')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  bloodDonors(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ListWebsiteBloodDonorsQueryDto,
+  ) {
+    return this.website.listBloodDonors(user.tid, query);
+  }
+
+  @Get('fyug-interest')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  fyugInterests(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ListWebsiteFyugInterestsQueryDto,
+  ) {
+    return this.website.listFyugInterests(user.tid, query);
+  }
+
+  @Get('fyug-interest/stats')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  fyugInterestStats(@CurrentUser() user: JwtUser) {
+    return this.website.getFyugInterestStats(user.tid);
+  }
+
+  @Get('fyug-interest/export.xlsx')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  async exportFyugInterests(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.website.exportFyugInterestsExcel(user.tid);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="fyug-interest-registrations.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  @Get('fyug-interest/:id/application.pdf')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  async fyugApplicationPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const row = await this.fyugDocuments.getInterest(user.tid, id);
+    const buffer = await this.fyugDocuments.renderPdfBuffer(user.tid, id);
+    const appNo = row.applicationNumber || row.id.slice(0, 8);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="fyug-application-${appNo}.pdf"`,
+    );
+    res.send(buffer);
   }
 }

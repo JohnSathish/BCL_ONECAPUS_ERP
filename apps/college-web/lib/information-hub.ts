@@ -316,8 +316,7 @@ export function mergeInformationHub(...values: unknown[]): InformationHubContent
           : seedInformationHub.leadership.portraitSrc,
       portraitAlt: merged.leadership?.portraitAlt ?? seedInformationHub.leadership.portraitAlt,
       message:
-        typeof merged.leadership?.message === 'string' &&
-        merged.leadership.message.trim().startsWith('Dear Staff and Students')
+        typeof merged.leadership?.message === 'string' && merged.leadership.message.trim()
           ? merged.leadership.message
           : seedInformationHub.leadership.message,
       messageHref: normalizePrincipalMessageHref(merged.leadership?.messageHref),
@@ -354,5 +353,6 @@ export function eventDateParts(isoDate: string) {
   return {
     day: date.toLocaleDateString('en-IN', { day: '2-digit' }),
     month: date.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase(),
+    weekday: date.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase(),
   };
 }

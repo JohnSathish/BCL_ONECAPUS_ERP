@@ -75,10 +75,13 @@ export function TimetableSlotModal({
   });
   const staffQ = useQuery({
     queryKey: ['timetable', 'staff', context?.shiftId],
-    queryFn: () =>
-      context?.shiftId
-        ? fetchFacultyShiftAssignments(context.shiftId, { limit: 200 })
-        : fetchAllStaff({ activeTeachingOnly: true }),
+    queryFn: async () => {
+      if (context?.shiftId) {
+        return fetchFacultyShiftAssignments(context.shiftId, { limit: 200 });
+      }
+      const result = await fetchAllStaff({ activeTeachingOnly: true });
+      return result.data;
+    },
     enabled: authReady && open,
   });
   const roomsQ = useQuery({
@@ -124,34 +127,13 @@ export function TimetableSlotModal({
   if (!open || !context) return null;
 
   const courses = coursesQ.data?.data ?? [];
-  const staff = Array.isArray(staffQ.data)
-    ? staffQ.data.map((row) => ({
-        id: 'staffProfileId' in row ? row.staffProfileId : row.id,
-        fullName: row.fullName,
-        shortCode: row.shortCode,
-        employeeCode: row.employeeCode,
-        assignedShifts: 'assignedShifts' in row ? row.assignedShifts : undefined,
-      }))
-    : (
-        (
-          staffQ.data as
-            | {
-                data?: Array<{
-                  id: string;
-                  fullName: string;
-                  shortCode?: string | null;
-                  employeeCode?: string;
-                }>;
-              }
-            | undefined
-        )?.data ?? []
-      ).map((row) => ({
-        id: row.id,
-        fullName: row.fullName,
-        shortCode: row.shortCode ?? null,
-        employeeCode: row.employeeCode ?? '',
-        assignedShifts: undefined as undefined,
-      }));
+  const staff = (staffQ.data ?? []).map((row) => ({
+    id: 'staffProfileId' in row ? row.staffProfileId : row.id,
+    fullName: row.fullName,
+    shortCode: row.shortCode,
+    employeeCode: row.employeeCode,
+    assignedShifts: 'assignedShifts' in row ? row.assignedShifts : undefined,
+  }));
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
   const selectedStaff = staff.find((m) => m.id === staffProfileId);

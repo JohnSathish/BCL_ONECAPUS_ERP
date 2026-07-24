@@ -38,7 +38,7 @@ export function MonthlyFeePlansPanel() {
     development: '100',
   });
 
-  const plansQ = useQuery({ queryKey: ['monthly-plans'], queryFn: fetchMonthlyPlans });
+  const plansQ = useQuery({ queryKey: ['monthly-plans'], queryFn: () => fetchMonthlyPlans() });
   const genMut = useMutation({
     mutationFn: () => generateMonthlyDemands(),
     onSuccess: (res: { created?: number; skipped?: number; billingPeriod?: string }) => {

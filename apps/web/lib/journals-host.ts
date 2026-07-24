@@ -9,11 +9,13 @@ const RESERVED_JOURNAL_LABELS = new Set([
   'career',
   'careers',
   'library',
+  'pay',
   'demo',
   'app',
   'portal',
   'admin',
   'mail',
+  'server',
   'journals',
   'localhost',
 ]);

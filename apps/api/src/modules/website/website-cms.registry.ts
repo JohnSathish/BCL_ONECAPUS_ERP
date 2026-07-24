@@ -16,6 +16,8 @@ export const HOMEPAGE_SECTION_KEYS = [
   'departments',
   'programmes',
   'campusLife',
+  'studentSupport',
+  'shortTermCourses',
   'news',
   'gallery',
   'coatOfArms',
@@ -86,6 +88,19 @@ export const HOMEPAGE_SECTION_CATALOG: Array<{
     key: 'campusLife',
     label: 'Why Choose Us',
     description: 'Why choose us / campus reasons section',
+    defaultEnabled: true,
+  },
+  {
+    key: 'studentSupport',
+    label: 'Student Support & Activities',
+    description: 'Grievance, anti-ragging, ICC, clubs, NSS and NCC cards',
+    defaultEnabled: true,
+  },
+  {
+    key: 'shortTermCourses',
+    label: 'Short Term Courses',
+    description:
+      'Certificate and skill courses such as CAFA, BCCS, ELPC, BCCH and Tally',
     defaultEnabled: true,
   },
   {

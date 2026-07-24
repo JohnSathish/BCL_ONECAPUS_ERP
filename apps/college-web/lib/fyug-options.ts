@@ -1,0 +1,81 @@
+/** Shared option lists for FYUG 4th-year interest registration (matches live DBC form). */
+
+export const FYUG_GENDERS = ['Male', 'Female'] as const;
+
+export const FYUG_UNIVERSITIES = [
+  'North Eastern Hill University (NEHU), Shillong',
+  'Other',
+] as const;
+
+export const FYUG_MAJOR_MINOR_SUBJECTS = [
+  'English',
+  'Garo',
+  'Economics',
+  'Political Science',
+  'Education',
+  'Sociology',
+  'Geography',
+  'Philosophy',
+  'History',
+  'Mathematics',
+  'Botany',
+  'Zoology',
+  'Chemistry',
+  'Physics',
+  'Commerce',
+] as const;
+
+export const FYUG_HONOURS_SUBJECTS = [
+  'English',
+  'Garo',
+  'Economics',
+  'Political Science',
+  'Education',
+  'Sociology',
+  'History',
+  'Mathematics',
+  'Botany',
+  'Zoology',
+  'Chemistry',
+  'Physics',
+  'Commerce',
+] as const;
+
+export const INDIAN_STATES = [
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chhattisgarh',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
+  'Andaman and Nicobar Islands',
+  'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi',
+  'Jammu and Kashmir',
+  'Ladakh',
+  'Lakshadweep',
+  'Puducherry',
+] as const;

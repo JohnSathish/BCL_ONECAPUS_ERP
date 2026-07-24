@@ -49,7 +49,22 @@ export class GatewayPaymentService {
   }
 
   async initiate(user: JwtUser, dto: GatewayPaymentDto) {
-    const config = await this.settings.get(user.tid);
+    return this.initiateForTenant(user.tid, dto, user.sub);
+  }
+
+  /**
+   * Public pay portal (no ERP JWT). collectedById omitted.
+   */
+  async initiatePublic(tenantId: string, dto: GatewayPaymentDto) {
+    return this.initiateForTenant(tenantId, dto, undefined);
+  }
+
+  private async initiateForTenant(
+    tenantId: string,
+    dto: GatewayPaymentDto,
+    collectedById?: string,
+  ) {
+    const config = await this.settings.get(tenantId);
     const modes = resolveCollectionModes(config);
     if (!modes.gateway) {
       throw new BadRequestException(
@@ -57,21 +72,21 @@ export class GatewayPaymentService {
       );
     }
 
-    const active = await this.gatewayResolver.requireActiveGateway(user.tid);
+    const active = await this.gatewayResolver.requireActiveGateway(tenantId);
     const provider = active.providerCode;
 
     const payment = await this.db().paymentTransaction.create({
       data: {
-        tenantId: user.tid,
+        tenantId,
         studentId: dto.studentId,
-        transactionNo: await this.nextTransactionNo(user.tid),
+        transactionNo: await this.nextTransactionNo(tenantId),
         paymentMode: 'ONLINE',
         paymentSource: 'ERP_GATEWAY',
         provider,
         status: 'INITIATED',
         amount: dto.amount,
         unallocatedAmount: dto.amount,
-        collectedById: user.sub,
+        ...(collectedById ? { collectedById } : {}),
         metadata: {
           demandIds: dto.demandIds ?? [],
           channel: dto.channel ?? 'STUDENT_PORTAL',
@@ -80,24 +95,45 @@ export class GatewayPaymentService {
       },
     });
 
-    const checkout = await this.gatewayResolver.createCheckoutOrder(user.tid, {
-      amount: dto.amount,
-      currency: 'INR',
-      receipt: payment.transactionNo,
-      notes: { studentId: dto.studentId, paymentId: payment.id },
-    });
+    let checkout;
+    try {
+      checkout = await this.gatewayResolver.createCheckoutOrder(tenantId, {
+        amount: dto.amount,
+        currency: 'INR',
+        receipt: payment.transactionNo,
+        notes: { studentId: dto.studentId, paymentId: payment.id },
+      });
+    } catch (error) {
+      await this.db().paymentTransaction.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            ...(typeof payment.metadata === 'object' && payment.metadata
+              ? payment.metadata
+              : {}),
+            gatewayInitError:
+              error instanceof Error ? error.message : 'Gateway init failed',
+          },
+        },
+      });
+      throw error;
+    }
 
+    const channel = dto.channel ?? 'STUDENT_PORTAL';
     const webOrigin =
-      dto.channel === 'CENTER_PORTAL'
+      channel === 'CENTER_PORTAL' || channel === 'PUBLIC_PORTAL'
         ? (process.env.PAY_PORTAL_ORIGIN ??
           process.env.WEB_ORIGIN ??
           'http://localhost:3000')
         : (process.env.WEB_ORIGIN ?? 'http://localhost:3000');
     const returnPath = dto.returnPath?.startsWith('/')
       ? dto.returnPath
-      : dto.channel === 'CENTER_PORTAL'
+      : channel === 'CENTER_PORTAL'
         ? '/fee-collection-portal/pay/return'
-        : '/student/fees';
+        : channel === 'PUBLIC_PORTAL'
+          ? '/public-fee-pay/return'
+          : '/student/fees';
     const returnUrl = `${webOrigin}${returnPath}${returnPath.includes('?') ? '&' : '?'}atomReturn=1&paymentId=${payment.id}`;
 
     if (
@@ -122,7 +158,7 @@ export class GatewayPaymentService {
 
     await this.db().paymentGatewayLog.create({
       data: {
-        tenantId: user.tid,
+        tenantId,
         paymentId: payment.id,
         provider,
         eventType: 'INITIATE',
@@ -153,13 +189,36 @@ export class GatewayPaymentService {
       razorpay_signature: string;
     },
   ) {
+    return this.verifyRazorpayForTenant(user.tid, dto, user.sub);
+  }
+
+  async verifyRazorpayPublic(
+    tenantId: string,
+    dto: {
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+  ) {
+    return this.verifyRazorpayForTenant(tenantId, dto, undefined);
+  }
+
+  private async verifyRazorpayForTenant(
+    tenantId: string,
+    dto: {
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+    collectedById?: string,
+  ) {
     const payment = await this.db().paymentTransaction.findFirst({
-      where: { tenantId: user.tid, providerOrderId: dto.razorpay_order_id },
+      where: { tenantId, providerOrderId: dto.razorpay_order_id },
     });
     if (!payment) throw new BadRequestException('Payment record not found.');
 
     const valid = await this.gatewayResolver.verifyPayment(
-      user.tid,
+      tenantId,
       String(payment.provider ?? 'RAZORPAY'),
       {
         orderId: dto.razorpay_order_id,
@@ -174,10 +233,10 @@ export class GatewayPaymentService {
     }
 
     const result = await this.completePayment(
-      user.tid,
+      tenantId,
       payment,
       dto.razorpay_payment_id,
-      user.sub,
+      collectedById,
     );
     return { alreadyPaid: false, ...result };
   }
@@ -206,6 +265,24 @@ export class GatewayPaymentService {
       payment,
       `MOCK-${Date.now()}`,
       user.sub,
+    );
+  }
+
+  async simulateMockPaymentPublic(tenantId: string, paymentId: string) {
+    const payment = await this.db().paymentTransaction.findFirst({
+      where: { id: paymentId, tenantId },
+    });
+    if (!payment) throw new BadRequestException('Payment not found.');
+    if (payment.status === 'SUCCESS') return { alreadyPaid: true, payment };
+    const meta = (payment.metadata ?? {}) as { channel?: string };
+    if (meta.channel !== 'PUBLIC_PORTAL') {
+      throw new BadRequestException('Payment not found.');
+    }
+    return this.completePayment(
+      tenantId,
+      payment,
+      `MOCK-${Date.now()}`,
+      undefined,
     );
   }
 
@@ -1149,7 +1226,9 @@ export class GatewayPaymentService {
 
     const paymentMeta = (payment.metadata ?? {}) as Record<string, unknown>;
     const notifyChannels: Array<'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH'> =
-      paymentMeta.collectedVia === 'CENTER_PORTAL'
+      paymentMeta.collectedVia === 'CENTER_PORTAL' ||
+      paymentMeta.channel === 'PUBLIC_PORTAL' ||
+      paymentMeta.collectedVia === 'PUBLIC_PORTAL'
         ? ['EMAIL', 'SMS', 'IN_APP', 'PUSH']
         : ['EMAIL', 'IN_APP', 'PUSH'];
     void this.receiptNotify

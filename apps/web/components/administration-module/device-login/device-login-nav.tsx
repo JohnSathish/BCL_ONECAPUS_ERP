@@ -60,7 +60,8 @@ export function DeviceLoginNav() {
       className="mb-5 flex flex-wrap gap-1.5 rounded-xl border border-border/80 bg-muted/30 p-1.5"
     >
       {LINKS.map((link) => {
-        const active = link.exact
+        const exact = 'exact' in link && link.exact === true;
+        const active = exact
           ? pathname === link.href
           : pathname === link.href || pathname.startsWith(`${link.href}/`);
         const Icon = link.icon;

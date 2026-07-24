@@ -46,6 +46,30 @@ export type WebsiteNotice = {
   updatedAt: string;
 };
 
+export type WebsiteAnnouncement = {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  bodyHtml: string;
+  featuredImageUrl?: string | null;
+  featuredImageAlt?: string | null;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  isPinned: boolean;
+  showOnTicker: boolean;
+  showOnHomepage: boolean;
+  isVisible: boolean;
+  publishAt?: string | null;
+  expireAt?: string | null;
+  status: string;
+  deletedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  href?: string;
+  isNew?: boolean;
+};
+
 export type WebsiteHomepageSection = {
   id: string;
   sectionKey: string;
@@ -171,4 +195,84 @@ export type WebsitePreview = {
   token: string;
   url: string;
   expiresAt: string;
+};
+
+export type WebsiteBloodDonor = {
+  id: string;
+  fullName: string;
+  dateOfBirth: string;
+  gender: string;
+  phone: string;
+  email: string;
+  preferredContact: string;
+  bloodGroup: string;
+  lastDonationDate?: string | null;
+  streetAddress: string;
+  city: string;
+  state: string;
+  pincode: string;
+  medicalNotes: string;
+  eligible: boolean;
+  status: string;
+  createdAt: string;
+};
+
+export type WebsiteBloodDonorList = {
+  items: WebsiteBloodDonor[];
+  total: number;
+  skip: number;
+  take: number;
+};
+
+export type WebsiteFyugInterest = {
+  id: string;
+  applicationNumber?: string | null;
+  academicSession?: string;
+  fullName: string;
+  photographUrl?: string | null;
+  gender: string;
+  dateOfBirth: string;
+  mobile: string;
+  whatsapp: string;
+  email: string;
+  state: string;
+  fatherName: string;
+  fatherMobile: string;
+  motherName: string;
+  motherMobile: string;
+  collegeLastAttended: string;
+  affiliatedUniversity: string;
+  majorCourse: string;
+  minorCourse: string;
+  applyingHonoursIn: string;
+  cuetScore: string;
+  cgpaSemesterV: string;
+  percentageSemesterV: string;
+  hasBackPapers: boolean;
+  backPaperDetails?: string;
+  signatureName: string;
+  remarks?: string;
+  status: string;
+  createdAt: string;
+};
+
+export type WebsiteFyugInterestList = {
+  items: WebsiteFyugInterest[];
+  total: number;
+  skip: number;
+  take: number;
+};
+
+export type WebsiteFyugInterestStats = {
+  total: number;
+  today: number;
+  eligible: number;
+  rejected: number;
+  pending: number;
+  approved: number;
+  byHonours: { label: string; value: number }[];
+  byMajor: { label: string; value: number }[];
+  byCollege: { label: string; value: number }[];
+  byState: { label: string; value: number }[];
+  byGender: { label: string; value: number }[];
 };
