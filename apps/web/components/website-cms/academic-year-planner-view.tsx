@@ -22,6 +22,44 @@ import { apiErrorMessage } from '@/utils/api-error';
 
 type Props = { onMessage: (message: string) => void };
 
+/** Fixed handbook day statuses — dropdown avoids free-text spelling drift. */
+const PLANNER_STATUS_OPTIONS = [
+  '',
+  'Class',
+  'Holiday',
+  'National Holiday',
+  'State Holiday',
+  'College Holiday',
+  'Restricted Holiday',
+  'Holiday Class',
+  'Compensatory',
+  'Makeup Class',
+  'Break',
+  'Teaching Break',
+  'Exam',
+  'Internal Assessment',
+  'Orientation',
+  'Bridge Course',
+  'Result',
+  'Admission',
+  'Institutional Event',
+  'Staff Event',
+  'Working',
+  'Non-working',
+  'Weekend',
+] as const;
+
+const selectClass =
+  'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
+
+function statusOptionsForDay(current: string) {
+  const trimmed = current.trim();
+  if (trimmed && !(PLANNER_STATUS_OPTIONS as readonly string[]).includes(trimmed)) {
+    return [...PLANNER_STATUS_OPTIONS, trimmed];
+  }
+  return [...PLANNER_STATUS_OPTIONS];
+}
+
 function monthOptionsFromRange(startDate: string, endDate: string) {
   const start = new Date(`${startDate}T00:00:00Z`);
   const end = new Date(`${endDate}T00:00:00Z`);
@@ -355,14 +393,40 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
                           {day.dayOfWeek}
                         </td>
                         <td className="border-t px-2 py-1 align-top">
-                          <Input
+                          <select
                             value={day.statusLabel}
-                            onChange={(event) =>
-                              patchDay(index, { statusLabel: event.target.value })
-                            }
-                            placeholder={day.dayOfWeek === 'SUN' ? '' : 'Class'}
-                            className="h-8"
-                          />
+                            onChange={(event) => {
+                              const statusLabel = event.target.value;
+                              const isHolidayLike =
+                                /holiday|break|weekend|non-working/i.test(statusLabel) &&
+                                !/holiday class|compensatory|makeup/i.test(statusLabel);
+                              patchDay(index, {
+                                statusLabel,
+                                ...(statusLabel === ''
+                                  ? {
+                                      isWorkingDay: false,
+                                      isHighlighted: true,
+                                    }
+                                  : isHolidayLike
+                                    ? {
+                                        isWorkingDay: false,
+                                        isHighlighted: true,
+                                      }
+                                    : {
+                                        isWorkingDay: true,
+                                        isHighlighted: day.dayOfWeek === 'SUN',
+                                      }),
+                              });
+                            }}
+                            className={selectClass}
+                            aria-label={`Status for ${day.date}`}
+                          >
+                            {statusOptionsForDay(day.statusLabel).map((option) => (
+                              <option key={option || '__empty'} value={option}>
+                                {option || (day.dayOfWeek === 'SUN' ? '— (Sunday)' : '—')}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="border-t px-2 py-1 align-top">
                           <textarea
