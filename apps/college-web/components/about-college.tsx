@@ -139,6 +139,11 @@ function YearsExperienceSeal({ years = 39 }: { years?: number }) {
       </div>
       <svg className="about-experience-seal-ring" viewBox="0 0 200 200" aria-hidden>
         <defs>
+          <linearGradient id="about-exp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#e4c15a" />
+            <stop offset="45%" stopColor="#c79a2b" />
+            <stop offset="100%" stopColor="#8a650f" />
+          </linearGradient>
           <path
             id="about-exp-circle"
             d="M 100,100 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0"

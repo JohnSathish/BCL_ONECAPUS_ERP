@@ -169,8 +169,10 @@
   place-items:center;
   border-radius:50%;
   background:#fff;
-  border:1px solid rgba(199,154,43,.28);
-  box-shadow:inset 0 0 0 4px rgba(11,46,89,.04);
+  border:1px solid rgba(199,154,43,.35);
+  box-shadow:
+    inset 0 0 0 4px rgba(199,154,43,.08),
+    0 8px 22px rgba(116,86,0,.12);
 }
 .about-experience-seal-core strong{
   font-family:var(--font-sans),Inter,sans-serif;
@@ -190,12 +192,13 @@
   width:100%;
   height:100%;
   animation:about-seal-spin 18s linear infinite;
+  filter:drop-shadow(0 6px 14px rgba(116,86,0,.22));
 }
 .about-experience-seal-disk{
-  fill:var(--navy);
+  fill:url(#about-exp-gold);
 }
 .about-experience-seal-text{
-  fill:#fff;
+  fill:var(--navy-dark,#061f3d);
   font-family:var(--font-sans),Inter,sans-serif;
   font-size:11.5px;
   font-weight:700;
