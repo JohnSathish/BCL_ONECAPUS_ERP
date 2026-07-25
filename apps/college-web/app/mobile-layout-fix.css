@@ -6,13 +6,33 @@ body {
   max-width: 100%;
 }
 
-.site-header,
-.site-header * {
+.site-header {
   max-width: 100%;
+  /* Keep overflow visible so mega menus can extend past the nav item / header edge */
+  overflow: visible;
 }
 
-.site-header {
-  overflow-x: clip;
+/*
+ * Do NOT set max-width:100% on all .site-header descendants.
+ * That squeezed .mega to the width of the open nav label (e.g. "About Us")
+ * and clipped Vision & Mission / Administration text.
+ */
+.site-header .mega,
+.site-header .mega * {
+  max-width: none;
+}
+
+.site-header .mega {
+  width: min(360px, calc(100vw - 24px));
+  min-width: 280px;
+}
+
+.site-header .mega-link-label,
+.site-header .mega-head small,
+.site-header .mega-cta-copy strong,
+.site-header .mega-cta-copy small {
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* Soften hero type so long mottos don't force page width */
