@@ -241,6 +241,24 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Manage semester lifecycle and promotion',
   },
   {
+    slug: 'academic-calendar:read',
+    resource: 'academic-calendar',
+    action: 'read',
+    description: 'View academic calendar and working-day resolution',
+  },
+  {
+    slug: 'academic-calendar:edit',
+    resource: 'academic-calendar',
+    action: 'edit',
+    description: 'Create and edit academic calendar events',
+  },
+  {
+    slug: 'academic-calendar:manage',
+    resource: 'academic-calendar',
+    action: 'manage',
+    description: 'Publish academic calendars and manage holidays',
+  },
+  {
     slug: 'fees:read',
     resource: 'fees',
     action: 'read',

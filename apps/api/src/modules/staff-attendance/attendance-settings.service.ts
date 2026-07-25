@@ -150,6 +150,11 @@ export class AttendanceSettingsService {
     resource: string,
     dto: AttendanceSettingsRecordDto,
   ) {
+    if (resource === 'holidays') {
+      throw new BadRequestException(
+        'Public holidays are managed in Academics → Academic Calendar. Import existing holidays there; new holiday masters are no longer created under Attendance Settings.',
+      );
+    }
     const row =
       resource === 'shift-rules'
         ? await this.createShiftRule(user.tid, dto.data)
@@ -172,6 +177,11 @@ export class AttendanceSettingsService {
     id: string,
     dto: AttendanceSettingsRecordDto,
   ) {
+    if (resource === 'holidays') {
+      throw new BadRequestException(
+        'Public holidays are managed in Academics → Academic Calendar. Attendance Settings holiday edits are disabled.',
+      );
+    }
     const delegate = this.delegate(resource);
     const previous = await delegate.findFirst({
       where: { id, tenantId: user.tid },
@@ -193,6 +203,11 @@ export class AttendanceSettingsService {
   }
 
   async remove(user: JwtUser, resource: string, id: string) {
+    if (resource === 'holidays') {
+      throw new BadRequestException(
+        'Public holidays are managed in Academics → Academic Calendar. Attendance Settings holiday deletes are disabled.',
+      );
+    }
     const delegate = this.delegate(resource);
     const previous = await delegate.findFirst({
       where: { id, tenantId: user.tid },

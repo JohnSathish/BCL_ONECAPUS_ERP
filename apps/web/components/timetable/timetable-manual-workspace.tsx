@@ -14,6 +14,7 @@ import {
 } from '@/components/timetable/timetable-components';
 import { TimetableImportExportPanel } from '@/components/timetable/timetable-import-export-panel';
 import { TimetableSettingsPanel } from '@/components/timetable/timetable-settings-panel';
+import { TimetableCalendarDayBanner } from '@/components/timetable/timetable-calendar-day-banner';
 import {
   TimetableSlotModal,
   type SlotModalContext,
@@ -274,6 +275,13 @@ export function TimetableManualWorkspace() {
 
   return (
     <>
+      <div className="mb-4">
+        <TimetableCalendarDayBanner
+          planId={selectedPlan?.status === 'PUBLISHED' ? selectedPlanId : undefined}
+          shiftId={effectiveShiftId || undefined}
+          streamId={streamId || undefined}
+        />
+      </div>
       <TimetableStudioShell
         title="Manual & Excel Timetable Workspace"
         description="Build FYUGP routines manually or via Excel. Auto-generation is optional under Advanced."

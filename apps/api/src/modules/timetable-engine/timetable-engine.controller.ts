@@ -30,6 +30,7 @@ import {
   TeachingSubjectGroupQueryDto,
   UpdateTeachingSubjectGroupDto,
 } from './dto/teaching-subject-group.dto';
+import { toDateOnlyIso } from '../academic-calendar/academic-calendar.types';
 
 @ApiBearerAuth()
 @ApiTags('timetable')
@@ -679,11 +680,65 @@ export class TimetableEngineController {
     @Query('streamId') streamId?: string,
     @Query('staffProfileId') staffProfileId?: string,
   ) {
-    return this.timetable.todayLectureSessions(
+    return this.timetable.todayLectureSessions(user, date ?? new Date(), {
+      shiftId,
+      streamId,
+      staffProfileId,
+    });
+  }
+
+  @Get('calendar/day')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:portal:self',
+  )
+  calendarDay(
+    @CurrentUser() user: JwtUser,
+    @Query('date') date?: string,
+    @Query('shiftId') shiftId?: string,
+    @Query('streamId') streamId?: string,
+    @Query('staffProfileId') staffProfileId?: string,
+  ) {
+    return this.timetable.sessionsForCalendarDate(
       user,
-      date ? new Date(date) : new Date(),
+      date ?? toDateOnlyIso(new Date()),
       { shiftId, streamId, staffProfileId },
     );
+  }
+
+  @Get('calendar/working-day')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:portal:self',
+  )
+  workingDay(@CurrentUser() user: JwtUser, @Query('date') date?: string) {
+    return this.timetable.resolveTimetableWorkingDay(
+      user,
+      date ?? toDateOnlyIso(new Date()),
+    );
+  }
+
+  @Post('plans/:id/calendar/apply-day')
+  @RequireAnyPermission('shift:timetable:manage', 'academic:timetable:manage')
+  applyCalendarDay(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      date: string;
+      action:
+        | 'CANCEL_DAY'
+        | 'FORCE_RUN'
+        | 'RELOCATE_ENTRY'
+        | 'CLEAR_DAY_ACTIONS';
+      originalEntryId?: string;
+      targetDate?: string;
+      reason?: string;
+    },
+  ) {
+    return this.timetable.applyCalendarDay(user, id, dto);
   }
 
   @Get('teaching-subject-groups')

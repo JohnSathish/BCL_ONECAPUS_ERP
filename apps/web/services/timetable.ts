@@ -526,6 +526,46 @@ export async function fetchTodayTimetableSessions(params?: {
   return data as TimetableEntry[];
 }
 
+export type TimetableCalendarDayPayload = {
+  date: string;
+  calendarDay: {
+    date: string;
+    isWorkingDay: boolean;
+    dayKind: string;
+    createsAttendanceSession: boolean;
+    events: Array<{ id: string; type: string; title: string }>;
+  };
+  sessionsRun: boolean;
+  suppressedReason: string | null;
+  plan: { id: string; name: string; academicYearId: string | null } | null;
+  sessions: TimetableEntry[];
+  relocated: TimetableEntry[];
+};
+
+export async function fetchTimetableCalendarDay(params?: {
+  date?: string;
+  shiftId?: string;
+  streamId?: string;
+  staffProfileId?: string;
+}) {
+  const { data } = await api.get('/v1/timetable/calendar/day', { params });
+  return data as TimetableCalendarDayPayload;
+}
+
+export async function applyTimetableCalendarDay(
+  planId: string,
+  payload: {
+    date: string;
+    action: 'CANCEL_DAY' | 'FORCE_RUN' | 'RELOCATE_ENTRY' | 'CLEAR_DAY_ACTIONS';
+    originalEntryId?: string;
+    targetDate?: string;
+    reason?: string;
+  },
+) {
+  const { data } = await api.post(`/v1/timetable/plans/${planId}/calendar/apply-day`, payload);
+  return data;
+}
+
 export async function fetchFacultyWeekTimetable(params?: { shiftId?: string; streamId?: string }) {
   const { data } = await api.get('/v1/timetable/views/faculty/week', { params });
   return data as TimetableMatrix & { plan?: TimetablePlan };

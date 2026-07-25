@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { QueueModule } from '../../shared/queue/queue.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { AttendanceProcessingOrchestratorService } from './attendance-processing-orchestrator.service';
 import { AttendanceAnalyticsService } from './attendance-analytics.service';
 import { AttendanceExportService } from './attendance-export.service';
@@ -20,7 +21,7 @@ import { StaffAttendanceProcessor } from './staff-attendance.processor';
 import { StaffAttendanceService } from './staff-attendance.service';
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, AcademicCalendarModule],
   controllers: [
     StaffAttendanceController,
     AttendanceSettingsController,

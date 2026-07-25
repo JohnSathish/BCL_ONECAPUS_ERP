@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
 
 type EffectivePolicy = {
   master: Record<string, any>;
@@ -35,7 +36,10 @@ export type EffectiveDayRule = {
 
 @Injectable()
 export class AttendancePolicyEngineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workingDays: WorkingDayEngineService,
+  ) {}
 
   private db() {
     return this.prisma as unknown as Record<string, any>;
@@ -258,6 +262,39 @@ export class AttendancePolicyEngineService {
     departmentId: string | null | undefined,
     date: Date,
   ) {
+    // Prefer ERP Academic Calendar Working Day Engine; StaffPublicHoliday is fallback only.
+    try {
+      const resolved = await this.workingDays.resolveDay(tenantId, date, {
+        departmentId,
+      });
+      if (resolved.createsAttendanceSession) {
+        return null; // holiday/compensatory class — still a workable attendance day
+      }
+      if (
+        !resolved.isWorkingDay &&
+        (resolved.dayKind === 'HOLIDAY' ||
+          resolved.dayKind === 'NON_WORKING' ||
+          resolved.dayKind === 'BREAK')
+      ) {
+        const primary = resolved.events[0];
+        return {
+          id: primary?.id ?? `calendar-${resolved.date}`,
+          name: primary?.title ?? resolved.dayKind,
+          holidayDate: date,
+          holidayType: primary?.type ?? resolved.dayKind,
+          scopeType: 'INSTITUTION',
+          departmentIds: departmentId ? [departmentId] : null,
+          active: true,
+          source: 'ACADEMIC_CALENDAR',
+        };
+      }
+      if (resolved.dayKind === 'WEEKEND' && !resolved.isWorkingDay) {
+        return null; // weekend handled via dayRule / weekly off
+      }
+    } catch {
+      // Fall through to legacy StaffPublicHoliday during transition.
+    }
+
     const holidays = await this.db().staffPublicHoliday.findMany({
       where: { tenantId, holidayDate: date, active: true },
       orderBy: { updatedAt: 'desc' },

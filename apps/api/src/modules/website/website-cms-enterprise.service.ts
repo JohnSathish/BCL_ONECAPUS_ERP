@@ -880,6 +880,34 @@ export class WebsiteCmsEnterpriseService {
   }
 
   async listUpcomingEvents(tenantId: string) {
+    // Prefer published ERP Academic Calendar public events.
+    const erpEvents = await this.prisma.academicCalendarEvent.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        active: true,
+        visibility: 'PUBLIC',
+        publishedToWebsite: true,
+        endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) },
+        calendar: { deletedAt: null, status: 'PUBLISHED' },
+      },
+      orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
+      take: 12,
+    });
+    if (erpEvents.length) {
+      return erpEvents.map((row) => ({
+        id: row.id,
+        title: row.title,
+        date: row.startDate.toISOString().slice(0, 10),
+        category: row.type,
+        href: '/academics/calendar',
+        registrationUrl: null,
+        featured: false,
+        showCountdown: false,
+        source: 'ERP',
+      }));
+    }
+
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },
     });

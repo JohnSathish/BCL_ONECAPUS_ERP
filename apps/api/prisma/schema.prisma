@@ -1496,6 +1496,7 @@ model Institution {
   departments                Department[]
   shifts                     Shift[]
   academicYears              AcademicYear[]
+  academicCalendars          AcademicCalendar[]
   admissionCycles            AdmissionCycle[]
   semesters                  Semester[]
   academicConfig             InstitutionAcademicConfig?
@@ -1695,11 +1696,76 @@ model AcademicYear {
   subjectTeachingAssignments SubjectTeachingAssignment[]
   staffWorkloads             StaffWorkload[]
   teachingSubjectGroups      TeachingSubjectGroup[]
+  academicCalendar           AcademicCalendar?
 
   @@index([tenantId])
   @@index([institutionId])
   @@map("academic_years")
   @@schema("core")
+}
+
+/// ERP foundation Academic Calendar (1:1 with AcademicYear) — single source of truth for working days / holidays / events.
+model AcademicCalendar {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  institutionId  String    @map("institution_id") @db.Uuid
+  academicYearId String    @unique @map("academic_year_id") @db.Uuid
+  title          String
+  status         String    @default("DRAFT")
+  /// JS weekday numbers that are weekends (0=Sun … 6=Sat). Default Sunday only.
+  weekendDays    Json      @default("[0]") @map("weekend_days")
+  publishedAt    DateTime? @map("published_at")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  updatedById    String?   @map("updated_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  institution  Institution             @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear            @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  events       AcademicCalendarEvent[]
+
+  @@index([tenantId, institutionId, status])
+  @@map("academic_calendars")
+  @@schema("academic")
+}
+
+model AcademicCalendarEvent {
+  id                       String    @id @default(uuid()) @db.Uuid
+  tenantId                 String    @map("tenant_id") @db.Uuid
+  calendarId               String    @map("calendar_id") @db.Uuid
+  type                     String
+  title                    String
+  description              String?   @db.Text
+  startDate                DateTime  @map("start_date") @db.Date
+  endDate                  DateTime  @map("end_date") @db.Date
+  startTime                String?   @map("start_time")
+  endTime                  String?   @map("end_time")
+  /// Null = use type default from Working Day Engine.
+  isWorkingDay             Boolean?  @map("is_working_day")
+  createsAttendanceSession Boolean   @default(false) @map("creates_attendance_session")
+  scopeType                String    @default("INSTITUTION") @map("scope_type")
+  campusId                 String?   @map("campus_id") @db.Uuid
+  departmentIds            Json?     @map("department_ids")
+  visibility               String    @default("INTERNAL")
+  sourceModule             String?   @map("source_module")
+  sourceRefId              String?   @map("source_ref_id")
+  publishedToWebsite       Boolean   @default(false) @map("published_to_website")
+  active                   Boolean   @default(true)
+  createdById              String?   @map("created_by_id") @db.Uuid
+  updatedById              String?   @map("updated_by_id") @db.Uuid
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  deletedAt                DateTime? @map("deleted_at")
+
+  calendar AcademicCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, calendarId, startDate, endDate])
+  @@index([calendarId, type, active, deletedAt])
+  @@index([tenantId, startDate, endDate, active])
+  @@index([sourceModule, sourceRefId])
+  @@map("academic_calendar_events")
+  @@schema("academic")
 }
 
 model Semester {

@@ -674,7 +674,7 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'academics',
         permissions: [...P.academics],
         activePattern:
-          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections)(?:/.*)?$',
+          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar)(?:/.*)?$',
         children: [
           { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
           {
@@ -701,6 +701,16 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Academic Sessions',
             href: '/admin/academic-lifecycle',
             permissions: ['academic-lifecycle:read', 'academic-lifecycle:manage'],
+          },
+          {
+            label: 'Academic Calendar',
+            href: '/admin/academics/academic-calendar',
+            permissions: [
+              'academic-calendar:read',
+              'academic-calendar:edit',
+              'academic-calendar:manage',
+              ...P.academics,
+            ],
           },
           {
             label: 'Shift Management',

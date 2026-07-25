@@ -29,6 +29,9 @@ export const MODULE_PERMISSIONS = {
     'academic-engine:manage',
     'academic-lifecycle:read',
     'academic-lifecycle:manage',
+    'academic-calendar:read',
+    'academic-calendar:edit',
+    'academic-calendar:manage',
   ],
   staff: ['staff:read', 'staff:manage', 'staff-attendance:view'],
   timetable: ['academic:timetable:manage', 'academic-engine:read', 'academic-engine:manage'],
@@ -613,6 +616,15 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { prefix: '/admin/academics/examinations', permissions: [...MODULE_PERMISSIONS.examinations] },
   { prefix: '/admin/academic-engine', permissions: [...MODULE_PERMISSIONS.academics] },
   { prefix: '/admin/academic-lifecycle', permissions: [...MODULE_PERMISSIONS.academics] },
+  {
+    prefix: '/admin/academics/academic-calendar',
+    permissions: [
+      'academic-calendar:read',
+      'academic-calendar:edit',
+      'academic-calendar:manage',
+      ...MODULE_PERMISSIONS.academics,
+    ],
+  },
   { prefix: '/admin/programs', permissions: [...MODULE_PERMISSIONS.academics] },
   {
     prefix: '/admin/shifts',

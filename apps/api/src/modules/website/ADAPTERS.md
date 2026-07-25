@@ -28,14 +28,16 @@ Defaults live in `apps/api/src/modules/website/website-cms.registry.ts` (`DEFAUL
 
 ## Current adapters
 
-| Key              | Adapter            | Behavior                                                                                                             |
-| ---------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `departments`    | `department`       | ERP `WebsiteDepartmentProfile` + Department masters when `mode: ERP`; MANUAL allows CMS-only publish                 |
-| `faculty`        | `staff`            | Staff profiles with `showOnWebsite`                                                                                  |
-| `programmes`     | `programme`        | Programme listings via academic projectors                                                                           |
-| `upcomingEvents` | `academicCalendar` | Reads `settingsJson.calendarItems` marked `showOnWebsite` (bridge until a full ERP Academic Calendar model is wired) |
-| `noticeBoard`    | MANUAL             | `WebsiteNotice` table                                                                                                |
-| `news`           | MANUAL             | CPT `news` entries                                                                                                   |
+| Key              | Adapter            | Behavior                                                                                                                                                                                  |
+| ---------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `departments`    | `department`       | ERP `WebsiteDepartmentProfile` + Department masters when `mode: ERP`; MANUAL allows CMS-only publish                                                                                      |
+| `faculty`        | `staff`            | Staff profiles with `showOnWebsite`                                                                                                                                                       |
+| `programmes`     | `programme`        | Programme listings via academic projectors                                                                                                                                                |
+| `upcomingEvents` | `academicCalendar` | Reads published `AcademicCalendarEvent` rows (`visibility=PUBLIC`, `publishedToWebsite`, calendar `PUBLISHED`). Falls back to `settingsJson.calendarItems` only when no ERP events exist. |
+| `noticeBoard`    | MANUAL             | `WebsiteNotice` table                                                                                                                                                                     |
+| `news`           | MANUAL             | CPT `news` entries                                                                                                                                                                        |
+
+Public handbook Year Planner (`GET /v1/website/public/academic-planner`) builds month grids from the Working Day Engine for the published ERP Academic Calendar when available; otherwise falls back to CMS `website_academic_planner_*` tables.
 
 ## Adding a new ERP adapter
 

@@ -24,6 +24,11 @@ import { TimetableDepartmentWorkloadService } from './timetable-department-workl
 import { StudentAttendanceService } from '../student-attendance/student-attendance.service';
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { CacheService } from '../../shared/cache/cache.service';
+import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
+import {
+  parseDateOnly,
+  toDateOnlyIso,
+} from '../academic-calendar/academic-calendar.types';
 
 type PlanFilters = {
   shiftId?: string;
@@ -105,6 +110,7 @@ export class TimetableEngineService {
     private readonly communication: CommunicationTriggerService,
     private readonly cache: CacheService,
     private readonly departmentWorkload: TimetableDepartmentWorkloadService,
+    private readonly workingDays: WorkingDayEngineService,
   ) {}
 
   listPlans(user: JwtUser, filters: PlanFilters = {}) {
@@ -1309,12 +1315,87 @@ export class TimetableEngineService {
 
   async todayLectureSessions(
     user: JwtUser,
-    date = new Date(),
+    date: string | Date = new Date(),
     filters?: { shiftId?: string; streamId?: string; staffProfileId?: string },
   ) {
+    const result = await this.sessionsForCalendarDate(user, date, filters);
+    return result.sessions;
+  }
+
+  /**
+   * Date-aware lecture sessions: weekly template filtered by Academic Calendar
+   * Working Day Engine + date-scoped CANCEL / RELOCATE substitutions.
+   */
+  async sessionsForCalendarDate(
+    user: JwtUser,
+    dateInput: string | Date = new Date(),
+    filters?: { shiftId?: string; streamId?: string; staffProfileId?: string },
+  ) {
+    const dateIso =
+      typeof dateInput === 'string'
+        ? dateInput.slice(0, 10)
+        : toDateOnlyIso(dateInput);
+    const date = parseDateOnly(dateIso);
     const plan = await this.latestPublishedPlan(user.tid, filters);
-    if (!plan) return [];
-    const dayOfWeek = date.getDay() || 7;
+    const calendarDay = await this.workingDays.resolveDay(user.tid, dateIso, {
+      academicYearId: plan?.academicYearId,
+    });
+
+    const forceRun = plan
+      ? await this.hasDayAction(user.tid, plan.id, date, [
+          'CALENDAR_FORCE_RUN',
+          'HOLIDAY_CLASS',
+        ])
+      : false;
+    const dayCancelled = plan
+      ? await this.hasDayAction(user.tid, plan.id, date, [
+          'CALENDAR_CANCEL_DAY',
+          'CANCEL_DAY',
+        ])
+      : false;
+
+    const sessionsRun =
+      forceRun ||
+      ((calendarDay.isWorkingDay || calendarDay.createsAttendanceSession) &&
+        !dayCancelled);
+
+    if (!plan || !sessionsRun) {
+      return {
+        date: dateIso,
+        calendarDay,
+        sessionsRun: false,
+        suppressedReason: !plan
+          ? 'NO_PUBLISHED_PLAN'
+          : dayCancelled
+            ? 'CALENDAR_CANCEL_DAY'
+            : calendarDay.dayKind,
+        plan: plan
+          ? {
+              id: plan.id,
+              name: plan.name,
+              academicYearId: plan.academicYearId,
+            }
+          : null,
+        sessions: [] as Array<Record<string, unknown>>,
+        relocated: [] as Array<Record<string, unknown>>,
+      };
+    }
+
+    // Timetable uses 1=Mon … 6=Sat, 7=Sun
+    const jsDow = date.getUTCDay();
+    const dayOfWeek = jsDow === 0 ? 7 : jsDow;
+
+    const cancelledEntryIds = await this.cancelledEntryIdsForDate(
+      user.tid,
+      plan.id,
+      date,
+    );
+    const relocates = await this.relocateTargetsForDate(
+      user.tid,
+      plan.id,
+      date,
+    );
+
     const entries = await this.prisma.timetablePlanEntry.findMany({
       where: {
         tenantId: user.tid,
@@ -1325,15 +1406,362 @@ export class TimetableEngineService {
         ...(filters?.staffProfileId
           ? { staffProfileId: filters.staffProfileId }
           : {}),
+        ...(cancelledEntryIds.length
+          ? { id: { notIn: cancelledEntryIds } }
+          : {}),
       },
       orderBy: { startTime: 'asc' },
     });
-    return entries.map((entry) => ({
+
+    const sessions = entries.map((entry) => ({
       ...entry,
-      sessionDate: date.toISOString().slice(0, 10),
+      sessionDate: dateIso,
       startTime: formatShiftTime(entry.startTime),
       endTime: formatShiftTime(entry.endTime),
+      calendarDayKind: calendarDay.dayKind,
+      createsAttendanceSession: calendarDay.createsAttendanceSession,
     }));
+
+    // Entries relocated onto this date (from another weekday template occurrence).
+    const relocatedSessions = [];
+    for (const rel of relocates) {
+      if (!rel.originalEntryId) continue;
+      if (
+        filters?.staffProfileId &&
+        rel.metadataStaffProfileId &&
+        rel.metadataStaffProfileId !== filters.staffProfileId
+      ) {
+        continue;
+      }
+      const entry = await this.prisma.timetablePlanEntry.findFirst({
+        where: {
+          id: rel.originalEntryId,
+          tenantId: user.tid,
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+        },
+      });
+      if (!entry) continue;
+      relocatedSessions.push({
+        ...entry,
+        sessionDate: dateIso,
+        startTime: formatShiftTime(entry.startTime),
+        endTime: formatShiftTime(entry.endTime),
+        calendarDayKind: calendarDay.dayKind,
+        createsAttendanceSession: true,
+        relocatedFrom: rel.fromDate,
+        substitutionId: rel.id,
+      });
+    }
+
+    return {
+      date: dateIso,
+      calendarDay,
+      sessionsRun: true,
+      suppressedReason: null as string | null,
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        academicYearId: plan.academicYearId,
+      },
+      sessions: [...sessions, ...relocatedSessions],
+      relocated: relocatedSessions,
+    };
+  }
+
+  async resolveTimetableWorkingDay(user: JwtUser, dateIso: string) {
+    const plan = await this.latestPublishedPlan(user.tid);
+    const calendarDay = await this.workingDays.resolveDay(user.tid, dateIso, {
+      academicYearId: plan?.academicYearId,
+    });
+    const dayCancelled = plan
+      ? await this.hasDayAction(user.tid, plan.id, parseDateOnly(dateIso), [
+          'CALENDAR_CANCEL_DAY',
+          'CANCEL_DAY',
+        ])
+      : false;
+    const forceRun = plan
+      ? await this.hasDayAction(user.tid, plan.id, parseDateOnly(dateIso), [
+          'CALENDAR_FORCE_RUN',
+          'HOLIDAY_CLASS',
+        ])
+      : false;
+    return {
+      date: dateIso.slice(0, 10),
+      calendarDay,
+      sessionsRun:
+        forceRun ||
+        ((calendarDay.isWorkingDay || calendarDay.createsAttendanceSession) &&
+          !dayCancelled),
+      dayCancelled,
+      forceRun,
+      plan: plan
+        ? { id: plan.id, name: plan.name, academicYearId: plan.academicYearId }
+        : null,
+    };
+  }
+
+  /**
+   * Apply calendar day action for a published plan:
+   * - CANCEL_DAY: suppress all template periods for that date
+   * - FORCE_RUN: run periods even on a calendar non-working day (holiday class override)
+   * - RELOCATE_ENTRY: move one entry occurrence to a target date (compensatory)
+   */
+  async applyCalendarDay(
+    user: JwtUser,
+    planId: string,
+    dto: {
+      date: string;
+      action:
+        | 'CANCEL_DAY'
+        | 'FORCE_RUN'
+        | 'RELOCATE_ENTRY'
+        | 'CLEAR_DAY_ACTIONS';
+      originalEntryId?: string;
+      targetDate?: string;
+      reason?: string;
+    },
+  ) {
+    await this.assertPlanExists(user.tid, planId);
+    const date = parseDateOnly(dto.date);
+    const reason =
+      dto.reason?.trim() ||
+      `Academic calendar action ${dto.action} for ${dto.date.slice(0, 10)}`;
+
+    if (dto.action === 'CLEAR_DAY_ACTIONS') {
+      const existing = await this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId: user.tid,
+          planId,
+          sessionDate: date,
+          action: {
+            in: [
+              'CALENDAR_CANCEL_DAY',
+              'CANCEL_DAY',
+              'CALENDAR_FORCE_RUN',
+              'HOLIDAY_CLASS',
+              'CANCEL_FOR_DATE',
+              'RELOCATE_TO_DATE',
+            ],
+          },
+        },
+      });
+      await this.prisma.timetableSubstitution.deleteMany({
+        where: { id: { in: existing.map((r) => r.id) } },
+      });
+      return { cleared: existing.length, date: dto.date.slice(0, 10) };
+    }
+
+    if (dto.action === 'CANCEL_DAY' || dto.action === 'FORCE_RUN') {
+      const action =
+        dto.action === 'CANCEL_DAY'
+          ? 'CALENDAR_CANCEL_DAY'
+          : 'CALENDAR_FORCE_RUN';
+      // Replace prior day-level action of the opposite kind.
+      await this.prisma.timetableSubstitution.deleteMany({
+        where: {
+          tenantId: user.tid,
+          planId,
+          sessionDate: date,
+          action: {
+            in: [
+              'CALENDAR_CANCEL_DAY',
+              'CANCEL_DAY',
+              'CALENDAR_FORCE_RUN',
+              'HOLIDAY_CLASS',
+            ],
+          },
+        },
+      });
+      const sub = await this.createSubstitution(user, {
+        planId,
+        action,
+        sessionDate: dto.date.slice(0, 10),
+        reason,
+      });
+      if (dto.action === 'CANCEL_DAY') {
+        await this.cancelAttendanceSessionsForDate(
+          user.tid,
+          planId,
+          date,
+          reason,
+        );
+      }
+      return {
+        substitution: sub,
+        calendarDay: await this.workingDays.resolveDay(user.tid, dto.date),
+      };
+    }
+
+    if (dto.action === 'RELOCATE_ENTRY') {
+      if (!dto.originalEntryId || !dto.targetDate) {
+        throw new BadRequestException(
+          'RELOCATE_ENTRY requires originalEntryId and targetDate',
+        );
+      }
+      const entry = await this.prisma.timetablePlanEntry.findFirst({
+        where: {
+          id: dto.originalEntryId,
+          planId,
+          tenantId: user.tid,
+          deletedAt: null,
+        },
+      });
+      if (!entry) throw new NotFoundException('Timetable entry not found');
+
+      const cancelSub = await this.createSubstitution(user, {
+        planId,
+        originalEntryId: entry.id,
+        action: 'CANCEL_FOR_DATE',
+        sessionDate: dto.date.slice(0, 10),
+        reason,
+      });
+      const relocateSub = await this.prisma.timetableSubstitution.create({
+        data: {
+          tenantId: user.tid,
+          planId,
+          originalEntryId: entry.id,
+          action: 'RELOCATE_TO_DATE',
+          sessionDate: parseDateOnly(dto.targetDate),
+          reason,
+          createdById: user.sub,
+          metadata: {
+            fromDate: dto.date.slice(0, 10),
+            toDate: dto.targetDate.slice(0, 10),
+            staffProfileId: entry.staffProfileId,
+          },
+        },
+      });
+      await this.audit(
+        user,
+        planId,
+        'RELOCATE_ENTRY',
+        'TimetableSubstitution',
+        relocateSub.id,
+        null,
+        { cancelSub, relocateSub },
+      );
+      return {
+        cancel: cancelSub,
+        relocate: relocateSub,
+        calendarDay: await this.workingDays.resolveDay(
+          user.tid,
+          dto.targetDate,
+        ),
+      };
+    }
+
+    throw new BadRequestException(`Unsupported action: ${dto.action}`);
+  }
+
+  private async assertPlanExists(tenantId: string, planId: string) {
+    const plan = await this.prisma.timetablePlan.findFirst({
+      where: { id: planId, tenantId, deletedAt: null },
+    });
+    if (!plan) throw new NotFoundException('Timetable plan not found');
+    return plan;
+  }
+
+  private async hasDayAction(
+    tenantId: string,
+    planId: string,
+    date: Date,
+    actions: string[],
+  ) {
+    const row = await this.prisma.timetableSubstitution.findFirst({
+      where: {
+        tenantId,
+        planId,
+        sessionDate: date,
+        action: { in: actions },
+        status: { not: 'REJECTED' },
+      },
+    });
+    return Boolean(row);
+  }
+
+  private async cancelledEntryIdsForDate(
+    tenantId: string,
+    planId: string,
+    date: Date,
+  ) {
+    const rows = await this.prisma.timetableSubstitution.findMany({
+      where: {
+        tenantId,
+        planId,
+        sessionDate: date,
+        action: { in: ['CANCEL_FOR_DATE'] },
+        status: { not: 'REJECTED' },
+        originalEntryId: { not: null },
+      },
+      select: { originalEntryId: true },
+    });
+    return rows
+      .map((r) => r.originalEntryId)
+      .filter((id): id is string => Boolean(id));
+  }
+
+  private async relocateTargetsForDate(
+    tenantId: string,
+    planId: string,
+    date: Date,
+  ) {
+    const rows = await this.prisma.timetableSubstitution.findMany({
+      where: {
+        tenantId,
+        planId,
+        sessionDate: date,
+        action: 'RELOCATE_TO_DATE',
+        status: { not: 'REJECTED' },
+        originalEntryId: { not: null },
+      },
+    });
+    return rows.map((row) => {
+      const meta =
+        row.metadata &&
+        typeof row.metadata === 'object' &&
+        !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {};
+      return {
+        id: row.id,
+        originalEntryId: row.originalEntryId,
+        fromDate: typeof meta.fromDate === 'string' ? meta.fromDate : null,
+        metadataStaffProfileId:
+          typeof meta.staffProfileId === 'string' ? meta.staffProfileId : null,
+      };
+    });
+  }
+
+  private async cancelAttendanceSessionsForDate(
+    tenantId: string,
+    planId: string,
+    date: Date,
+    reason: string,
+  ) {
+    const entryIds = (
+      await this.prisma.timetablePlanEntry.findMany({
+        where: { tenantId, planId, deletedAt: null },
+        select: { id: true },
+      })
+    ).map((e) => e.id);
+    if (!entryIds.length) return { count: 0 };
+    const delegate = (this.prisma as any).studentAttendanceSession;
+    if (!delegate?.updateMany) return { count: 0 };
+    return delegate.updateMany({
+      where: {
+        tenantId,
+        sessionDate: date,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        timetablePlanEntryId: { in: entryIds },
+      },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelReason: reason,
+      },
+    });
   }
 
   private async transition(

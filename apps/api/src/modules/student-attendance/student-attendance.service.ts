@@ -17,6 +17,7 @@ import {
 } from './dto/student-attendance.dto';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
 import { TeachingSubjectGroupService } from '../timetable-engine/teaching-subject-group.service';
+import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
 import { buildInstitutionalExcelReport } from '../../common/reports';
 import {
   buildAttendanceHeaderMeta,
@@ -36,6 +37,7 @@ export class StudentAttendanceService {
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly subjectGroups: TeachingSubjectGroupService,
     private readonly attendancePolicy: AttendancePolicyService,
+    private readonly workingDays: WorkingDayEngineService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -87,6 +89,59 @@ export class StudentAttendanceService {
     dto: GenerateAttendanceSessionsDto,
   ) {
     const sessionDate = this.startOfDay(dto.date);
+    const dayResolution = await this.workingDays.resolveDay(
+      user.tid,
+      sessionDate,
+    );
+    if (
+      !dayResolution.isWorkingDay &&
+      !dayResolution.createsAttendanceSession
+    ) {
+      return {
+        created: 0,
+        skipped: true,
+        reason: `Non-working day (${dayResolution.dayKind})`,
+        day: dayResolution,
+        removedDuplicates: 0,
+      };
+    }
+
+    // Honor date-scoped timetable cancellations (Phase 2 calendar cancel/relocate).
+    const dayCancelled = await this.prisma.timetableSubstitution.findFirst({
+      where: {
+        tenantId: user.tid,
+        sessionDate,
+        action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
+        status: { not: 'REJECTED' },
+        ...(dto.timetablePlanId ? { planId: dto.timetablePlanId } : {}),
+      },
+    });
+    if (dayCancelled && !dayResolution.createsAttendanceSession) {
+      return {
+        created: 0,
+        skipped: true,
+        reason: 'CALENDAR_CANCEL_DAY',
+        day: dayResolution,
+        removedDuplicates: 0,
+      };
+    }
+
+    const cancelledEntryIds = (
+      await this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId: user.tid,
+          sessionDate,
+          action: 'CANCEL_FOR_DATE',
+          status: { not: 'REJECTED' },
+          originalEntryId: { not: null },
+          ...(dto.timetablePlanId ? { planId: dto.timetablePlanId } : {}),
+        },
+        select: { originalEntryId: true },
+      })
+    )
+      .map((r) => r.originalEntryId)
+      .filter((id): id is string => Boolean(id));
+
     const dayOfWeek = sessionDate.getDay();
 
     const planScope = dto.timetablePlanId
@@ -104,6 +159,9 @@ export class StudentAttendanceService {
           ? { offeringSectionId: dto.offeringSectionId }
           : {}),
         ...(dto.staffProfileId ? { staffProfileId: dto.staffProfileId } : {}),
+        ...(cancelledEntryIds.length
+          ? { id: { notIn: cancelledEntryIds } }
+          : {}),
       },
       include: {
         plan: true,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StorageModule } from '../../shared/storage/storage.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { WebsiteAdminController } from './website-admin.controller';
 import { WebsiteAdminService } from './website-admin.service';
@@ -12,7 +13,7 @@ import { WebsiteFyugInterestDocumentService } from './services/website-fyug-inte
 import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
 
 @Module({
-  imports: [StorageModule, TenantsModule],
+  imports: [StorageModule, TenantsModule, AcademicCalendarModule],
   controllers: [
     WebsiteManagementController,
     WebsiteAdminController,

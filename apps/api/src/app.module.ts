@@ -31,6 +31,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { NepAbcModule } from './modules/nep-abc/nep-abc.module';
 import { ObeModule } from './modules/obe/obe.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { AcademicCalendarModule } from './modules/academic-calendar/academic-calendar.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { FacultyShiftsModule } from './modules/faculty-shifts/faculty-shifts.module';
 import { ShiftOperationsModule } from './modules/shift-operations/shift-operations.module';
@@ -134,6 +135,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     AiAssistantModule,
     KnowledgeBaseModule,
     OrganizationModule,
+    AcademicCalendarModule,
     ShiftsModule,
     FacultyShiftsModule,
     ShiftOperationsModule,

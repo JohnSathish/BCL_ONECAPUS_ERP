@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { HrModule } from '../hr/hr.module';
@@ -20,6 +21,7 @@ import { TimetableDepartmentWorkloadService } from './timetable-department-workl
 
 @Module({
   imports: [
+    AcademicCalendarModule,
     StudentAttendanceModule,
     CommunicationModule,
     HrModule,

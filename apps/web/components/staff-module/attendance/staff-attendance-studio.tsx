@@ -2894,7 +2894,7 @@ function RulesAndSettings({ kind }: { kind: PageKind }) {
       ],
       [
         'Public Holidays',
-        'National, state, institution, campus and department scoped holidays.',
+        'Managed in Academics → Academic Calendar (Working Day Engine). Attendance no longer owns a holiday master.',
         data?.counts?.holidays ?? 0,
       ],
       [
@@ -2976,21 +2976,40 @@ function RulesAndSettings({ kind }: { kind: PageKind }) {
         </section>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {sections.map(([title, description, count]) => (
-            <div
-              key={String(title)}
-              className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold">{title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          {sections.map(([title, description, count]) => {
+            const isHolidays = title === 'Public Holidays';
+            const body = (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                  </div>
+                  <StatusPill status={Number(count) ? 'CONFIGURED' : 'READY'} />
                 </div>
-                <StatusPill status={Number(count) ? 'CONFIGURED' : 'READY'} />
+                <p className="mt-4 text-2xl font-semibold">{Number(count).toLocaleString()}</p>
+                {isHolidays ? (
+                  <p className="mt-2 text-xs font-medium text-primary">Open Academic Calendar →</p>
+                ) : null}
+              </>
+            );
+            return isHolidays ? (
+              <a
+                key={String(title)}
+                href="/admin/academics/academic-calendar"
+                className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5 transition hover:border-primary/40"
+              >
+                {body}
+              </a>
+            ) : (
+              <div
+                key={String(title)}
+                className="rounded-3xl border border-border/60 bg-card/85 p-4 shadow-lg shadow-black/5"
+              >
+                {body}
               </div>
-              <p className="mt-4 text-2xl font-semibold">{Number(count).toLocaleString()}</p>
-            </div>
-          ))}
+            );
+          })}
         </section>
 
         <section className="grid gap-5 xl:grid-cols-2">

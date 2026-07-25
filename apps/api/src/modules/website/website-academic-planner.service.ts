@@ -5,6 +5,12 @@ import {
 } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
+import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
+import {
+  parseDateOnly,
+  statusLabelForType,
+  toDateOnlyIso,
+} from '../academic-calendar/academic-calendar.types';
 import { WebsiteService } from './website.service';
 
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
@@ -48,6 +54,7 @@ export class WebsiteAcademicPlannerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly website: WebsiteService,
+    private readonly workingDays: WorkingDayEngineService,
   ) {}
 
   async listYears(tenantId: string) {
@@ -387,6 +394,10 @@ export class WebsiteAcademicPlannerService {
   }
 
   async getPublicPlanner(tenantId: string, slug?: string) {
+    // ERP Academic Calendar is the source of truth when a published calendar exists.
+    const erp = await this.getPublicFromErpCalendar(tenantId, slug);
+    if (erp) return erp;
+
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },
     });
@@ -413,6 +424,71 @@ export class WebsiteAcademicPlannerService {
     return {
       ...this.mapYear(year, days.length),
       months: this.groupMonths(days),
+      source: 'CMS_HANDBOOK',
+    };
+  }
+
+  private async getPublicFromErpCalendar(tenantId: string, slug?: string) {
+    const calendar = await this.prisma.academicCalendar.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'PUBLISHED',
+        academicYear: { deletedAt: null },
+      },
+      include: { academicYear: true },
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+    });
+    if (!calendar?.academicYear) return null;
+
+    const year = calendar.academicYear;
+    const derivedSlug = this.slugify(year.name || calendar.title);
+    if (slug && slug !== derivedSlug) {
+      // Allow CMS slug match to fall through when ERP slug does not match.
+      return null;
+    }
+
+    const from = toDateOnlyIso(year.startDate);
+    const to = toDateOnlyIso(year.endDate);
+    const resolved = await this.workingDays.resolveRange(tenantId, from, to, {
+      calendarId: calendar.id,
+      academicYearId: year.id,
+    });
+
+    const dayRows = resolved.map((day) => {
+      const primary = day.events[0];
+      const statusLabel = primary
+        ? statusLabelForType(primary.type)
+        : day.dayKind === 'WEEKEND'
+          ? 'Weekend'
+          : day.isWorkingDay
+            ? 'Working'
+            : 'Non-working';
+      const description = day.events.map((e) => e.title).join('; ');
+      return {
+        id: `erp-${day.date}`,
+        date: parseDateOnly(day.date),
+        statusLabel,
+        description,
+        isWorkingDay: day.isWorkingDay,
+        isHighlighted: day.events.length > 0 && !day.isWorkingDay,
+      };
+    });
+
+    return {
+      id: calendar.id,
+      title: calendar.title,
+      slug: derivedSlug,
+      startDate: from,
+      endDate: to,
+      status: 'PUBLISHED',
+      isVisible: true,
+      dayCount: dayRows.length,
+      createdAt: calendar.createdAt.toISOString(),
+      updatedAt: calendar.updatedAt.toISOString(),
+      months: this.groupMonths(dayRows),
+      source: 'ERP_ACADEMIC_CALENDAR',
+      academicYearId: year.id,
     };
   }
 

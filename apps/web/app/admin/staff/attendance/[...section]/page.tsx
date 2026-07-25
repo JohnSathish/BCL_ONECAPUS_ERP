@@ -1,6 +1,7 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { StaffAttendanceStudio } from '@/components/staff-module/attendance/staff-attendance-studio';
@@ -27,7 +28,7 @@ type PageKind =
   | 'inspector'
   | 'settings';
 
-const SECTION_MAP: Record<string, { title: string; page: PageKind }> = {
+const SECTION_MAP: Record<string, { title: string; page: PageKind; redirectTo?: string }> = {
   'pull-logs': { title: 'Pull Logs', page: 'processing' },
   process: { title: 'Process Attendance', page: 'processing' },
   reprocess: { title: 'Reprocess Attendance', page: 'processing' },
@@ -43,7 +44,11 @@ const SECTION_MAP: Record<string, { title: string; page: PageKind }> = {
   'attendance-master': { title: 'Attendance Master', page: 'settings' },
   'shift-assignment': { title: 'Shift Assignment', page: 'settings' },
   'leave-types': { title: 'Leave Types', page: 'settings' },
-  'public-holidays': { title: 'Public Holidays', page: 'settings' },
+  'public-holidays': {
+    title: 'Public Holidays',
+    page: 'settings',
+    redirectTo: '/admin/academics/academic-calendar',
+  },
   'processing-rules': { title: 'Processing Rules', page: 'rules' },
 };
 
@@ -54,10 +59,24 @@ export default function StaffAttendanceSectionPage({
 }) {
   const { section } = use(params);
   const session = useRequireAuth();
-  if (!session) return null;
-
+  const router = useRouter();
   const key = section.join('/');
   const target = SECTION_MAP[key] ?? { title: 'Staff Attendance', page: 'dashboard' as PageKind };
+
+  useEffect(() => {
+    if (!session || !target.redirectTo) return;
+    router.replace(target.redirectTo);
+  }, [session, router, target.redirectTo]);
+
+  if (!session) return null;
+
+  if (target.redirectTo) {
+    return (
+      <DashboardShell role="admin" title={target.title}>
+        <p className="text-sm text-muted-foreground">Redirecting to Academic Calendar…</p>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell role="admin" title={target.title}>
