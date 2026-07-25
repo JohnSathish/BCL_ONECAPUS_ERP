@@ -1,8 +1,7 @@
 'use client';
 
-import { CareersAnimatedStat } from '@/components/careers-portal/careers-animated-stat';
+import { BookOpen, GraduationCap, Shield, Trophy, Users } from 'lucide-react';
 import type { CareersPortalInfo } from '@/services/careers-portal';
-import { Award, Building2, GraduationCap, Users } from 'lucide-react';
 
 export function CareersInstitutionalStatsBar({
   info,
@@ -12,53 +11,65 @@ export function CareersInstitutionalStatsBar({
   isLoading?: boolean;
 }) {
   const inst = info?.institutional;
+  const items = [
+    {
+      label: 'Dedicated Faculty',
+      value: `${inst?.facultyMembers ?? 140}+`,
+      icon: Users,
+      tone: 'bg-sky-100 text-sky-700',
+    },
+    {
+      label: 'Departments',
+      value: `${inst?.departments ?? 25}+`,
+      icon: BookOpen,
+      tone: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      label: 'Students Impacted',
+      value: `${inst?.students ?? 1000}+`,
+      icon: GraduationCap,
+      tone: 'bg-violet-100 text-violet-700',
+    },
+    {
+      label: 'Years of Excellence',
+      value: `${inst?.yearsOfExcellence ?? 39}+`,
+      icon: Trophy,
+      tone: 'bg-orange-100 text-orange-700',
+    },
+    {
+      label: inst?.naacGrade?.includes('B') ? 'B Grade NAAC Accredited' : 'NAAC Accredited',
+      value: null as string | null,
+      icon: Shield,
+      tone: 'bg-amber-100 text-amber-800',
+    },
+  ];
 
   return (
-    <section className="mt-12">
-      <div className="careers-stats-panel rounded-2xl border border-white/15 bg-[#0c1829]/70 p-4 backdrop-blur-xl sm:p-5">
-        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-sky-300/70">
-          Institution at a Glance
-        </p>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <CareersAnimatedStat
-            label="Faculty Members"
-            value={inst?.facultyMembers ?? 150}
-            suffix="+"
-            icon={Users}
-            accent="sky"
-            isLoading={isLoading}
-          />
-          <CareersAnimatedStat
-            label="Students Enrolled"
-            value={inst?.students ?? 3000}
-            suffix="+"
-            icon={GraduationCap}
-            accent="emerald"
-            isLoading={isLoading}
-          />
-          <CareersAnimatedStat
-            label="Academic Departments"
-            value={inst?.departments ?? 17}
-            icon={Building2}
-            accent="violet"
-            isLoading={isLoading}
-          />
-          <CareersAnimatedStat
-            label="Accreditation"
-            displayText={inst?.naacGrade ?? "NAAC Re-accredited with Grade 'B'"}
-            icon={Award}
-            accent="amber"
-            isLoading={isLoading}
-          />
-          <CareersAnimatedStat
-            label="Years of Academic Excellence"
-            value={inst?.yearsOfExcellence ?? 39}
-            suffix="+"
-            icon={Award}
-            accent="red"
-            isLoading={isLoading}
-          />
-        </div>
+    <section className="mx-auto max-w-[1400px] px-4 sm:px-6">
+      <div
+        className={`grid gap-4 rounded-2xl border border-slate-200/80 bg-white px-4 py-5 shadow-sm sm:grid-cols-2 sm:px-6 lg:grid-cols-5 ${
+          isLoading ? 'opacity-70' : ''
+        }`}
+      >
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center gap-3">
+            <span
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${item.tone}`}
+            >
+              <item.icon className="h-5 w-5" />
+            </span>
+            <div>
+              {item.value ? (
+                <p className="text-lg font-bold leading-tight text-[#0b1f4a]">{item.value}</p>
+              ) : null}
+              <p
+                className={`text-sm text-slate-600 ${item.value ? '' : 'font-semibold text-[#0b1f4a]'}`}
+              >
+                {item.label}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

@@ -12,7 +12,9 @@ import { fetchCareersJobs } from '@/services/careers-portal';
 export function CareersJobsPageClient() {
   const searchParams = useSearchParams();
   const departmentFilter = searchParams.get('department')?.trim() ?? '';
-  const [query, setQuery] = useState('');
+  const staffTypeFilter = searchParams.get('staffType')?.trim() ?? '';
+  const initialQuery = searchParams.get('q')?.trim() ?? '';
+  const [query, setQuery] = useState(initialQuery);
   const jobsQ = useQuery({ queryKey: ['careers-jobs'], queryFn: fetchCareersJobs });
   const jobs = jobsQ.data ?? [];
 
@@ -23,6 +25,17 @@ export function CareersJobsPageClient() {
         (j) => j.department?.name?.toLowerCase() === departmentFilter.toLowerCase(),
       );
     }
+    if (staffTypeFilter) {
+      const needle = staffTypeFilter.toUpperCase();
+      list = list.filter((j) => {
+        const type = (j.staffType ?? '').toUpperCase();
+        if (needle === 'TEACHING') return type.includes('TEACH') && !type.includes('NON');
+        if (needle === 'NON_TEACHING' || needle === 'NONTEACHING') {
+          return type.includes('NON') || type.includes('ADMIN');
+        }
+        return type.includes(needle.replace(/_/g, '')) || type.includes(needle);
+      });
+    }
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -31,7 +44,7 @@ export function CareersJobsPageClient() {
         j.department?.name?.toLowerCase().includes(q) ||
         j.designation?.label?.toLowerCase().includes(q),
     );
-  }, [jobs, query, departmentFilter]);
+  }, [jobs, query, departmentFilter, staffTypeFilter]);
 
   return (
     <CareersPublicShell>

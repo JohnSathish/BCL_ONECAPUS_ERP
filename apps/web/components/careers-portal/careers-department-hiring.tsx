@@ -16,14 +16,14 @@ export function CareersDepartmentHiring({ jobs }: { jobs: CareersJob[] }) {
   if (!hiringDepts.length) return null;
 
   return (
-    <section className="border-t border-white/10 py-20">
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400/90">
+    <section className="border-t border-slate-200 py-16 sm:py-20">
+      <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#1d4ed8]">
         Openings by department
       </p>
-      <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
+      <h2 className="mt-3 text-3xl font-bold text-[#0b1f4a] sm:text-4xl">
         Departments Currently Hiring
       </h2>
-      <p className="mt-3 max-w-2xl text-slate-400">
+      <p className="mt-3 max-w-2xl text-slate-600">
         These academic departments have published vacancies at Don Bosco College, Tura.
       </p>
 
@@ -32,7 +32,7 @@ export function CareersDepartmentHiring({ jobs }: { jobs: CareersJob[] }) {
           <Link
             key={name}
             href={`/careers-portal/jobs?department=${encodeURIComponent(name)}`}
-            className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-slate-200 transition hover:border-amber-400/40 hover:text-white"
+            className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#0b1f4a] shadow-sm transition hover:border-[#f0b429] hover:bg-[#fffbf0]"
           >
             {name}
           </Link>

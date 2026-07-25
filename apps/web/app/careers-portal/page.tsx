@@ -10,7 +10,7 @@ export default function CareersPortalLandingPage() {
   const jobs = jobsQ.data ?? [];
 
   return (
-    <CareersPublicShell hideHeroPadding>
+    <CareersPublicShell hideHeroPadding variant="landing">
       <CareersLandingPage jobs={jobs} />
     </CareersPublicShell>
   );

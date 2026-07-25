@@ -14,7 +14,7 @@ export function CareersFooter() {
   const website = info?.websiteUrl ?? 'https://donboscocollege.ac.in';
 
   return (
-    <footer className="mt-20 border-t border-white/10 bg-[#070f1a]">
+    <footer className="mt-0 border-t border-white/10 bg-[#070f1a]">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">

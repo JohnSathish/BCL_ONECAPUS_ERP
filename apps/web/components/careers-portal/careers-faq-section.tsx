@@ -1,88 +1,133 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Plus } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  Award,
+  ChevronDown,
+  GraduationCap,
+  Heart,
+  Plus,
+  TrendingUp,
+} from 'lucide-react';
 import { CAREERS_FAQ, WHY_JOIN_DBC } from '@/lib/careers-portal/constants';
 import { cn } from '@/utils/cn';
-import { Award, BookOpen, Building2, GraduationCap, Heart, TrendingUp } from 'lucide-react';
 
 const WHY_ICONS = {
   graduation: GraduationCap,
-  microscope: BookOpen,
+  microscope: GraduationCap,
   trending: TrendingUp,
   heart: Heart,
-  building: Building2,
+  building: Award,
   award: Award,
 } as const;
 
-export function CareersWhyJoin({ collegeName }: { collegeName?: string }) {
-  return (
-    <section className="border-t border-white/10 py-20">
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400/90">
-        Life at DBC
-      </p>
-      <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-        Why Join {collegeName ?? 'Don Bosco College'}?
-      </h2>
+const WHY_TONES = [
+  'bg-sky-100 text-sky-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-orange-100 text-orange-700',
+  'bg-indigo-100 text-indigo-700',
+] as const;
 
-      <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-        {WHY_JOIN_DBC.map((item) => {
-          const Icon = WHY_ICONS[item.icon];
-          return (
-            <div key={item.title} className="flex gap-4">
-              <Icon className="mt-0.5 h-6 w-6 shrink-0 text-amber-400/90" strokeWidth={1.5} />
-              <div>
-                <h3 className="text-lg font-semibold text-white">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-400">{item.description}</p>
+export function CareersWhyJoin({ collegeName }: { collegeName?: string }) {
+  const name = collegeName ?? 'Don Bosco College, Tura';
+  return (
+    <section id="why-join" className="bg-[#eef1f6] py-16 sm:py-20">
+      <div className="mx-auto grid max-w-[1400px] gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-16">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#1d4ed8]">
+            Why join {name}?
+          </p>
+          <h2 className="mt-3 text-3xl font-bold leading-tight text-[#0b1f4a] sm:text-4xl">
+            A Place to Grow.
+            <br />A Purpose to Fulfill.
+          </h2>
+          <div className="mt-4 h-1 w-14 rounded-full bg-[#f0b429]" />
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-slate-600">
+            Be part of a NAAC-accredited Don Bosco institution where teaching, research, and
+            community service come together — with room to grow your career and make a lasting
+            difference for students in Garo Hills and beyond.
+          </p>
+          <Link
+            href="/careers-portal#about"
+            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#0b1f4a] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#152a5c]"
+          >
+            Learn More About Us
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {WHY_JOIN_DBC.map((item, index) => {
+            const Icon = WHY_ICONS[item.icon];
+            return (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-white/80 bg-white p-5 shadow-sm"
+              >
+                <span
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-full',
+                    WHY_TONES[index % WHY_TONES.length],
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 text-base font-bold text-[#0b1f4a]">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.description}</p>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
 }
 
 export function CareersFaq() {
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="border-t border-white/10 py-20">
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400/90">Help</p>
-      <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Frequently Asked Questions</h2>
-
-      <div className="mt-10 divide-y divide-white/10">
-        {CAREERS_FAQ.map((item, i) => {
-          const isOpen = open === i;
-          return (
-            <div key={item.question}>
-              <button
-                type="button"
-                onClick={() => setOpen(isOpen ? null : i)}
-                className="flex w-full items-center justify-between gap-4 py-5 text-left transition hover:text-sky-100"
-              >
-                <span className="flex items-center gap-3 font-medium text-white">
-                  <Plus
+    <section className="bg-white py-16 sm:py-20">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#1d4ed8]">Help</p>
+        <h2 className="mt-3 text-3xl font-bold text-[#0b1f4a] sm:text-4xl">
+          Frequently Asked Questions
+        </h2>
+        <div className="mt-8 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-[#f8fafc]">
+          {CAREERS_FAQ.map((item, i) => {
+            const isOpen = open === i;
+            return (
+              <div key={item.question} className="px-4 sm:px-5">
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : i)}
+                  className="flex w-full items-center justify-between gap-4 py-5 text-left"
+                >
+                  <span className="flex items-center gap-3 font-semibold text-[#0b1f4a]">
+                    <Plus
+                      className={cn(
+                        'h-4 w-4 shrink-0 text-[#f0b429] transition',
+                        isOpen && 'rotate-45',
+                      )}
+                    />
+                    {item.question}
+                  </span>
+                  <ChevronDown
                     className={cn(
-                      'h-4 w-4 shrink-0 text-amber-400/90 transition',
-                      isOpen && 'rotate-45',
+                      'h-5 w-5 shrink-0 text-slate-400 transition',
+                      isOpen && 'rotate-180',
                     )}
                   />
-                  {item.question}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    'h-5 w-5 shrink-0 text-slate-500 transition',
-                    isOpen && 'rotate-180',
-                  )}
-                />
-              </button>
-              {isOpen ? (
-                <p className="pb-5 pl-7 text-sm leading-relaxed text-slate-400">{item.answer}</p>
-              ) : null}
-            </div>
-          );
-        })}
+                </button>
+                {isOpen ? (
+                  <p className="pb-5 pl-7 text-sm leading-relaxed text-slate-600">{item.answer}</p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

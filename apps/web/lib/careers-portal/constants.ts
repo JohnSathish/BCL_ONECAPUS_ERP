@@ -1,38 +1,26 @@
 export const WHY_JOIN_DBC = [
   {
-    title: 'Academic Excellence',
+    title: 'Meaningful Impact',
     description:
-      'NAAC accredited institution committed to quality higher education and student success.',
+      'Shape young minds through values-based education and the Salesian spirit of service.',
     icon: 'graduation',
   },
   {
-    title: 'Research Opportunities',
+    title: 'Growth Opportunities',
     description:
-      'Collaborate on publications, conferences, and interdisciplinary research across Northeast India.',
-    icon: 'microscope',
-  },
-  {
-    title: 'Professional Growth',
-    description:
-      'Faculty development programmes, leadership pathways, and continuous career advancement.',
+      'Faculty development, research pathways, and clear career progression across departments.',
     icon: 'trending',
   },
   {
-    title: 'Family Environment',
+    title: 'Supportive Community',
     description:
-      "Don Bosco's preventive system — mentoring, pastoral care, and values-based education.",
+      'A collegial campus culture rooted in mentoring, collaboration, and pastoral care.',
     icon: 'heart',
   },
   {
-    title: 'Modern Campus',
+    title: 'Work-Life Balance',
     description:
-      'Smart classrooms, laboratories, library resources, and digital learning environments.',
-    icon: 'building',
-  },
-  {
-    title: 'Social Impact',
-    description:
-      'Serve youth through the Salesian charism — reason, religion, and loving kindness.',
+      'A people-first institution that respects academic rhythm, family life, and wellbeing.',
     icon: 'award',
   },
 ] as const;

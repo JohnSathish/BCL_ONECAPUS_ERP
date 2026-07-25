@@ -41,7 +41,7 @@ export function CareersHeroCarousel({ heroImages }: { heroImages?: string[] }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={s.src} alt={s.label} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#0a1628]/60 lg:to-[#0a1628]/40" />
+          <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0a1628]/20 to-[#0a1628]/50 lg:via-transparent lg:to-[#0a1628]/30" />
         </div>
       ))}
 
