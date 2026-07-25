@@ -5,6 +5,11 @@ import { Eye } from 'lucide-react';
 
 const SESSION_KEY = 'dbc-college-visitor-counted';
 
+/**
+ * Footer visitor counter.
+ * Server counts at most once per visitor key (IP + UA) per Kolkata calendar day.
+ * sessionStorage avoids repeat POSTs within the same browser tab session.
+ */
 export function VisitorsCount() {
   const [count, setCount] = useState<number | null>(null);
 
@@ -19,7 +24,7 @@ export function VisitorsCount() {
           cache: 'no-store',
         });
         if (!response.ok) return;
-        const payload = (await response.json()) as { count?: number };
+        const payload = (await response.json()) as { count?: number; counted?: boolean };
         if (!alreadyCounted) sessionStorage.setItem(SESSION_KEY, '1');
         if (!cancelled && typeof payload.count === 'number') setCount(payload.count);
       } catch {
