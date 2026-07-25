@@ -1,0 +1,162 @@
+/* Mobile / tablet layout fixes — prevent horizontal overflow and cramped headers */
+
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+.site-header,
+.site-header * {
+  max-width: 100%;
+}
+
+.site-header {
+  overflow-x: clip;
+}
+
+/* Soften hero type so long mottos don't force page width */
+:root {
+  --text-hero: clamp(28px, 7.2vw, 54px);
+}
+
+@media (max-width: 1050px) {
+  .utility-inner {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    min-width: 0;
+  }
+
+  .utility-meta {
+    gap: 6px 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .utility-meta a[href^='mailto:'] {
+    display: none;
+  }
+
+  .utility nav {
+    display: none; /* Careers / Blood Donors / Contact live in the drawer on small screens */
+  }
+
+  .nav-bar-inner {
+    min-width: 0;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .nav-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .nav-app {
+    max-width: 100%;
+  }
+
+  .nav-app span {
+    white-space: nowrap;
+  }
+
+  .brand-bar-inner {
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .brand span {
+    min-width: 0;
+  }
+
+  .brand strong {
+    font-size: clamp(15px, 4.2vw, 22px);
+    letter-spacing: 0.02em;
+  }
+
+  .brand-actions {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .utility-inner {
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .utility-meta {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .utility-meta a[href^='tel:'] {
+    font-size: 12px;
+  }
+
+  .brand-bar-inner {
+    min-height: 64px;
+  }
+
+  .brand img {
+    width: 52px;
+    height: 52px;
+  }
+
+  .brand strong {
+    font-size: clamp(14px, 4.4vw, 18px);
+    line-height: 1.15;
+  }
+
+  .brand b {
+    font-size: 13px;
+  }
+
+  .hero-copy {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .hero h1 {
+    font-size: clamp(26px, 8vw, 36px) !important;
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+  }
+
+  .hero-copy > p {
+    font-size: 15px;
+    max-width: 100%;
+  }
+
+  .affiliation-bar p {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .nav-app span {
+    font-size: 11px;
+  }
+
+  .about-college-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .nav-app span {
+    display: none; /* icon-only Mobile App button on very narrow phones */
+  }
+}

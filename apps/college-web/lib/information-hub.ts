@@ -330,12 +330,23 @@ export function mergeInformationHub(...values: unknown[]): InformationHubContent
   };
 }
 
+/** Calendar “today” in Asia/Kolkata so SSR and browsers agree. */
+export function collegeTodayIso() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 export function daysUntil(isoDate: string) {
-  const target = new Date(isoDate);
-  const today = new Date();
-  target.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-  return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+  const today = collegeTodayIso();
+  const target = isoDate.slice(0, 10);
+  const start = Date.parse(`${today}T00:00:00+05:30`);
+  const end = Date.parse(`${target}T00:00:00+05:30`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.round((end - start) / 86_400_000);
 }
 
 export function isSameDay(isoDate: string) {
@@ -348,11 +359,43 @@ export function isRecentNotice(isoDate: string, hours = 24) {
   return Date.now() - published <= hours * 60 * 60 * 1000;
 }
 
+const MONTHS_SHORT = [
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+] as const;
+const WEEKDAYS_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+
 export function eventDateParts(isoDate: string) {
-  const date = new Date(isoDate);
+  const raw = isoDate.slice(0, 10);
+  const [year, month, day] = raw.split('-').map(Number);
+  if (!year || !month || !day) {
+    return { day: '--', month: '---', weekday: '---' };
+  }
+  const utc = new Date(Date.UTC(year, month - 1, day));
   return {
-    day: date.toLocaleDateString('en-IN', { day: '2-digit' }),
-    month: date.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase(),
-    weekday: date.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase(),
+    day: String(day).padStart(2, '0'),
+    month: MONTHS_SHORT[month - 1] ?? '---',
+    weekday: WEEKDAYS_SHORT[utc.getUTCDay()] ?? '---',
   };
+}
+
+export function formatNoticeDate(isoDate: string) {
+  const date = new Date(isoDate);
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
 }

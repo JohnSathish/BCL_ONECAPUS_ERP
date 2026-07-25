@@ -27,6 +27,7 @@ import './administration.css';
 import './leadership-profiles.css';
 import './biography-feature.css';
 import './important-links.css';
+import './mobile-layout-fix.css';
 
 const inter = Inter({
   subsets: ['latin'],

@@ -7,6 +7,7 @@ import {
   daysUntil,
   eventCategoryStyles,
   eventDateParts,
+  formatNoticeDate,
   isRecentNotice,
   isSameDay,
   noticeBadgeStyles,
@@ -36,7 +37,7 @@ function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?:
       <time
         className={`info-event-date${happeningToday ? ' is-today' : ''}`}
         dateTime={event.date}
-        aria-label={new Date(event.date).toLocaleDateString('en-IN', { dateStyle: 'full' })}
+        suppressHydrationWarning
       >
         <span className="info-event-date-month">{month}</span>
         <span className="info-event-date-body">
@@ -49,7 +50,7 @@ function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?:
           {event.category}
         </span>
         <strong>{event.title}</strong>
-        <em>
+        <em suppressHydrationWarning>
           {happeningToday
             ? 'Happening today'
             : `Starts in ${remaining} ${remaining === 1 ? 'day' : 'days'}`}
@@ -70,11 +71,7 @@ function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?:
 function NoticeRow({ notice, noticesHref }: { notice: HubNotice; noticesHref: string }) {
   const badge = notice.urgent ? 'URGENT' : notice.badge;
   const style = noticeBadgeStyles[badge];
-  const published = new Date(notice.publishedAt).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const published = formatNoticeDate(notice.publishedAt);
   const pulseNew = notice.badge === 'NEW' && isRecentNotice(notice.publishedAt);
 
   return (
@@ -90,7 +87,7 @@ function NoticeRow({ notice, noticesHref }: { notice: HubNotice; noticesHref: st
       </span>
       <span className="info-notice-copy">
         <strong>{notice.title}</strong>
-        <small>{published}</small>
+        <small suppressHydrationWarning>{published}</small>
       </span>
       {notice.attachmentHref ? (
         <span className="info-download" aria-label="Has attachment">
