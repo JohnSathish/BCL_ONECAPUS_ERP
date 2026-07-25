@@ -4,14 +4,23 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  ArrowLeft,
+  ArrowRight,
   Briefcase,
+  CalendarDays,
   Check,
   CheckCircle2,
   ClipboardCheck,
+  Droplets,
   GraduationCap,
+  Headphones,
+  Info,
   Phone,
+  Save,
+  ShieldCheck,
   Upload,
   User,
+  Users,
 } from 'lucide-react';
 import { AlumniPublicShell } from '@/components/alumni-portal/alumni-public-shell';
 import { Button } from '@/components/ui/button';
@@ -101,6 +110,7 @@ export default function AlumniRegisterPageClient() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [draftSaved, setDraftSaved] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const [form, setForm] = useState<FormState>({
     fullName: '',
@@ -198,6 +208,20 @@ export default function AlumniRegisterPageClient() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
+  function saveDraft() {
+    try {
+      localStorage.setItem(
+        'alumni-registration-draft',
+        JSON.stringify({ form, step, savedAt: new Date().toISOString() }),
+      );
+      setError('');
+      setDraftSaved(true);
+      window.setTimeout(() => setDraftSaved(false), 2500);
+    } catch {
+      setError('Could not save draft on this device.');
+    }
+  }
+
   function submit() {
     const msg = validateStep(4);
     if (msg) {
@@ -277,42 +301,76 @@ export default function AlumniRegisterPageClient() {
 
   return (
     <AlumniPublicShell associationName={infoQ.data?.settings.associationName}>
-      <div className="bg-[#F8FAFC]">
-        <section className="border-b border-[#0A2342]/10 bg-[#0A2342] text-white">
-          <div className="mx-auto max-w-6xl px-4 py-10 lg:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F4B400]">
-              Don Bosco College Tura
-            </p>
-            <h1 className="mt-2 font-serif text-3xl md:text-4xl">Become a Member</h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/75 md:text-base">
-              Join the Alumni Association — reconnect, network, and give back.
-            </p>
+      <div className="bg-[#eef1f6]">
+        <section
+          className="relative overflow-hidden border-b border-[#0A2342]/15 bg-[#0A2342] text-white"
+          style={{
+            backgroundImage:
+              'linear-gradient(105deg, rgba(10,35,66,0.94) 0%, rgba(10,35,66,0.78) 48%, rgba(10,35,66,0.55) 100%), url(/branding/alumni-campus-hero.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-12 sm:py-14 lg:flex-row lg:items-end lg:justify-between lg:px-6">
+            <div>
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={infoQ.data?.settings.logoUrl || '/branding/basecode-labs-logo.png'}
+                  alt=""
+                  className="h-12 w-12 rounded-full bg-white object-contain p-0.5 ring-2 ring-[#F4B400]/50"
+                />
+                <p className="font-serif text-sm tracking-wide text-[#F4B400] sm:text-base">
+                  DON BOSCO COLLEGE TURA
+                </p>
+              </div>
+              <h1 className="mt-5 font-serif text-4xl leading-tight md:text-5xl">
+                Become a Member
+              </h1>
+              <p className="mt-3 max-w-xl text-sm text-white/80 md:text-base">
+                Join the Alumni Association — reconnect, network, and give back.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm backdrop-blur-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F4B400]">
+                Application progress
+              </p>
+              <p className="mt-1 font-medium">
+                Step {step + 1} of {ALUMNI_REGISTRATION_STEPS.length} · {progress}% complete
+              </p>
+            </div>
           </div>
         </section>
 
-        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[0.95fr_1.35fr] lg:gap-8 lg:px-6 lg:py-10">
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[0.92fr_1.38fr] lg:gap-8 lg:px-6 lg:py-10">
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <div
-              className="overflow-hidden rounded-2xl border border-[#0A2342]/10 bg-cover bg-center shadow-md"
+              className="overflow-hidden rounded-2xl border border-[#0A2342]/10 shadow-md"
               style={{
                 backgroundImage:
-                  'linear-gradient(160deg, rgba(10,35,66,0.88), rgba(10,35,66,0.55)), url(/branding/alumni-campus-hero.png)',
-                minHeight: 220,
+                  'linear-gradient(160deg, rgba(10,35,66,0.92), rgba(10,35,66,0.72)), url(/branding/alumni-campus-hero.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
               }}
             >
-              <div className="flex h-full flex-col justify-end p-6 text-white">
-                <p className="text-2xl font-semibold">
+              <div className="p-6 text-white">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#F4B400]/20 text-[#F4B400]">
+                  <Users className="h-5 w-5" />
+                </div>
+                <p className="text-2xl font-semibold leading-snug">
                   Join {(stats?.displayAlumni ?? 5000).toLocaleString('en-IN')}+ Alumni Worldwide
                 </p>
-                <ul className="mt-4 space-y-2 text-sm text-white/90">
+                <ul className="mt-5 space-y-2.5 text-sm text-white/90">
                   {[
                     'Networking Opportunities',
                     'Alumni Events',
                     'Career Support',
                     'College Updates',
                   ].map((item) => (
-                    <li key={item} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-[#F4B400]" />
+                    <li key={item} className="flex items-center gap-2.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F4B400] text-[#0A2342]">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
                       {item}
                     </li>
                   ))}
@@ -321,13 +379,15 @@ export default function AlumniRegisterPageClient() {
             </div>
 
             <div className="rounded-2xl border border-[#0A2342]/10 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-[#0A2342]">
+              <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-[#0A2342]">
                 Membership Benefits
               </h2>
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-4 space-y-2.5">
                 {ALUMNI_MEMBERSHIP_BENEFITS.map((b) => (
-                  <li key={b} className="flex items-start gap-2 text-sm text-[#0A2342]/80">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F4B400]" />
+                  <li key={b} className="flex items-start gap-2.5 text-sm text-[#0A2342]/85">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F4B400]/20 text-[#c79a2b]">
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    </span>
                     {b}
                   </li>
                 ))}
@@ -335,70 +395,124 @@ export default function AlumniRegisterPageClient() {
             </div>
 
             <div className="rounded-2xl border border-[#0A2342]/10 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-[#0A2342]">
-                What happens next
+              <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-[#0A2342]">
+                What Happens Next
               </h2>
-              <ol className="mt-3 space-y-3 text-sm text-[#0A2342]/80">
+              <ol className="relative mt-5 space-y-0">
                 {[
                   'Register online',
                   'Verification by Alumni Office',
                   'Approval',
                   'Online payment',
                   'Digital membership card',
-                ].map((label, i) => (
-                  <li key={label} className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0A2342] text-[11px] font-bold text-[#F4B400]">
+                ].map((label, i, arr) => (
+                  <li key={label} className="relative flex gap-3 pb-5 last:pb-0">
+                    {i < arr.length - 1 ? (
+                      <span
+                        className="absolute left-[13px] top-7 h-[calc(100%-1.25rem)] w-px bg-[#0A2342]/15"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span className="relative z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0A2342] text-[11px] font-bold text-white">
                       {i + 1}
                     </span>
-                    <span className="pt-0.5">{label}</span>
+                    <span className="pt-1 text-sm text-[#0A2342]/85">{label}</span>
                   </li>
                 ))}
               </ol>
             </div>
+
+            <div className="rounded-2xl bg-[#0A2342] p-5 text-white shadow-md">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F4B400]/15 text-[#F4B400]">
+                  <Headphones className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#F4B400]">
+                    Need Help?
+                  </p>
+                  <p className="mt-1 text-sm text-white/75">
+                    Alumni Office is here if you get stuck during registration.
+                  </p>
+                  {infoQ.data?.settings.contactPhone ? (
+                    <a
+                      href={`tel:${infoQ.data.settings.contactPhone}`}
+                      className="mt-3 block text-sm font-medium text-white hover:text-[#F4B400]"
+                    >
+                      {infoQ.data.settings.contactPhone}
+                    </a>
+                  ) : null}
+                  {infoQ.data?.settings.contactEmail ? (
+                    <a
+                      href={`mailto:${infoQ.data.settings.contactEmail}`}
+                      className="mt-1 block text-sm text-white/85 hover:text-[#F4B400]"
+                    >
+                      {infoQ.data.settings.contactEmail}
+                    </a>
+                  ) : (
+                    <a
+                      href="mailto:alumni@donboscocollege.ac.in"
+                      className="mt-1 block text-sm text-white/85 hover:text-[#F4B400]"
+                    >
+                      alumni@donboscocollege.ac.in
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
           </aside>
 
-          <div className="rounded-2xl border border-[#0A2342]/10 bg-white p-5 shadow-lg sm:p-7">
+          <div className="rounded-2xl border border-[#0A2342]/10 bg-white p-5 shadow-xl sm:p-8">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#F4B400]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F4B400]">
                   Step {step + 1} of {ALUMNI_REGISTRATION_STEPS.length}
                 </p>
-                <h2 className="mt-1 font-serif text-2xl text-[#0A2342]">
+                <h2 className="mt-1 font-serif text-2xl text-[#0A2342] md:text-3xl">
                   {ALUMNI_REGISTRATION_STEPS[step]?.label}
                 </h2>
               </div>
-              <p className="text-sm font-medium text-[#0A2342]/65">{progress}% Complete</p>
+              <p className="text-sm font-semibold text-[#0A2342]/55">{progress}% Complete</p>
             </div>
 
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#0A2342]/10">
-              <div
-                className="h-full rounded-full bg-[#F4B400] transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-6 flex items-center justify-between gap-1 px-1">
               {ALUMNI_REGISTRATION_STEPS.map((s, i) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => {
-                    if (i <= step) setStep(i);
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition',
-                    i === step
-                      ? 'bg-[#0A2342] text-white'
-                      : i < step
-                        ? 'bg-[#F4B400]/25 text-[#0A2342]'
-                        : 'bg-[#0A2342]/5 text-[#0A2342]/45',
-                  )}
-                >
-                  <StepIcon name={s.icon} className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{s.label}</span>
-                  <span className="sm:hidden">{i + 1}</span>
-                </button>
+                <div key={s.key} className="flex flex-1 items-center last:flex-none">
+                  <button
+                    type="button"
+                    aria-label={s.label}
+                    onClick={() => {
+                      if (i <= step) setStep(i);
+                    }}
+                    className={cn(
+                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold transition',
+                      i === step
+                        ? 'bg-[#0A2342] text-white ring-4 ring-[#0A2342]/15'
+                        : i < step
+                          ? 'bg-[#F4B400] text-[#0A2342]'
+                          : 'border-2 border-[#0A2342]/15 bg-white text-[#0A2342]/35',
+                    )}
+                  >
+                    {i < step ? <Check className="h-4 w-4" strokeWidth={3} /> : i + 1}
+                  </button>
+                  {i < ALUMNI_REGISTRATION_STEPS.length - 1 ? (
+                    <div
+                      className={cn(
+                        'mx-1 h-0.5 flex-1 rounded-full',
+                        i < step ? 'bg-[#F4B400]' : 'bg-[#0A2342]/12',
+                      )}
+                    />
+                  ) : null}
+                </div>
               ))}
+            </div>
+
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-[#cfe0f5] bg-[#eef5ff] px-4 py-3 text-sm text-[#0A2342]/85">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2b6cb0]" />
+              <p>
+                Please provide accurate information as per your official records.{' '}
+                <span className="font-semibold text-red-600">* Required fields</span>
+              </p>
             </div>
 
             <div className="mt-7 space-y-5">
@@ -410,12 +524,14 @@ export default function AlumniRegisterPageClient() {
                       value={form.fullName}
                       onChange={(v) => set('fullName', v)}
                       required
+                      icon={<User className="h-4 w-4" />}
                       className="sm:col-span-2"
                     />
                     <FloatingSelect
                       label="Gender"
                       value={form.gender}
                       onChange={(v) => set('gender', v)}
+                      icon={<Users className="h-4 w-4" />}
                       options={ALUMNI_GENDERS.map((g) => ({ value: g, label: g }))}
                     />
                     <FloatingField
@@ -423,39 +539,64 @@ export default function AlumniRegisterPageClient() {
                       type="date"
                       value={form.dateOfBirth}
                       onChange={(v) => set('dateOfBirth', v)}
+                      icon={<CalendarDays className="h-4 w-4" />}
                     />
                     <FloatingSelect
                       label="Blood Group"
                       value={form.bloodGroup}
                       onChange={(v) => set('bloodGroup', v)}
+                      icon={<Droplets className="h-4 w-4" />}
                       options={ALUMNI_BLOOD_GROUPS.map((g) => ({ value: g, label: g }))}
                     />
                     <div className="sm:col-span-2">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#0A2342]/55">
                         Profile Photo
                       </p>
-                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#0A2342]/25 bg-[#F8FAFC] px-4 py-6 text-center transition hover:border-[#F4B400]">
-                        {form.photoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={form.photoUrl}
-                            alt="Profile preview"
-                            className="h-24 w-24 rounded-full object-cover ring-2 ring-[#F4B400]/50"
+                      <div className="grid gap-3 rounded-2xl border border-dashed border-[#9db7d8] bg-[#f7faff] p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+                        <div className="flex justify-center">
+                          {form.photoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={form.photoUrl}
+                              alt="Profile preview"
+                              className="h-20 w-20 rounded-full object-cover ring-2 ring-[#F4B400]/60"
+                            />
+                          ) : (
+                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white text-[#0A2342]/35 ring-1 ring-[#0A2342]/10">
+                              <User className="h-8 w-8" />
+                            </div>
+                          )}
+                        </div>
+                        <label className="flex cursor-pointer flex-col items-center gap-2 text-center sm:items-start sm:text-left">
+                          <Upload className="h-6 w-6 text-[#2b6cb0]" />
+                          <span className="text-sm font-medium text-[#0A2342]">
+                            Drag & drop your photo here
+                          </span>
+                          <span className="inline-flex rounded-lg bg-[#2b6cb0] px-3 py-1.5 text-xs font-semibold text-white">
+                            Browse Photo
+                          </span>
+                          <span className="text-xs text-[#0A2342]/55">JPEG / PNG · Max 2 MB</span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => void onPhotoChange(e.target.files?.[0] ?? null)}
                           />
-                        ) : (
-                          <Upload className="h-8 w-8 text-[#0A2342]/45" />
-                        )}
-                        <span className="text-sm font-medium text-[#0A2342]">
-                          {form.photoUrl ? 'Change photo' : 'Upload Photo'}
-                        </span>
-                        <span className="text-xs text-[#0A2342]/55">JPEG / PNG · Max 2 MB</span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={(e) => void onPhotoChange(e.target.files?.[0] ?? null)}
-                        />
-                      </label>
+                        </label>
+                        <div className="rounded-xl border border-[#0A2342]/08 bg-white p-3 text-xs text-[#0A2342]/7">
+                          <p className="mb-2 font-semibold uppercase tracking-wide text-[#0A2342]">
+                            Guidelines
+                          </p>
+                          <ul className="space-y-1.5">
+                            {['Passport size', 'Front-facing', 'Light background'].map((g) => (
+                              <li key={g} className="flex items-center gap-1.5">
+                                <Check className="h-3 w-3 text-[#F4B400]" strokeWidth={3} />
+                                {g}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
                       {photoError ? (
                         <p className="mt-2 text-xs text-red-600">{photoError}</p>
                       ) : null}
@@ -472,16 +613,19 @@ export default function AlumniRegisterPageClient() {
                       type="email"
                       value={form.email}
                       onChange={(v) => set('email', v)}
+                      icon={<Info className="h-4 w-4" />}
                     />
                     <FloatingField
                       label="Mobile"
                       value={form.phone}
                       onChange={(v) => set('phone', v)}
+                      icon={<Phone className="h-4 w-4" />}
                     />
                     <FloatingField
                       label="WhatsApp"
                       value={form.whatsapp}
                       onChange={(v) => set('whatsapp', v)}
+                      icon={<Phone className="h-4 w-4" />}
                     />
                     <FloatingField
                       label="PIN Code"
@@ -711,49 +855,70 @@ export default function AlumniRegisterPageClient() {
                 {error}
               </p>
             ) : null}
+            {draftSaved ? (
+              <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                Draft saved on this device.
+              </p>
+            ) : null}
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-[#0A2342]/08 pt-5">
               <Button
                 type="button"
                 variant="outline"
-                className="border-[#0A2342]/20"
+                className="border-[#0A2342]/20 gap-2"
                 disabled={step === 0 || mut.isPending}
                 onClick={goPrev}
               >
-                ← Previous
+                <ArrowLeft className="h-4 w-4" />
+                Previous
               </Button>
-              {step < ALUMNI_REGISTRATION_STEPS.length - 1 ? (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  className="bg-[#0A2342] text-white hover:bg-[#F4B400] hover:text-[#0A2342]"
-                  onClick={goNext}
+                  variant="outline"
+                  className="border-[#0A2342]/20 gap-2"
+                  onClick={saveDraft}
                 >
-                  Save & Continue →
+                  <Save className="h-4 w-4" />
+                  Save Draft
                 </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="bg-[#F4B400] text-[#0A2342] hover:bg-[#e5a82e]"
-                  disabled={mut.isPending}
-                  onClick={submit}
-                >
-                  {mut.isPending ? 'Submitting…' : 'Review & Submit'}
-                </Button>
-              )}
+                {step < ALUMNI_REGISTRATION_STEPS.length - 1 ? (
+                  <Button
+                    type="button"
+                    className="gap-2 bg-[#0A2342] text-white hover:bg-[#F4B400] hover:text-[#0A2342]"
+                    onClick={goNext}
+                  >
+                    Save & Continue
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="gap-2 bg-[#F4B400] text-[#0A2342] hover:bg-[#e5a82e]"
+                    disabled={mut.isPending}
+                    onClick={submit}
+                  >
+                    {mut.isPending ? 'Submitting…' : 'Submit Application'}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div className="border-t border-[#0A2342]/08 bg-white">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 text-sm text-[#0A2342]/65 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+            <p className="inline-flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-[#F4B400]" />
+              Your information is safe with us. We respect your privacy.
+            </p>
+            <p>© {new Date().getFullYear()} Don Bosco College Tura. All rights reserved.</p>
           </div>
         </div>
       </div>
     </AlumniPublicShell>
   );
-}
-
-function StepIcon({ name, className }: { name: string; className?: string }) {
-  if (name === 'Phone') return <Phone className={className} />;
-  if (name === 'GraduationCap') return <GraduationCap className={className} />;
-  if (name === 'Briefcase') return <Briefcase className={className} />;
-  if (name === 'ClipboardCheck') return <ClipboardCheck className={className} />;
-  return <User className={className} />;
 }
 
 function StepCard({
@@ -766,9 +931,9 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[#0A2342]/10 bg-[#F8FAFC]/70 p-4 sm:p-5">
-      <div className="mb-4 flex items-center gap-2 text-[#0A2342]">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0A2342] text-[#F4B400]">
+    <div className="rounded-2xl border border-[#0A2342]/08 bg-[#f7f9fc] p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-2.5 text-[#0A2342]">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0A2342] text-[#F4B400]">
           {icon}
         </span>
         <h3 className="text-sm font-bold uppercase tracking-wide">{title}</h3>
@@ -785,6 +950,7 @@ function FloatingField({
   type = 'text',
   required,
   className,
+  icon,
 }: {
   label: string;
   value: string;
@@ -792,15 +958,25 @@ function FloatingField({
   type?: string;
   required?: boolean;
   className?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <label
       className={cn(
-        'relative block rounded-2xl border border-[#0A2342]/15 bg-white px-3 pb-2 pt-5 shadow-sm focus-within:border-[#F4B400] focus-within:ring-2 focus-within:ring-[#F4B400]/25',
+        'relative block rounded-xl border border-[#0A2342]/12 bg-white px-3 pb-2.5 pt-5 shadow-sm transition focus-within:border-[#F4B400] focus-within:ring-2 focus-within:ring-[#F4B400]/20',
+        icon ? 'pl-10' : '',
         className,
       )}
     >
-      <span className="absolute left-3 top-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0A2342]/55">
+      {icon ? (
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0A2342]/35">{icon}</span>
+      ) : null}
+      <span
+        className={cn(
+          'absolute top-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0A2342]/5',
+          icon ? 'left-10' : 'left-3',
+        )}
+      >
         {label}
       </span>
       <input
@@ -820,21 +996,32 @@ function FloatingSelect({
   onChange,
   options,
   className,
+  icon,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
   className?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <label
       className={cn(
-        'relative block rounded-2xl border border-[#0A2342]/15 bg-white px-3 pb-2 pt-5 shadow-sm focus-within:border-[#F4B400] focus-within:ring-2 focus-within:ring-[#F4B400]/25',
+        'relative block rounded-xl border border-[#0A2342]/12 bg-white px-3 pb-2.5 pt-5 shadow-sm transition focus-within:border-[#F4B400] focus-within:ring-2 focus-within:ring-[#F4B400]/20',
+        icon ? 'pl-10' : '',
         className,
       )}
     >
-      <span className="absolute left-3 top-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0A2342]/55">
+      {icon ? (
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0A2342]/35">{icon}</span>
+      ) : null}
+      <span
+        className={cn(
+          'absolute top-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0A2342]/5',
+          icon ? 'left-10' : 'left-3',
+        )}
+      >
         {label}
       </span>
       <select
