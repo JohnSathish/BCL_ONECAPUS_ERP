@@ -11,8 +11,9 @@ import {
   CareersTurnstile,
   isCareersTurnstileEnabled,
 } from '@/components/careers-portal/careers-turnstile';
-import { CAREERS_WIZARD_STEPS } from '@/lib/careers-portal/constants';
+import { CAREERS_EDUCATION_TYPES, CAREERS_WIZARD_STEPS } from '@/lib/careers-portal/constants';
 import {
+  finalizeCareersApplicationPdf,
   submitCareersApplication,
   uploadCareersFile,
   type CareersJob,
@@ -23,17 +24,26 @@ import { cn } from '@/utils/cn';
 type EducationRow = {
   qualification: string;
   university: string;
+  institution: string;
   year: string;
   score: string;
-  specialization: string;
 };
 
 type ExperienceRow = {
   institution: string;
   designation: string;
+  department: string;
   fromDate: string;
   toDate: string;
   experience: string;
+};
+
+type ReferenceRow = {
+  name: string;
+  designation: string;
+  institution: string;
+  email: string;
+  phone: string;
 };
 
 type DraftData = {
@@ -46,6 +56,7 @@ type DraftData = {
     dateOfBirth: string;
     maritalStatus: string;
     nationality: string;
+    aadhaarOrPassport: string;
   };
   contact: {
     mobile: string;
@@ -68,6 +79,21 @@ type DraftData = {
     netQualified: string;
     setQualified: string;
     phdDetails: string;
+    patents: string;
+    fdp: string;
+    workshops: string;
+  };
+  skills: {
+    languagesKnown: string;
+    computerSkills: string;
+    teachingSkills: string;
+    researchSkills: string;
+  };
+  references: ReferenceRow[];
+  declarationMeta: {
+    signatureName: string;
+    place: string;
+    date: string;
   };
   declaration: boolean;
   website: string;
@@ -82,17 +108,26 @@ const selectClass = `${controlClass} appearance-none pr-8`;
 const emptyEducation = (): EducationRow => ({
   qualification: '',
   university: '',
+  institution: '',
   year: '',
   score: '',
-  specialization: '',
 });
 
 const emptyExperience = (): ExperienceRow => ({
   institution: '',
   designation: '',
+  department: '',
   fromDate: '',
   toDate: '',
   experience: '',
+});
+
+const emptyReference = (): ReferenceRow => ({
+  name: '',
+  designation: '',
+  institution: '',
+  email: '',
+  phone: '',
 });
 
 function defaultDraft(): DraftData {
@@ -106,6 +141,7 @@ function defaultDraft(): DraftData {
       dateOfBirth: '',
       maritalStatus: '',
       nationality: 'Indian',
+      aadhaarOrPassport: '',
     },
     contact: {
       mobile: '',
@@ -128,9 +164,57 @@ function defaultDraft(): DraftData {
       netQualified: '',
       setQualified: '',
       phdDetails: '',
+      patents: '',
+      fdp: '',
+      workshops: '',
+    },
+    skills: {
+      languagesKnown: '',
+      computerSkills: '',
+      teachingSkills: '',
+      researchSkills: '',
+    },
+    references: [emptyReference(), emptyReference()],
+    declarationMeta: {
+      signatureName: '',
+      place: '',
+      date: new Date().toISOString().slice(0, 10),
     },
     declaration: false,
     website: '',
+  };
+}
+
+function mergeSavedDraft(
+  parsed: Partial<DraftData> & { education?: Array<EducationRow & { specialization?: string }> },
+): DraftData {
+  const base = defaultDraft();
+  return {
+    ...base,
+    ...parsed,
+    personal: { ...base.personal, ...parsed.personal },
+    contact: { ...base.contact, ...parsed.contact },
+    research: { ...base.research, ...parsed.research },
+    skills: { ...base.skills, ...parsed.skills },
+    declarationMeta: { ...base.declarationMeta, ...parsed.declarationMeta },
+    education: parsed.education?.length
+      ? parsed.education.map((row) => {
+          const legacy = row as EducationRow & { specialization?: string };
+          return {
+            ...emptyEducation(),
+            ...row,
+            institution: legacy.institution || legacy.specialization || '',
+          };
+        })
+      : base.education,
+    experience: parsed.experience?.length
+      ? parsed.experience.map((row) => ({ ...emptyExperience(), ...row }))
+      : base.experience,
+    references:
+      parsed.references?.length === 2
+        ? parsed.references.map((row) => ({ ...emptyReference(), ...row }))
+        : base.references,
+    step: parsed.step ?? 0,
   };
 }
 
@@ -148,15 +232,20 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [ugCert, setUgCert] = useState<File | null>(null);
   const [pgCert, setPgCert] = useState<File | null>(null);
-  const [optionalDocs, setOptionalDocs] = useState<File[]>([]);
+  const [experienceCert, setExperienceCert] = useState<File | null>(null);
+  const [netCert, setNetCert] = useState<File | null>(null);
+  const [phdCert, setPhdCert] = useState<File | null>(null);
+  const [communityCert, setCommunityCert] = useState<File | null>(null);
+  const [otherDocs, setOtherDocs] = useState<File[]>([]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
-        const parsed = JSON.parse(raw) as DraftData;
-        setDraft({ ...defaultDraft(), ...parsed, step: parsed.step ?? 0 });
-        setStep(parsed.step ?? 0);
+        const parsed = JSON.parse(raw) as Partial<DraftData>;
+        const merged = mergeSavedDraft(parsed);
+        setDraft(merged);
+        setStep(merged.step);
       }
     } catch {
       /* ignore */
@@ -225,7 +314,10 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
           education: draft.education,
           experience: draft.experience,
           research: draft.research,
+          skills: draft.skills,
+          references: draft.references,
           declarationAccepted: draft.declaration,
+          declaration: draft.declarationMeta,
         },
         website: draft.website || undefined,
         turnstileToken: turnstileToken || undefined,
@@ -233,11 +325,21 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
 
       await uploadCareersFile(result.applicationId, 'resume', resume);
       if (photo) await uploadCareersFile(result.applicationId, 'photo', photo);
-      if (ugCert) await uploadCareersFile(result.applicationId, 'certificate', ugCert);
-      if (pgCert) await uploadCareersFile(result.applicationId, 'certificate', pgCert);
-      for (const doc of optionalDocs) {
-        await uploadCareersFile(result.applicationId, 'certificate', doc);
+      if (ugCert) await uploadCareersFile(result.applicationId, 'ug', ugCert);
+      if (pgCert) await uploadCareersFile(result.applicationId, 'pg', pgCert);
+      if (experienceCert)
+        await uploadCareersFile(result.applicationId, 'experience', experienceCert);
+      if (netCert) await uploadCareersFile(result.applicationId, 'net', netCert);
+      if (phdCert) await uploadCareersFile(result.applicationId, 'phd', phdCert);
+      if (communityCert) await uploadCareersFile(result.applicationId, 'community', communityCert);
+      for (const doc of otherDocs) {
+        await uploadCareersFile(result.applicationId, 'other', doc);
       }
+
+      await finalizeCareersApplicationPdf({
+        applicationNo: result.applicationNo,
+        mobile: draft.contact.mobile.trim(),
+      });
 
       localStorage.removeItem(storageKey);
       router.push(
@@ -259,7 +361,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
       setError('Mobile and email are required.');
       return;
     }
-    if (step === 5 && !resume) {
+    if (step === 7 && !resume) {
       setError('Please upload your resume (PDF) before continuing.');
       return;
     }
@@ -431,6 +533,18 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                 }
               />
             </Field>
+            <Field label="Aadhaar / Passport No." className="sm:col-span-2">
+              <Input
+                className={controlClass}
+                value={draft.personal.aadhaarOrPassport}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    personal: { ...d.personal, aadhaarOrPassport: e.target.value },
+                  }))
+                }
+              />
+            </Field>
           </div>
         )}
 
@@ -447,6 +561,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="WhatsApp Number">
               <Input
+                className={controlClass}
                 value={draft.contact.whatsapp}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, contact: { ...d.contact, whatsapp: e.target.value } }))
@@ -456,6 +571,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             <Field label="Email Address *" className="sm:col-span-2">
               <Input
                 type="email"
+                className={controlClass}
                 value={draft.contact.email}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, contact: { ...d.contact, email: e.target.value } }))
@@ -464,7 +580,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Permanent Address" className="sm:col-span-2">
               <textarea
-                className="min-h-20 w-full rounded-md border p-2 text-sm"
+                className="min-h-20 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 text-sm"
                 value={draft.contact.permanentAddress}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -476,7 +592,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Correspondence Address" className="sm:col-span-2">
               <textarea
-                className="min-h-20 w-full rounded-md border p-2 text-sm"
+                className="min-h-20 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 text-sm"
                 value={draft.contact.correspondenceAddress}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -494,19 +610,27 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             {draft.education.map((row, i) => (
               <div key={i} className="rounded-xl border border-slate-200 p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Qualification">
-                    <Input
-                      placeholder="e.g. M.A., Ph.D."
+                  <Field label="Qualification Type">
+                    <select
+                      className={selectClass}
                       value={row.qualification}
                       onChange={(e) => {
                         const education = [...draft.education];
                         education[i] = { ...row, qualification: e.target.value };
                         setDraft((d) => ({ ...d, education }));
                       }}
-                    />
+                    >
+                      <option value="">Select</option>
+                      {CAREERS_EDUCATION_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
                   <Field label="University / Board">
                     <Input
+                      className={controlClass}
                       value={row.university}
                       onChange={(e) => {
                         const education = [...draft.education];
@@ -515,8 +639,20 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                       }}
                     />
                   </Field>
+                  <Field label="Institution / College" className="sm:col-span-2">
+                    <Input
+                      className={controlClass}
+                      value={row.institution}
+                      onChange={(e) => {
+                        const education = [...draft.education];
+                        education[i] = { ...row, institution: e.target.value };
+                        setDraft((d) => ({ ...d, education }));
+                      }}
+                    />
+                  </Field>
                   <Field label="Year">
                     <Input
+                      className={controlClass}
                       value={row.year}
                       onChange={(e) => {
                         const education = [...draft.education];
@@ -527,20 +663,11 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                   </Field>
                   <Field label="% / CGPA">
                     <Input
+                      className={controlClass}
                       value={row.score}
                       onChange={(e) => {
                         const education = [...draft.education];
                         education[i] = { ...row, score: e.target.value };
-                        setDraft((d) => ({ ...d, education }));
-                      }}
-                    />
-                  </Field>
-                  <Field label="Specialization" className="sm:col-span-2">
-                    <Input
-                      value={row.specialization}
-                      onChange={(e) => {
-                        const education = [...draft.education];
-                        education[i] = { ...row, specialization: e.target.value };
                         setDraft((d) => ({ ...d, education }));
                       }}
                     />
@@ -568,6 +695,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Institution">
                     <Input
+                      className={controlClass}
                       value={row.institution}
                       onChange={(e) => {
                         const experience = [...draft.experience];
@@ -578,6 +706,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                   </Field>
                   <Field label="Designation">
                     <Input
+                      className={controlClass}
                       value={row.designation}
                       onChange={(e) => {
                         const experience = [...draft.experience];
@@ -586,9 +715,21 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                       }}
                     />
                   </Field>
+                  <Field label="Department" className="sm:col-span-2">
+                    <Input
+                      className={controlClass}
+                      value={row.department}
+                      onChange={(e) => {
+                        const experience = [...draft.experience];
+                        experience[i] = { ...row, department: e.target.value };
+                        setDraft((d) => ({ ...d, experience }));
+                      }}
+                    />
+                  </Field>
                   <Field label="From">
                     <Input
                       type="date"
+                      className={controlClass}
                       value={row.fromDate}
                       onChange={(e) => {
                         const experience = [...draft.experience];
@@ -600,6 +741,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                   <Field label="To">
                     <Input
                       type="date"
+                      className={controlClass}
                       value={row.toDate}
                       onChange={(e) => {
                         const experience = [...draft.experience];
@@ -612,6 +754,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                     <Input
                       type="number"
                       min={0}
+                      className={controlClass}
                       value={row.experience}
                       onChange={(e) => {
                         const experience = [...draft.experience];
@@ -640,6 +783,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Research Area" className="sm:col-span-2">
               <Input
+                className={controlClass}
                 value={draft.research.researchArea}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -683,6 +827,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="PhD Details" className="sm:col-span-2">
               <Input
+                className={controlClass}
                 value={draft.research.phdDetails}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -694,6 +839,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Publications Count">
               <Input
+                className={controlClass}
                 value={draft.research.publicationsCount}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -705,6 +851,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Books Published">
               <Input
+                className={controlClass}
                 value={draft.research.booksPublished}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -714,8 +861,69 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                 }
               />
             </Field>
+            <Field label="Conference Papers">
+              <Input
+                className={controlClass}
+                value={draft.research.conferencePapers}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, conferencePapers: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Research Projects">
+              <Input
+                className={controlClass}
+                value={draft.research.researchProjects}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, researchProjects: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Patents">
+              <Input
+                className={controlClass}
+                value={draft.research.patents}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, patents: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="FDP">
+              <Input
+                className={controlClass}
+                value={draft.research.fdp}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, fdp: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Workshops" className="sm:col-span-2">
+              <Input
+                className={controlClass}
+                value={draft.research.workshops}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, workshops: e.target.value },
+                  }))
+                }
+              />
+            </Field>
             <Field label="Google Scholar">
               <Input
+                className={controlClass}
                 value={draft.research.googleScholar}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -727,6 +935,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="ORCID">
               <Input
+                className={controlClass}
                 value={draft.research.orcid}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -736,10 +945,146 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                 }
               />
             </Field>
+            <Field label="Scopus ID" className="sm:col-span-2">
+              <Input
+                className={controlClass}
+                value={draft.research.scopusId}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    research: { ...d.research, scopusId: e.target.value },
+                  }))
+                }
+              />
+            </Field>
           </div>
         )}
 
         {step === 5 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Languages Known" className="sm:col-span-2">
+              <Input
+                className={controlClass}
+                placeholder="e.g. English, Hindi, Garo"
+                value={draft.skills.languagesKnown}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    skills: { ...d.skills, languagesKnown: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Computer Skills" className="sm:col-span-2">
+              <textarea
+                className="min-h-20 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 text-sm"
+                value={draft.skills.computerSkills}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    skills: { ...d.skills, computerSkills: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Teaching Skills" className="sm:col-span-2">
+              <textarea
+                className="min-h-20 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 text-sm"
+                value={draft.skills.teachingSkills}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    skills: { ...d.skills, teachingSkills: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Research Skills" className="sm:col-span-2">
+              <textarea
+                className="min-h-20 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 text-sm"
+                value={draft.skills.researchSkills}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    skills: { ...d.skills, researchSkills: e.target.value },
+                  }))
+                }
+              />
+            </Field>
+          </div>
+        )}
+
+        {step === 6 && (
+          <div className="space-y-4">
+            {draft.references.map((row, i) => (
+              <div key={i} className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Reference {i + 1}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Name">
+                    <Input
+                      className={controlClass}
+                      value={row.name}
+                      onChange={(e) => {
+                        const references = [...draft.references];
+                        references[i] = { ...row, name: e.target.value };
+                        setDraft((d) => ({ ...d, references }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Designation">
+                    <Input
+                      className={controlClass}
+                      value={row.designation}
+                      onChange={(e) => {
+                        const references = [...draft.references];
+                        references[i] = { ...row, designation: e.target.value };
+                        setDraft((d) => ({ ...d, references }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Institution" className="sm:col-span-2">
+                    <Input
+                      className={controlClass}
+                      value={row.institution}
+                      onChange={(e) => {
+                        const references = [...draft.references];
+                        references[i] = { ...row, institution: e.target.value };
+                        setDraft((d) => ({ ...d, references }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Email">
+                    <Input
+                      type="email"
+                      className={controlClass}
+                      value={row.email}
+                      onChange={(e) => {
+                        const references = [...draft.references];
+                        references[i] = { ...row, email: e.target.value };
+                        setDraft((d) => ({ ...d, references }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <Input
+                      className={controlClass}
+                      value={row.phone}
+                      onChange={(e) => {
+                        const references = [...draft.references];
+                        references[i] = { ...row, phone: e.target.value };
+                        setDraft((d) => ({ ...d, references }));
+                      }}
+                    />
+                  </Field>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {step === 7 && (
           <div className="space-y-6">
             <CareersFileDropzone
               label="Resume / CV"
@@ -767,20 +1112,51 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
               file={pgCert}
               onFile={setPgCert}
             />
+            <CareersFileDropzone
+              label="Experience Certificate"
+              accept=".pdf,image/*"
+              file={experienceCert}
+              onFile={setExperienceCert}
+            />
+            <CareersFileDropzone
+              label="NET / SET Certificate"
+              accept=".pdf,image/*"
+              file={netCert}
+              onFile={setNetCert}
+            />
+            <CareersFileDropzone
+              label="PhD Certificate"
+              accept=".pdf,image/*"
+              file={phdCert}
+              onFile={setPhdCert}
+            />
+            <CareersFileDropzone
+              label="Community Certificate"
+              accept=".pdf,image/*"
+              file={communityCert}
+              onFile={setCommunityCert}
+            />
             <div>
-              <Label className="text-sm">Optional certificates (NET/SET, PhD, experience)</Label>
+              <Label className="text-sm">Other documents (multiple)</Label>
               <Input
                 type="file"
                 accept=".pdf,image/*"
                 multiple
                 className="mt-2"
-                onChange={(e) => setOptionalDocs(Array.from(e.target.files ?? []))}
+                onChange={(e) => setOtherDocs(Array.from(e.target.files ?? []))}
               />
+              {otherDocs.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                  {otherDocs.map((f) => (
+                    <li key={f.name}>✓ {f.name}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           </div>
         )}
 
-        {step === 6 && (
+        {step === 8 && (
           <div className="space-y-4 text-sm">
             <div className="rounded-xl border border-cyan-400/20 bg-gradient-to-br from-slate-50 to-cyan-50/40 p-4">
               <p className="font-semibold text-[#0b1f4a]">Application Summary</p>
@@ -801,6 +1177,16 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                   <dt className="text-slate-500">Position</dt>
                   <dd className="font-medium">{job.title}</dd>
                 </div>
+                <div>
+                  <dt className="text-slate-500">Qualification</dt>
+                  <dd className="font-medium">{highestQualification || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Experience</dt>
+                  <dd className="font-medium">
+                    {totalExperienceYears ? `${totalExperienceYears} years` : '—'}
+                  </dd>
+                </div>
               </dl>
             </div>
             <div className="rounded-xl border border-slate-200 p-4">
@@ -808,8 +1194,21 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
               <ul className="mt-2 space-y-1 text-slate-600">
                 <li>{resume ? `✓ Resume: ${resume.name}` : '✗ Resume missing'}</li>
                 <li>{photo ? `✓ Photo: ${photo.name}` : '○ Photo optional'}</li>
-                <li>{ugCert ? `✓ UG: ${ugCert.name}` : '✗ UG certificate missing'}</li>
+                <li>{ugCert ? `✓ UG: ${ugCert.name}` : '○ UG optional'}</li>
                 <li>{pgCert ? `✓ PG: ${pgCert.name}` : '○ PG optional'}</li>
+                <li>
+                  {experienceCert
+                    ? `✓ Experience: ${experienceCert.name}`
+                    : '○ Experience optional'}
+                </li>
+                <li>{netCert ? `✓ NET/SET: ${netCert.name}` : '○ NET/SET optional'}</li>
+                <li>{phdCert ? `✓ PhD: ${phdCert.name}` : '○ PhD optional'}</li>
+                <li>
+                  {communityCert ? `✓ Community: ${communityCert.name}` : '○ Community optional'}
+                </li>
+                <li>
+                  {otherDocs.length ? `✓ Other: ${otherDocs.length} file(s)` : '○ Other optional'}
+                </li>
               </ul>
             </div>
             <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
@@ -824,6 +1223,45 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
                 that any false information may lead to rejection or cancellation of my application.
               </span>
             </label>
+            <div className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-3">
+              <Field label="Signature (Full Name)">
+                <Input
+                  className={controlClass}
+                  value={draft.declarationMeta.signatureName}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      declarationMeta: { ...d.declarationMeta, signatureName: e.target.value },
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="Place">
+                <Input
+                  className={controlClass}
+                  value={draft.declarationMeta.place}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      declarationMeta: { ...d.declarationMeta, place: e.target.value },
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="Date">
+                <Input
+                  type="date"
+                  className={controlClass}
+                  value={draft.declarationMeta.date}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      declarationMeta: { ...d.declarationMeta, date: e.target.value },
+                    }))
+                  }
+                />
+              </Field>
+            </div>
             <CareersTurnstile onToken={setTurnstileToken} />
             <input
               tabIndex={-1}

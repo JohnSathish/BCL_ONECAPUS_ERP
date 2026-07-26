@@ -10,7 +10,14 @@ import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 import type { SubmitCareersApplicationDto } from '../dto/careers-portal.dto';
 import { verifyTurnstileToken } from '../../../common/utils/turnstile.util';
 import { RecruitmentNotificationService } from './recruitment-notification.service';
+import { CareersApplicationDocumentService } from './careers-application-document.service';
 import { buildCareersStatusTimeline } from '../constants/careers-status-timeline';
+import {
+  docKindLabel,
+  isCareersDocKind,
+  normalizeDocKind,
+  type CareersStoredDocument,
+} from '../constants/careers-document-kinds';
 import { sanitizeDisplayText } from '../../../common/utils/display-text.util';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { parsePortalExtras } from '../../../common/types/portal-extras.types';
@@ -32,6 +39,7 @@ export class CareersPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: RecruitmentNotificationService,
+    private readonly applicationDocuments: CareersApplicationDocumentService,
   ) {}
 
   private db() {
@@ -384,43 +392,71 @@ export class CareersPortalService {
     kind: string,
     file: Express.Multer.File,
   ) {
+    if (!isCareersDocKind(kind)) {
+      throw new BadRequestException(
+        `Invalid document kind. Allowed: resume, photo, ug, pg, experience, net, phd, community, other`,
+      );
+    }
     const app = await this.db().recruitmentApplication.findFirst({
       where: { id: applicationId, tenantId },
     });
     if (!app) throw new NotFoundException('Application not found');
 
-    const url = await this.saveUpload(tenantId, applicationId, kind, file);
+    const normalized = normalizeDocKind(kind);
+    const url = await this.saveUpload(
+      tenantId,
+      applicationId,
+      normalized,
+      file,
+    );
+    const entry: CareersStoredDocument = {
+      kind: normalized.toUpperCase(),
+      name: file.originalname,
+      url,
+      mimeType: file.mimetype ?? null,
+      uploadedAt: new Date().toISOString(),
+    };
 
-    if (kind === 'resume') {
-      await this.db().recruitmentApplication.update({
-        where: { id: applicationId },
-        data: { resumeUrl: url },
-      });
-    } else if (kind === 'photo') {
-      await this.db().recruitmentApplication.update({
-        where: { id: applicationId },
-        data: { photoUrl: url },
-      });
-    } else if (kind === 'certificate') {
-      const existing = Array.isArray(app.certificatesJson)
-        ? (app.certificatesJson as Array<{ name: string; url: string }>)
-        : [];
-      await this.db().recruitmentApplication.update({
-        where: { id: applicationId },
-        data: {
-          certificatesJson: [
-            ...existing,
-            {
-              name: file.originalname,
-              url,
-              uploadedAt: new Date().toISOString(),
-            },
-          ],
-        },
-      });
+    const existing = Array.isArray(app.certificatesJson)
+      ? (app.certificatesJson as CareersStoredDocument[])
+      : [];
+
+    const data: Record<string, unknown> = {};
+    if (normalized === 'resume') {
+      data.resumeUrl = url;
+      data.certificatesJson = [
+        ...existing.filter((d) => normalizeDocKind(d.kind) !== 'resume'),
+        entry,
+      ];
+    } else if (normalized === 'photo') {
+      data.photoUrl = url;
+      data.certificatesJson = [
+        ...existing.filter((d) => normalizeDocKind(d.kind) !== 'photo'),
+        entry,
+      ];
+    } else {
+      data.certificatesJson = [...existing, entry];
     }
 
-    return { url, kind };
+    await this.db().recruitmentApplication.update({
+      where: { id: applicationId },
+      data,
+    });
+
+    return { url, kind: normalized, label: docKindLabel(normalized) };
+  }
+
+  async finalizeApplicationPdf(
+    tenantId: string,
+    applicationNo: string,
+    mobile: string,
+  ) {
+    const app = await this.verifyApplicationAccess(
+      tenantId,
+      applicationNo,
+      mobile,
+    );
+    return this.applicationDocuments.generateAndPersist(tenantId, app.id);
   }
 
   async saveUpload(
@@ -465,10 +501,10 @@ export class CareersPortalService {
     const year = new Date().getFullYear();
     const seq = await this.db().recruitmentApplicationSequence.upsert({
       where: { tenantId_year: { tenantId, year } },
-      create: { tenantId, year, currentNo: 1 },
+      create: { tenantId, year, currentNo: 1, prefix: 'DBC/CAR' },
       update: { currentNo: { increment: 1 } },
     });
     const no = seq.currentNo;
-    return `DBC-APP-${year}-${String(no).padStart(5, '0')}`;
+    return `DBC/CAR/${year}/${String(no).padStart(5, '0')}`;
   }
 }

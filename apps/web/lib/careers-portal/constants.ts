@@ -164,8 +164,22 @@ export const CAREERS_WIZARD_STEPS = [
   'Educational Qualification',
   'Experience',
   'Research Profile',
+  'Skills',
+  'References',
   'Document Upload',
   'Review & Submit',
+] as const;
+
+export const CAREERS_EDUCATION_TYPES = [
+  'SSLC',
+  'HSS',
+  'UG',
+  'PG',
+  'M.Phil',
+  'Ph.D',
+  'NET',
+  'SLET',
+  'Other',
 ] as const;
 
 export const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {

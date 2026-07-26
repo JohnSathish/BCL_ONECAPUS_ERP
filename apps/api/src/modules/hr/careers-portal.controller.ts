@@ -22,6 +22,8 @@ import {
   SubmitCareersApplicationDto,
 } from './dto/careers-portal.dto';
 import { CareersPortalService } from './services/careers-portal.service';
+import { CareersApplicationDocumentService } from './services/careers-application-document.service';
+import { isCareersDocKind } from './constants/careers-document-kinds';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -31,6 +33,7 @@ export class CareersPortalController {
   constructor(
     private readonly portal: CareersPortalService,
     private readonly tenantResolution: TenantResolutionService,
+    private readonly applicationDocuments: CareersApplicationDocumentService,
   ) {}
 
   private resolveCareersHost(req: Request): string {
@@ -128,8 +131,7 @@ export class CareersPortalController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    const allowed = ['resume', 'photo', 'certificate'];
-    if (!allowed.includes(kind)) {
+    if (!isCareersDocKind(kind)) {
       throw new BadRequestException('Invalid upload kind');
     }
     const tenantId = await this.resolveTenantId(req);
@@ -158,9 +160,8 @@ export class CareersPortalController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    const kind = dto.kind?.trim() || 'certificate';
-    const allowed = ['resume', 'photo', 'certificate'];
-    if (!allowed.includes(kind)) {
+    const kind = dto.kind?.trim() || 'other';
+    if (!isCareersDocKind(kind)) {
       throw new BadRequestException('Invalid upload kind');
     }
     const tenantId = await this.resolveTenantId(req);
@@ -171,5 +172,26 @@ export class CareersPortalController {
       kind,
       file,
     );
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  @Post('finalize-pdf')
+  async finalizePdf(
+    @Req() req: Request,
+    @Body() dto: CareersApplicationStatusDto,
+  ) {
+    const tenantId = await this.resolveTenantId(req);
+    return this.portal.finalizeApplicationPdf(
+      tenantId,
+      dto.applicationNo,
+      dto.mobile,
+    );
+  }
+
+  @Public()
+  @Get('verify/:token')
+  async verify(@Param('token') token: string) {
+    return this.applicationDocuments.verifyByToken(token);
   }
 }

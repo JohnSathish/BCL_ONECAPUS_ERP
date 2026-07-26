@@ -125,11 +125,7 @@ export async function submitCareersApplication(body: Record<string, unknown>) {
   return data;
 }
 
-export async function uploadCareersFile(
-  applicationId: string,
-  kind: 'resume' | 'photo' | 'certificate',
-  file: File,
-) {
+export async function uploadCareersFile(applicationId: string, kind: string, file: File) {
   const form = new FormData();
   form.append('file', file);
   const { data } = await publicClient.post<{ url: string }>(
@@ -141,6 +137,35 @@ export async function uploadCareersFile(
         'Content-Type': 'multipart/form-data',
       },
     },
+  );
+  return data;
+}
+
+export async function finalizeCareersApplicationPdf(body: {
+  applicationNo: string;
+  mobile: string;
+}) {
+  const { data } = await publicClient.post('/v1/careers/portal/finalize-pdf', body, {
+    headers: getCareerRequestHeaders(),
+  });
+  return data;
+}
+
+export type CareersVerifyResult = {
+  valid: boolean;
+  applicationNo?: string;
+  candidateName?: string;
+  position?: string | null;
+  department?: string | null;
+  appliedAt?: string;
+  contentHash?: string | null;
+  generatedAt?: string | null;
+};
+
+export async function fetchCareersVerify(token: string) {
+  const { data } = await publicClient.get<CareersVerifyResult>(
+    `/v1/careers/portal/verify/${token}`,
+    { headers: getCareerRequestHeaders() },
   );
   return data;
 }

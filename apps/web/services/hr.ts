@@ -173,9 +173,35 @@ export type RecruitmentApplicationDetail = RecruitmentApplication & {
   resumeUrl?: string;
   photoUrl?: string;
   notes?: string;
+  applicationPdfUrl?: string | null;
+  applicationPdfGeneratedAt?: string | null;
+  verifyToken?: string | null;
+  contentHash?: string | null;
   applicationDetailsJson?: Record<string, unknown>;
-  certificatesJson?: Array<{ name: string; url: string; uploadedAt?: string }>;
-  addressJson?: { line1?: string; city?: string };
+  certificatesJson?: Array<{
+    kind?: string;
+    name: string;
+    url: string;
+    mimeType?: string | null;
+    uploadedAt?: string;
+  }>;
+  addressJson?: { line1?: string; city?: string; correspondence?: string };
+};
+
+export type RecruitmentApplicationDocuments = {
+  applicationNo?: string | null;
+  applicationPdfUrl?: string | null;
+  applicationPdfGeneratedAt?: string | null;
+  contentHash?: string | null;
+  verifyToken?: string | null;
+  documents: Array<{
+    key: string;
+    kind: string;
+    label: string;
+    name: string;
+    url: string;
+    mimeType?: string | null;
+  }>;
 };
 
 export type RecruitmentPipelineColumn = {
@@ -239,6 +265,38 @@ export async function fetchRecruitmentApplication(id: string) {
     `/v1/hr/recruitment/applications/${id}`,
   );
   return data;
+}
+
+export async function fetchRecruitmentApplicationDocuments(id: string) {
+  const { data } = await api.get<RecruitmentApplicationDocuments>(
+    `/v1/hr/recruitment/applications/${id}/documents`,
+  );
+  return data;
+}
+
+export async function regenerateRecruitmentApplicationPdf(id: string) {
+  const { data } = await api.post(
+    `/v1/hr/recruitment/applications/${id}/application-pdf/regenerate`,
+  );
+  return data as {
+    applicationPdfUrl: string;
+    contentHash: string;
+    verifyToken: string;
+  };
+}
+
+export async function downloadRecruitmentApplicationPdf(id: string) {
+  const { data } = await api.get(`/v1/hr/recruitment/applications/${id}/application.pdf`, {
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export async function downloadRecruitmentApplicationZip(id: string) {
+  const { data } = await api.get(`/v1/hr/recruitment/applications/${id}/package.zip`, {
+    responseType: 'blob',
+  });
+  return data as Blob;
 }
 
 export async function createRecruitmentVacancy(body: {

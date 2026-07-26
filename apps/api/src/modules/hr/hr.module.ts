@@ -20,6 +20,7 @@ import { RecruitmentService } from './services/recruitment.service';
 import { RecruitmentInterviewDocumentService } from './services/recruitment-interview-document.service';
 import { RecruitmentNotificationService } from './services/recruitment-notification.service';
 import { CareersPortalService } from './services/careers-portal.service';
+import { CareersApplicationDocumentService } from './services/careers-application-document.service';
 import { CareersPortalController } from './careers-portal.controller';
 import { PensionService } from './services/pension.service';
 import { AppraisalService } from './services/appraisal.service';
@@ -53,6 +54,7 @@ import { ReplacementTimetableOverlayService } from './services/replacement-timet
     ProbationService,
     HrSchedulerService,
     CareersPortalService,
+    CareersApplicationDocumentService,
     RecruitmentNotificationService,
     RecruitmentInterviewDocumentService,
   ],
@@ -66,6 +68,7 @@ import { ReplacementTimetableOverlayService } from './services/replacement-timet
     ReplacementTimetableOverlayService,
     AppointmentOrderService,
     JoiningReportService,
+    CareersApplicationDocumentService,
   ],
 })
 export class HrModule {}

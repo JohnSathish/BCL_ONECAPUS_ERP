@@ -4211,6 +4211,10 @@ model RecruitmentApplication {
   experienceYears Int? @map("experience_years")
   applicationDetailsJson Json? @map("application_details_json")
   certificatesJson Json? @map("certificates_json")
+  applicationPdfUrl String? @map("application_pdf_url")
+  applicationPdfGeneratedAt DateTime? @map("application_pdf_generated_at")
+  verifyToken String?  @map("verify_token") @db.Uuid
+  contentHash String?  @map("content_hash")
   source        String   @default("INTERNAL")
   status      String   @default("SUBMITTED")
   appliedAt   DateTime @default(now()) @map("applied_at")
@@ -4227,6 +4231,7 @@ model RecruitmentApplication {
 
   @@index([tenantId, vacancyId])
   @@index([tenantId, status])
+  @@index([tenantId, verifyToken])
   @@map("recruitment_applications")
   @@schema("academic")
 }

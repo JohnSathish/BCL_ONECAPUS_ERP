@@ -54,6 +54,7 @@ import { RecruitmentService } from './services/recruitment.service';
 import { PensionService } from './services/pension.service';
 import { AppraisalService } from './services/appraisal.service';
 import { RecruitmentInterviewDocumentService } from './services/recruitment-interview-document.service';
+import { CareersApplicationDocumentService } from './services/careers-application-document.service';
 
 @ApiBearerAuth()
 @ApiTags('hr')
@@ -65,6 +66,7 @@ export class HrController {
     private readonly pension: PensionService,
     private readonly appraisal: AppraisalService,
     private readonly interviewDocuments: RecruitmentInterviewDocumentService,
+    private readonly careersDocuments: CareersApplicationDocumentService,
   ) {}
 
   // Leave
@@ -221,6 +223,56 @@ export class HrController {
   @RequireAnyPermission('payroll:read', 'staff:manage')
   getApplication(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.recruitment.getApplication(user.tid, id);
+  }
+
+  @Get('recruitment/applications/:id/application.pdf')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  async downloadApplicationPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.careersDocuments.pdfBuffer(
+      user.tid,
+      id,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Get('recruitment/applications/:id/documents')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  listApplicationDocuments(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.careersDocuments.listDocuments(user.tid, id);
+  }
+
+  @Get('recruitment/applications/:id/package.zip')
+  @RequireAnyPermission('payroll:read', 'staff:manage')
+  async downloadApplicationPackage(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.careersDocuments.packageZip(
+      user.tid,
+      id,
+    );
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Post('recruitment/applications/:id/application-pdf/regenerate')
+  @RequirePermissions('staff:manage')
+  regenerateApplicationPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.careersDocuments.generateAndPersist(user.tid, id);
   }
 
   @Get('recruitment/interviews')
