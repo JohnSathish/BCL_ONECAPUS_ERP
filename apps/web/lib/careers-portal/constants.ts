@@ -92,6 +92,12 @@ export const CAREERS_FAQ = [
 
 export const HERO_CAROUSEL_SLIDES = [
   {
+    id: 'faculty-campus',
+    label: 'Don Bosco College Faculty & Campus',
+    src: '/branding/careers-hero-faculty-campus.png',
+    floatCard: { title: 'Our Faculty Family', subtitle: 'Don Bosco College, Tura' },
+  },
+  {
     id: 'campus',
     label: 'College Main Building',
     src: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1920&q=85',
@@ -115,12 +121,6 @@ export const HERO_CAROUSEL_SLIDES = [
     src: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1920&q=85',
     floatCard: { title: 'Modern Classrooms', subtitle: 'Student-centric learning' },
   },
-  {
-    id: 'library',
-    label: 'Library Facilities',
-    src: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1920&q=85',
-    floatCard: { title: 'Research Activities', subtitle: 'Library & digital resources' },
-  },
 ] as const;
 
 export const INSTITUTIONAL_HIGHLIGHTS = [
@@ -143,7 +143,7 @@ export const DEPARTMENT_HIRING_DEFAULTS = [
 ] as const;
 
 export const HERO_CAMPUS_IMAGES = {
-  main: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=900&q=80',
+  main: '/branding/careers-hero-faculty-campus.png',
   classroom:
     'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=600&q=80',
   graduation:
