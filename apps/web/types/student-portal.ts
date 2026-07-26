@@ -31,6 +31,9 @@ export type StudentAcademicChip = {
   category: string;
   label: string;
   courseTitle: string;
+  courseCode?: string | null;
+  credits?: number;
+  facultyName?: string | null;
 };
 
 export type StudentTimetableSlot = TimetableEntry & {
@@ -59,6 +62,11 @@ export type StudentDashboardView = {
     status: 'PAID' | 'PENDING';
     semesterLabel: string;
   };
+  credits?: {
+    earned: number;
+    target: number;
+    percent: number;
+  };
   /** Loaded lazily via widget endpoints */
   todayTimetable?: StudentTimetableSlot[];
   attendance?: {
@@ -78,6 +86,7 @@ export type StudentDashboardView = {
   library?: {
     issuedBooks: number;
     finesDue: number;
+    dueInDays?: number | null;
   };
   certificates?: {
     available: number;

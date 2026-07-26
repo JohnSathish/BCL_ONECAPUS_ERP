@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
+import { fetchStudentDashboard } from '@/services/student-portal';
 import type { InstitutionBranding } from '@/types/branding';
 import { cn } from '@/utils/cn';
 
@@ -13,14 +14,29 @@ type Props = {
   active?: boolean;
   collapsed?: boolean;
   className?: string;
+  /** Student portal: show FYUGP · AY badge under college name */
+  studentMode?: boolean;
 };
 
-export function SidebarInstitutionCard({ branding, active, collapsed, className }: Props) {
+export function SidebarInstitutionCard({
+  branding,
+  active,
+  collapsed,
+  className,
+  studentMode,
+}: Props) {
   const statsQ = useQuery({
     queryKey: ['sidebar', 'institution-stats'],
     queryFn: () => fetchOperationsCenter({}),
     staleTime: 120_000,
     retry: 1,
+    enabled: !studentMode,
+  });
+  const studentDashQ = useQuery({
+    queryKey: ['student-portal', 'dashboard'],
+    queryFn: fetchStudentDashboard,
+    staleTime: 120_000,
+    enabled: Boolean(studentMode),
   });
 
   const logoSrc = active
@@ -29,9 +45,14 @@ export function SidebarInstitutionCard({ branding, active, collapsed, className 
   const name = active
     ? (branding?.displayName ?? branding?.shortName ?? 'BCL OneCampus ERP')
     : 'BCL OneCampus ERP';
-  const subtitle = active
-    ? (branding?.portalSubtitle ?? statsQ.data?.institution.academicYear ?? 'Campus OS')
-    : 'Campus OS';
+  const academicYear = studentMode
+    ? studentDashQ.data?.profile.academicYear
+    : statsQ.data?.institution.academicYear;
+  const subtitle = studentMode
+    ? `FYUGP${academicYear ? ` · AY ${academicYear}` : ''}`
+    : active
+      ? (branding?.portalSubtitle ?? academicYear ?? 'Campus OS')
+      : 'Campus OS';
   const location = branding?.address?.split(',').pop()?.trim() ?? 'Active Campus';
 
   const students = statsQ.data?.institution.studentCount;
@@ -88,13 +109,15 @@ export function SidebarInstitutionCard({ branding, active, collapsed, className 
         </div>
       </div>
 
-      <div className="pointer-events-none absolute left-3 right-3 top-full z-20 mt-1 hidden rounded-lg border border-sidebar-border bg-sidebar/95 p-2.5 opacity-0 shadow-xl backdrop-blur-md transition group-hover:pointer-events-auto group-hover:block group-hover:opacity-100">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <StatPill label="Students" value={students} color="#22c55e" />
-          <StatPill label="Staff" value={staff} color="#f59e0b" />
-          <StatPill label="Depts" value="—" color="#8b5cf6" />
+      {!collapsed && !studentMode ? (
+        <div className="pointer-events-none absolute left-3 right-3 top-full z-20 mt-1 hidden rounded-lg border border-sidebar-border bg-sidebar/95 p-2.5 opacity-0 shadow-xl backdrop-blur-md transition group-hover:pointer-events-auto group-hover:block group-hover:opacity-100">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <StatPill label="Students" value={students} color="#22c55e" />
+            <StatPill label="Staff" value={staff} color="#f59e0b" />
+            <StatPill label="Depts" value="—" color="#8b5cf6" />
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

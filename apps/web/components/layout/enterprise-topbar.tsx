@@ -1,7 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, User } from 'lucide-react';
+import {
+  LifeBuoy,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  User,
+} from 'lucide-react';
 import { CampusSwitcher } from '@/components/dashboard/campus-switcher';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { NotificationPanel } from '@/components/dashboard/notification-panel';
@@ -35,9 +44,11 @@ import { cn } from '@/utils/cn';
 
 export function EnterpriseTopbar({
   title,
+  subtitle,
   portalRole,
 }: {
   title?: string;
+  subtitle?: string;
   portalRole?: 'student' | 'staff' | 'admin' | 'shift';
 }) {
   const router = useRouter();
@@ -135,9 +146,16 @@ export function EnterpriseTopbar({
               </div>
             ) : null}
             {title && portalRole !== 'staff' ? (
-              <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
-                {title}
-              </h1>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                  {title}
+                </h1>
+                {subtitle && portalRole === 'student' ? (
+                  <p className="hidden truncate text-xs text-muted-foreground sm:block">
+                    {subtitle}
+                  </p>
+                ) : null}
+              </div>
             ) : title ? (
               <h1 className="hidden truncate text-base font-semibold tracking-tight sm:text-lg md:block">
                 {title}
@@ -163,6 +181,16 @@ export function EnterpriseTopbar({
           <CommandPalette />
           <CampusSwitcher />
           {authReady ? <NotificationPanel /> : null}
+          {portalRole === 'student' ? (
+            <Link
+              href="/student/support/chat"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-card/80 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+              aria-label="Live chat support"
+              title="Live Chat"
+            >
+              <LifeBuoy className="h-4 w-4" />
+            </Link>
+          ) : null}
           <ThemeToggle />
 
           {portalRole === 'student' ? (

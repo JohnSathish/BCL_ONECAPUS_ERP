@@ -1,9 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-
 import { StudentName } from '@/components/students/student-name';
-import { StaffPortalAvatar } from '@/components/staff-portal/layout/staff-portal-avatar';
+import { StudentCampusQuoteCard } from '@/components/student-portal/dashboard/student-campus-quote-card';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import type { StudentDashboardView } from '@/types/student-portal';
 import { getLocalGreeting } from '@/utils/student-portal-utils';
@@ -17,9 +16,12 @@ type Props = {
 export function StudentDashboardHeader({ data, loading }: Props) {
   if (loading || !data) {
     return (
-      <div className="animate-pulse rounded-2xl border border-border/40 bg-card/60 p-6">
-        <div className="h-6 w-48 rounded bg-muted" />
-        <div className="mt-3 h-4 w-72 rounded bg-muted" />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="animate-pulse rounded-2xl border border-slate-200/80 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+          <div className="h-6 w-48 rounded bg-muted" />
+          <div className="mt-3 h-4 w-72 rounded bg-muted" />
+        </div>
+        <div className="hidden min-h-[148px] animate-pulse rounded-2xl bg-muted lg:block" />
       </div>
     );
   }
@@ -27,114 +29,88 @@ export function StudentDashboardHeader({ data, loading }: Props) {
   const { profile } = data;
   const greeting = getLocalGreeting();
   const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
-  const rollLabel = profile.rollNumber?.trim() || '—';
-  const collegeReg = profile.enrollmentNumber?.trim() || '—';
-  const nehuRoll = profile.universityRollNumber?.trim() || '—';
-  const nehuReg = profile.universityRegistrationNumber?.trim() || '—';
   const displayName = profile.displayFullName?.trim() || profile.fullName;
+  const firstName = displayName.split(/\s+/)[0] || displayName;
 
-  const identityFields = [
-    { label: 'College Roll', value: rollLabel },
-    { label: 'College Reg', value: collegeReg },
-    { label: 'NEHU Roll', value: nehuRoll },
-    { label: 'NEHU Reg', value: nehuReg },
+  const chips = [
+    { label: 'Roll No.', value: profile.rollNumber?.trim() || '—' },
+    { label: 'College Reg.', value: profile.enrollmentNumber?.trim() || '—' },
+    { label: 'NEHU Reg.', value: profile.universityRegistrationNumber?.trim() || '—' },
+    { label: 'Department', value: profile.department || '—' },
+    { label: 'Academic Year', value: profile.academicYear || '—' },
+    {
+      label: 'Semester',
+      value: profile.semesterSequence != null ? `Sem ${profile.semesterSequence}` : '—',
+    },
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-primary/15 via-card/80 to-background p-4 backdrop-blur-xl sm:p-6"
-    >
-      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.9fr)]">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5"
+      >
+        <div className="flex min-w-0 items-center gap-3">
           <div className="relative shrink-0">
             {photoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={photoSrc}
                 alt=""
-                className="h-16 w-16 rounded-2xl border border-border/60 object-cover shadow-sm"
+                className="h-14 w-14 rounded-2xl object-cover ring-2 ring-[#1e4d8c]/20"
               />
             ) : (
-              <StaffPortalAvatar
-                photoUrl={null}
-                name={displayName}
-                size="lg"
-                className="rounded-2xl"
-              />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1e4d8c] text-sm font-semibold text-white">
+                {displayName
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((p) => p[0])
+                  .join('')}
+              </div>
             )}
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-              {greeting},{' '}
+            <p className="text-xs font-medium text-slate-500">
+              {greeting}, {firstName}!
+            </p>
+            <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl">
               <StudentName
                 name={profile.fullName}
                 displayFullName={profile.displayFullName}
                 className="inline"
               />
-            </h1>
-            <p className="mt-1 text-sm font-medium text-foreground/90">{profile.programLabel}</p>
-            <p className="text-sm text-muted-foreground">
-              {profile.semesterSequence != null
-                ? `Semester ${profile.semesterSequence}`
-                : 'Semester —'}
+            </h2>
+            <p className="truncate text-sm text-slate-600 dark:text-slate-300">
+              {profile.programLabel}
+              {profile.department && profile.department !== profile.programLabel
+                ? ` · ${profile.department}`
+                : ''}
             </p>
-            <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
-              {identityFields.map((field) => (
-                <div key={field.label} className="min-w-0">
-                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {field.label}
-                  </dt>
-                  <dd className="truncate font-mono text-xs font-medium text-foreground/90">
-                    {field.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {profile.academicYear ? (
-              <p className="text-xs text-muted-foreground">Academic Year: {profile.academicYear}</p>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-2">
-              {profile.department ? (
-                <span className="rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                  {profile.department}
-                </span>
-              ) : null}
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                  profile.rfidStatus === 'assigned'
-                    ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                    : 'border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
-                )}
-              >
-                RFID {profile.rfidStatus === 'assigned' ? 'Active' : 'Pending'}
-              </span>
-              <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                Profile {profile.profileCompletion}%
-              </span>
-            </div>
           </div>
         </div>
-        <div className="shrink-0 rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-right backdrop-blur-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Student Portal
-          </p>
-          <p className="font-semibold">Today&apos;s Overview</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Classes:{' '}
-            <span className="font-medium text-foreground">
-              {data.todayTimetable?.length ?? '—'}
-            </span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Health:{' '}
-            <span className="font-medium text-foreground">{data.health?.score ?? '—'}%</span>
-          </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {chips.map((c) => (
+            <div
+              key={c.label}
+              className={cn(
+                'rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/50',
+              )}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {c.label}
+              </p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {c.value}
+              </p>
+            </div>
+          ))}
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      <StudentCampusQuoteCard />
+    </div>
   );
 }

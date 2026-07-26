@@ -62,7 +62,7 @@ function asLifeAtCampus(value: unknown): LifeAtCampus {
       : {};
   const items = Array.isArray(source.items)
     ? source.items
-        .map((row, index) => {
+        .map((row, index): GalleryItem | null => {
           if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
           const item = row as Record<string, unknown>;
           const src = typeof item.src === 'string' ? item.src : '';
@@ -73,9 +73,9 @@ function asLifeAtCampus(value: unknown): LifeAtCampus {
             alt: typeof item.alt === 'string' ? item.alt : '',
             label: typeof item.label === 'string' ? item.label : '',
             href: typeof item.href === 'string' ? item.href : '',
-          } satisfies GalleryItem;
+          };
         })
-        .filter((item): item is GalleryItem => Boolean(item))
+        .filter((item): item is GalleryItem => item != null)
     : [];
   return {
     eyebrow: typeof source.eyebrow === 'string' ? source.eyebrow : 'Life at Don Bosco',
@@ -296,6 +296,7 @@ export function LifeAtCampusEditor({ onMessage }: { onMessage: (message: string)
                     src: '',
                     alt: '',
                     label: '',
+                    href: '',
                   },
                 ],
               })

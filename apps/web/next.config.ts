@@ -68,7 +68,9 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const devApiConnect =
-      process.env.NODE_ENV === 'development' ? ' http://127.0.0.1:3001 http://localhost:3001' : '';
+      process.env.NODE_ENV === 'development'
+        ? ' http://127.0.0.1:3001 http://localhost:3001 ws://127.0.0.1:3001 ws://localhost:3001'
+        : '';
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://sdk.cashfree.com https://pgtest.atomtech.in https://psa.atomtech.in",

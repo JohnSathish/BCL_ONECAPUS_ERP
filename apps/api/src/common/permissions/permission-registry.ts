@@ -452,7 +452,7 @@ export const ERP_MODULES: ErpModule[] = [
   },
   {
     id: 'helpdesk',
-    label: 'Helpdesk',
+    label: 'Support Centre',
     permissions: MODULE_PERMISSIONS.helpdesk,
     defaultHome: '/admin/helpdesk',
   },

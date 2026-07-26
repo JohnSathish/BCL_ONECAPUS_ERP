@@ -131,6 +131,44 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     return { ok: true };
   }
 
+  @SubscribeMessage('support:join-thread')
+  handleJoinSupportThread(
+    @ConnectedSocket() client: AppSocket,
+    @MessageBody() body: { threadId?: string },
+  ) {
+    const threadId = body?.threadId?.trim();
+    if (!threadId || !client.data.user?.tid) return { ok: false };
+    void client.join(`support:thread:${threadId}`);
+    return { ok: true, room: `support:thread:${threadId}` };
+  }
+
+  @SubscribeMessage('support:leave-thread')
+  handleLeaveSupportThread(
+    @ConnectedSocket() client: AppSocket,
+    @MessageBody() body: { threadId?: string },
+  ) {
+    const threadId = body?.threadId?.trim();
+    if (!threadId) return { ok: false };
+    void client.leave(`support:thread:${threadId}`);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('support:typing')
+  handleSupportTyping(
+    @ConnectedSocket() client: AppSocket,
+    @MessageBody() body: { threadId?: string; isTyping?: boolean },
+  ) {
+    const threadId = body?.threadId?.trim();
+    const user = client.data.user;
+    if (!threadId || !user) return { ok: false };
+    this.broadcastToRoom(`support:thread:${threadId}`, 'support.typing', {
+      threadId,
+      userId: user.sub,
+      isTyping: body.isTyping !== false,
+    });
+    return { ok: true };
+  }
+
   @SubscribeMessage('announcement')
   handleAnnouncement(
     @ConnectedSocket() client: AppSocket,

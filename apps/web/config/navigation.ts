@@ -1872,7 +1872,7 @@ export const ADMIN_NAV: NavGroup[] = [
         ],
       },
       {
-        label: 'Help Desk',
+        label: 'Support Centre',
         icon: LifeBuoy,
         href: '/admin/helpdesk',
         module: 'helpdesk',
@@ -2462,6 +2462,99 @@ export const STAFF_NAV: NavGroup[] = [
   },
 ];
 
+/** Grouped student portal navigation (sidebar sections). */
+export const STUDENT_NAV: NavGroup[] = [
+  {
+    label: 'Overview',
+    zone: 'pin-top',
+    items: [{ label: 'Dashboard', href: '/student', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Academics',
+    items: [
+      { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
+      { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },
+      { label: 'Results', href: '/student/results', icon: BarChart3 },
+      { label: 'Subjects', href: '/student/registration', icon: ClipboardList },
+      { label: 'LMS', href: '/student/lms', icon: GraduationCap },
+      { label: 'Academic Calendar', href: '/student/notifications', icon: CalendarDays },
+      { label: 'Examinations', href: '/student/examinations', icon: Ticket },
+      { label: 'Syllabus', href: '/student/syllabus-repository', icon: Library },
+      { label: 'Question Bank', href: '/student/question-bank', icon: HelpCircle },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      {
+        label: 'Fees',
+        href: '/student/fees',
+        icon: Wallet,
+        children: [
+          {
+            label: 'My Fee Account',
+            href: '/student/fees',
+            activePattern: '^/student/fees(?:/.*)?$',
+          },
+          {
+            label: 'Examination Fees',
+            href: '/student/examination-fees',
+            activePattern: '^/student/examination-fees(?:/.*)?$',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Campus Life',
+    items: [
+      { label: 'Dept Activities', href: '/student/department-activities', icon: CalendarDays },
+      { label: 'Competitions', href: '/student/campus-competitions', icon: Award },
+      { label: 'Short-Term Courses', href: '/student/short-term-courses', icon: Award },
+      { label: 'Library', href: '/student/library', icon: Library },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      { label: 'Support Centre', href: '/student/support', icon: LifeBuoy },
+      { label: 'Notices', href: '/student/notifications', icon: Bell },
+      { label: 'Feedback', href: '/student/feedback', icon: MessageSquare },
+      { label: 'Committee Notices', href: '/student/governance/notices', icon: Megaphone },
+      { label: 'Committee Meetings', href: '/student/governance/meetings', icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'My Account',
+    items: [
+      { label: 'Profile', href: '/student/my-profile', icon: User },
+      { label: 'Certificates', href: '/student/certificates', icon: FileText },
+      {
+        label: 'Activity Transcript',
+        href: '/student/department-activities/transcript',
+        icon: Award,
+      },
+      { label: 'Settings', href: '/student/settings', icon: Settings },
+    ],
+  },
+];
+
+function flattenStudentNav(): Array<{
+  label: string;
+  href?: string;
+  icon: LucideIcon;
+  children?: { label: string; href: string; activePattern?: string }[];
+}> {
+  return STUDENT_NAV.flatMap((g) =>
+    g.items.map((item) => ({
+      label: item.label,
+      href: item.href,
+      icon: item.icon,
+      ...(item.children?.length ? { children: item.children } : {}),
+    })),
+  );
+}
+
 export const ROLE_NAV: Record<
   string,
   {
@@ -2483,49 +2576,7 @@ export const ROLE_NAV: Record<
     { label: 'Attendance', href: '/staff/attendance', icon: ClipboardList },
     { label: 'Profile', href: '/staff/profile', icon: User },
   ],
-  student: [
-    { label: 'Dashboard', href: '/student', icon: LayoutDashboard },
-    { label: 'Notifications', href: '/student/notifications', icon: Bell },
-    { label: 'My Profile', href: '/student/my-profile', icon: User },
-    { label: 'Results', href: '/student/results', icon: BarChart3 },
-    {
-      label: 'Fees',
-      href: '/student/fees',
-      icon: Wallet,
-      children: [
-        {
-          label: 'My Fee Account',
-          href: '/student/fees',
-          activePattern: '^/student/fees(?:/.*)?$',
-        },
-        {
-          label: 'Semester Exam Fees',
-          href: '/student/examination-fees',
-          activePattern: '^/student/examination-fees(?:/.*)?$',
-        },
-      ],
-    },
-    { label: 'Feedback', href: '/student/feedback', icon: MessageSquare },
-    { label: 'Certificates', href: '/student/certificates', icon: FileText },
-    { label: 'Timetable', href: '/student/timetable', icon: BookOpen },
-    { label: 'LMS', href: '/student/lms', icon: GraduationCap },
-    { label: 'Short-Term Courses', href: '/student/short-term-courses', icon: Award },
-    { label: 'Department Activities', href: '/student/department-activities', icon: CalendarDays },
-    {
-      label: 'Activity transcript',
-      href: '/student/department-activities/transcript',
-      icon: Award,
-    },
-    { label: 'Campus Competitions', href: '/student/campus-competitions', icon: Award },
-    { label: 'Question Paper Repository', href: '/student/question-bank', icon: HelpCircle },
-    { label: 'Syllabus Repository', href: '/student/syllabus-repository', icon: Library },
-    { label: 'Library', href: '/student/library', icon: Library },
-    { label: 'Subject renewal', href: '/student/registration', icon: ClipboardList },
-    { label: 'Attendance', href: '/student/attendance', icon: ClipboardList },
-    { label: 'Examinations', href: '/student/examinations', icon: Ticket },
-    { label: 'Committee Notices', href: '/student/governance/notices', icon: Megaphone },
-    { label: 'Committee Meetings', href: '/student/governance/meetings', icon: CalendarDays },
-  ],
+  student: flattenStudentNav(),
   parent: [
     { label: 'Dashboard', href: '/parent', icon: LayoutDashboard },
     { label: 'Wards Portal', href: '/parent/portal', icon: Users },

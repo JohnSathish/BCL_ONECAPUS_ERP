@@ -46,9 +46,9 @@ async function loadArticle(id: string): Promise<ArticleMeta | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await Promise.resolve(params);
+  const { id } = await params;
   const article = await loadArticle(id);
   if (!article) {
     return { title: 'Article | Journal Portal' };
@@ -87,12 +87,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function ArticleDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }> | { id: string };
-}) {
-  const { id } = await Promise.resolve(params);
+export default async function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const article = await loadArticle(id);
   const authors = article?.authors ?? [];
   const year =

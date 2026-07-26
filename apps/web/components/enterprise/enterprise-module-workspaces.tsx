@@ -1,28 +1,10 @@
 'use client';
 
 import { EnterpriseCrudWorkspace } from '@/components/enterprise/enterprise-crud-workspace';
+import { SupportCentreWorkspace } from '@/components/support-centre/support-centre-workspace';
 
 export function HelpdeskWorkspace() {
-  return (
-    <EnterpriseCrudWorkspace
-      title="Help Desk"
-      description="Support tickets for campus helpdesk."
-      queryKey={['enterprise', 'helpdesk']}
-      listPath="/v1/helpdesk/tickets"
-      fields={[
-        { name: 'subject', label: 'Subject', required: true },
-        { name: 'category', label: 'Category', placeholder: 'GENERAL' },
-        { name: 'priority', label: 'Priority', placeholder: 'MEDIUM' },
-        { name: 'description', label: 'Description' },
-      ]}
-      columns={[
-        { key: 'ticketNo', label: 'Ticket' },
-        { key: 'subject', label: 'Subject' },
-        { key: 'status', label: 'Status' },
-        { key: 'priority', label: 'Priority' },
-      ]}
-    />
-  );
+  return <SupportCentreWorkspace />;
 }
 
 export function ParentPortalAdminWorkspace() {

@@ -564,7 +564,49 @@ export class AcademicEngineService {
         lines: {
           include: {
             offering: { include: { course: true } },
-            offeringSection: { include: { shift: true, seatLedger: true } },
+            offeringSection: {
+              include: {
+                shift: true,
+                seatLedger: true,
+                staffProfile: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    shortCode: true,
+                    departmentId: true,
+                  },
+                },
+                subjectAssignments: {
+                  where: { isPrimaryFaculty: true },
+                  take: 3,
+                  include: {
+                    staffProfile: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        shortCode: true,
+                        departmentId: true,
+                      },
+                    },
+                  },
+                },
+                subjectTeachingAssignments: {
+                  where: { deletedAt: null },
+                  take: 5,
+                  orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+                  include: {
+                    staffProfile: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        shortCode: true,
+                        departmentId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         semester: true,

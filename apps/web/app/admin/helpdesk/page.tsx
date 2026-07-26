@@ -1,10 +1,5 @@
-import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { HelpdeskWorkspace } from '@/components/enterprise/enterprise-module-workspaces';
+import { SupportCentreEnterpriseWorkspace } from '@/components/support-centre/support-centre-enterprise';
 
 export default function AdminHelpdeskPage() {
-  return (
-    <DashboardShell role="admin" title="Help Desk">
-      <HelpdeskWorkspace />
-    </DashboardShell>
-  );
+  return <SupportCentreEnterpriseWorkspace />;
 }

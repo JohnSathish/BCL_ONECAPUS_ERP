@@ -250,7 +250,8 @@ export const MODULE_CATALOG: ModuleCatalogEntry[] = [
     label: 'Helpdesk',
     category: 'optional',
     defaultEnabled: true,
-    description: 'Support ticket helpdesk',
+    description:
+      'Support Centre — live chat, tickets, FAQ, and multilingual helpdesk',
   },
   {
     key: 'parentPortal',

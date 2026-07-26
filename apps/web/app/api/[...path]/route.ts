@@ -6,13 +6,33 @@ const API_ORIGIN =
   process.env.NEXT_PRIVATE_API_ORIGIN ??
   'http://127.0.0.1:3001';
 
-/** Nest takes longer to boot than Next.js on `npm run dev`; retry brief connection failures. */
-const PROXY_STARTUP_MAX_ATTEMPTS = 15;
-const PROXY_STARTUP_INITIAL_DELAY_MS = 400;
-const PROXY_STARTUP_MAX_DELAY_MS = 2_000;
+/**
+ * Nest (`api:dev`) often finishes TypeScript compile after Next is already serving.
+ * Retry connection refused / fetch failures long enough to cover a cold watch boot.
+ */
+const PROXY_STARTUP_MAX_ATTEMPTS = 40;
+const PROXY_STARTUP_INITIAL_DELAY_MS = 500;
+const PROXY_STARTUP_MAX_DELAY_MS = 3_000;
+
+/** Avoid flooding the terminal when many tabs poll while the API is still compiling. */
+let lastUpstreamDownLogAt = 0;
+const UPSTREAM_DOWN_LOG_COOLDOWN_MS = 15_000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientUpstreamError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code =
+    error && typeof error === 'object' && 'cause' in error
+      ? String((error as { cause?: { code?: string } }).cause?.code ?? '')
+      : '';
+  return (
+    /fetch failed|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket hang up|other side closed/i.test(
+      message,
+    ) || /ECONNREFUSED|ECONNRESET|ETIMEDOUT/.test(code)
+  );
 }
 
 async function fetchUpstreamWithStartupRetry(url: URL, init: RequestInit): Promise<Response> {
@@ -22,9 +42,11 @@ async function fetchUpstreamWithStartupRetry(url: URL, init: RequestInit): Promi
       return await fetch(url, init);
     } catch (error) {
       lastError = error;
-      if (attempt === PROXY_STARTUP_MAX_ATTEMPTS - 1) break;
+      if (!isTransientUpstreamError(error) || attempt === PROXY_STARTUP_MAX_ATTEMPTS - 1) {
+        break;
+      }
       const delay = Math.min(
-        PROXY_STARTUP_INITIAL_DELAY_MS * 1.4 ** attempt,
+        PROXY_STARTUP_INITIAL_DELAY_MS * 1.25 ** attempt,
         PROXY_STARTUP_MAX_DELAY_MS,
       );
       await sleep(delay);
@@ -108,17 +130,22 @@ async function proxyApiRequest(request: NextRequest, context: RouteContext) {
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error('[api-proxy] upstream unavailable', {
-      traceId,
-      url: upstreamUrl.toString(),
-      message: error instanceof Error ? error.message : String(error),
-    });
+    const now = Date.now();
+    if (now - lastUpstreamDownLogAt >= UPSTREAM_DOWN_LOG_COOLDOWN_MS) {
+      lastUpstreamDownLogAt = now;
+      console.warn(
+        `[api-proxy] API not ready at ${API_ORIGIN} (Nest may still be compiling). Last: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     return NextResponse.json(
       {
         success: false,
         errorCode: 'API_PROXY_UNAVAILABLE',
-        message: 'Unable to reach the API server. Please confirm the backend is running.',
+        message:
+          'Unable to reach the API server. If you just ran npm run dev, wait for api:dev to finish compiling, then refresh.',
         details: { upstream: API_ORIGIN },
         timestamp: new Date().toISOString(),
         traceId,

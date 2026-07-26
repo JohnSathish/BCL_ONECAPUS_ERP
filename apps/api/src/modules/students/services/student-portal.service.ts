@@ -129,17 +129,49 @@ export class StudentPortalService {
     const student = await this.resolveStudent(user);
     const format = await this.displaySettings.getFormat(user.tid);
 
-    const [registration, feeSummaryRow, unreadCount, attendancePct] =
-      await Promise.all([
-        this.academicEngine
-          .getMyRegistration(user.tid, user.sub)
-          .catch(() => null),
-        this.feeSummary.get(user.tid, student.id),
-        this.notifications.unreadCount(user),
-        this.attendance
-          .studentPortalSummary(user)
-          .then((a) => (a.overall != null ? Number(a.overall) : null)),
-      ]);
+    const [
+      registration,
+      feeSummaryRow,
+      unreadCount,
+      attendancePct,
+      academicYear,
+      creditSummary,
+      examResults,
+      libraryLoans,
+    ] = await Promise.all([
+      this.academicEngine
+        .getMyRegistration(user.tid, user.sub)
+        .catch(() => null),
+      this.feeSummary.get(user.tid, student.id),
+      this.notifications.unreadCount(user),
+      this.attendance
+        .studentPortalSummary(user)
+        .then((a) => (a.overall != null ? Number(a.overall) : null)),
+      this.prisma.academicYear.findFirst({
+        where: {
+          tenantId: user.tid,
+          deletedAt: null,
+          OR: [{ status: 'ACTIVE' }, { isPrimarySession: true }],
+        },
+        select: { name: true },
+        orderBy: { startDate: 'desc' },
+      }),
+      this.academicEngine
+        .getMyCreditSummary(user.tid, user.sub)
+        .catch(() => null),
+      this.examinations.studentResults(user).catch(() => null),
+      this.prisma.libraryLoan.findMany({
+        where: {
+          tenantId: user.tid,
+          studentId: student.id,
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+          returnedAt: null,
+        },
+        select: { id: true, dueAt: true },
+        orderBy: { dueAt: 'asc' },
+        take: 20,
+      }),
+    ]);
 
     const semesterSequence =
       registration?.standing?.currentSemesterSequence ??
@@ -172,7 +204,11 @@ export class StudentPortalService {
       feesClear: feeDue <= 0,
     });
 
-    const academicChips = this.academicSnapshotChips(registration, majorMinor);
+    const academicChips = await this.withFacultyNames(
+      user.tid,
+      this.academicSnapshotChips(registration, majorMinor),
+      registration,
+    );
 
     const attendanceTone =
       attendancePct == null
@@ -182,6 +218,28 @@ export class StudentPortalService {
           : attendancePct >= 65
             ? 'warn'
             : 'bad';
+
+    const summaries = examResults?.summaries ?? [];
+    const cgpa = summaries[0]?.sgpa != null ? Number(summaries[0].sgpa) : null;
+    const creditsEarned = Number(creditSummary?.total ?? 0);
+    const creditsFromLines = academicChips.reduce(
+      (sum, c) => sum + Number(c.credits ?? 0),
+      0,
+    );
+    const earned = creditsEarned > 0 ? creditsEarned : creditsFromLines;
+    const creditsTarget =
+      semesterSequence != null && semesterSequence >= 7 ? 160 : 120;
+    const creditsPct =
+      creditsTarget > 0
+        ? Math.min(100, Math.round((earned / creditsTarget) * 100))
+        : 0;
+
+    const nextDue = libraryLoans.find((l) => l.dueAt)?.dueAt ?? null;
+    let libraryDueInDays: number | null = null;
+    if (nextDue) {
+      const ms = new Date(nextDue).getTime() - Date.now();
+      libraryDueInDays = Math.ceil(ms / 86_400_000);
+    }
 
     return {
       profile: {
@@ -196,7 +254,7 @@ export class StudentPortalService {
         programLabel: headerDepartment,
         department: headerDepartment,
         semesterSequence,
-        academicYear: null,
+        academicYear: academicYear?.name ?? null,
         rfidStatus: student.rfidNumber
           ? ('assigned' as const)
           : ('missing' as const),
@@ -211,18 +269,44 @@ export class StudentPortalService {
           href: '/student/attendance',
         },
         {
-          key: 'semester',
-          title: 'Current Semester',
-          value:
-            semesterSequence != null ? `Semester ${semesterSequence}` : '—',
-          tone: 'neutral',
-        },
-        {
           key: 'fees',
           title: 'Fee Status',
           value: feeDue > 0 ? `Pending ₹${feeDue.toLocaleString()}` : 'PAID',
           tone: feeDue > 0 ? 'warn' : 'good',
           href: '/student/fees',
+        },
+        {
+          key: 'cgpa',
+          title: 'CGPA',
+          value: cgpa != null && !Number.isNaN(cgpa) ? cgpa.toFixed(2) : '—',
+          tone: 'neutral',
+          href: '/student/results',
+        },
+        {
+          key: 'credits',
+          title: 'Credits Earned',
+          value: `${earned} / ${creditsTarget}`,
+          subvalue: `${creditsPct}% Completed`,
+          tone: 'neutral',
+          href: '/student/registration',
+        },
+        {
+          key: 'library',
+          title: 'Library Books',
+          value: String(libraryLoans.length),
+          subvalue:
+            libraryDueInDays != null
+              ? libraryDueInDays >= 0
+                ? `Due in ${libraryDueInDays} day${libraryDueInDays === 1 ? '' : 's'}`
+                : `Overdue by ${Math.abs(libraryDueInDays)} day${Math.abs(libraryDueInDays) === 1 ? '' : 's'}`
+              : libraryLoans.length
+                ? 'Books issued'
+                : 'No books issued',
+          tone:
+            libraryDueInDays != null && libraryDueInDays < 0
+              ? 'bad'
+              : 'neutral',
+          href: '/student/library',
         },
       ],
       academicChips,
@@ -232,6 +316,21 @@ export class StudentPortalService {
         due: feeDue,
         status: feeDue > 0 ? ('PENDING' as const) : ('PAID' as const),
         semesterLabel: 'Current semester',
+      },
+      credits: {
+        earned,
+        target: creditsTarget,
+        percent: creditsPct,
+      },
+      examinations: {
+        hasResults: summaries.length > 0,
+        hasAdmitCard: Boolean(examResults),
+        cgpa,
+      },
+      library: {
+        issuedBooks: libraryLoans.length,
+        finesDue: 0,
+        dueInDays: libraryDueInDays,
       },
     };
   }
@@ -272,28 +371,73 @@ export class StudentPortalService {
         : [];
     const offeringMap = new Map(offerings.map((o) => [o.id, o]));
 
-    return entries
+    const todayEntries = entries
       .filter((e: { dayOfWeek: number }) => e.dayOfWeek === today)
       .sort(
         (a: { startTime: string }, b: { startTime: string }) =>
           (parseTimeToMinutes(a.startTime) ?? 0) -
           (parseTimeToMinutes(b.startTime) ?? 0),
-      )
-      .map((entry: Record<string, unknown>) => {
-        const offering = entry.courseOfferingId
-          ? offeringMap.get(String(entry.courseOfferingId))
-          : null;
-        const startTime = String(entry.startTime ?? '');
-        const endTime = String(entry.endTime ?? '');
-        return {
-          ...entry,
-          course: offering?.course
-            ? { code: offering.course.code, title: offering.course.title }
-            : null,
-          isCurrent: isCurrentSlot(startTime, endTime),
-          isPast: isPastSlot(endTime),
-        };
-      });
+      );
+
+    const staffIds = [
+      ...new Set(
+        todayEntries
+          .map((e: { staffProfileId?: string | null }) => e.staffProfileId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    const classroomIds = [
+      ...new Set(
+        todayEntries
+          .map((e: { classroomId?: string | null }) => e.classroomId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+
+    const [staffRows, classroomRows] = await Promise.all([
+      staffIds.length
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId: user.tid, id: { in: staffIds } },
+            select: { id: true, fullName: true, shortCode: true },
+          })
+        : Promise.resolve([]),
+      classroomIds.length
+        ? this.prisma.classroom.findMany({
+            where: { tenantId: user.tid, id: { in: classroomIds } },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const staffMap = new Map(staffRows.map((s) => [s.id, s]));
+    const classroomMap = new Map(classroomRows.map((c) => [c.id, c]));
+
+    return todayEntries.map((entry: Record<string, unknown>) => {
+      const offering = entry.courseOfferingId
+        ? offeringMap.get(String(entry.courseOfferingId))
+        : null;
+      const startTime = String(entry.startTime ?? '');
+      const endTime = String(entry.endTime ?? '');
+      const staff = entry.staffProfileId
+        ? staffMap.get(String(entry.staffProfileId))
+        : null;
+      const classroom = entry.classroomId
+        ? classroomMap.get(String(entry.classroomId))
+        : null;
+      return {
+        ...entry,
+        course: offering?.course
+          ? { code: offering.course.code, title: offering.course.title }
+          : null,
+        staffProfile: staff
+          ? { fullName: staff.fullName, shortCode: staff.shortCode }
+          : null,
+        classroom: classroom
+          ? { code: classroom.code, name: classroom.name }
+          : null,
+        isCurrent: isCurrentSlot(startTime, endTime),
+        isPast: isPastSlot(endTime),
+      };
+    });
   }
 
   async getDashboardWidgetLms(user: JwtUser) {
@@ -365,7 +509,8 @@ export class StudentPortalService {
           status: { in: ['ACTIVE', 'OVERDUE'] },
           returnedAt: null,
         },
-        select: { id: true },
+        select: { id: true, dueAt: true },
+        orderBy: { dueAt: 'asc' },
       }),
       this.prisma.libraryFine.findMany({
         where: {
@@ -381,7 +526,14 @@ export class StudentPortalService {
       (sum, f) => sum + Number(f.amount ?? 0),
       0,
     );
-    return { issuedBooks: loans.length, finesDue: libraryFinesDue };
+    const nextDue = loans.find((l) => l.dueAt)?.dueAt ?? null;
+    let dueInDays: number | null = null;
+    if (nextDue) {
+      dueInDays = Math.ceil(
+        (new Date(nextDue).getTime() - Date.now()) / 86_400_000,
+      );
+    }
+    return { issuedBooks: loans.length, finesDue: libraryFinesDue, dueInDays };
   }
 
   async getDashboardWidgetHealth(user: JwtUser) {
@@ -480,6 +632,215 @@ export class StudentPortalService {
     );
   }
 
+  /**
+   * Resolve faculty for dashboard subject chips.
+   * Prefer staff whose home department matches the course department.
+   * Cross-department assignments are ignored (shown as —) so bad links
+   * (e.g. Economics staff on a Political Science paper) never surface.
+   */
+  private async withFacultyNames(
+    tenantId: string,
+    chips: {
+      category: string;
+      label: string;
+      courseTitle: string;
+      courseCode?: string | null;
+      credits?: number;
+      facultyName?: string | null;
+    }[],
+    registration: Awaited<
+      ReturnType<AcademicEngineService['getMyRegistration']>
+    > | null,
+  ) {
+    if (!chips.length) return chips;
+
+    type StaffLite = {
+      fullName?: string | null;
+      shortCode?: string | null;
+      departmentId?: string | null;
+    };
+
+    const staffLabel = (s?: StaffLite | null) =>
+      s?.fullName?.trim() || s?.shortCode?.trim() || null;
+
+    const lines = registration?.registration?.lines ?? [];
+    const sectionIds = [
+      ...new Set(
+        lines
+          .map((l) => l.offeringSectionId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const courseIds = [
+      ...new Set(
+        lines
+          .map((l) => l.offering?.course?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const [teachingRows, subjectRows] = await Promise.all([
+      sectionIds.length
+        ? this.prisma.subjectTeachingAssignment.findMany({
+            where: {
+              tenantId,
+              offeringSectionId: { in: sectionIds },
+              deletedAt: null,
+            },
+            include: {
+              staffProfile: {
+                select: {
+                  fullName: true,
+                  shortCode: true,
+                  departmentId: true,
+                },
+              },
+              course: { select: { id: true, departmentId: true, code: true } },
+            },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          })
+        : Promise.resolve([]),
+      sectionIds.length || courseIds.length
+        ? this.prisma.staffSubjectAssignment.findMany({
+            where: {
+              tenantId,
+              OR: [
+                ...(sectionIds.length
+                  ? [{ offeringSectionId: { in: sectionIds } }]
+                  : []),
+                ...(courseIds.length ? [{ courseId: { in: courseIds } }] : []),
+              ],
+            },
+            include: {
+              staffProfile: {
+                select: {
+                  fullName: true,
+                  shortCode: true,
+                  departmentId: true,
+                },
+              },
+              course: { select: { id: true, departmentId: true, code: true } },
+            },
+            orderBy: { isPrimaryFaculty: 'desc' },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const pickMatching = (
+      courseDeptId: string | null | undefined,
+      candidates: Array<{ staff: StaffLite | null | undefined; rank: number }>,
+    ): string | null => {
+      const usable = candidates
+        .map((c) => ({
+          name: staffLabel(c.staff),
+          deptId: c.staff?.departmentId ?? null,
+          rank: c.rank,
+        }))
+        .filter((c) => c.name);
+
+      if (!usable.length) return null;
+
+      // Course has a home department → only same-department staff
+      if (courseDeptId) {
+        const match = usable
+          .filter((c) => c.deptId === courseDeptId)
+          .sort((a, b) => a.rank - b.rank);
+        return match[0]?.name ?? null;
+      }
+
+      // No course department to validate against → best-ranked candidate
+      return usable.sort((a, b) => a.rank - b.rank)[0]?.name ?? null;
+    };
+
+    const lineMeta = new Map<
+      string,
+      {
+        sectionId: string | null;
+        courseId?: string;
+        courseDeptId?: string | null;
+        sectionStaff?: StaffLite | null;
+        sectionAssignStaff?: StaffLite[];
+        teachingStaff?: StaffLite[];
+      }
+    >();
+
+    for (const line of lines) {
+      const code = line.offering?.course?.code;
+      if (!code) continue;
+      const section = line.offeringSection as
+        | {
+            staffProfile?: StaffLite | null;
+            subjectAssignments?: Array<{ staffProfile?: StaffLite | null }>;
+            subjectTeachingAssignments?: Array<{
+              staffProfile?: StaffLite | null;
+            }>;
+          }
+        | null
+        | undefined;
+
+      lineMeta.set(String(code), {
+        sectionId: (line.offeringSectionId as string | null) ?? null,
+        courseId: line.offering?.course?.id,
+        courseDeptId: line.offering?.course?.departmentId ?? null,
+        sectionStaff: section?.staffProfile ?? null,
+        sectionAssignStaff: (section?.subjectAssignments ?? [])
+          .map((a) => a.staffProfile)
+          .filter(Boolean) as StaffLite[],
+        teachingStaff: (section?.subjectTeachingAssignments ?? [])
+          .map((a) => a.staffProfile)
+          .filter(Boolean) as StaffLite[],
+      });
+    }
+
+    return chips.map((chip) => {
+      const meta = chip.courseCode ? lineMeta.get(chip.courseCode) : undefined;
+      if (!meta) return { ...chip, facultyName: null };
+
+      const candidates: Array<{
+        staff: StaffLite | null | undefined;
+        rank: number;
+      }> = [];
+
+      // Prefer explicit teaching assignments (same section)
+      for (const row of teachingRows) {
+        if (
+          meta.sectionId &&
+          row.offeringSectionId === meta.sectionId &&
+          (!meta.courseId || row.courseId === meta.courseId)
+        ) {
+          candidates.push({
+            staff: row.staffProfile,
+            rank: row.isPrimary ? 1 : 2,
+          });
+        }
+      }
+
+      for (const s of meta.teachingStaff ?? []) {
+        candidates.push({ staff: s, rank: 2 });
+      }
+
+      // Section primary + subject assignments (section-scoped only)
+      if (meta.sectionStaff) {
+        candidates.push({ staff: meta.sectionStaff, rank: 3 });
+      }
+      for (const s of meta.sectionAssignStaff ?? []) {
+        candidates.push({ staff: s, rank: 3 });
+      }
+
+      for (const row of subjectRows) {
+        if (meta.sectionId && row.offeringSectionId === meta.sectionId) {
+          candidates.push({
+            staff: row.staffProfile,
+            rank: row.isPrimaryFaculty ? 3 : 4,
+          });
+        }
+      }
+
+      const facultyName = pickMatching(meta.courseDeptId, candidates);
+      return { ...chip, facultyName };
+    });
+  }
+
   private academicSnapshotChips(
     registration: Awaited<
       ReturnType<AcademicEngineService['getMyRegistration']>
@@ -489,8 +850,14 @@ export class StudentPortalService {
       minorSubject?: { name: string } | null;
     } | null,
   ) {
-    const chips: { category: string; label: string; courseTitle: string }[] =
-      [];
+    const chips: {
+      category: string;
+      label: string;
+      courseTitle: string;
+      courseCode?: string | null;
+      credits?: number;
+      facultyName?: string | null;
+    }[] = [];
     const lines = registration?.registration?.lines ?? [];
 
     for (const line of lines) {
@@ -498,11 +865,15 @@ export class StudentPortalService {
       if (
         ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC'].includes(category)
       ) {
+        const course = line.offering?.course;
         chips.push({
           category,
           label: SNAPSHOT_CATEGORY_LABELS[category] ?? category,
-          courseTitle:
-            line.offering?.course?.title ?? line.offering?.course?.code ?? '—',
+          courseTitle: course?.title ?? course?.code ?? '—',
+          courseCode: course?.code ?? null,
+          credits: Number(line.credits ?? course?.credits ?? 0),
+          // Faculty resolved later with department matching
+          facultyName: null,
         });
       }
     }
@@ -515,6 +886,9 @@ export class StudentPortalService {
         category: 'MAJOR',
         label: SNAPSHOT_CATEGORY_LABELS.MAJOR,
         courseTitle: majorMinor.majorSubject.name,
+        courseCode: null,
+        credits: 0,
+        facultyName: null,
       });
     }
     if (
@@ -525,6 +899,9 @@ export class StudentPortalService {
         category: 'MINOR',
         label: SNAPSHOT_CATEGORY_LABELS.MINOR,
         courseTitle: majorMinor.minorSubject.name,
+        courseCode: null,
+        credits: 0,
+        facultyName: null,
       });
     }
 

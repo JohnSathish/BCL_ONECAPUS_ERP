@@ -23,6 +23,7 @@ import {
   ADMIN_NAV,
   ROLE_NAV,
   STAFF_NAV,
+  STUDENT_NAV,
   isNavChildActive,
   isNavItemActive,
   type NavGroup,
@@ -49,6 +50,7 @@ import { fetchEnabledModules } from '@/services/licensing';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
 import { SidebarInstitutionCard } from '@/components/layout/sidebar-institution-card';
 import { SidebarPersonalizationMenu } from '@/components/layout/sidebar-personalization-menu';
+import { StudentSidebarFooter } from '@/components/student-portal/layout/student-sidebar-footer';
 import { cn } from '@/utils/cn';
 
 const NAV_ITEM_CLASS =
@@ -200,6 +202,9 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
             permissions: userPerms,
           });
       return filterStaffNav(STAFF_NAV, ctx);
+    }
+    if (role === 'student') {
+      return STUDENT_NAV;
     }
     const items = ROLE_NAV[role];
     if (!items) {
@@ -432,6 +437,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
                 branding={branding}
                 active={active}
                 collapsed={collapsed && !mobileNavOpen}
+                studentMode={role === 'student'}
               />
             </button>
             {mobileNavOpen ? (
@@ -580,6 +586,11 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         ) : null}
 
         <div className="hidden shrink-0 space-y-1 p-2 md:block">
+          {role === 'student' ? (
+            <div className="mb-1 px-0.5">
+              <StudentSidebarFooter collapsed={navCollapsed} />
+            </div>
+          ) : null}
           {isAdminLayout ? <SidebarPersonalizationMenu collapsed={navCollapsed} /> : null}
           <button
             type="button"

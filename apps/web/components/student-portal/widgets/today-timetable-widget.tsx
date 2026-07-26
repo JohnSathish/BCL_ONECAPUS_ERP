@@ -1,10 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock } from 'lucide-react';
-
-import { GlassCard } from '@/components/erp/glass-card';
-import { buttonVariants } from '@/components/ui/button';
+import { Clock, MapPin, User } from 'lucide-react';
 import type { StudentTimetableSlot } from '@/types/student-portal';
 import { cn } from '@/utils/cn';
 
@@ -17,78 +14,98 @@ export function TodayTimetableWidget({
 }) {
   if (loading) {
     return (
-      <GlassCard className="animate-pulse p-6 lg:col-span-2">
+      <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="h-5 w-40 rounded bg-muted" />
         <div className="mt-4 space-y-3">
           <div className="h-14 rounded-xl bg-muted" />
           <div className="h-14 rounded-xl bg-muted" />
         </div>
-      </GlassCard>
+      </div>
     );
   }
 
   return (
-    <GlassCard className="p-5 lg:col-span-2" glow>
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold tracking-tight">Today&apos;s Timetable</h3>
-          <p className="text-xs text-muted-foreground">Current period highlighted</p>
+          <h3 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
+            Today&apos;s Timetable
+          </h3>
+          <p className="text-xs text-slate-500">In progress &amp; upcoming periods</p>
         </div>
-        <Link href="/student/timetable" className="text-xs text-primary hover:underline">
+        <Link
+          href="/student/timetable"
+          className="text-xs font-medium text-[#1e4d8c] hover:underline dark:text-sky-300"
+        >
           Full week
         </Link>
       </div>
 
       {!schedule?.length ? (
-        <p className="mt-6 rounded-xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground">
-          No classes scheduled for today. Check your full week timetable once registration is
-          confirmed.
+        <p className="mt-6 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700">
+          No classes scheduled for today.
         </p>
       ) : (
-        <ul className="mt-4 space-y-0 md:space-y-2">
+        <ul className="mt-4 space-y-2">
           {schedule.map((slot) => {
             const title = slot.course?.title ?? slot.course?.code ?? 'Class';
+            const room = slot.classroom?.code || slot.classroom?.name;
+            const faculty = slot.staffProfile?.fullName || slot.staffProfile?.shortCode;
+            const status = slot.isCurrent ? 'In Progress' : slot.isPast ? 'Completed' : 'Upcoming';
+
             return (
               <li
                 key={slot.id}
                 className={cn(
-                  'relative flex gap-3 border-l-2 py-3 pl-4 md:rounded-xl md:border md:border-border/50 md:border-l-2 md:p-4',
-                  slot.isCurrent
-                    ? 'border-l-primary bg-primary/5 md:border-primary/40 md:shadow-[0_0_20px_hsl(var(--primary)/0.12)]'
-                    : slot.isPast
-                      ? 'border-l-muted opacity-60'
-                      : 'border-l-border/60',
+                  'relative flex gap-3 rounded-xl border border-slate-100 py-3 pl-4 pr-3 dark:border-slate-800',
+                  slot.isCurrent && 'border-[#1e4d8c]/30 bg-sky-50/60 dark:bg-sky-950/20',
+                  slot.isPast && 'opacity-60',
                 )}
               >
-                {slot.isCurrent ? (
-                  <span className="absolute -left-[5px] top-4 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary/20 md:top-5" />
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" />
+                <div className="w-[4.5rem] shrink-0">
+                  <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                    <Clock className="h-3 w-3" />
                     {slot.startTime}
-                    {slot.endTime ? ` – ${slot.endTime}` : ''}
                   </p>
-                  <p className="mt-0.5 font-semibold">{title}</p>
-                  {slot.fyugpCategory ? (
-                    <p className="text-xs text-muted-foreground">{slot.fyugpCategory}</p>
+                  {slot.endTime ? (
+                    <p className="text-[10px] text-slate-400">{slot.endTime}</p>
                   ) : null}
                 </div>
-                {slot.isCurrent ? (
-                  <span
-                    className={cn(
-                      buttonVariants({ size: 'sm', variant: 'secondary' }),
-                      'hidden shrink-0 self-center rounded-xl text-xs sm:inline-flex',
-                    )}
-                  >
-                    Now
-                  </span>
-                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900 dark:text-white">{title}</p>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                    {room ? (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {room}
+                      </span>
+                    ) : null}
+                    {faculty ? (
+                      <span className="inline-flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {faculty}
+                      </span>
+                    ) : null}
+                    {slot.fyugpCategory ? <span>{slot.fyugpCategory}</span> : null}
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    'shrink-0 self-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    slot.isCurrent
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                      : slot.isPast
+                        ? 'bg-slate-100 text-slate-500 dark:bg-slate-800'
+                        : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
+                  )}
+                >
+                  {status}
+                </span>
               </li>
             );
           })}
         </ul>
       )}
-    </GlassCard>
+    </div>
   );
 }

@@ -74,6 +74,7 @@ export function DashboardShell({
       >
         <EnterpriseTopbar
           title={title}
+          subtitle={subtitle}
           portalRole={role === 'student' || role === 'staff' ? role : undefined}
         />
 

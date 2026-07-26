@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 
@@ -296,7 +296,7 @@ export default function AcademicCalendarAdminPage() {
                   ))}
                   {(() => {
                     const firstDow = new Date(Date.UTC(viewYear, viewMonth - 1, 1)).getUTCDay();
-                    const cells: Array<JSX.Element | null> = [];
+                    const cells: Array<ReactElement | null> = [];
                     for (let i = 0; i < firstDow; i += 1) {
                       cells.push(<div key={`pad-${i}`} />);
                     }
