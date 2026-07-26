@@ -1,11 +1,13 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { AdministrationModule } from '../administration/administration.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { ProgramsCoursesModule } from '../programs-courses/programs-courses.module';
 import { StudentsModule } from '../students/students.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { AdmissionCalendarSyncService } from './admission-calendar-sync.service';
 import { AdmissionsAdminController } from './admissions-admin.controller';
 import { AdmissionsPortalController } from './admissions-portal.controller';
 import { AdmissionsAllocationService } from './admissions-allocation.service';
@@ -25,6 +27,7 @@ import { AdmissionsValidationService } from './admissions-validation.service';
 
 @Module({
   imports: [
+    AcademicCalendarModule,
     ProgramsCoursesModule,
     CommunicationModule,
     LicensingModule,
@@ -41,6 +44,7 @@ import { AdmissionsValidationService } from './admissions-validation.service';
   providers: [
     AdmissionsService,
     AdmissionsValidationService,
+    AdmissionCalendarSyncService,
     AdmissionsCycleService,
     AdmissionsPortalService,
     AdmissionsPortalPasswordService,

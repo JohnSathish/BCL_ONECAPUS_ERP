@@ -17,6 +17,7 @@ import {
 import { CommunicationTriggerService } from '../communication/services/communication-trigger.service';
 import { FeeEnforcementService } from '../fees/services/fee-enforcement.service';
 import { LicenseEnforcementService } from '../licensing/services/license-enforcement.service';
+import { ExamCalendarSyncService } from './exam-calendar-sync.service';
 import { IaSettingsService } from './ia/ia-settings.service';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class ExaminationsService {
     private readonly licenseEnforcement: LicenseEnforcementService,
     private readonly feeEnforcement: FeeEnforcementService,
     private readonly iaSettings: IaSettingsService,
+    private readonly examCalendar: ExamCalendarSyncService,
   ) {}
 
   private async assertLegacyUniversityMode(tenantId: string) {
@@ -104,6 +106,7 @@ export class ExaminationsService {
       },
     });
     await this.audit(user, 'SESSION', row.id, 'CREATE', null, row);
+    void this.examCalendar.syncSession(user, row.id);
     return row;
   }
 
@@ -125,6 +128,7 @@ export class ExaminationsService {
       },
     });
     await this.audit(user, 'SESSION', id, 'UPDATE', before, row);
+    void this.examCalendar.syncSession(user, id);
     return row;
   }
 
@@ -135,6 +139,7 @@ export class ExaminationsService {
       data: { status: 'ARCHIVED', deletedAt: new Date() },
     });
     await this.audit(user, 'SESSION', id, 'ARCHIVE', before, row);
+    void this.examCalendar.removeSession(user, id);
     return row;
   }
 
@@ -194,6 +199,7 @@ export class ExaminationsService {
       },
     });
     await this.audit(user, 'PAPER', row.id, 'CREATE', null, row);
+    void this.examCalendar.syncSession(user, dto.sessionId);
     return row;
   }
 
@@ -213,6 +219,7 @@ export class ExaminationsService {
       },
     });
     await this.audit(user, 'PAPER', id, 'UPDATE', before, row);
+    void this.examCalendar.syncSession(user, row.sessionId);
     return row;
   }
 
@@ -598,6 +605,7 @@ export class ExaminationsService {
       marks: marks.count,
     });
     void this.notifyResultsPublished(user.tid, sessionId);
+    void this.examCalendar.syncResultPublished(user, sessionId);
     return { publishedResults: summaries.count, publishedMarks: marks.count };
   }
 

@@ -5,6 +5,7 @@ import {
   MONTHLY_DEMAND_TYPE,
   VTC_MONTHLY_MODIFIER,
 } from '../constants/monthly-fee.constants';
+import { FeeCalendarSyncService } from '../fee-calendar-sync.service';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import { FeeLedgerService } from './fee-ledger.service';
 import { StudentFeeSummaryService } from './student-fee-summary.service';
@@ -53,6 +54,7 @@ export class MonthlyFeeEngineService {
     private readonly settings: FeeFinanceSettingsService,
     private readonly feeSummary: StudentFeeSummaryService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly feeCalendar: FeeCalendarSyncService,
   ) {}
 
   private db() {
@@ -102,6 +104,7 @@ export class MonthlyFeeEngineService {
       ready,
       user.sub,
     );
+    void this.feeCalendar.syncMonthlyPeriod(user, ready.billingPeriod);
     return { created: true, demand, preview };
   }
 
@@ -136,6 +139,13 @@ export class MonthlyFeeEngineService {
         user.sub,
       );
       created.push({ period, demandId: demand.id, amount: ready.totalAmount });
+    }
+
+    if (created.length) {
+      const periodsSynced = [...new Set(created.map((c) => c.period))];
+      for (const period of periodsSynced) {
+        void this.feeCalendar.syncMonthlyPeriod(user, period);
+      }
     }
 
     return {
@@ -190,6 +200,12 @@ export class MonthlyFeeEngineService {
           err instanceof Error ? err.message : 'Generation failed';
         results.push({ studentId, skipped: true, reason: message });
       }
+    }
+    if (created > 0) {
+      void this.feeCalendar.syncMonthlyPeriod(
+        { tid: tenantId, sub: actorId || 'system' },
+        billingPeriod,
+      );
     }
     return { billingPeriod, created, skipped, results };
   }

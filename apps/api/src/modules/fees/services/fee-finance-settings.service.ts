@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { CacheService } from '../../../shared/cache/cache.service';
+import { FeeCalendarSyncService } from '../fee-calendar-sync.service';
 import {
   COLLECTION_MODE_LABELS,
   COLLECTION_MODE_ORDER,
@@ -53,6 +54,7 @@ export class FeeFinanceSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly feeCalendar: FeeCalendarSyncService,
   ) {}
 
   private db() {
@@ -217,6 +219,13 @@ export class FeeFinanceSettingsService {
       },
     });
     await this.cache.del(`fee-settings:${user.tid}`);
+    const dueRelated =
+      dto.monthlyDueDay !== undefined ||
+      dto.lateFeeEnabled !== undefined ||
+      dto.lateFeeGraceDays !== undefined;
+    if (dueRelated) {
+      void this.feeCalendar.syncFromSettings(user);
+    }
     return this.normalize(updated);
   }
 

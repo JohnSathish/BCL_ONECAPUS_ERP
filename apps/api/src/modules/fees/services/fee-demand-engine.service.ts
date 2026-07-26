@@ -14,6 +14,7 @@ import {
 } from './fee-structure.service';
 import { CommunicationTriggerService } from '../../communication/services/communication-trigger.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
+import { FeeCalendarSyncService } from '../fee-calendar-sync.service';
 
 @Injectable()
 export class FeeDemandEngineService {
@@ -24,6 +25,7 @@ export class FeeDemandEngineService {
     private readonly courseDeliveryFees: CourseDeliveryFeeService,
     private readonly communication: CommunicationTriggerService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly feeCalendar: FeeCalendarSyncService,
   ) {}
 
   private db() {
@@ -128,6 +130,16 @@ export class FeeDemandEngineService {
       }
     }
 
+    if (created.length && dto.dueDate) {
+      void this.feeCalendar.syncStructureDue(user, {
+        academicYearId: dto.academicYearId,
+        dueDate: dto.dueDate,
+        billingPeriod: dto.billingPeriod,
+        demandType: dto.demandType,
+        title: dto.billingPeriod ? `Fee due — ${dto.billingPeriod}` : undefined,
+      });
+    }
+
     return {
       createdCount: created.length,
       skippedCount: skipped.length,
@@ -156,6 +168,14 @@ export class FeeDemandEngineService {
       after: updated,
     });
     void this.notifyDemandPublished(user.tid, id);
+    if (updated.dueDate && updated.academicYearId) {
+      void this.feeCalendar.syncStructureDue(user, {
+        academicYearId: updated.academicYearId,
+        dueDate: updated.dueDate,
+        billingPeriod: updated.billingPeriod,
+        demandType: updated.demandType,
+      });
+    }
     return updated;
   }
 

@@ -6,6 +6,7 @@ import {
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
+import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
 import { IA_EXAM_TYPES, isIaExamType } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type { IaPaperDto, IaQueryDto, IaSessionDto } from './dto/ia.dto';
@@ -16,6 +17,7 @@ export class IaSessionService {
     private readonly prisma: PrismaService,
     private readonly audit: IaAuditService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly examCalendar: ExamCalendarSyncService,
   ) {}
 
   private timeDate(value: string) {
@@ -62,6 +64,7 @@ export class IaSessionService {
       },
     });
     await this.audit.log(user, 'IA_SESSION', row.id, 'CREATE', null, row);
+    void this.examCalendar.syncSession(user, row.id);
     return row;
   }
 
@@ -106,6 +109,7 @@ export class IaSessionService {
       },
     });
     await this.audit.log(user, 'IA_PAPER', row.id, 'CREATE', null, row);
+    void this.examCalendar.syncSession(user, dto.sessionId);
     return row;
   }
 

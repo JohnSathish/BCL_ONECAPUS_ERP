@@ -6,6 +6,7 @@ import {
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
+import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
 import { isIaExamType, IA_EXAM_TYPES } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type {
@@ -49,6 +50,7 @@ export class IaExamProvisioningService {
     private readonly prisma: PrismaService,
     private readonly audit: IaAuditService,
     private readonly licenseEnforcement: LicenseEnforcementService,
+    private readonly examCalendar: ExamCalendarSyncService,
   ) {}
 
   private timeDate(value: string) {
@@ -587,6 +589,8 @@ export class IaExamProvisioningService {
       streamId: input.streamId,
     });
 
+    void this.examCalendar.syncSession(user, session.id);
+
     return {
       session,
       summary: {
@@ -741,6 +745,8 @@ export class IaExamProvisioningService {
         startDate: dto.startDate,
       },
     );
+
+    void this.examCalendar.syncSession(user, dto.sessionId);
 
     return { updated: papers.length };
   }

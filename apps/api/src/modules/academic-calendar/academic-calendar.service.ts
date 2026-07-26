@@ -448,6 +448,121 @@ export class AcademicCalendarService {
     return { imported, skipped, total: holidays.length };
   }
 
+  /**
+   * Upsert a calendar event keyed by sourceModule + sourceRefId.
+   * Used by Examinations / Fees / Admissions writers (Phase 3+).
+   */
+  async upsertFromSource(
+    user: JwtUser,
+    input: {
+      academicYearId: string;
+      sourceModule: string;
+      sourceRefId: string;
+      type: string;
+      title: string;
+      description?: string | null;
+      startDate: string;
+      endDate?: string;
+      startTime?: string | null;
+      endTime?: string | null;
+      visibility?: 'INTERNAL' | 'PUBLIC';
+      publishedToWebsite?: boolean;
+      createsAttendanceSession?: boolean;
+      isWorkingDay?: boolean | null;
+      scopeType?: string;
+      departmentIds?: string[];
+    },
+  ) {
+    this.assertEventType(input.type);
+    const calendar = await this.getOrCreateForYear(user, input.academicYearId);
+    const startDate = parseDateOnly(input.startDate);
+    const endDate = parseDateOnly(input.endDate ?? input.startDate);
+    if (endDate < startDate) {
+      throw new BadRequestException('endDate must be on or after startDate');
+    }
+
+    const existing = await this.prisma.academicCalendarEvent.findFirst({
+      where: {
+        tenantId: user.tid,
+        sourceModule: input.sourceModule,
+        sourceRefId: input.sourceRefId,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const data = {
+      calendarId: calendar.id,
+      type: input.type,
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      startDate,
+      endDate,
+      startTime: input.startTime ?? null,
+      endTime: input.endTime ?? null,
+      isWorkingDay:
+        input.isWorkingDay === undefined ? null : input.isWorkingDay,
+      createsAttendanceSession:
+        input.createsAttendanceSession ??
+        defaultCreatesAttendanceSession(input.type),
+      scopeType: input.scopeType ?? 'INSTITUTION',
+      departmentIds: input.departmentIds?.length
+        ? (input.departmentIds as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+      visibility: input.visibility ?? 'INTERNAL',
+      publishedToWebsite: Boolean(input.publishedToWebsite),
+      sourceModule: input.sourceModule,
+      sourceRefId: input.sourceRefId,
+      active: true,
+      updatedById: user.sub,
+    };
+
+    if (existing) {
+      const row = await this.prisma.academicCalendarEvent.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          deletedAt: null,
+        },
+      });
+      return this.mapEvent(row);
+    }
+
+    const row = await this.prisma.academicCalendarEvent.create({
+      data: {
+        tenantId: user.tid,
+        ...data,
+        createdById: user.sub,
+      },
+    });
+    return this.mapEvent(row);
+  }
+
+  async removeFromSource(
+    tenantId: string,
+    sourceModule: string,
+    sourceRefId: string,
+    updatedById?: string,
+  ) {
+    const rows = await this.prisma.academicCalendarEvent.findMany({
+      where: {
+        tenantId,
+        sourceModule,
+        sourceRefId,
+        deletedAt: null,
+      },
+    });
+    if (!rows.length) return { removed: 0 };
+    await this.prisma.academicCalendarEvent.updateMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      data: {
+        deletedAt: new Date(),
+        active: false,
+        ...(updatedById ? { updatedById } : {}),
+      },
+    });
+    return { removed: rows.length };
+  }
+
   resolveDay(
     tenantId: string,
     date: string,

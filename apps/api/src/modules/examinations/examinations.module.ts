@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { FeesModule } from '../fees/fees.module';
 import { LicensingModule } from '../licensing/licensing.module';
+import { ExamCalendarSyncService } from './exam-calendar-sync.service';
 import { ExaminationsController } from './examinations.controller';
 import { ExaminationsService } from './examinations.service';
 import { IaController } from './ia/ia.controller';
@@ -22,10 +24,16 @@ import { IaSettingsService } from './ia/ia-settings.service';
 import { IaWorkflowService } from './ia/ia-workflow.service';
 
 @Module({
-  imports: [CommunicationModule, LicensingModule, FeesModule],
+  imports: [
+    AcademicCalendarModule,
+    CommunicationModule,
+    LicensingModule,
+    FeesModule,
+  ],
   controllers: [ExaminationsController, IaController],
   providers: [
     ExaminationsService,
+    ExamCalendarSyncService,
     IaSettingsService,
     IaAuditService,
     IaSchemeService,

@@ -3,12 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { CourseDeliveryFeeService } from '../../common/services/course-delivery-fee.service';
 import { AccountingModule } from '../accounting/accounting.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { AuthModule } from '../auth/auth.module';
 import { CacheModule } from '../../shared/cache/cache.module';
 import { StorageModule } from '../../shared/storage/storage.module';
+import { FeeCalendarSyncService } from './fee-calendar-sync.service';
 import { FeesController } from './fees.controller';
 import { PublicFeePayController } from './public-fee-pay.controller';
 import { FeeCycleConfigService } from './services/fee-cycle-config.service';
@@ -46,6 +48,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
 @Module({
   imports: [
     AccountingModule,
+    AcademicCalendarModule,
     CommunicationModule,
     LicensingModule,
     TenantsModule,
@@ -64,6 +67,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
   controllers: [FeesController, PublicFeePayController],
   providers: [
     CourseDeliveryFeeService,
+    FeeCalendarSyncService,
     FeeStructureService,
     FeeHeadMasterService,
     FeeCycleConfigService,

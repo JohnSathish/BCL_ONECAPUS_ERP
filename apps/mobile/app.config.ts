@@ -84,7 +84,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 21,
+    versionCode: 22,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -112,8 +112,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-build-properties',
       {
         android: {
-          compileSdkVersion: 35,
-          targetSdkVersion: 35,
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
           // Play Console R8/obfuscation/shrinking scores (survives `expo prebuild --clean`).
           enableProguardInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,

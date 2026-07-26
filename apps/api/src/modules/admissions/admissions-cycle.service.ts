@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CacheService } from '../../shared/cache/cache.service';
+import { AdmissionCalendarSyncService } from './admission-calendar-sync.service';
 
 export type CycleSettings = {
   applicationNumberPrefix?: string;
@@ -26,6 +27,7 @@ export class AdmissionsCycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly admissionCalendar: AdmissionCalendarSyncService,
   ) {}
 
   private async bustPortalInfoCache(tenantId: string) {
@@ -137,6 +139,7 @@ export class AdmissionsCycleService {
       },
     );
     await this.bustPortalInfoCache(tenantId);
+    void this.admissionCalendar.syncCycle(tenantId, id, actorId);
     return updated;
   }
 
@@ -149,15 +152,22 @@ export class AdmissionsCycleService {
       );
     }
 
-    await this.prisma.admissionCycle.updateMany({
+    const previouslyOpen = await this.prisma.admissionCycle.findMany({
       where: {
         tenantId,
         status: 'OPEN',
         deletedAt: null,
         id: { not: id },
       },
-      data: { status: 'CLOSED' },
+      select: { id: true },
     });
+
+    if (previouslyOpen.length) {
+      await this.prisma.admissionCycle.updateMany({
+        where: { id: { in: previouslyOpen.map((r) => r.id) } },
+        data: { status: 'CLOSED' },
+      });
+    }
 
     const updated = await this.prisma.admissionCycle.update({
       where: { id },
@@ -167,6 +177,10 @@ export class AdmissionsCycleService {
 
     await this.audit(tenantId, id, 'cycle', id, 'cycle.published', actorId);
     await this.bustPortalInfoCache(tenantId);
+    void this.admissionCalendar.syncCycle(tenantId, id, actorId);
+    for (const row of previouslyOpen) {
+      void this.admissionCalendar.syncCycle(tenantId, row.id, actorId);
+    }
     return updated;
   }
 
@@ -183,6 +197,7 @@ export class AdmissionsCycleService {
     });
     await this.audit(tenantId, id, 'cycle', id, 'cycle.closed', actorId);
     await this.bustPortalInfoCache(tenantId);
+    void this.admissionCalendar.syncCycle(tenantId, id, actorId);
     return updated;
   }
 
@@ -269,6 +284,11 @@ export class AdmissionsCycleService {
         },
         data: { status: 'ARCHIVED', archivedAt: now },
       });
+      void this.admissionCalendar.removeCycles(
+        tenantId,
+        priorCycles.map((c) => c.id),
+        actorId,
+      );
     }
 
     const template = priorCycles[0];
@@ -397,6 +417,8 @@ export class AdmissionsCycleService {
       null,
       { academicYearId, code },
     );
+
+    void this.admissionCalendar.syncCycle(tenantId, cycle.id, actorId);
 
     return cycle;
   }
