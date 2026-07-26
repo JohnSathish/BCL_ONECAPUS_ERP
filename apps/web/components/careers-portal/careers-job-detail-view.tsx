@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Briefcase, Clock, FileText, GraduationCap, IndianRupee, MapPin } from 'lucide-react';
+import {
+  Briefcase,
+  ChevronDown,
+  Clock,
+  FileText,
+  GraduationCap,
+  IndianRupee,
+  MapPin,
+} from 'lucide-react';
 import type { CareersJob } from '@/services/careers-portal';
 import { formatSalaryRange } from '@/services/careers-portal';
 import { formatEmploymentType } from '@/lib/careers-portal/constants';
@@ -19,137 +27,167 @@ const DOCUMENTS_REQUIRED = [
 
 export function CareersJobDetailView({ job }: { job: CareersJob }) {
   return (
-    <div className="grid gap-8 lg:grid-cols-5">
-      <div className="space-y-6 lg:col-span-3">
-        <div className="rounded-2xl border border-white/10 bg-white p-6 text-slate-900 shadow-xl sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#c8102e]">
+    <div className="grid items-start gap-5 lg:grid-cols-12 lg:gap-6">
+      {/* Form first / dominant */}
+      <div className="order-1 lg:col-span-7 xl:col-span-8">
+        <CareersApplicationWizard job={job} />
+      </div>
+
+      {/* Compact job brief */}
+      <aside className="order-2 space-y-3 lg:sticky lg:top-24 lg:col-span-5 xl:col-span-4">
+        <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-[#0a1628] via-[#0f2138] to-[#0a1628] p-4 shadow-[0_0_40px_rgba(34,211,238,0.08)] sm:p-5">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-cyan-400/10 blur-2xl"
+          />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300/90">
             {job.department?.name ?? 'Don Bosco College'}
           </p>
-          <h1 className="mt-2 text-2xl font-bold text-[#1e3a5f] sm:text-3xl">{job.title}</h1>
-          <p className="mt-2 text-slate-600">
+          <h1 className="mt-1.5 text-xl font-bold leading-snug text-white sm:text-2xl">
+            {job.title}
+          </h1>
+          <p className="mt-1 text-xs text-slate-400">
             {job.designation?.label ?? formatEmploymentType(job.staffType)}
           </p>
 
-          <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-            <Detail
-              icon={Briefcase}
-              label="Employment Type"
-              value={formatEmploymentType(job.staffType)}
-            />
-            <Detail
-              icon={GraduationCap}
-              label="Vacancies"
-              value={`${job.vacanciesCount} position(s)`}
-            />
-            <Detail icon={MapPin} label="Location" value="Don Bosco College, Tura, Meghalaya" />
-            <Detail icon={IndianRupee} label="Salary Range" value={formatSalaryRange(job)} />
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <MetaChip icon={Briefcase} label="Type" value={formatEmploymentType(job.staffType)} />
+            <MetaChip icon={GraduationCap} label="Vacancies" value={`${job.vacanciesCount}`} />
+            <MetaChip icon={MapPin} label="Location" value="Tura, Meghalaya" />
+            <MetaChip icon={IndianRupee} label="Salary" value={formatSalaryRange(job)} />
             {job.closingDate ? (
-              <Detail
+              <MetaChip
                 icon={Clock}
-                label="Application Deadline"
+                label="Deadline"
                 value={new Date(job.closingDate).toLocaleDateString('en-IN', {
                   day: 'numeric',
-                  month: 'long',
+                  month: 'short',
                   year: 'numeric',
                 })}
+                className="col-span-2"
               />
             ) : null}
-          </dl>
+          </div>
         </div>
 
-        <Section title="Position Overview">
+        <CompactDisclosure title="Position Overview" defaultOpen>
           <div
-            className="prose prose-slate max-w-none text-sm"
+            className="prose prose-invert prose-sm max-w-none text-slate-300 prose-p:my-1.5 prose-headings:text-white"
             dangerouslySetInnerHTML={{
               __html:
                 job.jobDescriptionHtml ??
                 `<p>${job.description ?? 'Detailed job description will be updated shortly.'}</p>`,
             }}
           />
-        </Section>
+        </CompactDisclosure>
 
-        <Section title="Eligibility">
-          <ul className="space-y-2 text-sm text-slate-300">
+        <CompactDisclosure title="Eligibility">
+          <ul className="space-y-1.5 text-sm text-slate-300">
             <li>
-              <strong className="text-white">Qualification:</strong>{' '}
+              <span className="font-medium text-cyan-200">Qualification:</span>{' '}
               {job.qualificationRequired ?? 'As per UGC / college norms'}
             </li>
             <li>
-              <strong className="text-white">Experience:</strong>{' '}
+              <span className="font-medium text-cyan-200">Experience:</span>{' '}
               {job.experienceRequired ?? 'As required for the post'}
             </li>
           </ul>
-        </Section>
+        </CompactDisclosure>
 
-        <Section title="Documents Required">
-          <ul className="grid gap-2 sm:grid-cols-2">
+        <CompactDisclosure title="Documents Required">
+          <ul className="grid gap-1.5">
             {DOCUMENTS_REQUIRED.map((doc) => (
-              <li key={doc} className="flex items-center gap-2 text-sm text-slate-300">
-                <FileText className="h-4 w-4 shrink-0 text-sky-400" />
+              <li key={doc} className="flex items-center gap-2 text-xs text-slate-300">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
                 {doc}
               </li>
             ))}
           </ul>
-        </Section>
+        </CompactDisclosure>
 
         {(job.advertisementPdfUrl || job.termsPdfUrl) && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {job.advertisementPdfUrl ? (
-              <Button asChild variant="outline" className="border-white/20 bg-white/10 text-white">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 border-cyan-400/30 bg-cyan-400/5 text-xs text-cyan-100 hover:bg-cyan-400/10"
+              >
                 <a href={job.advertisementPdfUrl} target="_blank" rel="noreferrer">
-                  Official Advertisement
+                  Advertisement PDF
                 </a>
               </Button>
             ) : null}
             {job.termsPdfUrl ? (
-              <Button asChild variant="outline" className="border-white/20 bg-white/10 text-white">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 border-white/15 bg-white/5 text-xs text-white hover:bg-white/10"
+              >
                 <a href={job.termsPdfUrl} target="_blank" rel="noreferrer">
-                  Terms & Conditions
+                  Terms
                 </a>
               </Button>
             ) : null}
           </div>
         )}
 
-        <Link href="/careers-portal/jobs" className="text-sm text-sky-300 hover:text-white">
-          ← Back to all openings
+        <Link
+          href="/careers-portal/jobs"
+          className="inline-flex text-xs text-cyan-300/90 transition hover:text-white"
+        >
+          ← All openings
         </Link>
-      </div>
-
-      <div className="lg:col-span-2">
-        <div className="sticky top-24">
-          <CareersApplicationWizard job={job} />
-        </div>
-      </div>
+      </aside>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Detail({
+function MetaChip({
   icon: Icon,
   label,
   value,
+  className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  className?: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-xl bg-slate-50 p-3">
-      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#1e3a5f]" />
-      <div>
-        <dt className="text-xs text-slate-500">{label}</dt>
-        <dd className="text-sm font-medium text-slate-900">{value}</dd>
+    <div
+      className={`flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 ${className ?? ''}`}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="truncate text-xs font-medium text-slate-100">{value}</p>
       </div>
     </div>
+  );
+}
+
+function CompactDisclosure({
+  title,
+  children,
+  defaultOpen,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group rounded-xl border border-white/10 bg-white/[0.04] open:bg-white/[0.06]"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-2.5 text-sm font-semibold text-white marker:content-none [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown className="h-4 w-4 shrink-0 text-cyan-300/80 transition group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-white/5 px-3.5 pb-3.5 pt-2">{children}</div>
+    </details>
   );
 }

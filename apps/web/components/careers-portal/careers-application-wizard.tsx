@@ -73,6 +73,12 @@ type DraftData = {
   website: string;
 };
 
+/** Futuristic compact controls shared across wizard steps */
+const controlClass =
+  'h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 px-3 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] outline-none transition placeholder:text-slate-400 focus:border-cyan-400/70 focus:bg-white focus:ring-2 focus:ring-cyan-400/25';
+
+const selectClass = `${controlClass} appearance-none pr-8`;
+
 const emptyEducation = (): EducationRow => ({
   qualification: '',
   university: '',
@@ -262,36 +268,84 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl">
-      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#c8102e]">
-          Online Application
-        </p>
-        <h2 className="mt-1 text-lg font-bold text-[#1e3a5f]">{job.title}</h2>
-        <div className="mt-4">
-          <div className="mb-2 flex justify-between text-xs text-slate-500">
-            <span>
-              Step {step + 1} of {CAREERS_WIZARD_STEPS.length}: {CAREERS_WIZARD_STEPS[step]}
-            </span>
-            <span>{progress}% complete</span>
+    <div className="relative overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-b from-white via-white to-slate-50 text-slate-900 shadow-[0_24px_80px_rgba(8,24,48,0.45),0_0_0_1px_rgba(34,211,238,0.08)]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-10 top-24 h-28 w-28 rounded-full bg-[#c8102e]/10 blur-3xl"
+      />
+
+      <div className="relative border-b border-slate-200/80 bg-gradient-to-r from-[#0b1f4a] via-[#123058] to-[#0b1f4a] px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
+              Online Application
+            </p>
+            <h2 className="mt-1 text-lg font-bold tracking-tight text-white sm:text-xl">
+              {job.title}
+            </h2>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#1e3a5f] to-[#c8102e] transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+          <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium text-cyan-100 backdrop-blur">
+            {progress}% complete
           </div>
         </div>
+
+        <div className="mt-4 flex gap-1.5 overflow-x-auto pb-0.5">
+          {CAREERS_WIZARD_STEPS.map((label, i) => {
+            const active = i === step;
+            const done = i < step;
+            return (
+              <button
+                key={label}
+                type="button"
+                title={label}
+                onClick={() => {
+                  if (i <= step) setStep(i);
+                }}
+                className={cn(
+                  'h-1.5 min-w-[2rem] flex-1 rounded-full transition-all duration-300',
+                  active &&
+                    'bg-gradient-to-r from-cyan-300 to-[#f4b400] shadow-[0_0_12px_rgba(34,211,238,0.55)]',
+                  done && !active && 'bg-cyan-400/70',
+                  !done && !active && 'bg-white/20',
+                )}
+                aria-label={`Step ${i + 1}: ${label}`}
+                aria-current={active ? 'step' : undefined}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-2.5 text-xs text-slate-300">
+          Step {step + 1} of {CAREERS_WIZARD_STEPS.length}
+          <span className="mx-1.5 text-white/30">·</span>
+          <span className="font-medium text-white">{CAREERS_WIZARD_STEPS[step]}</span>
+        </p>
       </div>
 
-      <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
-        {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-        {savedHint ? <p className="mb-4 text-sm text-emerald-600">{savedHint}</p> : null}
+      <div className="relative max-h-[min(68vh,720px)] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:h-10 [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:rounded-xl [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:border-slate-200/90 [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:bg-slate-50/80 [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:focus-visible:border-cyan-400/70 [&_input:not([type=checkbox]):not([type=file]):not([type=hidden])]:focus-visible:ring-cyan-400/25 [&_select]:h-10 [&_select]:rounded-xl [&_select]:border-slate-200/90 [&_select]:bg-slate-50/80 [&_select]:px-3 [&_select]:text-sm [&_select]:focus:border-cyan-400/70 [&_select]:focus:ring-2 [&_select]:focus:ring-cyan-400/25 [&_textarea]:rounded-xl [&_textarea]:border-slate-200/90 [&_textarea]:bg-slate-50/80">
+        {error ? (
+          <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
+        {savedHint ? (
+          <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {savedHint}
+          </p>
+        ) : null}
 
         {step === 0 && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Full Name *" className="sm:col-span-2">
               <Input
+                className={controlClass}
                 value={draft.personal.fullName}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, personal: { ...d.personal, fullName: e.target.value } }))
@@ -300,6 +354,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Father's Name">
               <Input
+                className={controlClass}
                 value={draft.personal.fatherName}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -311,6 +366,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Mother's Name">
               <Input
+                className={controlClass}
                 value={draft.personal.motherName}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -322,7 +378,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Gender">
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={selectClass}
                 value={draft.personal.gender}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, personal: { ...d.personal, gender: e.target.value } }))
@@ -337,6 +393,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             <Field label="Date of Birth">
               <Input
                 type="date"
+                className={controlClass}
                 value={draft.personal.dateOfBirth}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -348,7 +405,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Marital Status">
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={selectClass}
                 value={draft.personal.maritalStatus}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -364,6 +421,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="Nationality">
               <Input
+                className={controlClass}
                 value={draft.personal.nationality}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -377,9 +435,10 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
         )}
 
         {step === 1 && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Mobile Number *">
               <Input
+                className={controlClass}
                 value={draft.contact.mobile}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, contact: { ...d.contact, mobile: e.target.value } }))
@@ -592,7 +651,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="NET Qualified">
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={selectClass}
                 value={draft.research.netQualified}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -608,7 +667,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             </Field>
             <Field label="SET Qualified">
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={selectClass}
                 value={draft.research.setQualified}
                 onChange={(e) =>
                   setDraft((d) => ({
@@ -723,8 +782,8 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
 
         {step === 6 && (
           <div className="space-y-4 text-sm">
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="font-semibold text-[#1e3a5f]">Application Summary</p>
+            <div className="rounded-xl border border-cyan-400/20 bg-gradient-to-br from-slate-50 to-cyan-50/40 p-4">
+              <p className="font-semibold text-[#0b1f4a]">Application Summary</p>
               <dl className="mt-3 grid gap-2 sm:grid-cols-2">
                 <div>
                   <dt className="text-slate-500">Name</dt>
@@ -777,8 +836,14 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 sm:px-6">
-        <Button type="button" variant="ghost" size="sm" onClick={saveDraft}>
+      <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 bg-slate-50/90 px-4 py-3.5 backdrop-blur sm:px-6">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={saveDraft}
+          className="text-slate-600 hover:text-[#0b1f4a]"
+        >
           <Save className="mr-2 h-4 w-4" />
           Save draft
         </Button>
@@ -788,12 +853,17 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             variant="outline"
             disabled={step === 0}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
+            className="border-slate-200 bg-white"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             Back
           </Button>
           {step < CAREERS_WIZARD_STEPS.length - 1 ? (
-            <Button type="button" onClick={nextStep}>
+            <Button
+              type="button"
+              onClick={nextStep}
+              className="bg-gradient-to-r from-[#0b1f4a] to-[#164a7a] shadow-lg shadow-cyan-900/20 hover:from-[#123058] hover:to-[#0b1f4a]"
+            >
               Next
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
@@ -801,7 +871,7 @@ export function CareersApplicationWizard({ job }: { job: CareersJob }) {
             <Button
               type="button"
               disabled={loading}
-              className="bg-[#c8102e] hover:bg-[#a50d25]"
+              className="bg-gradient-to-r from-[#c8102e] to-[#a50d25] shadow-lg shadow-red-900/25 hover:from-[#d41232] hover:to-[#c8102e]"
               onClick={() => void submitApplication()}
             >
               {loading ? 'Submitting…' : 'Submit Application'}
@@ -823,8 +893,10 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
-      <Label className="text-slate-700">{label}</Label>
+    <div className={cn('space-y-1', className)}>
+      <Label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </Label>
       {children}
     </div>
   );
