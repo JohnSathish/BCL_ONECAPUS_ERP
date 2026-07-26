@@ -7,7 +7,7 @@ import type { CareersPortalInfo } from '@/services/careers-portal';
 import { cn } from '@/utils/cn';
 
 function whatsappHref(phone?: string) {
-  const digits = (phone ?? '+919863000000').replace(/\D/g, '');
+  const digits = (phone ?? '+916909722989').replace(/\D/g, '');
   return `https://wa.me/${digits}?text=${encodeURIComponent('Hello, I have a query regarding recruitment at Don Bosco College Tura.')}`;
 }
 

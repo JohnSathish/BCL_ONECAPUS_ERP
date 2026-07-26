@@ -170,7 +170,8 @@ export class CareersPortalService {
       contactPhone: '+91 3651 232 291',
       contactEmail: 'career@donboscocollege.ac.in',
       websiteUrl: 'https://donboscocollege.ac.in',
-      whatsappSupport: '+91 98630 00000',
+      whatsappSupport:
+        careersExtras.whatsappSupport?.trim() || '+91 6909722989',
       stats: {
         openPositions: openCount,
         applicationsReceived,

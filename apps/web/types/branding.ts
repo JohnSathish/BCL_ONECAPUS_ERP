@@ -78,6 +78,7 @@ export type InstitutionBranding = {
       principalMessage?: string;
       principalPhotoUrl?: string;
       heroImages?: string[];
+      whatsappSupport?: string;
     };
   };
 };

@@ -4,6 +4,8 @@ export type CareersPortalExtras = {
   principalMessage?: string;
   principalPhotoUrl?: string;
   heroImages?: string[];
+  /** Public careers portal WhatsApp support number (e.g. +91 6909722989) */
+  whatsappSupport?: string;
 };
 
 export type PortalExtrasJson = {

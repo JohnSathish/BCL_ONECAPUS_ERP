@@ -49,7 +49,7 @@ export function BrandingCareersPortalSection({
   return (
     <BrandingSectionCard
       title="Careers portal — public website"
-      description="Content shown on career.donboscocollege.ac.in (hero banner slider, principal message)."
+      description="Content shown on career.donboscocollege.ac.in (hero banner, WhatsApp help, principal message)."
     >
       {/* Hero slider — prominent first */}
       <div className="mb-8 rounded-xl border border-dashed border-primary/30 bg-muted/30 p-5">
@@ -120,6 +120,20 @@ export function BrandingCareersPortalSection({
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="careersWhatsappSupport">WhatsApp Support number</Label>
+          <Input
+            id="careersWhatsappSupport"
+            className={brandingInputClass}
+            disabled={disabled}
+            placeholder="+91 6909722989"
+            {...register('portalExtras.careersPortal.whatsappSupport')}
+          />
+          <p className="text-xs text-muted-foreground">
+            Used by the green <strong>Need Help?</strong> button on the public careers portal.
+            Include country code (e.g. +91 …). Click <strong>Save changes</strong> after editing.
+          </p>
+        </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="careersPrincipalName">Principal name</Label>
           <Input
