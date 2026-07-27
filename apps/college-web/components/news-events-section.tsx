@@ -77,7 +77,53 @@ export function NewsEventsSection({ items }: Props) {
     };
   }, [embla, sync]);
 
-  if (!items.length) return null;
+  if (!items.length) {
+    return (
+      <section className="news-events" aria-labelledby="news-events-heading">
+        <div className="shell news-events-inner">
+          <header className="news-events-head">
+            <span className="news-events-emblem" aria-hidden>
+              <Newspaper />
+            </span>
+            <h2 id="news-events-heading">News &amp; Events</h2>
+            <span className="news-events-rule" aria-hidden />
+            <p>
+              Discover the latest happenings, achievements, and activities at Don Bosco College,
+              Tura.
+            </p>
+          </header>
+
+          <div className="news-events-empty" role="status">
+            <p>
+              No published news items yet. Official updates will appear here once the college
+              publishes them in the Website CMS.
+            </p>
+            <div className="news-events-cta">
+              <Link className="news-events-all" href="/news">
+                Open news archive <ArrowRight aria-hidden />
+              </Link>
+              <Link className="news-events-all" href="/notices">
+                View notice board <ArrowRight aria-hidden />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="news-events-bar" aria-label="Campus highlights">
+          <div className="shell news-events-bar-grid">
+            {highlights.map(({ icon: Icon, label }) => (
+              <div className="news-events-bar-item" key={label}>
+                <span aria-hidden>
+                  <Icon />
+                </span>
+                <p>{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="news-events" aria-labelledby="news-events-heading">

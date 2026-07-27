@@ -287,7 +287,27 @@
 .news-events-cta{
   display:flex;
   justify-content:center;
+  gap:12px;
+  flex-wrap:wrap;
   margin:28px 0 36px;
+}
+.news-events-empty{
+  margin:8px auto 12px;
+  max-width:640px;
+  text-align:center;
+  padding:28px 20px;
+  border:1px dashed rgba(11,46,89,.22);
+  border-radius:14px;
+  background:rgba(255,255,255,.72);
+}
+.news-events-empty p{
+  margin:0 0 18px;
+  color:var(--muted,#5b6b7c);
+  font-size:15px;
+  line-height:1.55;
+}
+.news-events-empty .news-events-cta{
+  margin:0;
 }
 .news-events-all{
   display:inline-flex;
