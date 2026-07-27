@@ -22,6 +22,7 @@ import {
 } from '@/lib/homepage-cms-content';
 import { PRINCIPAL_FULL_MESSAGE } from '@/lib/principal-message';
 import { seedTestimonials, type Testimonial } from '@/lib/testimonials';
+import { isDemoWebsiteContentSlug } from '@/lib/demo-content-slugs';
 
 export type NewsItem = {
   slug: string;
@@ -137,7 +138,7 @@ async function getPublicTestimonials(): Promise<Testimonial[]> {
       rating: data.rating,
     };
   });
-  return normalizeTestimonials(mapped) ?? [];
+  return (normalizeTestimonials(mapped) ?? []).filter((item) => !isDemoWebsiteContentSlug(item.id));
 }
 export type CmsPage = {
   title: string;
@@ -406,19 +407,13 @@ export async function getCollegeContent(): Promise<CollegeContent> {
     stats: data.stats?.length ? data.stats : seedContent.stats,
     // Prefer CMS news when the API is configured. Never silently replace an
     // empty/failed CMS response with demo seed articles (that looked like imports vanished).
-    news: cmsNews.length
-      ? cmsNews
-      : cmsBase()
-        ? []
-        : data.news?.length
-          ? data.news
-          : seedContent.news,
+    news: cmsNews.length ? cmsNews : cmsBase() ? [] : data.news?.length ? data.news : [],
     departments: data.departments?.length ? data.departments : seedContent.departments,
     testimonials: cmsTestimonials.length
       ? cmsTestimonials
       : data.testimonials?.length
         ? data.testimonials
-        : seedContent.testimonials,
+        : [],
     gallery: (() => {
       const fromCms = isRecord(homepageContent.lifeAtCampus) ? homepageContent.lifeAtCampus : null;
       const cmsItems = Array.isArray(fromCms?.items) ? fromCms.items : null;

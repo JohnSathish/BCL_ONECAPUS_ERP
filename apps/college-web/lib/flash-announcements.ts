@@ -2,7 +2,6 @@ import 'server-only';
 
 import { fetchCms, isRecord } from '@/lib/cms-client';
 import { listPublicAnnouncements } from '@/lib/announcements';
-import { seedContent } from '@/lib/content';
 import { getPublicNews } from '@/lib/news';
 
 export type FlashAnnouncement = {
@@ -102,21 +101,6 @@ export async function getFlashAnnouncements(limit = 12): Promise<FlashAnnounceme
     pushUnique(merged, seen, item, limit);
   }
 
-  if (!merged.length) {
-    for (const item of seedContent.news.slice(0, 8)) {
-      pushUnique(
-        merged,
-        seen,
-        {
-          id: `seed-news-${item.slug}`,
-          title: item.title,
-          href: `/news/${item.slug}`,
-          isNew: isRecent(item.date),
-        },
-        limit,
-      );
-    }
-  }
-
+  // Never resurrect demo seed news on the live college site.
   return merged;
 }

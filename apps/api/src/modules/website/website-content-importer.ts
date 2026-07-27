@@ -6,8 +6,6 @@ import {
   GALLERY_SEED,
   HEADER_MENU_CATALOG,
   HERO_FALLBACK_SLIDES,
-  NEWS_SEED_CATALOG,
-  NOTICE_SEED_CATALOG,
   UTILITY_MENU_CATALOG,
   WEBSITE_PAGE_CATALOG,
   type CatalogMenuNode,
@@ -80,6 +78,7 @@ async function upsertMenuTree(
  * Idempotent import of the public website catalogue into Website CMS tables.
  * Safe to run after migrations / deploys: creates missing rows only and never
  * overwrites saved homepage content, menus items, pages, or section toggles.
+ * Does not publish demo news, notices, or testimonials.
  */
 export async function importWebsiteContent(
   prisma: PrismaClient,
@@ -411,158 +410,10 @@ export async function importWebsiteContent(
   }
 
   let newsCreated = 0;
-  const newsType = await prisma.websiteContentType.findUnique({
-    where: { siteId_slug: { siteId: site.id, slug: 'news' } },
-  });
-  if (newsType) {
-    for (const entry of NEWS_SEED_CATALOG) {
-      const exists = await prisma.websiteContentEntry.findFirst({
-        where: { contentTypeId: newsType.id, slug: entry.slug },
-      });
-      if (exists) continue;
-      await prisma.websiteContentEntry.create({
-        data: {
-          tenantId,
-          siteId: site.id,
-          contentTypeId: newsType.id,
-          title: entry.title,
-          slug: entry.slug,
-          status: 'PUBLISHED',
-          publishedAt: new Date(),
-          data: {
-            summary: entry.summary,
-            body: entry.body,
-            category: entry.category,
-          },
-          createdById: actorId,
-          updatedById: actorId,
-        },
-      });
-      newsCreated += 1;
-    }
-  }
-
-  // Testimonials CPT entries from homepage principal-quality seed quotes
-  const testimonialsType = await prisma.websiteContentType.findUnique({
-    where: { siteId_slug: { siteId: site.id, slug: 'testimonials' } },
-  });
-  if (testimonialsType) {
-    const testimonialCount = await prisma.websiteContentEntry.count({
-      where: { contentTypeId: testimonialsType.id },
-    });
-    if (!testimonialCount) {
-      const seeds = [
-        {
-          title: 'Thangboi Singto',
-          slug: 'thangboi-singto',
-          quote:
-            'Don Bosco College Tura has been a pioneer and leader in imparting quality education to thousands of students of Garo Hills and beyond. I feel very proud and privileged to be an alumni of this great institution. The college has played a significant role in shaping me to what I have become as a professional football coach. May the college continue to grow and contribute to the upliftment of the society. Best regards to all.',
-          department: 'M.P.Ed.',
-          graduationYear: '',
-          status: 'Football Coach, Indian Super League',
-          photoSrc: '',
-        },
-        {
-          title: 'Sri Dorang Dekamra M Sangma',
-          slug: 'dorang-dekamra-m-sangma',
-          quote:
-            'Don Bosco College, Tura is a dynamic institution providing holistic development to its students and it caters to both learning and extracurricular activities, thus giving each student an opportunity to shine in their own field.',
-          department: 'Alumnus',
-          graduationYear: '',
-          status: 'WQM&S Coordinator under JJM in PHE',
-          photoSrc: '/images/testimonials/dorang-dekamra-m-sangma.png',
-        },
-        {
-          title: 'Dr. Subhankar Paul',
-          slug: 'subhankar-paul',
-          quote:
-            'There is so much more for all of us to achieve and do in life, and I can sincerely say that I found the right transition from school to a career in Science on the picturesque hilltop of Don Bosco College.',
-          department: 'Alumnus',
-          graduationYear: '',
-          status: 'MBBS, DNB General Surgery, FMAS, MRCS Edinburgh',
-          photoSrc: '/images/testimonials/subhankar-paul.png',
-        },
-        {
-          title: 'Jemina M. Sangma',
-          slug: 'jemina-sangma',
-          quote:
-            'Don Bosco College shaped the way I see science and service. Field visits around the Garo Hills taught me that ecology is not only a textbook chapter.',
-          department: 'B.Sc. Botany',
-          graduationYear: '2021',
-          status: 'Pursuing M.Sc. in Plant Ecology, NEHU, Shillong',
-          photoSrc: '',
-        },
-        {
-          title: 'Anita Ch. Marak',
-          slug: 'anita-marak',
-          quote:
-            'Don Bosco taught me to combine ambition with empathy. The mentors here continue to shape every decision I make.',
-          department: 'B.A. Education',
-          graduationYear: '2018',
-          status: 'Alumna · Secondary school educator, Tura',
-          photoSrc: '',
-        },
-        {
-          title: 'Ricky R. Sangma',
-          slug: 'ricky-sangma',
-          quote:
-            'The campus gave me room to question, create and lead. I found a community that believed in my potential before I fully believed in myself.',
-          department: 'B.Com.',
-          graduationYear: '2023',
-          status: 'Student leader · Department of Commerce',
-          photoSrc: '',
-        },
-      ];
-      for (const row of seeds) {
-        await prisma.websiteContentEntry.create({
-          data: {
-            tenantId,
-            siteId: site.id,
-            contentTypeId: testimonialsType.id,
-            title: row.title,
-            slug: row.slug,
-            status: 'PUBLISHED',
-            publishedAt: new Date(),
-            data: {
-              quote: row.quote,
-              department: row.department,
-              graduationYear: row.graduationYear,
-              status: row.status,
-              ...(row.photoSrc ? { photoSrc: row.photoSrc } : {}),
-            },
-            createdById: actorId,
-            updatedById: actorId,
-          },
-        });
-      }
-    }
-  }
+  // Never auto-publish demo news/notices/testimonials into a live CMS.
+  // Structure (pages, menus, CPT schemas) is enough for seed-defaults.
 
   let noticesCreated = 0;
-  for (const notice of NOTICE_SEED_CATALOG) {
-    const exists = await prisma.websiteNotice.findFirst({
-      where: { siteId: site.id, slug: notice.slug },
-    });
-    if (exists) continue;
-    await prisma.websiteNotice.create({
-      data: {
-        tenantId,
-        siteId: site.id,
-        title: notice.title,
-        slug: notice.slug,
-        bodyHtml: notice.bodyHtml,
-        category: notice.category,
-        priority: notice.priority,
-        status: 'PUBLISHED',
-        publishAt: new Date(),
-        showOnHomepage: true,
-        isVisible: true,
-        createdById: actorId,
-        updatedById: actorId,
-      },
-    });
-    noticesCreated += 1;
-  }
 
   const pagesTotal = await prisma.websitePage.count({
     where: { siteId: site.id, deletedAt: null },

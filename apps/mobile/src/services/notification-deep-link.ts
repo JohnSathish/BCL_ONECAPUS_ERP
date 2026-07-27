@@ -82,6 +82,19 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('/student/leave')) {
     return '/(student)/leave' as Href;
   }
+  {
+    const chatMatch = lower.match(/\/student\/support\/chats?\/([a-z0-9-]+)/);
+    if (chatMatch?.[1]) {
+      return `/(student)/support-chat/${chatMatch[1]}` as Href;
+    }
+    const ticketMatch = lower.match(/\/student\/support\/tickets\/([a-z0-9-]+)/);
+    if (ticketMatch?.[1]) {
+      return `/(student)/support-ticket/${ticketMatch[1]}` as Href;
+    }
+    if (lower.includes('/student/support')) {
+      return '/(student)/support' as Href;
+    }
+  }
   if (
     lower.includes('/student/my-profile') ||
     lower.includes('/student/profile') ||

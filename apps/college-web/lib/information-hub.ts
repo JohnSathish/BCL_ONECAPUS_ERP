@@ -321,10 +321,8 @@ export function mergeInformationHub(...values: unknown[]): InformationHubContent
           : seedInformationHub.leadership.message,
       messageHref: normalizePrincipalMessageHref(merged.leadership?.messageHref),
     },
-    upcomingEvents: merged.upcomingEvents?.length
-      ? merged.upcomingEvents
-      : seedInformationHub.upcomingEvents,
-    notices: merged.notices?.length ? merged.notices : seedInformationHub.notices,
+    upcomingEvents: merged.upcomingEvents?.length ? merged.upcomingEvents : [],
+    notices: merged.notices?.length ? merged.notices : [],
     calendarHref: merged.calendarHref ?? seedInformationHub.calendarHref,
     noticesHref: merged.noticesHref ?? seedInformationHub.noticesHref,
   };

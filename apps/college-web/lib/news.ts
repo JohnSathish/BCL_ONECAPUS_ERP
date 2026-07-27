@@ -2,6 +2,7 @@ import 'server-only';
 
 import { fetchCms, isRecord } from '@/lib/cms-client';
 import type { NewsItem } from '@/lib/content';
+import { isDemoWebsiteContentSlug } from '@/lib/demo-content-slugs';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
@@ -93,7 +94,10 @@ export async function getPublicNews(): Promise<NewsItem[]> {
   try {
     const rows = await fetchCms('content/news', {}, 120, 12000);
     if (!Array.isArray(rows) || !rows.length) return [];
-    return rows.map(mapNewsRow).filter((item): item is NewsItem => Boolean(item));
+    return rows
+      .map(mapNewsRow)
+      .filter((item): item is NewsItem => Boolean(item))
+      .filter((item) => !isDemoWebsiteContentSlug(item.slug));
   } catch {
     return [];
   }
@@ -101,6 +105,7 @@ export async function getPublicNews(): Promise<NewsItem[]> {
 
 /** Full article including body HTML. */
 export async function getPublicNewsBySlug(slug: string): Promise<NewsItem | null> {
+  if (isDemoWebsiteContentSlug(slug)) return null;
   try {
     const row = await fetchCms('content/news', { entry: slug }, 120, 12000);
     return mapNewsRow(row);

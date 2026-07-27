@@ -24,6 +24,7 @@ import type {
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
 import { DEFAULT_HOMEPAGE_CONTENT } from './website-homepage-content';
 import { WebsiteService } from './website.service';
+import { isDemoWebsiteContentSlug } from './website-content-catalog';
 
 const SETTINGS_DEFAULTS = {
   tagline: null,
@@ -1142,6 +1143,9 @@ export class WebsiteAdminService {
         },
       });
       if (!entry) throw new NotFoundException('Content entry not found');
+      if (isDemoWebsiteContentSlug(entry.slug)) {
+        throw new NotFoundException('Content entry not found');
+      }
       return entry;
     }
     const rows = await this.prisma.websiteContentEntry.findMany({
@@ -1153,10 +1157,11 @@ export class WebsiteAdminService {
       },
       orderBy: { publishedAt: 'desc' },
     });
+    const visible = rows.filter((row) => !isDemoWebsiteContentSlug(row.slug));
     // List payloads omit full HTML bodies so college-web can load all cards
     // without timing out; single-entry requests still return the full body.
     if (contentType.slug === 'news') {
-      return rows.map((row) => {
+      return visible.map((row) => {
         const data = this.asRecord(row.data);
         const lite: Record<string, unknown> = { ...data };
         delete lite.body;
@@ -1176,7 +1181,7 @@ export class WebsiteAdminService {
         };
       });
     }
-    return rows;
+    return visible;
   }
 
   async publish(user: JwtUser, dto: PublishWebsiteDto) {

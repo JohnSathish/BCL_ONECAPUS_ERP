@@ -258,6 +258,31 @@ export const NOTICE_SEED_CATALOG = [
   },
 ];
 
+/** Slugs created by seed/import — never show on the public site as live content. */
+export const DEMO_NEWS_SLUGS = NEWS_SEED_CATALOG.map((row) => row.slug);
+export const DEMO_NOTICE_SLUGS = NOTICE_SEED_CATALOG.map((row) => row.slug);
+export const DEMO_TESTIMONIAL_SLUGS = [
+  'thangboi-singto',
+  'dorang-dekamra-m-sangma',
+  'subhankar-paul',
+  'jemina-sangma',
+  'anita-marak',
+  'ricky-sangma',
+  'larisa-ch-marak',
+  'nangrak-momin',
+] as const;
+
+export const DEMO_WEBSITE_CONTENT_SLUGS = new Set<string>([
+  ...DEMO_NEWS_SLUGS,
+  ...DEMO_NOTICE_SLUGS,
+  ...DEMO_TESTIMONIAL_SLUGS,
+]);
+
+export function isDemoWebsiteContentSlug(slug: string | null | undefined) {
+  if (!slug) return false;
+  return DEMO_WEBSITE_CONTENT_SLUGS.has(slug.trim().toLowerCase());
+}
+
 export const GALLERY_SEED = [
   {
     src: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=1200&q=82',

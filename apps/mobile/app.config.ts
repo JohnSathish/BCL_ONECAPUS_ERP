@@ -61,7 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.1',
+  version: '1.0.3',
   scheme: 'onecampus',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -84,7 +84,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 22,
+    versionCode: 23,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',

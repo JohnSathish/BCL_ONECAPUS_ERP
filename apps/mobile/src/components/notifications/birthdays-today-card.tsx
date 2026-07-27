@@ -11,8 +11,8 @@ export type BirthdayWidgetPerson = {
 };
 
 export type BirthdaysWidgetData = {
-  isMyBirthday: boolean;
-  birthdays: BirthdayWidgetPerson[];
+  isMyBirthday?: boolean;
+  birthdays?: BirthdayWidgetPerson[];
 };
 
 type Props = {

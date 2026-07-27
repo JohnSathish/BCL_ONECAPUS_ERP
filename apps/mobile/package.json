@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -9,6 +9,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "preflight:play": "node ./scripts/preflight-play-release.js",
     "prebuild:android": "expo prebuild --platform android --clean",
     "build:apk": "node ./scripts/build-local-apk.js",
     "build:aab": "node ./scripts/build-local-aab.js",

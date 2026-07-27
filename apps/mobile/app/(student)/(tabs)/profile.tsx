@@ -53,6 +53,10 @@ export default function StudentProfileScreen() {
           />
           <LinkRow label="Feedback" onPress={() => router.push('/(student)/feedback' as never)} />
           <LinkRow
+            label="Support Centre"
+            onPress={() => router.push('/(student)/support' as never)}
+          />
+          <LinkRow
             label="Certificates"
             onPress={() => router.push('/(student)/certificates' as never)}
           />

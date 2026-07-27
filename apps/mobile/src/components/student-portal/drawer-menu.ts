@@ -174,6 +174,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
     icon: '🧾',
     items: [
       {
+        id: 'support-centre',
+        label: 'Support Centre',
+        href: '/(student)/support',
+        keywords: ['help', 'chat', 'ticket', 'support', 'helpdesk'],
+      },
+      {
         id: 'feedback',
         label: 'Feedback',
         href: '/(student)/feedback',
@@ -241,6 +247,7 @@ export const DRAWER_ITEM_FEATURE_FLAGS: Record<string, string> = {
   'exam-fees': 'fees',
   receipts: 'fees',
   feedback: 'feedback',
+  'support-centre': 'support',
   certificates: 'certificates',
   library: 'library',
   notices: 'notifications',

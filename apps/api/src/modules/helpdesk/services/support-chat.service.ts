@@ -231,6 +231,7 @@ export class SupportChatService {
       include: {
         department: true,
         agent: true,
+        ticket: true,
         messages: {
           orderBy: { createdAt: 'asc' },
           include: { attachments: true },

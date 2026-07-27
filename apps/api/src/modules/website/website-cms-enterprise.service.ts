@@ -22,6 +22,7 @@ import {
 } from './website-homepage-content';
 import { WebsiteService } from './website.service';
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
+import { isDemoWebsiteContentSlug } from './website-content-catalog';
 
 export type WebsiteMenuTreeNode = {
   id: string;
@@ -711,7 +712,9 @@ export class WebsiteCmsEnterpriseService {
       orderBy: [{ priority: 'asc' }, { publishAt: 'desc' }],
       take: opts?.homepage ? 12 : 50,
     });
-    return rows.map((row) => this.mapNotice(row));
+    return rows
+      .filter((row) => !isDemoWebsiteContentSlug(row.slug))
+      .map((row) => this.mapNotice(row));
   }
 
   async getPublicHomepage(tenantId: string) {
@@ -970,15 +973,17 @@ export class WebsiteCmsEnterpriseService {
       orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 12,
     });
-    return rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      title: row.title,
-      status: row.status,
-      fields: this.asRecord(row.data),
-      publishedAt: row.publishedAt,
-      updatedAt: row.updatedAt,
-    }));
+    return rows
+      .filter((row) => !isDemoWebsiteContentSlug(row.slug))
+      .map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        status: row.status,
+        fields: this.asRecord(row.data),
+        publishedAt: row.publishedAt,
+        updatedAt: row.updatedAt,
+      }));
   }
 
   async getCalendarItems(tenantId: string) {
