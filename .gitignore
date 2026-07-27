@@ -69,3 +69,4 @@ _safety-backups/
 # One-time office-filled legacy minor CSVs (keep directory via .gitkeep)
 apps/api/scripts/data/**
 !apps/api/scripts/data/.gitkeep
+!apps/api/scripts/data/news-export-demo.json
