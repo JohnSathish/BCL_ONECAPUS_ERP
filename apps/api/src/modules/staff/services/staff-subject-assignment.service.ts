@@ -263,7 +263,7 @@ export class StaffSubjectAssignmentService {
     const semesterNo = offering.semesterSequence;
     const category = offering.category;
 
-    await this.assertStaffShiftAssignment(
+    await this.ensureStaffShiftAssignment(
       tenantId,
       staffProfileId,
       offeringSection.shiftId,
@@ -730,18 +730,43 @@ export class StaffSubjectAssignmentService {
     }
   }
 
-  private async assertStaffShiftAssignment(
+  /**
+   * Subject teaching implies shift membership. Auto-provision (or reactivate) the
+   * shift row so admins are not blocked by a separate Faculty Shifts step first.
+   */
+  private async ensureStaffShiftAssignment(
     tenantId: string,
     staffProfileId: string,
     shiftId: string,
   ) {
-    const mapping = await this.prisma.staffShiftAssignment.findFirst({
-      where: { tenantId, staffProfileId, shiftId },
+    const shift = await this.prisma.shift.findFirst({
+      where: { id: shiftId, tenantId, deletedAt: null, status: 'ACTIVE' },
     });
-    if (!mapping) {
-      throw new BadRequestException(
-        'Staff member is not assigned to teach in this shift',
-      );
+    if (!shift) {
+      throw new BadRequestException('Invalid shift for this delivery section');
     }
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { id: staffProfileId, tenantId, deletedAt: null },
+      select: { primaryShiftId: true },
+    });
+    if (!staff) throw new NotFoundException('Staff member not found');
+
+    await this.prisma.staffShiftAssignment.upsert({
+      where: {
+        staffProfileId_shiftId: { staffProfileId, shiftId },
+      },
+      create: {
+        tenantId,
+        staffProfileId,
+        shiftId,
+        isPrimary: staff.primaryShiftId === shiftId,
+        active: true,
+      },
+      update: {
+        active: true,
+        ...(staff.primaryShiftId === shiftId ? { isPrimary: true } : {}),
+      },
+    });
   }
 }
