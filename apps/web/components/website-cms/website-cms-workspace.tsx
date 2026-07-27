@@ -106,6 +106,7 @@ import {
   PAGE_BLOCK_TYPES,
 } from '@/lib/website/homepage-sections';
 import { ContentEntriesEditor } from './content-entries-editor';
+import { NewsEditorView } from './news-editor-view';
 import { HomepageContentEditors } from './homepage-content-editors';
 import { LifeAtCampusEditor } from './life-at-campus-editor';
 import { ReorderableList } from './reorderable-list';
@@ -2914,7 +2915,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
 }
 
 function NewsEntriesView({ onMessage }: { onMessage: (message: string) => void }) {
-  return <ContentEntriesEditor typeSlug="news" onMessage={onMessage} />;
+  return <NewsEditorView onMessage={onMessage} />;
 }
 
 function HomepageBuilderView({ onMessage }: { onMessage: (message: string) => void }) {

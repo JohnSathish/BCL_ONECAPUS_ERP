@@ -36,7 +36,15 @@ export type NewsItem = {
   author?: string;
   seoTitle?: string;
   seoDescription?: string;
+  seoKeywords?: string;
+  ogImage?: string;
   featured?: boolean;
+  sticky?: boolean;
+  tags?: string[];
+  gallery?: Array<{ src: string; alt: string; caption: string }>;
+  attachments?: Array<{ url: string; name: string; mime: string }>;
+  relatedSlugs?: string[];
+  viewCount?: number;
 };
 export type CollegeContent = {
   stats: { value: string; label: string }[];

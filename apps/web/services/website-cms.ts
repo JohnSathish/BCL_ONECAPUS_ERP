@@ -153,6 +153,11 @@ export const fetchWebsiteContentEntries = (contentTypeId: string) =>
     .get<Array<Record<string, unknown>>>(`${base}/content-types/${contentTypeId}/entries`)
     .then((response) => response.data);
 
+export const fetchWebsiteContentEntriesTrash = (contentTypeId: string) =>
+  api
+    .get<Array<Record<string, unknown>>>(`${base}/content-types/${contentTypeId}/entries/trash`)
+    .then((response) => response.data);
+
 export const createWebsiteContentEntry = (
   contentTypeId: string,
   payload: {
@@ -161,6 +166,7 @@ export const createWebsiteContentEntry = (
     status?: string;
     data?: Record<string, unknown>;
     scheduledAt?: string | null;
+    publishedAt?: string | null;
   },
 ) =>
   api
@@ -175,8 +181,25 @@ export const updateWebsiteContentEntry = (
     status?: string;
     data?: Record<string, unknown>;
     scheduledAt?: string | null;
+    publishedAt?: string | null;
   },
 ) => api.patch(`${base}/content-entries/${entryId}`, payload).then((response) => response.data);
+
+export const trashWebsiteContentEntry = (entryId: string) =>
+  api.delete(`${base}/content-entries/${entryId}`).then((response) => response.data);
+
+export const restoreWebsiteContentEntry = (entryId: string) =>
+  api.post(`${base}/content-entries/${entryId}/restore`).then((response) => response.data);
+
+export const previewWebsiteContentEntry = (entryId: string) =>
+  api
+    .post<{
+      html: string;
+      title: string;
+      status: string;
+      slug: string;
+    }>(`${base}/content-entries/${entryId}/preview`)
+    .then((response) => response.data);
 
 export const fetchWebsiteNotices = () =>
   api

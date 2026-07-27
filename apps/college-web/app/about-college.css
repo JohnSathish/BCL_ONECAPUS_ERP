@@ -282,6 +282,8 @@
   .about-college-media{min-height:280px}
   .about-college-stats{grid-template-columns:repeat(3,1fr);row-gap:20px}
   .about-college-description{max-width:none}
+  /* Sample campus-reference mockup reads as a second UI behind the portrait on stacked layouts */
+  .about-college-watermark::after{display:none;content:none;background:none}
 }
 
 @media(max-width:760px){

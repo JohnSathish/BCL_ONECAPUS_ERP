@@ -318,55 +318,54 @@ export const HERO_FALLBACK_SLIDES = [
   },
 ];
 
+/** Canonical News CPT fields — keep in sync with seedDefaults + NewsEditorView. */
+export const NEWS_CONTENT_FIELDS = [
+  { key: 'summary', label: 'Summary', type: 'text', required: true },
+  { key: 'body', label: 'Body', type: 'richText', required: true },
+  { key: 'image', label: 'Featured image', type: 'image', required: false },
+  {
+    key: 'imageThumb',
+    label: 'Featured thumbnail',
+    type: 'image',
+    required: false,
+  },
+  { key: 'ogImage', label: 'Open Graph image', type: 'image', required: false },
+  { key: 'gallery', label: 'Gallery images', type: 'json', required: false },
+  { key: 'category', label: 'Category', type: 'text', required: false },
+  { key: 'author', label: 'Author', type: 'text', required: false },
+  { key: 'tags', label: 'Tags', type: 'json', required: false },
+  { key: 'seoTitle', label: 'SEO meta title', type: 'text', required: false },
+  {
+    key: 'seoDescription',
+    label: 'SEO description',
+    type: 'text',
+    required: false,
+  },
+  { key: 'seoKeywords', label: 'SEO keywords', type: 'text', required: false },
+  { key: 'featured', label: 'Featured news', type: 'boolean', required: false },
+  { key: 'sticky', label: 'Sticky news', type: 'boolean', required: false },
+  { key: 'attachments', label: 'Attachments', type: 'json', required: false },
+  {
+    key: 'relatedSlugs',
+    label: 'Related news',
+    type: 'json',
+    required: false,
+  },
+  { key: 'viewCount', label: 'View count', type: 'number', required: false },
+  {
+    key: 'sourceUrl',
+    label: 'Original source URL',
+    type: 'text',
+    required: false,
+  },
+] as const;
+
 export const CONTENT_TYPE_CATALOG = [
   {
     name: 'News',
     slug: 'news',
     description: 'College news and announcements',
-    fields: [
-      { key: 'summary', label: 'Summary', type: 'text', required: true },
-      { key: 'body', label: 'Body', type: 'richText', required: true },
-      { key: 'image', label: 'Featured image', type: 'image', required: false },
-      {
-        key: 'imageThumb',
-        label: 'Featured thumbnail',
-        type: 'image',
-        required: false,
-      },
-      {
-        key: 'gallery',
-        label: 'Gallery images',
-        type: 'json',
-        required: false,
-      },
-      { key: 'category', label: 'Category', type: 'text', required: false },
-      { key: 'author', label: 'Author', type: 'text', required: false },
-      { key: 'tags', label: 'Tags', type: 'json', required: false },
-      {
-        key: 'seoTitle',
-        label: 'SEO meta title',
-        type: 'text',
-        required: false,
-      },
-      {
-        key: 'seoDescription',
-        label: 'SEO description',
-        type: 'text',
-        required: false,
-      },
-      {
-        key: 'featured',
-        label: 'Featured news',
-        type: 'boolean',
-        required: false,
-      },
-      {
-        key: 'sourceUrl',
-        label: 'Original source URL',
-        type: 'text',
-        required: false,
-      },
-    ],
+    fields: [...NEWS_CONTENT_FIELDS],
   },
   {
     name: 'Events',

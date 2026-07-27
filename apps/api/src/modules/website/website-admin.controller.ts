@@ -172,7 +172,16 @@ export class WebsiteAdminController {
     @CurrentUser() user: JwtUser,
     @Param('contentTypeId') contentTypeId: string,
   ) {
-    return this.admin.entries(user.tid, contentTypeId);
+    return this.admin.entries(user.tid, contentTypeId, false);
+  }
+
+  @Get('content-types/:contentTypeId/entries/trash')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  entriesTrash(
+    @CurrentUser() user: JwtUser,
+    @Param('contentTypeId') contentTypeId: string,
+  ) {
+    return this.admin.entries(user.tid, contentTypeId, true);
   }
 
   @Post('content-types/:contentTypeId/entries')
@@ -193,6 +202,30 @@ export class WebsiteAdminController {
     @Body() dto: WebsiteContentEntryDto,
   ) {
     return this.admin.updateEntry(user, entryId, dto);
+  }
+
+  @Delete('content-entries/:entryId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  trashEntry(@CurrentUser() user: JwtUser, @Param('entryId') entryId: string) {
+    return this.admin.trashEntry(user, entryId);
+  }
+
+  @Post('content-entries/:entryId/restore')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  restoreEntry(
+    @CurrentUser() user: JwtUser,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.admin.restoreEntry(user, entryId);
+  }
+
+  @Post('content-entries/:entryId/preview')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  previewEntry(
+    @CurrentUser() user: JwtUser,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.admin.previewContentEntry(user, entryId);
   }
 
   @Get('media')

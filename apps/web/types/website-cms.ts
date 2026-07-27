@@ -151,7 +151,7 @@ export type WebsiteContentType = {
   fields: Array<{
     key: string;
     label: string;
-    type: 'text' | 'richText' | 'image' | 'date' | 'number' | 'boolean' | 'relation';
+    type: 'text' | 'richText' | 'image' | 'date' | 'number' | 'boolean' | 'relation' | 'json';
     required: boolean;
   }>;
   entryCount: number;

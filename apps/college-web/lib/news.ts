@@ -55,6 +55,47 @@ function resolveBody(
   return { body: excerpt ? [excerpt] : [] };
 }
 
+function mapGallery(value: unknown): NewsItem['gallery'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const src = stringField(item.src);
+      if (!src) return null;
+      return {
+        src,
+        alt: stringField(item.alt),
+        caption: stringField(item.caption),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+}
+
+function mapAttachments(value: unknown): NewsItem['attachments'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const url = stringField(item.url);
+      if (!url) return null;
+      return {
+        url,
+        name: stringField(item.name, 'Download'),
+        mime: stringField(item.mime),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+}
+
+function mapTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()));
+}
+
+function mapRelated(value: unknown): string[] {
+  return mapTags(value);
+}
+
 function mapNewsRow(row: unknown): NewsItem | null {
   if (!isRecord(row)) return null;
   const slug = typeof row.slug === 'string' ? row.slug : null;
@@ -85,8 +126,26 @@ function mapNewsRow(row: unknown): NewsItem | null {
     author: stringField(fields.author) || undefined,
     seoTitle: stringField(fields.seoTitle) || undefined,
     seoDescription: stringField(fields.seoDescription) || undefined,
+    seoKeywords: stringField(fields.seoKeywords) || undefined,
+    ogImage: stringField(fields.ogImage, fields.image) || undefined,
     featured: fields.featured === true,
+    sticky: fields.sticky === true,
+    tags: mapTags(fields.tags),
+    gallery: mapGallery(fields.gallery),
+    attachments: mapAttachments(fields.attachments),
+    relatedSlugs: mapRelated(fields.relatedSlugs),
+    viewCount: typeof fields.viewCount === 'number' ? fields.viewCount : undefined,
   };
+}
+
+function sortNews(items: NewsItem[]): NewsItem[] {
+  return [...items].sort((a, b) => {
+    const stickyDiff = Number(Boolean(b.sticky)) - Number(Boolean(a.sticky));
+    if (stickyDiff) return stickyDiff;
+    const featuredDiff = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+    if (featuredDiff) return featuredDiff;
+    return b.date.localeCompare(a.date);
+  });
 }
 
 /** List cards — API omits full HTML bodies for speed. */
@@ -94,10 +153,12 @@ export async function getPublicNews(): Promise<NewsItem[]> {
   try {
     const rows = await fetchCms('content/news', {}, 120, 12000);
     if (!Array.isArray(rows) || !rows.length) return [];
-    return rows
-      .map(mapNewsRow)
-      .filter((item): item is NewsItem => Boolean(item))
-      .filter((item) => !isDemoWebsiteContentSlug(item.slug));
+    return sortNews(
+      rows
+        .map(mapNewsRow)
+        .filter((item): item is NewsItem => Boolean(item))
+        .filter((item) => !isDemoWebsiteContentSlug(item.slug)),
+    );
   } catch {
     return [];
   }

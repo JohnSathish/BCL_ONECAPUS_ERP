@@ -33,7 +33,13 @@ export default async function NewsIndexPage({
   const content = await getCollegeContent();
   const items = [...content.news]
     .filter((item) => matchesQuery(item, query))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => {
+      const stickyDiff = Number(Boolean(b.sticky)) - Number(Boolean(a.sticky));
+      if (stickyDiff) return stickyDiff;
+      const featuredDiff = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+      if (featuredDiff) return featuredDiff;
+      return b.date.localeCompare(a.date);
+    });
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const requested = Number.parseInt(params.page ?? '1', 10);
   const page = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), pageCount) : 1;

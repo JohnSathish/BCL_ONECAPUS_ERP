@@ -24,7 +24,10 @@ import type {
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
 import { DEFAULT_HOMEPAGE_CONTENT } from './website-homepage-content';
 import { WebsiteService } from './website.service';
-import { isDemoWebsiteContentSlug } from './website-content-catalog';
+import {
+  isDemoWebsiteContentSlug,
+  NEWS_CONTENT_FIELDS,
+} from './website-content-catalog';
 
 const SETTINGS_DEFAULTS = {
   tagline: null,
@@ -101,55 +104,7 @@ export class WebsiteAdminService {
         name: 'News',
         slug: 'news',
         description: 'College news and announcements',
-        fields: [
-          { key: 'summary', label: 'Summary', type: 'text', required: true },
-          { key: 'body', label: 'Body', type: 'richText', required: true },
-          {
-            key: 'image',
-            label: 'Featured image',
-            type: 'image',
-            required: false,
-          },
-          {
-            key: 'imageThumb',
-            label: 'Featured thumbnail',
-            type: 'image',
-            required: false,
-          },
-          {
-            key: 'gallery',
-            label: 'Gallery images',
-            type: 'json',
-            required: false,
-          },
-          { key: 'category', label: 'Category', type: 'text', required: false },
-          { key: 'author', label: 'Author', type: 'text', required: false },
-          { key: 'tags', label: 'Tags', type: 'json', required: false },
-          {
-            key: 'seoTitle',
-            label: 'SEO meta title',
-            type: 'text',
-            required: false,
-          },
-          {
-            key: 'seoDescription',
-            label: 'SEO description',
-            type: 'text',
-            required: false,
-          },
-          {
-            key: 'featured',
-            label: 'Featured news',
-            type: 'boolean',
-            required: false,
-          },
-          {
-            key: 'sourceUrl',
-            label: 'Original source URL',
-            type: 'text',
-            required: false,
-          },
-        ],
+        fields: [...NEWS_CONTENT_FIELDS],
       },
       {
         name: 'Events',
@@ -217,11 +172,18 @@ export class WebsiteAdminService {
         where: {
           siteId_slug: { siteId: site.id, slug: definition.slug },
         },
-        update: {},
+        update: {
+          name: definition.name,
+          description: definition.description,
+          fields: definition.fields as unknown as Prisma.InputJsonValue,
+        },
         create: {
           tenantId: user.tid,
           siteId: site.id,
-          ...definition,
+          name: definition.name,
+          slug: definition.slug,
+          description: definition.description,
+          fields: definition.fields as unknown as Prisma.InputJsonValue,
         },
       });
     }
@@ -627,7 +589,9 @@ export class WebsiteAdminService {
     const site = await this.website.getOrCreateSite(tenantId);
     const rows = await this.prisma.websiteContentType.findMany({
       where: { tenantId, siteId: site.id },
-      include: { _count: { select: { entries: true } } },
+      include: {
+        _count: { select: { entries: { where: { deletedAt: null } } } },
+      },
       orderBy: { name: 'asc' },
     });
     return rows.map(({ _count, ...row }) => ({
@@ -666,10 +630,15 @@ export class WebsiteAdminService {
     return { ...row, entryCount: 0 };
   }
 
-  async entries(tenantId: string, contentTypeId: string) {
-    await this.requireContentType(tenantId, contentTypeId);
+  async entries(tenantId: string, contentTypeId: string, trash = false) {
+    const type = await this.requireContentType(tenantId, contentTypeId);
+    await this.ensureNewsContentFields(type);
     return this.prisma.websiteContentEntry.findMany({
-      where: { tenantId, contentTypeId },
+      where: {
+        tenantId,
+        contentTypeId,
+        deletedAt: trash ? { not: null } : null,
+      },
       orderBy: { updatedAt: 'desc' },
     });
   }
@@ -685,9 +654,16 @@ export class WebsiteAdminService {
     if (dto.status === 'SCHEDULED' && !dto.scheduledAt) {
       throw new BadRequestException('scheduledAt is required');
     }
-    const type = await this.requireContentType(user.tid, contentTypeId);
+    const type = await this.ensureNewsContentFields(
+      await this.requireContentType(user.tid, contentTypeId),
+    );
     if (!dto.title?.trim()) throw new BadRequestException('title is required');
     const data = this.sanitizeEntryData(type.fields, dto.data ?? {});
+    const status = dto.status ?? 'DRAFT';
+    const publishedAt =
+      status === 'PUBLISHED'
+        ? (this.optionalDate(dto.publishedAt) ?? new Date())
+        : null;
     const row = await this.prisma.websiteContentEntry.create({
       data: {
         tenantId: user.tid,
@@ -695,10 +671,13 @@ export class WebsiteAdminService {
         contentTypeId,
         title: dto.title.trim(),
         slug: this.slugify(dto.slug || dto.title),
-        status: dto.status ?? 'DRAFT',
+        status,
         data: data as Prisma.InputJsonValue,
-        scheduledAt: this.optionalFutureDate(dto.scheduledAt),
-        publishedAt: dto.status === 'PUBLISHED' ? new Date() : null,
+        scheduledAt:
+          status === 'SCHEDULED'
+            ? this.optionalFutureDate(dto.scheduledAt)
+            : null,
+        publishedAt,
         createdById: user.sub,
         updatedById: user.sub,
       },
@@ -723,10 +702,13 @@ export class WebsiteAdminService {
       this.assertCanPublish(user);
     }
     const existing = await this.prisma.websiteContentEntry.findFirst({
-      where: { id: entryId, tenantId: user.tid },
+      where: { id: entryId, tenantId: user.tid, deletedAt: null },
       include: { contentType: true },
     });
     if (!existing) throw new NotFoundException('Content entry not found');
+    const contentType = await this.ensureNewsContentFields(
+      existing.contentType,
+    );
     if (
       dto.status === 'SCHEDULED' &&
       !dto.scheduledAt &&
@@ -734,26 +716,50 @@ export class WebsiteAdminService {
     ) {
       throw new BadRequestException('scheduledAt is required');
     }
+    const nextStatus = dto.status ?? existing.status;
     const scheduledAt =
       dto.scheduledAt !== undefined
-        ? this.optionalFutureDate(dto.scheduledAt)
+        ? nextStatus === 'SCHEDULED'
+          ? this.optionalFutureDate(dto.scheduledAt)
+          : null
         : undefined;
+    let publishedAt: Date | null | undefined;
+    if (dto.publishedAt !== undefined && nextStatus === 'PUBLISHED') {
+      publishedAt = this.optionalDate(dto.publishedAt) ?? new Date();
+    } else if (dto.status === 'PUBLISHED') {
+      publishedAt = existing.publishedAt ?? new Date();
+    } else if (
+      dto.status === 'DRAFT' ||
+      dto.status === 'IN_REVIEW' ||
+      dto.status === 'SCHEDULED'
+    ) {
+      publishedAt = null;
+    }
+    const mergedData = dto.data
+      ? { ...this.asRecord(existing.data), ...dto.data }
+      : undefined;
     const row = await this.prisma.websiteContentEntry.update({
       where: { id: entryId },
       data: {
         ...(dto.title ? { title: dto.title.trim() } : {}),
         ...(dto.slug ? { slug: this.slugify(dto.slug) } : {}),
         ...(dto.status ? { status: dto.status } : {}),
-        ...(dto.status === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
-        ...(dto.data
+        ...(publishedAt !== undefined ? { publishedAt } : {}),
+        ...(mergedData
           ? {
               data: this.sanitizeEntryData(
-                existing.contentType.fields,
-                dto.data,
+                contentType.fields,
+                mergedData,
               ) as Prisma.InputJsonValue,
             }
           : {}),
-        ...(scheduledAt !== undefined ? { scheduledAt } : {}),
+        ...(scheduledAt !== undefined
+          ? { scheduledAt }
+          : dto.status === 'PUBLISHED' ||
+              dto.status === 'DRAFT' ||
+              dto.status === 'IN_REVIEW'
+            ? { scheduledAt: null }
+            : {}),
         updatedById: user.sub,
       },
     });
@@ -766,6 +772,87 @@ export class WebsiteAdminService {
       row,
     );
     return row;
+  }
+
+  async trashEntry(user: JwtUser, entryId: string) {
+    const existing = await this.prisma.websiteContentEntry.findFirst({
+      where: { id: entryId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Content entry not found');
+    const row = await this.prisma.websiteContentEntry.update({
+      where: { id: entryId },
+      data: {
+        deletedAt: new Date(),
+        deletedById: user.sub,
+        status: existing.status === 'PUBLISHED' ? 'ARCHIVED' : existing.status,
+        updatedById: user.sub,
+      },
+    });
+    await this.recordRevision(
+      user,
+      existing.siteId,
+      'CONTENT',
+      row.id,
+      'TRASHED',
+      row,
+    );
+    return row;
+  }
+
+  async restoreEntry(user: JwtUser, entryId: string) {
+    const existing = await this.prisma.websiteContentEntry.findFirst({
+      where: { id: entryId, tenantId: user.tid, deletedAt: { not: null } },
+    });
+    if (!existing) {
+      throw new NotFoundException('Trashed content entry not found');
+    }
+    const row = await this.prisma.websiteContentEntry.update({
+      where: { id: entryId },
+      data: {
+        deletedAt: null,
+        deletedById: null,
+        status: 'DRAFT',
+        publishedAt: null,
+        scheduledAt: null,
+        updatedById: user.sub,
+      },
+    });
+    await this.recordRevision(
+      user,
+      existing.siteId,
+      'CONTENT',
+      row.id,
+      'RESTORED',
+      row,
+    );
+    return row;
+  }
+
+  async previewContentEntry(user: JwtUser, entryId: string) {
+    const entry = await this.prisma.websiteContentEntry.findFirst({
+      where: { id: entryId, tenantId: user.tid },
+      include: { site: true },
+    });
+    if (!entry) throw new NotFoundException('Content entry not found');
+    const data = this.asRecord(entry.data);
+    const body =
+      typeof data.body === 'string'
+        ? sanitizeWebsiteHtml(data.body)
+        : '<p>No body content yet.</p>';
+    const summary =
+      typeof data.summary === 'string'
+        ? `<p class="lead">${this.escapeHtml(data.summary)}</p>`
+        : '';
+    const image =
+      typeof data.image === 'string' && data.image
+        ? `<img src="${this.escapeHtml(data.image)}" alt="${this.escapeHtml(entry.title)}" />`
+        : '';
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${this.escapeHtml(entry.title)} — Preview</title>
+<style>body{margin:0;font:16px/1.65 system-ui,sans-serif;color:#14263a;background:#f7f8fb}header{padding:12px 5%;background:#0b2e59;color:#fff}.badge{font-size:12px;opacity:.85;margin-left:8px}main{max-width:900px;margin:auto;padding:28px 5%;background:#fff;min-height:70vh}img{max-width:100%;height:auto;border-radius:12px}.lead{color:#617083;font-size:1.05rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #dde3e9;padding:8px}</style>
+</head><body><header>${this.escapeHtml(entry.site.name)} <span class="badge">${this.escapeHtml(entry.status)} PREVIEW</span></header><main><h1>${this.escapeHtml(entry.title)}</h1>${image}${summary}${body}</main></body></html>`;
+    return { html, title: entry.title, status: entry.status, slug: entry.slug };
   }
 
   async updateMedia(
@@ -972,8 +1059,13 @@ export class WebsiteAdminService {
       where: { id: revisionId, tenantId: user.tid },
     });
     if (!revision) throw new NotFoundException('Revision not found');
+    if (revision.entityType === 'CONTENT') {
+      return this.restoreContentRevision(user, revision);
+    }
     if (revision.entityType !== 'PAGE') {
-      throw new BadRequestException('Only page revisions can be restored');
+      throw new BadRequestException(
+        'Only page or content revisions can be restored',
+      );
     }
     const snapshot = revision.snapshot as Record<string, unknown>;
     await this.updatePage(user, revision.entityId, {
@@ -1028,6 +1120,60 @@ export class WebsiteAdminService {
       'RESTORED',
     );
     return this.mapRevision(restored);
+  }
+
+  private async restoreContentRevision(
+    user: JwtUser,
+    revision: {
+      id: string;
+      siteId: string;
+      entityId: string;
+      snapshot: unknown;
+    },
+  ) {
+    const snapshot = this.asRecord(revision.snapshot);
+    const existing = await this.prisma.websiteContentEntry.findFirst({
+      where: { id: revision.entityId, tenantId: user.tid },
+      include: { contentType: true },
+    });
+    if (!existing) throw new NotFoundException('Content entry not found');
+    const contentType = await this.ensureNewsContentFields(
+      existing.contentType,
+    );
+    const data = this.sanitizeEntryData(
+      contentType.fields,
+      this.asRecord(snapshot.data),
+    );
+    const row = await this.prisma.websiteContentEntry.update({
+      where: { id: revision.entityId },
+      data: {
+        title: this.stringValue(snapshot.title, existing.title),
+        slug: this.slugify(
+          this.stringValue(snapshot.slug, existing.slug) || existing.slug,
+        ),
+        status: 'DRAFT',
+        data: data as Prisma.InputJsonValue,
+        publishedAt: null,
+        scheduledAt: null,
+        deletedAt: null,
+        deletedById: null,
+        updatedById: user.sub,
+      },
+    });
+    await this.recordRevision(
+      user,
+      revision.siteId,
+      'CONTENT',
+      row.id,
+      'REVISION_RESTORED',
+      row,
+    );
+    return this.mapRevision(
+      await this.prisma.websiteRevision.findFirstOrThrow({
+        where: { tenantId: user.tid, entityType: 'CONTENT', entityId: row.id },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async createPreview(user: JwtUser, pageId?: string) {
@@ -1132,6 +1278,7 @@ export class WebsiteAdminService {
       where: { tenantId, siteId: site.id, slug: this.slugify(typeSlug) },
     });
     if (!contentType) throw new NotFoundException('Content type not found');
+    const now = new Date();
     if (entrySlug) {
       const entry = await this.prisma.websiteContentEntry.findFirst({
         where: {
@@ -1140,11 +1287,25 @@ export class WebsiteAdminService {
           slug: this.slugify(entrySlug),
           status: 'PUBLISHED',
           deletedAt: null,
+          OR: [{ publishedAt: null }, { publishedAt: { lte: now } }],
         },
       });
       if (!entry) throw new NotFoundException('Content entry not found');
       if (isDemoWebsiteContentSlug(entry.slug)) {
         throw new NotFoundException('Content entry not found');
+      }
+      if (contentType.slug === 'news') {
+        const data = this.asRecord(entry.data);
+        const viewCount =
+          typeof data.viewCount === 'number' && Number.isFinite(data.viewCount)
+            ? data.viewCount + 1
+            : 1;
+        const nextData = { ...data, viewCount };
+        await this.prisma.websiteContentEntry.update({
+          where: { id: entry.id },
+          data: { data: nextData as Prisma.InputJsonValue },
+        });
+        return { ...entry, data: nextData };
       }
       return entry;
     }
@@ -1154,19 +1315,32 @@ export class WebsiteAdminService {
         contentTypeId: contentType.id,
         status: 'PUBLISHED',
         deletedAt: null,
+        OR: [{ publishedAt: null }, { publishedAt: { lte: now } }],
       },
       orderBy: { publishedAt: 'desc' },
     });
     const visible = rows.filter((row) => !isDemoWebsiteContentSlug(row.slug));
-    // List payloads omit full HTML bodies so college-web can load all cards
-    // without timing out; single-entry requests still return the full body.
     if (contentType.slug === 'news') {
-      return visible.map((row) => {
+      const ranked = [...visible].sort((a, b) => {
+        const aData = this.asRecord(a.data);
+        const bData = this.asRecord(b.data);
+        const stickyDiff =
+          Number(bData.sticky === true) - Number(aData.sticky === true);
+        if (stickyDiff) return stickyDiff;
+        const featuredDiff =
+          Number(bData.featured === true) - Number(aData.featured === true);
+        if (featuredDiff) return featuredDiff;
+        const aTime = a.publishedAt?.getTime() ?? 0;
+        const bTime = b.publishedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+      return ranked.map((row) => {
         const data = this.asRecord(row.data);
         const lite: Record<string, unknown> = { ...data };
         delete lite.body;
         delete lite.bodyHtml;
         delete lite.gallery;
+        delete lite.attachments;
         return {
           ...row,
           data: {
@@ -1497,6 +1671,7 @@ export class WebsiteAdminService {
       'number',
       'boolean',
       'relation',
+      'json',
     ]);
     const keys = new Set<string>();
     for (const field of fields) {
@@ -1515,6 +1690,44 @@ export class WebsiteAdminService {
         throw new BadRequestException('Duplicate content field key');
       keys.add(key);
     }
+  }
+
+  private async ensureNewsContentFields<
+    T extends { id: string; slug: string; fields: unknown },
+  >(type: T): Promise<T> {
+    if (type.slug !== 'news') return type;
+    const current = Array.isArray(type.fields) ? type.fields : [];
+    const currentKeys = new Set(
+      current
+        .map((field) =>
+          field && typeof field === 'object'
+            ? this.stringValue((field as Record<string, unknown>).key)
+            : '',
+        )
+        .filter(Boolean),
+    );
+    const missing = NEWS_CONTENT_FIELDS.filter(
+      (field) => !currentKeys.has(field.key),
+    );
+    if (!missing.length && current.length >= NEWS_CONTENT_FIELDS.length) {
+      return type;
+    }
+    const updated = await this.prisma.websiteContentType.update({
+      where: { id: type.id },
+      data: {
+        fields: [...NEWS_CONTENT_FIELDS] as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return { ...type, fields: updated.fields };
+  }
+
+  private optionalDate(value?: string | null) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('publishedAt must be a valid ISO date');
+    }
+    return date;
   }
 
   private sanitizeEntryData(

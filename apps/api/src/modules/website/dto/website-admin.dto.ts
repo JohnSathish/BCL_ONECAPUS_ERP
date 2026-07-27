@@ -86,6 +86,8 @@ export class WebsiteContentEntryDto {
   status?: string;
   @IsOptional() @IsObject() data?: Record<string, unknown>;
   @IsOptional() @IsString() scheduledAt?: string | null;
+  /** Backdate / pin publish date when status is PUBLISHED */
+  @IsOptional() @IsString() publishedAt?: string | null;
 }
 
 export class UpdateWebsiteMediaDto {
