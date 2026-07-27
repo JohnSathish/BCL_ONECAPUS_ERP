@@ -272,8 +272,12 @@ export const DEMO_TESTIMONIAL_SLUGS = [
   'nangrak-momin',
 ] as const;
 
+/**
+ * Hard-hide only placeholder notices/testimonials that clutter the live site.
+ * News seed slugs are NOT blocked — college may republish/edit those as real updates.
+ * Auto-seed still does not create news/notices/testimonials (see importer).
+ */
 export const DEMO_WEBSITE_CONTENT_SLUGS = new Set<string>([
-  ...DEMO_NEWS_SLUGS,
   ...DEMO_NOTICE_SLUGS,
   ...DEMO_TESTIMONIAL_SLUGS,
 ]);

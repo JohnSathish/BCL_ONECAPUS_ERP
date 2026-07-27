@@ -189,6 +189,10 @@ export class WebsiteCmsEnterpriseService {
       if (item.key === 'departments' && !current.enabled) {
         patch.enabled = true;
       }
+      // News & Events must stay on the public homepage.
+      if (item.key === 'news' && !current.enabled) {
+        patch.enabled = true;
+      }
       if (Object.keys(patch).length) {
         await this.prisma.websiteHomepageSection.update({
           where: { id: current.id },

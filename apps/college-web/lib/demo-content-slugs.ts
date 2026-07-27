@@ -1,8 +1,5 @@
-/** Mirrors API website-content-catalog demo slugs — never show these as live public content. */
+/** Placeholder notices/testimonials — never show as live public content. */
 export const DEMO_WEBSITE_CONTENT_SLUGS = new Set([
-  'college-week-2026',
-  'admissions-open-2026',
-  'internal-assessment',
   'ug-admission-2026-open',
   'internal-assessment-schedule',
   'iqac-meeting-notice',
