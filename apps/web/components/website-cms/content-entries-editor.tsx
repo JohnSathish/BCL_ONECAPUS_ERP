@@ -103,6 +103,7 @@ export function ContentEntriesEditor({
 
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
+  const [search, setSearch] = useState('');
 
   const ensureType = useMutation({
     mutationFn: () =>
@@ -172,6 +173,15 @@ export function ContentEntriesEditor({
   }
 
   const rows = (entries.data ?? []) as EntryRow[];
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const summaryText = String(row.data?.summary ?? row.data?.quote ?? '');
+      const haystack = `${row.title} ${row.slug} ${row.status} ${summaryText}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [rows, search]);
 
   return (
     <div className="space-y-4">
@@ -197,9 +207,20 @@ export function ContentEntriesEditor({
         </CompactCardBody>
       </CompactCard>
       <CompactCard>
-        <CompactCardHeader title="Entries" />
-        <CompactCardBody className="space-y-2">
-          {rows.map((row) => (
+        <CompactCardHeader
+          title="Entries"
+          description={
+            search.trim() ? `Showing ${filteredRows.length} of ${rows.length}` : undefined
+          }
+        />
+        <CompactCardBody className="space-y-3">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={`Search ${defaults.name.toLowerCase()} by title, slug, or summary…`}
+            aria-label={`Search ${defaults.name} entries`}
+          />
+          {filteredRows.map((row) => (
             <div
               key={row.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
@@ -223,7 +244,11 @@ export function ContentEntriesEditor({
               </div>
             </div>
           ))}
-          {!rows.length ? <p className="text-sm text-muted-foreground">No entries yet.</p> : null}
+          {!filteredRows.length ? (
+            <p className="text-sm text-muted-foreground">
+              {rows.length ? 'No entries match your search.' : 'No entries yet.'}
+            </p>
+          ) : null}
         </CompactCardBody>
       </CompactCard>
     </div>

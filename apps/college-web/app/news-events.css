@@ -330,6 +330,57 @@
 .news-events-all svg{width:15px;height:15px;color:var(--gold)}
 .news-events-all:hover{filter:brightness(1.06)}
 
+.news-search{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:min(100%,520px);
+  margin-top:16px;
+  padding:6px 6px 6px 14px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:12px;
+  background:rgba(255,255,255,.1);
+  backdrop-filter:blur(6px);
+}
+.news-search svg{
+  width:18px;
+  height:18px;
+  flex-shrink:0;
+  color:var(--gold);
+}
+.news-search input{
+  flex:1;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  min-height:40px;
+  font-size:14px;
+}
+.news-search input::placeholder{color:rgba(231,238,246,.72)}
+.news-search button{
+  flex-shrink:0;
+  min-height:40px;
+  padding:0 16px;
+  border:0;
+  border-radius:9px;
+  background:var(--gold);
+  color:var(--navy-dark);
+  font-family:var(--font-sans),Inter,sans-serif;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.news-search button:hover{filter:brightness(1.05)}
+.news-search-meta{
+  margin:0 0 18px;
+  color:var(--muted);
+  font-size:14px;
+}
+
 .news-index-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
