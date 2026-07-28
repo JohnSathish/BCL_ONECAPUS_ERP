@@ -506,7 +506,9 @@ export function FacultyAttendanceWorkspace() {
 
               {!rows.length ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
-                  No students match your search.
+                  {students.length
+                    ? 'No students match your search.'
+                    : 'No students found for this class. Ensure Sem 3 Garo students are registered for this paper (e.g. GAR-200), or link a subject section on the timetable slot.'}
                 </div>
               ) : null}
             </>

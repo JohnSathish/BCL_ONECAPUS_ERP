@@ -395,12 +395,35 @@ export class StudentAttendanceService {
         const enriched = await this.enrichSession(session);
         let rosterSize: number | null = null;
         if (session.teachingSubjectGroupId) {
-          const cacheKey = `${session.teachingSubjectGroupId}:${session.semesterNo ?? ''}`;
+          const cacheKey = `g:${session.teachingSubjectGroupId}:${session.semesterNo ?? ''}`;
           if (!rosterSizeCache.has(cacheKey)) {
             const students = await this.subjectGroups.studentsForGroup(
               user.tid,
               session.teachingSubjectGroupId,
               session.semesterNo,
+            );
+            rosterSizeCache.set(cacheKey, students.length);
+          }
+          rosterSize = rosterSizeCache.get(cacheKey) ?? null;
+        } else if (session.offeringSectionId) {
+          const cacheKey = `s:${session.offeringSectionId}:${session.semesterNo ?? ''}`;
+          if (!rosterSizeCache.has(cacheKey)) {
+            const students = await this.studentsForSection(
+              user.tid,
+              session.offeringSectionId,
+              session.semesterNo,
+            );
+            rosterSizeCache.set(cacheKey, students.length);
+          }
+          rosterSize = rosterSizeCache.get(cacheKey) ?? null;
+        } else if (session.courseId) {
+          const cacheKey = `c:${session.courseId}:${session.semesterNo ?? ''}:${session.shiftId ?? ''}`;
+          if (!rosterSizeCache.has(cacheKey)) {
+            const students = await this.studentsForCourse(
+              user.tid,
+              session.courseId,
+              session.semesterNo,
+              session.shiftId,
             );
             rosterSizeCache.set(cacheKey, students.length);
           }
@@ -419,17 +442,32 @@ export class StudentAttendanceService {
       include: { entries: true },
     });
     if (!session) throw new NotFoundException('Attendance session not found');
-    const students = session.teachingSubjectGroupId
-      ? await this.subjectGroups.studentsForGroup(
-          tenantId,
-          session.teachingSubjectGroupId,
-          session.semesterNo,
-        )
-      : await this.studentsForSection(
-          tenantId,
-          session.offeringSectionId,
-          session.semesterNo,
-        );
+
+    let students: any[] = [];
+    if (session.teachingSubjectGroupId) {
+      students = await this.subjectGroups.studentsForGroup(
+        tenantId,
+        session.teachingSubjectGroupId,
+        session.semesterNo,
+      );
+    }
+    if (!students.length && session.offeringSectionId) {
+      students = await this.studentsForSection(
+        tenantId,
+        session.offeringSectionId,
+        session.semesterNo,
+      );
+    }
+    // Manual timetable slots often have courseId but no offeringSectionId.
+    if (!students.length && session.courseId) {
+      students = await this.studentsForCourse(
+        tenantId,
+        session.courseId,
+        session.semesterNo,
+        session.shiftId,
+      );
+    }
+
     const entryByStudent = new Map<string, any>(
       session.entries.map((entry: any) => [entry.studentId, entry]),
     );
@@ -841,6 +879,95 @@ export class StudentAttendanceService {
       take: 500,
     });
     return lines.map((line) => line.registration.student);
+  }
+
+  /**
+   * Roster for timetable slots that have a course but no offering section
+   * (common for manually built stream routines).
+   */
+  private async studentsForCourse(
+    tenantId: string,
+    courseId: string,
+    semesterNo?: number | null,
+    shiftId?: string | null,
+  ) {
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId,
+        status: {
+          in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
+        },
+        offering: {
+          courseId,
+          deletedAt: null,
+        },
+        registration: {
+          ...(semesterNo != null ? { semesterSequence: semesterNo } : {}),
+          ...(shiftId
+            ? {
+                OR: [{ shiftId }, { shiftId: null }],
+              }
+            : {}),
+        },
+      },
+      include: {
+        registration: {
+          include: {
+            student: {
+              include: {
+                masterProfile: true,
+                user: { select: { displayName: true } },
+              },
+            },
+          },
+        },
+      },
+      take: 500,
+    });
+
+    const byId = new Map<
+      string,
+      (typeof lines)[number]['registration']['student']
+    >();
+    for (const line of lines) {
+      const student = line.registration?.student;
+      if (student?.id) byId.set(student.id, student);
+    }
+    if (byId.size) return [...byId.values()];
+
+    // Fallback: students with Sem progress / standing in this semester who
+    // have the course in any registration line (ignore shift mismatch).
+    if (semesterNo != null && shiftId) {
+      const loose = await this.prisma.semesterRegistrationLine.findMany({
+        where: {
+          tenantId,
+          status: {
+            in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
+          },
+          offering: { courseId, deletedAt: null },
+          registration: { semesterSequence: semesterNo },
+        },
+        include: {
+          registration: {
+            include: {
+              student: {
+                include: {
+                  masterProfile: true,
+                  user: { select: { displayName: true } },
+                },
+              },
+            },
+          },
+        },
+        take: 500,
+      });
+      for (const line of loose) {
+        const student = line.registration?.student;
+        if (student?.id) byId.set(student.id, student);
+      }
+    }
+
+    return [...byId.values()];
   }
 
   private async recalculateForSession(tenantId: string, sessionId: string) {
