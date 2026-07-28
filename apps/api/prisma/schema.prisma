@@ -1940,6 +1940,7 @@ model Program {
   cyclePrograms         AdmissionCycleProgram[]
   admissionApplications AdmissionApplication[]
   shiftProgrammeConfigs ShiftProgrammeConfig[]
+  lmsOpenCourses        LmsOpenCourse[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -8348,6 +8349,31 @@ model LmsSettings {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("lms_settings")
+  @@schema("academic")
+}
+
+/// Catalog of non-registered Moodle resource / stream courses (college-wide or programme-scoped).
+model LmsOpenCourse {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  title          String
+  description    String?
+  stream         String    @default("COMMON")
+  visibility     String    @default("COLLEGE")
+  programId      String?   @map("program_id") @db.Uuid
+  moodleCourseId Int       @map("moodle_course_id")
+  sortOrder      Int       @default(0) @map("sort_order")
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  program Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, visibility])
+  @@index([tenantId, stream])
+  @@index([tenantId, programId])
+  @@map("lms_open_courses")
   @@schema("academic")
 }
 

@@ -335,3 +335,104 @@ export class CreateLmsDiscussionReplyDto {
   @IsString()
   body!: string;
 }
+
+export class LmsOpenCourseListQueryDto {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsIn(['SCIENCE', 'COMPUTER_SCIENCE', 'COMMON', 'ARTS', 'COMMERCE', 'OTHER'])
+  stream?: string;
+
+  @IsOptional()
+  @IsIn(['COLLEGE', 'PROGRAMME'])
+  visibility?: string;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
+export class CreateLmsOpenCourseDto {
+  @IsString()
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsIn(['SCIENCE', 'COMPUTER_SCIENCE', 'COMMON', 'ARTS', 'COMMERCE', 'OTHER'])
+  stream!: string;
+
+  @IsIn(['COLLEGE', 'PROGRAMME'])
+  visibility!: string;
+
+  @IsOptional()
+  @IsUUID()
+  programId?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  moodleCourseId!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  status?: string;
+}
+
+export class UpdateLmsOpenCourseDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @IsOptional()
+  @IsIn(['SCIENCE', 'COMPUTER_SCIENCE', 'COMMON', 'ARTS', 'COMMERCE', 'OTHER'])
+  stream?: string;
+
+  @IsOptional()
+  @IsIn(['COLLEGE', 'PROGRAMME'])
+  visibility?: string;
+
+  @IsOptional()
+  @IsUUID()
+  programId?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  moodleCourseId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  status?: string;
+}

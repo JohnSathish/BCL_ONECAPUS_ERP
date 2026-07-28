@@ -197,6 +197,80 @@ export async function fetchLmsMyDashboard() {
   return data;
 }
 
+export type LmsOpenCourse = {
+  id: string;
+  title: string;
+  description?: string | null;
+  stream: string;
+  visibility: string;
+  programId?: string | null;
+  moodleCourseId: number;
+  sortOrder: number;
+  status: string;
+  program?: { id: string; code: string; name: string } | null;
+};
+
+export async function fetchLmsMyOpenCourses() {
+  const { data } = await api.get('/v1/lms/me/open-courses');
+  return data as { courses: LmsOpenCourse[]; programId: string | null };
+}
+
+export async function fetchLmsOpenCourseLaunchUrl(id: string) {
+  const { data } = await api.get(`/v1/lms/me/open-courses/${id}/launch`);
+  return data as { url: string; moodleCourseId: number; title: string };
+}
+
+export async function fetchLmsOpenCoursesAdmin(params?: {
+  q?: string;
+  stream?: string;
+  visibility?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const { data } = await api.get('/v1/lms/open-courses', { params });
+  return data as {
+    data: LmsOpenCourse[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  };
+}
+
+export async function createLmsOpenCourse(payload: {
+  title: string;
+  description?: string;
+  stream: string;
+  visibility: string;
+  programId?: string;
+  moodleCourseId: number;
+  sortOrder?: number;
+  status?: string;
+}) {
+  const { data } = await api.post('/v1/lms/open-courses', payload);
+  return data as LmsOpenCourse;
+}
+
+export async function updateLmsOpenCourse(
+  id: string,
+  payload: Partial<{
+    title: string;
+    description: string | null;
+    stream: string;
+    visibility: string;
+    programId: string | null;
+    moodleCourseId: number;
+    sortOrder: number;
+    status: string;
+  }>,
+) {
+  const { data } = await api.patch(`/v1/lms/open-courses/${id}`, payload);
+  return data as LmsOpenCourse;
+}
+
+export async function deleteLmsOpenCourse(id: string) {
+  const { data } = await api.delete(`/v1/lms/open-courses/${id}`);
+  return data as { ok: boolean };
+}
+
 export async function fetchLmsWorkspaceAttendance(workspaceId: string) {
   const { data } = await api.get(`/v1/lms/workspaces/${workspaceId}/attendance`);
   return data;

@@ -15,8 +15,11 @@ import {
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import {
   fetchLmsMyDashboard,
+  fetchLmsMyOpenCourses,
   fetchLmsMyWorkspaces,
+  fetchLmsOpenCourseLaunchUrl,
   formatLmsWorkspaceMeta,
+  type LmsOpenCourse,
   type LmsWorkspace,
 } from '@/services/lms';
 import { fetchLmsWorkspaceLaunchUrl } from '@/services/moodle';
@@ -27,6 +30,15 @@ type Props = {
   workspaceId?: string;
 };
 
+const STREAM_LABELS: Record<string, string> = {
+  SCIENCE: 'Science',
+  COMPUTER_SCIENCE: 'Computer Science',
+  COMMON: 'Common Resources',
+  ARTS: 'Arts',
+  COMMERCE: 'Commerce',
+  OTHER: 'Other',
+};
+
 export function LmsPortalHome({ role, workspaceId }: Props) {
   const dashboard = useQuery({
     queryKey: ['lms', 'me', 'dashboard'],
@@ -35,6 +47,10 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
   const workspaces = useQuery({
     queryKey: ['lms', 'me', 'workspaces'],
     queryFn: fetchLmsMyWorkspaces,
+  });
+  const openCourses = useQuery({
+    queryKey: ['lms', 'me', 'open-courses'],
+    queryFn: fetchLmsMyOpenCourses,
   });
 
   if (workspaceId) {
@@ -50,6 +66,7 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
 
   const cards = dashboard.data?.cards;
   const list: LmsWorkspace[] = workspaces.data?.workspaces ?? dashboard.data?.workspaces ?? [];
+  const openList: LmsOpenCourse[] = openCourses.data?.courses ?? [];
   const basePath = role === 'student' ? '/student/lms' : '/staff/academic/lms';
   const totalDue = list.reduce((sum, ws) => sum + (ws.moodleSummary?.assignmentsDue ?? 0), 0);
   const totalOpenQuizzes = list.reduce((sum, ws) => sum + (ws.moodleSummary?.quizzesOpen ?? 0), 0);
@@ -66,6 +83,12 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
       ? 'Ready to continue your learning journey?'
       : 'Keep classes, plans, and outcomes on track.';
   const title = role === 'student' ? 'My Learning Command Center' : 'Faculty LMS Command Center';
+
+  const openByStream = openList.reduce<Record<string, LmsOpenCourse[]>>((acc, course) => {
+    const key = course.stream || 'OTHER';
+    (acc[key] ??= []).push(course);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -109,7 +132,7 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
           <CompactCard>
             <CompactCardHeader
               title="My subjects"
-              subtitle="Open your course spaces, resources, and collaborative updates."
+              description="Open your course spaces, resources, and collaborative updates."
             />
             <CompactCardBody className="grid gap-3 p-4 sm:grid-cols-2">
               {list.map((ws) => (
@@ -178,6 +201,64 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
           </CompactCard>
 
           <CompactCard>
+            <CompactCardHeader
+              title="Stream & Open Resources"
+              description="College-wide and programme resource courses you can launch in Moodle."
+            />
+            <CompactCardBody className="space-y-4 p-4">
+              {Object.keys(openByStream).length ? (
+                Object.entries(openByStream).map(([stream, courses]) => (
+                  <div key={stream} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {STREAM_LABELS[stream] ?? stream}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {courses.map((course) => (
+                        <div
+                          key={course.id}
+                          className="rounded-xl border bg-gradient-to-b from-background to-muted/20 p-4"
+                        >
+                          <p className="text-sm font-semibold">{course.title}</p>
+                          {course.description ? (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {course.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-md bg-sky-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                              {course.visibility === 'PROGRAMME' ? 'Programme' : 'College'}
+                            </span>
+                            {course.program?.name ? (
+                              <span className="rounded-md bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                                {course.program.name}
+                              </span>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            className="mt-3 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground"
+                            onClick={async () => {
+                              const { url } = await fetchLmsOpenCourseLaunchUrl(course.id);
+                              if (url) window.location.href = url;
+                            }}
+                          >
+                            Launch Moodle
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No open stream resources published yet. Ask your admin to add Science, CS, or
+                  Common resource courses.
+                </p>
+              )}
+            </CompactCardBody>
+          </CompactCard>
+
+          <CompactCard>
             <CompactCardHeader title="Recent announcements" />
             <CompactCardBody className="space-y-2 p-4">
               {(dashboard.data?.announcements ?? [])
@@ -225,13 +306,20 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
                 </div>
                 <span className="text-lg font-semibold">{list.length}</span>
               </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  Open resources
+                </div>
+                <span className="text-lg font-semibold">{openList.length}</span>
+              </div>
             </CompactCardBody>
           </CompactCard>
 
           <CompactCard>
             <CompactCardHeader
               title="Needs attention"
-              subtitle="Subjects with the highest pending load."
+              description="Subjects with the highest pending load."
             />
             <CompactCardBody className="space-y-2 p-4">
               {highlightWorkspaces.length ? (

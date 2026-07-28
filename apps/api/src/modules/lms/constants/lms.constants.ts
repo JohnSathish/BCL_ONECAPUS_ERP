@@ -69,3 +69,15 @@ export const ENROLLED_LINE_STATUSES = [
   'registered',
   'pending',
 ];
+
+export const LMS_OPEN_COURSE_STREAMS = [
+  'SCIENCE',
+  'COMPUTER_SCIENCE',
+  'COMMON',
+  'ARTS',
+  'COMMERCE',
+  'OTHER',
+] as const;
+
+export const LMS_OPEN_COURSE_VISIBILITY = ['COLLEGE', 'PROGRAMME'] as const;
+export const LMS_OPEN_COURSE_STATUS = ['ACTIVE', 'INACTIVE'] as const;

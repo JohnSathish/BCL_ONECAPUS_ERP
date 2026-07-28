@@ -7,6 +7,7 @@ import {
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { LmsAnnouncementsService } from './services/lms-announcements.service';
 import { LmsDashboardService } from './services/lms-dashboard.service';
+import { LmsOpenCoursesService } from './services/lms-open-courses.service';
 import { LmsProviderRouterService } from './adapters/lms-provider-router.service';
 
 @ApiBearerAuth()
@@ -16,6 +17,7 @@ export class LmsPortalController {
   constructor(
     private readonly dashboard: LmsDashboardService,
     private readonly announcements: LmsAnnouncementsService,
+    private readonly openCourses: LmsOpenCoursesService,
     private readonly providerRouter: LmsProviderRouterService,
   ) {}
 
@@ -38,6 +40,18 @@ export class LmsPortalController {
   @RequirePermissions('lms:read')
   myAnnouncements(@CurrentUser() user: JwtUser) {
     return this.announcements.list(user);
+  }
+
+  @Get('open-courses')
+  @RequirePermissions('lms:read')
+  myOpenCourses(@CurrentUser() user: JwtUser) {
+    return this.openCourses.listForPortal(user);
+  }
+
+  @Get('open-courses/:id/launch')
+  @RequirePermissions('lms:read')
+  launchOpenCourse(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.openCourses.launchForPortal(user, id);
   }
 
   @Get('workspaces/:workspaceId/launch')

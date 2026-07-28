@@ -831,6 +831,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['lms:lesson-plans:manage', 'lms:read'],
           },
           {
+            label: 'Open Courses',
+            href: '/admin/academics/lms/open-courses',
+            permissions: ['lms:settings:manage', 'lms:manage', 'lms:workspace:manage'],
+          },
+          {
             label: 'Settings',
             href: '/admin/academics/lms/settings',
             permissions: ['lms:settings:manage', 'lms:manage'],

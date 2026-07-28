@@ -17,24 +17,30 @@ import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
-import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import {
+  RequireAnyPermission,
+  RequirePermissions,
+} from '../../common/decorators/require-permissions.decorator';
 import {
   CreateLmsAnnouncementDto,
   CreateLmsAssignmentDto,
   CreateLmsDiscussionDto,
   CreateLmsDiscussionReplyDto,
+  CreateLmsOpenCourseDto,
   CreateLmsQuizDto,
   CreateLmsQuizQuestionDto,
   CreateLmsLessonPlanDto,
   CreateLmsMaterialDto,
   EvaluateLmsSubmissionDto,
   LmsMaterialListQueryDto,
+  LmsOpenCourseListQueryDto,
   LmsSearchQueryDto,
   LmsWorkspaceListQueryDto,
   ReturnLmsSubmissionDto,
   SubmitLmsAssignmentDto,
   SubmitLmsQuizAttemptDto,
   UpdateLmsAssignmentDto,
+  UpdateLmsOpenCourseDto,
   UpdateLmsQuizDto,
   UpdateLmsLessonPlanDto,
   UpdateLmsMaterialDto,
@@ -48,6 +54,7 @@ import { LmsAttendanceBridgeService } from './services/lms-attendance-bridge.ser
 import { LmsDashboardService } from './services/lms-dashboard.service';
 import { LmsLessonPlansService } from './services/lms-lesson-plans.service';
 import { LmsMaterialsService } from './services/lms-materials.service';
+import { LmsOpenCoursesService } from './services/lms-open-courses.service';
 import { LmsSettingsService } from './services/lms-settings.service';
 import { LmsWorkspaceService } from './services/lms-workspace.service';
 import { LmsAccessService } from './services/lms-access.service';
@@ -66,6 +73,7 @@ export class LmsController {
     private readonly discussions: LmsDiscussionsService,
     private readonly dashboard: LmsDashboardService,
     private readonly settings: LmsSettingsService,
+    private readonly openCourses: LmsOpenCoursesService,
     private readonly attendance: LmsAttendanceBridgeService,
     private readonly access: LmsAccessService,
   ) {}
@@ -89,6 +97,56 @@ export class LmsController {
     @Body() dto: UpdateLmsSettingsDto,
   ) {
     return this.settings.update(user.tid, dto);
+  }
+
+  @Get('open-courses')
+  @RequireAnyPermission(
+    'lms:manage',
+    'lms:settings:manage',
+    'lms:workspace:manage',
+  )
+  listOpenCourses(
+    @CurrentUser() user: JwtUser,
+    @Query() query: LmsOpenCourseListQueryDto,
+  ) {
+    return this.openCourses.listAdmin(user.tid, query);
+  }
+
+  @Post('open-courses')
+  @RequireAnyPermission(
+    'lms:manage',
+    'lms:settings:manage',
+    'lms:workspace:manage',
+  )
+  createOpenCourse(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateLmsOpenCourseDto,
+  ) {
+    return this.openCourses.create(user.tid, dto);
+  }
+
+  @Patch('open-courses/:id')
+  @RequireAnyPermission(
+    'lms:manage',
+    'lms:settings:manage',
+    'lms:workspace:manage',
+  )
+  updateOpenCourse(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateLmsOpenCourseDto,
+  ) {
+    return this.openCourses.update(user.tid, id, dto);
+  }
+
+  @Delete('open-courses/:id')
+  @RequireAnyPermission(
+    'lms:manage',
+    'lms:settings:manage',
+    'lms:workspace:manage',
+  )
+  deleteOpenCourse(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.openCourses.softDelete(user.tid, id);
   }
 
   @Post('workspaces/provision')

@@ -36,6 +36,8 @@ import { LmsMaterialsService } from './services/lms-materials.service';
 
 import { LmsNotificationService } from './services/lms-notification.service';
 
+import { LmsOpenCoursesService } from './services/lms-open-courses.service';
+
 import { LmsSettingsService } from './services/lms-settings.service';
 
 import { LmsWorkspaceService } from './services/lms-workspace.service';
@@ -66,6 +68,8 @@ import { LmsWorkspaceService } from './services/lms-workspace.service';
 
     LmsSettingsService,
 
+    LmsOpenCoursesService,
+
     LmsAuditService,
 
     LmsAttendanceBridgeService,
@@ -79,6 +83,11 @@ import { LmsWorkspaceService } from './services/lms-workspace.service';
     LmsProviderRouterService,
   ],
 
-  exports: [LmsWorkspaceService, LmsDashboardService, LmsProviderRouterService],
+  exports: [
+    LmsWorkspaceService,
+    LmsDashboardService,
+    LmsProviderRouterService,
+    LmsOpenCoursesService,
+  ],
 })
 export class LmsModule {}
