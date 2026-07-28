@@ -305,7 +305,7 @@ export function HomepageSpotlight({ spotlight, news }: Props) {
               <ul className="spotlight-news-list">
                 {latestNews.map((item) => {
                   const category = normalizeNewsCategory(item.category);
-                  const badge = newsBadgeStyles[category];
+                  const badge = newsBadgeStyles[category] ?? newsBadgeStyles.Campus;
                   const { day, month } = newsDateParts(item.date);
                   return (
                     <li key={item.slug}>

@@ -69,6 +69,39 @@ export const eventCategoryStyles: Record<HubEventCategory, { bg: string; color: 
   Seminar: { bg: '#f1e6ff', color: '#7a3eb1' },
 };
 
+/** Map ERP calendar `type` / CMS labels onto hub badge categories. */
+export function normalizeEventCategory(category: string | null | undefined): HubEventCategory {
+  const raw = (category ?? '').trim();
+  if (!raw) return 'Academic';
+
+  const direct = raw as HubEventCategory;
+  if (direct in eventCategoryStyles) return direct;
+
+  const key = raw.toUpperCase().replace(/[\s_-]+/g, '_');
+  const map: Record<string, HubEventCategory> = {
+    ACADEMIC: 'Academic',
+    CULTURAL: 'Cultural',
+    SPORTS: 'Sports',
+    HOLIDAY: 'Holiday',
+    PUBLIC_HOLIDAY: 'Holiday',
+    RESTRICTED_HOLIDAY: 'Holiday',
+    OPTIONAL_HOLIDAY: 'Holiday',
+    ORIENTATION: 'Orientation',
+    SEMINAR: 'Seminar',
+    WORKSHOP: 'Seminar',
+    EXAM: 'Academic',
+    EXAMINATION: 'Academic',
+    RESULT: 'Academic',
+    ADMISSION: 'Academic',
+    MEETING: 'Academic',
+    EVENT: 'Academic',
+    GENERAL: 'Academic',
+    WORKING: 'Academic',
+    WORKING_DAY: 'Academic',
+  };
+  return map[key] ?? 'Academic';
+}
+
 export const noticeBadgeStyles: Record<HubNoticeBadge | 'URGENT', { bg: string; color: string }> = {
   NEW: { bg: '#dff3e4', color: '#1f7a3f' },
   PDF: { bg: '#e4efff', color: '#1f5fbf' },

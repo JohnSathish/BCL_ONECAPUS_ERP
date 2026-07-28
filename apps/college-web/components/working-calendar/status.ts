@@ -58,7 +58,6 @@ export function resolveDayVisual(day: WorkingCalendarDay): DayVisual {
 }
 
 export function summarizeMonth(days: WorkingCalendarDay[]) {
-  let working = 0;
   let weekends = 0;
   let holidays = 0;
   let optional = 0;
@@ -67,11 +66,7 @@ export function summarizeMonth(days: WorkingCalendarDay[]) {
 
   for (const day of days) {
     const visual = resolveDayVisual(day);
-    if (visual.status === 'working') working += 1;
-    if (visual.status === 'saturday-working') {
-      working += 1;
-      saturdaysWorking += 1;
-    }
+    if (visual.status === 'saturday-working') saturdaysWorking += 1;
     if (visual.status === 'weekend') weekends += 1;
     if (visual.status === 'holiday') holidays += 1;
     if (visual.status === 'optional') optional += 1;

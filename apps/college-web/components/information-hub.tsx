@@ -10,6 +10,7 @@ import {
   formatNoticeDate,
   isRecentNotice,
   isSameDay,
+  normalizeEventCategory,
   noticeBadgeStyles,
   type HubEvent,
   type HubNotice,
@@ -29,7 +30,8 @@ const COLLEGE_MISSION =
 
 function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?: boolean }) {
   const { day, month, weekday } = eventDateParts(event.date);
-  const style = eventCategoryStyles[event.category];
+  const category = normalizeEventCategory(event.category);
+  const style = eventCategoryStyles[category];
   const remaining = Math.max(0, daysUntil(event.date));
   const happeningToday = highlightToday || isSameDay(event.date);
   const content = (
@@ -47,7 +49,7 @@ function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?:
       </time>
       <span className="info-event-copy">
         <span className="info-badge" style={{ background: style.bg, color: style.color }}>
-          {event.category}
+          {category}
         </span>
         <strong>{event.title}</strong>
         <em suppressHydrationWarning>
@@ -70,7 +72,7 @@ function EventRow({ event, highlightToday }: { event: HubEvent; highlightToday?:
 
 function NoticeRow({ notice, noticesHref }: { notice: HubNotice; noticesHref: string }) {
   const badge = notice.urgent ? 'URGENT' : notice.badge;
-  const style = noticeBadgeStyles[badge];
+  const style = noticeBadgeStyles[badge] ?? noticeBadgeStyles.NEW;
   const published = formatNoticeDate(notice.publishedAt);
   const pulseNew = notice.badge === 'NEW' && isRecentNotice(notice.publishedAt);
 

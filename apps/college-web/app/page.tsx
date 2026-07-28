@@ -10,7 +10,7 @@ import { listAcademicDepartments } from '@/lib/academic-departments';
 import { getHeroSlides } from '@/lib/hero-slides';
 import { getHomepage, getUpcomingEvents } from '@/lib/homepage';
 import { isRecord } from '@/lib/cms-client';
-import type { HubEvent, HubEventCategory } from '@/lib/information-hub';
+import { normalizeEventCategory, type HubEvent } from '@/lib/information-hub';
 
 export default async function HomePage() {
   const [content, academicDepartments, heroSlides, homepage, upcoming] = await Promise.all([
@@ -40,7 +40,7 @@ export default async function HomePage() {
       id: row.id,
       title: row.title,
       date: typeof row.date === 'string' ? row.date : new Date().toISOString().slice(0, 10),
-      category: (typeof row.category === 'string' ? row.category : 'Academic') as HubEventCategory,
+      category: normalizeEventCategory(typeof row.category === 'string' ? row.category : undefined),
       href: typeof row.href === 'string' ? row.href : undefined,
       registrationHref: typeof row.registrationUrl === 'string' ? row.registrationUrl : undefined,
     });
