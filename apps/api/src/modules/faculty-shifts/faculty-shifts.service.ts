@@ -51,6 +51,71 @@ export class FacultyShiftsService {
     return map;
   }
 
+  /**
+   * Staff Directory "Day Shift" often comes from teachingShiftCategory (default DAY),
+   * while timetable eligibility uses StaffShiftAssignment. Align eligible profiles so
+   * they appear in the timetable faculty picker.
+   */
+  private async ensurePrimaryShiftAssignments(
+    tenantId: string,
+    shiftId: string,
+  ) {
+    const shift = await this.prisma.shift.findFirst({
+      where: { id: shiftId, tenantId, deletedAt: null },
+      select: { id: true, code: true },
+    });
+    if (!shift) return;
+
+    const code = shift.code.toUpperCase();
+    const categoryMatch =
+      code === 'DAY'
+        ? ['DAY', 'BOTH']
+        : code === 'MORNING'
+          ? ['MORNING', 'BOTH']
+          : code === 'EVENING'
+            ? ['EVENING']
+            : [];
+
+    const staff = await this.prisma.staffProfile.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        OR: [
+          { primaryShiftId: shiftId },
+          ...(categoryMatch.length
+            ? [{ teachingShiftCategory: { in: categoryMatch } }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (!staff.length) return;
+
+    await Promise.all(
+      staff.map((row) =>
+        this.prisma.staffShiftAssignment.upsert({
+          where: {
+            staffProfileId_shiftId: {
+              staffProfileId: row.id,
+              shiftId,
+            },
+          },
+          create: {
+            tenantId,
+            staffProfileId: row.id,
+            shiftId,
+            isPrimary: true,
+            active: true,
+          },
+          update: {
+            active: true,
+          },
+        }),
+      ),
+    );
+  }
+
   async listForShift(
     user: JwtUser,
     shiftId: string,
@@ -61,6 +126,8 @@ export class FacultyShiftsService {
       shiftId,
     );
 
+    await this.ensurePrimaryShiftAssignments(user.tid, shiftId);
+
     const page = Math.max(1, opts?.page ?? 1);
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
     const q = opts?.search?.trim();
@@ -69,18 +136,22 @@ export class FacultyShiftsService {
       tenantId: user.tid,
       shiftId,
       active: true,
-      ...(q
-        ? {
-            staffProfile: {
+      staffProfile: {
+        deletedAt: null,
+        status: 'ACTIVE',
+        ...(q
+          ? {
               OR: [
                 { fullName: { contains: q, mode: 'insensitive' as const } },
-                { employeeCode: { contains: q, mode: 'insensitive' as const } },
+                {
+                  employeeCode: { contains: q, mode: 'insensitive' as const },
+                },
                 { shortCode: { contains: q, mode: 'insensitive' as const } },
                 { email: { contains: q, mode: 'insensitive' as const } },
               ],
-            },
-          }
-        : {}),
+            }
+          : {}),
+      },
     };
 
     const [total, rows] = await Promise.all([

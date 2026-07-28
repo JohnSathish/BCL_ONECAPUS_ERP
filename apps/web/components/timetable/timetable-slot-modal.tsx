@@ -473,15 +473,15 @@ export function TimetableSlotModal({
             />
             {context.shiftId ? (
               <p className="text-[11px] leading-5 text-muted-foreground">
-                Only staff assigned to this shift appear here. If someone is missing (e.g.
-                Nicholas), assign them under{' '}
+                Search by name or code. Staff whose teaching category or primary shift matches this
+                plan are included. If someone is still missing, check{' '}
                 <Link
                   href="/admin/academics/shift-faculty"
                   className="font-medium text-primary underline-offset-2 hover:underline"
                 >
                   Academics → Shift Faculty
                 </Link>
-                , then search again.
+                .
               </p>
             ) : null}
             {!selectedStaff && staffProfileId && entry?.staffProfile ? (
