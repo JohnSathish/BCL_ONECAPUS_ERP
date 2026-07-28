@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MoodleApiService } from './moodle-api.service';
@@ -25,6 +26,7 @@ export class MoodleUserSyncService {
       where: { id: studentId, tenantId, deletedAt: null },
       include: {
         user: true,
+        masterProfile: true,
         department: true,
         programVersion: { include: { program: true } },
         academicStanding: true,
@@ -33,36 +35,32 @@ export class MoodleUserSyncService {
     });
     if (!student?.user) return null;
 
-    const username = this.usernameFor(student.enrollmentNumber);
     const existing = await this.prisma.moodleUser.findFirst({
       where: { tenantId, erpUserId: student.userId },
     });
     if (existing) return existing;
 
-    const created = await this.api.call<
-      Array<{ id: number; username: string }>
-    >({
-      tenantId,
-      wsfunction: 'core_user_create_users',
-      params: {
-        users: [
-          {
-            username,
-            password: this.tempPassword(),
-            firstname: student.user.displayName?.split(' ')[0] || 'Student',
-            lastname:
-              student.user.displayName?.split(' ').slice(1).join(' ') ||
-              student.enrollmentNumber,
-            email: student.user.email,
-            idnumber: student.enrollmentNumber,
-            auth: 'manual',
-          },
-        ],
-      },
-    });
+    const username = this.usernameFor(
+      student.enrollmentNumber,
+      student.user.email,
+      student.userId,
+    );
+    const names = this.splitName(
+      student.masterProfile?.fullName ||
+        student.user.displayName ||
+        student.enrollmentNumber ||
+        'Student',
+      'Student',
+      student.enrollmentNumber || 'Learner',
+    );
 
-    const moodleUserId = created?.[0]?.id;
-    if (!moodleUserId) throw new Error('Moodle user create returned no id');
+    const moodleUserId = await this.resolveOrCreateMoodleUser(tenantId, {
+      username,
+      firstname: names.firstname,
+      lastname: names.lastname,
+      email: student.user.email,
+      idnumber: student.enrollmentNumber || username,
+    });
 
     await this.prisma.student.update({
       where: { id: student.id },
@@ -111,31 +109,24 @@ export class MoodleUserSyncService {
     });
     if (existing) return existing;
 
-    const username = this.usernameFor(staff.employeeCode);
-    const created = await this.api.call<Array<{ id: number }>>({
-      tenantId,
-      wsfunction: 'core_user_create_users',
-      params: {
-        users: [
-          {
-            username,
-            password: this.tempPassword(),
-            firstname:
-              staff.portalUser.displayName?.split(' ')[0] ||
-              staff.fullName.split(' ')[0] ||
-              'Faculty',
-            lastname:
-              staff.portalUser.displayName?.split(' ').slice(1).join(' ') ||
-              staff.fullName,
-            email: staff.portalUser.email,
-            idnumber: staff.employeeCode,
-            auth: 'manual',
-          },
-        ],
-      },
+    const username = this.usernameFor(
+      staff.employeeCode,
+      staff.portalUser.email,
+      staff.portalUserId,
+    );
+    const names = this.splitName(
+      staff.portalUser.displayName || staff.fullName || staff.employeeCode,
+      'Faculty',
+      staff.employeeCode || 'Staff',
+    );
+
+    const moodleUserId = await this.resolveOrCreateMoodleUser(tenantId, {
+      username,
+      firstname: names.firstname,
+      lastname: names.lastname,
+      email: staff.portalUser.email,
+      idnumber: staff.employeeCode || username,
     });
-    const moodleUserId = created?.[0]?.id;
-    if (!moodleUserId) throw new Error('Moodle user create returned no id');
 
     await this.prisma.staffProfile.update({
       where: { id: staff.id },
@@ -157,14 +148,125 @@ export class MoodleUserSyncService {
     });
   }
 
-  private usernameFor(value: string) {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]/g, '_')
-      .slice(0, 90);
+  private async resolveOrCreateMoodleUser(
+    tenantId: string,
+    input: {
+      username: string;
+      firstname: string;
+      lastname: string;
+      email: string;
+      idnumber: string;
+    },
+  ) {
+    const byEmail = await this.findMoodleUserId(tenantId, 'email', input.email);
+    if (byEmail) return byEmail;
+
+    const byUsername = await this.findMoodleUserId(
+      tenantId,
+      'username',
+      input.username,
+    );
+    if (byUsername) return byUsername;
+
+    const created = await this.api.call<
+      Array<{ id: number; username: string }>
+    >({
+      tenantId,
+      wsfunction: 'core_user_create_users',
+      params: {
+        users: [
+          {
+            username: input.username,
+            password: this.tempPassword(),
+            firstname: input.firstname,
+            lastname: input.lastname,
+            email: input.email,
+            idnumber: input.idnumber,
+            auth: 'manual',
+          },
+        ],
+      },
+    });
+
+    const moodleUserId = created?.[0]?.id;
+    if (!moodleUserId) throw new Error('Moodle user create returned no id');
+    return moodleUserId;
   }
 
+  private async findMoodleUserId(
+    tenantId: string,
+    field: 'email' | 'username',
+    value: string,
+  ) {
+    if (!value?.trim()) return null;
+    try {
+      const found = await this.api.call<Array<{ id: number }>>({
+        tenantId,
+        wsfunction: 'core_user_get_users_by_field',
+        params: { field, values: [value.trim()] },
+      });
+      const id = found?.[0]?.id;
+      return id ? Number(id) : null;
+    } catch (err) {
+      this.logger.debug(
+        `Moodle lookup by ${field} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+  }
+
+  private splitName(
+    fullName: string,
+    fallbackFirst: string,
+    fallbackLast: string,
+  ) {
+    const cleaned = fullName.replace(/\s+/g, ' ').trim();
+    if (!cleaned) {
+      return { firstname: fallbackFirst, lastname: fallbackLast };
+    }
+    const parts = cleaned.split(' ');
+    const firstname = (parts[0] || fallbackFirst).slice(0, 100);
+    const lastname = (parts.slice(1).join(' ') || fallbackLast).slice(0, 100);
+    return {
+      firstname: firstname || fallbackFirst,
+      lastname: lastname || fallbackLast,
+    };
+  }
+
+  private usernameFor(
+    primary?: string | null,
+    email?: string | null,
+    fallbackId?: string | null,
+  ) {
+    const fromPrimary = this.sanitizeUsername(primary ?? '');
+    if (fromPrimary.length >= 2) return fromPrimary;
+
+    const local = (email ?? '').split('@')[0] ?? '';
+    const fromEmail = this.sanitizeUsername(local);
+    if (fromEmail.length >= 2) return fromEmail;
+
+    const hash = createHash('sha1')
+      .update(fallbackId || email || primary || randomBytes(8))
+      .digest('hex')
+      .slice(0, 10);
+    return `u_${hash}`;
+  }
+
+  private sanitizeUsername(value: string) {
+    let out = value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9._-]/g, '_')
+      .replace(/^[._-]+/, '')
+      .replace(/[._-]+$/, '')
+      .slice(0, 90);
+    if (out && /^[0-9]/.test(out)) out = `u_${out}`;
+    return out;
+  }
+
+  /** Meets typical Moodle password policy: upper/lower/digit/symbol + length. */
   private tempPassword() {
-    return `Erp_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+    const rand = randomBytes(6).toString('base64url');
+    return `Erp!${rand}A9_${Date.now().toString().slice(-6)}`;
   }
 }

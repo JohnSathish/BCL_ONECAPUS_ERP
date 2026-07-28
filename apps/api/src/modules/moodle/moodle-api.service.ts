@@ -57,9 +57,14 @@ export class MoodleApiService {
         'exception' in (payload as Record<string, unknown>)
       ) {
         success = false;
-        errorMessage = String(
-          (payload as Record<string, unknown>).message ?? 'Moodle exception',
-        );
+        const moodle = payload as Record<string, unknown>;
+        const message = String(moodle.message ?? 'Moodle exception');
+        const debuginfo = moodle.debuginfo ? String(moodle.debuginfo) : '';
+        const errorcode = moodle.errorcode ? String(moodle.errorcode) : '';
+        errorMessage = [message, errorcode, debuginfo]
+          .filter(Boolean)
+          .join(' | ')
+          .slice(0, 1000);
       }
       if (!success) {
         throw new Error(errorMessage ?? 'Moodle API error');
@@ -71,6 +76,10 @@ export class MoodleApiService {
       throw err;
     } finally {
       const durationMs = Date.now() - started;
+      const moodlePayload =
+        payload && typeof payload === 'object'
+          ? (payload as Record<string, unknown>)
+          : null;
       await this.prisma.moodleApiLog
         .create({
           data: {
@@ -82,7 +91,15 @@ export class MoodleApiService {
             requestMeta: { paramKeys: Object.keys(options.params ?? {}) },
             responseMeta: success
               ? { type: typeof payload }
-              : { error: errorMessage?.slice(0, 500) },
+              : {
+                  error: errorMessage?.slice(0, 500),
+                  exception: moodlePayload?.exception ?? null,
+                  errorcode: moodlePayload?.errorcode ?? null,
+                  debuginfo:
+                    typeof moodlePayload?.debuginfo === 'string'
+                      ? moodlePayload.debuginfo.slice(0, 500)
+                      : null,
+                },
             errorMessage: errorMessage?.slice(0, 1000) ?? null,
           },
         })
