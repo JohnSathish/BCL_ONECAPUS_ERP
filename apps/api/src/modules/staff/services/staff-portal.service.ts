@@ -805,13 +805,32 @@ export class StaffPortalService {
     };
 
     const results: TodaySlot[] = [];
-    const seenSlotKeys = new Set<string>();
+    const slotByKey = new Map<string, TodaySlot>();
+
+    const slotDedupeKey = (slot: TodaySlot) =>
+      // Same faculty cannot teach two real classes in the identical time window.
+      // Ignore subject/shift differences so plan entries + generated attendance
+      // sessions collapse to one card (e.g. Day Shift vs Classes duplicate).
+      [slot.startTime, slot.endTime, slot.semesterNo ?? ''].join('|');
+
+    const slotRichness = (slot: TodaySlot) =>
+      (slot.shiftId ? 4 : 0) +
+      (slot.shiftName ? 2 : 0) +
+      (slot.offeringSectionId ? 2 : 0) +
+      (slot.classroom ? 1 : 0);
 
     const pushSlot = (slot: TodaySlot) => {
-      const key = `${slot.shiftId ?? ''}:${slot.startTime}:${slot.offeringSectionId ?? slot.subject}`;
-      if (seenSlotKeys.has(key)) return;
-      seenSlotKeys.add(key);
-      results.push(slot);
+      // Publish generates attendance sessions from the same plan entries; those
+      // must not inflate "Today's Classes" when the timetable slot already exists.
+      const key = slotDedupeKey(slot);
+      const existing = slotByKey.get(key);
+      if (!existing) {
+        slotByKey.set(key, slot);
+        return;
+      }
+      if (slotRichness(slot) > slotRichness(existing)) {
+        slotByKey.set(key, slot);
+      }
     };
 
     const planEntries = await this.prisma.timetablePlanEntry.findMany({
@@ -1100,7 +1119,9 @@ export class StaffPortalService {
       }
     }
 
-    return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return Array.from(slotByKey.values()).sort((a, b) =>
+      a.startTime.localeCompare(b.startTime),
+    );
   }
 
   async getTodayScheduleForUser(user: JwtUser) {
