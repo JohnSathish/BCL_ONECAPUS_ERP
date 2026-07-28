@@ -29,7 +29,7 @@ export default function StudentTimetablePage() {
       <ErpWorkspace>
         <TimetableStudioShell
           title="My Class Timetable"
-          description="Published class routine based on your registered FYUGP offering sections."
+          description="Published class routine for your shift and semester (Garo Day Sem 3, etc.)."
         >
           <Card>
             <CardHeader>
