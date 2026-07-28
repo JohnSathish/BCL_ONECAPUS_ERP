@@ -44,6 +44,9 @@ export default function StudentTimetablePage() {
                   <div className="space-y-2">
                     {entries
                       .filter((entry) => entry.dayOfWeek === day)
+                      .sort((a, b) =>
+                        String(a.startTime ?? '').localeCompare(String(b.startTime ?? '')),
+                      )
                       .map((entry) => (
                         <TimetableSlotCell key={entry.id} entry={entry} />
                       ))}

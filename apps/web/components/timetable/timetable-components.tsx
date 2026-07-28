@@ -555,6 +555,12 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
   const display = timetableEntryDisplay(entry);
   const category = display.category;
   const overlay = entry.replacementOverlay;
+  const start = String(entry.startTime ?? '').slice(0, 5);
+  const end = String(entry.endTime ?? '').slice(0, 5);
+  const timing = start && end ? `${start} – ${end}` : start || end || null;
+  const periodLabel =
+    entry.periodNo != null && entry.periodNo !== undefined ? `P${entry.periodNo}` : null;
+
   return (
     <div
       className={cn(
@@ -563,6 +569,16 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
         overlay ? 'border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/20' : '',
       )}
     >
+      {(timing || periodLabel) && (
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-semibold tracking-wide text-foreground/90">
+          <span>{timing ?? 'Time TBA'}</span>
+          {periodLabel ? (
+            <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px] font-medium opacity-90">
+              {periodLabel}
+            </span>
+          ) : null}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold">{display.categoryOnly ? category : display.title}</span>
         <div className="flex items-center gap-1">
