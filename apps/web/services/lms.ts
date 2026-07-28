@@ -17,6 +17,11 @@ export type LmsWorkspace = {
   workspaceType: string;
   semesterNo: number;
   status: string;
+  provider?: string;
+  moodleCourseId?: number | null;
+  effectiveProvider?: 'NATIVE' | 'MOODLE';
+  launchUrl?: string | null;
+  moodleSummary?: { assignmentsDue: number; quizzesOpen: number } | null;
   course: { code: string; title: string; credits: string | number };
   offeringSection?: { sectionCode: string } | null;
   context?: LmsWorkspaceContext;
@@ -87,6 +92,7 @@ export type LmsSettings = {
   allowedMimeTypes: string[];
   poolWorkspacesEnabled: boolean;
   defaultVisibility: string;
+  defaultLmsProvider?: 'NATIVE' | 'MOODLE';
   featureFlags: Record<string, boolean>;
 };
 

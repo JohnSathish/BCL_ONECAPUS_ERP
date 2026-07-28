@@ -102,6 +102,7 @@ import { WebsiteModule } from './modules/website/website.module';
 import { HostelModule } from './modules/hostel/hostel.module';
 import { ResearchModule } from './modules/research/research.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { MoodleModule } from './modules/moodle/moodle.module';
 
 @Module({
   imports: [
@@ -159,6 +160,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     ExaminationsModule,
     ExaminationFeesModule,
     LmsModule,
+    MoodleModule,
     CommunicationModule,
     CertificatesModule,
     QuestionBankModule,

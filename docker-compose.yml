@@ -129,8 +129,54 @@ services:
       college-web:
         condition: service_started
 
+  moodle-db:
+    image: postgres:16-alpine
+    profiles:
+      - moodle
+    environment:
+      POSTGRES_USER: ${MOODLE_DB_USER:-moodle}
+      POSTGRES_PASSWORD: ${MOODLE_DB_PASSWORD:-moodle_dev_password}
+      POSTGRES_DB: ${MOODLE_DB_NAME:-moodle}
+    volumes:
+      - moodle_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${MOODLE_DB_USER:-moodle} -d ${MOODLE_DB_NAME:-moodle}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  moodle:
+    image: bitnami/moodle:4.5.2
+    profiles:
+      - moodle
+    environment:
+      MOODLE_USERNAME: ${MOODLE_ADMIN_USER:-admin}
+      MOODLE_PASSWORD: ${MOODLE_ADMIN_PASSWORD:-MoodleAdmin123!}
+      MOODLE_EMAIL: ${MOODLE_ADMIN_EMAIL:-admin@donboscocollege.ac.in}
+      MOODLE_SITE_NAME: ${MOODLE_SITE_NAME:-Don Bosco College LMS}
+      MOODLE_HOST: ${MOODLE_HOST:-lms.donboscocollege.ac.in}
+      MOODLE_DATABASE_TYPE: pgsql
+      MOODLE_DATABASE_HOST: moodle-db
+      MOODLE_DATABASE_PORT_NUMBER: 5432
+      MOODLE_DATABASE_NAME: ${MOODLE_DB_NAME:-moodle}
+      MOODLE_DATABASE_USER: ${MOODLE_DB_USER:-moodle}
+      MOODLE_DATABASE_PASSWORD: ${MOODLE_DB_PASSWORD:-moodle_dev_password}
+      MOODLE_SKIP_BOOTSTRAP: ${MOODLE_SKIP_BOOTSTRAP:-no}
+    volumes:
+      - moodle_data:/bitnami/moodle
+      - moodle_moodledata:/bitnami/moodledata
+    ports:
+      - '8080:8080'
+      - '8443:8443'
+    depends_on:
+      moodle-db:
+        condition: service_healthy
+
 volumes:
   nep_pg_data: {}
   nep_uploads: {}
   nep_storage: {}
   nep_backups: {}
+  moodle_pg_data: {}
+  moodle_data: {}
+  moodle_moodledata: {}

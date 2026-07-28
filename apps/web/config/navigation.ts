@@ -835,6 +835,26 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/academics/lms/settings',
             permissions: ['lms:settings:manage', 'lms:manage'],
           },
+          {
+            label: 'Moodle Settings',
+            href: '/admin/academics/lms/moodle/settings',
+            permissions: [...P.moodle],
+          },
+          {
+            label: 'Moodle Sync',
+            href: '/admin/academics/lms/moodle/sync',
+            permissions: ['moodle:sync', 'moodle:manage'],
+          },
+          {
+            label: 'Moodle API Logs',
+            href: '/admin/academics/lms/moodle/logs',
+            permissions: ['moodle:read', 'moodle:manage'],
+          },
+          {
+            label: 'Moodle Reports',
+            href: '/admin/academics/lms/moodle/reports',
+            permissions: ['moodle:read', 'moodle:manage'],
+          },
         ],
       },
       {

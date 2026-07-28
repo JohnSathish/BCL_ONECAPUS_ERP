@@ -38,6 +38,7 @@ export class LmsSettingsService {
       allowedMimeTypes?: string[];
       poolWorkspacesEnabled?: boolean;
       defaultVisibility?: string;
+      defaultLmsProvider?: string;
       featureFlags?: Record<string, boolean>;
     },
   ) {
@@ -54,6 +55,9 @@ export class LmsSettingsService {
           : {}),
         ...(data.defaultVisibility
           ? { defaultVisibility: data.defaultVisibility }
+          : {}),
+        ...(data.defaultLmsProvider
+          ? { defaultLmsProvider: data.defaultLmsProvider }
           : {}),
         ...(data.featureFlags ? { featureFlags: data.featureFlags } : {}),
       },

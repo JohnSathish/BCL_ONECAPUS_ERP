@@ -723,6 +723,30 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Manage LMS settings',
   },
   {
+    slug: 'moodle:read',
+    resource: 'moodle',
+    action: 'read',
+    description: 'View Moodle integration status and logs',
+  },
+  {
+    slug: 'moodle:manage',
+    resource: 'moodle',
+    action: 'manage',
+    description: 'Manage Moodle integration',
+  },
+  {
+    slug: 'moodle:sync',
+    resource: 'moodle',
+    action: 'sync',
+    description: 'Run Moodle sync jobs',
+  },
+  {
+    slug: 'moodle:settings',
+    resource: 'moodle',
+    action: 'settings',
+    description: 'Configure Moodle connection and SSO',
+  },
+  {
     slug: 'question-bank:read',
     resource: 'question-bank',
     action: 'read',

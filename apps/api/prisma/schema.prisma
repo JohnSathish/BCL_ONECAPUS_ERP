@@ -2220,6 +2220,7 @@ model Student {
   lastModifiedById       String?   @map("last_modified_by_id") @db.Uuid
   admissionApplicationId String?   @unique @map("admission_application_id") @db.Uuid
   admissionDate          DateTime? @map("admission_date") @db.Date
+  moodleUserId           Int?      @map("moodle_user_id")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
   deletedAt              DateTime? @map("deleted_at")
@@ -3291,6 +3292,7 @@ model StaffProfile {
   orcidUrl                  String?   @map("orcid_url")
   researchAreas             String?   @map("research_areas")
   portalUserId              String?   @unique @map("portal_user_id") @db.Uuid
+  moodleUserId              Int?      @map("moodle_user_id")
   addressJson               Json?     @map("address_json")
   emergencyContactJson      Json?     @map("emergency_contact_json")
   attendanceDeviceMapping   Json?     @map("attendance_device_mapping")
@@ -8336,6 +8338,7 @@ model CertificateAuditLog {
 model LmsSettings {
   id                    String   @id @default(uuid()) @db.Uuid
   tenantId              String   @unique @map("tenant_id") @db.Uuid
+  defaultLmsProvider    String   @default("NATIVE") @map("default_lms_provider")
   maxUploadMb           Int      @default(50) @map("max_upload_mb")
   allowedMimeTypes      Json     @default("[]") @map("allowed_mime_types")
   poolWorkspacesEnabled Boolean  @default(true) @map("pool_workspaces_enabled")
@@ -8358,6 +8361,8 @@ model LmsWorkspace {
   semesterNo        Int       @map("semester_no")
   shiftId           String?   @map("shift_id") @db.Uuid
   title             String
+  provider          String    @default("INHERIT") @map("provider")
+  moodleCourseId    Int?      @map("moodle_course_id")
   status            String    @default("ACTIVE")
   settings          Json      @default("{}")
   createdAt         DateTime  @default(now()) @map("created_at")
@@ -8701,6 +8706,262 @@ model LmsAuditLog {
   @@index([tenantId, workspaceId, createdAt])
   @@index([tenantId, entityType, entityId])
   @@map("lms_audit_logs")
+  @@schema("academic")
+}
+
+// --- Moodle LMS Integration ---
+
+model MoodleSettings {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @unique @map("tenant_id") @db.Uuid
+  moodleUrl               String?   @map("moodle_url")
+  wsTokenEncrypted        String?   @map("ws_token_encrypted")
+  wsServiceName           String?   @map("ws_service_name")
+  ssoSecretEncrypted      String?   @map("sso_secret_encrypted")
+  enableSync              Boolean   @default(false) @map("enable_sync")
+  enableAutoUserCreation  Boolean   @default(true) @map("enable_auto_user_creation")
+  enableAutoCourseCreation Boolean  @default(true) @map("enable_auto_course_creation")
+  enableAutoEnrollment    Boolean   @default(true) @map("enable_auto_enrollment")
+  enableGradeSync         Boolean   @default(true) @map("enable_grade_sync")
+  enableAttendanceSync    Boolean   @default(true) @map("enable_attendance_sync")
+  enableAssignmentSync    Boolean   @default(true) @map("enable_assignment_sync")
+  enableNotificationSync  Boolean   @default(true) @map("enable_notification_sync")
+  ssoEnabled              Boolean   @default(true) @map("sso_enabled")
+  cronIntervalMinutes     Int       @default(5) @map("cron_interval_minutes")
+  connectionStatus        String    @default("UNKNOWN") @map("connection_status")
+  lastConnectionAt        DateTime? @map("last_connection_at")
+  lastConnectionError     String?   @map("last_connection_error")
+  lastSyncAt              DateTime? @map("last_sync_at")
+  featureFlags            Json      @default("{}") @map("feature_flags")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  @@map("moodle_settings")
+  @@schema("academic")
+}
+
+model MoodleUser {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  erpUserId       String    @map("erp_user_id") @db.Uuid
+  erpEntityType   String    @map("erp_entity_type")
+  erpEntityId     String    @map("erp_entity_id") @db.Uuid
+  moodleUserId    Int       @map("moodle_user_id")
+  username        String
+  email           String?
+  syncStatus      String    @default("SYNCED") @map("sync_status")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  lastError       String?   @map("last_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  enrollments MoodleEnrollment[]
+
+  @@unique([tenantId, erpUserId])
+  @@unique([tenantId, moodleUserId])
+  @@index([tenantId, erpEntityType, erpEntityId])
+  @@map("moodle_users")
+  @@schema("academic")
+}
+
+model MoodleCourse {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  programVersionId   String?   @map("program_version_id") @db.Uuid
+  semesterSequence   Int?      @map("semester_sequence")
+  courseOfferingId   String?   @map("course_offering_id") @db.Uuid
+  lmsWorkspaceId     String?   @map("lms_workspace_id") @db.Uuid
+  moodleCourseId     Int       @map("moodle_course_id")
+  shortname          String
+  fullname           String
+  syncStatus         String    @default("SYNCED") @map("sync_status")
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  lastError          String?   @map("last_error")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  enrollments MoodleEnrollment[]
+  assignments MoodleAssignment[]
+  quizzes     MoodleQuiz[]
+  grades      MoodleGrade[]
+  attendance  MoodleAttendance[]
+
+  @@unique([tenantId, moodleCourseId])
+  @@index([tenantId, programVersionId, semesterSequence])
+  @@index([tenantId, lmsWorkspaceId])
+  @@map("moodle_courses")
+  @@schema("academic")
+}
+
+model MoodleEnrollment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  moodleUserId   String    @map("moodle_user_id") @db.Uuid
+  moodleCourseId String    @map("moodle_course_id") @db.Uuid
+  moodleEnrolId  Int?      @map("moodle_enrol_id")
+  role           String    @default("student")
+  status         String    @default("ACTIVE")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  moodleUser   MoodleUser   @relation(fields: [moodleUserId], references: [id], onDelete: Cascade)
+  moodleCourse MoodleCourse @relation(fields: [moodleCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moodleUserId, moodleCourseId, role])
+  @@index([tenantId, status])
+  @@map("moodle_enrollments")
+  @@schema("academic")
+}
+
+model MoodleAssignment {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  moodleCourseId     String    @map("moodle_course_id") @db.Uuid
+  moodleAssignmentId Int       @map("moodle_assignment_id")
+  name               String
+  dueAt              DateTime? @map("due_at")
+  maxGrade           Decimal?  @map("max_grade") @db.Decimal(8, 2)
+  rawPayload         Json?     @map("raw_payload")
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  moodleCourse MoodleCourse @relation(fields: [moodleCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moodleAssignmentId])
+  @@map("moodle_assignments")
+  @@schema("academic")
+}
+
+model MoodleQuiz {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  moodleCourseId String  @map("moodle_course_id") @db.Uuid
+  moodleQuizId Int       @map("moodle_quiz_id")
+  name         String
+  timeOpen     DateTime? @map("time_open")
+  timeClose    DateTime? @map("time_close")
+  rawPayload   Json?     @map("raw_payload")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  moodleCourse MoodleCourse @relation(fields: [moodleCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moodleQuizId])
+  @@map("moodle_quizzes")
+  @@schema("academic")
+}
+
+model MoodleGrade {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  moodleCourseId String    @map("moodle_course_id") @db.Uuid
+  moodleUserId   Int       @map("moodle_user_id")
+  itemType       String    @map("item_type")
+  itemName       String    @map("item_name")
+  gradeValue     Decimal?  @map("grade_value") @db.Decimal(8, 2)
+  gradeMax       Decimal?  @map("grade_max") @db.Decimal(8, 2)
+  rawPayload     Json?     @map("raw_payload")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  moodleCourse MoodleCourse @relation(fields: [moodleCourseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, moodleCourseId, moodleUserId])
+  @@map("moodle_grades")
+  @@schema("academic")
+}
+
+model MoodleAttendance {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  moodleCourseId String    @map("moodle_course_id") @db.Uuid
+  moodleUserId   Int       @map("moodle_user_id")
+  sessionDate    DateTime  @map("session_date") @db.Date
+  status         String
+  source         String    @default("MOODLE")
+  rawPayload     Json?     @map("raw_payload")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  moodleCourse MoodleCourse @relation(fields: [moodleCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moodleCourseId, moodleUserId, sessionDate])
+  @@map("moodle_attendance")
+  @@schema("academic")
+}
+
+model MoodleSyncLog {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  syncType     String    @map("sync_type")
+  status       String    @default("RUNNING")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  successCount Int       @default(0) @map("success_count")
+  failureCount Int       @default(0) @map("failure_count")
+  errorMessage String?   @map("error_message")
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, syncType, startedAt])
+  @@map("moodle_sync_logs")
+  @@schema("academic")
+}
+
+model MoodleApiLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  wsFunction   String   @map("ws_function")
+  httpStatus   Int?     @map("http_status")
+  success      Boolean  @default(true)
+  durationMs   Int?     @map("duration_ms")
+  requestMeta  Json?    @map("request_meta")
+  responseMeta Json?    @map("response_meta")
+  errorMessage String?  @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, wsFunction])
+  @@map("moodle_api_logs")
+  @@schema("academic")
+}
+
+model MoodleNotification {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  erpUserId    String?   @map("erp_user_id") @db.Uuid
+  moodleUserId Int?      @map("moodle_user_id")
+  title        String
+  body         String?
+  category     String    @default("GENERAL")
+  readAt       DateTime? @map("read_at")
+  rawPayload   Json?     @map("raw_payload")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, erpUserId, createdAt])
+  @@map("moodle_notifications")
+  @@schema("academic")
+}
+
+model MoodleSyncEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id") @db.Uuid
+  action      String
+  payloadHash String?  @map("payload_hash")
+  status      String   @default("PENDING")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, entityType, status, createdAt])
+  @@map("moodle_sync_events")
   @@schema("academic")
 }
 

@@ -9,6 +9,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { UserProvisioningService } from '../../administration/services/user-provisioning.service';
 import type { CreateStaffDto } from '../dto/staff.dto';
 import { EmployeeCodeService } from './employee-code.service';
+import { MoodleHookService } from '../../moodle/moodle-hook.service';
 import { StaffEmploymentService } from './staff-employment.service';
 import {
   assertBiometricIdUnique,
@@ -22,6 +23,7 @@ export class StaffProvisioningService {
     private readonly provisioning: UserProvisioningService,
     private readonly employment: StaffEmploymentService,
     private readonly employeeCodes: EmployeeCodeService,
+    private readonly moodleHooks: MoodleHookService,
   ) {}
 
   async create(
@@ -244,6 +246,7 @@ export class StaffProvisioningService {
       });
     }
 
+    void this.moodleHooks.onStaffCreated(tenantId, staff.id);
     return { staff, generatedPassword, actorUserId };
   }
 

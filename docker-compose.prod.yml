@@ -34,6 +34,9 @@ services:
       CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS:-}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      MOODLE_SSO_SECRET: ${MOODLE_SSO_SECRET:-}
+      MOODLE_TOKEN_ENCRYPTION_KEY: ${MOODLE_TOKEN_ENCRYPTION_KEY:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
       BACKUP_ROOT: /data/backups
@@ -149,8 +152,37 @@ services:
       college-web:
         condition: service_started
 
+  moodle-db:
+    profiles:
+      - moodle
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MOODLE_DB_USER:-moodle}
+      POSTGRES_PASSWORD: ${MOODLE_DB_PASSWORD:?MOODLE_DB_PASSWORD required}
+      POSTGRES_DB: ${MOODLE_DB_NAME:-moodle}
+
+  moodle:
+    profiles:
+      - moodle
+    restart: unless-stopped
+    environment:
+      MOODLE_USERNAME: ${MOODLE_ADMIN_USER:-admin}
+      MOODLE_PASSWORD: ${MOODLE_ADMIN_PASSWORD:?MOODLE_ADMIN_PASSWORD required}
+      MOODLE_EMAIL: ${MOODLE_ADMIN_EMAIL:-admin@donboscocollege.ac.in}
+      MOODLE_SITE_NAME: ${MOODLE_SITE_NAME:-Don Bosco College LMS}
+      MOODLE_HOST: ${MOODLE_HOST:-lms.donboscocollege.ac.in}
+      MOODLE_DATABASE_TYPE: pgsql
+      MOODLE_DATABASE_HOST: moodle-db
+      MOODLE_DATABASE_PORT_NUMBER: 5432
+      MOODLE_DATABASE_NAME: ${MOODLE_DB_NAME:-moodle}
+      MOODLE_DATABASE_USER: ${MOODLE_DB_USER:-moodle}
+      MOODLE_DATABASE_PASSWORD: ${MOODLE_DB_PASSWORD:?MOODLE_DB_PASSWORD required}
+
 volumes:
   nep_uploads: {}
   nep_storage: {}
   nep_backups: {}
   college_web_data: {}
+  moodle_pg_data: {}
+  moodle_data: {}
+  moodle_moodledata: {}

@@ -44,6 +44,7 @@ export const MODULE_PERMISSIONS = {
     'academic-engine:manage',
   ],
   lms: ['lms:read', 'lms:manage'],
+  moodle: ['moodle:read', 'moodle:manage', 'moodle:sync', 'moodle:settings'],
   questionBank: [
     'question-bank:read',
     'question-bank:manage',

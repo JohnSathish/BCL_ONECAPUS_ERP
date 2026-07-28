@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { MoodleHookService } from '../../moodle/moodle-hook.service';
 import { LmsSettingsService } from './lms-settings.service';
 import {
   enrichLmsWorkspaceRow,
@@ -15,6 +16,7 @@ export class LmsWorkspaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: LmsSettingsService,
+    private readonly moodleHooks: MoodleHookService,
   ) {}
 
   buildTitle(
@@ -47,7 +49,7 @@ export class LmsWorkspaceService {
       (await this.inferSemesterNo(tenantId, section.courseOfferingId)) ??
       1;
 
-    return this.prisma.lmsWorkspace.create({
+    const workspace = await this.prisma.lmsWorkspace.create({
       data: {
         tenantId,
         workspaceType: 'SECTION',
@@ -60,6 +62,8 @@ export class LmsWorkspaceService {
         status: 'ACTIVE',
       },
     });
+    void this.moodleHooks.onWorkspaceProvisioned(tenantId, workspace.id);
+    return workspace;
   }
 
   async provisionPoolWorkspace(tenantId: string, courseOfferingId: string) {
@@ -86,7 +90,7 @@ export class LmsWorkspaceService {
     if (existing) return existing;
 
     const semesterNo = offering.semesterSequence ?? 1;
-    return this.prisma.lmsWorkspace.create({
+    const workspace = await this.prisma.lmsWorkspace.create({
       data: {
         tenantId,
         workspaceType: 'POOL',
@@ -97,6 +101,8 @@ export class LmsWorkspaceService {
         status: 'ACTIVE',
       },
     });
+    void this.moodleHooks.onWorkspaceProvisioned(tenantId, workspace.id);
+    return workspace;
   }
 
   async provisionAllForTenant(tenantId: string) {

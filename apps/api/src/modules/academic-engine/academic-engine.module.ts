@@ -33,6 +33,7 @@ import { StudentVtcTrackService } from './services/student-vtc-track.service';
 import { CourseEligibilityService } from './services/course-eligibility.service';
 import { ShiftCurriculumService } from './services/shift-curriculum.service';
 import { LmsModule } from '../lms/lms.module';
+import { MoodleModule } from '../moodle/moodle.module';
 import { FeesModule } from '../fees/fees.module';
 import { AcademicChangeHistoryModule } from '../students/academic-change-history/academic-change-history.module';
 import { CommunicationModule } from '../communication/communication.module';
@@ -44,6 +45,7 @@ import { CommunicationModule } from '../communication/communication.module';
     ShiftsModule,
     ImportModule,
     LmsModule,
+    MoodleModule,
     FeesModule,
     CommunicationModule,
   ],

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { ENROLLED_LINE_STATUSES } from '../../lms/constants/lms.constants';
+import { MoodleCalendarService } from '../../moodle/moodle-calendar.service';
 
 export type PortalCalendarEventDto = {
   id: string;
@@ -12,7 +13,10 @@ export type PortalCalendarEventDto = {
 
 @Injectable()
 export class StudentPortalCalendarService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moodleCalendar: MoodleCalendarService,
+  ) {}
 
   async buildForStudent(
     tenantId: string,
@@ -185,6 +189,22 @@ export class StudentPortalCalendarService {
         type: 'event',
         title: activity.title,
         subtitle: activity.department?.name ?? activity.status,
+      });
+    }
+
+    const moodleEvents = await this.moodleCalendar.listEventsForStudent(
+      tenantId,
+      studentId,
+      from,
+      to,
+    );
+    for (const me of moodleEvents) {
+      events.push({
+        id: me.id,
+        date: me.date,
+        type: me.type === 'quiz' ? 'event' : 'assignment',
+        title: me.title,
+        subtitle: me.subtitle ?? 'Moodle',
       });
     }
 

@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { AdmissionsModule } from '../admissions/admissions.module';
 import { AcademicEngineModule } from '../academic-engine/academic-engine.module';
 import { FeesModule } from '../fees/fees.module';
+import { MoodleModule } from '../moodle/moodle.module';
 import { AcademicLifecycleController } from './academic-lifecycle.controller';
 import { AcademicLifecycleService } from './academic-lifecycle.service';
 import { AcademicSessionService } from './services/academic-session.service';
@@ -22,6 +23,7 @@ import { SemesterLifecycleService } from './services/semester-lifecycle.service'
     forwardRef(() => AdmissionsModule),
     forwardRef(() => AcademicEngineModule),
     FeesModule,
+    MoodleModule,
   ],
   controllers: [AcademicLifecycleController],
   providers: [

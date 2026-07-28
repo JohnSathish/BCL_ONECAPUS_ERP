@@ -17,6 +17,7 @@ import type {
   IndividualPromotionDto,
   PromotionPreviewQueryDto,
 } from '../dto/academic-lifecycle.dto';
+import { MoodleHookService } from '../../moodle/moodle-hook.service';
 
 @Injectable()
 export class PromotionRunService {
@@ -27,6 +28,7 @@ export class PromotionRunService {
     private readonly promotionRegistration: PromotionRegistrationService,
     private readonly completion: ProgrammeCompletionService,
     private readonly feeCycleEngine: FeeCycleEngineService,
+    private readonly moodleHooks: MoodleHookService,
   ) {}
 
   async preview(tenantId: string, query: PromotionPreviewQueryDto) {
@@ -319,6 +321,11 @@ export class PromotionRunService {
         entry.studentId,
         entry.toSequence,
         actorId,
+      );
+      void this.moodleHooks.onPromotionApplied(
+        tenantId,
+        entry.studentId,
+        entry.toSequence,
       );
     }
 

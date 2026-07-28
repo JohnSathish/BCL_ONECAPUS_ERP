@@ -12,6 +12,7 @@ import { FeesModule } from '../fees/fees.module';
 import { IdCardsModule } from '../id-cards/id-cards.module';
 import { LibraryModule } from '../library/library.module';
 import { LmsModule } from '../lms/lms.module';
+import { MoodleModule } from '../moodle/moodle.module';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { TimetableEngineModule } from '../timetable-engine/timetable-engine.module';
 import { StudentBulkUpdateController } from './bulk-update/student-bulk-update.controller';
@@ -70,6 +71,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
     FeesModule,
     ExaminationsModule,
     LmsModule,
+    MoodleModule,
     TimetableEngineModule,
     LibraryModule,
     IdCardsModule,

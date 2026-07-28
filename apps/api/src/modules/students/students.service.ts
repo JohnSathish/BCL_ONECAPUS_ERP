@@ -49,6 +49,7 @@ import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service
 import { createWorkbookWithSheets } from '../../common/import/excel.util';
 import { StudentAbcService } from './services/student-abc.service';
 import { AcademicChangeHistoryService } from './academic-change-history/academic-change-history.service';
+import { MoodleHookService } from '../moodle/moodle-hook.service';
 import type { AcademicChangeAuditContext } from './academic-change-history/academic-change-history.types';
 
 const directoryInclude = {
@@ -159,6 +160,7 @@ export class StudentsService {
     private readonly feeCycleEngine: FeeCycleEngineService,
     private readonly abcService: StudentAbcService,
     private readonly academicChangeHistory: AcademicChangeHistoryService,
+    private readonly moodleHooks: MoodleHookService,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -1793,7 +1795,7 @@ export class StudentsService {
         }
       }
 
-      return tx.student.create({
+      const created = await tx.student.create({
         data: {
           tenantId,
           userId: user.id,
@@ -1805,6 +1807,8 @@ export class StudentsService {
         },
         include: studentInclude,
       });
+      void this.moodleHooks.onStudentEnrolled(tenantId, created.id, 1);
+      return created;
     });
   }
 
@@ -2080,6 +2084,11 @@ export class StudentsService {
       student.id,
       standing?.currentSemesterSequence ?? 1,
       user.sub,
+    );
+    void this.moodleHooks.onStudentEnrolled(
+      tenantId,
+      student.id,
+      standing?.currentSemesterSequence ?? 1,
     );
     return this.getOne(user, student.id);
   }

@@ -4,12 +4,14 @@ import type { NepCategory } from '../domain/nep-categories';
 import { DEFAULT_SEMESTER_CREDIT_TARGET } from '../domain/fyugp-templates';
 import { CreditLedgerService } from './credit-ledger.service';
 import { resolveSemesterCreditTarget } from './structure-rules.helper';
+import { MoodleHookService } from '../../moodle/moodle-hook.service';
 
 @Injectable()
 export class AllocationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credits: CreditLedgerService,
+    private readonly moodleHooks: MoodleHookService,
   ) {}
 
   async allocateRegistration(
@@ -38,7 +40,7 @@ export class AllocationService {
       (a, b) => (a.priorityRank ?? 0) - (b.priorityRank ?? 0),
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       let rank = 1;
       for (const line of lines) {
         if (!line.offeringSectionId) {
@@ -182,6 +184,13 @@ export class AllocationService {
         },
       });
     });
+
+    void this.moodleHooks.onRegistrationApproved(
+      tenantId,
+      reg.studentId,
+      reg.semesterSequence,
+    );
+    return result;
   }
 
   async promoteWaitlist(

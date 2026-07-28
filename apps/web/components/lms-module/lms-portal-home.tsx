@@ -11,6 +11,7 @@ import {
   formatLmsWorkspaceMeta,
   type LmsWorkspace,
 } from '@/services/lms';
+import { fetchLmsWorkspaceLaunchUrl } from '@/services/moodle';
 import { LmsWorkspaceShell } from '@/components/lms-module/lms-workspace-shell';
 
 type Props = {
@@ -88,26 +89,42 @@ export function LmsPortalHome({ role, workspaceId }: Props) {
         <CompactCardHeader title="My subjects" />
         <CompactCardBody className="space-y-2">
           {list.map((ws) => (
-            <Link
-              key={ws.id}
-              href={`${role === 'student' ? '/student/lms' : '/staff/academic/lms'}/${ws.id}`}
-              className="rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
-            >
+            <div key={ws.id} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted/40">
               <div className="flex items-start justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2 font-medium">
+                <Link
+                  href={`${role === 'student' ? '/student/lms' : '/staff/academic/lms'}/${ws.id}`}
+                  className="flex min-w-0 flex-1 items-start gap-2 font-medium"
+                >
                   <BookOpen className="h-4 w-4 shrink-0 text-primary" />
                   <span className="truncate">{ws.title}</span>
-                </span>
-                {ws.workspaceType === 'POOL' ? (
-                  <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    Shared
-                  </span>
-                ) : null}
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  {ws.workspaceType === 'POOL' ? (
+                    <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      Shared
+                    </span>
+                  ) : null}
+                  {ws.effectiveProvider === 'MOODLE' ? (
+                    <button
+                      type="button"
+                      className="rounded-md bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground"
+                      onClick={async () => {
+                        const { url } = await fetchLmsWorkspaceLaunchUrl(ws.id);
+                        if (url) window.location.href = url;
+                      }}
+                    >
+                      Launch in LMS
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-1 pl-6 text-xs text-muted-foreground">
                 {formatLmsWorkspaceMeta(ws)}
+                {ws.moodleSummary?.assignmentsDue
+                  ? ` · ${ws.moodleSummary.assignmentsDue} Moodle assignments due`
+                  : ''}
               </p>
-            </Link>
+            </div>
           ))}
           {!list.length ? (
             <p className="text-sm text-muted-foreground">

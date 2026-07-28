@@ -18,6 +18,7 @@ import { QueueService } from './queue.service';
       { name: 'notifications' },
       { name: 'exports' },
       { name: 'backups' },
+      { name: 'moodle-sync' },
     ),
   ],
   providers: [QueueService],

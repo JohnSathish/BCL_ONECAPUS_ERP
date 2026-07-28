@@ -70,6 +70,10 @@ export class UpdateLmsSettingsDto {
   defaultVisibility?: string;
 
   @IsOptional()
+  @IsIn(['NATIVE', 'MOODLE'])
+  defaultLmsProvider?: string;
+
+  @IsOptional()
   featureFlags?: Record<string, boolean>;
 }
 

@@ -5,6 +5,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { ENROLLED_LINE_STATUSES } from '../constants/lms.constants';
 import { LmsAccessService } from './lms-access.service';
 import { LmsAssignmentsService } from './lms-assignments.service';
+import { LmsProviderRouterService } from '../adapters/lms-provider-router.service';
 import {
   enrichLmsWorkspaceRow,
   lmsWorkspaceListInclude,
@@ -27,6 +28,7 @@ export class LmsDashboardService {
     private readonly prisma: PrismaService,
     private readonly access: LmsAccessService,
     private readonly assignments: LmsAssignmentsService,
+    private readonly providerRouter: LmsProviderRouterService,
   ) {}
 
   private async findEnrichedWorkspaces(
@@ -98,7 +100,13 @@ export class LmsDashboardService {
         { tenantId: user.tid, deletedAt: null, status: 'ACTIVE' },
         50,
       );
-      return { role: 'admin', workspaces };
+      return {
+        role: 'admin',
+        workspaces: await this.providerRouter.enrichWorkspaces(
+          user,
+          workspaces,
+        ),
+      };
     }
 
     const staffId = await this.access.getStaffProfileId(user);
@@ -131,7 +139,13 @@ export class LmsDashboardService {
         ],
       });
 
-      return { role: 'faculty', workspaces };
+      return {
+        role: 'faculty',
+        workspaces: await this.providerRouter.enrichWorkspaces(
+          user,
+          workspaces,
+        ),
+      };
     }
 
     const studentId = await this.access.getStudentId(user);
@@ -174,15 +188,25 @@ export class LmsDashboardService {
       },
     });
 
+    const enriched = await this.providerRouter.enrichWorkspaces(
+      user,
+      workspaces,
+    );
+    const moodleAssignmentsDue = enriched.reduce(
+      (n, w) => n + (w.moodleSummary?.assignmentsDue ?? 0),
+      0,
+    );
+
     return {
       role: 'student',
-      workspaces,
+      workspaces: enriched,
       progress: {
-        enrolledWorkspaces: workspaces.length,
+        enrolledWorkspaces: enriched.length,
         bookmarks,
         materialsDownloaded: downloads,
         assignmentCompletionPct: 0,
         quizCompletionPct: 0,
+        moodleAssignmentsDue,
       },
     };
   }
@@ -207,9 +231,14 @@ export class LmsDashboardService {
   async studentDashboard(user: JwtUser) {
     const my = await this.myWorkspaces(user);
     const studentId = await this.access.getStudentId(user);
-    const assignmentsDue = studentId
-      ? await this.assignments.countDueForStudent(user.tid, studentId)
-      : 0;
+    const assignmentsDue =
+      (studentId
+        ? await this.assignments.countDueForStudent(user.tid, studentId)
+        : 0) +
+      (('progress' in my && my.progress && 'moodleAssignmentsDue' in my.progress
+        ? (my.progress as { moodleAssignmentsDue?: number })
+            .moodleAssignmentsDue
+        : 0) ?? 0);
     const announcements = await this.prisma.lmsAnnouncement.findMany({
       where: {
         tenantId: user.tid,

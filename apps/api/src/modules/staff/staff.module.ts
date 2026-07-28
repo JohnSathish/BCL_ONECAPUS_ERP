@@ -7,6 +7,7 @@ import { AcademicLifecycleModule } from '../academic-lifecycle/academic-lifecycl
 import { CommunicationModule } from '../communication/communication.module';
 import { GovernanceModule } from '../governance/governance.module';
 import { LmsModule } from '../lms/lms.module';
+import { MoodleModule } from '../moodle/moodle.module';
 import { AdministrationModule } from '../administration/administration.module';
 import { ShiftsModule } from '../shifts/shifts.module';
 import { StaffImportCommitService } from './import/staff-import-commit.service';
@@ -42,6 +43,7 @@ import { StaffPortalService } from './services/staff-portal.service';
     CommunicationModule,
     forwardRef(() => GovernanceModule),
     LmsModule,
+    MoodleModule,
     ImportModule,
     QueueModule,
     LicensingModule,
