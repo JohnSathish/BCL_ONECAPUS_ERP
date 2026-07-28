@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
@@ -235,6 +244,7 @@ export class MoodleController {
 
   @Post('sso/verify')
   @Public()
+  @HttpCode(200)
   verifySso(@Body() dto: MoodleSsoVerifyDto) {
     return this.auth.verifyLaunchToken(dto.token);
   }

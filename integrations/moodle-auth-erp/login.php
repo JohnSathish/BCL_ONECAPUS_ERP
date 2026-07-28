@@ -36,7 +36,7 @@ $httpcode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlerror = curl_error($ch);
 curl_close($ch);
 
-if ($responsebody === false || $httpcode !== 200) {
+if ($responsebody === false || $httpcode < 200 || $httpcode >= 300) {
     debugging('auth_erp verify failed: HTTP ' . $httpcode . ' ' . $curlerror, DEBUG_DEVELOPER);
     throw new moodle_exception('verifyfailed', 'auth_erp');
 }
