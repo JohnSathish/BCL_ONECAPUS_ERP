@@ -804,7 +804,6 @@ export class StaffPortalService {
       shiftName: string | null;
     };
 
-    const results: TodaySlot[] = [];
     const slotByKey = new Map<string, TodaySlot>();
 
     const slotDedupeKey = (slot: TodaySlot) =>
