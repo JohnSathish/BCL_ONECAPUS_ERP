@@ -126,13 +126,42 @@ echo "Fixing data volume permissions…"
 "${COMPOSE[@]}" exec -u root worker \
   chown -R worker:nodejs /data/uploads /data/storage /data/backups 2>/dev/null || true
 
+echo "Fixing data volume permissions…"
+"${COMPOSE[@]}" exec -u root api \
+  chown -R nestjs:nodejs /data/uploads /data/storage /data/backups 2>/dev/null || true
+"${COMPOSE[@]}" exec -u root worker \
+  chown -R worker:nodejs /data/uploads /data/storage /data/backups 2>/dev/null || true
+
 HOST="${NEXT_PUBLIC_LOGIN_HOST:-erp.donboscocollege.ac.in}"
+
+wait_for_erp_web() {
+  local url="https://${HOST}/login"
+  local attempt code
+  for attempt in $(seq 1 30); do
+    code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 12 "${url}" || true)"
+    if [[ "${code}" =~ ^(200|301|302|303|307|308)$ ]]; then
+      echo "${code}"
+      return 0
+    fi
+    if [[ "${attempt}" -lt 30 ]]; then
+      echo "ERP web not ready yet (HTTP ${code:-000}), waiting… (${attempt}/30)" >&2
+      sleep 3
+    fi
+  done
+  echo "${code:-000}"
+  return 1
+}
+
 echo
 echo "--- Health ---"
 curl -sf "https://${HOST}/api/health/live" | head -c 200 || true
 echo
 echo "college_https: ${CODE:-$(curl -sk -o /dev/null -w '%{http_code}' --max-time 12 https://donboscocollege.ac.in/ || true)}"
-echo "erp_https: $(curl -sk -o /dev/null -w '%{http_code}' --max-time 12 https://${HOST}/login || true)"
+ERP_CODE="$(wait_for_erp_web || true)"
+echo "erp_https: ${ERP_CODE}"
+if [[ ! "${ERP_CODE}" =~ ^(200|301|302|303|307|308)$ ]]; then
+  echo "WARN: ERP web still returned HTTP ${ERP_CODE} after wait. Check: docker compose logs web --tail 80"
+fi
 echo "Deployed: $(git log -1 --oneline)"
 echo "=== Safe update complete — hard-refresh ERP (Ctrl+Shift+R) ==="
 
