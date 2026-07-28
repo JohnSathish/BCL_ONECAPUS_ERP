@@ -11,6 +11,7 @@ import { fetchAllStaff } from '@/services/staff';
 import { fetchFacultyShiftAssignments } from '@/services/faculty-shifts';
 import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-badges';
 import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
+import { isPoolFyugpCategory } from '@/lib/timetable/entry-display';
 import type { ManualEntryPayload, TimetableEntry } from '@/services/timetable';
 
 const CATEGORIES = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'LAB'];
@@ -64,6 +65,7 @@ export function TimetableSlotModal({
   const [staffProfileId, setStaffProfileId] = useState('');
   const [classroomId, setClassroomId] = useState('');
   const [fyugpCategory, setFyugpCategory] = useState('MAJOR');
+  const [categoryOnlyPeriod, setCategoryOnlyPeriod] = useState(false);
   const [coFacultyIds, setCoFacultyIds] = useState<string[]>([]);
   const [coFacultyPick, setCoFacultyPick] = useState('');
   const authReady = useAuthQueryEnabled();
@@ -110,11 +112,30 @@ export function TimetableSlotModal({
     setTeachingSubjectGroupId(entry?.teachingSubjectGroupId ?? '');
     setUseSubjectGroup(Boolean(entry?.teachingSubjectGroupId ?? true));
     setCourseId(entry?.courseId ?? '');
-    setStaffProfileId(entry?.staffProfileId ?? '');
+    setStaffProfileId(
+      entry?.staffProfileId ??
+        (entry?.staffProfile as { id?: string } | null | undefined)?.id ??
+        '',
+    );
     setClassroomId(entry?.classroomId ?? '');
     setFyugpCategory(entry?.fyugpCategory ?? 'MAJOR');
+    setCategoryOnlyPeriod(
+      Boolean(
+        (entry?.metadata as { displayAsCategoryOnly?: boolean } | undefined)?.displayAsCategoryOnly,
+      ) ||
+        (isPoolFyugpCategory(entry?.fyugpCategory) &&
+          !entry?.courseId &&
+          !entry?.teachingSubjectGroupId),
+    );
     setCoFacultyIds([]);
   }, [open, entry, context]);
+
+  useEffect(() => {
+    if (!open || entry?.courseId || entry?.teachingSubjectGroupId) return;
+    if (isPoolFyugpCategory(fyugpCategory)) {
+      setCategoryOnlyPeriod(true);
+    }
+  }, [open, fyugpCategory, entry?.courseId, entry?.teachingSubjectGroupId]);
 
   useEffect(() => {
     if (!teachingSubjectGroupId) return;
@@ -141,6 +162,7 @@ export function TimetableSlotModal({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!semesterSequence || !periodNo) return;
+    const poolPeriod = categoryOnlyPeriod && isPoolFyugpCategory(fyugpCategory);
     onSave({
       planId: context.planId,
       dayOfWeek,
@@ -151,15 +173,20 @@ export function TimetableSlotModal({
       semesterSequence: Number(semesterSequence),
       sectionCode: sectionCode || undefined,
       teachingSubjectGroupId:
-        useSubjectGroup && teachingSubjectGroupId ? teachingSubjectGroupId : undefined,
-      courseId: !useSubjectGroup && courseId ? courseId : undefined,
-      staffProfileId: staffProfileId || undefined,
+        !poolPeriod && useSubjectGroup && teachingSubjectGroupId
+          ? teachingSubjectGroupId
+          : undefined,
+      courseId: !poolPeriod && !useSubjectGroup && courseId ? courseId : undefined,
+      staffProfileId: staffProfileId ? staffProfileId : null,
       classroomId: classroomId || undefined,
       fyugpCategory,
       slotType: fyugpCategory === 'LAB' ? 'LAB' : 'THEORY',
+      metadata: poolPeriod ? { displayAsCategoryOnly: true } : { displayAsCategoryOnly: false },
       facultyTeam: coFacultyIds.map((id) => ({ staffProfileId: id, role: 'CO_FACULTY' })),
     });
   };
+
+  const showPoolPeriodOption = isPoolFyugpCategory(fyugpCategory);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -239,72 +266,97 @@ export function TimetableSlotModal({
               ))}
             </select>
           </label>
-          <div className="flex gap-2 text-xs">
-            <button
-              type="button"
-              className={`rounded-md border px-3 py-1 ${useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
-              onClick={() => setUseSubjectGroup(true)}
-            >
-              Subject group
-            </button>
-            <button
-              type="button"
-              className={`rounded-md border px-3 py-1 ${!useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
-              onClick={() => setUseSubjectGroup(false)}
-            >
-              Single paper
-            </button>
-          </div>
-          {useSubjectGroup ? (
-            <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-              Teaching subject group
-              <select
-                className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
-                value={teachingSubjectGroupId}
-                onChange={(e) => setTeachingSubjectGroupId(e.target.value)}
-                disabled={subjectGroupsQ.isLoading}
-              >
-                <option value="">
-                  {subjectGroupsQ.isLoading
-                    ? 'Loading groups…'
-                    : subjectGroups.length
-                      ? 'Select group (e.g. Major Sociology)'
-                      : 'No groups — create in Subject Groups page'}
-                </option>
-                {subjectGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.code} · {group.title}
-                    {(group.papers?.length ?? 0) > 0 ? ` (${group.papers?.length} papers)` : ''}
-                  </option>
-                ))}
-              </select>
+          {showPoolPeriodOption ? (
+            <label className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={categoryOnlyPeriod}
+                onChange={(event) => {
+                  setCategoryOnlyPeriod(event.target.checked);
+                  if (event.target.checked) {
+                    setTeachingSubjectGroupId('');
+                    setCourseId('');
+                  }
+                }}
+              />
+              <span>
+                <strong>Category period only</strong> — print and department routine show{' '}
+                <strong>{fyugpCategory}</strong> label only (no single paper name). Use this for
+                VTC/MDC pools when students choose different subjects.
+              </span>
             </label>
-          ) : (
-            <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-              University paper
-              <select
-                className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
-                value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
-                disabled={coursesQ.isLoading}
-              >
-                <option value="">
-                  {coursesQ.isLoading
-                    ? 'Loading courses…'
-                    : coursesQ.isError
-                      ? 'Failed to load courses'
-                      : courses.length
-                        ? 'Select course'
-                        : 'No courses found'}
-                </option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.code} · {course.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          ) : null}
+          {!categoryOnlyPeriod ? (
+            <>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  className={`rounded-md border px-3 py-1 ${useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
+                  onClick={() => setUseSubjectGroup(true)}
+                >
+                  Subject group
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-md border px-3 py-1 ${!useSubjectGroup ? 'bg-primary text-primary-foreground' : ''}`}
+                  onClick={() => setUseSubjectGroup(false)}
+                >
+                  Single paper
+                </button>
+              </div>
+              {useSubjectGroup ? (
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                  Teaching subject group
+                  <select
+                    className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+                    value={teachingSubjectGroupId}
+                    onChange={(e) => setTeachingSubjectGroupId(e.target.value)}
+                    disabled={subjectGroupsQ.isLoading}
+                  >
+                    <option value="">
+                      {subjectGroupsQ.isLoading
+                        ? 'Loading groups…'
+                        : subjectGroups.length
+                          ? 'Select group (e.g. Major Sociology)'
+                          : 'No groups — create in Subject Groups page'}
+                    </option>
+                    {subjectGroups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.code} · {group.title}
+                        {(group.papers?.length ?? 0) > 0 ? ` (${group.papers?.length} papers)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                  University paper
+                  <select
+                    className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+                    value={courseId}
+                    onChange={(e) => setCourseId(e.target.value)}
+                    disabled={coursesQ.isLoading}
+                  >
+                    <option value="">
+                      {coursesQ.isLoading
+                        ? 'Loading courses…'
+                        : coursesQ.isError
+                          ? 'Failed to load courses'
+                          : courses.length
+                            ? 'Select course'
+                            : 'No courses found'}
+                    </option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.code} · {course.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </>
+          ) : null}
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
             Primary Faculty (short code on print)
             <select
@@ -331,6 +383,13 @@ export function TimetableSlotModal({
                 </option>
               ))}
             </select>
+            {!selectedStaff && staffProfileId && entry?.staffProfile ? (
+              <p className="text-[11px] leading-5 text-amber-700">
+                Print still shows{' '}
+                <strong>{entry.staffProfile.shortCode ?? entry.staffProfile.fullName}</strong> from
+                an earlier save. Leave faculty blank and click Update Slot to clear it.
+              </p>
+            ) : null}
             {selectedStaff?.assignedShifts?.length ? (
               <ShiftAssignmentBadges
                 className="pt-1"

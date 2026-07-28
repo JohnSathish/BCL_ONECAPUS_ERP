@@ -26,6 +26,7 @@ import {
   openTimetablePrint,
   type TimetablePrintParams,
 } from '@/lib/timetable/open-timetable-print';
+import { timetableEntryDisplay } from '@/lib/timetable/entry-display';
 import { cn } from '@/utils/cn';
 
 const categoryClasses: Record<string, string> = {
@@ -551,11 +552,9 @@ export function TimetableMatrixGrid({
 }
 
 export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
-  const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
+  const display = timetableEntryDisplay(entry);
+  const category = display.category;
   const overlay = entry.replacementOverlay;
-  const group = entry.teachingSubjectGroup;
-  const primaryCode = group?.code ?? entry.course?.code ?? entry.slotType;
-  const primaryTitle = group?.title ?? entry.course?.title ?? 'Manual / library / tutorial slot';
   return (
     <div
       className={cn(
@@ -565,7 +564,7 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold">{primaryTitle}</span>
+        <span className="font-semibold">{display.categoryOnly ? category : display.title}</span>
         <div className="flex items-center gap-1">
           {entry.shiftName ? (
             <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-medium">
@@ -575,9 +574,11 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
           <span className="rounded-full bg-background/70 px-2 py-0.5">{category}</span>
         </div>
       </div>
-      <p className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide opacity-80">
-        {primaryCode}
-      </p>
+      {!display.categoryOnly ? (
+        <p className="mt-1 line-clamp-1 text-[10px] uppercase tracking-wide opacity-80">
+          {display.code}
+        </p>
+      ) : null}
       <p className="mt-2 text-[11px]">
         Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'}
       </p>

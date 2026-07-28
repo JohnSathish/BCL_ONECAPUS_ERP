@@ -60,6 +60,7 @@ export type TimetableEntry = {
   shiftId?: string | null;
   shiftCode?: string | null;
   shiftName?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type TimetableMatrixRow = {
@@ -323,7 +324,7 @@ export type ManualEntryPayload = {
   courseOfferingId?: string;
   courseId?: string;
   teachingSubjectGroupId?: string;
-  staffProfileId?: string;
+  staffProfileId?: string | null;
   classroomId?: string;
   semesterSequence?: number;
   sectionCode?: string;
@@ -332,6 +333,7 @@ export type ManualEntryPayload = {
   combinedGroupKey?: string;
   isCombined?: boolean;
   notes?: string;
+  metadata?: Record<string, unknown>;
   facultyTeam?: Array<{ staffProfileId: string; role?: string; allocationPercent?: number }>;
 };
 

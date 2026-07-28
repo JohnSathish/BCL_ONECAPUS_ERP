@@ -73,7 +73,7 @@ type EntryPayload = {
   courseOfferingId?: string;
   courseId?: string;
   teachingSubjectGroupId?: string;
-  staffProfileId?: string;
+  staffProfileId?: string | null;
   classroomId?: string;
   semesterSequence?: number;
   sectionCode?: string;
@@ -550,13 +550,25 @@ export class TimetableEngineService {
 
   async createManualEntry(user: JwtUser, dto: EntryPayload) {
     const plan = await this.assertEditablePlan(user.tid, dto.planId);
-    const links = await this.subjectGroups.resolveEntryLinks(
-      user.tid,
-      dto.teachingSubjectGroupId,
-      dto.courseId,
-      dto.offeringSectionId,
+    const categoryOnly = dto.metadata?.displayAsCategoryOnly === true;
+    const resolvedStaffProfileId = this.resolveEntryStaffProfileId(
       dto.staffProfileId,
+      null,
     );
+    const links = categoryOnly
+      ? {
+          courseId: null,
+          offeringSectionId: null,
+          teachingSubjectGroupId: null,
+          staffProfileId: resolvedStaffProfileId,
+        }
+      : await this.subjectGroups.resolveEntryLinks(
+          user.tid,
+          dto.teachingSubjectGroupId,
+          dto.courseId,
+          dto.offeringSectionId,
+          resolvedStaffProfileId ?? undefined,
+        );
     const entry = await this.prisma.timetablePlanEntry.create({
       data: {
         tenantId: user.tid,
@@ -567,11 +579,15 @@ export class TimetableEngineService {
         periodNo: dto.periodNo,
         startTime: parseTimeToDate(dto.startTime),
         endTime: parseTimeToDate(dto.endTime),
-        offeringSectionId: links.offeringSectionId ?? undefined,
-        courseOfferingId: dto.courseOfferingId,
-        courseId: links.courseId ?? undefined,
-        teachingSubjectGroupId: links.teachingSubjectGroupId ?? undefined,
-        staffProfileId: links.staffProfileId ?? undefined,
+        offeringSectionId: categoryOnly
+          ? null
+          : (links.offeringSectionId ?? undefined),
+        courseOfferingId: categoryOnly ? null : dto.courseOfferingId,
+        courseId: categoryOnly ? null : (links.courseId ?? undefined),
+        teachingSubjectGroupId: categoryOnly
+          ? null
+          : (links.teachingSubjectGroupId ?? undefined),
+        staffProfileId: resolvedStaffProfileId,
         classroomId: dto.classroomId,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
@@ -618,13 +634,25 @@ export class TimetableEngineService {
     });
     if (!existing) throw new NotFoundException('Timetable entry not found');
     await this.assertEditablePlan(user.tid, existing.planId);
-    const links = await this.subjectGroups.resolveEntryLinks(
-      user.tid,
-      dto.teachingSubjectGroupId ?? existing.teachingSubjectGroupId,
-      dto.courseId ?? existing.courseId,
-      dto.offeringSectionId ?? existing.offeringSectionId,
-      dto.staffProfileId ?? existing.staffProfileId,
+    const resolvedCategoryOnly = dto.metadata?.displayAsCategoryOnly === true;
+    const resolvedStaffProfileId = this.resolveEntryStaffProfileId(
+      dto.staffProfileId,
+      existing.staffProfileId,
     );
+    const links = resolvedCategoryOnly
+      ? {
+          courseId: null,
+          offeringSectionId: null,
+          teachingSubjectGroupId: null,
+          staffProfileId: resolvedStaffProfileId,
+        }
+      : await this.subjectGroups.resolveEntryLinks(
+          user.tid,
+          dto.teachingSubjectGroupId ?? existing.teachingSubjectGroupId,
+          dto.courseId ?? existing.courseId,
+          dto.offeringSectionId ?? existing.offeringSectionId,
+          resolvedStaffProfileId ?? undefined,
+        );
     const updated = await this.prisma.timetablePlanEntry.update({
       where: { id: entryId },
       data: {
@@ -634,11 +662,15 @@ export class TimetableEngineService {
         periodNo: dto.periodNo,
         startTime: dto.startTime ? parseTimeToDate(dto.startTime) : undefined,
         endTime: dto.endTime ? parseTimeToDate(dto.endTime) : undefined,
-        offeringSectionId: links.offeringSectionId ?? undefined,
-        courseOfferingId: dto.courseOfferingId,
-        courseId: links.courseId ?? undefined,
-        teachingSubjectGroupId: links.teachingSubjectGroupId ?? undefined,
-        staffProfileId: links.staffProfileId ?? undefined,
+        offeringSectionId: resolvedCategoryOnly
+          ? null
+          : (links.offeringSectionId ?? undefined),
+        courseOfferingId: resolvedCategoryOnly ? null : dto.courseOfferingId,
+        courseId: resolvedCategoryOnly ? null : (links.courseId ?? undefined),
+        teachingSubjectGroupId: resolvedCategoryOnly
+          ? null
+          : (links.teachingSubjectGroupId ?? undefined),
+        staffProfileId: resolvedStaffProfileId,
         classroomId: dto.classroomId,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
@@ -1787,6 +1819,15 @@ export class TimetableEngineService {
       updated,
     );
     return updated;
+  }
+
+  private resolveEntryStaffProfileId(
+    incoming: string | null | undefined,
+    existing: string | null | undefined,
+  ) {
+    if (incoming === null || incoming === '') return null;
+    if (incoming !== undefined) return incoming;
+    return existing ?? null;
   }
 
   private async assertEditablePlan(tenantId: string, planId: string) {

@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import type { TimetableContext, TimetableMatrix, TimetablePlan } from '@/services/timetable';
 import type { BrandingDocumentContext } from '@/lib/branding-document';
+import { timetableEntryDisplay } from '@/lib/timetable/entry-display';
 
 const LEGEND = [
   { code: 'MAJOR', label: 'Major / Core' },
@@ -196,15 +197,18 @@ function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], da
   return (
     <div>
       {entries.map((entry) => {
-        const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
+        const display = timetableEntryDisplay(entry);
+        const category = display.category;
         const overlay = entry.replacementOverlay;
         return (
           <div key={entry.id} className="timetable-print-slot">
             <div className="timetable-print-slot-head">
-              <span>{entry.course?.code ?? entry.slotType}</span>
+              <span>{display.categoryOnly ? category : display.code}</span>
               <span className="timetable-print-slot-cat">{category}</span>
             </div>
-            <p className="timetable-print-slot-title">{entry.course?.title ?? 'Scheduled slot'}</p>
+            {!display.categoryOnly ? (
+              <p className="timetable-print-slot-title">{display.title}</p>
+            ) : null}
             <p className="timetable-print-slot-meta">
               Sem {entry.semesterSequence ?? '-'}
               {entry.sectionCode ? ` · Sec ${entry.sectionCode}` : ''}
