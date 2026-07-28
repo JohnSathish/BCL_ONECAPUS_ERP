@@ -1,7 +1,8 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { cn } from '@/utils/cn';
 
@@ -28,9 +29,39 @@ type Props = {
   className?: string;
 };
 
+type MenuPosition = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+};
+
+const DROPDOWN_MAX_HEIGHT = 240;
+const VIEWPORT_PADDING = 8;
+
 function optionLabel(member: TimetableFacultyOption) {
   const code = member.shortCode ?? member.employeeCode ?? '';
   return code ? `${code} · ${member.fullName}` : member.fullName;
+}
+
+function computeMenuPosition(anchor: DOMRect): MenuPosition {
+  const gap = 4;
+  const spaceBelow = window.innerHeight - anchor.bottom - VIEWPORT_PADDING;
+  const spaceAbove = anchor.top - VIEWPORT_PADDING;
+  const openUp = spaceBelow < 160 && spaceAbove > spaceBelow;
+  const maxHeight = Math.min(
+    DROPDOWN_MAX_HEIGHT,
+    Math.max(120, openUp ? spaceAbove - gap : spaceBelow - gap),
+  );
+  const width = Math.min(Math.max(anchor.width, 220), window.innerWidth - VIEWPORT_PADDING * 2);
+  const left = Math.min(anchor.left, window.innerWidth - width - VIEWPORT_PADDING);
+
+  return {
+    top: openUp ? anchor.top - gap - maxHeight : anchor.bottom + gap,
+    left: Math.max(VIEWPORT_PADDING, left),
+    width,
+    maxHeight,
+  };
 }
 
 export function TimetableFacultySearchSelect({
@@ -48,8 +79,10 @@ export function TimetableFacultySearchSelect({
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const query = searchQuery ?? localQuery;
 
   const selected = options.find((m) => m.id === value);
@@ -71,15 +104,31 @@ export function TimetableFacultySearchSelect({
     });
   }, [options, query, excludeIds]);
 
+  useLayoutEffect(() => {
+    if (!open || !containerRef.current) return;
+    const update = () => {
+      if (!containerRef.current) return;
+      setMenuPosition(computeMenuPosition(containerRef.current.getBoundingClientRect()));
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, filtered.length, loading]);
+
   useEffect(() => {
+    if (!open) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [open]);
 
   const setQuery = (next: string) => {
     if (onSearchChange) onSearchChange(next);
@@ -91,6 +140,57 @@ export function TimetableFacultySearchSelect({
     setQuery('');
     setOpen(false);
   };
+
+  const menu =
+    open && menuPosition && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[10000] overflow-hidden rounded-md border border-border bg-background text-foreground shadow-xl"
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              width: menuPosition.width,
+              maxHeight: menuPosition.maxHeight,
+            }}
+            role="listbox"
+          >
+            <div className="max-h-full overflow-auto bg-background">
+              {loading ? (
+                <p className="bg-background p-3 text-xs text-muted-foreground">Searching…</p>
+              ) : filtered.length ? (
+                filtered.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    className={cn(
+                      'flex w-full flex-col border-b border-border/50 bg-background px-3 py-2 text-left text-sm last:border-0 hover:bg-muted',
+                      value === member.id && 'bg-primary/10',
+                    )}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onChange(member.id);
+                      setQuery('');
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="font-medium text-foreground">{member.fullName}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {member.shortCode ?? member.employeeCode ?? 'No code'}
+                      {member.assignedShifts?.length
+                        ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
+                        : ''}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="bg-background p-3 text-xs text-muted-foreground">{emptyHint}</p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -132,41 +232,7 @@ export function TimetableFacultySearchSelect({
           </button>
         ) : null}
       </div>
-
-      {open ? (
-        <div className="absolute z-40 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-popover shadow-lg">
-          {loading ? (
-            <p className="p-3 text-xs text-muted-foreground">Searching…</p>
-          ) : filtered.length ? (
-            filtered.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                className={cn(
-                  'flex w-full flex-col border-b border-border/50 px-3 py-2 text-left text-sm last:border-0 hover:bg-muted/60',
-                  value === member.id && 'bg-primary/5',
-                )}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onChange(member.id);
-                  setQuery('');
-                  setOpen(false);
-                }}
-              >
-                <span className="font-medium">{member.fullName}</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {member.shortCode ?? member.employeeCode ?? 'No code'}
-                  {member.assignedShifts?.length
-                    ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
-                    : ''}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="p-3 text-xs text-muted-foreground">{emptyHint}</p>
-          )}
-        </div>
-      ) : null}
+      {menu}
     </div>
   );
 }
