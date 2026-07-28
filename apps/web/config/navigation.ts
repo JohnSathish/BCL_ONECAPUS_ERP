@@ -674,7 +674,7 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'academics',
         permissions: [...P.academics],
         activePattern:
-          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar)(?:/.*)?$',
+          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar|academics/shift-faculty)(?:/.*)?$',
         children: [
           { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
           {
@@ -716,6 +716,11 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Shift Management',
             href: '/admin/shifts',
             permissions: [...P.shifts, ...P.academics],
+          },
+          {
+            label: 'Shift Faculty',
+            href: '/admin/academics/shift-faculty',
+            permissions: ['shift:read', ...P.shifts, ...P.academics],
           },
         ],
       },
@@ -963,14 +968,6 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'lms',
         permissions: ['lms:lesson-plans:manage', 'lms:read'],
         activePattern: '^/admin/academics/lms/lesson-plans(?:/.*)?$',
-      },
-      {
-        label: 'Faculty',
-        icon: Users,
-        href: '/admin/academics/shift-faculty',
-        module: 'shifts',
-        permissions: ['shift:read'],
-        activePattern: '^/admin/academics/shift-faculty(?:/.*)?$',
       },
       {
         label: 'Shift Reports',
