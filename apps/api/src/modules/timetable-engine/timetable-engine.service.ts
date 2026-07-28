@@ -1298,9 +1298,9 @@ export class TimetableEngineService {
     });
     if (!student) return { entries: [] };
 
+    // v3 key busts stale empty payloads cached before semester/course matching fix.
     const dateKey = new Date().toISOString().slice(0, 10);
-    const cacheKey = `timetable:student:${student.id}:week:${dateKey}`;
-    // Short TTL — publish/manual edits must reach students quickly.
+    const cacheKey = `timetable:student:v3:${student.id}:week:${dateKey}`;
     return this.cache.wrap(cacheKey, 60, () =>
       this.computeStudentWeek(user, student, filters),
     );
@@ -1316,14 +1316,18 @@ export class TimetableEngineService {
       select: {
         id: true,
         primaryShiftId: true,
-        departmentId: true,
         academicStanding: {
           select: { currentSemesterSequence: true },
         },
         semesterRegistrations: {
-          include: {
+          select: {
+            semesterSequence: true,
+            status: true,
+            createdAt: true,
             lines: {
-              include: {
+              select: {
+                offeringId: true,
+                offeringSectionId: true,
                 offering: { select: { id: true, courseId: true } },
               },
             },
@@ -1341,19 +1345,77 @@ export class TimetableEngineService {
     if (!plan) return { entries: [] };
 
     const registrations = fullStudent?.semesterRegistrations ?? [];
-    // Prefer newest registration that actually has lines; fall back to latest.
     const activeRegistration =
       registrations.find((reg) => (reg.lines?.length ?? 0) > 0) ??
       registrations[0];
     const lines = activeRegistration?.lines ?? [];
-    const studentSemester =
-      activeRegistration?.semesterSequence ??
-      fullStudent?.academicStanding?.currentSemesterSequence ??
-      null;
+    const standingSemester =
+      fullStudent?.academicStanding?.currentSemesterSequence ?? null;
+    const registrationSemester = activeRegistration?.semesterSequence ?? null;
 
-    const offeringIds = [
-      ...new Set(lines.map((line) => line.offeringId).filter(Boolean)),
-    ] as string[];
+    // Load the full published class routine for this plan, with display relations.
+    const planEntries = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId: user.tid,
+        planId: plan.id,
+        deletedAt: null,
+      },
+      include: {
+        teachingSubjectGroup: {
+          select: { id: true, code: true, title: true, fyugpCategory: true },
+        },
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    });
+
+    if (!planEntries.length) {
+      return {
+        plan,
+        entries: [],
+        meta: {
+          matchedBy: 'none',
+          reason: 'Published plan has no timetable entries.',
+        },
+      };
+    }
+
+    const semestersOnPlan = [
+      ...new Set(
+        planEntries
+          .map((e) => e.semesterSequence)
+          .filter((s): s is number => s != null),
+      ),
+    ].sort((a, b) => a - b);
+
+    // Prefer student's semester when that semester exists on the plan.
+    // Otherwise fall back to the plan's sole/dominant semester (fixes standing still at Sem 1).
+    let targetSemester: number | null = null;
+    if (
+      registrationSemester != null &&
+      semestersOnPlan.includes(registrationSemester)
+    ) {
+      targetSemester = registrationSemester;
+    } else if (
+      standingSemester != null &&
+      semestersOnPlan.includes(standingSemester)
+    ) {
+      targetSemester = standingSemester;
+    } else if (semestersOnPlan.length === 1) {
+      targetSemester = semestersOnPlan[0]!;
+    } else if (semestersOnPlan.length > 1) {
+      // Odd/even stream plans may contain multiple semesters — pick the densest.
+      const counts = new Map<number, number>();
+      for (const entry of planEntries) {
+        if (entry.semesterSequence == null) continue;
+        counts.set(
+          entry.semesterSequence,
+          (counts.get(entry.semesterSequence) ?? 0) + 1,
+        );
+      }
+      targetSemester =
+        [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    }
+
     const courseIds = [
       ...new Set(
         lines
@@ -1361,27 +1423,16 @@ export class TimetableEngineService {
           .filter((id): id is string => Boolean(id)),
       ),
     ];
-
-    const sectionByOffering = new Map<string, Set<string | null>>();
-    for (const line of lines) {
-      if (!line.offeringId) continue;
-      if (!sectionByOffering.has(line.offeringId)) {
-        sectionByOffering.set(line.offeringId, new Set());
-      }
-      sectionByOffering
-        .get(line.offeringId)!
-        .add(line.offeringSectionId ?? null);
-    }
+    const offeringIds = [
+      ...new Set(lines.map((line) => line.offeringId).filter(Boolean)),
+    ] as string[];
 
     let groupIds: string[] = [];
     if (courseIds.length) {
       const papers = await (
         this.prisma as any
       ).teachingSubjectGroupPaper.findMany({
-        where: {
-          tenantId: user.tid,
-          courseId: { in: courseIds },
-        },
+        where: { tenantId: user.tid, courseId: { in: courseIds } },
         select: { teachingSubjectGroupId: true },
       });
       groupIds = [
@@ -1396,98 +1447,86 @@ export class TimetableEngineService {
       ] as string[];
     }
 
-    const orFilters: Record<string, unknown>[] = [];
-    if (offeringIds.length) {
-      orFilters.push({ courseOfferingId: { in: offeringIds } });
-    }
-    if (courseIds.length) {
-      orFilters.push({ courseId: { in: courseIds } });
-    }
-    if (groupIds.length) {
-      orFilters.push({ teachingSubjectGroupId: { in: groupIds } });
-    }
-    if (studentSemester != null) {
-      // Stream class routine: show the semester's published slots on this plan.
-      // (Manual entries often lack courseOfferingId, so offering-only match was empty.)
-      orFilters.push({ semesterSequence: studentSemester });
-    }
-
-    if (!orFilters.length) {
-      return {
-        plan,
-        entries: [],
-        meta: {
-          matchedBy: 'none',
-          reason: 'Student has no semester registration subjects to match.',
-          registrationSemester: studentSemester,
-          offeringCount: 0,
-          courseCount: 0,
-        },
-      };
+    const courseById = new Map<string, { code: string; title: string }>();
+    const courseIdsOnEntries = [
+      ...new Set(
+        planEntries
+          .map((e) => e.courseId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (courseIdsOnEntries.length) {
+      const courses = await this.prisma.course.findMany({
+        where: { tenantId: user.tid, id: { in: courseIdsOnEntries } },
+        select: { id: true, code: true, title: true },
+      });
+      for (const c of courses) courseById.set(c.id, c);
     }
 
-    // Manual slots often store courseId / subject-group without courseOfferingId.
-    const allEntries = await this.prisma.timetablePlanEntry.findMany({
-      where: {
-        tenantId: user.tid,
-        planId: plan.id,
-        deletedAt: null,
-        OR: orFilters as any,
-      },
-      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
-    });
+    const staffById = new Map<
+      string,
+      { fullName: string; shortCode: string | null }
+    >();
+    const staffIds = [
+      ...new Set(
+        planEntries
+          .map((e) => e.staffProfileId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (staffIds.length) {
+      const staff = await this.prisma.staffProfile.findMany({
+        where: { tenantId: user.tid, id: { in: staffIds } },
+        select: { id: true, fullName: true, shortCode: true },
+      });
+      for (const s of staff) staffById.set(s.id, s);
+    }
 
-    const entries = allEntries.filter((entry) => {
-      if (
-        studentSemester != null &&
-        entry.semesterSequence != null &&
-        entry.semesterSequence !== studentSemester
-      ) {
-        return false;
-      }
-
-      // Prefer section-aware match when offering is linked
-      if (
-        entry.courseOfferingId &&
-        sectionByOffering.has(entry.courseOfferingId)
-      ) {
-        const enrolledSections = sectionByOffering.get(entry.courseOfferingId)!;
-        if (entry.offeringSectionId == null) return true;
-        if (enrolledSections.has(null)) return true;
-        if (enrolledSections.has(entry.offeringSectionId)) return true;
-      }
-
-      if (entry.courseId && courseIds.includes(entry.courseId)) return true;
-      if (
-        entry.teachingSubjectGroupId &&
-        groupIds.includes(entry.teachingSubjectGroupId)
-      ) {
-        return true;
-      }
-
-      // Stream plan + same semester → show class routine slots
-      if (
-        studentSemester != null &&
-        entry.semesterSequence === studentSemester
-      ) {
-        return true;
-      }
-
-      return false;
+    const entries = planEntries.filter((entry) => {
+      if (targetSemester == null) return true;
+      if (entry.semesterSequence == null) return true;
+      return entry.semesterSequence === targetSemester;
     });
 
     return {
       plan,
-      entries: entries.map((entry) => ({
-        ...entry,
-        startTime: formatShiftTime(entry.startTime),
-        endTime: formatShiftTime(entry.endTime),
-      })),
+      entries: entries.map((entry) => {
+        const course = entry.courseId ? courseById.get(entry.courseId) : null;
+        const staff = entry.staffProfileId
+          ? staffById.get(entry.staffProfileId)
+          : null;
+        return {
+          ...entry,
+          startTime: formatShiftTime(entry.startTime),
+          endTime: formatShiftTime(entry.endTime),
+          course: course
+            ? { id: entry.courseId, code: course.code, title: course.title }
+            : entry.teachingSubjectGroup
+              ? {
+                  id: entry.teachingSubjectGroup.id,
+                  code: entry.teachingSubjectGroup.code,
+                  title: entry.teachingSubjectGroup.title,
+                }
+              : null,
+          staffProfile: staff
+            ? {
+                id: entry.staffProfileId,
+                fullName: staff.fullName,
+                shortCode: staff.shortCode,
+              }
+            : null,
+        };
+      }),
       meta: {
-        matchedBy: 'offering_course_group_or_semester',
-        registrationSemester: studentSemester,
+        matchedBy: 'published_plan_semester',
+        targetSemester,
+        registrationSemester,
+        standingSemester,
+        semestersOnPlan,
         offeringCount: offeringIds.length,
         courseCount: courseIds.length,
+        groupCount: groupIds.length,
+        entryCount: entries.length,
       },
     };
   }
