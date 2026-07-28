@@ -168,29 +168,39 @@ export class MoodleUserSyncService {
     );
     if (byUsername) return byUsername;
 
-    const created = await this.api.call<
-      Array<{ id: number; username: string }>
-    >({
-      tenantId,
-      wsfunction: 'core_user_create_users',
-      params: {
-        users: [
-          {
-            username: input.username,
-            password: this.tempPassword(),
-            firstname: input.firstname,
-            lastname: input.lastname,
-            email: input.email,
-            idnumber: input.idnumber,
-            auth: 'manual',
-          },
-        ],
-      },
-    });
+    try {
+      const created = await this.api.call<
+        Array<{ id: number; username: string }>
+      >({
+        tenantId,
+        wsfunction: 'core_user_create_users',
+        params: {
+          users: [
+            {
+              username: input.username,
+              // Let Moodle generate a policy-compliant password (SSO users won't need it).
+              createpassword: 1,
+              firstname: input.firstname,
+              lastname: input.lastname,
+              email: input.email,
+              idnumber: input.idnumber,
+              auth: 'manual',
+            },
+          ],
+        },
+      });
 
-    const moodleUserId = created?.[0]?.id;
-    if (!moodleUserId) throw new Error('Moodle user create returned no id');
-    return moodleUserId;
+      const moodleUserId = created?.[0]?.id;
+      if (!moodleUserId) throw new Error('Moodle user create returned no id');
+      return moodleUserId;
+    } catch (err) {
+      // Common race/duplicate: email or username already exists in Moodle.
+      const again =
+        (await this.findMoodleUserId(tenantId, 'email', input.email)) ||
+        (await this.findMoodleUserId(tenantId, 'username', input.username));
+      if (again) return again;
+      throw err;
+    }
   }
 
   private async findMoodleUserId(
@@ -262,11 +272,5 @@ export class MoodleUserSyncService {
       .slice(0, 90);
     if (out && /^[0-9]/.test(out)) out = `u_${out}`;
     return out;
-  }
-
-  /** Meets typical Moodle password policy: upper/lower/digit/symbol + length. */
-  private tempPassword() {
-    const rand = randomBytes(6).toString('base64url');
-    return `Erp!${rand}A9_${Date.now().toString().slice(-6)}`;
   }
 }
