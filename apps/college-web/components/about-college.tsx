@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Reveal } from '@/components/ui/reveal';
 import type { AboutCollegeContent, AboutStat } from '@/lib/about-college';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 type Props = {
   about: AboutCollegeContent;
@@ -127,7 +128,7 @@ function AboutDescription({ text }: { text: string }) {
   );
 }
 
-function YearsExperienceSeal({ years = 39 }: { years?: number }) {
+function YearsExperienceSeal({ years }: { years: number }) {
   const ringText = 'YEARS OF EXPERIENCE • YEARS OF EXPERIENCE • ';
   return (
     <div className="about-experience-seal" aria-label={`${years}+ years of experience`}>
@@ -162,8 +163,9 @@ function YearsExperienceSeal({ years = 39 }: { years?: number }) {
 
 export function AboutCollegeSection({ about }: Props) {
   const { ref, visible } = useInViewOnce();
-  const founded = about.stats.find((stat) => stat.id === 'founded')?.value ?? 1987;
-  const years = Math.max(1, new Date().getFullYear() - founded);
+  const founded =
+    about.stats.find((stat) => stat.id === 'founded')?.value ?? COMPANY_INFO.establishedYear;
+  const years = Math.max(0, new Date().getFullYear() - founded);
 
   return (
     <Reveal>

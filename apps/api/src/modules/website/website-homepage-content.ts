@@ -3,6 +3,10 @@
  * college-web merges this with section layout; seeds are offline fallback only.
  */
 
+const COLLEGE_ESTABLISHED_YEAR = 1987;
+const yearsOfExcellenceLabel = () =>
+  `${Math.max(0, new Date().getFullYear() - COLLEGE_ESTABLISHED_YEAR)}+`;
+
 export type HomepagePrincipalContent = {
   name: string;
   role: string;
@@ -243,7 +247,11 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     readMoreHref: '/about/history',
     tourHref: '/about/history',
     stats: [
-      { id: 'founded', label: 'Year Established', value: 1987 },
+      {
+        id: 'founded',
+        label: 'Year Established',
+        value: COLLEGE_ESTABLISHED_YEAR,
+      },
       { id: 'programmes', label: 'Programmes Offered', value: 15, suffix: '+' },
       { id: 'students', label: 'Students', value: 3100, suffix: '+' },
       { id: 'faculty', label: 'Faculty Members', value: 140, suffix: '+' },
@@ -290,7 +298,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
     { value: '3100+', label: 'Students' },
     { value: '140+', label: 'Faculty members' },
     { value: '35+', label: 'Departments' },
-    { value: '39+', label: 'Years of excellence' },
+    { value: yearsOfExcellenceLabel(), label: 'Years of excellence' },
   ],
   whyChooseUs: {
     eyebrow: 'Why choose us',

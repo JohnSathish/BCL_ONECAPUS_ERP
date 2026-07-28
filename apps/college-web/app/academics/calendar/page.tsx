@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { WorkingCalendar } from '@/components/working-calendar';
 import { getPublicAcademicPlanner } from '@/lib/academic-planner';
-import './academic-calendar.css';
 
 export const metadata: Metadata = {
   title: 'Academic Calendar',
@@ -42,75 +42,14 @@ export default async function AcademicCalendarPage({ searchParams }: Props) {
       </header>
 
       <section className="section shell">
-        {!planner || !months.length ? (
+        {!planner || !months.length || !active ? (
           <p className="text-muted">
             No published year planner yet. In the ERP Website CMS, open{' '}
             <strong>Year Planner</strong>, create an academic year, generate months, enter events,
             then Publish.
           </p>
         ) : (
-          <>
-            <nav className="ac-month-nav" aria-label="Calendar months">
-              {months.map((month) => (
-                <Link
-                  key={month.key}
-                  href={`/academics/calendar?month=${month.key}`}
-                  className={month.key === active?.key ? 'is-active' : undefined}
-                >
-                  {month.title}
-                </Link>
-              ))}
-            </nav>
-
-            {active ? (
-              <article className="ac-month-card">
-                <header className="ac-month-head">
-                  <h2>{active.title}</h2>
-                  <p>Working Days: {active.workingDays}</p>
-                </header>
-                <div className="ac-table-wrap">
-                  <table className="ac-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Day</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Events / notes</th>
-                        <th scope="col">WD</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {active.days.map((day) => (
-                        <tr
-                          key={day.id}
-                          className={
-                            day.isHighlighted || day.dayOfWeek === 'SUN'
-                              ? 'is-highlight'
-                              : undefined
-                          }
-                        >
-                          <td>{day.dayOfMonth}</td>
-                          <td>{day.dayOfWeek}</td>
-                          <td>{day.statusLabel || (day.dayOfWeek === 'SUN' ? '' : '—')}</td>
-                          <td className="ac-events">
-                            {day.description
-                              ? day.description.split('\n').map((line, index) => (
-                                  <span key={`${day.id}-${index}`}>
-                                    {line}
-                                    {index < day.description.split('\n').length - 1 ? <br /> : null}
-                                  </span>
-                                ))
-                              : null}
-                          </td>
-                          <td>{day.isWorkingDay ? '✓' : ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-            ) : null}
-          </>
+          <WorkingCalendar months={months} active={active} />
         )}
       </section>
     </main>

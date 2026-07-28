@@ -6,6 +6,7 @@ import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/er
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WorkingCalendarEditor } from '@/components/website-cms/working-calendar/working-calendar-editor';
 import {
   createAcademicPlannerYear,
   ensureAcademicPlannerAllMonths,
@@ -22,44 +23,6 @@ import { apiErrorMessage } from '@/utils/api-error';
 
 type Props = { onMessage: (message: string) => void };
 
-/** Fixed handbook day statuses — dropdown avoids free-text spelling drift. */
-const PLANNER_STATUS_OPTIONS = [
-  '',
-  'Class',
-  'Holiday',
-  'National Holiday',
-  'State Holiday',
-  'College Holiday',
-  'Restricted Holiday',
-  'Holiday Class',
-  'Compensatory',
-  'Makeup Class',
-  'Break',
-  'Teaching Break',
-  'Exam',
-  'Internal Assessment',
-  'Orientation',
-  'Bridge Course',
-  'Result',
-  'Admission',
-  'Institutional Event',
-  'Staff Event',
-  'Working',
-  'Non-working',
-  'Weekend',
-] as const;
-
-const selectClass =
-  'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
-
-function statusOptionsForDay(current: string) {
-  const trimmed = current.trim();
-  if (trimmed && !(PLANNER_STATUS_OPTIONS as readonly string[]).includes(trimmed)) {
-    return [...PLANNER_STATUS_OPTIONS, trimmed];
-  }
-  return [...PLANNER_STATUS_OPTIONS];
-}
-
 function monthOptionsFromRange(startDate: string, endDate: string) {
   const start = new Date(`${startDate}T00:00:00Z`);
   const end = new Date(`${endDate}T00:00:00Z`);
@@ -75,7 +38,7 @@ function monthOptionsFromRange(startDate: string, endDate: string) {
       year: 'numeric',
       timeZone: 'UTC',
     });
-    options.push({ key, label: label.toUpperCase(), year, month });
+    options.push({ key, label, year, month });
     cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
   return options;
@@ -225,7 +188,6 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not trash planner year')),
   });
 
-  const workingDays = draftDays.filter((day) => day.isWorkingDay).length;
   const monthTitle =
     detail.data?.selectedMonth?.title ??
     monthChoices.find((item) => item.key === monthKey)?.label ??
@@ -244,7 +206,7 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
       <CompactCard>
         <CompactCardHeader
           title="Handbook Year Planner"
-          description="Month-by-month academic calendar (Date · Day · Class · Events · Working days) for the public /academics/calendar page."
+          description="Modern working-days calendar for the public /academics/calendar page. Edit day status and events, then publish."
         />
         <CompactCardBody className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
           <Input
@@ -268,7 +230,7 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
       </CompactCard>
 
       <CompactCard>
-        <CompactCardHeader title="Select year & month" />
+        <CompactCardHeader title="Select year" />
         <CompactCardBody className="flex flex-wrap items-center gap-2">
           <select
             className="rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -282,19 +244,6 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
             {(years.data ?? []).map((row) => (
               <option key={row.id} value={row.id}>
                 {row.title} · {row.status}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={monthKey}
-            disabled={!yearId}
-            onChange={(event) => setMonthKey(event.target.value)}
-          >
-            <option value="">Select month</option>
-            {monthChoices.map((item) => (
-              <option key={item.key} value={item.key}>
-                {item.label}
               </option>
             ))}
           </select>
@@ -337,131 +286,16 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
       </CompactCard>
 
       {yearId && monthKey ? (
-        <CompactCard>
-          <CompactCardHeader
-            title={monthTitle}
-            description={`Working days: ${workingDays}. Edit status and events, then save the month.`}
-          />
-          <CompactCardBody className="space-y-3">
-            <div className="flex justify-end px-1">
-              <Button
-                disabled={saveMonth.isPending || !draftDays.length}
-                onClick={() => saveMonth.mutate()}
-              >
-                Save month
-              </Button>
-            </div>
-            <div className="overflow-x-auto">
-              {!draftDays.length ? (
-                <p className="p-4 text-sm text-muted-foreground">
-                  No day rows yet. Click <strong>Generate / fill month days</strong> to create the
-                  handbook table for this month.
-                </p>
-              ) : (
-                <table className="w-full min-w-[720px] border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-700 text-left text-white">
-                      <th className="px-3 py-2 font-semibold" colSpan={3}>
-                        {monthTitle}
-                      </th>
-                      <th className="px-3 py-2 text-right font-semibold" colSpan={2}>
-                        Working Days: {workingDays}
-                      </th>
-                    </tr>
-                    <tr className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                      <th className="px-2 py-2 w-14">Date</th>
-                      <th className="px-2 py-2 w-14">Day</th>
-                      <th className="px-2 py-2 w-36">Status</th>
-                      <th className="px-2 py-2">Events / notes</th>
-                      <th className="px-2 py-2 w-28">Working</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {draftDays.map((day, index) => (
-                      <tr
-                        key={day.id}
-                        className={
-                          day.isHighlighted || day.dayOfWeek === 'SUN'
-                            ? 'bg-muted/60'
-                            : 'bg-background'
-                        }
-                      >
-                        <td className="border-t px-2 py-1 align-top font-medium">
-                          {day.dayOfMonth}
-                        </td>
-                        <td className="border-t px-2 py-1 align-top text-muted-foreground">
-                          {day.dayOfWeek}
-                        </td>
-                        <td className="border-t px-2 py-1 align-top">
-                          <select
-                            value={day.statusLabel}
-                            onChange={(event) => {
-                              const statusLabel = event.target.value;
-                              const isHolidayLike =
-                                /holiday|break|weekend|non-working/i.test(statusLabel) &&
-                                !/holiday class|compensatory|makeup/i.test(statusLabel);
-                              patchDay(index, {
-                                statusLabel,
-                                ...(statusLabel === ''
-                                  ? {
-                                      isWorkingDay: false,
-                                      isHighlighted: true,
-                                    }
-                                  : isHolidayLike
-                                    ? {
-                                        isWorkingDay: false,
-                                        isHighlighted: true,
-                                      }
-                                    : {
-                                        isWorkingDay: true,
-                                        isHighlighted: day.dayOfWeek === 'SUN',
-                                      }),
-                              });
-                            }}
-                            className={selectClass}
-                            aria-label={`Status for ${day.date}`}
-                          >
-                            {statusOptionsForDay(day.statusLabel).map((option) => (
-                              <option key={option || '__empty'} value={option}>
-                                {option || (day.dayOfWeek === 'SUN' ? '— (Sunday)' : '—')}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="border-t px-2 py-1 align-top">
-                          <textarea
-                            value={day.description}
-                            onChange={(event) =>
-                              patchDay(index, { description: event.target.value })
-                            }
-                            rows={2}
-                            className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-                            placeholder="Seminars, meetings, observances…"
-                          />
-                        </td>
-                        <td className="border-t px-2 py-1 align-top">
-                          <label className="flex items-center gap-2 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={day.isWorkingDay}
-                              onChange={(event) =>
-                                patchDay(index, {
-                                  isWorkingDay: event.target.checked,
-                                  isHighlighted: !event.target.checked || day.dayOfWeek === 'SUN',
-                                })
-                              }
-                            />
-                            Count
-                          </label>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </CompactCardBody>
-        </CompactCard>
+        <WorkingCalendarEditor
+          monthChoices={monthChoices}
+          monthKey={monthKey}
+          monthTitle={monthTitle}
+          draftDays={draftDays}
+          saving={saveMonth.isPending}
+          onSelectMonth={setMonthKey}
+          onPatchDay={patchDay}
+          onSave={() => saveMonth.mutate()}
+        />
       ) : null}
     </div>
   );

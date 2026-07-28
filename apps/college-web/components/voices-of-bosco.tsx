@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { initialsFromName, testimonialRoleLine, type Testimonial } from '@/lib/testimonials';
+import { yearsOfExperienceLabel } from '@/lib/company-info';
 
 const PREVIEW_CHARS = 160;
 
@@ -192,7 +193,7 @@ export function VoicesOfBosco({ items }: Props) {
         <li>
           <Trophy aria-hidden />
           <div>
-            <strong>38+</strong>
+            <strong>{yearsOfExperienceLabel()}</strong>
             <span>Years of excellence</span>
           </div>
         </li>

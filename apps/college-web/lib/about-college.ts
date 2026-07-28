@@ -1,3 +1,5 @@
+import { COMPANY_INFO } from '@/lib/company-info';
+
 export type AboutStat = {
   id: string;
   label: string;
@@ -36,7 +38,7 @@ export const seedAboutCollege: AboutCollegeContent = {
   readMoreHref: '/about/history',
   tourHref: '/about/history',
   stats: [
-    { id: 'founded', label: 'Year Established', value: 1987 },
+    { id: 'founded', label: 'Year Established', value: COMPANY_INFO.establishedYear },
     { id: 'programmes', label: 'Programmes Offered', value: 15, suffix: '+' },
     { id: 'students', label: 'Students', value: 3100, suffix: '+' },
     { id: 'faculty', label: 'Faculty Members', value: 140, suffix: '+' },
