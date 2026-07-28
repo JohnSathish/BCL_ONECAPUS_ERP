@@ -178,6 +178,17 @@ export default function AcademicCalendarAdminPage() {
   return (
     <DashboardShell role="admin" title="Academic Calendar">
       <div className="space-y-6">
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-semibold">Single source of truth for calendar data</p>
+          <p className="mt-1 text-muted-foreground">
+            Publish this calendar once — it drives the public{' '}
+            <Link className="underline underline-offset-2" href="/academics/calendar">
+              Academic Calendar
+            </Link>{' '}
+            page, homepage Upcoming Events (when events use Publish to website), Attendance, and
+            Timetable. Do not re-enter the same dates in Website CMS handbook tools.
+          </p>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Foundation calendar</CardTitle>

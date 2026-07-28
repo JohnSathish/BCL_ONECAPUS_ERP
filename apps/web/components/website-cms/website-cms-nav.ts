@@ -32,6 +32,8 @@ export type WebsiteCmsNavItem = {
   icon: LucideIcon;
   group: 'root' | 'content' | 'academic' | 'media' | 'appearance' | 'system';
   comingSoon?: boolean;
+  /** Shown when the screen is a legacy fallback, not the primary data source. */
+  legacy?: boolean;
 };
 
 export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
@@ -109,17 +111,19 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
   },
   {
     id: 'calendar',
-    label: 'Upcoming Events',
+    label: 'Event list (fallback)',
     href: '/admin/website/calendar',
     icon: CalendarDays,
     group: 'academic',
+    legacy: true,
   },
   {
     id: 'year-planner',
-    label: 'Year Planner',
+    label: 'Handbook planner (legacy)',
     href: '/admin/website/year-planner',
     icon: CalendarDays,
     group: 'academic',
+    legacy: true,
   },
   {
     id: 'media',

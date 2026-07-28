@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { AcademicCalendarSourceNotice } from '@/components/website-cms/academic-calendar-source-notice';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -110,8 +111,8 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
     onSuccess: async (row) => {
       onMessage(
         row.status === 'PUBLISHED'
-          ? 'Year planner published to the public Academic Calendar page.'
-          : 'Year planner set back to draft.',
+          ? 'Legacy handbook planner published (used only when no ERP Academic Calendar is published).'
+          : 'Legacy handbook planner set back to draft.',
       );
       void queryClient.invalidateQueries({ queryKey: ['website', 'academic-planner'] });
       await revalidateWebsite(['/academics/calendar']).catch(() => undefined);
@@ -203,10 +204,11 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
 
   return (
     <div className="space-y-4">
+      <AcademicCalendarSourceNotice variant="legacy-planner" />
       <CompactCard>
         <CompactCardHeader
-          title="Handbook Year Planner"
-          description="Modern working-days calendar for the public /academics/calendar page. Edit day status and events, then publish."
+          title="Handbook planner (legacy fallback)"
+          description="CMS-only handbook editor. The public site prefers the published ERP Academic Calendar; use this only when ERP is not published yet."
         />
         <CompactCardBody className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
           <Input

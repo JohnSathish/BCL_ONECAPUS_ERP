@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { AnnouncementsView } from '@/components/website-cms/announcements-view';
+import { AcademicCalendarSourceNotice } from '@/components/website-cms/academic-calendar-source-notice';
 import { AcademicYearPlannerView } from '@/components/website-cms/academic-year-planner-view';
 import { RichTextEditor } from '@/components/communication/compose/rich-text-editor';
 import { CompactCard, CompactCardBody, CompactCardHeader } from '@/components/erp/compact-card';
@@ -183,6 +184,14 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
                         {item.comingSoon ? (
                           <Badge variant="secondary" className="ml-auto text-[10px]">
                             Soon
+                          </Badge>
+                        ) : null}
+                        {!item.comingSoon && item.legacy ? (
+                          <Badge
+                            variant="outline"
+                            className="ml-auto border-amber-500/50 text-[10px] text-amber-800 dark:text-amber-200"
+                          >
+                            Legacy
                           </Badge>
                         ) : null}
                       </Link>
@@ -2125,13 +2134,14 @@ function CalendarVisibilityView({ onMessage }: { onMessage: (message: string) =>
   const rows = items.data;
   return (
     <div className="space-y-4">
+      <AcademicCalendarSourceNotice variant="legacy-events" />
       <CompactCard>
         <CompactCardHeader
-          title="Academic Calendar → Website"
+          title="Manual event list (fallback)"
           description={
             editingKey
-              ? 'Editing an existing event. Save changes or cancel to add a new one.'
-              : 'Homepage Upcoming Events only (short list). For the full handbook year planner, use Year Planner.'
+              ? 'Editing an existing fallback event. Save changes or cancel to add a new one.'
+              : 'Used only when ERP Academic Calendar events are unavailable. Prefer Academics → Academic Calendar.'
           }
         />
         <CompactCardBody className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">

@@ -36,7 +36,7 @@ export default async function AcademicCalendarPage({ searchParams }: Props) {
           <p>
             {planner
               ? `${planner.startDate} to ${planner.endDate} · month-by-month class days, events and working-day totals.`
-              : 'The handbook calendar will appear here once it is published from the Website CMS Year Planner.'}
+              : 'The academic calendar will appear here once an ERP Academic Calendar is published for this academic year.'}
           </p>
         </div>
       </header>
@@ -44,9 +44,9 @@ export default async function AcademicCalendarPage({ searchParams }: Props) {
       <section className="section shell">
         {!planner || !months.length || !active ? (
           <p className="text-muted">
-            No published year planner yet. In the ERP Website CMS, open{' '}
-            <strong>Year Planner</strong>, create an academic year, generate months, enter events,
-            then Publish.
+            No published academic calendar yet. In the ERP, open{' '}
+            <strong>Academics → Academic Calendar</strong>, add events for the academic year, then
+            click <strong>Publish</strong> on the calendar.
           </p>
         ) : (
           <WorkingCalendar months={months} active={active} />
