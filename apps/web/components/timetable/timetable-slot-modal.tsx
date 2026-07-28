@@ -1,15 +1,18 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
-import { fetchAllStaff } from '@/services/staff';
+import { fetchStaff } from '@/services/staff';
 import { fetchFacultyShiftAssignments } from '@/services/faculty-shifts';
 import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-badges';
+import { TimetableFacultySearchSelect } from '@/components/timetable/timetable-faculty-search-select';
 import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
 import { isPoolFyugpCategory } from '@/lib/timetable/entry-display';
 import type { ManualEntryPayload, TimetableEntry } from '@/services/timetable';
@@ -68,7 +71,23 @@ export function TimetableSlotModal({
   const [categoryOnlyPeriod, setCategoryOnlyPeriod] = useState(false);
   const [coFacultyIds, setCoFacultyIds] = useState<string[]>([]);
   const [coFacultyPick, setCoFacultyPick] = useState('');
+  const [facultySearch, setFacultySearch] = useState('');
+  const [coFacultySearch, setCoFacultySearch] = useState('');
+  const [pickedStaffCache, setPickedStaffCache] = useState<
+    Record<
+      string,
+      {
+        id: string;
+        fullName: string;
+        shortCode?: string | null;
+        employeeCode?: string | null;
+        assignedShifts?: Array<{ id: string; code: string; name: string; isPrimary: boolean }>;
+      }
+    >
+  >({});
   const authReady = useAuthQueryEnabled();
+  const debouncedFacultySearch = useDebouncedValue(facultySearch, 250);
+  const debouncedCoFacultySearch = useDebouncedValue(coFacultySearch, 250);
 
   const coursesQ = useQuery({
     queryKey: ['timetable', 'courses'],
@@ -76,12 +95,37 @@ export function TimetableSlotModal({
     enabled: authReady && open,
   });
   const staffQ = useQuery({
-    queryKey: ['timetable', 'staff', context?.shiftId],
+    queryKey: ['timetable', 'staff', context?.shiftId, debouncedFacultySearch],
     queryFn: async () => {
       if (context?.shiftId) {
-        return fetchFacultyShiftAssignments(context.shiftId, { limit: 200 });
+        return fetchFacultyShiftAssignments(context.shiftId, {
+          limit: 200,
+          search: debouncedFacultySearch.trim() || undefined,
+        });
       }
-      const result = await fetchAllStaff({ activeTeachingOnly: true });
+      const result = await fetchStaff({
+        activeTeachingOnly: true,
+        limit: 100,
+        search: debouncedFacultySearch.trim() || undefined,
+      });
+      return result.data;
+    },
+    enabled: authReady && open,
+  });
+  const coStaffQ = useQuery({
+    queryKey: ['timetable', 'staff', 'co', context?.shiftId, debouncedCoFacultySearch],
+    queryFn: async () => {
+      if (context?.shiftId) {
+        return fetchFacultyShiftAssignments(context.shiftId, {
+          limit: 200,
+          search: debouncedCoFacultySearch.trim() || undefined,
+        });
+      }
+      const result = await fetchStaff({
+        activeTeachingOnly: true,
+        limit: 100,
+        search: debouncedCoFacultySearch.trim() || undefined,
+      });
       return result.data;
     },
     enabled: authReady && open,
@@ -128,6 +172,9 @@ export function TimetableSlotModal({
           !entry?.teachingSubjectGroupId),
     );
     setCoFacultyIds([]);
+    setFacultySearch('');
+    setCoFacultySearch('');
+    setPickedStaffCache({});
   }, [open, entry, context]);
 
   useEffect(() => {
@@ -148,17 +195,56 @@ export function TimetableSlotModal({
   if (!open || !context) return null;
 
   const courses = coursesQ.data?.data ?? [];
-  const staff = (staffQ.data ?? []).map((row) => ({
-    id: 'staffProfileId' in row ? row.staffProfileId : row.id,
-    fullName: row.fullName,
-    shortCode: row.shortCode,
-    employeeCode: row.employeeCode,
-    assignedShifts: 'assignedShifts' in row ? row.assignedShifts : undefined,
-  }));
+  const mapStaffRows = (rows: unknown[] | undefined) =>
+    (rows ?? []).map((row) => {
+      const r = row as {
+        id: string;
+        staffProfileId?: string;
+        fullName: string;
+        shortCode?: string | null;
+        employeeCode?: string | null;
+        assignedShifts?: Array<{ id: string; code: string; name: string; isPrimary: boolean }>;
+      };
+      return {
+        id: r.staffProfileId ?? r.id,
+        fullName: r.fullName,
+        shortCode: r.shortCode,
+        employeeCode: r.employeeCode,
+        assignedShifts: r.assignedShifts,
+      };
+    });
+  const staff = mapStaffRows(staffQ.data as unknown[] | undefined);
+  const coStaff = mapStaffRows(coStaffQ.data as unknown[] | undefined);
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
-  const selectedStaff = staff.find((m) => m.id === staffProfileId);
+  const selectedFromLists =
+    staff.find((m) => m.id === staffProfileId) ??
+    coStaff.find((m) => m.id === staffProfileId) ??
+    pickedStaffCache[staffProfileId];
+  const selectedStaff =
+    selectedFromLists ??
+    (staffProfileId && entry?.staffProfile
+      ? {
+          id: staffProfileId,
+          fullName: entry.staffProfile.fullName,
+          shortCode: entry.staffProfile.shortCode,
+          employeeCode: null,
+          assignedShifts: undefined as
+            | Array<{ id: string; code: string; name: string; isPrimary: boolean }>
+            | undefined,
+        }
+      : undefined);
+  const primaryOptions = selectedStaff
+    ? [selectedStaff, ...staff.filter((m) => m.id !== selectedStaff.id)]
+    : staff;
+  const coOptions = coStaff;
 
+  const rememberStaff = (id: string, list: typeof staff) => {
+    const member = list.find((m) => m.id === id);
+    if (member) {
+      setPickedStaffCache((prev) => ({ ...prev, [id]: member }));
+    }
+  };
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!semesterSequence || !periodNo) return;
@@ -357,32 +443,47 @@ export function TimetableSlotModal({
               )}
             </>
           ) : null}
-          <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Primary Faculty (short code on print)
-            <select
-              className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">
+              Primary Faculty (short code on print)
+            </p>
+            <TimetableFacultySearchSelect
               value={staffProfileId}
-              onChange={(e) => setStaffProfileId(e.target.value)}
-              disabled={staffQ.isLoading}
-            >
-              <option value="">
-                {staffQ.isLoading
-                  ? 'Loading faculty…'
-                  : staffQ.isError
-                    ? 'Failed to load faculty'
-                    : staff.length
-                      ? 'Select faculty eligible for this shift'
-                      : 'No faculty assigned to this shift'}
-              </option>
-              {staff.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.shortCode ?? member.employeeCode} · {member.fullName}
-                  {member.assignedShifts?.length
-                    ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
-                    : ''}
-                </option>
-              ))}
-            </select>
+              options={primaryOptions}
+              onChange={(id) => {
+                rememberStaff(id, staff);
+                setStaffProfileId(id);
+              }}
+              searchQuery={facultySearch}
+              onSearchChange={setFacultySearch}
+              loading={staffQ.isLoading}
+              error={staffQ.isError}
+              emptyHint={
+                context.shiftId
+                  ? facultySearch.trim()
+                    ? `No shift-assigned faculty match “${facultySearch.trim()}”`
+                    : 'No faculty assigned to this shift yet'
+                  : 'No active teaching staff found'
+              }
+              placeholder={
+                context.shiftId
+                  ? 'Search faculty eligible for this shift…'
+                  : 'Search active teaching staff…'
+              }
+            />
+            {context.shiftId ? (
+              <p className="text-[11px] leading-5 text-muted-foreground">
+                Only staff assigned to this shift appear here. If someone is missing (e.g.
+                Nicholas), assign them under{' '}
+                <Link
+                  href="/admin/academics/shift-faculty"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Academics → Shift Faculty
+                </Link>
+                , then search again.
+              </p>
+            ) : null}
             {!selectedStaff && staffProfileId && entry?.staffProfile ? (
               <p className="text-[11px] leading-5 text-amber-700">
                 Print still shows{' '}
@@ -397,24 +498,26 @@ export function TimetableSlotModal({
                 currentShiftId={context.shiftId}
               />
             ) : null}
-          </label>
-          <label className="block space-y-1 text-xs font-medium text-muted-foreground">
-            Co-faculty
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Co-faculty</p>
             <div className="flex gap-2">
-              <select
-                className="h-10 flex-1 rounded-md border border-border bg-card px-3 text-sm"
+              <TimetableFacultySearchSelect
+                className="flex-1"
                 value={coFacultyPick}
-                onChange={(e) => setCoFacultyPick(e.target.value)}
-              >
-                <option value="">Add co-faculty</option>
-                {staff
-                  .filter((m) => m.id !== staffProfileId && !coFacultyIds.includes(m.id))
-                  .map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.shortCode ?? member.employeeCode} · {member.fullName}
-                    </option>
-                  ))}
-              </select>
+                options={coOptions}
+                onChange={(id) => {
+                  rememberStaff(id, coStaff);
+                  setCoFacultyPick(id);
+                }}
+                searchQuery={coFacultySearch}
+                onSearchChange={setCoFacultySearch}
+                loading={coStaffQ.isLoading}
+                error={coStaffQ.isError}
+                excludeIds={[staffProfileId, ...coFacultyIds].filter(Boolean)}
+                emptyHint="No matching co-faculty"
+                placeholder="Search co-faculty…"
+              />
               <Button
                 type="button"
                 size="sm"
@@ -423,6 +526,7 @@ export function TimetableSlotModal({
                   if (coFacultyPick) {
                     setCoFacultyIds((prev) => [...prev, coFacultyPick]);
                     setCoFacultyPick('');
+                    setCoFacultySearch('');
                   }
                 }}
               >
@@ -432,7 +536,10 @@ export function TimetableSlotModal({
             {coFacultyIds.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {coFacultyIds.map((id) => {
-                  const member = staff.find((row) => row.id === id);
+                  const member =
+                    staff.find((row) => row.id === id) ??
+                    coStaff.find((row) => row.id === id) ??
+                    pickedStaffCache[id];
                   return (
                     <button
                       key={id}
@@ -446,7 +553,7 @@ export function TimetableSlotModal({
                 })}
               </div>
             ) : null}
-          </label>
+          </div>
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
             Room / Lab (optional — TBA for draft)
             <select
