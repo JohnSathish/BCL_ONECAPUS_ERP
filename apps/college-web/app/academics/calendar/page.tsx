@@ -18,7 +18,13 @@ export default async function AcademicCalendarPage({ searchParams }: Props) {
   const planner = await getPublicAcademicPlanner();
   const months = planner?.months ?? [];
   const requested = typeof params.month === 'string' ? params.month : '';
-  const active = months.find((month) => month.key === requested) ?? months[0] ?? null;
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const active =
+    months.find((month) => month.key === requested) ??
+    months.find((month) => month.key === currentMonthKey) ??
+    months[0] ??
+    null;
 
   return (
     <main id="main" className="academic-calendar-page">

@@ -31,7 +31,9 @@ export function EventsCard({ events }: Props) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-[#64748B]">Add notes or important events for this month.</p>
+        <p className="text-sm text-[#64748B]">
+          Events from the published Academic Calendar will appear here for this month.
+        </p>
       )}
     </section>
   );

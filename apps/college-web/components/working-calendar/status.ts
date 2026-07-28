@@ -1,17 +1,22 @@
 import type { DayVisual, WorkingCalendarDay, WorkingDayStatus } from './types';
 
-const HOLIDAY_RE =
-  /holiday|break|non-working|result|admission|exam|orientation|bridge|institutional event|staff event/i;
+const HOLIDAY_RE = /holiday|break|non-working|result|admission|exam|bridge|staff event/i;
 const OPTIONAL_RE = /optional|restricted/i;
 const WEEKEND_RE = /weekend/i;
 const WORKING_SAT_RE = /working on saturday|saturday working|holiday class|compensatory|makeup/i;
 
-export function resolveDayVisual(day: WorkingCalendarDay): DayVisual {
-  const statusLabel = day.statusLabel.trim();
-  const events = day.description
-    .split(/\n+/)
+/** ERP joins titles with "; " — CMS handbook uses newlines. Accept both. */
+export function parseDayEventTitles(description: string): string[] {
+  return description
+    .split(/\n+|;\s*/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+export function resolveDayVisual(day: WorkingCalendarDay): DayVisual {
+  const statusLabel = day.statusLabel.trim();
+  const events = parseDayEventTitles(day.description);
+  const hasEvents = events.length > 0;
 
   const isSunday = day.dayOfWeek.toUpperCase() === 'SUN';
   const isSaturday = day.dayOfWeek.toUpperCase() === 'SAT';
@@ -19,7 +24,11 @@ export function resolveDayVisual(day: WorkingCalendarDay): DayVisual {
   let status: WorkingDayStatus;
   let label: string;
 
-  if (OPTIONAL_RE.test(statusLabel)) {
+  // ERP days with events use statusLabel for event type (e.g. "Institutional Event"), not day kind.
+  if (hasEvents && day.isWorkingDay) {
+    status = isSaturday ? 'saturday-working' : 'working';
+    label = 'Working';
+  } else if (OPTIONAL_RE.test(statusLabel)) {
     status = 'optional';
     label = 'Optional';
   } else if (WEEKEND_RE.test(statusLabel) || (isSunday && !day.isWorkingDay && !statusLabel)) {
@@ -52,7 +61,7 @@ export function resolveDayVisual(day: WorkingCalendarDay): DayVisual {
   return {
     status,
     label,
-    title: statusLabel || events[0],
+    title: hasEvents ? events[0] : statusLabel || undefined,
     events,
   };
 }

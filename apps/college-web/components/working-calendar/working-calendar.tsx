@@ -7,7 +7,7 @@ import { CalendarGrid } from './calendar-grid';
 import { EventsCard } from './events-card';
 import { LegendCard } from './legend-card';
 import { MonthNavigation } from './month-navigation';
-import { summarizeMonth } from './status';
+import { parseDayEventTitles, summarizeMonth } from './status';
 import { SummaryCard } from './summary-card';
 import type { WorkingCalendarMonth } from './types';
 
@@ -26,15 +26,11 @@ export function WorkingCalendar({
   const events = useMemo(
     () =>
       active.days.flatMap((day) =>
-        day.description
-          .split(/\n+/)
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .map((title) => ({
-            date: day.date,
-            dayOfMonth: day.dayOfMonth,
-            title,
-          })),
+        parseDayEventTitles(day.description).map((title) => ({
+          date: day.date,
+          dayOfMonth: day.dayOfMonth,
+          title,
+        })),
       ),
     [active.days],
   );

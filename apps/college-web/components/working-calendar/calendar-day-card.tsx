@@ -28,8 +28,8 @@ function CalendarDayCardComponent({ day, outsideMonth, dateLabel }: Props) {
   const visual = resolveDayVisual(day);
   const styles =
     visual.status === 'empty' ? null : STATUS_STYLES[visual.status as keyof typeof STATUS_STYLES];
-  const eventPreview =
-    visual.events[0] ?? (visual.title && visual.title !== visual.label ? visual.title : '');
+  const eventLines = visual.events.slice(0, 2);
+  const extraEvents = visual.events.length - eventLines.length;
 
   return (
     <motion.article
@@ -40,7 +40,7 @@ function CalendarDayCardComponent({ day, outsideMonth, dateLabel }: Props) {
         'transition-shadow duration-250 hover:shadow-[0_10px_28px_rgba(30,58,138,0.10)] focus-within:ring-2 focus-within:ring-[#2563EB]/40',
         styles?.card,
       )}
-      aria-label={`${day.date}, ${visual.label}${eventPreview ? `, ${eventPreview}` : ''}`}
+      aria-label={`${day.date}, ${visual.label}${eventLines.length ? `, ${eventLines.join(', ')}` : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-base font-semibold tracking-tight text-[#1E293B]">
@@ -54,8 +54,20 @@ function CalendarDayCardComponent({ day, outsideMonth, dateLabel }: Props) {
         {visual.status !== 'empty' ? (
           <StatusBadge status={visual.status} label={visual.label} />
         ) : null}
-        {eventPreview ? (
-          <p className="line-clamp-2 text-[11px] leading-snug text-[#64748B]">{eventPreview}</p>
+        {eventLines.length ? (
+          <div className="space-y-0.5">
+            {eventLines.map((title) => (
+              <p
+                key={title}
+                className="line-clamp-2 text-[11px] font-medium leading-snug text-[#475569]"
+              >
+                {title}
+              </p>
+            ))}
+            {extraEvents > 0 ? (
+              <p className="text-[10px] font-medium text-[#2563EB]">+{extraEvents} more</p>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </motion.article>

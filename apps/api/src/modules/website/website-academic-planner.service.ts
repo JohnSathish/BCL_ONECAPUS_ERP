@@ -464,7 +464,7 @@ export class WebsiteAcademicPlannerService {
           : day.isWorkingDay
             ? 'Working'
             : 'Non-working';
-      const description = day.events.map((e) => e.title).join('; ');
+      const description = day.events.map((e) => e.title).join('\n');
       return {
         id: `erp-${day.date}`,
         date: parseDateOnly(day.date),
