@@ -52,7 +52,8 @@ function mapPopup(row: Record<string, unknown>): PublicPopup | null {
 }
 
 export async function getActiveHomePopups(): Promise<PublicPopup[]> {
-  const payload = await fetchCms('popups', { page: 'home' }, 120);
+  // Short ISR window so CMS popup changes appear quickly on the public site.
+  const payload = await fetchCms('popups', { page: 'home' }, 10, 6000);
   if (!Array.isArray(payload)) return [];
   const mapped = payload.filter(isRecord).map(mapPopup).filter(Boolean) as PublicPopup[];
   return mapped.sort((a, b) => a.displayOrder - b.displayOrder);

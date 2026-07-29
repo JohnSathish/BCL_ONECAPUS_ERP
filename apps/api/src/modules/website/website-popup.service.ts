@@ -154,6 +154,7 @@ export class WebsitePopupService {
       entityId: row.id,
       metadata: { title: row.title, popupType: row.popupType },
     });
+    await this.revalidatePublicSite(user);
     return this.mapPopup(row);
   }
 
@@ -173,6 +174,7 @@ export class WebsitePopupService {
       entityId: row.id,
       metadata: { title: row.title },
     });
+    await this.revalidatePublicSite(user);
     return this.mapPopup(row);
   }
 
@@ -188,6 +190,7 @@ export class WebsitePopupService {
       entityId: existing.id,
       metadata: { title: existing.title },
     });
+    await this.revalidatePublicSite(user);
     return { ok: true };
   }
 
@@ -212,6 +215,7 @@ export class WebsitePopupService {
       entityId: row.id,
       metadata: { status: normalized },
     });
+    await this.revalidatePublicSite(user);
     return this.mapPopup(row);
   }
 
@@ -274,6 +278,33 @@ export class WebsitePopupService {
       entityId: row.id,
     });
     return this.mapPublicPopup(row);
+  }
+
+  private async revalidatePublicSite(user: JwtUser) {
+    const hook = process.env.WEBSITE_REVALIDATE_WEBHOOK_URL?.trim();
+    if (!hook) return;
+    try {
+      const secret =
+        process.env.WEBSITE_REVALIDATE_SECRET?.trim() ||
+        process.env.REVALIDATE_SECRET?.trim();
+      await fetch(hook, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(secret ? { 'x-revalidate-secret': secret } : {}),
+        },
+        body: JSON.stringify({
+          tenantId: user.tid,
+          paths: ['/'],
+          tags: ['website-cms'],
+          requestedAt: new Date().toISOString(),
+          requestedBy: user.sub,
+          reason: 'website_popup_changed',
+        }),
+      });
+    } catch {
+      // Non-blocking: popup save still succeeds if college-web webhook is down
+    }
   }
 
   private async requirePopup(tenantId: string, popupId: string) {
