@@ -151,11 +151,8 @@ export default function FacultyProfileScreen() {
         </Pressable>
 
         <Text style={styles.section}>Security</Text>
-        <Pressable
-          style={styles.row}
-          onPress={() => router.push('/(auth)/change-password' as never)}
-        >
-          <Text style={styles.rowLabel}>Change password</Text>
+        <Pressable style={styles.row} onPress={() => router.push('/(staff)/security' as never)}>
+          <Text style={styles.rowLabel}>Password & Security</Text>
           <Text style={styles.rowValue}>→</Text>
         </Pressable>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,14 @@ import { facultyTheme } from '@/components/faculty-portal/theme';
 import { updateFacultyProfile, uploadFacultyPhoto } from '@/services/faculty-profile';
 import type { UpdateFacultyProfilePayload } from '@/services/faculty-profile';
 import { apiFetch } from '@/api/client';
+
+const FALLBACK_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+
+type MasterLookup = {
+  id: string;
+  code?: string;
+  label?: string;
+};
 
 type FormState = Required<UpdateFacultyProfilePayload>;
 
@@ -82,6 +90,8 @@ export default function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [bloodGroup, setBloodGroup] = useState<string>('');
+  const [bloodGroupOptions, setBloodGroupOptions] = useState<string[]>([...FALLBACK_BLOOD_GROUPS]);
 
   type AddressForm = {
     line1: string;
@@ -138,7 +148,45 @@ export default function EditProfileScreen() {
       relationship: emg.relationship ?? '',
       phone: emg.phone ?? '',
     });
+    if (typeof p.bloodGroup === 'string' && p.bloodGroup.trim()) {
+      setBloodGroup(p.bloodGroup.trim());
+    }
   }, [profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await apiFetch<{ bloodGroup?: string | null }>('/v1/staff/me');
+        if (!cancelled && me.bloodGroup?.trim()) {
+          setBloodGroup(me.bloodGroup.trim());
+        }
+      } catch {
+        // keep home snapshot value if any
+      }
+      try {
+        const lookups = await apiFetch<MasterLookup[]>(
+          '/v1/master-lookups?type=BLOOD_GROUP&activeOnly=true',
+        );
+        if (cancelled) return;
+        const labels = lookups.map((row) => (row.label ?? row.code ?? '').trim()).filter(Boolean);
+        if (labels.length) {
+          setBloodGroupOptions(Array.from(new Set(labels)));
+        }
+      } catch {
+        if (!cancelled) setBloodGroupOptions([...FALLBACK_BLOOD_GROUPS]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedBloodGroup = useMemo(() => {
+    const current = bloodGroup.trim();
+    if (!current) return '';
+    return bloodGroupOptions.find((o) => o.toUpperCase() === current.toUpperCase()) ?? current;
+  }, [bloodGroup, bloodGroupOptions]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -254,6 +302,23 @@ export default function EditProfileScreen() {
           <View style={styles.readonlyRow}>
             <Text style={styles.label}>Designation</Text>
             <Text style={styles.readonlyValue}>{profile?.designation ?? '—'}</Text>
+          </View>
+          <View style={styles.bloodBlock}>
+            <Text style={styles.label}>Blood Group</Text>
+            <Text style={styles.bloodValue}>{selectedBloodGroup || '—'}</Text>
+            <Text style={styles.bloodHint}>Non-editable · Contact HR if this needs correction</Text>
+            <View style={styles.bloodChips}>
+              {bloodGroupOptions.map((opt) => {
+                const active = selectedBloodGroup.toUpperCase() === opt.toUpperCase();
+                return (
+                  <View key={opt} style={[styles.bloodChip, active && styles.bloodChipActive]}>
+                    <Text style={[styles.bloodChipText, active && styles.bloodChipTextActive]}>
+                      {opt}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
 
           {/* Contact */}
@@ -456,6 +521,41 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   readonlyValue: { fontSize: 13, color: facultyTheme.textMuted, fontWeight: '500' },
+  bloodBlock: {
+    backgroundColor: facultyTheme.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: facultyTheme.border,
+    padding: 12,
+    gap: 6,
+    marginBottom: 6,
+  },
+  bloodValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: facultyTheme.text,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    overflow: 'hidden',
+  },
+  bloodHint: { fontSize: 11, color: facultyTheme.textSubtle },
+  bloodChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  bloodChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: facultyTheme.border,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#f9fafb',
+  },
+  bloodChipActive: {
+    borderColor: facultyTheme.primary,
+    backgroundColor: '#eff6ff',
+  },
+  bloodChipText: { fontSize: 12, fontWeight: '600', color: facultyTheme.textMuted },
+  bloodChipTextActive: { color: facultyTheme.primary, fontWeight: '800' },
   field: { gap: 4, marginBottom: 6 },
   label: { fontSize: 12, fontWeight: '600', color: facultyTheme.textMuted },
   input: {

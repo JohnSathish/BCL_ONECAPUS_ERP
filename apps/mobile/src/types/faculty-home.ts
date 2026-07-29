@@ -41,6 +41,7 @@ export type FacultyHomeSnapshot = {
     researchAreas?: string | null;
     addressJson?: Record<string, string> | null;
     emergencyContactJson?: Record<string, string> | null;
+    bloodGroup?: string | null;
     profileCompletion?: number;
     isTeaching?: boolean;
     isHod?: boolean;

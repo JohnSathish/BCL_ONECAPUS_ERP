@@ -54,6 +54,8 @@ export default function StaffLayout() {
         <Stack.Screen name="teaching-load" />
         <Stack.Screen name="notices" />
         <Stack.Screen name="payroll" />
+        <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="security" />
         <Stack.Screen name="notification-preferences" />
         <Stack.Screen name="about" />
         <Stack.Screen name="account-deletion" />
