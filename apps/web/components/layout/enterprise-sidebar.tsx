@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronDown,
   Clock,
@@ -120,6 +120,8 @@ function hasAnyPermission(userPerms: string[], required?: string[]) {
 
 export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'admin' | 'staff' }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const router = useRouter();
   const roleKey = String(role);
   const { branding, active } = useInstitutionBranding();
@@ -251,7 +253,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
   }, [favoriteIds.length, navIndex, role, roleKey, setFavorites]);
 
   useLayoutEffect(() => {
-    const parents = activeParentLabels(groups, pathname, isNavChildActive);
+    const parents = activeParentLabels(groups, pathname, isNavChildActive, search);
     const pathnameChanged = prevPathname.current !== pathname;
     prevPathname.current = pathname;
 
@@ -271,7 +273,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     if (!toOpen.length) return;
     if (toOpen.every((label) => current[label] === true)) return;
     mergeOpenGroups(roleKey, Object.fromEntries(toOpen.map((label) => [label, true])));
-  }, [groups, mergeOpenGroups, pathname, roleKey, setExclusiveGroupOpen]);
+  }, [groups, mergeOpenGroups, pathname, search, roleKey, setExclusiveGroupOpen]);
 
   const badgeMap = useMemo(() => {
     const s = statsQ.data;
@@ -358,7 +360,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     if (stored === false) return false;
     if (stored === true) return true;
     const hasActiveChild = item.children?.some((c) =>
-      isNavChildActive(pathname, c, item.children ?? []),
+      isNavChildActive(pathname, c, item.children ?? [], search),
     );
     return Boolean(hasActiveChild);
   };
@@ -390,6 +392,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
         key={group.label}
         group={group}
         pathname={pathname}
+        search={search}
         collapsed={navCollapsed}
         resolveOpen={resolveOpen}
         onToggle={handleToggle}
@@ -692,6 +695,7 @@ function CompactNavLink({
 function NavSection({
   group,
   pathname,
+  search,
   collapsed,
   resolveOpen,
   onToggle,
@@ -702,6 +706,7 @@ function NavSection({
 }: {
   group: NavGroup;
   pathname: string;
+  search: string;
   collapsed: boolean;
   resolveOpen: (item: NavItem) => boolean;
   onToggle: (item: NavItem) => void;
@@ -723,6 +728,7 @@ function NavSection({
             key={item.label}
             item={item}
             pathname={pathname}
+            search={search}
             collapsed={collapsed}
             open={resolveOpen(item)}
             onToggle={() => onToggle(item)}
@@ -742,6 +748,7 @@ function NavSection({
 function SidebarItem({
   item,
   pathname,
+  search,
   collapsed,
   open,
   onToggle,
@@ -752,6 +759,7 @@ function SidebarItem({
 }: {
   item: NavItem;
   pathname: string;
+  search: string;
   collapsed: boolean;
   open: boolean;
   onToggle: () => void;
@@ -761,7 +769,7 @@ function SidebarItem({
   onToggleFavorite?: (id: string) => void;
 }) {
   const Icon = item.icon;
-  const active = isNavItemActive(pathname, item);
+  const active = isNavItemActive(pathname, item, search);
   const accent = moduleColor(item.module);
 
   const iconNode = (
@@ -850,7 +858,7 @@ function SidebarItem({
         {open ? (
           <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border/50 pl-3">
             {item.children.map((child) => {
-              const childActive = isNavChildActive(pathname, child, item.children ?? []);
+              const childActive = isNavChildActive(pathname, child, item.children ?? [], search);
               return (
                 <li key={child.href + child.label}>
                   <Link

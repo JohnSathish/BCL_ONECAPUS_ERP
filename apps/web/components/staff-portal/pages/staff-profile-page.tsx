@@ -6,9 +6,11 @@ import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Briefcase,
+  ChevronRight,
   FileText,
   History,
   KeyRound,
+  Pencil,
   Phone,
   UserRound,
   GraduationCap,
@@ -24,9 +26,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-me';
 import { StaffNotLinkedState } from '@/components/staff-portal/layout/staff-module-placeholder';
+import { StaffProfileHero } from '@/components/staff-portal/profile/staff-profile-hero';
+import {
+  StaffProfileOverviewDashboard,
+  StaffProfileTipBanner,
+} from '@/components/staff-portal/profile/staff-profile-overview-dashboard';
 import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
-import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
 import { cn } from '@/utils/cn';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
@@ -56,7 +61,6 @@ import { fetchMasterLookups } from '@/services/students';
 import { StaffSecurityTab } from '@/components/staff-portal/pages/staff-security-tab';
 
 const TABS = [
-  { key: 'overview', label: 'Overview', icon: UserRound },
   { key: 'personal', label: 'Personal Details', icon: UserRound },
   { key: 'contact', label: 'Contact Details', icon: Phone },
   { key: 'qualifications', label: 'Educational Qualifications', icon: GraduationCap },
@@ -70,6 +74,11 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
+
+function normalizeTab(raw: string | null): TabKey {
+  if (raw === 'overview' || !raw) return 'personal';
+  return TABS.some((t) => t.key === raw) ? (raw as TabKey) : 'personal';
+}
 
 const QUAL_TYPES = [
   'SSLC',
@@ -149,10 +158,15 @@ const inputCls =
 export function StaffProfilePage() {
   useRequireStaffPortal();
   const search = useSearchParams();
-  const tabParam = (search.get('tab') as TabKey | null) ?? 'overview';
-  const tab = TABS.some((t) => t.key === tabParam) ? tabParam : 'overview';
+  const tab = normalizeTab(search.get('tab'));
+  const editMode = search.get('edit') === '1';
   const me = useStaffMe();
   const qc = useQueryClient();
+  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const showPersonalDashboard = tab === 'personal' && !editMode;
+
+  const editHref =
+    tab === 'personal' ? '/staff/profile?tab=personal&edit=1' : `/staff/profile?tab=${tab}`;
 
   if (me.isError) return <StaffNotLinkedState />;
   if (!me.data) {
@@ -168,115 +182,81 @@ export function StaffProfilePage() {
   }
 
   const profile = me.data;
-  const pct = profile.profileCompletion ?? 0;
-  const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
+  const refreshMe = () => void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] });
 
   return (
     <DashboardShell role="staff" title="My Profile">
       <ErpWorkspace className="space-y-4 pb-24">
-        <GlassCard className="p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative shrink-0">
-              {photoSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={photoSrc}
-                  alt=""
-                  className="h-20 w-20 rounded-2xl object-cover ring-2 ring-border/40"
-                />
-              ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
-                  {profile.fullName?.charAt(0) ?? '?'}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-xl font-semibold tracking-tight">{profile.fullName}</h1>
-              <p className="text-sm text-muted-foreground">
-                {profile.designation ?? '—'}
-                {profile.department ? ` · ${profile.department}` : ''}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>Staff Code: {profile.employeeCode}</span>
-                <StatusBadge status={profile.status} />
-                <Badge variant="outline">{staffTypeLabel(profile.staffType)}</Badge>
-              </div>
-            </div>
-            <div className="w-full sm:w-48">
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="font-medium text-muted-foreground">Profile Completion</span>
-                <span className="font-bold">{pct}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    'h-full rounded-full',
-                    pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-400',
-                  )}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <Button
-                className="mt-3 w-full rounded-xl"
-                size="sm"
-                onClick={() => {
-                  window.location.href = '/staff/profile?tab=personal';
-                }}
-              >
-                Edit Profile
-              </Button>
-            </div>
-          </div>
-        </GlassCard>
-
-        <div className="flex gap-1 overflow-x-auto rounded-[18px] border border-border/40 bg-card/60 p-1">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.key;
-            return (
-              <Link
-                key={t.key}
-                href={`/staff/profile?tab=${t.key}`}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition',
-                  active
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {t.label}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <nav className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
+            <Link href="/staff/profile" className="font-medium text-slate-700 hover:text-primary">
+              My Profile
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+            <span className="font-medium text-slate-900">{activeTab.label}</span>
+            {editMode && tab === 'personal' ? (
+              <>
+                <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                <span className="text-slate-500">Edit</span>
+              </>
+            ) : null}
+          </nav>
+          {tab !== 'security' && tab !== 'activity' ? (
+            <Button asChild className="rounded-xl">
+              <Link href={editHref}>
+                <Pencil className="mr-2 h-4 w-4" /> Edit Profile
               </Link>
-            );
-          })}
+            </Button>
+          ) : null}
         </div>
 
-        {tab === 'overview' ? <OverviewTab profile={profile} /> : null}
-        {tab === 'personal' ? (
-          <PersonalTab
-            profile={profile}
-            onSaved={() => void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] })}
-          />
+        <StaffProfileHero
+          profile={profile}
+          onPhotoSaved={refreshMe}
+          onViewCompletion={() => {
+            window.location.href = '/staff/profile?tab=personal&edit=1';
+          }}
+        />
+
+        <div className="overflow-x-auto border-b border-slate-200">
+          <div className="flex min-w-max gap-0">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              const active = tab === t.key;
+              return (
+                <Link
+                  key={t.key}
+                  href={`/staff/profile?tab=${t.key}`}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 border-b-2 px-3.5 py-3 text-xs font-medium transition',
+                    active
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-slate-500 hover:border-slate-200 hover:text-slate-800',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {t.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {showPersonalDashboard ? <StaffProfileOverviewDashboard profile={profile} /> : null}
+        {tab === 'personal' && editMode ? (
+          <PersonalTab profile={profile} onSaved={refreshMe} />
         ) : null}
-        {tab === 'contact' ? (
-          <ContactTab
-            profile={profile}
-            onSaved={() => void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] })}
-          />
-        ) : null}
+        {tab === 'contact' ? <ContactTab profile={profile} onSaved={refreshMe} /> : null}
         {tab === 'qualifications' ? <QualificationsTab /> : null}
         {tab === 'experience' ? <ExperienceTab /> : null}
         {tab === 'certifications' ? <CertificationsTab /> : null}
         {tab === 'documents' ? <DocumentsTab /> : null}
-        {tab === 'bank' ? (
-          <BankTab
-            profile={profile}
-            onSaved={() => void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] })}
-          />
-        ) : null}
+        {tab === 'bank' ? <BankTab profile={profile} onSaved={refreshMe} /> : null}
         {tab === 'emergency' ? <EmergencyTab /> : null}
         {tab === 'security' ? <StaffSecurityTab /> : null}
         {tab === 'activity' ? <ActivityTab /> : null}
+
+        <StaffProfileTipBanner />
 
         {(tab === 'qualifications' ||
           tab === 'experience' ||
@@ -303,42 +283,6 @@ export function StaffProfilePage() {
         )}
       </ErpWorkspace>
     </DashboardShell>
-  );
-}
-
-function OverviewTab({ profile }: { profile: NonNullable<ReturnType<typeof useStaffMe>['data']> }) {
-  const exp = useQuery({ queryKey: ['staff-portal', 'experience'], queryFn: fetchMyExperience });
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {[
-        ['Total Experience', `${exp.data?.totalTeachingYears ?? profile.experienceYears ?? 0} yrs`],
-        ['Highest Qualification', profile.qualification],
-        [
-          'Date of Joining',
-          profile.joiningDate ? new Date(profile.joiningDate).toLocaleDateString() : null,
-        ],
-        ['Official Email', profile.email],
-        ['Mobile Number', profile.mobile],
-        ['Department', profile.department],
-        ['Designation', profile.designation],
-      ].map(([label, value]) => (
-        <GlassCard key={String(label)} className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-2 text-sm font-semibold text-foreground">{value || '—'}</p>
-        </GlassCard>
-      ))}
-      <GlassCard className="p-4 sm:col-span-2 lg:col-span-3">
-        <p className="text-sm text-muted-foreground">
-          Research publications remain available from{' '}
-          <Link href="/staff/profile?tab=personal" className="text-primary underline">
-            Personal Details
-          </Link>{' '}
-          (Scholar / ORCID) and the legacy research tools.
-        </p>
-      </GlassCard>
-    </div>
   );
 }
 

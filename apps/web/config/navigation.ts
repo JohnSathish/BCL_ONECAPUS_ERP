@@ -72,22 +72,43 @@ export type NavGroup = {
   zone?: 'pin-top' | 'scroll' | 'pin-bottom';
 };
 
-export function isNavChildActive(pathname: string, child: NavChild, siblings: NavChild[]): boolean {
+export function isNavChildActive(
+  pathname: string,
+  child: NavChild,
+  siblings: NavChild[],
+  search = '',
+): boolean {
+  const qs = search.startsWith('?') ? search.slice(1) : search;
+  if (child.href.includes('?')) {
+    const [path, query = ''] = child.href.split('?');
+    if (pathname !== path) return false;
+    const wanted = new URLSearchParams(query);
+    const current = new URLSearchParams(qs);
+    for (const [key, value] of wanted.entries()) {
+      const cur = current.get(key);
+      if (key === 'tab' && value === 'personal') {
+        if (cur && cur !== 'personal' && cur !== 'overview') return false;
+        continue;
+      }
+      if (cur !== value) return false;
+    }
+    return true;
+  }
   if (pathname === child.href) return true;
   if (child.activePattern && new RegExp(child.activePattern).test(pathname)) {
     const ownedBySibling = siblings.some(
-      (s) => s.href !== child.href && pathname.startsWith(s.href),
+      (s) => s.href !== child.href && pathname.startsWith(s.href.split('?')[0]!),
     );
     return !ownedBySibling;
   }
   return false;
 }
 
-export function isNavItemActive(pathname: string, item: NavItem): boolean {
+export function isNavItemActive(pathname: string, item: NavItem, search = ''): boolean {
   if (item.href && pathname === item.href) return true;
   if (item.activePattern && new RegExp(item.activePattern).test(pathname)) return true;
   if (item.children?.length) {
-    return item.children.some((c) => isNavChildActive(pathname, c, item.children ?? []));
+    return item.children.some((c) => isNavChildActive(pathname, c, item.children ?? [], search));
   }
   return false;
 }
@@ -2411,7 +2432,23 @@ export const STAFF_NAV: NavGroup[] = [
       { label: 'Notifications', href: '/staff/notifications', icon: Bell },
       { label: 'Feedback', href: '/staff/feedback', icon: MessageSquare },
       { label: 'My Calendar', href: '/staff/calendar', icon: CalendarDays },
-      { label: 'My Profile', href: '/staff/profile', icon: User },
+      {
+        label: 'My Profile',
+        href: '/staff/profile',
+        icon: User,
+        children: [
+          { label: 'Personal Details', href: '/staff/profile?tab=personal' },
+          { label: 'Contact Details', href: '/staff/profile?tab=contact' },
+          { label: 'Educational Qualifications', href: '/staff/profile?tab=qualifications' },
+          { label: 'Teaching Experience', href: '/staff/profile?tab=experience' },
+          { label: 'Professional Certifications', href: '/staff/profile?tab=certifications' },
+          { label: 'Documents', href: '/staff/profile?tab=documents' },
+          { label: 'Bank Details', href: '/staff/profile?tab=bank' },
+          { label: 'Emergency Contacts', href: '/staff/profile?tab=emergency' },
+          { label: 'Password & Security', href: '/staff/profile?tab=security' },
+          { label: 'Activity Log', href: '/staff/profile?tab=activity' },
+        ],
+      },
     ],
   },
   {

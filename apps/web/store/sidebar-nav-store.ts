@@ -81,12 +81,18 @@ export const useSidebarNavStore = create<SidebarNavState>()(
 export function activeParentLabels(
   groups: NavGroup[],
   pathname: string,
-  isChildActive: (pathname: string, child: NavChild, siblings: NavChild[]) => boolean,
+  isChildActive: (
+    pathname: string,
+    child: NavChild,
+    siblings: NavChild[],
+    search?: string,
+  ) => boolean,
+  search = '',
 ): string[] {
   const labels: string[] = [];
   for (const group of groups) {
     for (const item of group.items) {
-      if (item.children?.some((c) => isChildActive(pathname, c, item.children ?? []))) {
+      if (item.children?.some((c) => isChildActive(pathname, c, item.children ?? [], search))) {
         labels.push(item.label);
       }
     }
