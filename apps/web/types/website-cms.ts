@@ -226,6 +226,23 @@ export type WebsiteBloodDonorList = {
   take: number;
 };
 
+export type WebsiteNewsletterSubscriber = {
+  id: string;
+  email: string;
+  status: string;
+  source: string;
+  unsubscribedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebsiteNewsletterSubscriberList = {
+  items: WebsiteNewsletterSubscriber[];
+  total: number;
+  skip: number;
+  take: number;
+};
+
 export type WebsiteFyugInterest = {
   id: string;
   applicationNumber?: string | null;

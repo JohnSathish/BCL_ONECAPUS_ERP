@@ -271,6 +271,47 @@ export class ListWebsiteBloodDonorsQueryDto {
   take?: number;
 }
 
+export class CreateWebsiteNewsletterDto {
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  source?: string;
+
+  /** Honeypot — must be empty when present. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(0)
+  company?: string;
+}
+
+export class ListWebsiteNewsletterQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  take?: number;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'UNSUBSCRIBED', 'ALL'])
+  status?: string;
+}
+
+export class UpdateWebsiteNewsletterStatusDto {
+  @IsIn(['ACTIVE', 'UNSUBSCRIBED'])
+  status!: string;
+}
+
 export class CreateWebsiteFyugInterestDto {
   @IsString()
   @MaxLength(160)

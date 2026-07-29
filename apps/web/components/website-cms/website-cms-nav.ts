@@ -10,6 +10,7 @@ import {
   LayoutTemplate,
   Megaphone,
   Menu,
+  Mail,
   Newspaper,
   Palette,
   PanelBottom,
@@ -59,6 +60,13 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     label: 'Blood Donors',
     href: '/admin/website/blood-donors',
     icon: Droplets,
+    group: 'content',
+  },
+  {
+    id: 'newsletter',
+    label: 'Newsletter',
+    href: '/admin/website/newsletter',
+    icon: Mail,
     group: 'content',
   },
   {

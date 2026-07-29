@@ -47,6 +47,9 @@ import {
   fetchWebsiteAcademicDepartments,
   fetchWebsiteAppearance,
   fetchWebsiteBloodDonors,
+  fetchWebsiteNewsletterSubscribers,
+  updateWebsiteNewsletterSubscriberStatus,
+  deleteWebsiteNewsletterSubscriber,
   fetchWebsiteFyugInterests,
   fetchWebsiteFyugInterestStats,
   downloadWebsiteFyugInterestExcel,
@@ -142,6 +145,7 @@ export type WebsiteCmsSection =
   | 'footer'
   | 'seo'
   | 'blood-donors'
+  | 'newsletter'
   | 'fyug-interest';
 
 export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection }) {
@@ -232,6 +236,7 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'announcements' ? <AnnouncementsView onMessage={setMessage} /> : null}
           {section === 'popups' ? <PopupsView onMessage={setMessage} /> : null}
           {section === 'blood-donors' ? <BloodDonorsView /> : null}
+          {section === 'newsletter' ? <NewsletterView /> : null}
           {section === 'fyug-interest' ? <FyugInterestView /> : null}
           {section === 'news' ? <NewsEntriesView onMessage={setMessage} /> : null}
           {section === 'homepage' ? <HomepageBuilderView onMessage={setMessage} /> : null}
@@ -2482,6 +2487,133 @@ function BloodDonorsView() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CompactCardBody>
+    </CompactCard>
+  );
+}
+
+function NewsletterView() {
+  const queryClient = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const subscribers = useQuery({
+    queryKey: ['website', 'newsletter'],
+    queryFn: () => fetchWebsiteNewsletterSubscribers({ take: 200 }),
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['website', 'newsletter'] });
+
+  const setStatus = async (id: string, status: 'ACTIVE' | 'UNSUBSCRIBED') => {
+    setBusyId(id);
+    setMessage('');
+    try {
+      await updateWebsiteNewsletterSubscriberStatus(id, status);
+      setMessage(status === 'ACTIVE' ? 'Subscriber reactivated.' : 'Subscriber unsubscribed.');
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to update subscriber.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Permanently delete this newsletter subscriber?')) return;
+    setBusyId(id);
+    setMessage('');
+    try {
+      await deleteWebsiteNewsletterSubscriber(id);
+      setMessage('Subscriber deleted.');
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to delete subscriber.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!subscribers.data) {
+    return <QueryState loading={subscribers.isLoading} error={subscribers.error} />;
+  }
+
+  return (
+    <CompactCard>
+      <CompactCardHeader
+        title="Newsletter subscribers"
+        description={`${subscribers.data.total} email${subscribers.data.total === 1 ? '' : 's'} from the college website footer.`}
+      />
+      <CompactCardBody className="space-y-3">
+        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        {!subscribers.data.items.length ? (
+          <p className="text-sm text-muted-foreground">No newsletter subscribers yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2 font-semibold">Email</th>
+                  <th className="px-2 py-2 font-semibold">Status</th>
+                  <th className="px-2 py-2 font-semibold">Source</th>
+                  <th className="px-2 py-2 font-semibold">Subscribed</th>
+                  <th className="px-2 py-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subscribers.data.items.map((row) => {
+                  const busy = busyId === row.id;
+                  return (
+                    <tr key={row.id} className="border-b border-border/70 align-top">
+                      <td className="px-2 py-2 font-medium text-foreground">{row.email}</td>
+                      <td className="px-2 py-2">
+                        <Badge variant={row.status === 'ACTIVE' ? 'secondary' : 'outline'}>
+                          {row.status}
+                        </Badge>
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">{row.source}</td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          {row.status === 'ACTIVE' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => void setStatus(row.id, 'UNSUBSCRIBED')}
+                            >
+                              Unsubscribe
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => void setStatus(row.id, 'ACTIVE')}
+                            >
+                              Reactivate
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() => void remove(row.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

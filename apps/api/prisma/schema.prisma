@@ -14704,6 +14704,7 @@ model WebsiteSite {
   revisions WebsiteRevision[]
   bloodDonors WebsiteBloodDonor[]
   fyugInterests WebsiteFyugInterest[]
+  newsletterSubscribers WebsiteNewsletterSubscriber[]
   academicPlannerYears WebsiteAcademicPlannerYear[]
   academicPlannerDays WebsiteAcademicPlannerDay[]
   popups WebsitePopup[]
@@ -15270,6 +15271,26 @@ model WebsiteBloodDonor {
   @@index([siteId, bloodGroup])
   @@index([siteId, email])
   @@map("website_blood_donors")
+  @@schema("academic")
+}
+
+model WebsiteNewsletterSubscriber {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  siteId         String    @map("site_id") @db.Uuid
+  email          String
+  status         String    @default("ACTIVE")
+  source         String    @default("FOOTER")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, email])
+  @@index([tenantId, siteId, createdAt])
+  @@index([siteId, status])
+  @@map("website_newsletter_subscribers")
   @@schema("academic")
 }
 

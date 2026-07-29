@@ -22,9 +22,11 @@ import { StorageService } from '../../shared/storage/storage.service';
 import type {
   CreateWebsiteBloodDonorDto,
   CreateWebsiteFyugInterestDto,
+  CreateWebsiteNewsletterDto,
   CreateWebsitePageDto,
   ListWebsiteBloodDonorsQueryDto,
   ListWebsiteFyugInterestsQueryDto,
+  ListWebsiteNewsletterQueryDto,
   ListWebsitePagesQueryDto,
   UpdateWebsitePageDto,
   UpdateWebsiteSiteDto,
@@ -666,6 +668,133 @@ export class WebsiteService {
       }),
     ]);
     return { items, total, skip, take };
+  }
+
+  async createPublicNewsletterSubscriber(
+    tenantId: string,
+    dto: CreateWebsiteNewsletterDto,
+  ) {
+    if (dto.company) {
+      throw new BadRequestException('Automated submission rejected');
+    }
+    const email = dto.email.trim().toLowerCase();
+    if (!email) throw new BadRequestException('Email is required');
+    const site = await this.getOrCreateSite(tenantId);
+    const source = (dto.source?.trim() || 'FOOTER').toUpperCase();
+
+    const existing = await this.prisma.websiteNewsletterSubscriber.findUnique({
+      where: { siteId_email: { siteId: site.id, email } },
+    });
+
+    if (existing) {
+      if (existing.status === 'ACTIVE') {
+        return {
+          id: existing.id,
+          email: existing.email,
+          status: existing.status,
+          alreadySubscribed: true,
+        };
+      }
+      const revived = await this.prisma.websiteNewsletterSubscriber.update({
+        where: { id: existing.id },
+        data: {
+          status: 'ACTIVE',
+          source,
+          unsubscribedAt: null,
+        },
+        select: { id: true, email: true, status: true },
+      });
+      return { ...revived, alreadySubscribed: false };
+    }
+
+    const row = await this.prisma.websiteNewsletterSubscriber.create({
+      data: {
+        tenantId,
+        siteId: site.id,
+        email,
+        status: 'ACTIVE',
+        source,
+      },
+      select: { id: true, email: true, status: true },
+    });
+    return { ...row, alreadySubscribed: false };
+  }
+
+  async listNewsletterSubscribers(
+    tenantId: string,
+    query: ListWebsiteNewsletterQueryDto = {},
+  ) {
+    const site = await this.getOrCreateSite(tenantId);
+    const skip = query.skip ?? 0;
+    const take = query.take ?? 100;
+    const status =
+      !query.status || query.status === 'ALL' ? undefined : query.status;
+    const where = {
+      tenantId,
+      siteId: site.id,
+      ...(status ? { status } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.websiteNewsletterSubscriber.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          source: true,
+          unsubscribedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.websiteNewsletterSubscriber.count({ where }),
+    ]);
+    return { items, total, skip, take };
+  }
+
+  async updateNewsletterSubscriberStatus(
+    tenantId: string,
+    subscriberId: string,
+    status: string,
+  ) {
+    const normalized = status.toUpperCase();
+    if (!['ACTIVE', 'UNSUBSCRIBED'].includes(normalized)) {
+      throw new BadRequestException('Invalid newsletter status');
+    }
+    const existing = await this.prisma.websiteNewsletterSubscriber.findFirst({
+      where: { id: subscriberId, tenantId },
+    });
+    if (!existing) throw new NotFoundException('Subscriber not found');
+    return this.prisma.websiteNewsletterSubscriber.update({
+      where: { id: existing.id },
+      data: {
+        status: normalized,
+        unsubscribedAt: normalized === 'UNSUBSCRIBED' ? new Date() : null,
+      },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        source: true,
+        unsubscribedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async deleteNewsletterSubscriber(tenantId: string, subscriberId: string) {
+    const existing = await this.prisma.websiteNewsletterSubscriber.findFirst({
+      where: { id: subscriberId, tenantId },
+    });
+    if (!existing) throw new NotFoundException('Subscriber not found');
+    await this.prisma.websiteNewsletterSubscriber.delete({
+      where: { id: existing.id },
+    });
+    return { ok: true };
   }
 
   async createPublicFyugInterest(

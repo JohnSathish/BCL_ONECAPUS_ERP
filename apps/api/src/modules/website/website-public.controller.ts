@@ -27,6 +27,7 @@ import { WebsitePopupService } from './website-popup.service';
 import {
   CreateWebsiteBloodDonorDto,
   CreateWebsiteFyugInterestDto,
+  CreateWebsiteNewsletterDto,
 } from './dto/website.dto';
 
 @ApiTags('website-public')
@@ -231,6 +232,17 @@ export class WebsitePublicController {
   ) {
     const tenant = await this.resolveTenant(req, tenantSlug);
     return this.website.createPublicBloodDonor(tenant.id, body);
+  }
+
+  @Public()
+  @Post('newsletter')
+  async createNewsletterSubscriber(
+    @Req() req: Request,
+    @Body() body: CreateWebsiteNewsletterDto,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.createPublicNewsletterSubscriber(tenant.id, body);
   }
 
   @Public()

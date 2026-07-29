@@ -498,6 +498,30 @@ export const fetchWebsiteBloodDonors = (params?: { skip?: number; take?: number 
     })
     .then((response) => response.data);
 
+export const fetchWebsiteNewsletterSubscribers = (params?: {
+  skip?: number;
+  take?: number;
+  status?: string;
+}) =>
+  api
+    .get<import('@/types/website-cms').WebsiteNewsletterSubscriberList>(`${base}/newsletter`, {
+      params,
+    })
+    .then((response) => response.data);
+
+export const updateWebsiteNewsletterSubscriberStatus = (
+  subscriberId: string,
+  status: 'ACTIVE' | 'UNSUBSCRIBED',
+) =>
+  api
+    .patch<
+      import('@/types/website-cms').WebsiteNewsletterSubscriber
+    >(`${base}/newsletter/${subscriberId}`, { status })
+    .then((response) => response.data);
+
+export const deleteWebsiteNewsletterSubscriber = (subscriberId: string) =>
+  api.delete(`${base}/newsletter/${subscriberId}`).then((response) => response.data);
+
 export const fetchWebsiteFyugInterests = (params?: { skip?: number; take?: number }) =>
   api
     .get<import('@/types/website-cms').WebsiteFyugInterestList>(`${base}/fyug-interest`, {

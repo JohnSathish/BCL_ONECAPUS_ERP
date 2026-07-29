@@ -2002,6 +2002,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['website:read', 'website:edit', 'website:manage'],
           },
           {
+            label: 'Newsletter',
+            href: '/admin/website/newsletter',
+            permissions: ['website:read', 'website:edit', 'website:manage'],
+          },
+          {
             label: 'FYUG Interest',
             href: '/admin/website/fyug-interest',
             permissions: ['website:read', 'website:edit', 'website:manage'],

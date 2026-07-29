@@ -40,6 +40,8 @@ import {
 import {
   ListWebsiteBloodDonorsQueryDto,
   ListWebsiteFyugInterestsQueryDto,
+  ListWebsiteNewsletterQueryDto,
+  UpdateWebsiteNewsletterStatusDto,
 } from './dto/website.dto';
 import { WebsiteAdminService } from './website-admin.service';
 import { WebsiteAcademicService } from './website-academic.service';
@@ -844,6 +846,38 @@ export class WebsiteAdminController {
     @Query() query: ListWebsiteBloodDonorsQueryDto,
   ) {
     return this.website.listBloodDonors(user.tid, query);
+  }
+
+  @Get('newsletter')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  newsletterSubscribers(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ListWebsiteNewsletterQueryDto,
+  ) {
+    return this.website.listNewsletterSubscribers(user.tid, query);
+  }
+
+  @Patch('newsletter/:subscriberId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  updateNewsletterSubscriber(
+    @CurrentUser() user: JwtUser,
+    @Param('subscriberId') subscriberId: string,
+    @Body() body: UpdateWebsiteNewsletterStatusDto,
+  ) {
+    return this.website.updateNewsletterSubscriberStatus(
+      user.tid,
+      subscriberId,
+      body.status,
+    );
+  }
+
+  @Delete('newsletter/:subscriberId')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  deleteNewsletterSubscriber(
+    @CurrentUser() user: JwtUser,
+    @Param('subscriberId') subscriberId: string,
+  ) {
+    return this.website.deleteNewsletterSubscriber(user.tid, subscriberId);
   }
 
   @Get('fyug-interest')
