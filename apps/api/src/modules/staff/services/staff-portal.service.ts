@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { AcademicLifecycleService } from '../../academic-lifecycle/academic-lifecycle.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
@@ -877,9 +878,12 @@ export class StaffPortalService {
     await this.prisma.staffProfile.update({
       where: { id: staff.id },
       data: {
-        ...(dto.addressJson !== undefined && { addressJson: dto.addressJson }),
+        ...(dto.addressJson !== undefined && {
+          addressJson: dto.addressJson as Prisma.InputJsonValue,
+        }),
         ...(dto.emergencyContactJson !== undefined && {
-          emergencyContactJson: dto.emergencyContactJson,
+          emergencyContactJson:
+            dto.emergencyContactJson as Prisma.InputJsonValue,
         }),
       },
     });

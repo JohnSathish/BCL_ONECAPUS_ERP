@@ -545,3 +545,37 @@ export const downloadWebsiteFyugInterestPdf = async (
   const name = applicationNumber || id.slice(0, 8);
   downloadBlob(data, `fyug-application-${name}.pdf`);
 };
+
+export const fetchWebsitePopups = () =>
+  api.get<import('@/types/website-cms').WebsitePopup[]>(`${base}/popups`).then((r) => r.data);
+
+export const createWebsitePopup = (payload: Partial<import('@/types/website-cms').WebsitePopup>) =>
+  api
+    .post<import('@/types/website-cms').WebsitePopup>(`${base}/popups`, payload)
+    .then((r) => r.data);
+
+export const updateWebsitePopup = (
+  id: string,
+  payload: Partial<import('@/types/website-cms').WebsitePopup>,
+) =>
+  api
+    .patch<import('@/types/website-cms').WebsitePopup>(`${base}/popups/${id}`, payload)
+    .then((r) => r.data);
+
+export const deleteWebsitePopup = (id: string) =>
+  api.delete(`${base}/popups/${id}`).then((r) => r.data);
+
+export const updateWebsitePopupStatus = (id: string, status: 'ACTIVE' | 'INACTIVE') =>
+  api
+    .patch<import('@/types/website-cms').WebsitePopup>(`${base}/popups/${id}/status`, { status })
+    .then((r) => r.data);
+
+export const duplicateWebsitePopup = (id: string) =>
+  api
+    .post<import('@/types/website-cms').WebsitePopup>(`${base}/popups/${id}/duplicate`)
+    .then((r) => r.data);
+
+export const previewWebsitePopup = (id: string) =>
+  api
+    .post<import('@/types/website-cms').WebsitePublicPopup>(`${base}/popups/${id}/preview`)
+    .then((r) => r.data);

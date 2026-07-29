@@ -23,6 +23,7 @@ import { WebsiteAcademicService } from './website-academic.service';
 import { WebsiteCmsEnterpriseService } from './website-cms-enterprise.service';
 import { WebsiteService } from './website.service';
 import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
+import { WebsitePopupService } from './website-popup.service';
 import {
   CreateWebsiteBloodDonorDto,
   CreateWebsiteFyugInterestDto,
@@ -38,6 +39,7 @@ export class WebsitePublicController {
     private readonly academic: WebsiteAcademicService,
     private readonly enterprise: WebsiteCmsEnterpriseService,
     private readonly planner: WebsiteAcademicPlannerService,
+    private readonly popupService: WebsitePopupService,
   ) {}
 
   private async resolveTenant(req: Request, tenantSlug?: string) {
@@ -101,6 +103,17 @@ export class WebsitePublicController {
       throw new NotFoundException('Announcement not found');
     }
     return row;
+  }
+
+  @Public()
+  @Get('popups')
+  async popups(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+    @Query('page') page?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.popupService.listPublicActive(tenant.id, page);
   }
 
   @Public()

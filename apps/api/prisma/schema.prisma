@@ -14706,6 +14706,7 @@ model WebsiteSite {
   fyugInterests WebsiteFyugInterest[]
   academicPlannerYears WebsiteAcademicPlannerYear[]
   academicPlannerDays WebsiteAcademicPlannerDay[]
+  popups WebsitePopup[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -15060,6 +15061,50 @@ model WebsiteAnnouncement {
   @@index([siteId, isPinned, publishAt])
   @@index([siteId, showOnTicker, status, deletedAt])
   @@map("website_announcements")
+  @@schema("academic")
+}
+
+/// Home-page and targeted overlay popups (schedule on server; frequency/close rules on client).
+model WebsitePopup {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  siteId           String    @map("site_id") @db.Uuid
+  title            String
+  popupType        String    @map("popup_type")
+  contentHtml      String    @default("") @map("content_html") @db.Text
+  contentJson      Json      @default("{}") @map("content_json")
+  imageJson        Json?     @map("image_json")
+  videoUrl         String?   @map("video_url")
+  videoType        String?   @map("video_type")
+  buttonJson       Json      @default("[]") @map("button_json")
+  status           String    @default("INACTIVE")
+  displayOrder     Int       @default(0) @map("display_order")
+  showTrigger      String    @default("IMMEDIATE") @map("show_trigger")
+  showDelay        Int       @default(0) @map("show_delay")
+  scrollPercent    Int?      @map("scroll_percent")
+  frequency        String    @default("EVERY_VISIT")
+  closeBehavior    Json      @default("[]") @map("close_behavior")
+  autoCloseSeconds Int?      @map("auto_close_seconds")
+  position         String    @default("CENTER")
+  animation        String    @default("FADE")
+  overlayJson      Json      @default("{}") @map("overlay_json")
+  sizeJson         Json      @default("{}") @map("size_json")
+  audienceJson     Json      @default("{}") @map("audience_json")
+  startDate        DateTime? @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  startTime        String?   @map("start_time")
+  endTime          String?   @map("end_time")
+  page             String    @default("HOME")
+  createdById      String?   @map("created_by_id") @db.Uuid
+  updatedById      String?   @map("updated_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, status, page, displayOrder])
+  @@index([siteId, page, status, startDate, endDate])
+  @@map("website_popups")
   @@schema("academic")
 }
 

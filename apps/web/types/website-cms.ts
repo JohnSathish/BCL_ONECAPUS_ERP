@@ -317,3 +317,57 @@ export type AcademicPlannerYearDetail = AcademicPlannerYear & {
   selectedMonthKey: string;
   selectedMonth: AcademicPlannerMonth | null;
 };
+
+export type WebsitePopupType = 'IMAGE' | 'HTML' | 'VIDEO' | 'ANNOUNCEMENT' | 'BANNER';
+
+export type WebsitePopupButton = {
+  label: string;
+  href: string;
+  variant?: 'primary' | 'secondary' | 'outline';
+  openInNewTab?: boolean;
+};
+
+export type WebsitePopupImage = {
+  url: string;
+  alt?: string;
+  caption?: string;
+};
+
+export type WebsitePopup = {
+  id: string;
+  title: string;
+  popupType: WebsitePopupType | string;
+  contentHtml: string;
+  contentJson: Record<string, unknown>;
+  imageJson: WebsitePopupImage | null;
+  videoUrl?: string | null;
+  videoType?: 'YOUTUBE' | 'VIMEO' | 'MP4' | string | null;
+  buttonJson: WebsitePopupButton[];
+  status: 'ACTIVE' | 'INACTIVE' | string;
+  displayOrder: number;
+  showTrigger: string;
+  showDelay: number;
+  scrollPercent?: number | null;
+  frequency: string;
+  closeBehavior: string[];
+  autoCloseSeconds?: number | null;
+  position: string;
+  animation: string;
+  overlayJson: Record<string, unknown>;
+  sizeJson: Record<string, unknown>;
+  audienceJson?: Record<string, unknown>;
+  startDate?: string | null;
+  endDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  page: string;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebsitePublicPopup = Omit<
+  WebsitePopup,
+  'status' | 'audienceJson' | 'createdById' | 'createdByName' | 'createdAt' | 'updatedAt' | 'page'
+>;

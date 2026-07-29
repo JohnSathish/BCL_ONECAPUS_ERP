@@ -23,6 +23,7 @@ import {
   Quote,
   Zap,
   Droplets,
+  Layers,
 } from 'lucide-react';
 
 export type WebsiteCmsNavItem = {
@@ -72,6 +73,13 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     label: 'Announcements',
     href: '/admin/website/announcements',
     icon: Sparkles,
+    group: 'content',
+  },
+  {
+    id: 'popups',
+    label: 'Popup Management',
+    href: '/admin/website/popups',
+    icon: Layers,
     group: 'content',
   },
   {
