@@ -28,10 +28,23 @@ export type FacultyHomeSnapshot = {
     designation?: string | null;
     greeting?: string;
     email?: string | null;
+    mobile?: string | null;
     experienceYears?: number | null;
     joiningDate?: string | null;
+    qualification?: string | null;
+    specialization?: string | null;
+    publicEmail?: string | null;
+    publicPhone?: string | null;
+    officeLocation?: string | null;
+    googleScholarUrl?: string | null;
+    orcidUrl?: string | null;
+    researchAreas?: string | null;
+    addressJson?: Record<string, string> | null;
+    emergencyContactJson?: Record<string, string> | null;
+    profileCompletion?: number;
     isTeaching?: boolean;
     isHod?: boolean;
+    additionalRoles?: { code: string; label: string }[];
   };
   academicContext?: {
     session?: string | null;

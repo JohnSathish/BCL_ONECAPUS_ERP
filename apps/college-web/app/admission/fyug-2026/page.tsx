@@ -41,7 +41,7 @@ const importantDates = [
   },
   {
     label: 'Last date of admission',
-    date: '10 August 2026',
+    date: '13 August 2026',
     icon: GraduationCap,
   },
 ] as const;

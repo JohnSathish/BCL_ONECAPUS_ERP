@@ -608,6 +608,62 @@ export class UploadStaffDocumentDto {
   documentType!: string;
 }
 
+export class UpdateMyProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  mobile?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  qualification?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  specialization?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  experienceYears?: number;
+
+  @IsOptional()
+  @IsEmail()
+  publicEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  publicPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  officeLocation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  googleScholarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  orcidUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  researchAreas?: string;
+}
+
 export class VerifyStaffDocumentDto {
   @IsString()
   verificationStatus!: string;

@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -16,9 +18,12 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
-import { UploadStaffDocumentDto } from './dto/staff.dto';
+import { UpdateMyProfileDto, UploadStaffDocumentDto } from './dto/staff.dto';
 import { StaffDocumentsService } from './services/staff-documents.service';
 import { StaffPortalService } from './services/staff-portal.service';
+import { StaffAssetsService } from './services/staff-assets.service';
+import { StaffPublicationService } from './services/staff-publication.service';
+import { StaffAwardService } from './services/staff-award.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -29,12 +34,57 @@ export class StaffPortalController {
   constructor(
     private readonly portal: StaffPortalService,
     private readonly documents: StaffDocumentsService,
+    private readonly assets: StaffAssetsService,
+    private readonly publications: StaffPublicationService,
+    private readonly awards: StaffAwardService,
   ) {}
 
   @Get('me')
   @RequireAnyPermission('staff:portal:self')
   getMe(@CurrentUser() user: JwtUser) {
     return this.portal.getMe(user);
+  }
+
+  @Patch('me/profile')
+  @RequireAnyPermission('staff:portal:self')
+  updateMyProfile(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: UpdateMyProfileDto,
+  ) {
+    return this.portal.updateMyProfile(user, dto);
+  }
+
+  @Patch('me/address')
+  @RequireAnyPermission('staff:portal:self')
+  updateMyAddress(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    dto: {
+      addressJson?: Record<string, unknown>;
+      emergencyContactJson?: Record<string, unknown>;
+    },
+  ) {
+    return this.portal.updateMyAddress(user, dto);
+  }
+
+  @Post('me/photo')
+  @RequireAnyPermission('staff:portal:self')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_FILE_BYTES },
+    }),
+  )
+  async uploadMyPhoto(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('No file uploaded');
+    }
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.assets.uploadPhoto(user.tid, staff.id, file, user.sub);
   }
 
   @Get('me/dashboard')
@@ -100,6 +150,104 @@ export class StaffPortalController {
       user.sub,
       { selfService: true },
     );
+  }
+
+  /* ─── Self-service publications ─── */
+
+  @Get('me/publications')
+  @RequireAnyPermission('staff:portal:self')
+  async getMyPublications(@CurrentUser() user: JwtUser) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.publications.list(user.tid, staff.id);
+  }
+
+  @Post('me/publications')
+  @RequireAnyPermission('staff:portal:self')
+  async createMyPublication(
+    @CurrentUser() user: JwtUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.publications.create(
+      user.tid,
+      staff.id,
+      body as Parameters<StaffPublicationService['create']>[2],
+    );
+  }
+
+  @Patch('me/publications/:pubId')
+  @RequireAnyPermission('staff:portal:self')
+  async updateMyPublication(
+    @CurrentUser() user: JwtUser,
+    @Param('pubId') pubId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.publications.update(
+      user.tid,
+      staff.id,
+      pubId,
+      body as Parameters<StaffPublicationService['update']>[3],
+    );
+  }
+
+  @Delete('me/publications/:pubId')
+  @RequireAnyPermission('staff:portal:self')
+  async deleteMyPublication(
+    @CurrentUser() user: JwtUser,
+    @Param('pubId') pubId: string,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.publications.remove(user.tid, staff.id, pubId);
+  }
+
+  /* ─── Self-service awards ─── */
+
+  @Get('me/awards')
+  @RequireAnyPermission('staff:portal:self')
+  async getMyAwards(@CurrentUser() user: JwtUser) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.awards.list(user.tid, staff.id);
+  }
+
+  @Post('me/awards')
+  @RequireAnyPermission('staff:portal:self')
+  async createMyAward(
+    @CurrentUser() user: JwtUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.awards.create(
+      user.tid,
+      staff.id,
+      body as Parameters<StaffAwardService['create']>[2],
+    );
+  }
+
+  @Patch('me/awards/:awardId')
+  @RequireAnyPermission('staff:portal:self')
+  async updateMyAward(
+    @CurrentUser() user: JwtUser,
+    @Param('awardId') awardId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.awards.update(
+      user.tid,
+      staff.id,
+      awardId,
+      body as Parameters<StaffAwardService['update']>[3],
+    );
+  }
+
+  @Delete('me/awards/:awardId')
+  @RequireAnyPermission('staff:portal:self')
+  async deleteMyAward(
+    @CurrentUser() user: JwtUser,
+    @Param('awardId') awardId: string,
+  ) {
+    const staff = await this.portal.resolveStaffProfile(user.tid, user.sub);
+    return this.awards.remove(user.tid, staff.id, awardId);
   }
 
   @Get('me/timetable/today')

@@ -51,8 +51,8 @@ check(
 );
 check(
   'version-code-gt-23',
-  versionCode > 23,
-  `versionCode=${versionCode} (last built Play AAB was 23)`,
+  versionCode > 24,
+  `versionCode=${versionCode} (last built Play AAB was 24)`,
 );
 
 let uploadOk = false;

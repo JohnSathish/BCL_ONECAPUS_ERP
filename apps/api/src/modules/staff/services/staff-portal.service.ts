@@ -100,6 +100,27 @@ export class StaffPortalService {
           r.roleName.toLowerCase().includes('head of department'),
       );
 
+    const filledFields = [
+      staff.mobile,
+      staff.email,
+      staff.qualification,
+      staff.specialization,
+      staff.experienceYears,
+      staff.publicEmail,
+      staff.publicPhone,
+      staff.officeLocation,
+      staff.googleScholarUrl,
+      staff.orcidUrl,
+      staff.researchAreas,
+      staff.photoUrl,
+      staff.addressJson,
+      staff.emergencyContactJson,
+    ].filter((v) => v !== null && v !== undefined && v !== '');
+    const profileCompletion = Math.min(
+      100,
+      Math.round((filledFields.length / 14) * 100),
+    );
+
     return {
       id: staff.id,
       employeeCode: staff.employeeCode,
@@ -124,6 +145,17 @@ export class StaffPortalService {
       rfidNo: staff.rfidNo,
       biometricSyncStatus: staff.biometricSyncStatus,
       biometricDeviceId: staff.biometricDeviceId,
+      publicEmail: staff.publicEmail,
+      publicPhone: staff.publicPhone,
+      officeLocation: staff.officeLocation,
+      googleScholarUrl: staff.googleScholarUrl,
+      orcidUrl: staff.orcidUrl,
+      researchAreas: staff.researchAreas,
+      addressJson: staff.addressJson as Record<string, unknown> | null,
+      emergencyContactJson: staff.emergencyContactJson as Record<
+        string,
+        unknown
+      > | null,
       isTeaching,
       isHod,
       isAdminStaff: staff.staffType === 'ADMIN',
@@ -133,6 +165,7 @@ export class StaffPortalService {
       })),
       greeting: greetingForHour(getZonedHour(new Date())),
       online: staff.portalUser?.isActive ?? false,
+      profileCompletion,
     };
   }
 
@@ -783,6 +816,74 @@ export class StaffPortalService {
       where: { tenantId: user.tid, staffProfileId: staff.id },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async updateMyProfile(
+    user: JwtUser,
+    dto: {
+      mobile?: string;
+      email?: string;
+      qualification?: string;
+      specialization?: string;
+      experienceYears?: number;
+      publicEmail?: string;
+      publicPhone?: string;
+      officeLocation?: string;
+      googleScholarUrl?: string;
+      orcidUrl?: string;
+      researchAreas?: string;
+    },
+  ) {
+    const staff = await this.resolveStaffProfile(user.tid, user.sub);
+    await this.prisma.staffProfile.update({
+      where: { id: staff.id },
+      data: {
+        ...(dto.mobile !== undefined && { mobile: dto.mobile }),
+        ...(dto.email !== undefined && { email: dto.email }),
+        ...(dto.qualification !== undefined && {
+          qualification: dto.qualification,
+        }),
+        ...(dto.specialization !== undefined && {
+          specialization: dto.specialization,
+        }),
+        ...(dto.experienceYears !== undefined && {
+          experienceYears: dto.experienceYears,
+        }),
+        ...(dto.publicEmail !== undefined && { publicEmail: dto.publicEmail }),
+        ...(dto.publicPhone !== undefined && { publicPhone: dto.publicPhone }),
+        ...(dto.officeLocation !== undefined && {
+          officeLocation: dto.officeLocation,
+        }),
+        ...(dto.googleScholarUrl !== undefined && {
+          googleScholarUrl: dto.googleScholarUrl,
+        }),
+        ...(dto.orcidUrl !== undefined && { orcidUrl: dto.orcidUrl }),
+        ...(dto.researchAreas !== undefined && {
+          researchAreas: dto.researchAreas,
+        }),
+      },
+    });
+    return this.getMe(user);
+  }
+
+  async updateMyAddress(
+    user: JwtUser,
+    dto: {
+      addressJson?: Record<string, unknown>;
+      emergencyContactJson?: Record<string, unknown>;
+    },
+  ) {
+    const staff = await this.resolveStaffProfile(user.tid, user.sub);
+    await this.prisma.staffProfile.update({
+      where: { id: staff.id },
+      data: {
+        ...(dto.addressJson !== undefined && { addressJson: dto.addressJson }),
+        ...(dto.emergencyContactJson !== undefined && {
+          emergencyContactJson: dto.emergencyContactJson,
+        }),
+      },
+    });
+    return this.getMe(user);
   }
 
   async getTodaySchedule(tenantId: string, staffProfileId: string) {

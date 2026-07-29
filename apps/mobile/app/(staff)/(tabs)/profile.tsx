@@ -29,6 +29,69 @@ export default function FacultyProfileScreen() {
           <Text style={styles.name}>{profile?.fullName ?? 'Faculty'}</Text>
           <Text style={styles.meta}>{profile?.designation ?? '—'}</Text>
           <Text style={styles.meta}>{profile?.department ?? '—'}</Text>
+
+          {/* Additional roles */}
+          {(profile?.additionalRoles?.length ?? 0) > 0 && (
+            <View style={styles.rolesRow}>
+              {profile?.isHod && (
+                <View style={[styles.roleChip, styles.roleChipHod]}>
+                  <Text style={[styles.roleChipText, styles.roleChipTextHod]}>HoD</Text>
+                </View>
+              )}
+              {profile?.additionalRoles?.map((r) => (
+                <View key={r.code} style={styles.roleChip}>
+                  <Text style={styles.roleChipText}>{r.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Profile completion bar */}
+          {(profile?.profileCompletion ?? 0) < 100 && (
+            <View style={styles.completionWrap}>
+              <View style={styles.completionRow}>
+                <Text style={styles.completionLabel}>Profile Completion</Text>
+                <Text
+                  style={[
+                    styles.completionPct,
+                    {
+                      color:
+                        (profile?.profileCompletion ?? 0) >= 80
+                          ? '#16a34a'
+                          : (profile?.profileCompletion ?? 0) >= 50
+                            ? '#d97706'
+                            : '#dc2626',
+                    },
+                  ]}
+                >
+                  {profile?.profileCompletion ?? 0}%
+                </Text>
+              </View>
+              <View style={styles.completionTrack}>
+                <View
+                  style={[
+                    styles.completionFill,
+                    {
+                      width: `${profile?.profileCompletion ?? 0}%` as `${number}%`,
+                      backgroundColor:
+                        (profile?.profileCompletion ?? 0) >= 80
+                          ? '#16a34a'
+                          : (profile?.profileCompletion ?? 0) >= 50
+                            ? '#d97706'
+                            : '#dc2626',
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
+
+          <Pressable
+            style={styles.editProfileBtn}
+            onPress={() => router.push('/(staff)/edit-profile' as never)}
+          >
+            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+          </Pressable>
         </View>
 
         <InfoRow label="Employee ID" value={profile?.employeeCode ?? '—'} />
@@ -152,6 +215,46 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 8, paddingBottom: 32 },
   hero: { alignItems: 'center', gap: 6, marginBottom: 8 },
+  editProfileBtn: {
+    marginTop: 4,
+    borderRadius: 20,
+    backgroundColor: facultyTheme.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 7,
+  },
+  editProfileBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  rolesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  roleChip: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  roleChipHod: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
+  roleChipText: { fontSize: 11, fontWeight: '700', color: facultyTheme.primaryLight },
+  roleChipTextHod: { color: '#92400E' },
+  completionWrap: {
+    width: '90%',
+    marginTop: 8,
+    backgroundColor: facultyTheme.surface,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: facultyTheme.border,
+  },
+  completionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  completionLabel: { fontSize: 11, color: facultyTheme.textMuted, fontWeight: '600' },
+  completionPct: { fontSize: 11, fontWeight: '800' },
+  completionTrack: { height: 6, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  completionFill: { height: 6, borderRadius: 4 },
   name: { fontSize: 18, fontWeight: '800', color: facultyTheme.text },
   meta: { fontSize: 13, color: facultyTheme.textMuted, fontWeight: '600' },
   section: {

@@ -2,7 +2,7 @@
 export const COLLEGE_NAME = 'Don Bosco College, Tura';
 /** Product brand — splash screen + About only */
 export const PRODUCT_NAME = 'BCL OneCampus ERP';
-export const APP_VERSION = '1.0.4';
+export const APP_VERSION = '1.0.5';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
 /** Shown under college name on welcome/login (client-facing) */

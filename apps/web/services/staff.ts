@@ -267,6 +267,117 @@ export async function fetchMyStaffDocumentCompliance() {
   return data;
 }
 
+export interface UpdateMyProfilePayload {
+  mobile?: string;
+  email?: string;
+  qualification?: string;
+  specialization?: string;
+  experienceYears?: number;
+  publicEmail?: string;
+  publicPhone?: string;
+  officeLocation?: string;
+  googleScholarUrl?: string;
+  orcidUrl?: string;
+  researchAreas?: string;
+}
+
+export async function updateMyProfile(payload: UpdateMyProfilePayload) {
+  const { data } = await api.patch('/v1/staff/me/profile', payload);
+  return data;
+}
+
+export async function uploadMyPhoto(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post('/v1/staff/me/photo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data as { photoUrl: string };
+}
+
+export async function updateMyAddress(payload: {
+  addressJson?: Record<string, unknown>;
+  emergencyContactJson?: Record<string, unknown>;
+}) {
+  const { data } = await api.patch('/v1/staff/me/address', payload);
+  return data;
+}
+
+/* ─── Self-service publications ─── */
+
+export type StaffPublicationPayload = {
+  title: string;
+  publicationType: string;
+  journal?: string;
+  isbnIssn?: string;
+  doi?: string;
+  coAuthors?: string;
+  indexedIn?: string;
+  publishedAt?: string;
+};
+
+export type StaffPublication = StaffPublicationPayload & { id: string; createdAt: string };
+
+export async function fetchMyPublications(): Promise<StaffPublication[]> {
+  const { data } = await api.get('/v1/staff/me/publications');
+  return data;
+}
+
+export async function createMyPublication(
+  payload: StaffPublicationPayload,
+): Promise<StaffPublication> {
+  const { data } = await api.post('/v1/staff/me/publications', payload);
+  return data;
+}
+
+export async function updateMyPublication(
+  id: string,
+  payload: Partial<StaffPublicationPayload>,
+): Promise<StaffPublication> {
+  const { data } = await api.patch(`/v1/staff/me/publications/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyPublication(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/publications/${id}`);
+  return data;
+}
+
+/* ─── Self-service awards ─── */
+
+export type StaffAwardPayload = {
+  title: string;
+  organization?: string;
+  level?: string;
+  awardDate?: string;
+  description?: string;
+};
+
+export type StaffAward = StaffAwardPayload & { id: string; createdAt: string };
+
+export async function fetchMyAwards(): Promise<StaffAward[]> {
+  const { data } = await api.get('/v1/staff/me/awards');
+  return data;
+}
+
+export async function createMyAward(payload: StaffAwardPayload): Promise<StaffAward> {
+  const { data } = await api.post('/v1/staff/me/awards', payload);
+  return data;
+}
+
+export async function updateMyAward(
+  id: string,
+  payload: Partial<StaffAwardPayload>,
+): Promise<StaffAward> {
+  const { data } = await api.patch(`/v1/staff/me/awards/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyAward(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/awards/${id}`);
+  return data;
+}
+
 export async function exportStaffCsv(params?: StaffExportParams) {
   const { data } = await api.get('/v1/staff/export.csv', {
     params,
