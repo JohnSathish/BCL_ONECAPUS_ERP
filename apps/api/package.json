@@ -33,6 +33,7 @@
     "ensure:college-domain": "tsx scripts/ensure-college-domain.ts",
     "import:class12-subjects": "tsx scripts/import-class12-subjects-master.ts",
     "shorten:internship-titles": "tsx scripts/shorten-internship-course-titles.ts",
+    "sync:teaching-staff-export": "tsx scripts/sync-teaching-staff-from-export.ts",
     "production:purge-demo": "tsx scripts/production-purge-demo.ts",
     "production:purge-applicants": "tsx scripts/purge-demo-applicants.ts",
     "verify:odd-semester": "ts-node --transpile-only scripts/verify-odd-semester-config.ts",

@@ -1,28 +1,18 @@
 /**
- * Sync teaching faculty from staff_export CSV (keep-list).
+ * Sync teaching faculty from staff_export CSV (Prisma-only — no Nest bootstrap).
  *
- * - Upserts every CSV faculty row (short code + email when missing)
- * - Resolves short-code collisions to campus-unique values
- * - Soft-deactivates TEACHING staff not present in the CSV
- * - Leaves NON_TEACHING / other staff types alone
+ * Safe in Docker/prod with either:
+ *   npx tsx scripts/sync-teaching-staff-from-export.ts --dry-run
+ *   npx tsx scripts/sync-teaching-staff-from-export.ts
  *
- * Usage:
- *   npx ts-node --transpile-only scripts/sync-teaching-staff-from-export.ts
- *   npx ts-node --transpile-only scripts/sync-teaching-staff-from-export.ts --dry-run
- *   npx ts-node --transpile-only scripts/sync-teaching-staff-from-export.ts --csv=path/to.csv
+ * VPS:
+ *   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db exec api \
+ *     npx tsx scripts/sync-teaching-staff-from-export.ts --dry-run
  */
+import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
-import type { JwtUser } from '../src/common/decorators/current-user.decorator';
-import { PrismaService } from '../src/database/prisma.service';
-import { StaffEmploymentService } from '../src/modules/staff/services/staff-employment.service';
-import { StaffProvisioningService } from '../src/modules/staff/services/staff-provisioning.service';
-import {
-  normalizeStaffName,
-  type TeachingShiftCategory,
-} from '../src/modules/staff/services/staff-shift-category';
+import { PrismaClient } from '@prisma/client';
 
 type CsvRow = {
   id: string;
@@ -40,14 +30,25 @@ type CsvRow = {
   status: string;
 };
 
-/** Prefer stable codes for known collisions in the export. */
+type StaffRow = {
+  id: string;
+  fullName: string;
+  employeeCode: string;
+  shortCode: string | null;
+  email: string | null;
+  mobile: string | null;
+  staffType: string;
+  status: string;
+  departmentId: string | null;
+  designationId: string | null;
+  campusId: string | null;
+  portalUserId: string | null;
+};
+
 const SHORT_CODE_OVERRIDES: Record<string, string> = {
-  // BM used by Binendro — Brilliant needs a distinct code
   'MR. BRILLIANT N MARAK': 'BL',
-  // SM used by Suzan — others need distinct codes
   'MR. SENGMATCHI M. SANGMA': 'SX',
   'SENGBACHI G MOMIN': 'SB',
-  // SA used by Sabrina — Sanggra needs a distinct code
   'DR. SANGGRA SANGMA': 'SG',
 };
 
@@ -57,6 +58,10 @@ const DEPARTMENT_ALIASES: Record<string, string> = {
   'environmental studies department': 'Environmental Studies Department',
 };
 
+function normalizeStaffName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').replace(/[.']/g, '').toUpperCase();
+}
+
 function parseArgs(argv: string[]) {
   const dryRun = argv.includes('--dry-run');
   const csvArg = argv.find((a) => a.startsWith('--csv='));
@@ -64,6 +69,32 @@ function parseArgs(argv: string[]) {
     ? resolve(csvArg.slice('--csv='.length))
     : resolve(__dirname, 'data/staff_export_teaching.csv');
   return { dryRun, csvPath };
+}
+
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!;
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
 }
 
 function parseCsv(text: string): CsvRow[] {
@@ -98,32 +129,6 @@ function parseCsv(text: string): CsvRow[] {
   return rows;
 }
 
-function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i]!;
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-    if (ch === ',' && !inQuotes) {
-      out.push(cur);
-      cur = '';
-      continue;
-    }
-    cur += ch;
-  }
-  out.push(cur);
-  return out;
-}
-
 function emailSlug(fullName: string): string {
   return fullName
     .toLowerCase()
@@ -134,10 +139,8 @@ function emailSlug(fullName: string): string {
 }
 
 function isValidEmail(value: string): boolean {
-  if (!value) return false;
-  if (/\s/.test(value)) return false;
+  if (!value || /\s/.test(value)) return false;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return false;
-  // Reject obvious bad domains like "@com"
   const domain = value.split('@')[1] ?? '';
   if (!domain.includes('.') || domain.split('.').pop()!.length < 2)
     return false;
@@ -154,20 +157,17 @@ function normalizeEmail(
     .replace(/@gmail\.comm$/, '@gmail.com')
     .replace(/donboscocollge\.ac\.in$/, 'donboscocollege.ac.in')
     .replace(/@com$/, '@gmail.com');
-
   if (isValidEmail(email)) return email;
   const slug = emailSlug(fullName) || shortCode.toLowerCase() || 'faculty';
   return `${slug}@dbc-faculty.placeholder`;
 }
 
 function mapStaffType(raw: string): string {
-  const value = raw.trim().toUpperCase();
-  // This CSV is the teaching faculty keep-list (incl. Principal / VP who teach).
-  if (value.includes('NON')) return 'NON_TEACHING';
+  if (raw.trim().toUpperCase().includes('NON')) return 'NON_TEACHING';
   return 'TEACHING';
 }
 
-function mapShiftCategory(shift: string): TeachingShiftCategory {
+function mapShiftCategory(shift: string): string {
   const s = shift.toLowerCase();
   if (s.includes('morning')) return 'MORNING';
   if (s.includes('evening')) return 'EVENING';
@@ -175,10 +175,9 @@ function mapShiftCategory(shift: string): TeachingShiftCategory {
   return 'DAY';
 }
 
-function mapAdditionalRoles(raw: string): string[] {
+function wantsHod(raw: string): boolean {
   const lower = raw.toLowerCase();
-  if (lower.includes('head of department') || lower === 'hod') return ['HOD'];
-  return [];
+  return lower.includes('head of department') || lower === 'hod';
 }
 
 function resolveShortCodes(rows: CsvRow[]): Map<string, string> {
@@ -220,6 +219,28 @@ function resolveShortCodes(rows: CsvRow[]): Map<string, string> {
   return byName;
 }
 
+async function nextEmployeeCode(
+  prisma: PrismaClient,
+  tenantId: string,
+): Promise<string> {
+  const existing = await prisma.staffProfile.findMany({
+    where: { tenantId, employeeCode: { startsWith: 'DBCTCH-' } },
+    select: { employeeCode: true },
+  });
+  let max = 0;
+  for (const row of existing) {
+    const m = row.employeeCode.match(/DBCTCH-(\d+)-(\d+)/i);
+    if (m) {
+      const n = Number(m[1]) * 1000 + Number(m[2]);
+      if (n > max) max = n;
+    }
+  }
+  const next = max + 1;
+  const yearPart = String(Math.floor(next / 1000)).padStart(2, '0');
+  const seq = String(next % 1000).padStart(3, '0');
+  return `DBCTCH-${yearPart}-${seq}`;
+}
+
 async function main() {
   const { dryRun, csvPath } = parseArgs(process.argv.slice(2));
   const rows = parseCsv(readFileSync(csvPath, 'utf8'));
@@ -229,295 +250,310 @@ async function main() {
   console.log(`CSV: ${csvPath}`);
   console.log(`Rows: ${rows.length} | dryRun=${dryRun}`);
 
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: ['log', 'error', 'warn'],
-  });
-  const prisma = app.get(PrismaService);
-  const provisioning = app.get(StaffProvisioningService);
-  const employment = app.get(StaffEmploymentService);
+  const prisma = new PrismaClient();
+  try {
+    const tenant =
+      (await prisma.tenant.findFirst({
+        where: { name: { contains: 'Don Bosco' } },
+      })) ?? (await prisma.tenant.findFirst({ where: { slug: 'demo' } }));
+    if (!tenant) throw new Error('Tenant not found');
 
-  const tenant =
-    (await prisma.tenant.findFirst({
-      where: { name: { contains: 'Don Bosco' } },
-    })) ?? (await prisma.tenant.findFirst({ where: { slug: 'demo' } }));
-  if (!tenant) throw new Error('Tenant not found');
-
-  const admin = await prisma.user.findFirst({
-    where: { tenantId: tenant.id, isActive: true },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (!admin) throw new Error('Admin user not found');
-
-  const user: JwtUser = {
-    sub: admin.id,
-    tid: tenant.id,
-    email: admin.email,
-    roles: [],
-    permissions: [],
-  };
-  void user;
-
-  const departments = await prisma.department.findMany({
-    where: { tenantId: tenant.id, deletedAt: null },
-    select: { id: true, name: true, code: true },
-  });
-  const deptByName = new Map(
-    departments.map((d) => [d.name.trim().toLowerCase(), d]),
-  );
-  for (const [alias, deptName] of Object.entries(DEPARTMENT_ALIASES)) {
-    const dept = departments.find(
-      (d) => d.name.toLowerCase() === deptName.toLowerCase(),
-    );
-    if (dept) deptByName.set(alias, dept);
-  }
-
-  const designations = await prisma.designation.findMany({
-    where: { tenantId: tenant.id, isActive: true },
-    select: { id: true, label: true },
-  });
-  const designationByLabel = new Map(
-    designations.map((d) => [d.label.trim().toLowerCase(), d]),
-  );
-  const fallbackDesignation =
-    designationByLabel.get('assistant professor') ??
-    designations.find((d) =>
-      d.label.toLowerCase().includes('assistant professor'),
-    ) ??
-    designations[0];
-  if (!fallbackDesignation) throw new Error('No designation found');
-
-  const existing = await prisma.staffProfile.findMany({
-    where: { tenantId: tenant.id, deletedAt: null },
-    select: {
-      id: true,
-      fullName: true,
-      employeeCode: true,
-      shortCode: true,
-      email: true,
-      mobile: true,
-      staffType: true,
-      status: true,
-      departmentId: true,
-      designationId: true,
-      campusId: true,
-    },
-  });
-
-  // Free campus short codes before re-assigning (incl. soft-deleted rows —
-  // @@unique([campusId, shortCode]) is not partial).
-  if (!dryRun) {
-    const cleared = await prisma.staffProfile.updateMany({
-      where: {
-        tenantId: tenant.id,
-        shortCode: { not: null },
-      },
-      data: { shortCode: null },
+    const departments = await prisma.department.findMany({
+      where: { tenantId: tenant.id, deletedAt: null },
+      select: { id: true, name: true, campusId: true },
     });
-    console.log(`Cleared short codes on ${cleared.count} staff rows`);
-  }
-
-  const keepIds = new Set<string>();
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-  const errors: string[] = [];
-
-  for (const row of rows) {
-    const nameKey = normalizeStaffName(row.fullName);
-    const shortCode = shortCodes.get(nameKey)!;
-    const email = normalizeEmail(row.email, row.fullName, shortCode);
-    const staffType = mapStaffType(row.staffTypeRaw);
-    const teachingShiftCategory = mapShiftCategory(row.shift);
-    const additionalRoleCodes = mapAdditionalRoles(row.additionalRoles);
-
-    const deptKey = row.department.toLowerCase();
-    const dept =
-      deptByName.get(deptKey) ??
-      deptByName.get((DEPARTMENT_ALIASES[deptKey] ?? '').toLowerCase());
-
-    const designation =
-      (row.designation
-        ? designationByLabel.get(row.designation.toLowerCase())
-        : undefined) ?? fallbackDesignation;
-
-    let match =
-      (row.id ? existing.find((s) => s.id === row.id) : undefined) ??
-      (row.employeeCode
-        ? existing.find(
-            (s) =>
-              s.employeeCode.toUpperCase() === row.employeeCode.toUpperCase(),
-          )
-        : undefined) ??
-      existing.find((s) => normalizeStaffName(s.fullName) === nameKey);
-
-    if (!match) {
-      const tokens = nameKey.split(' ').filter((t) => t.length > 2);
-      const partial = existing.filter((s) => {
-        const st = normalizeStaffName(s.fullName);
-        return tokens.length >= 2 && tokens.every((t) => st.includes(t));
-      });
-      if (partial.length === 1) match = partial[0];
-      else if (partial.length > 1) {
-        errors.push(`AMBIGUOUS ${row.fullName}`);
-        skipped += 1;
-        continue;
-      }
+    const deptByName = new Map(
+      departments.map((d) => [d.name.trim().toLowerCase(), d]),
+    );
+    for (const [alias, deptName] of Object.entries(DEPARTMENT_ALIASES)) {
+      const dept = departments.find(
+        (d) => d.name.toLowerCase() === deptName.toLowerCase(),
+      );
+      if (dept) deptByName.set(alias, dept);
     }
 
-    try {
-      if (match) {
-        keepIds.add(match.id);
-        if (!dryRun) {
-          await provisioning.mergeFromImport(
-            tenant.id,
-            match.id,
-            {
-              fullName: row.fullName,
-              email,
-              mobile: row.mobile || undefined,
-              staffType,
-              employmentType: row.employmentType || 'PERMANENT',
-              departmentId: dept?.id,
-              designationId: designation.id,
-              status: 'ACTIVE',
-              createPortalAccount: false,
-              employeeCode: row.employeeCode || undefined,
-              employeeCodeAutoGenerated: !row.employeeCode,
-            },
-            'MERGE',
-            admin.id,
-          );
-          await employment.applyEmploymentUpdate(tenant.id, match.id, {
-            staffType,
-            employmentType: row.employmentType || 'PERMANENT',
-            status: 'ACTIVE',
-            departmentId: dept?.id ?? null,
-            designationId: designation.id,
-            teachingShiftCategory:
-              staffType === 'TEACHING' ? teachingShiftCategory : undefined,
-            shortCode,
-            additionalRoleCodes:
-              additionalRoleCodes.length > 0 ? additionalRoleCodes : undefined,
-          });
-        }
-        updated += 1;
-        console.log(
-          `UPDATE ${match.employeeCode.padEnd(14)} ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
-        );
-        match.shortCode = shortCode;
-        match.email = email;
-        match.fullName = row.fullName;
-        match.staffType = staffType;
-      } else {
-        if (dryRun) {
-          created += 1;
-          console.log(
-            `CREATE (dry) ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
-          );
+    const designations = await prisma.designation.findMany({
+      where: { tenantId: tenant.id, isActive: true },
+      select: { id: true, label: true },
+    });
+    const designationByLabel = new Map(
+      designations.map((d) => [d.label.trim().toLowerCase(), d]),
+    );
+    const fallbackDesignation =
+      designationByLabel.get('assistant professor') ??
+      designations.find((d) =>
+        d.label.toLowerCase().includes('assistant professor'),
+      ) ??
+      designations[0];
+    if (!fallbackDesignation) throw new Error('No designation found');
+
+    const shifts = await prisma.shift.findMany({
+      where: { tenantId: tenant.id, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, code: true },
+    });
+    const shiftByCode = new Map(
+      shifts.map((s) => [s.code.toUpperCase(), s.id]),
+    );
+
+    const existing = (await prisma.staffProfile.findMany({
+      where: { tenantId: tenant.id, deletedAt: null },
+      select: {
+        id: true,
+        fullName: true,
+        employeeCode: true,
+        shortCode: true,
+        email: true,
+        mobile: true,
+        staffType: true,
+        status: true,
+        departmentId: true,
+        designationId: true,
+        campusId: true,
+        portalUserId: true,
+      },
+    })) as StaffRow[];
+
+    if (!dryRun) {
+      const cleared = await prisma.staffProfile.updateMany({
+        where: { tenantId: tenant.id, shortCode: { not: null } },
+        data: { shortCode: null },
+      });
+      console.log(`Cleared short codes on ${cleared.count} staff rows`);
+    }
+
+    const keepIds = new Set<string>();
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const row of rows) {
+      const nameKey = normalizeStaffName(row.fullName);
+      const shortCode = shortCodes.get(nameKey)!;
+      const email = normalizeEmail(row.email, row.fullName, shortCode);
+      const staffType = mapStaffType(row.staffTypeRaw);
+      const teachingShiftCategory = mapShiftCategory(row.shift);
+      const deptKey = row.department.toLowerCase();
+      const dept =
+        deptByName.get(deptKey) ??
+        deptByName.get((DEPARTMENT_ALIASES[deptKey] ?? '').toLowerCase());
+      const designation =
+        (row.designation
+          ? designationByLabel.get(row.designation.toLowerCase())
+          : undefined) ?? fallbackDesignation;
+      const primaryShiftId =
+        teachingShiftCategory === 'MORNING'
+          ? (shiftByCode.get('MORNING') ?? null)
+          : teachingShiftCategory === 'EVENING'
+            ? (shiftByCode.get('EVENING') ?? null)
+            : (shiftByCode.get('DAY') ?? null);
+      const campusId = dept?.campusId ?? null;
+
+      let match =
+        (row.id ? existing.find((s) => s.id === row.id) : undefined) ??
+        (row.employeeCode
+          ? existing.find(
+              (s) =>
+                s.employeeCode.toUpperCase() === row.employeeCode.toUpperCase(),
+            )
+          : undefined) ??
+        existing.find((s) => normalizeStaffName(s.fullName) === nameKey);
+
+      if (!match) {
+        const tokens = nameKey.split(' ').filter((t) => t.length > 2);
+        const partial = existing.filter((s) => {
+          const st = normalizeStaffName(s.fullName);
+          return tokens.length >= 2 && tokens.every((t) => st.includes(t));
+        });
+        if (partial.length === 1) match = partial[0];
+        else if (partial.length > 1) {
+          errors.push(`AMBIGUOUS ${row.fullName}`);
+          skipped += 1;
           continue;
         }
-        const { staff } = await provisioning.create(
-          tenant.id,
-          {
-            fullName: row.fullName,
-            email,
-            mobile: row.mobile || undefined,
-            staffType,
-            employmentType: row.employmentType || 'PERMANENT',
-            departmentId: dept?.id,
-            designationId: designation.id,
-            teachingShiftCategory:
-              staffType === 'TEACHING' ? teachingShiftCategory : undefined,
-            shortCode,
-            additionalRoleCodes:
-              additionalRoleCodes.length > 0 ? additionalRoleCodes : undefined,
-            status: 'ACTIVE',
-            createPortalAccount: false,
-            employeeCode: row.employeeCode || undefined,
-            employeeCodeAutoGenerated: !row.employeeCode,
-            joiningDate: '2024-01-01',
-          },
-          admin.id,
-        );
-        keepIds.add(staff.id);
-        existing.push({
-          id: staff.id,
-          fullName: staff.fullName,
-          employeeCode: staff.employeeCode,
-          shortCode: staff.shortCode,
-          email: staff.email,
-          mobile: staff.mobile,
-          staffType: staff.staffType,
-          status: staff.status,
-          departmentId: staff.departmentId,
-          designationId: staff.designationId,
-          campusId: staff.campusId,
-        });
-        created += 1;
-        console.log(
-          `CREATE  ${staff.employeeCode.padEnd(14)} ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
-        );
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`${row.fullName}: ${msg}`);
-      console.error(`FAIL ${row.fullName}: ${msg}`);
-    }
-  }
 
-  const teachingExtras = existing.filter(
-    (s) =>
-      s.staffType === 'TEACHING' && s.status === 'ACTIVE' && !keepIds.has(s.id),
-  );
-
-  let deactivated = 0;
-  for (const extra of teachingExtras) {
-    if (!dryRun) {
       try {
-        await prisma.staffProfile.update({
-          where: { id: extra.id },
-          data: { shortCode: null },
-        });
-        await provisioning.deactivate(tenant.id, extra.id);
-        deactivated += 1;
-        console.log(
-          `DEACTIVATE ${extra.employeeCode.padEnd(14)} ${extra.fullName}`,
-        );
+        if (match) {
+          keepIds.add(match.id);
+          if (!dryRun) {
+            await prisma.staffProfile.update({
+              where: { id: match.id },
+              data: {
+                fullName: row.fullName,
+                email,
+                mobile: row.mobile || null,
+                staffType,
+                employmentType: row.employmentType || 'PERMANENT',
+                departmentId: dept?.id ?? null,
+                designationId: designation.id,
+                campusId,
+                shortCode,
+                primaryShiftId,
+                teachingShiftCategory,
+                status: 'ACTIVE',
+                deletedAt: null,
+                ...(row.employeeCode ? { employeeCode: row.employeeCode } : {}),
+              },
+            });
+            if (wantsHod(row.additionalRoles)) {
+              await prisma.staffAdditionalRole.upsert({
+                where: {
+                  staffProfileId_roleCode: {
+                    staffProfileId: match.id,
+                    roleCode: 'HOD',
+                  },
+                },
+                create: {
+                  tenantId: tenant.id,
+                  staffProfileId: match.id,
+                  roleCode: 'HOD',
+                  roleName: 'Head of Department',
+                  active: true,
+                },
+                update: { active: true, roleName: 'Head of Department' },
+              });
+            }
+          }
+          updated += 1;
+          console.log(
+            `UPDATE ${match.employeeCode.padEnd(14)} ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
+          );
+          match.shortCode = shortCode;
+          match.email = email;
+          match.fullName = row.fullName;
+          match.staffType = staffType;
+          match.status = 'ACTIVE';
+        } else {
+          if (dryRun) {
+            created += 1;
+            console.log(
+              `CREATE (dry) ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
+            );
+            continue;
+          }
+          const employeeCode =
+            row.employeeCode || (await nextEmployeeCode(prisma, tenant.id));
+          const id = randomUUID();
+          const staff = await prisma.staffProfile.create({
+            data: {
+              id,
+              tenantId: tenant.id,
+              employeeCode,
+              employeeCodeAutoGenerated: !row.employeeCode,
+              fullName: row.fullName,
+              email,
+              mobile: row.mobile || null,
+              staffType,
+              employmentType: row.employmentType || 'PERMANENT',
+              departmentId: dept?.id ?? null,
+              designationId: designation.id,
+              campusId,
+              shortCode,
+              primaryShiftId,
+              teachingShiftCategory,
+              status: 'ACTIVE',
+              joiningDate: new Date('2024-01-01'),
+            },
+          });
+          if (wantsHod(row.additionalRoles)) {
+            await prisma.staffAdditionalRole.create({
+              data: {
+                tenantId: tenant.id,
+                staffProfileId: staff.id,
+                roleCode: 'HOD',
+                roleName: 'Head of Department',
+                active: true,
+              },
+            });
+          }
+          keepIds.add(staff.id);
+          existing.push({
+            id: staff.id,
+            fullName: staff.fullName,
+            employeeCode: staff.employeeCode,
+            shortCode: staff.shortCode,
+            email: staff.email,
+            mobile: staff.mobile,
+            staffType: staff.staffType,
+            status: staff.status,
+            departmentId: staff.departmentId,
+            designationId: staff.designationId,
+            campusId: staff.campusId,
+            portalUserId: staff.portalUserId,
+          });
+          created += 1;
+          console.log(
+            `CREATE  ${staff.employeeCode.padEnd(14)} ${shortCode.padEnd(4)} ${row.fullName} <${email}>`,
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`deactivate ${extra.fullName}: ${msg}`);
+        errors.push(`${row.fullName}: ${msg}`);
+        console.error(`FAIL ${row.fullName}: ${msg}`);
       }
-    } else {
-      deactivated += 1;
-      console.log(
-        `DEACTIVATE (dry) ${extra.employeeCode.padEnd(14)} ${extra.fullName}`,
-      );
     }
-  }
 
-  console.log('\nSummary');
-  console.log({
-    tenant: tenant.slug,
-    csvRows: rows.length,
-    updated,
-    created,
-    deactivated,
-    skipped,
-    errors: errors.length,
-    dryRun,
-  });
-  if (errors.length) {
-    console.log('Errors:');
-    for (const e of errors) console.log(` - ${e}`);
-  }
+    const teachingExtras = existing.filter(
+      (s) =>
+        s.staffType === 'TEACHING' &&
+        s.status === 'ACTIVE' &&
+        !keepIds.has(s.id),
+    );
 
-  try {
-    await app.close();
-  } catch {
-    // Redis may already be closed during script shutdown.
+    let deactivated = 0;
+    for (const extra of teachingExtras) {
+      if (!dryRun) {
+        try {
+          await prisma.staffProfile.update({
+            where: { id: extra.id },
+            data: {
+              shortCode: null,
+              status: 'INACTIVE',
+              deletedAt: new Date(),
+            },
+          });
+          if (extra.portalUserId) {
+            await prisma.user.update({
+              where: { id: extra.portalUserId },
+              data: { isActive: false, accountStatus: 'inactive' },
+            });
+          }
+          deactivated += 1;
+          console.log(
+            `DEACTIVATE ${extra.employeeCode.padEnd(14)} ${extra.fullName}`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`deactivate ${extra.fullName}: ${msg}`);
+        }
+      } else {
+        deactivated += 1;
+        console.log(
+          `DEACTIVATE (dry) ${extra.employeeCode.padEnd(14)} ${extra.fullName}`,
+        );
+      }
+    }
+
+    console.log('\nSummary');
+    console.log({
+      tenant: tenant.slug,
+      csvRows: rows.length,
+      updated,
+      created,
+      deactivated,
+      skipped,
+      errors: errors.length,
+      dryRun,
+    });
+    if (errors.length) {
+      console.log('Errors:');
+      for (const e of errors) console.log(` - ${e}`);
+      process.exitCode = 1;
+    }
+  } finally {
+    await prisma.$disconnect();
   }
-  if (errors.length) process.exit(1);
-  process.exit(0);
 }
 
 main().catch((err) => {
