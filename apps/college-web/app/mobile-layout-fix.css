@@ -120,36 +120,10 @@ body {
     gap: 8px;
   }
 
-  /* ERP + search sit in the navy brand bar on tablet/phone */
-  .brand-actions .brand-erp {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    min-height: 36px;
-    padding: 0 10px;
-    border: 1.5px solid rgba(255, 255, 255, 0.9);
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    font-family: var(--font-nav), Oswald, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .brand-actions .brand-search.icon-button {
-    width: 36px;
-    height: 36px;
-    border-color: rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-  }
-
-  .brand-actions .brand-search.icon-button svg {
-    color: #fff;
-    stroke: currentColor;
+  /* ERP stays in the drawer on mobile — brand bar is logo + menu only */
+  .brand-actions .nav-erp.desktop-only,
+  .brand-actions .desktop-only {
+    display: none !important;
   }
 
   /* Menu control must stay visible on navy (globals .icon-button forces white bg) */
@@ -230,13 +204,6 @@ body {
     gap: 6px;
   }
 
-  .brand-actions .brand-erp {
-    min-height: 34px;
-    padding: 0 8px;
-    font-size: 10px;
-  }
-
-  .brand-actions .brand-search.icon-button,
   .brand-actions .icon-button.mobile-menu.brand-menu {
     width: 36px;
     height: 36px;
@@ -299,11 +266,6 @@ body {
 }
 
 @media (max-width: 420px) {
-  .brand-actions .brand-erp {
-    padding: 0 7px;
-    letter-spacing: 0.03em;
-  }
-
   .nav-app span {
     display: none; /* icon-only Mobile App button on very narrow phones */
   }

@@ -50,9 +50,9 @@ check(
   `gradle=${gradleVN}/${gradleVC} app.config=${appVersion}/${versionCode}`,
 );
 check(
-  'version-code-gt-22',
-  versionCode > 22,
-  `versionCode=${versionCode} (last built Play AAB was 22)`,
+  'version-code-gt-23',
+  versionCode > 23,
+  `versionCode=${versionCode} (last built Play AAB was 23)`,
 );
 
 let uploadOk = false;

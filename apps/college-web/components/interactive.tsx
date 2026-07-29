@@ -136,16 +136,6 @@ export function Header({
             <Button asChild variant="gold" className="compact desktop-only">
               <HeaderCtaLink href={onlineAdmission.href}>{onlineAdmission.label}</HeaderCtaLink>
             </Button>
-            <HeaderCtaLink className="nav-erp mobile-only brand-erp" href={erpLogin.href}>
-              {erpLogin.label}
-            </HeaderCtaLink>
-            <Link
-              className="icon-button mobile-only brand-search"
-              href="/search"
-              aria-label="Search"
-            >
-              <Search size={18} />
-            </Link>
             <button
               type="button"
               className="icon-button mobile-menu brand-menu"
@@ -248,6 +238,12 @@ export function Header({
               </Link>
               <Link href="/naac" onClick={() => setOpen(false)}>
                 NAAC
+              </Link>
+              <Link href="/admission/apply" onClick={() => setOpen(false)}>
+                Admissions
+              </Link>
+              <Link href="/contact" onClick={() => setOpen(false)}>
+                Contact
               </Link>
               <Link href="/search" onClick={() => setOpen(false)}>
                 Search
