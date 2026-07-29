@@ -2,44 +2,64 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-  Award,
-  Building2,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
   FileText,
+  Gavel,
   GraduationCap,
+  Landmark,
   MessageCircle,
   PencilLine,
   Phone,
+  QrCode,
   ShieldCheck,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import { FyugInterestForm } from '@/components/fyug-interest-form';
 import './fyug-interest.css';
 
 export const metadata: Metadata = {
-  title: 'FYUG Fourth-Year Honours Interest 2026',
+  title: 'Fourth-Year UG Admission 2026 | Don Bosco College, Tura',
   description:
-    'Register interest for admission to the Fourth-Year Undergraduate Honours Programme at Don Bosco College Tura for 2026.',
+    'Fourth-Year Undergraduate Honours admission under NEP 2020 at Don Bosco College, Tura. Interest registration, important dates, entrance test, and eligibility for Semester VII admission.',
 };
 
-const REGISTRATION_CLOSES = new Date('2026-08-30T23:59:59+05:30');
-
-const eligibilityItems = [
-  { label: 'NEHU Affiliated College', icon: ShieldCheck },
-  { label: 'Semester V Completed', icon: GraduationCap },
-  { label: 'No Back Papers (Sem I–V)', icon: FileText },
-  { label: 'Minimum CGPA as per NEHU Norms', icon: Award },
+const importantDates = [
+  {
+    label: 'Form will be issued from',
+    date: '30 July 2026',
+    icon: FileText,
+  },
+  {
+    label: 'Last date of issuing form',
+    date: '6 August 2026',
+    icon: CalendarDays,
+  },
+  {
+    label: 'Last date of admission',
+    date: '10 August 2026',
+    icon: GraduationCap,
+  },
 ] as const;
 
-const trustItems = [
-  "NAAC 'B' Grade Accredited",
-  'UGC Recognised',
-  'NEHU Affiliated',
-  'Experienced Faculty',
-  'Placement Assistance',
+const eligibilityItems = [
+  { label: '120 Credits completed', icon: ShieldCheck },
+  { label: 'No Back Papers', icon: FileText },
+  { label: 'Semester VI FYUP cleared', icon: GraduationCap },
+  { label: 'NEHU-affiliated college student', icon: Landmark },
+] as const;
+
+const programmes = [
+  { name: 'Garo', icon: Users },
+  { name: 'English', icon: BookOpen },
+  { name: 'Education', icon: GraduationCap },
+  { name: 'Political Science', icon: Gavel },
+  { name: 'Sociology', icon: Users },
+  { name: 'Economics', icon: TrendingUp },
 ] as const;
 
 const processSteps = [
@@ -49,20 +69,15 @@ const processSteps = [
   'Confirmation & Acknowledgement',
 ] as const;
 
-const stats = [
-  { value: '500+', label: 'Seats', icon: Users },
-  { value: '12', label: 'Departments', icon: Building2 },
-  { value: '4 Years', label: 'Programme', icon: GraduationCap },
-  { value: '2026', label: 'Admission', icon: CalendarDays },
-] as const;
+const FORM_DEADLINE = new Date('2026-08-06T23:59:59+05:30');
 
-function daysUntilClose() {
-  const ms = REGISTRATION_CLOSES.getTime() - Date.now();
+function daysUntilFormClose() {
+  const ms = FORM_DEADLINE.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
 export default function FyugInterestPage() {
-  const daysLeft = daysUntilClose();
+  const daysLeft = daysUntilFormClose();
 
   return (
     <main id="main" className="fyug-page">
@@ -97,13 +112,14 @@ export default function FyugInterestPage() {
 
           <div className="fyug-hero-grid">
             <div className="fyug-hero-copy">
-              <p className="fyug-session-badge">Academic Session 2026 · NEP 2020</p>
+              <p className="fyug-session-badge">Admission Open · NEP 2020</p>
               <h1>
-                <span className="fyug-hero-title-main">Fourth-Year Honours</span>
-                <span className="fyug-hero-title-accent">Interest Registration</span>
+                <span className="fyug-hero-title-main">Fourth-Year UG</span>
+                <span className="fyug-hero-title-accent">Admission</span>
               </h1>
               <p className="fyug-hero-lead">
-                Register your interest for the Fourth-Year Undergraduate Honours Programme.
+                Bonafide students of any NEHU-affiliated college (including Don Bosco College, Tura)
+                who have successfully cleared the Semester VI FYUP (NEP 2020) examination.
               </p>
               <a className="fyug-hero-cta" href="#fyug-form">
                 <PencilLine aria-hidden />
@@ -115,64 +131,95 @@ export default function FyugInterestPage() {
         </div>
       </header>
 
-      <section className="shell fyug-countdown" aria-label="Registration deadline">
-        <div className="fyug-countdown-card">
-          <div className="fyug-countdown-icon" aria-hidden>
-            <Clock3 />
-          </div>
-          <div className="fyug-countdown-copy">
-            <p>Registration closes in</p>
-            <strong>30 August 2026</strong>
-          </div>
-          <div className="fyug-countdown-days">
-            <CalendarDays aria-hidden />
-            <span>
-              {daysLeft === 0
-                ? 'Closes today'
-                : daysLeft === 1
-                  ? '1 day left'
-                  : `${daysLeft} days left`}
-            </span>
+      <section className="shell fyug-entrance" aria-label="Entrance test">
+        <div className="fyug-entrance-card">
+          <Clock3 aria-hidden />
+          <div>
+            <p className="fyug-entrance-kicker">Entrance test</p>
+            <p className="fyug-entrance-title">
+              <strong>7 &amp; 8 August 2026</strong> at <strong>10:00 am</strong>
+            </p>
+            <p className="fyug-entrance-venue">Venue: Don Bosco College, Tura</p>
           </div>
         </div>
       </section>
 
-      <section className="shell fyug-stats" aria-label="Programme highlights">
-        {stats.map((stat) => (
-          <div className="fyug-stat" key={stat.label}>
-            <stat.icon aria-hidden />
-            <strong>{stat.value}</strong>
-            <span>{stat.label}</span>
+      <section className="shell fyug-dates" aria-label="Important dates">
+        <div className="fyug-dates-card">
+          <div className="fyug-dates-head">
+            <CalendarDays aria-hidden />
+            <h2>Important dates</h2>
           </div>
-        ))}
+          <ul className="fyug-dates-list">
+            {importantDates.map((item) => (
+              <li key={item.label}>
+                <item.icon aria-hidden />
+                <div>
+                  <p>{item.label}</p>
+                  <strong>{item.date}</strong>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="fyug-dates-note">
+            <CheckCircle2 aria-hidden />
+            You may take admission if you have cleared the 6th Semester Examination 2026.
+          </p>
+          <p className="fyug-dates-urgency">
+            {daysLeft === 0
+              ? 'Last day to collect the form is today.'
+              : daysLeft === 1
+                ? '1 day left to collect the form.'
+                : `${daysLeft} days left to collect the form.`}
+          </p>
+        </div>
+      </section>
+
+      <section className="shell fyug-programmes" aria-label="Available programmes">
+        <h2>Available programmes for admission</h2>
+        <ul className="fyug-programme-grid">
+          {programmes.map((programme) => (
+            <li key={programme.name}>
+              <programme.icon aria-hidden />
+              <span>{programme.name}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="shell fyug-scan" aria-label="Online registration">
+        <div className="fyug-scan-card">
+          <div className="fyug-scan-icon" aria-hidden>
+            <QrCode />
+          </div>
+          <div>
+            <h2>Scan here for quick access</h2>
+            <p>
+              Fill the Interest Registration Form online. Share this page link or scan the QR code
+              on the college notice to register from your phone.
+            </p>
+            <a className="fyug-scan-link" href="#fyug-form">
+              Open registration form
+              <ChevronRight aria-hidden />
+            </a>
+          </div>
+        </div>
       </section>
 
       <section className="shell fyug-eligibility">
         <div className="fyug-mkt-head">
-          <h2>Who can register?</h2>
-          <a href="#fyug-form">View details</a>
+          <h2>Eligibility</h2>
+          <a href="#fyug-form">Register now</a>
         </div>
         <p className="fyug-eligibility-intro">
-          Bona fide students of any NEHU-affiliated college (including Don Bosco College, Tura)
-          currently pursuing the Four-Year Undergraduate Programme under NEP 2020.
+          Only students having <strong>120 credits</strong> and <strong>no back papers</strong> at
+          the completion of Semester VI will be eligible for admission into Semester VII.
         </p>
         <ul className="fyug-elig-grid">
           {eligibilityItems.map((item) => (
             <li key={item.label}>
               <item.icon aria-hidden />
               <span>{item.label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="shell fyug-trust" aria-label="Why choose Don Bosco College, Tura">
-        <h2>Why choose Don Bosco College, Tura?</h2>
-        <ul className="fyug-trust-row">
-          {trustItems.map((item) => (
-            <li key={item}>
-              <CheckCircle2 aria-hidden />
-              <span>{item}</span>
             </li>
           ))}
         </ul>
@@ -195,13 +242,17 @@ export default function FyugInterestPage() {
       <section className="shell fyug-help-band">
         <div className="fyug-help-card">
           <div>
-            <p className="fyug-help-kicker">Need help?</p>
+            <p className="fyug-help-kicker">For enquiries</p>
             <h2>Contact Admission Office</h2>
           </div>
           <div className="fyug-help-actions">
             <a href="tel:+919402152496">
               <Phone aria-hidden />
-              +91 9402152496
+              +91 94021 52496
+            </a>
+            <a href="tel:+919678402086">
+              <Phone aria-hidden />
+              +91 96784 02086
             </a>
             <a href="mailto:principal@donboscocollege.ac.in">principal@donboscocollege.ac.in</a>
           </div>
