@@ -66,6 +66,37 @@ function animationClass(animation: string) {
   }
 }
 
+function PopupButtons({
+  buttons,
+  className,
+}: {
+  buttons: PublicPopup['buttonJson'];
+  className?: string;
+}) {
+  if (!buttons.length) return null;
+  return (
+    <div className={className ?? 'mt-4 flex flex-wrap gap-2'}>
+      {buttons.map((button, index) => (
+        <a
+          key={`${button.label}-${index}`}
+          href={button.href || '#'}
+          target={button.openInNewTab ? '_blank' : undefined}
+          rel={button.openInNewTab ? 'noreferrer noopener' : undefined}
+          className={
+            button.variant === 'outline'
+              ? 'ui-button ui-button-outline min-h-[40px] px-4 py-2 text-xs'
+              : button.variant === 'secondary'
+                ? 'ui-button ui-button-ghost min-h-[40px] px-4 py-2 text-xs'
+                : 'ui-button min-h-[40px] px-4 py-2 text-xs'
+          }
+        >
+          {button.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => void }) {
   const overlay = popup.overlayJson || {};
   const size = popup.sizeJson || {};
@@ -83,6 +114,7 @@ function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => v
   const canClickOutside = popup.closeBehavior?.includes('CLICK_OUTSIDE') ?? true;
   const canEsc = popup.closeBehavior?.includes('ESC') ?? true;
   const videoEmbed = embedVideoUrl(popup.videoUrl || '', popup.videoType);
+  const primaryLink = popup.buttonJson.find((b) => b.href && b.href !== '#') ?? null;
 
   useEffect(() => {
     if (!canEsc) return;
@@ -99,6 +131,16 @@ function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => v
     const timer = window.setTimeout(onClose, autoCloseMs);
     return () => window.clearTimeout(timer);
   }, [popup, onClose]);
+
+  const imageEl = popup.imageJson?.url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={popup.imageJson.url}
+      alt={popup.imageJson.alt || popup.title}
+      loading="lazy"
+      className="website-popup-image rounded-lg"
+    />
+  ) : null;
 
   return (
     <div className="fixed inset-0 z-[1200] overflow-y-auto" role="presentation">
@@ -117,12 +159,13 @@ function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => v
       <div
         className={`relative z-[1201] flex min-h-full w-full justify-center p-4 ${isImagePopup ? 'items-center py-4' : positionClass(popup.position)}`}
       >
-        {isImagePopup && popup.imageJson?.url ? (
+        {isImagePopup && imageEl ? (
           <div
             role="dialog"
             aria-modal="true"
             aria-label={popup.title}
             className={`website-popup-image-shell rounded-lg bg-white shadow-2xl ${animationClass(popup.animation)}`}
+            style={{ maxWidth }}
           >
             {canCloseX ? (
               <button
@@ -134,13 +177,27 @@ function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => v
                 <X className="h-4 w-4" />
               </button>
             ) : null}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={popup.imageJson.url}
-              alt={popup.imageJson.alt || popup.title}
-              loading="lazy"
-              className="website-popup-image rounded-lg"
-            />
+            {primaryLink ? (
+              <a
+                href={primaryLink.href}
+                target={primaryLink.openInNewTab ? '_blank' : undefined}
+                rel={primaryLink.openInNewTab ? 'noreferrer noopener' : undefined}
+                className="block cursor-pointer"
+                aria-label={primaryLink.label || popup.title}
+              >
+                {imageEl}
+              </a>
+            ) : (
+              imageEl
+            )}
+            {popup.buttonJson.length > 0 ? (
+              <div className="border-t border-[#e8eef4] bg-white px-4 py-3">
+                <PopupButtons
+                  buttons={popup.buttonJson}
+                  className="flex flex-wrap justify-center gap-2"
+                />
+              </div>
+            ) : null}
           </div>
         ) : (
           <div
@@ -186,27 +243,7 @@ function PopupOverlay({ popup, onClose }: { popup: PublicPopup; onClose: () => v
                   />
                 )
               ) : null}
-              {popup.buttonJson.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {popup.buttonJson.map((button, index) => (
-                    <a
-                      key={`${button.label}-${index}`}
-                      href={button.href || '#'}
-                      target={button.openInNewTab ? '_blank' : undefined}
-                      rel={button.openInNewTab ? 'noreferrer noopener' : undefined}
-                      className={
-                        button.variant === 'outline'
-                          ? 'ui-button ui-button-outline min-h-[40px] px-4 py-2 text-xs'
-                          : button.variant === 'secondary'
-                            ? 'ui-button ui-button-ghost min-h-[40px] px-4 py-2 text-xs'
-                            : 'ui-button min-h-[40px] px-4 py-2 text-xs'
-                      }
-                    >
-                      {button.label}
-                    </a>
-                  ))}
-                </div>
-              ) : null}
+              <PopupButtons buttons={popup.buttonJson} />
               {popup.closeBehavior?.includes('CLOSE_BUTTON') ? (
                 <div className="mt-4 flex justify-end">
                   <button

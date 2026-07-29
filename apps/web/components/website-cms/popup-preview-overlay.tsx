@@ -118,7 +118,7 @@ export function PopupPreviewOverlay({ popup, onClose, forceShow }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label={popup.title}
-            className={`relative inline-block max-h-[calc(100dvh-32px)] max-w-[min(92vw,900px)] rounded-lg bg-white shadow-2xl ${animationClass(popup.animation)}`}
+            className={`relative inline-block max-h-[calc(100dvh-32px)] max-w-[min(92vw,900px)] overflow-hidden rounded-lg bg-white shadow-2xl ${animationClass(popup.animation)}`}
           >
             {canCloseX ? (
               <button
@@ -130,17 +130,57 @@ export function PopupPreviewOverlay({ popup, onClose, forceShow }: Props) {
                 <X className="h-4 w-4" />
               </button>
             ) : null}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl!}
-              alt={
-                (popup.imageJson && typeof popup.imageJson === 'object'
-                  ? (popup.imageJson as { alt?: string }).alt
-                  : undefined) || popup.title
-              }
-              className="block max-h-[calc(100dvh-32px)] max-w-[min(92vw,900px)] rounded-lg"
-              style={{ width: 'auto', height: 'auto', objectFit: 'contain' }}
-            />
+            {(() => {
+              const primary = Array.isArray(popup.buttonJson)
+                ? popup.buttonJson.find((b) => b.href && b.href !== '#')
+                : null;
+              const img = (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imageUrl!}
+                  alt={
+                    (popup.imageJson && typeof popup.imageJson === 'object'
+                      ? (popup.imageJson as { alt?: string }).alt
+                      : undefined) || popup.title
+                  }
+                  className="block max-h-[calc(100dvh-96px)] max-w-[min(92vw,900px)] rounded-t-lg"
+                  style={{ width: 'auto', height: 'auto', objectFit: 'contain' }}
+                />
+              );
+              return primary ? (
+                <a
+                  href={primary.href}
+                  target={primary.openInNewTab ? '_blank' : undefined}
+                  rel={primary.openInNewTab ? 'noreferrer noopener' : undefined}
+                  className="block"
+                >
+                  {img}
+                </a>
+              ) : (
+                img
+              );
+            })()}
+            {Array.isArray(popup.buttonJson) && popup.buttonJson.length > 0 ? (
+              <div className="flex flex-wrap justify-center gap-2 border-t border-border bg-white px-4 py-3">
+                {popup.buttonJson.map((button, index) => (
+                  <a
+                    key={`${button.label}-${index}`}
+                    href={button.href || '#'}
+                    target={button.openInNewTab ? '_blank' : undefined}
+                    rel={button.openInNewTab ? 'noreferrer noopener' : undefined}
+                    className={
+                      button.variant === 'outline'
+                        ? 'inline-flex rounded border border-current px-4 py-2 text-sm font-semibold'
+                        : button.variant === 'secondary'
+                          ? 'inline-flex rounded bg-muted px-4 py-2 text-sm font-semibold'
+                          : 'inline-flex rounded bg-[#0b2e59] px-4 py-2 text-sm font-semibold text-white'
+                    }
+                  >
+                    {button.label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div
