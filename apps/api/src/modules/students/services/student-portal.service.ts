@@ -135,7 +135,6 @@ export class StudentPortalService {
       unreadCount,
       attendancePct,
       academicYear,
-      creditSummary,
       examResults,
       libraryLoans,
     ] = await Promise.all([
@@ -156,9 +155,6 @@ export class StudentPortalService {
         select: { name: true },
         orderBy: { startDate: 'desc' },
       }),
-      this.academicEngine
-        .getMyCreditSummary(user.tid, user.sub)
-        .catch(() => null),
       this.examinations.studentResults(user).catch(() => null),
       this.prisma.libraryLoan.findMany({
         where: {
@@ -221,18 +217,6 @@ export class StudentPortalService {
 
     const summaries = examResults?.summaries ?? [];
     const cgpa = summaries[0]?.sgpa != null ? Number(summaries[0].sgpa) : null;
-    const creditsEarned = Number(creditSummary?.total ?? 0);
-    const creditsFromLines = academicChips.reduce(
-      (sum, c) => sum + Number(c.credits ?? 0),
-      0,
-    );
-    const earned = creditsEarned > 0 ? creditsEarned : creditsFromLines;
-    const creditsTarget =
-      semesterSequence != null && semesterSequence >= 7 ? 160 : 120;
-    const creditsPct =
-      creditsTarget > 0
-        ? Math.min(100, Math.round((earned / creditsTarget) * 100))
-        : 0;
 
     const nextDue = libraryLoans.find((l) => l.dueAt)?.dueAt ?? null;
     let libraryDueInDays: number | null = null;
@@ -285,8 +269,7 @@ export class StudentPortalService {
         {
           key: 'credits',
           title: 'Credits Earned',
-          value: `${earned} / ${creditsTarget}`,
-          subvalue: `${creditsPct}% Completed`,
+          value: '—',
           tone: 'neutral',
           href: '/student/registration',
         },
@@ -316,11 +299,6 @@ export class StudentPortalService {
         due: feeDue,
         status: feeDue > 0 ? ('PENDING' as const) : ('PAID' as const),
         semesterLabel: 'Current semester',
-      },
-      credits: {
-        earned,
-        target: creditsTarget,
-        percent: creditsPct,
       },
       examinations: {
         hasResults: summaries.length > 0,

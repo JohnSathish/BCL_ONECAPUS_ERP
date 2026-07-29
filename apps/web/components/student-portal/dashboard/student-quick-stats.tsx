@@ -149,15 +149,12 @@ function buildStats(data: StudentDashboardView): StudentQuickStat[] {
       value: data.examinations?.cgpa != null ? Number(data.examinations.cgpa).toFixed(2) : '—',
       href: '/student/results',
     } satisfies StudentQuickStat);
-  const credits =
-    byKey.credits ??
-    ({
-      key: 'credits',
-      title: 'Credits Earned',
-      value: data.credits != null ? `${data.credits.earned} / ${data.credits.target}` : '—',
-      subvalue: data.credits != null ? `${data.credits.percent}% Completed` : undefined,
-      href: '/student/registration',
-    } satisfies StudentQuickStat);
+  const credits = {
+    key: 'credits',
+    title: 'Credits Earned',
+    value: '—',
+    href: '/student/registration',
+  } satisfies StudentQuickStat;
   const library =
     byKey.library ??
     ({
@@ -223,7 +220,7 @@ export function StudentQuickStats({
   });
 
   const attendancePct = Number.parseInt(stats[0]?.value ?? '0', 10) || 0;
-  const creditsPct = data.credits?.percent ?? 0;
+  const creditsPct = data.credits?.percent ?? null;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
@@ -234,7 +231,7 @@ export function StudentQuickStats({
         } else if (stat.key === 'cgpa') {
           visual = <MiniBars values={[6, 7, 6.5, 8, 7.5, 8.2, 8.4]} color="#1e4d8c" />;
         } else if (stat.key === 'credits') {
-          visual = <CreditsBar percent={creditsPct} />;
+          visual = creditsPct != null ? <CreditsBar percent={creditsPct} /> : null;
         } else if (stat.key === 'library') {
           visual = <Sparkline color="#6366f1" />;
         } else if (stat.key === 'fees') {

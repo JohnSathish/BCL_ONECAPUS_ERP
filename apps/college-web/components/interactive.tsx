@@ -136,12 +136,23 @@ export function Header({
             <Button asChild variant="gold" className="compact desktop-only">
               <HeaderCtaLink href={onlineAdmission.href}>{onlineAdmission.label}</HeaderCtaLink>
             </Button>
+            <HeaderCtaLink className="nav-erp mobile-only brand-erp" href={erpLogin.href}>
+              {erpLogin.label}
+            </HeaderCtaLink>
+            <Link
+              className="icon-button mobile-only brand-search"
+              href="/search"
+              aria-label="Search"
+            >
+              <Search size={18} />
+            </Link>
             <button
+              type="button"
               className="icon-button mobile-menu brand-menu"
               aria-label="Open navigation"
               onClick={() => setOpen(true)}
             >
-              <Menu />
+              <Menu size={22} strokeWidth={2.25} />
             </button>
           </div>
         </div>
@@ -173,7 +184,7 @@ export function Header({
             <Link href="/iqac">IQAC</Link>
             <Link href="/naac">NAAC</Link>
           </nav>
-          <div className="nav-actions">
+          <div className="nav-actions desktop-nav-actions">
             <HeaderCtaLink className="nav-app" href={mobileApp.href}>
               <PlayStoreMark className="nav-app-icon" />
               <span>{mobileApp.label}</span>
@@ -237,6 +248,9 @@ export function Header({
               </Link>
               <Link href="/naac" onClick={() => setOpen(false)}>
                 NAAC
+              </Link>
+              <Link href="/search" onClick={() => setOpen(false)}>
+                Search
               </Link>
               <HeaderCtaLink
                 className="nav-app"

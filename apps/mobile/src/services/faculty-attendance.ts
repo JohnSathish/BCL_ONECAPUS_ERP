@@ -52,5 +52,7 @@ export function markAttendanceSession(
   return apiFetch<AttendanceRoster>(`/v1/student-attendance/sessions/${sessionId}/mark`, {
     method: 'POST',
     body: JSON.stringify(payload),
+    // Large rosters (40+ students) need more than the default 20s.
+    timeoutMs: 60_000,
   });
 }

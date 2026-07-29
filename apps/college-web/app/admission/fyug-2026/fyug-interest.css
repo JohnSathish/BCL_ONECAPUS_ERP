@@ -957,16 +957,84 @@
 }
 
 @media (max-width: 760px) {
+  .fyug-hero {
+    min-height: 0;
+  }
+
   .fyug-hero-inner {
-    padding: 18px 0 34px;
+    padding: 14px 0 28px;
+  }
+
+  .fyug-breadcrumbs {
+    margin-bottom: 8px;
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .fyug-session-badge {
+    margin-bottom: 8px;
+    padding: 4px 9px;
+    font-size: 11px;
+  }
+
+  .fyug-hero h1 {
+    font-size: clamp(22px, 6.4vw, 28px);
+    max-width: none;
+    line-height: 1.18;
+  }
+
+  .fyug-hero-lead {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .fyug-deadline {
+    display: flex;
+    width: 100%;
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .fyug-hero-cta {
+    width: 100%;
+    margin-top: 12px;
+    min-height: 44px;
+  }
+
+  .fyug-eligibility {
+    margin-top: -18px;
+  }
+
+  .fyug-eligibility-card {
+    border-radius: 16px;
+  }
+
+  .fyug-eligibility-main {
+    padding: 18px 16px;
+  }
+
+  .fyug-eligibility-main > p {
+    font-size: 13.5px;
   }
 
   .fyug-check-list {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .fyug-eligibility-help {
+    padding: 16px;
   }
 
   .fyug-layout {
-    padding-bottom: 48px;
+    margin-top: 14px;
+    padding-bottom: max(40px, env(safe-area-inset-bottom));
+  }
+
+  .fyug-workspace {
+    gap: 12px;
   }
 
   .fyug-form-grid,
@@ -975,29 +1043,105 @@
     grid-template-columns: 1fr;
   }
 
-  .fyug-form-panel,
-  .fyug-section {
+  .fyug-form-panel {
     padding: 16px 14px;
+    border-radius: 16px;
+  }
+
+  .fyug-section {
+    padding: 14px 12px;
+    border-radius: 14px;
+    scroll-margin-top: 72px;
+  }
+
+  .fyug-stepper {
+    display: flex;
+    gap: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .fyug-stepper::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fyug-step {
+    flex: 1 0 auto;
+    min-width: 56px;
+    padding: 6px 4px;
+    gap: 4px;
   }
 
   .fyug-step-label {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .fyug-step-index {
+    width: 24px;
+    height: 24px;
     font-size: 11px;
   }
 
+  .fyug-summary-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
   .fyug-field input,
-  .fyug-field select {
-    font-size: 16px;
+  .fyug-field select,
+  .fyug-field textarea {
+    font-size: 16px; /* avoid iOS zoom on focus */
     min-height: 46px;
   }
 
   .fyug-submit {
     width: 100%;
+    min-height: 48px;
+  }
+
+  .fyug-form-actions {
+    margin-top: 12px;
   }
 
   .fyug-save-pill {
     top: auto;
-    bottom: 16px;
-    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    right: 12px;
+    left: 12px;
+    justify-content: center;
+  }
+
+  .fyug-upload-empty {
+    padding: 22px 12px;
+  }
+
+  .fyug-upload-actions {
+    flex-wrap: wrap;
+  }
+
+  .fyug-upload-actions button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .fyug-hero-inner {
+    padding: 12px 0 24px;
+  }
+
+  .fyug-eligibility-main,
+  .fyug-form-panel,
+  .fyug-section {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .fyug-step-label {
+    /* Keep labels for accessibility; allow wrap on tiny screens */
+    max-width: 4.8rem;
   }
 }
 

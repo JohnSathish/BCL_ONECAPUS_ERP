@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -32,6 +33,8 @@ const NEUTRAL_STATUSES = new Set(['EXEMPTED']);
 
 @Injectable()
 export class StudentAttendanceService {
+  private readonly logger = new Logger(StudentAttendanceService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly licenseEnforcement: LicenseEnforcementService,
@@ -530,11 +533,27 @@ export class StudentAttendanceService {
         },
       });
     });
-    await this.recalculateForSession(user.tid, sessionId);
-    await this.audit(user, 'MARK_SESSION', sessionId, null, {
-      mode: dto.mode,
-      count: dto.entries.length,
-    });
+    // Entries are already persisted — do not fail the mark response if
+    // summary recalculation or audit logging throws (e.g. null section keys).
+    try {
+      await this.recalculateForSession(user.tid, sessionId);
+    } catch (err) {
+      this.logger.error(
+        { err, sessionId, tenantId: user.tid },
+        'Attendance saved but summary recalculation failed',
+      );
+    }
+    try {
+      await this.audit(user, 'MARK_SESSION', sessionId, null, {
+        mode: dto.mode,
+        count: dto.entries.length,
+      });
+    } catch (err) {
+      this.logger.error(
+        { err, sessionId, tenantId: user.tid },
+        'Attendance saved but audit logging failed',
+      );
+    }
     return this.roster(user.tid, sessionId);
   }
 
@@ -578,11 +597,25 @@ export class StudentAttendanceService {
         });
       }
     });
-    await this.recalculateForSession(user.tid, sessionId);
-    await this.audit(user, 'CORRECT_SESSION', sessionId, null, {
-      reason: dto.reason,
-      count: dto.entries.length,
-    });
+    try {
+      await this.recalculateForSession(user.tid, sessionId);
+    } catch (err) {
+      this.logger.error(
+        { err, sessionId, tenantId: user.tid },
+        'Attendance corrected but summary recalculation failed',
+      );
+    }
+    try {
+      await this.audit(user, 'CORRECT_SESSION', sessionId, null, {
+        reason: dto.reason,
+        count: dto.entries.length,
+      });
+    } catch (err) {
+      this.logger.error(
+        { err, sessionId, tenantId: user.tid },
+        'Attendance corrected but audit logging failed',
+      );
+    }
     return this.roster(user.tid, sessionId);
   }
 
@@ -1056,54 +1089,87 @@ export class StudentAttendanceService {
         const percentage = counted.length
           ? Math.round((present / counted.length) * 10000) / 100
           : 0;
-        await (this.prisma as any).studentAttendanceSummary.upsert({
-          where: {
-            studentId_courseId_offeringSectionId_semesterNo_periodKey: {
-              studentId: entry.studentId,
-              courseId: paper.courseId,
-              offeringSectionId:
-                paper.offeringSectionId ?? session.offeringSectionId,
-              semesterNo: session.semesterNo,
-              periodKey: 'SEMESTER',
-            },
-          },
-          create: {
-            tenantId,
-            studentId: entry.studentId,
-            courseId: paper.courseId,
-            offeringSectionId:
-              paper.offeringSectionId ?? session.offeringSectionId,
-            semesterNo: session.semesterNo,
-            periodKey: 'SEMESTER',
-            totalSessions: counted.length,
-            presentCount: present,
-            absentCount: absent,
-            medicalLeaveCount: medical,
-            percentage,
-            metadata: {
-              ...(session.teachingSubjectGroupId
-                ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
-                : {}),
-              attendanceMode: policy.attendanceMode,
-            },
-          },
-          update: {
-            totalSessions: counted.length,
-            presentCount: present,
-            absentCount: absent,
-            medicalLeaveCount: medical,
-            percentage,
-            calculatedAt: new Date(),
-            metadata: {
-              ...(session.teachingSubjectGroupId
-                ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
-                : {}),
-              attendanceMode: policy.attendanceMode,
-            },
-          },
+        const offeringSectionId =
+          paper.offeringSectionId ?? session.offeringSectionId ?? null;
+        const semesterNo = session.semesterNo ?? null;
+        const metadata = {
+          ...(session.teachingSubjectGroupId
+            ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
+            : {}),
+          attendanceMode: policy.attendanceMode,
+        };
+        // Prisma compound unique upsert rejects null keys; use find+update/create.
+        await this.upsertAttendanceSummary({
+          tenantId,
+          studentId: entry.studentId,
+          courseId: paper.courseId,
+          offeringSectionId,
+          semesterNo,
+          periodKey: 'SEMESTER',
+          totalSessions: counted.length,
+          presentCount: present,
+          absentCount: absent,
+          medicalLeaveCount: medical,
+          percentage,
+          metadata,
         });
       }
     }
+  }
+
+  private async upsertAttendanceSummary(input: {
+    tenantId: string;
+    studentId: string;
+    courseId: string;
+    offeringSectionId: string | null;
+    semesterNo: number | null;
+    periodKey: string;
+    totalSessions: number;
+    presentCount: number;
+    absentCount: number;
+    medicalLeaveCount: number;
+    percentage: number;
+    metadata: Record<string, unknown>;
+  }) {
+    const existing = await (
+      this.prisma as any
+    ).studentAttendanceSummary.findFirst({
+      where: {
+        studentId: input.studentId,
+        courseId: input.courseId,
+        offeringSectionId: input.offeringSectionId,
+        semesterNo: input.semesterNo,
+        periodKey: input.periodKey,
+      },
+      select: { id: true },
+    });
+    const stats = {
+      totalSessions: input.totalSessions,
+      presentCount: input.presentCount,
+      absentCount: input.absentCount,
+      medicalLeaveCount: input.medicalLeaveCount,
+      percentage: input.percentage,
+      metadata: input.metadata,
+      calculatedAt: new Date(),
+    };
+    if (existing?.id) {
+      await (this.prisma as any).studentAttendanceSummary.update({
+        where: { id: existing.id },
+        data: stats,
+      });
+      return;
+    }
+    await (this.prisma as any).studentAttendanceSummary.create({
+      data: {
+        tenantId: input.tenantId,
+        studentId: input.studentId,
+        courseId: input.courseId,
+        offeringSectionId: input.offeringSectionId,
+        semesterNo: input.semesterNo,
+        periodKey: input.periodKey,
+        ...stats,
+      },
+    });
   }
 
   private async enrichSession(session: any) {

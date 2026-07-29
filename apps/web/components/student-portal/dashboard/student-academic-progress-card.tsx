@@ -19,9 +19,10 @@ export function StudentAcademicProgressCard({
     );
   }
 
-  const creditsPct = data.credits?.percent ?? 0;
+  const creditsPct = data.credits?.percent ?? null;
   const subjectsPct = Math.min(100, (data.academicChips?.length ?? 0) * 12);
-  const ringPct = creditsPct > 0 ? creditsPct : (data.profile.profileCompletion ?? 0);
+  const ringPct =
+    creditsPct != null && creditsPct > 0 ? creditsPct : (data.profile.profileCompletion ?? 0);
   const r = 42;
   const circ = 2 * Math.PI * r;
   const offset = circ - (ringPct / 100) * circ;
@@ -69,8 +70,8 @@ export function StudentAcademicProgressCard({
         <div className="min-w-0 flex-1 space-y-3">
           <Bar
             label="Credits"
-            value={creditsPct}
-            caption={data.credits ? `${data.credits.earned} / ${data.credits.target}` : undefined}
+            value={creditsPct ?? 0}
+            caption={data.credits ? `${data.credits.earned} / ${data.credits.target}` : '—'}
           />
           <Bar
             label="Subjects"
