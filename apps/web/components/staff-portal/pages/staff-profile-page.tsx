@@ -10,7 +10,6 @@ import {
   History,
   KeyRound,
   Phone,
-  Shield,
   UserRound,
   GraduationCap,
   BadgeCheck,
@@ -23,7 +22,6 @@ import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
 import { GlassCard } from '@/components/erp/glass-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useStaffMe } from '@/components/staff-portal/hooks/use-staff-me';
 import { StaffNotLinkedState } from '@/components/staff-portal/layout/staff-module-placeholder';
 import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
@@ -31,7 +29,6 @@ import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
 import { cn } from '@/utils/cn';
 import { apiErrorMessage } from '@/utils/api-error';
-import { api } from '@/services/api';
 import {
   createMyCertification,
   createMyEmergencyContact,
@@ -55,6 +52,8 @@ import {
   fetchMyStaffDocumentCompliance,
 } from '@/services/staff';
 import { fetchMyDocuments } from '@/services/staff-portal';
+import { fetchMasterLookups } from '@/services/students';
+import { StaffSecurityTab } from '@/components/staff-portal/pages/staff-security-tab';
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: UserRound },
@@ -276,7 +275,7 @@ export function StaffProfilePage() {
           />
         ) : null}
         {tab === 'emergency' ? <EmergencyTab /> : null}
-        {tab === 'security' ? <SecurityTab /> : null}
+        {tab === 'security' ? <StaffSecurityTab /> : null}
         {tab === 'activity' ? <ActivityTab /> : null}
 
         {(tab === 'qualifications' ||
@@ -425,7 +424,7 @@ function PersonalTab({
             onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
           />
         </Field>
-        <ReadonlyField label="Blood Group" value={profile.bloodGroup} />
+        <BloodGroupField value={profile.bloodGroup} />
         <Field label="Marital Status">
           <input
             className={inputCls}
@@ -1201,67 +1200,48 @@ function EmergencyTab() {
   );
 }
 
-function SecurityTab() {
-  const [currentPassword, setCurrent] = useState('');
-  const [newPassword, setNew] = useState('');
-  const [confirmPassword, setConfirm] = useState('');
-  const [msg, setMsg] = useState('');
+const FALLBACK_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+
+function BloodGroupField({ value }: { value?: string | null }) {
+  const lookups = useQuery({
+    queryKey: ['master-lookups', 'BLOOD_GROUP'],
+    queryFn: () => fetchMasterLookups('BLOOD_GROUP'),
+    staleTime: 60_000,
+  });
+  const options = useMemo(() => {
+    const fromApi = (lookups.data ?? [])
+      .map((row) => (row.label ?? row.code ?? '').trim())
+      .filter(Boolean);
+    const merged = fromApi.length ? fromApi : [...FALLBACK_BLOOD_GROUPS];
+    return Array.from(new Set(merged));
+  }, [lookups.data]);
+  const current = (value ?? '').trim();
+  const matched = options.find((o) => o.toUpperCase() === current.toUpperCase());
+  const selected = matched ?? (current || '');
+
   return (
-    <div className="space-y-4">
-      <GlassCard className="space-y-3 p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <KeyRound className="h-4 w-4" /> Change Password
-        </h3>
-        <Field label="Current Password">
-          <Input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrent(e.target.value)}
-          />
-        </Field>
-        <Field label="New Password">
-          <Input type="password" value={newPassword} onChange={(e) => setNew(e.target.value)} />
-        </Field>
-        <Field label="Confirm Password">
-          <Input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirm(e.target.value)}
-          />
-        </Field>
-        <Button
-          className="rounded-xl"
-          onClick={() =>
-            void api
-              .post('/v1/auth/change-password', {
-                currentPassword,
-                newPassword,
-                confirmPassword,
-              })
-              .then(() => setMsg('Password updated'))
-              .catch((e) => setMsg(apiErrorMessage(e, 'Unable to change password')))
-          }
-        >
-          Update Password
-        </Button>
-        {msg ? <p className="text-xs text-muted-foreground">{msg}</p> : null}
-      </GlassCard>
-      <GlassCard className="p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <Shield className="h-4 w-4" /> Two-Factor Authentication
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground">Coming soon.</p>
-        <Button className="mt-3 rounded-xl" variant="outline" disabled>
-          Enable 2FA
-        </Button>
-      </GlassCard>
-      <GlassCard className="p-5">
-        <h3 className="text-sm font-semibold">Active Sessions / Login History</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Session management will appear here in a future update.
-        </p>
-      </GlassCard>
-    </div>
+    <Field label="Blood Group">
+      <select
+        className={cn(inputCls, 'cursor-not-allowed bg-muted/30 text-muted-foreground')}
+        value={selected}
+        disabled
+        aria-readonly="true"
+        title="Blood group is managed by the college office and cannot be edited here"
+      >
+        {!selected ? <option value="">—</option> : null}
+        {selected && !options.some((o) => o.toUpperCase() === selected.toUpperCase()) ? (
+          <option value={selected}>{selected}</option>
+        ) : null}
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+      <span className="text-[10px] text-muted-foreground">
+        Non-editable · Contact HR if this needs correction
+      </span>
+    </Field>
   );
 }
 
