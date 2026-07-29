@@ -29,6 +29,35 @@ export type StaffMeProfile = {
   additionalRoles: { code: string; label: string }[];
   greeting: string;
   online: boolean;
+  profileCompletion?: number;
+  gender?: string | null;
+  dateOfBirth?: string | null;
+  aadhaarNo?: string | null;
+  panNo?: string | null;
+  passportNo?: string | null;
+  maritalStatus?: string | null;
+  nationality?: string | null;
+  religion?: string | null;
+  alternateMobile?: string | null;
+  personalEmail?: string | null;
+  bloodGroup?: string | null;
+  publicEmail?: string | null;
+  publicPhone?: string | null;
+  officeLocation?: string | null;
+  googleScholarUrl?: string | null;
+  orcidUrl?: string | null;
+  researchAreas?: string | null;
+  addressJson?: Record<string, unknown> | null;
+  emergencyContactJson?: Record<string, unknown> | null;
+  bank?: {
+    accountHolderName: string | null;
+    bankName: string | null;
+    branch: string | null;
+    accountNumber: string | null;
+    ifsc: string | null;
+    upiId: string | null;
+  };
+  lastUpdatedAt?: string | null;
 };
 
 export type StaffAcademicContext = {
@@ -164,6 +193,7 @@ export type StaffPortalDocument = {
   fileName: string;
   fileUrl: string;
   createdAt: string;
+  verificationStatus?: string;
 };
 
 export type StaffNavContext = {

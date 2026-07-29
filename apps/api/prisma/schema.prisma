@@ -393,6 +393,10 @@ model User {
   studentDocumentsVerified       StudentDocument[]           @relation("StudentDocumentVerifiedBy")
   staffDocumentsUploaded         StaffDocument[]             @relation("StaffDocumentUploadedBy")
   staffDocumentsVerified         StaffDocument[]             @relation("StaffDocumentVerifiedBy")
+  staffQualificationsReviewed    StaffQualification[]        @relation("StaffQualificationReviewedBy")
+  staffExperiencesReviewed       StaffExperience[]           @relation("StaffExperienceReviewedBy")
+  staffCertificationsReviewed    StaffCertification[]        @relation("StaffCertificationReviewedBy")
+  staffProfileAuditLogs          StaffProfileAuditLog[]      @relation("StaffProfileAuditActor")
   substituteStaffCreated         SubstituteStaff[]           @relation("SubstituteStaffCreatedBy")
   studentsCreated                Student[]                   @relation("StudentCreatedBy")
   studentsModified               Student[]                   @relation("StudentModifiedBy")
@@ -3257,6 +3261,10 @@ model StaffProfile {
   email                     String?
   aadhaarNo                 String?   @map("aadhaar_no")
   panNo                     String?   @map("pan_no")
+  passportNo                String?   @map("passport_no")
+  maritalStatus             String?   @map("marital_status")
+  nationality               String?
+  religion                  String?
   photoUrl                  String?   @map("photo_url")
   bloodGroupLookupId        String?   @map("blood_group_lookup_id") @db.Uuid
   rfidNo                    String?   @map("rfid_no")
@@ -3288,6 +3296,8 @@ model StaffProfile {
   websiteSlug               String?   @map("website_slug")
   publicEmail               String?   @map("public_email")
   publicPhone               String?   @map("public_phone")
+  alternateMobile           String?   @map("alternate_mobile")
+  personalEmail             String?   @map("personal_email")
   officeLocation            String?   @map("office_location")
   googleScholarUrl          String?   @map("google_scholar_url")
   orcidUrl                  String?   @map("orcid_url")
@@ -3298,8 +3308,11 @@ model StaffProfile {
   emergencyContactJson      Json?     @map("emergency_contact_json")
   attendanceDeviceMapping   Json?     @map("attendance_device_mapping")
   bankName                  String?   @map("bank_name")
+  accountHolderName         String?   @map("account_holder_name")
   accountNumber             String?   @map("account_number")
   ifsc                      String?
+  bankBranch                String?   @map("bank_branch")
+  upiId                     String?   @map("upi_id")
   pfNumber                  String?   @map("pf_number")
   npsPran                   String?   @map("nps_pran")
   basicPay                  Decimal?  @map("basic_pay") @db.Decimal(12, 2)
@@ -3323,6 +3336,10 @@ model StaffProfile {
   subjectTeachingAssignments SubjectTeachingAssignment[]
   subjectEligibility         StaffSubjectEligibility[]
   qualifications             StaffQualification[]
+  experiences                StaffExperience[]
+  certifications             StaffCertification[]
+  emergencyContacts          StaffEmergencyContact[]
+  profileAuditLogs           StaffProfileAuditLog[]
   documents                  StaffDocument[]
   workloads                  StaffWorkload[]
   employeeCodeAuditLogs      StaffEmployeeCodeAuditLog[]
@@ -4807,18 +4824,126 @@ model StaffSubjectEligibility {
 }
 
 model StaffQualification {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  staffProfileId   String    @map("staff_profile_id") @db.Uuid
+  qualification    String
+  specialization   String?
+  institution      String?
+  university       String?
+  board            String?
+  passingYear      Int?      @map("passing_year")
+  percentageOrCgpa String?   @map("percentage_or_cgpa")
+  division         String?
+  certificateUrl   String?   @map("certificate_url")
+  approvalStatus   String    @default("APPROVED") @map("approval_status")
+  reviewRemarks    String?   @map("review_remarks")
+  submittedAt      DateTime? @map("submitted_at")
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewedById     String?   @map("reviewed_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("StaffQualificationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, approvalStatus])
+  @@map("staff_qualifications")
+  @@schema("academic")
+}
+
+model StaffExperience {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  staffProfileId   String    @map("staff_profile_id") @db.Uuid
+  institutionName  String    @map("institution_name")
+  designation      String
+  department       String?
+  employmentType   String?   @map("employment_type")
+  fromDate         DateTime  @map("from_date") @db.Date
+  toDate           DateTime? @map("to_date") @db.Date
+  totalMonths      Int?      @map("total_months")
+  certificateUrl   String?   @map("certificate_url")
+  approvalStatus   String    @default("PENDING") @map("approval_status")
+  reviewRemarks    String?   @map("review_remarks")
+  submittedAt      DateTime? @map("submitted_at")
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewedById     String?   @map("reviewed_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("StaffExperienceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, approvalStatus])
+  @@map("staff_experiences")
+  @@schema("academic")
+}
+
+model StaffCertification {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  staffProfileId   String    @map("staff_profile_id") @db.Uuid
+  certificationType String   @map("certification_type")
+  title            String
+  organizer        String?
+  year             Int?
+  certificateUrl   String?   @map("certificate_url")
+  approvalStatus   String    @default("PENDING") @map("approval_status")
+  reviewRemarks    String?   @map("review_remarks")
+  submittedAt      DateTime? @map("submitted_at")
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewedById     String?   @map("reviewed_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("StaffCertificationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, approvalStatus])
+  @@map("staff_certifications")
+  @@schema("academic")
+}
+
+model StaffEmergencyContact {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @map("tenant_id") @db.Uuid
   staffProfileId String   @map("staff_profile_id") @db.Uuid
-  qualification  String
-  specialization String?
-  university     String?
+  contactName    String   @map("contact_name")
+  relationship   String
+  mobile         String
+  alternateMobile String? @map("alternate_mobile")
+  address        String?
+  sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, staffProfileId])
-  @@map("staff_qualifications")
+  @@map("staff_emergency_contacts")
+  @@schema("academic")
+}
+
+model StaffProfileAuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  staffProfileId String   @map("staff_profile_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  action         String
+  section        String
+  summary        String
+  metaJson       Json?    @map("meta_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  actorUser    User?        @relation("StaffProfileAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffProfileId, createdAt])
+  @@map("staff_profile_audit_logs")
   @@schema("academic")
 }
 

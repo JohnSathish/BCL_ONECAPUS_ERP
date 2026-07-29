@@ -37,6 +37,8 @@ import { HodDashboardWidget } from '@/components/staff-portal/widgets/hod-dashbo
 
 import { BirthdaysTodayWidget } from '@/components/portal/birthdays-today-widget';
 
+import { ProfileCompletionWidget } from '@/components/staff-portal/widgets/profile-completion-widget';
+
 import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
 
 import { useStaffPortalLayoutStore } from '@/store/staff-portal-layout-store';
@@ -99,6 +101,10 @@ export function StaffDashboardPage() {
           {widgets.header !== false ? <StaffDashboardHeader data={data} loading={loading} /> : null}
 
           {widgets.kpis !== false ? <StaffSnapshotCards data={data} loading={loading} /> : null}
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ProfileCompletionWidget percent={data?.profile.profileCompletion} loading={loading} />
+          </div>
 
           <TeachingWorkspaceWidget isTeaching={data?.profile.isTeaching} />
 

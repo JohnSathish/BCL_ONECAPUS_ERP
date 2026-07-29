@@ -147,6 +147,23 @@ export function StaffMobileDashboard({ data, loading }: Props) {
         </div>
       </motion.div>
 
+      <MobileCard>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Profile Completion
+            </p>
+            <p className="mt-1 text-lg font-bold tabular-nums">{profile.profileCompletion ?? 0}%</p>
+          </div>
+          <Link
+            href="/staff/profile"
+            className={cn(buttonVariants({ size: 'sm' }), 'rounded-xl text-xs')}
+          >
+            Update Now
+          </Link>
+        </div>
+      </MobileCard>
+
       {profile.isTeaching ? (
         <div className="grid grid-cols-2 gap-2">
           {QUICK_ACTIONS.map((action, i) => {

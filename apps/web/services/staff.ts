@@ -548,3 +548,162 @@ export async function downloadStaffImportErrorReport(batchId: string) {
 }
 
 export type { StaffDirectoryRow };
+
+/* ─── Self-service profile (Phase 1 + Approval) ─── */
+
+export async function updateMyPersonal(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/staff/me/personal', payload);
+  return data;
+}
+
+export async function updateMyContact(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/staff/me/contact', payload);
+  return data;
+}
+
+export async function updateMyBank(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/staff/me/bank', payload);
+  return data;
+}
+
+export async function fetchMyEmergencyContacts() {
+  const { data } = await api.get('/v1/staff/me/emergency-contacts');
+  return data as Array<{
+    id: string;
+    contactName: string;
+    relationship: string;
+    mobile: string;
+    alternateMobile?: string | null;
+    address?: string | null;
+  }>;
+}
+
+export async function createMyEmergencyContact(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/staff/me/emergency-contacts', payload);
+  return data;
+}
+
+export async function updateMyEmergencyContact(id: string, payload: Record<string, unknown>) {
+  const { data } = await api.patch(`/v1/staff/me/emergency-contacts/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyEmergencyContact(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/emergency-contacts/${id}`);
+  return data;
+}
+
+export async function fetchMyQualifications() {
+  const { data } = await api.get('/v1/staff/me/qualifications');
+  return data as Array<Record<string, unknown> & { id: string; approvalStatus: string }>;
+}
+
+export async function createMyQualification(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/staff/me/qualifications', payload);
+  return data;
+}
+
+export async function updateMyQualification(id: string, payload: Record<string, unknown>) {
+  const { data } = await api.patch(`/v1/staff/me/qualifications/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyQualification(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/qualifications/${id}`);
+  return data;
+}
+
+export async function fetchMyExperience() {
+  const { data } = await api.get('/v1/staff/me/experience');
+  return data as {
+    items: Array<Record<string, unknown> & { id: string; approvalStatus: string }>;
+    totalTeachingMonths: number;
+    totalTeachingYears: number;
+  };
+}
+
+export async function createMyExperience(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/staff/me/experience', payload);
+  return data;
+}
+
+export async function updateMyExperience(id: string, payload: Record<string, unknown>) {
+  const { data } = await api.patch(`/v1/staff/me/experience/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyExperience(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/experience/${id}`);
+  return data;
+}
+
+export async function fetchMyCertifications() {
+  const { data } = await api.get('/v1/staff/me/certifications');
+  return data as Array<Record<string, unknown> & { id: string; approvalStatus: string }>;
+}
+
+export async function createMyCertification(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/staff/me/certifications', payload);
+  return data;
+}
+
+export async function updateMyCertification(id: string, payload: Record<string, unknown>) {
+  const { data } = await api.patch(`/v1/staff/me/certifications/${id}`, payload);
+  return data;
+}
+
+export async function deleteMyCertification(id: string) {
+  const { data } = await api.delete(`/v1/staff/me/certifications/${id}`);
+  return data;
+}
+
+export async function fetchMyProfileHistory() {
+  const { data } = await api.get('/v1/staff/me/profile/history');
+  return data as Array<{
+    id: string;
+    action: string;
+    section: string;
+    summary: string;
+    createdAt: string;
+  }>;
+}
+
+export async function submitMyProfileForReview() {
+  const { data } = await api.post('/v1/staff/me/profile/submit');
+  return data as { ok: boolean; message: string };
+}
+
+export async function fetchStaffProfileReviewPending() {
+  const { data } = await api.get('/v1/staff/profile-reviews/pending');
+  return data as {
+    total: number;
+    counts: Record<string, number>;
+    items: Array<{
+      kind: string;
+      id: string;
+      title: string;
+      subtitle: string;
+      submittedAt: string;
+      staff: {
+        id: string;
+        fullName: string;
+        employeeCode: string;
+        department?: { name: string } | null;
+      };
+    }>;
+  };
+}
+
+export async function approveStaffProfileReview(kind: string, id: string, remarks?: string) {
+  const { data } = await api.post(`/v1/staff/profile-reviews/${kind}/${id}/approve`, {
+    remarks,
+  });
+  return data;
+}
+
+export async function rejectStaffProfileReview(kind: string, id: string, remarks: string) {
+  const { data } = await api.post(`/v1/staff/profile-reviews/${kind}/${id}/reject`, {
+    remarks,
+  });
+  return data;
+}

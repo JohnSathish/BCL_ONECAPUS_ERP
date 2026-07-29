@@ -30,9 +30,12 @@ import { StaffPublicationService } from './services/staff-publication.service';
 import { StaffSubjectAssignmentService } from './services/staff-subject-assignment.service';
 import { StaffSummaryService } from './services/staff-summary.service';
 import { StaffPortalController } from './staff-portal.controller';
+import { StaffProfileReviewController } from './staff-profile-review.controller';
 import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
 import { StaffPortalService } from './services/staff-portal.service';
+import { StaffSelfServiceProfileService } from './services/staff-self-service-profile.service';
+import { StaffProfileReviewService } from './services/staff-profile-review.service';
 
 @Module({
   imports: [
@@ -50,11 +53,14 @@ import { StaffPortalService } from './services/staff-portal.service';
   ],
   controllers: [
     StaffPortalController,
+    StaffProfileReviewController,
     StaffBulkUpdateController,
     StaffController,
   ],
   providers: [
     StaffPortalService,
+    StaffSelfServiceProfileService,
+    StaffProfileReviewService,
     StaffService,
     StaffSummaryService,
     EmployeeCodeService,

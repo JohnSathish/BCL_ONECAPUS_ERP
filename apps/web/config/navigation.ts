@@ -555,6 +555,11 @@ export const ADMIN_NAV: NavGroup[] = [
             activePattern: '^/admin/staff(?:/[0-9a-f-]{36})?$',
           },
           {
+            label: 'Profile Reviews',
+            href: '/admin/staff/profile-reviews',
+            permissions: ['staff:manage', 'staff:edit'],
+          },
+          {
             label: 'Departments',
             href: '/admin/staff/departments',
             permissions: ['staff:read', 'org:read', 'payroll:read'],
@@ -2406,6 +2411,7 @@ export const STAFF_NAV: NavGroup[] = [
       { label: 'Notifications', href: '/staff/notifications', icon: Bell },
       { label: 'Feedback', href: '/staff/feedback', icon: MessageSquare },
       { label: 'My Calendar', href: '/staff/calendar', icon: CalendarDays },
+      { label: 'My Profile', href: '/staff/profile', icon: User },
     ],
   },
   {
