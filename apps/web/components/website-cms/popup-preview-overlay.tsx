@@ -77,7 +77,8 @@ export function PopupPreviewOverlay({ popup, onClose, forceShow }: Props) {
 
   const overlay = popup.overlayJson || {};
   const size = popup.sizeJson || {};
-  const isImagePopup = popup.popupType === 'IMAGE';
+  const imageUrl = resolvePopupImageUrl(popup.imageJson);
+  const isImagePopup = popup.popupType === 'IMAGE' && Boolean(imageUrl);
   const maxWidth = isImagePopup
     ? typeof size.maxWidth === 'number'
       ? Math.max(size.maxWidth, 680)
@@ -91,8 +92,6 @@ export function PopupPreviewOverlay({ popup, onClose, forceShow }: Props) {
   const canCloseX = popup.closeBehavior?.includes('X') ?? true;
   const canClickOutside = popup.closeBehavior?.includes('CLICK_OUTSIDE') ?? true;
   const videoEmbed = embedVideoUrl(popup.videoUrl || '', popup.videoType);
-  const imageUrl = resolvePopupImageUrl(popup.imageJson);
-  const isImagePopup = popup.popupType === 'IMAGE' && Boolean(imageUrl);
 
   const content = (
     <div className="fixed inset-0 z-[1200] overflow-y-auto" role="presentation">
