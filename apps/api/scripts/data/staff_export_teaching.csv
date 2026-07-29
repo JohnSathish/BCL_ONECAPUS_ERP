@@ -1,0 +1,93 @@
+ID,Employee Code,Short Code,Name,Email,Mobile,Staff Type,Employment Type,Department,Designation,Additional Roles,Shift,Status,RFID,Portal Active
+9a776fa2-198d-4199-96dc-f1b46448ba11,DBCTCH-01-001,LB,Dr. Lilly Bell Ch Marak,lcm4105@outlook.com,7085288619,TEACHING,PERMANENT,Botany,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+1adaeadb-dccd-4a40-85f0-f1ff351be5c8,DBCTCH-01-002,MR,Mr. Mahidhar rajbongshi,mohiraj1936@gmail.com,6002987454,TEACHING,PERMANENT,Physics,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+041cb6b5-6373-4c84-bd9a-6a8c06581cc8,DBCTCH-03-001,MC,Mr. Mridul Chanda,mridul.chanda77@gmail.com,8787574858,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+1ba6b393-c696-486d-aa3f-75da312e5464,DBCTCH-04-001,LR,Dr. Lucy R Marak,lucymarak@gmail.com,9402133353,TEACHING,PERMANENT,English,Assistant Professor,Head of Department,Morning Shift,ACTIVE,,yes
+e5e3bc0b-d224-45a2-bd95-e88269873b5d,DBCTCH-05-001,BM,Mr. Binendro N Marak,binenmarak@gmail.com,7085140165,TEACHING,PERMANENT,Political Science,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+8702c0c2-a3c6-4d84-a67a-6a8dfb7e3764,DBCTCH-07-001,BR,Mrs. Bristina D. Shira,bristina 26@gmail.com,8575504930,TEACHING,PERMANENT,Political Science,Assistant Professor,,Day Shift,ACTIVE,,yes
+248add60-2c10-4abf-88a8-7cf00ce311be,DBCTCH-08-001,SR,Dr. Sabindra Barman,sabindra2011@gmail.com,8119804800,TEACHING,PERMANENT,Commerce,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+f89d28ee-2a78-4e2e-8b63-f5a0e58d150f,DBCTCH-08-002,ZN,Ms. ZINNIA K Marak,zinniamarak@gmail.com,9436313069,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+1926848f-6453-461c-8be1-0dfa5425b98b,DBCTCH-08-003,ME,Dr. Meuller Beul M Sangma,meullerbeul@gmail.com,8787586845,TEACHING,PERMANENT,Education,Assistant Professor,,Day Shift,ACTIVE,,yes
+1b30aceb-7def-4c20-8a80-9bf63bc2119b,DBCTCH-10-001,SJ,Mr. Toijam Sanjeev Lyngdoh,sanjeev.zoology@donboscocollege.ac.in,7005023171,TEACHING,PERMANENT,Zoology,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+8ca6f8b5-230f-4b1b-b9cb-274755beb56d,DBCTCH-14-001,SD,Dr. Sugata Debnath,sugata79.dn@gmail.com,9436705009,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+a55ec659-558b-4947-bec4-8e1d72ee372b,DBCTCH-14-002,GB,Mr. GAURAV BISWAS,gaurav.physics@donboscocollege.ac.in,7005428663,TEACHING,PERMANENT,Physics,Assistant Professor,,Day Shift,ACTIVE,,yes
+45072348-6a39-419b-bb8b-cb46cd4a9a10,DBCTCH-14-003,RD,Mrs. RANI ARULDASS,rani.zoology@donboscocollege.ac.in,8014124254,TEACHING,PERMANENT,Zoology,Assistant Professor,,Day Shift,ACTIVE,,yes
+5a481d75-4003-4c7b-8244-a75acfaca642,DBCTCH-15-001,TD,Mr. TENANG R. MARAK,tenang.zoology@donboscocollege.ac.in,9862394568,TEACHING,PERMANENT,Zoology,Assistant Professor,,Day Shift,ACTIVE,,yes
+de4898e2-e818-45bb-9533-856f3631e5d0,DBCTCH-15-002,DK,Mr. Dhiraj Kumar Rabha,dhiraj.chemistry@donboscocollege.ac.in,8638271426,TEACHING,PERMANENT,Chemistry,Assistant Professor,,Day Shift,ACTIVE,,yes
+e08fb234-60ec-4db1-ba4a-a6abcef5542c,DBCTCH-15-003,RU,Mrs. Rubitha A Sangma,rubithasangma@com,9436176661,TEACHING,PERMANENT,Education,Assistant Professor,,Day Shift,ACTIVE,,yes
+527b94e8-dc9f-43ac-95b7-e976deb9235c,DBCTCH-17-001,YS,Dr. Yubaraj Sharma,yubaraj.physics@donboscocollege.ac.in,7005416347,TEACHING,PERMANENT,Physics,Assistant Professor,,Day Shift,ACTIVE,,yes
+56c5cf51-5cf3-41c1-bf0e-d545c69a397f,DBCTCH-17-002,KI,Mrs. Kimberley Nokimbe G. Momin,kimberley.polscience@donboscocollege.ac.in,9077732728,TEACHING,PERMANENT,Political Science,Assistant Professor,,Day Shift,ACTIVE,,yes
+2eb68e61-cd96-4ae3-8aa9-2e2669ef2a84,DBCTCH-18-001,CS,Chichi Ch Sangma,chichi.botany@donboscocollge.ac.in,8731094692,TEACHING,PERMANENT,Botany,Assistant Professor,,Day Shift,ACTIVE,,yes
+657ae947-ee30-412d-b291-937012eef972,DBCTCH-19-001,JK,Ms. JUDALIN KHARSHANDI,judalin.sociology@donboscocollege.ac.in,8974207200,TEACHING,PERMANENT,Sociology,Assistant Professor,Head of Department,Day Shift,ACTIVE,1174552,yes
+0624191b-6aef-4613-b81e-7632baee7883,DBCTCH-19-002,FS,Mr. Ferick Salnang D Sangma,ferick.philosophy@donboscocollege.ac.in,9615309669,TEACHING,PERMANENT,Philosophy,Assistant Professor,,Day Shift,ACTIVE,,yes
+4b7d71b0-2aab-41e6-ba5d-9251d5fc369d,DBCTCH-19-003,BW,Mr. Brave Well Mawthoh,bravewell.mawthoh@gmail.com,8787321588,TEACHING,PERMANENT,Economics,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+728bad36-f007-404e-8ef6-69117b792a27,DBCTCH-19-004,FM,Ms. Friangky M. Marak,marakfriangky@gmail.com,9366941324,TEACHING,PERMANENT,Philosophy,Assistant Professor,,Day Shift,ACTIVE,,yes
+1978ed8c-11c6-4725-97bd-8ac608953c20,DBCTCH-19-005,SH,SURJORON HAJONG,surjoron.zoology@donboscocollege.ac.in,8415893918,TEACHING,PERMANENT,Environmental Studies Department,Assistant Professor,,Day Shift,ACTIVE,,yes
+423b2704-bbec-4482-ac43-c5998e157ee2,DBCTCH-19-006,BC,Mr. Bikki Ch Sangma,bikkysangma23@gmail.com,9774080327,TEACHING,PERMANENT,Sociology,Assistant Professor,,Day Shift,ACTIVE,,yes
+66393010-e3f1-449c-8706-0d5370221636,DBCTCH-21-001,RR,Mrs. Ringse Rani Patringchi K Marak,ringse.garo@donboscocollege.ac.in,9774376709,TEACHING,PERMANENT,Garo,Assistant Professor,,Morning Shift,ACTIVE,,yes
+0b92bcfd-6afc-4e10-9b75-85a52a01b4a7,DBCTCH-21-002,TM,Dr. Tamara R Marak,tamaramarak@gmail.com,8610696402,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+ea88e1c1-ff39-41ea-9a09-6be225cd3b67,DBCTCH-21-003,AB,Mr. Andrew B Sangma,andrewsangma876@gmail.com,6900332795,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+86c928cc-c2b6-4f20-b184-0ff18c51f632,DBCTCH-21-004,AR,Mrs. Arantxa Shannon R Marak,arantxamarak27@gmail.com,7085368149,TEACHING,PERMANENT,History,Assistant Professor,,Day Shift,ACTIVE,,yes
+4479c1ee-f005-4a4d-a688-f25f38694ee9,DBCTCH-21-005,KK,Mr. Ksanbor Kharkongor,ksanborkharkongor19@gmail.com,9774577724,TEACHING,PERMANENT,Geography,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+2d815965-45b7-4b11-9952-0ee9d243e63f,DBCTCH-21-006,CB,DR. COLNAT B MARAK,colnatmarak@gmail.com,9362188630,TEACHING,PERMANENT,Garo,Assistant Professor,,Day Shift,ACTIVE,,yes
+55294a99-49ea-4b0f-b725-206645554850,DBCTCH-21-007,GV,Ms. Genevive A Sangma,genysangma@gmail.com,8974671796,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+18f1eba2-f41e-4604-955c-ace954e896b3,DBCTCH-21-008,NK,Mrs. Nokme M Marak,nokmemrong995@gmail.com,9362288550,TEACHING,PERMANENT,Education,Assistant Professor,,Morning Shift,ACTIVE,,yes
+39296846-9b6b-42fb-86cb-d4eecd23044d,DBCTCH-22-001,WM,Ms. Westerley R Marak,westerley.philosophy@donboscocollege.ac.in,8131056755,TEACHING,PERMANENT,Philosophy,Assistant Professor,,Day Shift,ACTIVE,,yes
+dab42c6d-3f41-4983-8e07-90e9f943d039,DBCTCH-22-002,WJ,Dr. Wanphai Mary K. Japang,wanphai.philosophy@donboscocollege.ac.in,6909077156,TEACHING,PERMANENT,Philosophy,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+6ca6017e-7c96-47a3-a034-e02870671e70,DBCTCH-22-003,KP,Kaushik Paul,kaushikpaul345@gmail.com,6009327812,TEACHING,PERMANENT,Computer Science,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+581414bb-8a70-4bab-b234-a7a516d9114e,DBCTCH-22-004,TU,Ms. TUSUMIKA ADHIKARY,tusumika.sociology@donboscocollege.ac.in,6289334522,TEACHING,PERMANENT,Sociology,Assistant Professor,,Day Shift,ACTIVE,,yes
+a9a0ecfc-8943-41bf-927b-9873e056acc3,DBCTCH-22-005,AC,Mr. Abhimanyu Sharma,abhimanyu0927@gmail.com,7005703983,TEACHING,PERMANENT,Education,Assistant Professor,,Day Shift,ACTIVE,,yes
+d0847141-41e0-47bb-89c2-d48fb2103e6f,DBCTCH-22-006,TS,Mr. Tapsreng Jones K. Sangma,koksit.jones@gmail.com,8974062290,TEACHING,PERMANENT,History,Assistant Professor,,Day Shift,ACTIVE,,yes
+364fe87a-3101-47bf-9660-9f9bca716ba5,DBCTCH-22-007,CH,Mrs. Cherimchi.M.Sangma,chirimchi@gmail.com,6009474126,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+4b4e9084-f5d8-42ec-9273-777faec5dffb,DBCTCH-22-008,TK,Mr. Thomas M Marak,thomasmrongmarak2018@gmail.com,8787308179,TEACHING,PERMANENT,English,Assistant Professor,,Morning Shift,ACTIVE,,yes
+7a7755f6-51d7-4a96-a21b-a61847dfd82f,DBCTCH-23-001,ED,Estania D Shira,estaniashira2015@gmail.com,9862645670,TEACHING,PERMANENT,Botany,Assistant Professor,,Day Shift,ACTIVE,,yes
+7a0bf202-081b-45a9-b763-54f12f633dcc,DBCTCH-23-003,SS,Ms. Sonatchi T. Sangma,sonatchisangma16@gmail.com,8731877714,TEACHING,PERMANENT,Philosophy,Assistant Professor,,Morning Shift,ACTIVE,,yes
+d6ecd3d6-8cc1-48e2-b1c4-5b910789a110,DBCTCH-23-004,JR,Ms. Jordana Dipera R. Marak,jordana.polscience@donboscocollege.ac.in,7005037218,TEACHING,PERMANENT,Political Science,Assistant Professor,,Day Shift,ACTIVE,,yes
+f3de879d-4cd1-401a-85f6-87a570983f92,DBCTCH-23-005,AW,Ms. Alwisha T. Sangma,alwishasangma@gmail.com,8974077154,TEACHING,PERMANENT,Geography,Assistant Professor,,Day Shift,ACTIVE,,yes
+b1c179ef-b51c-449a-ad03-84565445b3a9,DBCTCH-23-006,SM,Ms. Suzan Maryl S. Marak,maraksuzan@gmail.com,8974891674,TEACHING,PERMANENT,History,Assistant Professor,,Morning Shift,ACTIVE,,yes
+8d4befc6-6809-4c1f-9779-fa44a22962b7,DBCTCH-23-007,SE,Mr. Sengrik Ch. Marak,sengrikmarak30@gmail.com,8787586096,TEACHING,PERMANENT,Garo,Assistant Professor,,Evening Shift,ACTIVE,,yes
+d6232ed1-962c-4b44-ace1-870b12374637,DBCTCH-23-008,NA,Mr. NIKJRANG A SANGMA,nikjrang16@gmail.com,7085384398,TEACHING,PERMANENT,Political Science,Assistant Professor,,Morning Shift,ACTIVE,,yes
+511be463-85f3-43bf-8448-52c282f4cfc9,DBCTCH-23-009,JE,Mr. Jesterfield D Sangma,sangmajesterfield@gmail.com,8729956951,TEACHING,PERMANENT,Political Science,Assistant Professor,,Morning Shift,ACTIVE,,yes
+ebf8c8cc-0b80-4b16-9b54-de21fb1152f1,DBCTCH-23-010,AT,Mr. Albert S Tirkey,albertstirkey@gmail.com,9939771857,TEACHING,PERMANENT,Education,Assistant Professor,,Morning Shift,ACTIVE,,yes
+8bc156ed-0ee9-4186-b222-c441bb21ffb1,DBCTCH-23-011,CR,Ms. Chakme R Marak,dactylogramfromchaki@gmail.com,8730959829,TEACHING,PERMANENT,Education,Assistant Professor,,Evening Shift,ACTIVE,,yes
+c13826ce-7562-4590-81cf-ca7c0ad1a3d9,DBCTCH-23-012,NM,Mr. Namsang K Marak,namsang797@gmail.com,9436173098,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+4e32e024-4104-4878-87a5-f4acd1ff999c,DBCTCH-23-013,KC,Ms. Kasaan Chokchim M Sangma,kasaan.english@donboscocollege.ac.in,8259941729,TEACHING,PERMANENT,English,Assistant Professor,,Morning Shift,ACTIVE,,yes
+8ee923ac-ed2f-425a-9c10-ec4554a43a8b,DBCTCH-23-014,BA,Ms. Bonme A Sangma,bonsangma28@gmail.com,9366159583,TEACHING,PERMANENT,Zoology,Assistant Professor,,Day Shift,ACTIVE,,yes
+67587f8e-723b-421b-8476-149d23b264fc,DBCTCH-24-001,CM,Ms. Chanchi Aman R Marak,chanchirmarak@gmail.com,8798931766,TEACHING,PERMANENT,Economics,Assistant Professor,,Morning Shift,ACTIVE,,yes
+1e7658b1-3110-4e36-89d8-90de7cf95b1b,DBCTCH-24-002,CC,Ms. Chonre Ch Marak,chonremarak123@gmail.com,9863499601,TEACHING,PERMANENT,Economics,Assistant Professor,,Morning Shift,ACTIVE,,yes
+dbe9b52c-a743-48d8-8835-f0aecfb7f879,DBCTCH-24-003,AK,Ms. Ambalika M Marak,ambamarak3@gmail.com,8259913788,TEACHING,PERMANENT,History,Assistant Professor,,Morning Shift,ACTIVE,,yes
+e4a1d341-0e47-4273-a542-7f5c29b2dfaf,DBCTCH-24-004,BE,Ms. Benobitha M Sangma,benobitha@gmail.com,7085847044,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+12facc41-4aa6-4618-b127-b42f3ffccf1d,DBCTCH-24-005,BS,Mr. Brithuel G Sangma,brithuelgsangma3293@gmail.com,9366848480,TEACHING,PERMANENT,Economics,Assistant Professor,,Morning Shift,ACTIVE,,yes
+464d939e-0db7-4d7e-9918-7b0fb206a3c9,DBCTCH-24-006,JT,Ms. Jessy T Sangma,tegitejessy97@gmail.com,9678063297,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+0be522cc-09a1-4849-9ec8-2d426f32f76b,DBCTCH-24-007,RC,Ms. Renchi ch Sangma,sangmarenchich@gmail.com,8414967747,TEACHING,PERMANENT,Sociology,Assistant Professor,,Morning Shift,ACTIVE,,yes
+6725abe4-b8ad-464c-9e3b-67ef2a2ca3ec,DBCTCH-24-008,GM,Mr. Gripseng G Momin,gripmo99@gmail.com,9612482595,TEACHING,PERMANENT,Garo,Assistant Professor,,Morning Shift,ACTIVE,,yes
+30b042da-9754-4b62-bde8-81a4507e5d34,DBCTCH-24-009,UM,Mr. UZZIEL S MOMIN,uzziel.s.momin@dbc-faculty.placeholder,,TEACHING,PERMANENT,English,Assistant Professor,,Morning Shift,ACTIVE,,yes
+8a3e96ab-748e-4d41-9051-30bb1902cfc9,DBCTCH-24-010,MB,Mr. MARCUCH B SANGMA,marcuch.sangma@dbc-faculty.placeholder,,TEACHING,PERMANENT,History,Assistant Professor,,Morning Shift,ACTIVE,,yes
+67026f5c-3abd-45fd-875f-b670dab2280e,DBCTCH-24-012,SC,Ms. SALMAN CH MARAK,salman@dbc-faculty.placeholder,,TEACHING,PERMANENT,Political Science,Assistant Professor,,Morning Shift,ACTIVE,,yes
+11b6f883-1d8b-4d2a-a474-3a85e00ae609,DBCTCH-24-016,CN,Mr. CHARE N SANGMA,chare.n.sangma@dbc-faculty.placeholder,,TEACHING,PERMANENT,Geography,Assistant Professor,,Morning Shift,ACTIVE,,yes
+db1a3aac-847f-45c9-8aad-7aa3746d9447,DBCTCH-25-001,BI,Mr. BINDARASH R MARAK,marakbindarash@gmail.comm,8638545258,TEACHING,PERMANENT,Garo,Assistant Professor,,Day Shift,ACTIVE,,yes
+29bc23d2-5a77-436a-83d7-e99600e2aca0,DBCTCH-25-002,NZ,Ms. Nenzebi Ch Sangma,nenzebi1@gmail.com,9366016914,TEACHING,PERMANENT,Mathematics,Assistant Professor,,Day Shift,ACTIVE,,yes
+eb13073e-591b-4264-81ac-ed2d7b5ef38e,DBCTCH-25-003,PH,Dr. Pranita Hajong,pranitahajong@gmail.com,9436563824,TEACHING,PERMANENT,Botany,Assistant Professor,,Day Shift,ACTIVE,,yes
+3c75cb63-5e95-4048-9301-617c7c043fc4,DBCTCH-25-004,SM,Mr. Sengmatchi M. Sangma,sengmatchi1989@gmail.com,8794708498,TEACHING,PERMANENT,Garo,Assistant Professor,,Day Shift,ACTIVE,,yes
+0d732e27-c586-4093-a8d6-edcac35f8412,DBCTCH-25-005,JM,Ms. Jasmine Sylvera Ch Marak,jasminechambugongmarak27@gmail.com,7629809231,TEACHING,PERMANENT,Economics,Assistant Professor,,Day Shift,ACTIVE,,yes
+193561fe-0645-4df5-8c15-d950db7a8b22,DBCTCH-25-006,KA,Ms. Kasinchi A Marak,kasinchi98@gmail.com,9077601042,TEACHING,PERMANENT,Sociology,Assistant Professor,,Day Shift,ACTIVE,,yes
+c03fd707-56a2-44f8-b994-bd5e45adf281,DBCTCH-25-007,LS,Ms. LAIAMONRITI P SOH,laiamonriti4@gmail.com,9485444132,TEACHING,PERMANENT,Commerce,Assistant Professor,,Day Shift,ACTIVE,,yes
+37291d02-e674-4c16-9f34-e89ab712fd03,DBCTCH-25-008,IK,Mr. Isaac Kadimwasa N Sangma,snngmaisaac@gmail.com,7005690083,TEACHING,PERMANENT,Philosophy,Assistant Professor,,Day Shift,ACTIVE,,yes
+ca443488-914d-44c0-b75b-3fbd265cbc9f,DBCTCH-25-009,DS,Dolina R. Sangma,dollinarongsime@gmail.com,9394629785,TEACHING,PERMANENT,Botany,Assistant Professor,,Day Shift,ACTIVE,,yes
+ba36073e-6b9c-4916-bc85-b6f38516eb83,DBCTCH-25-010,PY,Mrs. Popy Dey,popydey12@gmail.com,7005662778,TEACHING,PERMANENT,Chemistry,Assistant Professor,,Day Shift,ACTIVE,,yes
+ad740566-25fa-4fee-ae80-4518ff1eea17,DBCTCH-25-011,SA,Ms. Sabrina A Sangma,sabrinaagitok@gmail.com,7005722428,TEACHING,PERMANENT,Sociology,Assistant Professor,,Evening Shift,ACTIVE,,yes
+d2f51afa-cf20-44df-a7ab-5a5a4e2e4f9f,DBCTCH-89-001,AN,Mr. ANIL KUMAR,anilmaths63@gmail.com,9366379188,TEACHING,PERMANENT,Mathematics,Associate Professor,,Day Shift,ACTIVE,,yes
+6f103ec6-4260-4b08-a4fc-f9fc8b447e33,DBCTCH-94-001,MS,Dr. Madhusudhan Saha,ms.19.chem@gmail.com,9436113395,TEACHING,PERMANENT,Chemistry,Associate Professor,Head of Department,Day Shift,ACTIVE,,yes
+98f347e1-aa1c-4aa1-b68d-729b14a5a1e1,DBCTCH-94-002,UB,Dr. Uma Roy Bhowmik,umaraybhowmik@gmail.com,8787803077,TEACHING,PERMANENT,Education,Associate Professor,Head of Department,Day Shift,ACTIVE,,yes
+ab267330-5a1b-43dd-8df9-25ffa677230f,DBCTCH-96-001,HD,Mr. HABUL CHANDRA DAS,habul13@gmail.com,8837304026,TEACHING,PERMANENT,Mathematics,Associate Professor,Head of Department,Day Shift,ACTIVE,,yes
+80cbf4af-e771-46df-81ab-ad39bf9fedd0,DBCTCH-96-002,NS,Mr. Nicholas M. Sangma,nicholassangma3@gmail.com,9862631963,TEACHING,PERMANENT,Garo,Associate Professor,Head of Department,Day Shift,ACTIVE,,yes
+e83559e9-1add-4c90-a1ba-617930c9999b,DBCTCH-97-001,AG,Dr. Arindam Ghosh,aringh999@gmail.com,7005036227,TEACHING,PERMANENT,Physics,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,BM,Mr. Brilliant N Marak,,,TEACHING,PERMANENT,Chemistry,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,ZS,Mr. Zakkur D Sangma,,,TEACHING,PERMANENT,Economics,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,TE,Ms. Tengme K Marak,,,TEACHING,PERMANENT,English,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,CT,Ms. Chonme Ch Sangma,,,TEACHING,PERMANENT,Garo,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,SM,Sengbachi G Momin,,,TEACHING,PERMANENT,Geography,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,SA,Dr. Sanggra Sangma,,,TEACHING,PERMANENT,History,Assistant Professor,Head of Department,Day Shift,ACTIVE,,yes
+,,SP,Mr. Sengprang A Sangma,,,TEACHING,PERMANENT,History,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,PR,"Dr (Fr) Jogesh B Sangma, SDB",,,Principal,PERMANENT,Garo,Assistant Professor,,Day Shift,ACTIVE,,yes
+,,JP,"Fr. John Paul Tirkey, SDB",,,Vice Principal,PERMANENT,Environmental Studies Department,Assistant Professor,,Day Shift,ACTIVE,,yes

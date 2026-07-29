@@ -70,3 +70,4 @@ _safety-backups/
 apps/api/scripts/data/**
 !apps/api/scripts/data/.gitkeep
 !apps/api/scripts/data/news-export-demo.json
+!apps/api/scripts/data/staff_export_teaching.csv
