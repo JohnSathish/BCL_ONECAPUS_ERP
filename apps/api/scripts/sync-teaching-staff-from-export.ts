@@ -180,6 +180,34 @@ function wantsHod(raw: string): boolean {
   return lower.includes('head of department') || lower === 'hod';
 }
 
+/** No @@unique on (staffProfileId, roleCode) — cannot use Prisma upsert compound where. */
+async function ensureHodRole(
+  prisma: PrismaClient,
+  tenantId: string,
+  staffProfileId: string,
+) {
+  const existing = await prisma.staffAdditionalRole.findFirst({
+    where: { tenantId, staffProfileId, roleCode: 'HOD' },
+    orderBy: { updatedAt: 'desc' },
+  });
+  if (existing) {
+    await prisma.staffAdditionalRole.update({
+      where: { id: existing.id },
+      data: { active: true, roleName: 'Head of Department', endDate: null },
+    });
+    return;
+  }
+  await prisma.staffAdditionalRole.create({
+    data: {
+      tenantId,
+      staffProfileId,
+      roleCode: 'HOD',
+      roleName: 'Head of Department',
+      active: true,
+    },
+  });
+}
+
 function resolveShortCodes(rows: CsvRow[]): Map<string, string> {
   const byName = new Map<string, string>();
   const used = new Set<string>();
@@ -397,22 +425,7 @@ async function main() {
               },
             });
             if (wantsHod(row.additionalRoles)) {
-              await prisma.staffAdditionalRole.upsert({
-                where: {
-                  staffProfileId_roleCode: {
-                    staffProfileId: match.id,
-                    roleCode: 'HOD',
-                  },
-                },
-                create: {
-                  tenantId: tenant.id,
-                  staffProfileId: match.id,
-                  roleCode: 'HOD',
-                  roleName: 'Head of Department',
-                  active: true,
-                },
-                update: { active: true, roleName: 'Head of Department' },
-              });
+              await ensureHodRole(prisma, tenant.id, match.id);
             }
           }
           updated += 1;
@@ -457,15 +470,7 @@ async function main() {
             },
           });
           if (wantsHod(row.additionalRoles)) {
-            await prisma.staffAdditionalRole.create({
-              data: {
-                tenantId: tenant.id,
-                staffProfileId: staff.id,
-                roleCode: 'HOD',
-                roleName: 'Head of Department',
-                active: true,
-              },
-            });
+            await ensureHodRole(prisma, tenant.id, staff.id);
           }
           keepIds.add(staff.id);
           existing.push({
