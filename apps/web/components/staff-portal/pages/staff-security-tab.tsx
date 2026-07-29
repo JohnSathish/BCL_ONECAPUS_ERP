@@ -4,27 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Check,
-  CheckCircle2,
+  Clock3,
   Eye,
   EyeOff,
-  Fingerprint,
+  HelpCircle,
   KeyRound,
+  Lightbulb,
   Loader2,
   Lock,
   LogOut,
   Monitor,
-  Phone,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
-  Sparkles,
 } from 'lucide-react';
 
 import { GlassCard } from '@/components/erp/glass-card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { api } from '@/services/api';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -44,7 +41,8 @@ function parseDevice() {
   else if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) browser = 'Safari';
 
   let os = 'Unknown';
-  if (/Windows/i.test(ua)) os = 'Windows';
+  if (/Windows NT 10/i.test(ua)) os = 'Windows 11';
+  else if (/Windows/i.test(ua)) os = 'Windows';
   else if (/Mac OS X/i.test(ua)) os = 'macOS';
   else if (/Android/i.test(ua)) os = 'Android';
   else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
@@ -65,22 +63,23 @@ function passwordChecks(password: string) {
 
 function strengthFromChecks(password: string): {
   level: StrengthLevel;
-  score: number;
+  segments: number;
   label: string;
 } {
-  if (!password) return { level: 'empty', score: 0, label: 'Enter a password' };
+  if (!password) return { level: 'empty', segments: 0, label: '—' };
   const c = passwordChecks(password);
   const score = [c.minLength, c.upper, c.lower, c.number, c.special].filter(Boolean).length;
-  if (score <= 2) return { level: 'weak', score: score * 20, label: 'Weak' };
-  if (score === 3) return { level: 'fair', score: 60, label: 'Fair' };
-  if (score === 4) return { level: 'good', score: 80, label: 'Good' };
-  return { level: 'strong', score: 100, label: 'Strong' };
+  if (score <= 1) return { level: 'weak', segments: 1, label: 'Weak' };
+  if (score === 2) return { level: 'fair', segments: 2, label: 'Fair' };
+  if (score === 3) return { level: 'fair', segments: 3, label: 'Fair' };
+  if (score === 4) return { level: 'good', segments: 4, label: 'Good' };
+  return { level: 'strong', segments: 5, label: 'Strong' };
 }
 
-function strengthColor(level: StrengthLevel) {
+function segmentColor(level: StrengthLevel) {
   switch (level) {
     case 'weak':
-      return 'bg-destructive';
+      return 'bg-red-500';
     case 'fair':
       return 'bg-amber-500';
     case 'good':
@@ -88,27 +87,35 @@ function strengthColor(level: StrengthLevel) {
     case 'strong':
       return 'bg-emerald-500';
     default:
-      return 'bg-muted-foreground/30';
+      return 'bg-slate-200';
   }
 }
 
-function statusTone(kind: 'strong' | 'warn' | 'danger' | 'neutral') {
-  switch (kind) {
-    case 'strong':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
-    case 'warn':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300';
-    case 'danger':
-      return 'border-destructive/30 bg-destructive/10 text-destructive';
-    default:
-      return 'border-border/50 bg-muted/40 text-muted-foreground';
-  }
+function Pill({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: 'strong' | 'warn' | 'info' | 'neutral';
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+        tone === 'strong' && 'bg-emerald-100 text-emerald-700',
+        tone === 'warn' && 'bg-amber-100 text-amber-700',
+        tone === 'info' && 'bg-sky-100 text-sky-700',
+        tone === 'neutral' && 'bg-slate-100 text-slate-600',
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
 function PasswordField({
   id,
   label,
-  icon,
   value,
   onChange,
   show,
@@ -118,7 +125,6 @@ function PasswordField({
 }: {
   id: string;
   label: string;
-  icon: React.ReactNode;
   value: string;
   onChange: (v: string) => void;
   show: boolean;
@@ -128,13 +134,10 @@ function PasswordField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+      <label htmlFor={id} className="text-xs font-medium text-slate-500">
         {label}
       </label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-          {icon}
-        </span>
         <input
           id={id}
           type={show ? 'text' : 'password'}
@@ -142,12 +145,12 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyUp={onKeyUp}
-          className="w-full rounded-[14px] border border-border/60 bg-background/80 py-2.5 pl-10 pr-11 text-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-11 text-sm text-slate-900 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
         />
         <button
           type="button"
           aria-label={show ? 'Hide password' : 'Show password'}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           onClick={onToggle}
         >
           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -158,10 +161,18 @@ function PasswordField({
 }
 
 const cardMotion = {
-  initial: { opacity: 0, y: 16 },
+  initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const },
+  transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
+
+const TIPS = [
+  'Never share your password with anyone',
+  'Change your password every 90 days',
+  'Use a unique password for this account',
+  'Enable Two-Factor Authentication when available',
+  'Always log out from shared or public computers',
+] as const;
 
 export function StaffSecurityTab() {
   const device = useMemo(() => parseDevice(), []);
@@ -180,6 +191,7 @@ export function StaffSecurityTab() {
 
   const checks = passwordChecks(newPassword);
   const strength = strengthFromChecks(newPassword);
+  const displayStrength = strength;
   const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
   const passwordsMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
   const allChecksPass = Object.values(checks).every(Boolean);
@@ -190,6 +202,16 @@ export function StaffSecurityTab() {
       new Date().toLocaleTimeString([], {
         hour: 'numeric',
         minute: '2-digit',
+      }),
+    [],
+  );
+
+  const passwordUpdatedLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
       }),
     [],
   );
@@ -241,305 +263,275 @@ export function StaffSecurityTab() {
   }
 
   const requirementRows: { ok: boolean; label: string }[] = [
-    { ok: checks.minLength, label: 'Minimum 8 characters' },
-    { ok: checks.upper, label: 'Uppercase letter' },
-    { ok: checks.lower, label: 'Lowercase letter' },
-    { ok: checks.number, label: 'Number' },
-    { ok: checks.special, label: 'Special character' },
+    { ok: !newPassword || checks.minLength, label: 'Minimum 8 characters' },
+    { ok: !newPassword || checks.upper, label: 'Uppercase letter (A–Z)' },
+    { ok: !newPassword || checks.number, label: 'Number (0–9)' },
+    { ok: !newPassword || checks.lower, label: 'Lowercase letter (a–z)' },
+    { ok: !newPassword || checks.special, label: 'Special character (!@#$…)' },
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* Hero */}
       <motion.div {...cardMotion}>
-        <div className="relative overflow-hidden rounded-[18px] border border-border/40 bg-gradient-to-br from-primary/10 via-background to-sky-500/5 p-5 sm:p-6">
-          <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-primary/15 blur-3xl" />
-          <div className="relative flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-sm">
-              <ShieldCheck className="h-5 w-5" />
+        <GlassCard className="overflow-hidden rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+          <div className="flex flex-col gap-4 bg-gradient-to-r from-sky-50 via-white to-emerald-50/40 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
+                <Shield className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                  Password & Security
+                </h2>
+                <p className="mt-1 max-w-xl text-sm text-slate-500">
+                  Protect your account by using a strong password and keeping your account secure.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Password & Security</h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Protect your account by using a strong password and keeping your account secure.
-              </p>
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/70 bg-white/90 px-4 py-3 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Account Security
+                </p>
+                <p className="text-sm font-semibold text-slate-800">
+                  Your account security is <span className="text-emerald-600">Strong</span>
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        </GlassCard>
       </motion.div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          {/* Password Management */}
-          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.05 }}>
-            <GlassCard className="overflow-hidden rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-              <div className="border-b border-border/40 bg-gradient-to-r from-primary/5 to-transparent px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
-                    <KeyRound className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">Change Password</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Keep your account secure by updating your password regularly.
-                    </p>
-                  </div>
+      {/* 3-column dashboard */}
+      <div className="grid gap-4 xl:grid-cols-12">
+        {/* LEFT — Change Password */}
+        <motion.div
+          className="xl:col-span-5"
+          {...cardMotion}
+          transition={{ ...cardMotion.transition, delay: 0.04 }}
+        >
+          <GlassCard className="h-full rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <KeyRound className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Change Password</h3>
+                  <p className="text-xs text-slate-500">
+                    Keep your account secure by updating your password regularly.
+                  </p>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-4 p-5">
-                <PasswordField
-                  id="current-password"
-                  label="Current Password"
-                  icon={<KeyRound className="h-4 w-4" />}
-                  value={currentPassword}
-                  onChange={setCurrent}
-                  show={showCurrent}
-                  onToggle={() => setShowCurrent((v) => !v)}
-                  onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
-                  autoComplete="current-password"
-                />
-                <PasswordField
-                  id="new-password"
-                  label="New Password"
-                  icon={<Lock className="h-4 w-4" />}
-                  value={newPassword}
-                  onChange={setNew}
-                  show={showNew}
-                  onToggle={() => setShowNew((v) => !v)}
-                  onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
-                  autoComplete="new-password"
-                />
-                <PasswordField
-                  id="confirm-password"
-                  label="Confirm Password"
-                  icon={<CheckCircle2 className="h-4 w-4" />}
-                  value={confirmPassword}
-                  onChange={setConfirm}
-                  show={showConfirm}
-                  onToggle={() => setShowConfirm((v) => !v)}
-                  onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
-                  autoComplete="new-password"
-                />
+            <div className="space-y-3.5 p-5">
+              <PasswordField
+                id="current-password"
+                label="Current Password"
+                value={currentPassword}
+                onChange={setCurrent}
+                show={showCurrent}
+                onToggle={() => setShowCurrent((v) => !v)}
+                onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
+                autoComplete="current-password"
+              />
+              <PasswordField
+                id="new-password"
+                label="New Password"
+                value={newPassword}
+                onChange={setNew}
+                show={showNew}
+                onToggle={() => setShowNew((v) => !v)}
+                onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
+                autoComplete="new-password"
+              />
+              <PasswordField
+                id="confirm-password"
+                label="Confirm New Password"
+                value={confirmPassword}
+                onChange={setConfirm}
+                show={showConfirm}
+                onToggle={() => setShowConfirm((v) => !v)}
+                onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
+                autoComplete="new-password"
+              />
 
-                <AnimatePresence>
-                  {capsOn ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-                        <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                        Caps Lock is on
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-
-                {passwordsMatch ? (
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    <Check className="h-3.5 w-3.5" /> Passwords match
-                  </p>
-                ) : null}
-                {passwordsMismatch ? (
-                  <p className="text-xs font-medium text-destructive">Passwords do not match</p>
-                ) : null}
-
-                <div className="space-y-2 rounded-[14px] border border-border/40 bg-muted/20 p-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Password Strength
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        'rounded-full',
-                        strength.level === 'strong' && statusTone('strong'),
-                        strength.level === 'good' && 'border-sky-500/30 bg-sky-500/10 text-sky-700',
-                        strength.level === 'fair' && statusTone('warn'),
-                        strength.level === 'weak' && statusTone('danger'),
-                      )}
-                    >
-                      {strength.label}
-                    </Badge>
-                  </div>
-                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      className={cn('h-full rounded-full', strengthColor(strength.level))}
-                      initial={false}
-                      animate={{ width: `${strength.score}%` }}
-                      transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-                    />
-                  </div>
-                  <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                    {requirementRows.map((row) => (
-                      <li
-                        key={row.label}
-                        className={cn(
-                          'flex items-center gap-2 text-xs transition-colors',
-                          row.ok
-                            ? 'font-medium text-emerald-600 dark:text-emerald-400'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'flex h-4 w-4 items-center justify-center rounded-full border',
-                            row.ok
-                              ? 'border-emerald-500/40 bg-emerald-500/15'
-                              : 'border-border/60 bg-background',
-                          )}
-                        >
-                          {row.ok ? <Check className="h-2.5 w-2.5" /> : null}
-                        </span>
-                        {row.label}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <Button
-                    className="min-w-[180px] rounded-xl"
-                    disabled={!canSubmit}
-                    onClick={() => void onUpdatePassword()}
+              <AnimatePresence>
+                {capsOn ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
                   >
-                    {pending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating…
-                      </>
-                    ) : success ? (
-                      <>
-                        <Check className="mr-2 h-4 w-4" /> Updated
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="mr-2 h-4 w-4" /> Update Password
-                      </>
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                      Caps Lock is on
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              {passwordsMatch ? (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                  <Check className="h-3.5 w-3.5" /> Passwords match
+                </p>
+              ) : null}
+              {passwordsMismatch ? (
+                <p className="text-xs font-medium text-red-600">Passwords do not match</p>
+              ) : null}
+
+              {/* Segmented strength meter */}
+              <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500">Password Strength</span>
+                  <span
+                    className={cn(
+                      'text-xs font-semibold',
+                      displayStrength.level === 'strong' && 'text-emerald-600',
+                      displayStrength.level === 'good' && 'text-sky-600',
+                      displayStrength.level === 'fair' && 'text-amber-600',
+                      displayStrength.level === 'weak' && 'text-red-600',
+                      displayStrength.level === 'empty' && 'text-slate-400',
                     )}
-                  </Button>
-                  <AnimatePresence mode="wait">
-                    {msg ? (
-                      <motion.p
-                        key={msg.text}
-                        initial={{ opacity: 0, x: 6 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
+                  >
+                    {displayStrength.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className={cn(
+                        'h-2 rounded-full',
+                        i < displayStrength.segments
+                          ? segmentColor(displayStrength.level)
+                          : 'bg-slate-200',
+                      )}
+                      initial={false}
+                      animate={{
+                        scale: i < displayStrength.segments ? 1 : 0.96,
+                        opacity: i < displayStrength.segments ? 1 : 0.7,
+                      }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                    />
+                  ))}
+                </div>
+                <ul className="mt-1 grid gap-1.5 sm:grid-cols-2">
+                  {requirementRows.map((row) => (
+                    <li key={row.label} className="flex items-center gap-2 text-xs text-slate-600">
+                      <span
                         className={cn(
-                          'text-xs',
-                          msg.type === 'ok'
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-destructive',
+                          'flex h-4 w-4 items-center justify-center rounded-full',
+                          row.ok ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-transparent',
                         )}
                       >
-                        {msg.text}
-                      </motion.p>
-                    ) : null}
-                  </AnimatePresence>
+                        <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                      </span>
+                      {row.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <Button
+                className="mt-1 h-11 w-full rounded-xl text-sm font-semibold"
+                disabled={!canSubmit}
+                onClick={() => void onUpdatePassword()}
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating…
+                  </>
+                ) : success ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" /> Updated
+                  </>
+                ) : (
+                  <>
+                    <Lock className="mr-2 h-4 w-4" /> Update Password
+                  </>
+                )}
+              </Button>
+              <AnimatePresence mode="wait">
+                {msg ? (
+                  <motion.p
+                    key={msg.text}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={cn(
+                      'text-center text-xs',
+                      msg.type === 'ok' ? 'text-emerald-600' : 'text-red-600',
+                    )}
+                  >
+                    {msg.text}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* CENTER — Status / Activity / Sessions */}
+        <div className="flex flex-col gap-4 xl:col-span-4">
+          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.08 }}>
+            <GlassCard className="rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">Security Status</h3>
                 </div>
+              </div>
+              <div className="divide-y divide-slate-100 px-5">
+                <StatusLine
+                  label="Password Strength"
+                  value={
+                    <span className="flex items-center gap-2">
+                      <span className="tracking-widest text-slate-400">•••••••••</span>
+                      <Pill tone="strong">Strong</Pill>
+                    </span>
+                  }
+                />
+                <StatusLine label="Password Updated" value={passwordUpdatedLabel} />
+                <StatusLine
+                  label="Two-Factor Authentication"
+                  value={<Pill tone="warn">Not Enabled</Pill>}
+                />
+                <StatusLine label="Last Login" value={`Today, ${nowLabel}`} />
+                <StatusLine label="Trusted Device" value={`${device.os} · ${device.browser}`} />
               </div>
             </GlassCard>
           </motion.div>
 
-          {/* Security Status + 2FA */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.1 }}>
-              <GlassCard className="h-full rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <div className="border-b border-border/40 px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-600">
-                      <ShieldCheck className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold">Security Status</h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Account security overview
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3 p-5">
-                  <StatusRow label="Account Security" badge="Strong" tone="strong" />
-                  <StatusRow
-                    label="Password Updated"
-                    badge="Keep current"
-                    tone="warn"
-                    hint="Change every 90 days"
-                  />
-                  <StatusRow label="Two-Factor Authentication" badge="Not Enabled" tone="warn" />
-                  <StatusRow label="Last Login" badge="Today" tone="strong" hint={nowLabel} />
-                  <StatusRow
-                    label="Trusted Device"
-                    badge={`${device.os} · ${device.browser}`}
-                    tone="neutral"
-                  />
-                </div>
-              </GlassCard>
-            </motion.div>
-
-            <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.12 }}>
-              <GlassCard className="relative h-full overflow-hidden rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <div className="pointer-events-none absolute -right-6 bottom-0 h-28 w-28 rounded-full bg-primary/10 blur-2xl" />
-                <div className="border-b border-border/40 px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/12 text-sky-600">
-                      <Fingerprint className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold">Two-Factor Authentication</h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Protect your account with an additional layer of security.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="relative space-y-4 p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className={cn('rounded-full', statusTone('warn'))}>
-                      Coming Soon
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Available in a future release
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <EmptyIconTile icon={<Phone className="h-4 w-4" />} label="SMS" />
-                    <EmptyIconTile icon={<Smartphone className="h-4 w-4" />} label="App" />
-                    <EmptyIconTile icon={<Shield className="h-4 w-4" />} label="Shield" />
-                  </div>
-                  <Button className="w-full rounded-xl" variant="outline" disabled>
-                    Enable 2FA
-                  </Button>
-                </div>
-              </GlassCard>
-            </motion.div>
-          </div>
-
-          {/* Login Activity */}
-          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.15 }}>
-            <GlassCard className="rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-              <div className="border-b border-border/40 px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/12 text-violet-600">
-                    <Monitor className="h-5 w-5" />
+          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.1 }}>
+            <GlassCard className="rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+                    <Clock3 className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold">Recent Login Activity</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Showing your current session. Full history coming soon.
+                    <h3 className="text-sm font-semibold text-slate-900">Recent Login Activity</h3>
+                    <p className="text-xs text-slate-500">
+                      Current session only · full history soon
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="divide-y divide-border/40">
-                <LoginRow
+              <div className="space-y-0 px-5 py-2">
+                <LoginItem
                   when="Today"
-                  title={device.browser}
-                  subtitle={device.os}
+                  detail={`${device.os} · ${device.browser}`}
                   time={nowLabel}
-                  badge="Current Session"
-                  tone="strong"
+                  badge={<Pill tone="info">Current Session</Pill>}
                   icon={
                     device.isMobile ? (
                       <Smartphone className="h-4 w-4" />
@@ -548,11 +540,8 @@ export function StaffSecurityTab() {
                     )
                   }
                 />
-                <div className="px-5 py-6 text-center">
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
+                <div className="border-t border-dashed border-slate-100 py-4 text-center">
+                  <p className="text-xs text-slate-400">
                     Additional login history will appear here when available.
                   </p>
                 </div>
@@ -560,197 +549,187 @@ export function StaffSecurityTab() {
             </GlassCard>
           </motion.div>
 
-          {/* Active Sessions */}
-          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.18 }}>
-            <GlassCard className="rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-              <div className="border-b border-border/40 px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/12 text-orange-600">
-                    <LogOut className="h-5 w-5" />
+          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.12 }}>
+            <GlassCard className="rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                    <Monitor className="h-4 w-4" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">Active Sessions</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Manage devices signed into your account.
-                    </p>
-                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">Active Sessions</h3>
                 </div>
               </div>
-              <div className="space-y-4 p-5">
-                <div className="flex flex-col gap-3 rounded-[14px] border border-border/50 bg-gradient-to-br from-muted/30 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background shadow-sm ring-1 ring-border/40">
+              <div className="space-y-3 p-5">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary shadow-sm ring-1 ring-slate-100">
                       {device.isMobile ? (
-                        <Smartphone className="h-4 w-4 text-primary" />
+                        <Smartphone className="h-4 w-4" />
                       ) : (
-                        <Monitor className="h-4 w-4 text-primary" />
+                        <Monitor className="h-4 w-4" />
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Current Device</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium text-slate-800">
                         {device.os} · {device.browser}
                       </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Logged in today · This session
-                      </p>
+                      <p className="text-[11px] text-slate-400">This device · logged in today</p>
                     </div>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn('w-fit rounded-full', statusTone('strong'))}
-                  >
-                    Active
-                  </Badge>
+                  <Pill tone="strong">Current Session</Pill>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    variant="outline"
-                    className="rounded-xl"
-                    disabled={revokePending}
-                    onClick={() => void onLogoutOthers()}
-                  >
-                    {revokePending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing out…
-                      </>
-                    ) : (
-                      <>
-                        <LogOut className="mr-2 h-4 w-4" /> Sign Out All Devices
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-[11px] text-muted-foreground">
-                    Ends every session (including this one). Per-device revoke arrives later.
-                  </p>
-                  {revokeMsg ? (
-                    <span className="text-xs text-muted-foreground">{revokeMsg}</span>
-                  ) : null}
-                </div>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  disabled={revokePending}
+                  onClick={() => void onLogoutOthers()}
+                >
+                  {revokePending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing out…
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="mr-2 h-4 w-4" /> Logout Other Devices
+                    </>
+                  )}
+                </Button>
+                {revokeMsg ? (
+                  <p className="text-center text-xs text-slate-500">{revokeMsg}</p>
+                ) : null}
               </div>
             </GlassCard>
           </motion.div>
         </div>
 
-        {/* Security Tips */}
-        <motion.div
-          className="lg:col-span-1"
-          {...cardMotion}
-          transition={{ ...cardMotion.transition, delay: 0.1 }}
-        >
-          <GlassCard className="sticky top-4 rounded-[18px] p-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-            <div className="border-b border-border/40 bg-gradient-to-br from-primary/8 to-transparent px-5 py-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
-                  <ShieldAlert className="h-5 w-5" />
+        {/* RIGHT — 2FA + Tips */}
+        <div className="flex flex-col gap-4 xl:col-span-3">
+          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.1 }}>
+            <GlassCard className="relative overflow-hidden rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+              <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-violet-200/40 blur-2xl" />
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                    <Smartphone className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Two-Factor Authentication
+                  </h3>
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold">Security Tips</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Best practices for your account
+              </div>
+              <div className="relative space-y-4 p-5">
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Protect your account with an additional layer of security using an authenticator
+                  app or SMS.
+                </p>
+                <div className="flex items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-sky-50 py-6">
+                  <div className="relative">
+                    <div className="flex h-16 w-10 items-center justify-center rounded-xl border-2 border-violet-300 bg-white shadow-sm">
+                      <Lock className="h-5 w-5 text-violet-500" />
+                    </div>
+                    <div className="absolute -right-3 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    Coming Soon
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-amber-600/90">
+                    Available in a future release
                   </p>
                 </div>
+                <Button className="w-full rounded-xl" variant="outline" disabled>
+                  Enable 2FA
+                </Button>
               </div>
-            </div>
-            <ul className="space-y-3 p-5">
-              {[
-                'Never share your password.',
-                'Change password every 90 days.',
-                'Use a unique password.',
-                'Enable 2FA when available.',
-                'Log out from shared computers.',
-              ].map((tip) => (
-                <li key={tip} className="flex items-start gap-2.5 text-sm text-foreground/90">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
-                    <Check className="h-3 w-3" />
-                  </span>
-                  {tip}
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-border/40 px-5 py-4">
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Tip: A strong password uses letters, numbers, and symbols — and is not reused on
-                other sites.
-              </p>
-              <div className="mt-3">
-                <Progress value={strength.score || 12} className="h-1.5" />
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
+            </GlassCard>
+          </motion.div>
 
-function StatusRow({
-  label,
-  badge,
-  tone,
-  hint,
-}: {
-  label: string;
-  badge: string;
-  tone: 'strong' | 'warn' | 'danger' | 'neutral';
-  hint?: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-border/30 pb-3 last:border-0 last:pb-0">
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground/80">{hint}</p> : null}
+          <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.12 }}>
+            <GlassCard className="rounded-[18px] border-slate-200/80 p-0 shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                    <Lightbulb className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">Security Tips</h3>
+                </div>
+              </div>
+              <ul className="space-y-3 p-5">
+                {TIPS.map((tip) => (
+                  <li key={tip} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    </span>
+                    <span className="leading-snug">{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
+          </motion.div>
+        </div>
       </div>
-      <Badge
-        variant="outline"
-        className={cn('max-w-[55%] truncate rounded-full', statusTone(tone))}
+
+      {/* Footer */}
+      <motion.div
+        {...cardMotion}
+        transition={{ ...cardMotion.transition, delay: 0.14 }}
+        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       >
-        {badge}
-      </Badge>
+        <p className="flex items-start gap-2 text-xs text-slate-500 sm:items-center">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 sm:mt-0" />
+          If you notice any suspicious activity, contact your college administrator immediately.
+        </p>
+        <Button
+          variant="outline"
+          className="h-9 rounded-xl border-slate-200 text-slate-600"
+          onClick={() => {
+            window.location.href = '/staff/feedback';
+          }}
+        >
+          <HelpCircle className="mr-2 h-4 w-4" /> Need Help?
+        </Button>
+      </motion.div>
     </div>
   );
 }
 
-function EmptyIconTile({ icon, label }: { icon: React.ReactNode; label: string }) {
+function StatusLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-[14px] border border-dashed border-border/60 bg-muted/20 px-2 py-3 text-muted-foreground">
-      {icon}
-      <span className="text-[10px] font-medium">{label}</span>
+    <div className="flex items-center justify-between gap-3 py-3">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <div className="text-right text-xs font-medium text-slate-800">{value}</div>
     </div>
   );
 }
 
-function LoginRow({
+function LoginItem({
   when,
-  title,
-  subtitle,
+  detail,
   time,
   badge,
-  tone,
   icon,
 }: {
   when: string;
-  title: string;
-  subtitle: string;
+  detail: string;
   time: string;
-  badge: string;
-  tone: 'strong' | 'warn' | 'danger' | 'neutral';
+  badge: React.ReactNode;
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 px-5 py-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground">
+    <div className="flex items-start gap-3 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">{title}</p>
-          <Badge variant="outline" className={cn('rounded-full', statusTone(tone))}>
-            {badge}
-          </Badge>
+          <p className="text-sm font-medium text-slate-800">{when}</p>
+          {badge}
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {when} · {subtitle} · {time}
+        <p className="mt-0.5 text-xs text-slate-500">
+          {detail} · {time}
         </p>
       </div>
     </div>
