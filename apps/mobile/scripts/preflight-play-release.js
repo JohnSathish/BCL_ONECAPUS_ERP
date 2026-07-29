@@ -49,11 +49,7 @@ check(
   !gradle || (gradleVC === versionCode && gradleVN === appVersion),
   `gradle=${gradleVN}/${gradleVC} app.config=${appVersion}/${versionCode}`,
 );
-check(
-  'version-code-gt-23',
-  versionCode > 24,
-  `versionCode=${versionCode} (last built Play AAB was 24)`,
-);
+check('version-code-gt-25', versionCode > 25, `versionCode=${versionCode} (last Play AAB was 25)`);
 
 let uploadOk = false;
 let uploadDetail = 'missing credentials';
