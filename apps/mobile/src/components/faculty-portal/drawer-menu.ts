@@ -25,7 +25,7 @@ export const FACULTY_DRAWER_SECTIONS: FacultyDrawerSection[] = [
         id: 'notifications',
         label: 'Notifications',
         icon: '🔔',
-        href: '/(staff)/notifications',
+        href: '/(staff)/(tabs)/notifications',
         keywords: ['alerts', 'inbox'],
         badgeFrom: 'notifications',
       },
@@ -146,7 +146,7 @@ export const FACULTY_QUICK_ACTIONS = [
     label: 'Notifications',
     icon: '🔔',
     tone: '#7C3AED',
-    href: '/(staff)/notifications',
+    href: '/(staff)/(tabs)/notifications',
   },
   { id: 'leave', label: 'Leave', icon: '🏖', tone: '#D97706', href: '/(staff)/leave' },
   {

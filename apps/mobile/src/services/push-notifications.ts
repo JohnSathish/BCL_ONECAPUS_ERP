@@ -312,16 +312,30 @@ export async function clearStalePushResponse() {
 
 /**
  * Handle a notification that launched the app from a killed state, then clear it.
+ * Ignores stale responses so a previous tap does not reopen Notifications on every cold start.
+ * @returns true if navigation was triggered from a fresh push tap
  */
-export async function consumeInitialPushResponse() {
+const INITIAL_PUSH_MAX_AGE_MS = 60_000;
+
+export async function consumeInitialPushResponse(): Promise<boolean> {
   try {
     const last = await Notifications.getLastNotificationResponseAsync();
-    if (last) {
-      handleNotificationResponse(last);
+    if (!last) return false;
+
+    const rawDate = last.notification.date;
+    const whenMs =
+      typeof rawDate === 'number' ? (rawDate < 1e12 ? rawDate * 1000 : rawDate) : Date.now();
+
+    if (Date.now() - whenMs > INITIAL_PUSH_MAX_AGE_MS) {
       await clearStalePushResponse();
+      return false;
     }
+
+    handleNotificationResponse(last);
+    await clearStalePushResponse();
+    return true;
   } catch {
-    // ignore
+    return false;
   }
 }
 

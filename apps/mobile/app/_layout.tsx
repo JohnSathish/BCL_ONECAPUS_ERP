@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthFailureRedirect } from '@/hooks/useAuthFailureRedirect';
 import {
   attachPushResponseListener,
-  consumeInitialPushResponse,
   detachPushResponseListener,
   ensureAndroidDefaultChannel,
   refreshPushRegistrationIfLoggedIn,
@@ -29,7 +28,6 @@ export default function RootLayout() {
       void ensureAndroidDefaultChannel();
       void requestPushPermissions();
       attachPushResponseListener();
-      void consumeInitialPushResponse();
       void refreshPushRegistrationIfLoggedIn();
     } catch (err) {
       console.warn('[root] push bootstrap failed', err);

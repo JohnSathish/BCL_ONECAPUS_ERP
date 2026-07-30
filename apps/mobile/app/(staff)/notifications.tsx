@@ -1,22 +1,6 @@
-import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-shell';
-import { NotificationCenterPanel } from '@/components/notifications/notification-center-panel';
-import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-context';
-import { facultyTheme } from '@/components/faculty-portal/theme';
+import { Redirect } from 'expo-router';
 
-export default function FacultyNotificationsScreen() {
-  const { refreshHome, home } = useFacultyPortal();
-  const unread = home?.unreadNotificationCount ?? 0;
-
-  return (
-    <FacultyScreenShell
-      title="Notifications"
-      subtitle={unread > 0 ? `${unread} unread` : 'Alerts & notices'}
-    >
-      <NotificationCenterPanel
-        role="staff"
-        theme={facultyTheme}
-        onChanged={() => void refreshHome()}
-      />
-    </FacultyScreenShell>
-  );
+/** Legacy stack route — keep for old push deep links; always land inside tabs. */
+export default function FacultyNotificationsRedirect() {
+  return <Redirect href="/(staff)/(tabs)/notifications" />;
 }

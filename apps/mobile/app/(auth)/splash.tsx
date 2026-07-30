@@ -4,6 +4,7 @@ import { ensureDeviceId, hydrateAppType } from '@/api/config';
 import { PremiumSplashScreen } from '@/components/auth/premium-splash-screen';
 import { bootstrapSession } from '@/auth/bootstrap-session';
 import { SPLASH_DURATION_MS } from '@/constants/release';
+import { consumeInitialPushResponse } from '@/services/push-notifications';
 import { StatusBar } from 'expo-status-bar';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 
@@ -26,8 +27,12 @@ export default function AuthSplashScreen() {
           await hydrateAppType();
           await ensureDeviceId();
           const result = await bootstrapSession();
-          // Initial push tap is handled once in root layout via consumeInitialPushResponse.
-          if (!cancelled) {
+          const href = String(result.href);
+          const canOpenPush = href.startsWith('/(staff)') || href.startsWith('/(student)');
+          // After session is ready: only honor a *fresh* notification tap.
+          // Stale responses are ignored so normal opens land on Home with tabs.
+          const openedFromPush = canOpenPush && (await consumeInitialPushResponse());
+          if (!cancelled && !openedFromPush) {
             router.replace(result.href as never);
           }
         } catch {

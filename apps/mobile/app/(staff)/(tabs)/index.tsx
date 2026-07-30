@@ -154,7 +154,7 @@ export default function FacultyHomeScreen() {
         <BirthdaysTodayCard
           data={birthdays}
           variant="staff"
-          onPressNotifications={() => router.push('/(staff)/notifications' as never)}
+          onPressNotifications={() => router.push('/(staff)/(tabs)/notifications' as never)}
         />
 
         {/* Today's schedule — top priority */}

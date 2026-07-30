@@ -16,34 +16,37 @@ export function FacultyTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const meta = TAB_META[route.name] ?? { label: route.name, icon: '•' };
-        const { options } = descriptors[route.key];
-        const label = options.title ?? meta.label;
+      {state.routes
+        .filter((route) => Boolean(TAB_META[route.name]))
+        .map((route) => {
+          const index = state.routes.findIndex((r) => r.key === route.key);
+          const focused = state.index === index;
+          const meta = TAB_META[route.name] ?? { label: route.name, icon: '•' };
+          const { options } = descriptors[route.key];
+          const label = options.title ?? meta.label;
 
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="button"
-            accessibilityState={focused ? { selected: true } : {}}
-            onPress={() => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-              if (!focused && !event.defaultPrevented) {
-                navigation.navigate(route.name, route.params);
-              }
-            }}
-            style={styles.tab}
-          >
-            <Text style={[styles.icon, focused && styles.iconActive]}>{meta.icon}</Text>
-            <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
-          </Pressable>
-        );
-      })}
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              onPress={() => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!focused && !event.defaultPrevented) {
+                  navigation.navigate(route.name, route.params);
+                }
+              }}
+              style={styles.tab}
+            >
+              <Text style={[styles.icon, focused && styles.iconActive]}>{meta.icon}</Text>
+              <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
     </View>
   );
 }

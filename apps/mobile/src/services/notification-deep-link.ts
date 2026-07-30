@@ -131,7 +131,7 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(staff)/payroll' as Href;
   }
   if (lower.includes('/staff/notifications')) {
-    return '/(staff)/notifications' as Href;
+    return '/(staff)/(tabs)/notifications' as Href;
   }
   if (lower.includes('/staff') || lower.includes('faculty')) {
     return '/(staff)/(tabs)' as Href;
@@ -156,7 +156,7 @@ export function isGenericNotificationLink(link?: string | null): boolean {
 
 export function fallbackNotificationCenter(appType: 'student' | 'staff'): Href {
   return appType === 'staff'
-    ? ('/(staff)/notifications' as Href)
+    ? ('/(staff)/(tabs)/notifications' as Href)
     : ('/(student)/(tabs)/notifications' as Href);
 }
 
