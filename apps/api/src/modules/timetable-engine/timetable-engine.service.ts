@@ -663,6 +663,7 @@ export class TimetableEngineService {
       null,
       entry,
     );
+    await this.syncPublishedMirrorIfNeeded(user.tid, plan);
     return entry;
   }
 
@@ -675,7 +676,7 @@ export class TimetableEngineService {
       where: { id: entryId, tenantId: user.tid, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Timetable entry not found');
-    await this.assertEditablePlan(user.tid, existing.planId);
+    const plan = await this.assertEditablePlan(user.tid, existing.planId);
     const resolvedCategoryOnly = dto.metadata?.displayAsCategoryOnly === true;
     const resolvedStaffProfileId = this.resolveEntryStaffProfileId(
       dto.staffProfileId,
@@ -751,6 +752,7 @@ export class TimetableEngineService {
       existing,
       updated,
     );
+    await this.syncPublishedMirrorIfNeeded(user.tid, plan);
     return updated;
   }
 
@@ -767,7 +769,7 @@ export class TimetableEngineService {
       where: { id: entryId, tenantId: user.tid, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Timetable entry not found');
-    await this.assertEditablePlan(user.tid, existing.planId);
+    const plan = await this.assertEditablePlan(user.tid, existing.planId);
     const updated = await this.prisma.timetablePlanEntry.update({
       where: { id: entryId },
       data: { deletedAt: new Date(), status: 'CANCELLED' },
@@ -781,6 +783,7 @@ export class TimetableEngineService {
       existing,
       updated,
     );
+    await this.syncPublishedMirrorIfNeeded(user.tid, plan);
     return updated;
   }
 
@@ -2034,12 +2037,18 @@ export class TimetableEngineService {
       where: { id: planId, tenantId, deletedAt: null },
     });
     if (!plan) throw new NotFoundException('Timetable plan not found');
-    if (plan.status === 'PUBLISHED') {
-      throw new BadRequestException(
-        'Published timetable is locked. Use substitution or create a new revision.',
-      );
-    }
+    // Published plans remain editable so faculty/room mistakes can be corrected;
+    // entry mutations remirror the live published schedule afterward.
     return plan;
+  }
+
+  private async syncPublishedMirrorIfNeeded(
+    tenantId: string,
+    plan: { id: string; status: string },
+  ) {
+    if (plan.status !== 'PUBLISHED') return;
+    await this.mirrorPublishedEntries(tenantId, plan.id);
+    await this.cache.delByPrefix(`timetable:student:`);
   }
 
   private async mirrorPublishedEntries(tenantId: string, planId: string) {

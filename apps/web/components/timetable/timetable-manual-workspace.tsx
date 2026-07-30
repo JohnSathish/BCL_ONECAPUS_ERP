@@ -46,6 +46,7 @@ import {
   type TimetablePlan,
 } from '@/services/timetable';
 import { cn } from '@/utils/cn';
+import { apiErrorMessage } from '@/utils/api-error';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
 import { useTimetableWorkspaceFilters } from '@/hooks/use-timetable-workspace-filters';
 import type { TimetablePrintParams } from '@/lib/timetable/open-timetable-print';
@@ -88,6 +89,7 @@ export function TimetableManualWorkspace() {
   const [slotOpen, setSlotOpen] = useState(false);
   const [slotContext, setSlotContext] = useState<SlotModalContext>();
   const [editEntry, setEditEntry] = useState<TimetableEntry | null>(null);
+  const [slotError, setSlotError] = useState<string | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('');
   const [roomFilter, setRoomFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState<number | ''>('');
@@ -192,18 +194,26 @@ export function TimetableManualWorkspace() {
     mutationFn: (payload: ManualEntryPayload) =>
       editEntry ? updateTimetableEntry(editEntry.id, payload) : createManualEntry(payload),
     onSuccess: async () => {
+      setSlotError(null);
       setSlotOpen(false);
       setEditEntry(null);
       await invalidate();
+    },
+    onError: (error) => {
+      setSlotError(apiErrorMessage(error, 'Could not save timetable slot.'));
     },
   });
 
   const deleteSlotMut = useMutation({
     mutationFn: (entryId: string) => deleteTimetableEntry(entryId),
     onSuccess: async () => {
+      setSlotError(null);
       setSlotOpen(false);
       setEditEntry(null);
       await invalidate();
+    },
+    onError: (error) => {
+      setSlotError(apiErrorMessage(error, 'Could not delete timetable slot.'));
     },
   });
 
@@ -240,6 +250,7 @@ export function TimetableManualWorkspace() {
   }) => {
     if (!selectedPlanId) return;
     setEditEntry(null);
+    setSlotError(null);
     setSlotContext({
       planId: selectedPlanId,
       shiftId: effectiveShiftId || undefined,
@@ -257,6 +268,7 @@ export function TimetableManualWorkspace() {
   const openEditSlot = (entry: TimetableEntry) => {
     if (!selectedPlanId) return;
     setEditEntry(entry);
+    setSlotError(null);
     setSlotContext({
       planId: selectedPlanId,
       shiftId: effectiveShiftId || entry.shiftId || undefined,
@@ -563,12 +575,20 @@ export function TimetableManualWorkspace() {
         onClose={() => {
           setSlotOpen(false);
           setEditEntry(null);
+          setSlotError(null);
         }}
         context={slotContext}
         entry={editEntry}
         busy={saveSlotMut.isPending || deleteSlotMut.isPending}
-        onSave={(payload) => saveSlotMut.mutate(payload)}
-        onDelete={(entryId) => deleteSlotMut.mutate(entryId)}
+        errorMessage={slotError}
+        onSave={(payload) => {
+          setSlotError(null);
+          saveSlotMut.mutate(payload);
+        }}
+        onDelete={(entryId) => {
+          setSlotError(null);
+          deleteSlotMut.mutate(entryId);
+        }}
       />
     </>
   );

@@ -45,6 +45,7 @@ type Props = {
   context?: SlotModalContext;
   entry?: TimetableEntry | null;
   busy?: boolean;
+  errorMessage?: string | null;
   onSave: (payload: ManualEntryPayload) => void;
   onDelete?: (entryId: string) => void;
 };
@@ -55,6 +56,7 @@ export function TimetableSlotModal({
   context,
   entry,
   busy,
+  errorMessage,
   onSave,
   onDelete,
 }: Props) {
@@ -289,6 +291,11 @@ export function TimetableSlotModal({
           {context.startTime.slice(0, 5)} – {context.endTime.slice(0, 5)}
           {periodNo ? ` · Period P${periodNo}` : ''}
         </p>
+        {errorMessage ? (
+          <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {errorMessage}
+          </div>
+        ) : null}
         <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
           <label className="block space-y-1 text-xs font-medium text-muted-foreground">
             Day
@@ -583,7 +590,12 @@ export function TimetableSlotModal({
                 variant="destructive"
                 size="sm"
                 disabled={busy}
-                onClick={() => onDelete(entry.id)}
+                onClick={() => {
+                  const ok = window.confirm(
+                    'Delete this timetable slot? This cannot be undone from the grid.',
+                  );
+                  if (ok) onDelete(entry.id);
+                }}
               >
                 Delete
               </Button>

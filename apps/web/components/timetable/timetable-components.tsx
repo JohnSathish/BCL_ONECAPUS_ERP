@@ -217,11 +217,15 @@ export function TimetableFilterBar({
             ) : null}
           </div>
           {selectedPlan?.status === 'PUBLISHED' ? (
-            <p className="text-[11px] text-muted-foreground">
-              Published plans stay active for student portals. Create a new plan instead of
-              deleting.
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Published plan — click any slot card to edit or delete faculty/room. Changes update
+              the live student timetable.
             </p>
-          ) : null}
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Tip: click an existing slot card to edit faculty/room or delete it.
+            </p>
+          )}
         </label>
       </CardContent>
     </Card>
@@ -786,7 +790,12 @@ function renderTimeCell(
         <button
           key={entry.id}
           type="button"
-          className={cn('w-full text-left', options?.editable && 'cursor-pointer')}
+          title={options?.editable ? 'Click to edit or delete this slot' : undefined}
+          className={cn(
+            'w-full text-left',
+            options?.editable &&
+              'cursor-pointer rounded-lg ring-offset-2 hover:ring-2 hover:ring-primary/30',
+          )}
           onClick={(event) => {
             if (!options?.editable || !options.onEntryClick) return;
             event.stopPropagation();
