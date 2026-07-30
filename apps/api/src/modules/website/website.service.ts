@@ -530,6 +530,84 @@ export class WebsiteService {
       }));
   }
 
+  /**
+   * Public committee roster for college-web (e.g. IQAC Members).
+   * Source of truth: GovernanceCommittee / GovernanceCommitteeMember.
+   */
+  async getPublicCommitteeMembers(tenantId: string, rawCode: string) {
+    const code = String(rawCode ?? '')
+      .trim()
+      .toUpperCase();
+    if (!code) throw new BadRequestException('Committee code is required');
+
+    const committee = await this.prisma.governanceCommittee.findFirst({
+      where: {
+        tenantId,
+        shortCode: code,
+        status: 'ACTIVE',
+      },
+      select: { id: true, name: true, shortCode: true },
+    });
+    if (!committee) {
+      return {
+        code,
+        name: code === 'IQAC' ? 'Internal Quality Assurance Cell' : code,
+        members: [] as Array<{
+          displayName: string;
+          role: string;
+          designation: string | null;
+          departmentName: string | null;
+          memberType: string | null;
+          organization: string | null;
+          exOfficioPosition: string | null;
+        }>,
+      };
+    }
+
+    const roleOrder = [
+      'CHAIRPERSON',
+      'COORDINATOR',
+      'CONVENER',
+      'MEMBER_SECRETARY',
+      'SECRETARY',
+      'EX_OFFICIO',
+      'MEMBER',
+    ];
+
+    const rows = await this.prisma.governanceCommitteeMember.findMany({
+      where: {
+        tenantId,
+        committeeId: committee.id,
+        status: 'ACTIVE',
+      },
+      select: {
+        displayName: true,
+        role: true,
+        designation: true,
+        departmentName: true,
+        memberType: true,
+        organization: true,
+        exOfficioPosition: true,
+      },
+      orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
+    });
+
+    const members = [...rows].sort((a, b) => {
+      const ai = roleOrder.indexOf(a.role);
+      const bi = roleOrder.indexOf(b.role);
+      const aRank = ai === -1 ? roleOrder.length : ai;
+      const bRank = bi === -1 ? roleOrder.length : bi;
+      if (aRank !== bRank) return aRank - bRank;
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    return {
+      code: committee.shortCode,
+      name: committee.name,
+      members,
+    };
+  }
+
   async findPublicRedirect(tenantId: string, rawPath: string) {
     const site = await this.getPublicSite(tenantId);
     const redirect = await this.prisma.websiteRedirect.findFirst({

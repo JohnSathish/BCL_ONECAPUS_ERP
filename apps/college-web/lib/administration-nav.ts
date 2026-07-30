@@ -35,7 +35,7 @@ export const ADMINISTRATION_NAV: AdministrationNavItem[] = [
   {
     label: 'IQAC',
     slug: 'iqac',
-    href: `${ADMINISTRATION_BASE}/iqac`,
+    href: '/iqac',
     description: 'Internal Quality Assurance Cell initiatives and reports.',
   },
   {

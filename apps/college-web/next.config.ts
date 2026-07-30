@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
         destination: '/departments/:slug',
         permanent: true,
       },
+      {
+        source: '/about/administration/iqac',
+        destination: '/iqac',
+        permanent: true,
+      },
     ];
   },
   async headers() {

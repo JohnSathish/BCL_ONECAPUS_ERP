@@ -105,7 +105,42 @@ export const WEBSITE_PAGE_CATALOG: CatalogPage[] = [
   page('/research/journals', 'Journals'),
   page('/research/innovation', 'Innovation'),
   page('/research/projects', 'Research Projects'),
-  page('/iqac', 'IQAC'),
+  page(
+    '/iqac',
+    'IQAC',
+    `<h2>Internal Quality Assurance Cell</h2>
+<p>The Internal Quality Assurance Cell (IQAC) of Don Bosco College, Tura coordinates institutional quality initiatives, NAAC-related processes, and continuous improvement across academics and administration.</p>
+<p>Use the IQAC menu to view AQAR reports, committee members, meetings, and action reports.</p>`,
+    'Internal Quality Assurance Cell — quality initiatives at Don Bosco College, Tura.',
+  ),
+  page(
+    '/iqac/aqar',
+    'AQAR',
+    `<h2>Annual Quality Assurance Report (AQAR)</h2>
+<p>Publish AQAR documents and year-wise submissions here through the Website CMS.</p>`,
+    'Annual Quality Assurance Reports submitted to NAAC.',
+  ),
+  page(
+    '/iqac/members',
+    'IQAC Members',
+    `<h2>Committee composition</h2>
+<p>The member roster below is loaded automatically from Committee Management. Optional introductory text can be edited on this page.</p>`,
+    'IQAC committee composition from college Governance records.',
+  ),
+  page(
+    '/iqac/meetings',
+    'IQAC Meetings',
+    `<h2>Meetings</h2>
+<p>Publish IQAC meeting notices, agendas and minutes here through the Website CMS.</p>`,
+    'IQAC meeting notices, agendas and minutes.',
+  ),
+  page(
+    '/iqac/action-report',
+    'Action Report',
+    `<h2>Action Taken Report</h2>
+<p>Publish IQAC action taken reports and follow-up documents here through the Website CMS.</p>`,
+    'Action taken reports on IQAC recommendations and quality plans.',
+  ),
   page('/naac', 'NAAC'),
   page('/news', 'News & Events'),
   page('/gallery', 'Gallery'),

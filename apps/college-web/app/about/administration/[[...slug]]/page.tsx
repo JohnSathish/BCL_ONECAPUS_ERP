@@ -27,7 +27,12 @@ function breadcrumbsFor(title: string, slug?: string) {
 }
 
 export function generateStaticParams() {
-  return [{ slug: [] }, ...ADMINISTRATION_NAV.map((item) => ({ slug: [item.slug!] }))];
+  return [
+    { slug: [] },
+    ...ADMINISTRATION_NAV.filter((item) => item.href.startsWith(`${ADMINISTRATION_BASE}/`)).map(
+      (item) => ({ slug: [item.slug!] }),
+    ),
+  ];
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -59,6 +64,10 @@ export default async function AdministrationPage({ params }: Props) {
   if (slug && (slug.length > 1 || !administrationItemForSlug(part))) notFound();
 
   const item = part ? administrationItemForSlug(part) : null;
+  // External hubs (e.g. IQAC → /iqac) are handled by next.config redirects;
+  // do not render them inside the Administration shell.
+  if (item && !item.href.startsWith(ADMINISTRATION_BASE)) notFound();
+
   const path = item?.href ?? ADMINISTRATION_BASE;
   const cms = await getCmsPage(path);
   const title = cms?.title || item?.label || 'Administration';

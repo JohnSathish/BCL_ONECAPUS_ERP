@@ -175,6 +175,17 @@ export class WebsitePublicController {
   }
 
   @Public()
+  @Get('committees/:code/members')
+  async committeeMembers(
+    @Req() req: Request,
+    @Param('code') code: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.getPublicCommitteeMembers(tenant.id, code);
+  }
+
+  @Public()
   @Get('pages')
   async pages(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
     const tenant = await this.resolveTenant(req, tenantSlug);

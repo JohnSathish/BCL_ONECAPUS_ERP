@@ -24,6 +24,7 @@ import './voices-of-bosco.css';
 import './sister-institutions.css';
 import './inner-page.css';
 import './administration.css';
+import './iqac.css';
 import './leadership-profiles.css';
 import './biography-feature.css';
 import './important-links.css';
