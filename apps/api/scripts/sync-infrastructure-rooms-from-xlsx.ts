@@ -70,10 +70,7 @@ function parseArgs(argv: string[]) {
   const xlsxArg = argv.find((a) => a.startsWith('--xlsx='));
   const xlsxPath = xlsxArg
     ? resolve(xlsxArg.slice('--xlsx='.length))
-    : resolve(
-        process.env.USERPROFILE ?? '',
-        'OneDrive/Desktop/infrastructure-rooms.xlsx',
-      );
+    : resolve(__dirname, 'data/infrastructure-rooms.xlsx');
   return { dryRun, xlsxPath };
 }
 

@@ -196,23 +196,28 @@ export function TimetableSlotModal({
 
   const courses = coursesQ.data?.data ?? [];
   const mapStaffRows = (rows: unknown[] | undefined) =>
-    (rows ?? []).map((row) => {
-      const r = row as {
-        id: string;
-        staffProfileId?: string;
-        fullName: string;
-        shortCode?: string | null;
-        employeeCode?: string | null;
-        assignedShifts?: Array<{ id: string; code: string; name: string; isPrimary: boolean }>;
-      };
-      return {
-        id: r.staffProfileId ?? r.id,
-        fullName: r.fullName,
-        shortCode: r.shortCode,
-        employeeCode: r.employeeCode,
-        assignedShifts: r.assignedShifts,
-      };
-    });
+    (rows ?? [])
+      .filter((row) => {
+        const staffType = (row as { staffType?: string }).staffType;
+        return !staffType || staffType === 'TEACHING';
+      })
+      .map((row) => {
+        const r = row as {
+          id: string;
+          staffProfileId?: string;
+          fullName: string;
+          shortCode?: string | null;
+          employeeCode?: string | null;
+          assignedShifts?: Array<{ id: string; code: string; name: string; isPrimary: boolean }>;
+        };
+        return {
+          id: r.staffProfileId ?? r.id,
+          fullName: r.fullName,
+          shortCode: r.shortCode,
+          employeeCode: r.employeeCode,
+          assignedShifts: r.assignedShifts,
+        };
+      });
   const staff = mapStaffRows(staffQ.data as unknown[] | undefined);
   const coStaff = mapStaffRows(coStaffQ.data as unknown[] | undefined);
   const rooms = roomsQ.data ?? [];

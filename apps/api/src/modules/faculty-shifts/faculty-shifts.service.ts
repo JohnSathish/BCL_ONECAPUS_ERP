@@ -81,6 +81,7 @@ export class FacultyShiftsService {
         tenantId,
         deletedAt: null,
         status: 'ACTIVE',
+        staffType: 'TEACHING',
         OR: [
           { primaryShiftId: shiftId },
           ...(categoryMatch.length
@@ -139,6 +140,7 @@ export class FacultyShiftsService {
       staffProfile: {
         deletedAt: null,
         status: 'ACTIVE',
+        staffType: 'TEACHING',
         ...(q
           ? {
               OR: [
@@ -246,6 +248,7 @@ export class FacultyShiftsService {
       tenantId: user.tid,
       deletedAt: null,
       status: 'ACTIVE' as const,
+      staffType: 'TEACHING' as const,
       ...(assignedIds.length ? { id: { notIn: assignedIds } } : {}),
       ...(q
         ? {
@@ -313,10 +316,15 @@ export class FacultyShiftsService {
     );
 
     const staff = await this.prisma.staffProfile.findFirst({
-      where: { id: staffProfileId, tenantId: user.tid, deletedAt: null },
+      where: {
+        id: staffProfileId,
+        tenantId: user.tid,
+        deletedAt: null,
+        staffType: 'TEACHING',
+      },
     });
 
-    if (!staff) throw new NotFoundException('Faculty not found');
+    if (!staff) throw new NotFoundException('Teaching faculty not found');
 
     try {
       return await this.prisma.staffShiftAssignment.create({
