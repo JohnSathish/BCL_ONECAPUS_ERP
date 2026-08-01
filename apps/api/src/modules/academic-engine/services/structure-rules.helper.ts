@@ -135,10 +135,25 @@ export async function upsertSemesterStructureRules(
   programVersionId: string,
   rules: SemesterRulePayload[],
   fallbackCreditTarget = DEFAULT_SEMESTER_CREDIT_TARGET,
+  opts?: { preserveExisting?: boolean },
 ) {
+  const preserveExisting = opts?.preserveExisting === true;
   for (const rule of rules) {
     const semesterCreditTarget =
       rule.semesterCreditTarget ?? fallbackCreditTarget;
+
+    if (preserveExisting) {
+      const existing = await db.semesterStructureRule.findUnique({
+        where: {
+          programVersionId_semesterSequence: {
+            programVersionId,
+            semesterSequence: rule.semesterSequence,
+          },
+        },
+      });
+      if (existing) continue;
+    }
+
     const saved = await db.semesterStructureRule.upsert({
       where: {
         programVersionId_semesterSequence: {
@@ -156,20 +171,29 @@ export async function upsertSemesterStructureRules(
         pathwayVariants: rule.pathwayVariants ?? Prisma.JsonNull,
         semesterCreditTarget,
       },
-      update: {
-        categoryCounts: rule.categoryCounts,
-        continuityRules: rule.continuityRules,
-        categoryMeta: rule.categoryMeta ?? Prisma.JsonNull,
-        pathwayVariants: rule.pathwayVariants ?? Prisma.JsonNull,
-        semesterCreditTarget,
-      },
+      update: preserveExisting
+        ? {}
+        : {
+            categoryCounts: rule.categoryCounts,
+            continuityRules: rule.continuityRules,
+            categoryMeta: rule.categoryMeta ?? Prisma.JsonNull,
+            pathwayVariants: rule.pathwayVariants ?? Prisma.JsonNull,
+            semesterCreditTarget,
+          },
     });
 
     const lines = payloadToRuleLines(rule);
     if (db.semesterStructureRuleLine) {
-      await db.semesterStructureRuleLine.deleteMany({
-        where: { ruleId: saved.id },
-      });
+      if (preserveExisting) {
+        const lineCount = await db.semesterStructureRuleLine.count({
+          where: { ruleId: saved.id },
+        });
+        if (lineCount > 0) continue;
+      } else {
+        await db.semesterStructureRuleLine.deleteMany({
+          where: { ruleId: saved.id },
+        });
+      }
       if (lines.length) {
         await db.semesterStructureRuleLine.createMany({
           data: lines.map((line) => ({

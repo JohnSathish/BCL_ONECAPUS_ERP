@@ -74,11 +74,8 @@ export async function syncProgramPromotionMappings(
           category,
           majorPaperIndex: from.majorPaperIndex,
         },
-        update: {
-          toOfferingId: target.id,
-          category,
-          majorPaperIndex: from.majorPaperIndex,
-        },
+        // Preserve live remaps; only create missing links.
+        update: {},
       });
       created++;
     }

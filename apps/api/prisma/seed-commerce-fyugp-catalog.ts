@@ -260,6 +260,8 @@ export async function seedCommerceFyugpCatalog(
       tenantId,
       version.id,
       DEFAULT_FYUGP_SEMESTER_RULES,
+      undefined,
+      { preserveExisting: true },
     );
 
     await prisma.programVersion.updateMany({
@@ -349,12 +351,8 @@ async function upsertCommerceCourse(
   }
 
   if (existing) {
-    return (
-      await prisma.course.update({
-        where: { id: existing.id },
-        data: { ...data, title, code },
-      })
-    ).id;
+    // Never overwrite live curriculum titles/credits/hours on re-seed.
+    return existing.id;
   }
 
   return (

@@ -1427,11 +1427,7 @@ async function main() {
   for (const def of courseDefs) {
     const course = await prisma.course.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code: def.code } },
-      update: {
-        title: def.title,
-        credits: def.credits,
-        courseType: def.courseType,
-      },
+      update: {},
       create: { tenantId: tenant.id, ...def },
     });
 
@@ -2781,25 +2777,7 @@ async function main() {
 
     const course = await prisma.course.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code: c.code } },
-      update: {
-        title: c.title,
-        credits: totalCredits,
-        deliveryType,
-        creditCalculationMode,
-        requiresTheorySplit,
-        requiresPracticalSplit,
-        hasPractical,
-        theoryCredits,
-        practicalCredits,
-        theoryHoursPerWeek: c.theoryHoursPerWeek ?? 0,
-        practicalHoursPerWeek: c.practicalHoursPerWeek ?? 0,
-        totalTheoryContactHours,
-        totalPracticalContactHours,
-        totalContactHours,
-        subjectSlug: c.subjectSlug,
-        courseType: 'CORE',
-        departmentId: department.id,
-      },
+      update: {},
       create: {
         tenantId: tenant.id,
         code: c.code,
@@ -2919,44 +2897,72 @@ async function main() {
     }
   }
 
-  await seedArtsFyugpCatalog({
-    prisma,
-    tenantId: tenant.id,
-    institutionId: institution.id,
-    semesterBySeq,
-    shifts,
-    createdById: adminUser.id,
+  const forceCurriculumSeed = process.env.FORCE_CURRICULUM_SEED === '1';
+  const skipCurriculumSeed = process.env.SKIP_CURRICULUM_SEED === '1';
+  const existingFyugpCourses = await prisma.course.count({
+    where: {
+      tenantId: tenant.id,
+      deletedAt: null,
+      OR: [
+        { code: { startsWith: 'ENG-' } },
+        { code: { startsWith: 'ECO-' } },
+        { code: { startsWith: 'PHY-' } },
+        { code: { startsWith: 'COM-' } },
+        { code: { startsWith: 'MDC-' } },
+        { code: { startsWith: 'AEC-' } },
+        { code: { startsWith: 'SEC-' } },
+        { code: { startsWith: 'VAC-' } },
+      ],
+    },
   });
+  const shouldSeedCurriculum =
+    !skipCurriculumSeed && (forceCurriculumSeed || existingFyugpCourses === 0);
 
-  await seedScienceFyugpCatalog({
-    prisma,
-    tenantId: tenant.id,
-    institutionId: institution.id,
-    semesterBySeq,
-    shifts,
-    createdById: adminUser.id,
-  });
+  let fyugpRules = { subjectCount: 0, ruleCount: 0 };
+  if (!shouldSeedCurriculum) {
+    console.log(
+      `Curriculum seed skipped (existing FYUGP courses=${existingFyugpCourses}; set FORCE_CURRICULUM_SEED=1 only for empty rebuilds)`,
+    );
+  } else {
+    await seedArtsFyugpCatalog({
+      prisma,
+      tenantId: tenant.id,
+      institutionId: institution.id,
+      semesterBySeq,
+      shifts,
+      createdById: adminUser.id,
+    });
 
-  await seedCommerceFyugpCatalog({
-    prisma,
-    tenantId: tenant.id,
-    institutionId: institution.id,
-    semesterBySeq,
-    shifts,
-    createdById: adminUser.id,
-  });
+    await seedScienceFyugpCatalog({
+      prisma,
+      tenantId: tenant.id,
+      institutionId: institution.id,
+      semesterBySeq,
+      shifts,
+      createdById: adminUser.id,
+    });
 
-  const fyugpRules = await seedDbcFyugpRules(prisma, tenant.id, institution.id);
-  await seedDbcShiftCurriculum({
-    prisma,
-    tenantId: tenant.id,
-    institutionId: institution.id,
-    shifts,
-    createdById: adminUser.id,
-  });
-  console.log(
-    'DBC shift curriculum seeded (Morning/Day Sem 1–3 pools, programmes, sections)',
-  );
+    await seedCommerceFyugpCatalog({
+      prisma,
+      tenantId: tenant.id,
+      institutionId: institution.id,
+      semesterBySeq,
+      shifts,
+      createdById: adminUser.id,
+    });
+
+    fyugpRules = await seedDbcFyugpRules(prisma, tenant.id, institution.id);
+    await seedDbcShiftCurriculum({
+      prisma,
+      tenantId: tenant.id,
+      institutionId: institution.id,
+      shifts,
+      createdById: adminUser.id,
+    });
+    console.log(
+      'DBC shift curriculum seeded (Morning/Day Sem 1–3 pools, programmes, sections)',
+    );
+  }
 
   await syncProgramPromotionMappings(prisma, tenant.id, programVersion.id, [
     { fromSequence: 1, toSequence: 2 },
@@ -2986,16 +2992,23 @@ async function main() {
     createdById: adminUser.id,
   });
 
-  await seedDemoLiveReady({
-    prisma,
-    tenantId: tenant.id,
-    institutionId: institution.id,
-    campusId: campus.id,
-    academicYearId: academicYear.id,
-    createdById: adminUser.id,
-    shifts,
-    semesterBySeq,
-  });
+  try {
+    await seedDemoLiveReady({
+      prisma,
+      tenantId: tenant.id,
+      institutionId: institution.id,
+      campusId: campus.id,
+      academicYearId: academicYear.id,
+      createdById: adminUser.id,
+      shifts,
+      semesterBySeq,
+    });
+  } catch (err) {
+    console.warn(
+      'Demo live-ready seed skipped (non-fatal):',
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   for (const [code, cap] of [
     ['MORNING', 30],
@@ -3466,9 +3479,9 @@ async function main() {
   // Legacy NEP demo pools superseded by seedDbcShiftCurriculum (Day/Morning Sem 1–6).
   // await seedCategoryPools(tenant.id, institution.id, adminUser.id);
   console.log(
-    'FYUGP major/minor rules seeded:',
-    fyugpRules.subjectCount,
-    'subject paths',
+    shouldSeedCurriculum
+      ? `FYUGP major/minor rules seeded: ${fyugpRules.subjectCount} subject paths`
+      : 'FYUGP major/minor rules left unchanged (curriculum seed skipped)',
   );
 
   await seedTenantLicensing(tenant.id, adminUser.id, passwordHash);

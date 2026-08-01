@@ -489,6 +489,8 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
       tenantId,
       version.id,
       DEFAULT_FYUGP_SEMESTER_RULES,
+      undefined,
+      { preserveExisting: true },
     );
 
     await prisma.programVersion.updateMany({
@@ -584,11 +586,8 @@ async function upsertArtsCourse(
   }
 
   if (existing) {
-    const course = await prisma.course.update({
-      where: { id: existing.id },
-      data: { ...data, title, code },
-    });
-    return course.id;
+    // Never overwrite live curriculum titles/credits/hours on re-seed.
+    return existing.id;
   }
 
   const course = await prisma.course.create({

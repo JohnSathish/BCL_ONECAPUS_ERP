@@ -224,23 +224,27 @@ async function ensureCategoryPool(
     });
     if (course) allowedCourseIds.add(course.id);
   }
-  await prisma.categoryPoolCourse.updateMany({
-    where: {
-      poolId: pool.id,
-      courseId: { notIn: [...allowedCourseIds] },
-    },
-    data: { active: false },
-  });
 
-  await prisma.courseOffering.updateMany({
-    where: {
-      tenantId: ctx.tenantId,
-      categoryPoolId: pool.id,
-      deletedAt: null,
-      courseId: { notIn: [...allowedCourseIds] },
-    },
-    data: { deletedAt: new Date() },
-  });
+  // Never deactivate/remove live pool membership on re-seed.
+  if (process.env.FORCE_POOL_SYNC === '1') {
+    await prisma.categoryPoolCourse.updateMany({
+      where: {
+        poolId: pool.id,
+        courseId: { notIn: [...allowedCourseIds] },
+      },
+      data: { active: false },
+    });
+
+    await prisma.courseOffering.updateMany({
+      where: {
+        tenantId: ctx.tenantId,
+        categoryPoolId: pool.id,
+        deletedAt: null,
+        courseId: { notIn: [...allowedCourseIds] },
+      },
+      data: { deletedAt: new Date() },
+    });
+  }
 
   return pool;
 }
@@ -249,6 +253,14 @@ export async function syncNehuCourseTitlesAndEligibility(
   prisma: PrismaClient,
   tenantId: string,
 ) {
+  // Intentionally a no-op: live curriculum titles/eligibility must never be
+  // rewritten by seed. Use FORCE_CURRICULUM_TITLE_SYNC=1 only for empty rebuilds.
+  if (process.env.FORCE_CURRICULUM_TITLE_SYNC !== '1') {
+    void prisma;
+    void tenantId;
+    return;
+  }
+
   const catalog = buildArtsFyugpOddCourses();
   for (const def of catalog) {
     const existing = await prisma.course.findFirst({

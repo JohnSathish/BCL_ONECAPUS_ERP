@@ -34,13 +34,7 @@ export async function seedDbcFyugpRules(
 
     const row = await prisma.academicSubject.upsert({
       where: { tenantId_slug: { tenantId, slug } },
-      update: {
-        name,
-        departmentId: departmentId ?? null,
-        programmeGroup: DBC_MAJOR_MINOR_PROGRAMME_GROUP[name] ?? null,
-        isActive: true,
-        deletedAt: null,
-      },
+      update: {},
       create: {
         tenantId,
         institutionId,
