@@ -5,6 +5,7 @@ import type {
   IdCardPhotoShape,
 } from '@/types/id-card-template';
 import type { IdCardModel } from '@/types/id-card';
+import { resolveUploadAssetUrlForPrint } from '@/lib/branding-asset';
 import { CR80_HEIGHT_MM, CR80_WIDTH_MM } from './cr80-constants';
 import { normalizeIdCardLayout } from './layout-legacy-migrate';
 import type { EvolisFeedOptions, PrintCalibration } from './cr80-designer-constants';
@@ -18,6 +19,32 @@ import {
   renderShapeHtml,
   renderStaticTextHtml,
 } from './id-card-element-style';
+
+/** Remap browser same-origin upload URLs to Nest for Puppeteer. */
+function modelForPrint(model: IdCardModel): IdCardModel {
+  const institution = {
+    ...model.institution,
+    logoUrl: resolveUploadAssetUrlForPrint(model.institution.logoUrl) ?? model.institution.logoUrl,
+  };
+  if (model.cardType === 'student') {
+    return {
+      ...model,
+      institution,
+      holder: {
+        ...model.holder,
+        photoUrl: resolveUploadAssetUrlForPrint(model.holder.photoUrl) ?? model.holder.photoUrl,
+      },
+    };
+  }
+  return {
+    ...model,
+    institution,
+    holder: {
+      ...model.holder,
+      photoUrl: resolveUploadAssetUrlForPrint(model.holder.photoUrl) ?? model.holder.photoUrl,
+    },
+  };
+}
 
 export type Cr80PrintPurpose = 'preview' | 'evolis';
 
@@ -41,6 +68,7 @@ function fieldHtml(
   signatureUrl?: string | null,
   side?: 'front' | 'back',
   fontSize?: number | null,
+  showLabel?: boolean,
 ): string {
   return renderFieldHtml(fieldKey, {
     model,
@@ -51,6 +79,7 @@ function fieldHtml(
     signatureUrl,
     side,
     fontSize,
+    showLabel,
   });
 }
 
@@ -76,6 +105,7 @@ function elementPrintInner(
     signatureUrl,
     side,
     el.style?.fontSize,
+    el.binding?.showLabel,
   );
   if (!html) return '';
   const prefix = el.binding?.prefix
@@ -182,21 +212,25 @@ export function buildCr80PrintDocument(options: {
   const frontRotationDeg = applyEvolisFeed && options.evolisFeed?.rotateFront180 ? 180 : 0;
   const backRotationDeg = applyEvolisFeed && options.evolisFeed?.rotateBack180 ? 180 : 0;
 
+  const printModel = modelForPrint(options.model);
+  const signatureUrl =
+    resolveUploadAssetUrlForPrint(options.signatureUrl) ?? options.signatureUrl ?? null;
+
   const frontBody = sideHtml(
-    options.model,
+    printModel,
     options.layout,
     'front',
     options.holderType,
     options.testMode,
-    options.signatureUrl,
+    signatureUrl,
   );
   const backBody = sideHtml(
-    options.model,
+    printModel,
     options.layout,
     'back',
     options.holderType,
     options.testMode,
-    options.signatureUrl,
+    signatureUrl,
   );
 
   const meta: Cr80PrintMeta = {

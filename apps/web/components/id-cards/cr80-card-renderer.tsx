@@ -210,9 +210,11 @@ export function Cr80CardRenderer({
       signatureUrl,
       side,
       fontSize: element.style?.fontSize,
+      showLabel: element.binding?.showLabel,
     });
     if (!content) return null;
-    const showLabel = element.binding?.showLabel;
+    // Capition labels only when showLabel is explicitly true (value-only overlays omit them).
+    const showLabel = element.binding?.showLabel === true;
     const label = getFieldDisplayName(element.fieldKey, element.label);
     const prefix = element.binding?.prefix;
     const suffix = element.binding?.suffix;

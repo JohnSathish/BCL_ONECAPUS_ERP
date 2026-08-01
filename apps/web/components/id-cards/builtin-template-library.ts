@@ -1,4 +1,9 @@
-import type { IdCardLayoutInput, IdCardLayoutMeta, IdCardLayoutV1 } from '@/types/id-card-template';
+import type {
+  IdCardElementBinding,
+  IdCardLayoutInput,
+  IdCardLayoutMeta,
+  IdCardLayoutV1,
+} from '@/types/id-card-template';
 import type {
   BuiltinIdCardTemplate,
   IdCardTemplateCategory,
@@ -9,8 +14,23 @@ function layout(
   meta: IdCardLayoutMeta,
   front: IdCardLayoutV1['front'],
   back: IdCardLayoutV1['back'],
+  extras?: Pick<IdCardLayoutV1, 'frontBackground' | 'backBackground'>,
 ): IdCardLayoutV1 {
-  return { version: 1, meta, front, back };
+  return { version: 1, meta, front, back, ...extras };
+}
+
+function overlayEl(
+  fieldKey: Parameters<typeof el>[0],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  zIndex: number,
+  align: 'left' | 'center' | 'right' = 'left',
+  style?: Parameters<typeof el>[7],
+  binding: IdCardElementBinding = { showLabel: false },
+) {
+  return { ...el(fieldKey, x, y, width, height, zIndex, align, style), binding };
 }
 
 export const DBC_CLASSIC_LAYOUT: IdCardLayoutV1 = layout(
@@ -46,6 +66,108 @@ export const DBC_CLASSIC_LAYOUT: IdCardLayoutV1 = layout(
     el('terms', 3, 63.5, 48, 10, 8),
     el('validityFooter', 0, 80, 53.98, 5.6, 9),
   ],
+);
+
+/** ChatGPT / Canva front art with value-only overlays. Back empty until art is provided. */
+export const DBC_MODERN_STUDENT_LAYOUT: IdCardLayoutV1 = layout(
+  {
+    libraryCode: 'dbc-modern-student',
+    stylePreset: 'minimal',
+    creationMethod: 'background-upload',
+    layoutRevision: 1,
+  },
+  [
+    overlayEl('photo', 16.2, 16.8, 18.2, 20.5, 5, 'center', {
+      photoShape: 'rounded',
+      backgroundColor: '#ffffff',
+      borderRadiusMm: 1.2,
+      borderWidthMm: 0.35,
+      borderColor: '#0b1f4d',
+    }),
+    overlayEl(
+      'name',
+      5,
+      41.2,
+      44,
+      4.2,
+      6,
+      'center',
+      {
+        fontSize: 9,
+        fontWeight: 'extrabold',
+        color: '#0b1f4d',
+        backgroundColor: 'rgba(255,255,255,0.92)',
+      },
+      { showLabel: false, textTransform: 'uppercase' },
+    ),
+    overlayEl('subtitle', 5, 45.2, 44, 3, 6, 'center', {
+      fontSize: 5.5,
+      fontWeight: 'medium',
+      color: '#334155',
+      backgroundColor: 'rgba(255,255,255,0.92)',
+    }),
+    overlayEl('rollNumber', 27.5, 49.1, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('registrationNumber', 27.5, 52.2, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('programme', 27.5, 55.3, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('semester', 27.5, 58.4, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('dateOfBirth', 27.5, 61.5, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('bloodGroup', 27.5, 64.6, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('contact', 27.5, 67.7, 23, 2.8, 7, 'left', {
+      fontSize: 5.2,
+      fontWeight: 'bold',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    }),
+    overlayEl('qr', 3.2, 71.2, 11.5, 11.5, 8, 'center', {
+      backgroundColor: '#ffffff',
+      borderRadiusMm: 0.8,
+    }),
+    overlayEl('principalSignature', 30, 71.5, 20, 7.5, 8, 'center', {
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    }),
+    overlayEl('validity', 18, 81.4, 33, 3.4, 9, 'left', {
+      fontSize: 4.5,
+      fontWeight: 'extrabold',
+      color: '#ffffff',
+    }),
+  ],
+  [],
+  {
+    frontBackground: {
+      imageUrl: '/uploads/shared/id-cards/dbct-student-front.png',
+      x: 0,
+      y: 0,
+      width: 53.98,
+      height: 85.6,
+      opacity: 1,
+      fit: 'stretch',
+      locked: true,
+    },
+    backBackground: null,
+  },
 );
 
 export const MODERN_GRADIENT_LAYOUT: IdCardLayoutV1 = layout(
@@ -424,6 +546,19 @@ export const BUILTIN_ID_CARD_TEMPLATES: BuiltinIdCardTemplate[] = [
     colorHints: ['Navy Blue', 'White', 'Gold accent'],
     bestFor: ['Traditional Colleges', 'Universities'],
     layout: DBC_CLASSIC_LAYOUT,
+  },
+  {
+    code: 'dbc-modern-student',
+    name: 'DBC Modern Student (Front Art)',
+    description:
+      'Don Bosco College Tura portrait front from designed artwork — navy/red chrome in the background with live photo, details, QR, signature, and validity overlays.',
+    category: 'STUDENT',
+    holderType: 'STUDENT',
+    tags: ['dbc', 'modern', 'background', 'nehu'],
+    styleLabel: 'Modern Front Art',
+    colorHints: ['Navy Blue', 'Red', 'White'],
+    bestFor: ['Don Bosco College Tura', 'Evolis CR80 Print'],
+    layout: DBC_MODERN_STUDENT_LAYOUT,
   },
   {
     code: 'modern-gradient',

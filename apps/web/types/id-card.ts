@@ -30,6 +30,8 @@ export type StudentIdCardModel = {
     semester: string | null;
     shift: string | null;
     gender: string | null;
+    dateOfBirth: string | null;
+    phone: string | null;
     fatherName: string | null;
     motherName: string | null;
     holderAddress: string | null;

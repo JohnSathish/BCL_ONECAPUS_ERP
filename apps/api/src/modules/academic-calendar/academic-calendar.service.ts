@@ -4,16 +4,30 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ACADEMIC_CALENDAR_EVENT_TYPES,
+  defaultColorForType,
   defaultCreatesAttendanceSession,
   defaultIsWorkingDayForType,
+  filterGroupForType,
   mapStaffHolidayType,
   parseDateOnly,
   toDateOnlyIso,
+  type CalendarAttachmentMeta,
+  type CalendarVisibilityFlags,
 } from './academic-calendar.types';
+import {
+  assertCanCreateType,
+  assertCanWriteEvent,
+  canPublishCalendar,
+} from './calendar-rbac.policy';
+import { expandRruleOccurrences } from './rrule-expand';
 import { WorkingDayEngineService } from './working-day-engine.service';
 
 @Injectable()
@@ -26,6 +40,12 @@ export class AcademicCalendarService {
   listEventTypes() {
     return ACADEMIC_CALENDAR_EVENT_TYPES.map((type) => ({
       type,
+      label: type
+        .split('_')
+        .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
+        .join(' '),
+      defaultColor: defaultColorForType(type),
+      filterGroup: filterGroupForType(type),
       defaultIsWorkingDay: defaultIsWorkingDayForType(type),
       defaultCreatesAttendanceSession: defaultCreatesAttendanceSession(type),
     }));
@@ -182,19 +202,50 @@ export class AcademicCalendarService {
       from?: string;
       to?: string;
       type?: string;
+      types?: string[];
       visibility?: string;
+      q?: string;
+      departmentId?: string;
+      expandRecurrence?: boolean;
     },
   ) {
     await this.requireCalendar(tenantId, calendarId);
     const from = query?.from ? parseDateOnly(query.from) : undefined;
     const to = query?.to ? parseDateOnly(query.to) : undefined;
+    const types = query?.types?.length
+      ? query.types
+      : query?.type
+        ? [query.type]
+        : undefined;
     const rows = await this.prisma.academicCalendarEvent.findMany({
       where: {
         tenantId,
         calendarId,
         deletedAt: null,
-        ...(query?.type ? { type: query.type } : {}),
+        ...(types?.length ? { type: { in: types } } : {}),
         ...(query?.visibility ? { visibility: query.visibility } : {}),
+        ...(query?.q?.trim()
+          ? {
+              OR: [
+                { title: { contains: query.q.trim(), mode: 'insensitive' } },
+                {
+                  description: {
+                    contains: query.q.trim(),
+                    mode: 'insensitive',
+                  },
+                },
+                { venue: { contains: query.q.trim(), mode: 'insensitive' } },
+                {
+                  organizerName: {
+                    contains: query.q.trim(),
+                    mode: 'insensitive',
+                  },
+                },
+                { type: { contains: query.q.trim(), mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+        ...(query?.departmentId ? {} : {}),
         ...(from || to
           ? {
               AND: [
@@ -206,7 +257,122 @@ export class AcademicCalendarService {
       },
       orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
     });
-    return rows.map((row) => this.mapEvent(row));
+
+    let mapped = rows.map((row) => this.mapEvent(row));
+    if (query?.departmentId) {
+      const dept = query.departmentId;
+      mapped = mapped.filter(
+        (e) => !e.departmentIds.length || e.departmentIds.includes(dept),
+      );
+    }
+    if (!query?.expandRecurrence || !from || !to) return mapped;
+
+    const rangeFrom = toDateOnlyIso(from);
+    const rangeTo = toDateOnlyIso(to);
+    const expanded: typeof mapped = [];
+    for (const ev of mapped) {
+      if (!ev.isRecurring || !ev.recurrenceRule) {
+        expanded.push(ev);
+        continue;
+      }
+      const occs = expandRruleOccurrences({
+        startDate: ev.startDate,
+        endDate: ev.endDate,
+        recurrenceRule: ev.recurrenceRule,
+        rangeFrom,
+        rangeTo,
+      });
+      for (const occ of occs) {
+        expanded.push({
+          ...ev,
+          id: `${ev.id}::${occ.startDate}`,
+          occurrenceOf: ev.id,
+          startDate: occ.startDate,
+          endDate: occ.endDate,
+        });
+      }
+    }
+    return expanded.sort((a, b) =>
+      a.startDate === b.startDate
+        ? a.title.localeCompare(b.title)
+        : a.startDate.localeCompare(b.startDate),
+    );
+  }
+
+  async getEvent(tenantId: string, eventId: string) {
+    const row = await this.requireEvent(tenantId, eventId);
+    return this.mapEvent(row);
+  }
+
+  async monthSummary(
+    tenantId: string,
+    calendarId: string,
+    year: number,
+    month: number,
+  ) {
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const to = `${year}-${String(month).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+    const days = await this.engine.resolveRange(tenantId, from, to, {
+      calendarId,
+    });
+    const events = await this.listEvents(tenantId, calendarId, {
+      from,
+      to,
+      expandRecurrence: true,
+    });
+    const today = toDateOnlyIso(new Date());
+    const holidays = days.filter((d) => d.dayKind === 'HOLIDAY').length;
+    const weekends = days.filter((d) => d.dayKind === 'WEEKEND').length;
+    const working = days.filter((d) => d.isWorkingDay).length;
+    const exams = events.filter((e) =>
+      [
+        'INTERNAL_ASSESSMENT',
+        'MID_SEM_EXAM',
+        'END_SEM_EXAM',
+        'PRACTICAL_EXAM',
+        'VIVA',
+      ].includes(e.type),
+    ).length;
+    const meetings = events.filter((e) =>
+      ['STAFF_MEETING', 'DEPARTMENT_MEETING', 'STAFF_EVENT'].includes(e.type),
+    ).length;
+    return {
+      year,
+      month,
+      from,
+      to,
+      workingDays: working,
+      weekends,
+      holidays,
+      exams,
+      meetings,
+      eventsThisMonth: events.length,
+      todaysEvents: events.filter(
+        (e) => e.startDate <= today && e.endDate >= today,
+      ).length,
+      upcomingEvents: events.filter((e) => e.startDate > today).length,
+    };
+  }
+
+  async todayEvents(tenantId: string, calendarId: string) {
+    const today = toDateOnlyIso(new Date());
+    return this.listEvents(tenantId, calendarId, {
+      from: today,
+      to: today,
+      expandRecurrence: true,
+    });
+  }
+
+  async upcomingEvents(tenantId: string, calendarId: string, limit = 20) {
+    const today = toDateOnlyIso(new Date());
+    const to = toDateOnlyIso(new Date(Date.now() + 90 * 86_400_000));
+    const events = await this.listEvents(tenantId, calendarId, {
+      from: today,
+      to,
+      expandRecurrence: true,
+    });
+    return events.filter((e) => e.startDate >= today).slice(0, limit);
   }
 
   async createEvent(
@@ -228,10 +394,27 @@ export class AcademicCalendarService {
       visibility?: string;
       publishedToWebsite?: boolean;
       active?: boolean;
+      color?: string;
+      icon?: string;
+      venue?: string;
+      isAllDay?: boolean;
+      isRecurring?: boolean;
+      recurrenceRule?: string;
+      programmeId?: string;
+      semesterId?: string;
+      shiftId?: string;
+      visibilityFlags?: CalendarVisibilityFlags;
+      organizerName?: string;
     },
   ) {
     await this.requireCalendar(user.tid, calendarId);
     this.assertEventType(dto.type);
+    assertCanCreateType(user, dto.type, dto.departmentIds);
+    if (dto.publishedToWebsite && !canPublishCalendar(user)) {
+      throw new BadRequestException(
+        'Only managers can publish events to website',
+      );
+    }
     const startDate = parseDateOnly(dto.startDate);
     const endDate = parseDateOnly(dto.endDate ?? dto.startDate);
     if (endDate < startDate) {
@@ -248,7 +431,10 @@ export class AcademicCalendarService {
         description: dto.description?.trim() || null,
         startDate,
         endDate,
-        startTime: dto.startTime ?? null,
+        startTime:
+          dto.isAllDay === false
+            ? (dto.startTime ?? null)
+            : (dto.startTime ?? null),
         endTime: dto.endTime ?? null,
         isWorkingDay: dto.isWorkingDay === undefined ? null : dto.isWorkingDay,
         createsAttendanceSession,
@@ -260,6 +446,19 @@ export class AcademicCalendarService {
         visibility: dto.visibility ?? 'INTERNAL',
         publishedToWebsite: Boolean(dto.publishedToWebsite),
         active: dto.active ?? true,
+        color: dto.color?.trim() || null,
+        icon: dto.icon?.trim() || null,
+        venue: dto.venue?.trim() || null,
+        isAllDay: dto.isAllDay ?? true,
+        isRecurring: Boolean(dto.isRecurring && dto.recurrenceRule),
+        recurrenceRule: dto.recurrenceRule?.trim() || null,
+        programmeId: dto.programmeId ?? null,
+        semesterId: dto.semesterId ?? null,
+        shiftId: dto.shiftId ?? null,
+        visibilityFlags: dto.visibilityFlags
+          ? (dto.visibilityFlags as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        organizerName: dto.organizerName?.trim() || null,
         createdById: user.sub,
         updatedById: user.sub,
       },
@@ -286,9 +485,31 @@ export class AcademicCalendarService {
       visibility: string;
       publishedToWebsite: boolean;
       active: boolean;
+      color: string | null;
+      icon: string | null;
+      venue: string | null;
+      isAllDay: boolean;
+      isRecurring: boolean;
+      recurrenceRule: string | null;
+      programmeId: string | null;
+      semesterId: string | null;
+      shiftId: string | null;
+      visibilityFlags: CalendarVisibilityFlags | null;
+      organizerName: string | null;
     }>,
   ) {
     const existing = await this.requireEvent(user.tid, eventId);
+    assertCanWriteEvent(user, 'update', {
+      type: dto.type ?? existing.type,
+      createdById: existing.createdById,
+      departmentIds: dto.departmentIds ?? existing.departmentIds,
+      sourceModule: existing.sourceModule,
+    });
+    if (dto.publishedToWebsite && !canPublishCalendar(user)) {
+      throw new BadRequestException(
+        'Only managers can publish events to website',
+      );
+    }
     if (dto.type) this.assertEventType(dto.type);
     const startDate = dto.startDate
       ? parseDateOnly(dto.startDate)
@@ -329,6 +550,35 @@ export class AcademicCalendarService {
           ? { publishedToWebsite: dto.publishedToWebsite }
           : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.color !== undefined
+          ? { color: dto.color?.trim() || null }
+          : {}),
+        ...(dto.icon !== undefined ? { icon: dto.icon?.trim() || null } : {}),
+        ...(dto.venue !== undefined
+          ? { venue: dto.venue?.trim() || null }
+          : {}),
+        ...(dto.isAllDay !== undefined ? { isAllDay: dto.isAllDay } : {}),
+        ...(dto.isRecurring !== undefined
+          ? { isRecurring: dto.isRecurring }
+          : {}),
+        ...(dto.recurrenceRule !== undefined
+          ? { recurrenceRule: dto.recurrenceRule?.trim() || null }
+          : {}),
+        ...(dto.programmeId !== undefined
+          ? { programmeId: dto.programmeId }
+          : {}),
+        ...(dto.semesterId !== undefined ? { semesterId: dto.semesterId } : {}),
+        ...(dto.shiftId !== undefined ? { shiftId: dto.shiftId } : {}),
+        ...(dto.visibilityFlags !== undefined
+          ? {
+              visibilityFlags: dto.visibilityFlags
+                ? (dto.visibilityFlags as unknown as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+            }
+          : {}),
+        ...(dto.organizerName !== undefined
+          ? { organizerName: dto.organizerName?.trim() || null }
+          : {}),
         updatedById: user.sub,
       },
     });
@@ -336,12 +586,122 @@ export class AcademicCalendarService {
   }
 
   async deleteEvent(user: JwtUser, eventId: string) {
-    await this.requireEvent(user.tid, eventId);
+    const existing = await this.requireEvent(user.tid, eventId);
+    assertCanWriteEvent(user, 'delete', {
+      type: existing.type,
+      createdById: existing.createdById,
+      departmentIds: existing.departmentIds,
+      sourceModule: existing.sourceModule,
+    });
     await this.prisma.academicCalendarEvent.update({
       where: { id: eventId },
       data: { deletedAt: new Date(), active: false, updatedById: user.sub },
     });
     return { ok: true };
+  }
+
+  async duplicateEvent(user: JwtUser, eventId: string) {
+    const existing = await this.requireEvent(user.tid, eventId);
+    assertCanCreateType(
+      user,
+      existing.type,
+      Array.isArray(existing.departmentIds)
+        ? (existing.departmentIds as string[])
+        : undefined,
+    );
+    return this.createEvent(user, existing.calendarId, {
+      type: existing.type,
+      title: `${existing.title} (Copy)`,
+      description: existing.description ?? undefined,
+      startDate: toDateOnlyIso(existing.startDate),
+      endDate: toDateOnlyIso(existing.endDate),
+      startTime: existing.startTime ?? undefined,
+      endTime: existing.endTime ?? undefined,
+      isWorkingDay: existing.isWorkingDay,
+      createsAttendanceSession: existing.createsAttendanceSession,
+      scopeType: existing.scopeType,
+      campusId: existing.campusId ?? undefined,
+      departmentIds: Array.isArray(existing.departmentIds)
+        ? (existing.departmentIds as string[])
+        : undefined,
+      visibility: existing.visibility,
+      publishedToWebsite: false,
+      color: existing.color ?? undefined,
+      icon: existing.icon ?? undefined,
+      venue: existing.venue ?? undefined,
+      isAllDay: existing.isAllDay,
+      isRecurring: existing.isRecurring,
+      recurrenceRule: existing.recurrenceRule ?? undefined,
+      programmeId: existing.programmeId ?? undefined,
+      semesterId: existing.semesterId ?? undefined,
+      shiftId: existing.shiftId ?? undefined,
+      organizerName: existing.organizerName ?? undefined,
+    });
+  }
+
+  async addAttachment(
+    user: JwtUser,
+    eventId: string,
+    file: Express.Multer.File,
+  ) {
+    const existing = await this.requireEvent(user.tid, eventId);
+    assertCanWriteEvent(user, 'update', {
+      type: existing.type,
+      createdById: existing.createdById,
+      departmentIds: existing.departmentIds,
+      sourceModule: existing.sourceModule,
+    });
+    const allowed = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Only PDF or images are allowed');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('Attachment max size is 10MB');
+    }
+    const dir = join(
+      resolveTenantUploadRoot(),
+      user.tid,
+      'academic-calendar',
+      eventId,
+    );
+    await mkdir(dir, { recursive: true });
+    const ext =
+      file.mimetype === 'application/pdf'
+        ? 'pdf'
+        : file.mimetype.includes('png')
+          ? 'png'
+          : file.mimetype.includes('webp')
+            ? 'webp'
+            : 'jpg';
+    const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
+    await writeFile(join(dir, filename), file.buffer);
+    const publicPath = `/uploads/tenants/${user.tid}/academic-calendar/${eventId}/${filename}`;
+    const current = (
+      Array.isArray(existing.attachmentUrls) ? existing.attachmentUrls : []
+    ) as CalendarAttachmentMeta[];
+    const next: CalendarAttachmentMeta[] = [
+      ...current,
+      {
+        url: publicPath,
+        name: file.originalname || filename,
+        mimeType: file.mimetype,
+        size: file.size,
+      },
+    ];
+    const row = await this.prisma.academicCalendarEvent.update({
+      where: { id: eventId },
+      data: {
+        attachmentUrls: next as unknown as Prisma.InputJsonValue,
+        updatedById: user.sub,
+      },
+    });
+    return this.mapEvent(row);
   }
 
   async bulkCreateHolidays(
@@ -647,8 +1007,23 @@ export class AcademicCalendarService {
     sourceRefId: string | null;
     publishedToWebsite: boolean;
     active: boolean;
+    createdById?: string | null;
+    updatedById?: string | null;
     createdAt: Date;
     updatedAt: Date;
+    color?: string | null;
+    icon?: string | null;
+    venue?: string | null;
+    isAllDay?: boolean;
+    isRecurring?: boolean;
+    recurrenceRule?: string | null;
+    recurrenceParentId?: string | null;
+    programmeId?: string | null;
+    semesterId?: string | null;
+    shiftId?: string | null;
+    visibilityFlags?: unknown;
+    attachmentUrls?: unknown;
+    organizerName?: string | null;
   }) {
     return {
       id: row.id,
@@ -672,8 +1047,30 @@ export class AcademicCalendarService {
       sourceRefId: row.sourceRefId,
       publishedToWebsite: row.publishedToWebsite,
       active: row.active,
+      color: row.color ?? defaultColorForType(row.type),
+      icon: row.icon ?? null,
+      venue: row.venue ?? null,
+      isAllDay: row.isAllDay ?? true,
+      isRecurring: row.isRecurring ?? false,
+      recurrenceRule: row.recurrenceRule ?? null,
+      recurrenceParentId: row.recurrenceParentId ?? null,
+      programmeId: row.programmeId ?? null,
+      semesterId: row.semesterId ?? null,
+      shiftId: row.shiftId ?? null,
+      visibilityFlags:
+        row.visibilityFlags && typeof row.visibilityFlags === 'object'
+          ? (row.visibilityFlags as CalendarVisibilityFlags)
+          : null,
+      attachmentUrls: Array.isArray(row.attachmentUrls)
+        ? (row.attachmentUrls as CalendarAttachmentMeta[])
+        : [],
+      organizerName: row.organizerName ?? null,
+      createdById: row.createdById ?? null,
+      updatedById: row.updatedById ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      readOnly: Boolean(row.sourceModule),
+      occurrenceOf: null as string | null,
     };
   }
 

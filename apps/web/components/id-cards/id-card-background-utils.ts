@@ -1,5 +1,5 @@
 import { CR80_HEIGHT_MM, CR80_WIDTH_MM } from './cr80-constants';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAssetUrl, resolveUploadAssetUrlForPrint } from '@/lib/branding-asset';
 import type {
   IdCardBackgroundFit,
   IdCardBackgroundLayer,
@@ -73,7 +73,8 @@ export function backgroundImageUrl(layer: IdCardBackgroundLayer): string | undef
 }
 
 export function backgroundPrintHtml(layer: IdCardBackgroundLayer): string {
-  const url = backgroundImageUrl(layer);
+  // Puppeteer fetches from Nest; browser preview window has no Next CSP.
+  const url = resolveUploadAssetUrlForPrint(layer.imageUrl);
   if (!url) return '';
   const opacity = layer.opacity ?? 1;
   const fit = cssObjectFit(layer.fit);

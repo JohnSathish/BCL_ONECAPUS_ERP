@@ -40,6 +40,11 @@ export type FieldRenderOptions = {
   side?: 'front' | 'back';
   /** Designer element style.fontSize (pt) — scales Pursuit type when set. */
   fontSize?: number | null;
+  /**
+   * When explicitly false, render values without built-in labels
+   * (for background-upload overlays where labels are in the artwork).
+   */
+  showLabel?: boolean;
 };
 
 export type FieldRenderCtx = {
@@ -132,7 +137,7 @@ export function labelValueHtml(
   label: string,
   value: string | null | undefined,
   _primary: string,
-  opts?: { multiline?: boolean; typeScale?: IdCardTypeScale },
+  opts?: { multiline?: boolean; typeScale?: IdCardTypeScale; valueOnly?: boolean },
 ) {
   if (isBlank(value)) return '';
   const text = value!.trim();
@@ -140,10 +145,32 @@ export function labelValueHtml(
   const valueSize = opts?.multiline
     ? (opts?.typeScale?.address ?? opts?.typeScale?.value ?? '5.2pt')
     : (opts?.typeScale?.value ?? '5.2pt');
+  if (opts?.valueOnly) {
+    return `<div style="line-height:1.25;width:100%;font-size:${valueSize};font-weight:700;color:#0f172a;${opts?.multiline ? 'white-space:pre-wrap;word-break:break-word;' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">${escHtml(text)}</div>`;
+  }
   return `<div style="display:flex;gap:1.2mm;align-items:baseline;line-height:1.25;width:100%;">
     <span style="flex:0 0 16mm;font-size:${labelSize};font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">${escHtml(label)}</span>
     <span style="flex:1;font-size:${valueSize};font-weight:700;color:#0f172a;${opts?.multiline ? 'white-space:pre-wrap;word-break:break-word;' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">${escHtml(text)}</span>
   </div>`;
+}
+
+export function formatSemesterLabel(semester: string | null | undefined): string | null {
+  if (isBlank(semester)) return null;
+  const raw = semester!.trim();
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return raw;
+  const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  return romans[n - 1] ?? String(n);
+}
+
+export function formatIdCardDate(isoOrDate: string | null | undefined): string | null {
+  if (isBlank(isoOrDate)) return null;
+  const d = new Date(isoOrDate!);
+  if (Number.isNaN(d.getTime())) return isoOrDate!.trim();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd} / ${mm} / ${yyyy}`;
 }
 
 export function qrImageUrl(payload: string) {
@@ -160,7 +187,23 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     if (staffHtml !== null) return staffHtml;
   }
 
-  const { model, primary, accent, stylePreset, photoShape, signatureUrl, side, fontSize } = ctx;
+  const {
+    model,
+    primary,
+    accent,
+    stylePreset,
+    photoShape,
+    signatureUrl,
+    side,
+    fontSize,
+    showLabel,
+  } = ctx;
+  const valueOnly = showLabel === false;
+  const lv = (
+    label: string,
+    value: string | null | undefined,
+    opts?: { multiline?: boolean; typeScale?: IdCardTypeScale },
+  ) => labelValueHtml(label, value, primary, { ...opts, valueOnly });
   const inst = model.institution;
   const student = studentHolder(model);
   const holder = model.holder;
@@ -255,14 +298,14 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       return student
         ? pe
           ? pursuitGridRowHtml('Reg No', (student.registrationNumber ?? student.rollNumber)!, ts!)
-          : labelValueHtml('Reg No', student.registrationNumber ?? student.rollNumber, primary)
+          : lv('Reg No', student.registrationNumber ?? student.rollNumber)
         : '';
     case 'rollNumber':
-      return student ? labelValueHtml('Roll No', student.rollNumber, primary) : '';
+      return student ? lv('Roll No', student.rollNumber) : '';
     case 'department':
       return pe && !isBlank(holder.department)
         ? pursuitGridRowHtml('Department', holder.department!, ts!)
-        : labelValueHtml('Department', holder.department, primary);
+        : lv('Department', holder.department);
     case 'programme':
       if (student) {
         if (pe) {
@@ -270,24 +313,36 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
           const prog = displayProgramme(student);
           return !isBlank(prog) ? pursuitGridRowHtml('Programme', prog!, ts!) : '';
         }
-        return labelValueHtml('Programme', displayProgramme(student) ?? '', primary);
+        return lv('Programme', displayProgramme(student) ?? '');
       }
       return '';
-    case 'semester':
+    case 'semester': {
+      if (!student) return '';
+      const label = formatSemesterLabel(student.semester);
+      return lv('Semester', label);
+    }
     case 'academicYear':
       return '';
+    case 'dateOfBirth': {
+      if (!student) return '';
+      return lv('Date of Birth', formatIdCardDate(student.dateOfBirth));
+    }
     case 'gender':
       return student
         ? pe && !isBlank(student.gender)
           ? pursuitGridRowHtml('Gender', formatDisplayGender(student.gender), ts!)
-          : labelValueHtml('Gender', formatDisplayGender(student.gender) || student.gender, primary)
+          : lv('Gender', formatDisplayGender(student.gender) || student.gender)
         : '';
     case 'bloodGroup':
       if (pe) return '';
-      return labelValueHtml('Blood Group', holder.bloodGroup, primary);
+      return lv('Blood Group', holder.bloodGroup);
     case 'validity': {
       const dateLabel = formatPursuitValidUntilDate(v.validTo, v.validToLabel);
       if (!dateLabel && !v.validToLabel) return '';
+      if (valueOnly) {
+        const text = dateLabel || v.validToLabel || '';
+        return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:flex-start;color:#fff;font-size:4pt;font-weight:800;white-space:nowrap;overflow:hidden;">${escHtml(text)}</div>`;
+      }
       return pe
         ? pursuitValidityHtml(escHtml(dateLabel || v.validToLabel!), ts!)
         : v.validToLabel
@@ -324,10 +379,9 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       </div>`;
     }
     case 'memberId':
-      return labelValueHtml(
+      return lv(
         'Member ID',
         (holder as { memberId?: string | null }).memberId ?? student?.registrationNumber,
-        primary,
       );
     case 'principalSignature': {
       const url =
@@ -337,6 +391,10 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         null;
       const peSig = pe;
       const align = peSig ? 'align-items:flex-end;' : 'align-items:center;';
+      if (valueOnly) {
+        if (!url) return '';
+        return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><img src="${escHtml(url)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`;
+      }
       if (url) {
         return `<div style="width:100%;height:100%;display:flex;flex-direction:column;${align}justify-content:flex-end;">
           <img src="${escHtml(url)}" alt="" style="max-width:90%;max-height:70%;object-fit:contain;" />
@@ -349,12 +407,12 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
       </div>`;
     }
     case 'fatherName':
-      return student ? labelValueHtml('Father', student.fatherName, primary) : '';
+      return student ? lv('Father', student.fatherName) : '';
     case 'motherName':
-      return student ? labelValueHtml('Mother', student.motherName, primary) : '';
+      return student ? lv('Mother', student.motherName) : '';
     case 'holderAddress':
       return student
-        ? labelValueHtml('Address', student.holderAddress, primary, {
+        ? lv('Address', student.holderAddress, {
             multiline: true,
             typeScale: ts ?? undefined,
           })
@@ -371,14 +429,10 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
         return ec ? pursuitGridRowHtml('Emergency', ec, ts!) : '';
       }
       return student && !isBlank(student.emergencyContact)
-        ? labelValueHtml('Emergency', student.emergencyContact!, primary)
+        ? lv('Emergency', student.emergencyContact!)
         : model.cardType === 'staff' &&
             !isBlank((model.holder as StaffIdCardModel['holder']).emergencyContact)
-          ? labelValueHtml(
-              'Emergency',
-              (model.holder as StaffIdCardModel['holder']).emergencyContact!,
-              primary,
-            )
+          ? lv('Emergency', (model.holder as StaffIdCardModel['holder']).emergencyContact!)
           : '';
     case 'qr': {
       if (!model.verification.qrPayload) return '';
@@ -412,14 +466,21 @@ export function renderFieldHtml(fieldKey: IdCardFieldKey, ctx: FieldRenderCtx): 
     }
     case 'address': {
       const line = formatCollegeAddress(inst);
-      return line
-        ? labelValueHtml('College', line, primary, { multiline: true, typeScale: ts ?? undefined })
-        : '';
+      return line ? lv('College', line, { multiline: true, typeScale: ts ?? undefined }) : '';
     }
-    case 'contact':
+    case 'contact': {
+      if (student) {
+        const phone = student.phone ?? student.emergencyContact;
+        if (!isBlank(phone)) return lv('Contact', phone);
+      }
+      if (model.cardType === 'staff') {
+        const phone = (model.holder as StaffIdCardModel['holder']).phone;
+        if (!isBlank(phone)) return lv('Phone', phone);
+      }
       return institutionContactLines(model)
         .map((line) => pursuitContactLineHtml(line.icon, escHtml(line.text), ts ?? undefined))
         .join('');
+    }
     case 'terms':
       if (pe) {
         return pursuitTermsHtml(ts!);

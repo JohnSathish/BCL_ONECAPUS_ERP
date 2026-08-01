@@ -1,5 +1,15 @@
+import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
+import { pingActivity } from '@/lib/auth/session-activity';
+import { createHttpClient } from '@/lib/http/create-client';
+import { getApiBaseUrl, getDirectApiBaseUrl } from '@/lib/http/env';
 import { api } from '@/services/api';
-import { getApiBaseUrl } from '@/lib/http/env';
+
+/** Bypass Next.js proxy — multipart uploads can be truncated when proxied. */
+const uploadApi = createHttpClient({
+  baseURL: getDirectApiBaseUrl(),
+  onSuccess: pingActivity,
+  onUnauthorized: (error, retry) => tokenRefreshManager.handle401(error, retry),
+});
 
 export type IdCardDashboard = {
   studentCards: { generated: number; pending: number; printed: number; assigned: number };
@@ -258,10 +268,9 @@ export async function uploadIdCardBackground(
   if (opts?.side) params.set('side', opts.side);
   if (opts?.templateId) params.set('templateId', opts.templateId);
   const qs = params.toString();
-  const { data } = await api.post<IdCardBackgroundUploadResult>(
+  const { data } = await uploadApi.post<IdCardBackgroundUploadResult>(
     `/v1/id-cards/templates/background-upload${qs ? `?${qs}` : ''}`,
     form,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
   );
   return data;
 }
@@ -269,9 +278,10 @@ export async function uploadIdCardBackground(
 export async function uploadIdCardSignature(file: File): Promise<IdCardSettings> {
   const form = new FormData();
   form.append('file', file);
-  const { data } = await api.post<IdCardSettings>('/v1/id-cards/settings/signature-upload', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const { data } = await uploadApi.post<IdCardSettings>(
+    '/v1/id-cards/settings/signature-upload',
+    form,
+  );
   return data;
 }
 

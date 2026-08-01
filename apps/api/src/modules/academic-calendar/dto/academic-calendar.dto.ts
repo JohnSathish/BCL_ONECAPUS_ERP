@@ -4,10 +4,14 @@ import {
   IsBoolean,
   IsDateString,
   IsIn,
+  IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { ACADEMIC_CALENDAR_EVENT_TYPES } from '../academic-calendar.types';
@@ -35,6 +39,24 @@ export class UpdateCalendarDto {
   @IsOptional()
   @IsArray()
   weekendDays?: number[];
+}
+
+export class VisibilityFlagsDto {
+  @IsOptional()
+  @IsBoolean()
+  students?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  staff?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  parents?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  public?: boolean;
 }
 
 export class CreateCalendarEventDto {
@@ -95,6 +117,57 @@ export class CreateCalendarEventDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  venue?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isAllDay?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  recurrenceRule?: string;
+
+  @IsOptional()
+  @IsUUID()
+  programmeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  semesterId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => VisibilityFlagsDto)
+  visibilityFlags?: VisibilityFlagsDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  organizerName?: string;
 }
 
 export class UpdateCalendarEventDto {
@@ -158,6 +231,55 @@ export class UpdateCalendarEventDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  color?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  icon?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  venue?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isAllDay?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  recurrenceRule?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  programmeId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  semesterId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  visibilityFlags?: VisibilityFlagsDto | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  organizerName?: string | null;
 }
 
 export class BulkHolidayItemDto {
@@ -247,4 +369,54 @@ export class RangeQueryDto {
   @IsOptional()
   @IsUUID()
   academicYearId?: string;
+}
+
+export class MonthSummaryQueryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  year!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month!: number;
+}
+
+export class ListEventsQueryDto {
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  /** Comma-separated event types */
+  @IsOptional()
+  @IsString()
+  types?: string;
+
+  @IsOptional()
+  @IsString()
+  visibility?: string;
+
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  expandRecurrence?: boolean;
 }

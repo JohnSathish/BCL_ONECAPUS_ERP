@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "meta": {
+    "libraryCode": "dbc-modern-student",
+    "stylePreset": "minimal",
+    "creationMethod": "background-upload",
+    "layoutRevision": 1
+  },
+  "frontBackground": {
+    "imageUrl": "/uploads/shared/id-cards/dbct-student-front.png",
+    "x": 0,
+    "y": 0,
+    "width": 53.98,
+    "height": 85.6,
+    "opacity": 1,
+    "fit": "stretch",
+    "locked": true
+  },
+  "backBackground": null,
+  "front": [
+    {
+      "id": "photo",
+      "type": "field",
+      "fieldKey": "photo",
+      "x": 16.2,
+      "y": 16.8,
+      "width": 18.2,
+      "height": 20.5,
+      "zIndex": 5,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "center",
+        "photoShape": "rounded",
+        "backgroundColor": "#ffffff",
+        "borderRadiusMm": 1.2,
+        "borderWidthMm": 0.35,
+        "borderColor": "#0b1f4d"
+      }
+    },
+    {
+      "id": "name",
+      "type": "field",
+      "fieldKey": "name",
+      "x": 5,
+      "y": 41.2,
+      "width": 44,
+      "height": 4.2,
+      "zIndex": 6,
+      "binding": { "showLabel": false, "textTransform": "uppercase" },
+      "style": {
+        "visible": true,
+        "align": "center",
+        "fontSize": 9,
+        "fontWeight": "extrabold",
+        "color": "#0b1f4d",
+        "backgroundColor": "rgba(255,255,255,0.92)"
+      }
+    },
+    {
+      "id": "subtitle",
+      "type": "field",
+      "fieldKey": "subtitle",
+      "x": 5,
+      "y": 45.2,
+      "width": 44,
+      "height": 3,
+      "zIndex": 6,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "center",
+        "fontSize": 5.5,
+        "fontWeight": "medium",
+        "color": "#334155",
+        "backgroundColor": "rgba(255,255,255,0.92)"
+      }
+    },
+    {
+      "id": "rollNumber",
+      "type": "field",
+      "fieldKey": "rollNumber",
+      "x": 27.5,
+      "y": 49.1,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "registrationNumber",
+      "type": "field",
+      "fieldKey": "registrationNumber",
+      "x": 27.5,
+      "y": 52.2,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "programme",
+      "type": "field",
+      "fieldKey": "programme",
+      "x": 27.5,
+      "y": 55.3,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "semester",
+      "type": "field",
+      "fieldKey": "semester",
+      "x": 27.5,
+      "y": 58.4,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "dateOfBirth",
+      "type": "field",
+      "fieldKey": "dateOfBirth",
+      "x": 27.5,
+      "y": 61.5,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "bloodGroup",
+      "type": "field",
+      "fieldKey": "bloodGroup",
+      "x": 27.5,
+      "y": 64.6,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "contact",
+      "type": "field",
+      "fieldKey": "contact",
+      "x": 27.5,
+      "y": 67.7,
+      "width": 23,
+      "height": 2.8,
+      "zIndex": 7,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 5.2,
+        "fontWeight": "bold",
+        "backgroundColor": "rgba(255,255,255,0.95)"
+      }
+    },
+    {
+      "id": "qr",
+      "type": "field",
+      "fieldKey": "qr",
+      "x": 3.2,
+      "y": 71.2,
+      "width": 11.5,
+      "height": 11.5,
+      "zIndex": 8,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "center",
+        "backgroundColor": "#ffffff",
+        "borderRadiusMm": 0.8
+      }
+    },
+    {
+      "id": "principalSignature",
+      "type": "field",
+      "fieldKey": "principalSignature",
+      "x": 30,
+      "y": 71.5,
+      "width": 20,
+      "height": 7.5,
+      "zIndex": 8,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "center",
+        "backgroundColor": "rgba(255,255,255,0.15)"
+      }
+    },
+    {
+      "id": "validity",
+      "type": "field",
+      "fieldKey": "validity",
+      "x": 18,
+      "y": 81.4,
+      "width": 33,
+      "height": 3.4,
+      "zIndex": 9,
+      "binding": { "showLabel": false },
+      "style": {
+        "visible": true,
+        "align": "left",
+        "fontSize": 4.5,
+        "fontWeight": "extrabold",
+        "color": "#ffffff"
+      }
+    }
+  ],
+  "back": []
+}

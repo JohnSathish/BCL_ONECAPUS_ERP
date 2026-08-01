@@ -6,6 +6,7 @@ import {
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import {
   formatShiftTime,
+  optionalUuid,
   parseTimeToDate,
 } from '../../common/utils/shift-scope.util';
 import { PrismaService } from '../../database/prisma.service';
@@ -554,6 +555,7 @@ export class TimetableEngineService {
     courseOfferingId?: string | null;
     offeringSectionId?: string | null;
     courseId?: string | null;
+    semesterSequence?: number | null;
   }) {
     if (params.courseOfferingId) return params.courseOfferingId;
     if (params.offeringSectionId) {
@@ -564,19 +566,44 @@ export class TimetableEngineService {
       if (section?.courseOfferingId) return section.courseOfferingId;
     }
     if (params.courseId) {
+      // CourseOffering has no academicYearId column — match by course (+ semester when known).
       const offering = await this.prisma.courseOffering.findFirst({
         where: {
           tenantId: params.tenantId,
           courseId: params.courseId,
           deletedAt: null,
+          ...(params.semesterSequence != null
+            ? { semesterSequence: params.semesterSequence }
+            : {}),
           ...(params.academicYearId
-            ? { academicYearId: params.academicYearId }
+            ? {
+                semester: {
+                  is: { academicYearId: params.academicYearId },
+                },
+              }
             : {}),
         },
         orderBy: { createdAt: 'desc' },
         select: { id: true },
       });
       if (offering?.id) return offering.id;
+
+      // Fallback when year-scoped semester link is missing on the offering.
+      if (params.academicYearId) {
+        const anyOffering = await this.prisma.courseOffering.findFirst({
+          where: {
+            tenantId: params.tenantId,
+            courseId: params.courseId,
+            deletedAt: null,
+            ...(params.semesterSequence != null
+              ? { semesterSequence: params.semesterSequence }
+              : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (anyOffering?.id) return anyOffering.id;
+      }
     }
     return null;
   }
@@ -585,7 +612,11 @@ export class TimetableEngineService {
     const plan = await this.assertEditablePlan(user.tid, dto.planId);
     const categoryOnly = dto.metadata?.displayAsCategoryOnly === true;
     const resolvedStaffProfileId = this.resolveEntryStaffProfileId(
-      dto.staffProfileId,
+      dto.staffProfileId === undefined
+        ? undefined
+        : dto.staffProfileId === null || dto.staffProfileId === ''
+          ? null
+          : optionalUuid(dto.staffProfileId),
       null,
     );
     const links = categoryOnly
@@ -597,9 +628,9 @@ export class TimetableEngineService {
         }
       : await this.subjectGroups.resolveEntryLinks(
           user.tid,
-          dto.teachingSubjectGroupId,
-          dto.courseId,
-          dto.offeringSectionId,
+          optionalUuid(dto.teachingSubjectGroupId),
+          optionalUuid(dto.courseId),
+          optionalUuid(dto.offeringSectionId),
           resolvedStaffProfileId ?? undefined,
         );
     const courseOfferingId = categoryOnly
@@ -607,30 +638,44 @@ export class TimetableEngineService {
       : await this.resolveCourseOfferingId({
           tenantId: user.tid,
           academicYearId: plan.academicYearId,
-          courseOfferingId: dto.courseOfferingId,
+          courseOfferingId: optionalUuid(dto.courseOfferingId),
           offeringSectionId: links.offeringSectionId,
           courseId: links.courseId,
+          semesterSequence: dto.semesterSequence,
         });
+    let startTime: Date;
+    let endTime: Date;
+    try {
+      startTime = parseTimeToDate(dto.startTime);
+      endTime = parseTimeToDate(dto.endTime);
+    } catch {
+      throw new BadRequestException(
+        'Invalid start/end time. Use HH:mm or HH:mm:ss (e.g. 09:45).',
+      );
+    }
     const entry = await this.prisma.timetablePlanEntry.create({
       data: {
         tenantId: user.tid,
         planId: plan.id,
-        shiftId: dto.shiftId ?? plan.shiftId,
-        slotTemplateId: dto.slotTemplateId,
+        shiftId: optionalUuid(dto.shiftId) ?? plan.shiftId,
+        slotTemplateId: optionalUuid(dto.slotTemplateId) ?? undefined,
         dayOfWeek: dto.dayOfWeek,
         periodNo: dto.periodNo,
-        startTime: parseTimeToDate(dto.startTime),
-        endTime: parseTimeToDate(dto.endTime),
+        startTime,
+        endTime,
         offeringSectionId: categoryOnly
           ? null
-          : (links.offeringSectionId ?? undefined),
+          : (optionalUuid(links.offeringSectionId ?? undefined) ?? undefined),
         courseOfferingId: courseOfferingId ?? undefined,
-        courseId: categoryOnly ? null : (links.courseId ?? undefined),
+        courseId: categoryOnly
+          ? null
+          : (optionalUuid(links.courseId ?? undefined) ?? undefined),
         teachingSubjectGroupId: categoryOnly
           ? null
-          : (links.teachingSubjectGroupId ?? undefined),
+          : (optionalUuid(links.teachingSubjectGroupId ?? undefined) ??
+            undefined),
         staffProfileId: resolvedStaffProfileId,
-        classroomId: dto.classroomId,
+        classroomId: optionalUuid(dto.classroomId) ?? undefined,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
         slotType: dto.slotType ?? 'THEORY',
@@ -663,7 +708,11 @@ export class TimetableEngineService {
       null,
       entry,
     );
-    await this.syncPublishedMirrorIfNeeded(user.tid, plan);
+    try {
+      await this.syncPublishedMirrorIfNeeded(user.tid, plan);
+    } catch {
+      // Slot is saved; remirror can be retried on next edit/publish.
+    }
     return entry;
   }
 
@@ -679,7 +728,11 @@ export class TimetableEngineService {
     const plan = await this.assertEditablePlan(user.tid, existing.planId);
     const resolvedCategoryOnly = dto.metadata?.displayAsCategoryOnly === true;
     const resolvedStaffProfileId = this.resolveEntryStaffProfileId(
-      dto.staffProfileId,
+      dto.staffProfileId === undefined
+        ? undefined
+        : dto.staffProfileId === null || dto.staffProfileId === ''
+          ? null
+          : optionalUuid(dto.staffProfileId),
       existing.staffProfileId,
     );
     const links = resolvedCategoryOnly
@@ -691,30 +744,65 @@ export class TimetableEngineService {
         }
       : await this.subjectGroups.resolveEntryLinks(
           user.tid,
-          dto.teachingSubjectGroupId ?? existing.teachingSubjectGroupId,
-          dto.courseId ?? existing.courseId,
-          dto.offeringSectionId ?? existing.offeringSectionId,
+          optionalUuid(dto.teachingSubjectGroupId) ??
+            existing.teachingSubjectGroupId,
+          optionalUuid(dto.courseId) ?? existing.courseId,
+          optionalUuid(dto.offeringSectionId) ?? existing.offeringSectionId,
           resolvedStaffProfileId ?? undefined,
         );
+    let startTime: Date | undefined;
+    let endTime: Date | undefined;
+    if (dto.startTime) {
+      try {
+        startTime = parseTimeToDate(dto.startTime);
+      } catch {
+        throw new BadRequestException(
+          'Invalid start time. Use HH:mm or HH:mm:ss (e.g. 09:45).',
+        );
+      }
+    }
+    if (dto.endTime) {
+      try {
+        endTime = parseTimeToDate(dto.endTime);
+      } catch {
+        throw new BadRequestException(
+          'Invalid end time. Use HH:mm or HH:mm:ss (e.g. 10:40).',
+        );
+      }
+    }
     const updated = await this.prisma.timetablePlanEntry.update({
       where: { id: entryId },
       data: {
-        shiftId: dto.shiftId,
-        slotTemplateId: dto.slotTemplateId,
+        shiftId:
+          dto.shiftId !== undefined ? optionalUuid(dto.shiftId) : undefined,
+        slotTemplateId:
+          dto.slotTemplateId !== undefined
+            ? optionalUuid(dto.slotTemplateId)
+            : undefined,
         dayOfWeek: dto.dayOfWeek,
         periodNo: dto.periodNo,
-        startTime: dto.startTime ? parseTimeToDate(dto.startTime) : undefined,
-        endTime: dto.endTime ? parseTimeToDate(dto.endTime) : undefined,
+        startTime,
+        endTime,
         offeringSectionId: resolvedCategoryOnly
           ? null
-          : (links.offeringSectionId ?? undefined),
-        courseOfferingId: resolvedCategoryOnly ? null : dto.courseOfferingId,
-        courseId: resolvedCategoryOnly ? null : (links.courseId ?? undefined),
+          : (optionalUuid(links.offeringSectionId ?? undefined) ?? undefined),
+        courseOfferingId: resolvedCategoryOnly
+          ? null
+          : dto.courseOfferingId !== undefined
+            ? optionalUuid(dto.courseOfferingId)
+            : undefined,
+        courseId: resolvedCategoryOnly
+          ? null
+          : (optionalUuid(links.courseId ?? undefined) ?? undefined),
         teachingSubjectGroupId: resolvedCategoryOnly
           ? null
-          : (links.teachingSubjectGroupId ?? undefined),
+          : (optionalUuid(links.teachingSubjectGroupId ?? undefined) ??
+            undefined),
         staffProfileId: resolvedStaffProfileId,
-        classroomId: dto.classroomId,
+        classroomId:
+          dto.classroomId !== undefined
+            ? optionalUuid(dto.classroomId)
+            : undefined,
         semesterSequence: dto.semesterSequence,
         sectionCode: dto.sectionCode,
         slotType: dto.slotType,
@@ -752,7 +840,11 @@ export class TimetableEngineService {
       existing,
       updated,
     );
-    await this.syncPublishedMirrorIfNeeded(user.tid, plan);
+    try {
+      await this.syncPublishedMirrorIfNeeded(user.tid, plan);
+    } catch {
+      // Entry is saved; remirror can be retried on next edit/publish.
+    }
     return updated;
   }
 

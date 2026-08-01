@@ -26,9 +26,11 @@ export const SAMPLE_STUDENT_ID_CARD: StudentIdCardModel = {
     registrationNumber: 'REG2026048',
     department: 'Education',
     programme: 'B.A. (Economics)',
-    semester: null,
+    semester: 'III',
     shift: 'Morning',
     gender: 'Male',
+    dateOfBirth: '2005-08-15',
+    phone: '+91 98765 43210',
     fatherName: 'Bablu Ch Marak',
     motherName: 'Tina T Sangma',
     holderAddress:

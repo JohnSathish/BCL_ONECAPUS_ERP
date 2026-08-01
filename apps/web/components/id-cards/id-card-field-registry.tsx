@@ -10,6 +10,8 @@ import {
   affiliationLine,
   displayProgramme,
   formatCollegeAddress,
+  formatIdCardDate,
+  formatSemesterLabel,
   isBlank,
   qrImageUrl,
   renderFieldHtml,
@@ -81,14 +83,30 @@ function LabelValueRow({
   value,
   multiline,
   fontSize,
+  valueOnly,
 }: {
   label: string;
   value: string | null | undefined;
   multiline?: boolean;
   fontSize?: number | null;
+  valueOnly?: boolean;
 }) {
   if (isBlank(value)) return null;
   const px = fontSize != null ? scaleToPx(scalePursuitType(fontSize)) : PURSUIT_TYPE_SCALE_PX;
+  if (valueOnly) {
+    return (
+      <div
+        className={
+          multiline
+            ? 'w-full whitespace-pre-wrap break-words font-bold leading-snug text-slate-900'
+            : 'w-full truncate font-bold text-slate-900'
+        }
+        style={{ fontSize: multiline ? px.address : px.value }}
+      >
+        {value}
+      </div>
+    );
+  }
   return (
     <div className="flex w-full gap-[1.2mm] leading-[1.25]">
       <span
@@ -141,7 +159,17 @@ export function renderIdCardField(
   primary: string,
   options: FieldRenderOptions = {},
 ): React.ReactNode {
-  const { stylePreset, photoShape, signatureUrl, side, fontSize } = options;
+  const { stylePreset, photoShape, signatureUrl, side, fontSize, showLabel } = options;
+  const valueOnly = showLabel === false;
+  const lv = (label: string, value: string | null | undefined, opts?: { multiline?: boolean }) => (
+    <LabelValueRow
+      label={label}
+      value={value}
+      multiline={opts?.multiline}
+      fontSize={fontSize}
+      valueOnly={valueOnly}
+    />
+  );
   const { institution, verification, validity } = model;
   const student = studentHolder(model);
   const displayName = student?.displayFullName ?? model.holder.fullName;
@@ -443,12 +471,12 @@ export function renderIdCardField(
         )
       ) : null;
     case 'rollNumber':
-      return student ? <LabelValueRow label="Roll No" value={student.rollNumber} /> : null;
+      return student ? lv('Roll No', student.rollNumber) : null;
     case 'department':
       return isPursuitExcellence(stylePreset) ? (
         <PursuitGridRow label="Department" value={model.holder.department} />
       ) : (
-        <LabelValueRow label="Department" value={model.holder.department} />
+        lv('Department', model.holder.department)
       );
     case 'programme':
       if (!student) return null;
@@ -456,27 +484,34 @@ export function renderIdCardField(
         if (side !== 'back') return null;
         return <PursuitGridRow label="Programme" value={displayProgramme(student)} />;
       }
-      return <LabelValueRow label="Programme" value={displayProgramme(student)} />;
+      return lv('Programme', displayProgramme(student));
     case 'semester':
+      return student ? lv('Semester', formatSemesterLabel(student.semester)) : null;
     case 'academicYear':
       return null;
+    case 'dateOfBirth':
+      return student ? lv('Date of Birth', formatIdCardDate(student.dateOfBirth)) : null;
     case 'gender':
       return student ? (
         isPursuitExcellence(stylePreset) ? (
           <PursuitGridRow label="Gender" value={formatDisplayGender(student.gender)} />
         ) : (
-          <LabelValueRow
-            label="Gender"
-            value={formatDisplayGender(student.gender) || student.gender}
-          />
+          lv('Gender', formatDisplayGender(student.gender) || student.gender)
         )
       ) : null;
     case 'bloodGroup':
       if (isPursuitExcellence(stylePreset)) return null;
-      return <LabelValueRow label="Blood Group" value={model.holder.bloodGroup} />;
+      return lv('Blood Group', model.holder.bloodGroup);
     case 'validity': {
       const dateLabel = formatPursuitValidUntilDate(validity.validTo, validity.validToLabel);
       if (!dateLabel && !validity.validToLabel) return null;
+      if (valueOnly) {
+        return (
+          <div className="flex h-full w-full items-center justify-start overflow-hidden whitespace-nowrap text-[4px] font-extrabold text-white">
+            {dateLabel || validity.validToLabel}
+          </div>
+        );
+      }
       if (isPursuitExcellence(stylePreset)) {
         return (
           <div className="flex w-full justify-center">
@@ -557,6 +592,13 @@ export function renderIdCardField(
         (model.branding as { principalSignatureUrl?: string | null } | undefined)
           ?.principalSignatureUrl ??
         null;
+      if (valueOnly) {
+        if (!url) return null;
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-full w-full object-contain" />
+        );
+      }
       const pe = isPursuitExcellence(stylePreset);
       return (
         <div
@@ -651,6 +693,13 @@ export function renderIdCardField(
       );
     }
     case 'contact': {
+      if (student) {
+        const phone = student.phone ?? student.emergencyContact;
+        if (!isBlank(phone)) return lv('Contact', phone);
+      }
+      if (isStaff(model) && !isBlank(model.holder.phone)) {
+        return lv('Phone', model.holder.phone);
+      }
       const lines = institutionContactLines(model);
       return (
         <div className="w-full">

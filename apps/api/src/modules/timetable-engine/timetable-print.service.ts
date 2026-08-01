@@ -213,7 +213,8 @@ export class TimetablePrintService {
         return true;
       })
       .map((entry) => ({
-        id: `entry-${entry.id}`,
+        // Not a real TimetableSlotTemplate id — API optionalUuid() drops these.
+        id: `synthetic-${entry.id}`,
         dayOfWeek: entry.dayOfWeek,
         periodNo: entry.periodNo ?? 0,
         label: entry.periodNo ? `P${entry.periodNo}` : 'Slot',

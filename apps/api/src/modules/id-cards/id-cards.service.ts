@@ -15,7 +15,12 @@ import type {
 import dbcClassicLayout from './seeds/dbc-classic.json';
 import dbcPursuitExcellenceLayout from './seeds/dbc-pursuit-excellence.json';
 import dbcPursuitStaffLayout from './seeds/dbc-pursuit-staff.json';
+import dbcModernStudentLayout from './seeds/dbc-modern-student.json';
 import corporateProfessionalLayout from './seeds/corporate-professional.json';
+import {
+  DBCT_STUDENT_FRONT_PUBLIC_PATH,
+  ensureSharedIdCardLibraryAssets,
+} from './id-card-library-assets';
 
 const LIBRARY_TEMPLATE_SEEDS = [
   {
@@ -35,6 +40,12 @@ const LIBRARY_TEMPLATE_SEEDS = [
     name: 'DBC Classic',
     holderType: 'STUDENT',
     layout: dbcClassicLayout,
+  },
+  {
+    code: 'dbc-modern-student',
+    name: 'DBC Modern Student (Front Art)',
+    holderType: 'STUDENT',
+    layout: dbcModernStudentLayout,
   },
   {
     code: 'corporate-professional',
@@ -142,6 +153,8 @@ export class IdCardsService {
 
   /** Seed v1 gallery templates for new tenants only (never overwrite existing layouts). */
   private async ensureLibraryTemplates(tenantId: string) {
+    const { frontPublicPath } = await ensureSharedIdCardLibraryAssets();
+
     for (const seed of LIBRARY_TEMPLATE_SEEDS) {
       const existing = await this.db().idCardTemplate.findFirst({
         where: { tenantId, code: seed.code },
@@ -157,13 +170,26 @@ export class IdCardsService {
         where: { tenantId, holderType: seed.holderType, isDefault: true },
       });
 
+      const layout =
+        seed.code === 'dbc-modern-student'
+          ? {
+              ...seed.layout,
+              frontBackground: {
+                ...(
+                  seed.layout as { frontBackground?: Record<string, unknown> }
+                ).frontBackground,
+                imageUrl: frontPublicPath || DBCT_STUDENT_FRONT_PUBLIC_PATH,
+              },
+            }
+          : seed.layout;
+
       await this.db().idCardTemplate.create({
         data: {
           tenantId,
           code: seed.code,
           name: seed.name,
           holderType: seed.holderType,
-          layout: seed.layout,
+          layout,
           isDefault: !hasDefaultForType,
         },
       });

@@ -27,6 +27,26 @@ const DAYS = [
   { value: 6, label: 'Saturday' },
 ];
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Normalize API/ISO clocks to HH:mm:ss for the timetable API. */
+function normalizeTimetableClock(value: string): string {
+  const raw = String(value ?? '').trim();
+  const iso = raw.match(/T(\d{2}:\d{2}:\d{2})/i);
+  if (iso) return iso[1];
+  if (/^\d{2}:\d{2}$/.test(raw)) return `${raw}:00`;
+  if (/^\d{2}:\d{2}:\d{2}/.test(raw)) return raw.slice(0, 8);
+  return raw;
+}
+
+function asOptionalUuid(value?: string | null): string | undefined {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed || trimmed.startsWith('entry-') || trimmed.startsWith('synthetic-')) {
+    return undefined;
+  }
+  return UUID_RE.test(trimmed) ? trimmed : undefined;
+}
+
 export type SlotModalContext = {
   planId: string;
   shiftId?: string;
@@ -260,9 +280,9 @@ export function TimetableSlotModal({
       planId: context.planId,
       dayOfWeek,
       periodNo: Number(periodNo),
-      startTime: context.startTime,
-      endTime: context.endTime,
-      slotTemplateId: context.slotTemplateId,
+      startTime: normalizeTimetableClock(context.startTime),
+      endTime: normalizeTimetableClock(context.endTime),
+      slotTemplateId: asOptionalUuid(context.slotTemplateId),
       semesterSequence: Number(semesterSequence),
       sectionCode: sectionCode || undefined,
       teachingSubjectGroupId:

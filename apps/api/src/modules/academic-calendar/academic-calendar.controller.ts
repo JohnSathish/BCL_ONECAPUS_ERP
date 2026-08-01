@@ -7,7 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CurrentUser,
@@ -22,6 +25,8 @@ import {
   BulkHolidaysDto,
   CreateCalendarEventDto,
   EnsureCalendarDto,
+  ListEventsQueryDto,
+  MonthSummaryQueryDto,
   RangeQueryDto,
   ResolveQueryDto,
   UpdateCalendarDto,
@@ -99,6 +104,12 @@ export class AcademicCalendarController {
     });
   }
 
+  @Get('events/:eventId')
+  @RequireAnyPermission(...READ)
+  getEvent(@CurrentUser() user: JwtUser, @Param('eventId') eventId: string) {
+    return this.calendars.getEvent(user.tid, eventId);
+  }
+
   @Patch('events/:eventId')
   @RequireAnyPermission(...WRITE)
   updateEvent(
@@ -115,22 +126,88 @@ export class AcademicCalendarController {
     return this.calendars.deleteEvent(user, eventId);
   }
 
+  @Post('events/:eventId/duplicate')
+  @RequireAnyPermission(...WRITE)
+  duplicateEvent(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.calendars.duplicateEvent(user, eventId);
+  }
+
+  @Post('events/:eventId/attachments')
+  @RequireAnyPermission(...WRITE)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  addAttachment(
+    @CurrentUser() user: JwtUser,
+    @Param('eventId') eventId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.calendars.addAttachment(user, eventId, file);
+  }
+
   @Get(':calendarId/events')
   @RequireAnyPermission(...READ)
   events(
     @CurrentUser() user: JwtUser,
     @Param('calendarId') calendarId: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('type') type?: string,
-    @Query('visibility') visibility?: string,
+    @Query() query: ListEventsQueryDto,
   ) {
+    const types = query.types
+      ? query.types
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : undefined;
     return this.calendars.listEvents(user.tid, calendarId, {
-      from,
-      to,
-      type,
-      visibility,
+      from: query.from,
+      to: query.to,
+      type: query.type,
+      types,
+      visibility: query.visibility,
+      q: query.q,
+      departmentId: query.departmentId,
+      expandRecurrence: query.expandRecurrence !== false,
     });
+  }
+
+  @Get(':calendarId/month-summary')
+  @RequireAnyPermission(...READ)
+  monthSummary(
+    @CurrentUser() user: JwtUser,
+    @Param('calendarId') calendarId: string,
+    @Query() query: MonthSummaryQueryDto,
+  ) {
+    return this.calendars.monthSummary(
+      user.tid,
+      calendarId,
+      query.year,
+      query.month,
+    );
+  }
+
+  @Get(':calendarId/today')
+  @RequireAnyPermission(...READ)
+  today(@CurrentUser() user: JwtUser, @Param('calendarId') calendarId: string) {
+    return this.calendars.todayEvents(user.tid, calendarId);
+  }
+
+  @Get(':calendarId/upcoming')
+  @RequireAnyPermission(...READ)
+  upcoming(
+    @CurrentUser() user: JwtUser,
+    @Param('calendarId') calendarId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.calendars.upcomingEvents(
+      user.tid,
+      calendarId,
+      limit ? Number(limit) : 20,
+    );
   }
 
   @Post(':calendarId/events')

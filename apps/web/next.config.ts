@@ -71,11 +71,14 @@ const nextConfig: NextConfig = {
       process.env.NODE_ENV === 'development'
         ? ' http://127.0.0.1:3001 http://localhost:3001 ws://127.0.0.1:3001 ws://localhost:3001'
         : '';
+    // Dev: allow Nest-served /uploads when a URL still points at :3001 (print HTML, older layouts).
+    const devImgSrc =
+      process.env.NODE_ENV === 'development' ? ' http://127.0.0.1:3001 http://localhost:3001' : '';
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://sdk.cashfree.com https://pgtest.atomtech.in https://psa.atomtech.in",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
+      `img-src 'self' data: blob: https:${devImgSrc}`,
       "font-src 'self' data:",
       `connect-src 'self' https://api.razorpay.com https://api.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in wss: ws:${devApiConnect}`,
       "frame-src 'self' https://api.razorpay.com https://sdk.cashfree.com https://payments.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in",

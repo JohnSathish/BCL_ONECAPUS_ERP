@@ -36,5 +36,9 @@ export function prismaSchemaDriftMessage(error: unknown): string | null {
     return `A record with the same ${fields} already exists. Change the title/slug and try again.`;
   }
 
+  if (error.code === 'P2023') {
+    return 'Invalid ID or time value in the request. Clear optional fields (room, slot) and try again.';
+  }
+
   return null;
 }

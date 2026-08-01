@@ -180,7 +180,7 @@ export type IdCardFieldKey =
   | 'email'
   | 'phone'
   | 'joiningDate'
-  | 'contact';
+  | 'dateOfBirth';
 
 export const STUDENT_FIELD_KEYS: IdCardFieldKey[] = [
   'headerBand',
@@ -195,8 +195,12 @@ export const STUDENT_FIELD_KEYS: IdCardFieldKey[] = [
   'roleLabel',
   'subtitle',
   'registrationNumber',
+  'rollNumber',
   'department',
   'programme',
+  'semester',
+  'academicYear',
+  'dateOfBirth',
   'gender',
   'bloodGroup',
   'validityBlock',

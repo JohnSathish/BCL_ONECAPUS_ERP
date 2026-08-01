@@ -1756,6 +1756,21 @@ model AcademicCalendarEvent {
   sourceRefId              String?   @map("source_ref_id")
   publishedToWebsite       Boolean   @default(false) @map("published_to_website")
   active                   Boolean   @default(true)
+  color                    String?
+  icon                     String?
+  venue                    String?
+  isAllDay                 Boolean   @default(true) @map("is_all_day")
+  isRecurring              Boolean   @default(false) @map("is_recurring")
+  recurrenceRule           String?   @map("recurrence_rule") @db.Text
+  recurrenceParentId       String?   @map("recurrence_parent_id") @db.Uuid
+  programmeId              String?   @map("programme_id") @db.Uuid
+  semesterId               String?   @map("semester_id") @db.Uuid
+  shiftId                  String?   @map("shift_id") @db.Uuid
+  /// { students, staff, parents, public }
+  visibilityFlags          Json?     @map("visibility_flags")
+  /// [{ url, name, mimeType, size }]
+  attachmentUrls           Json?     @map("attachment_urls")
+  organizerName            String?   @map("organizer_name")
   createdById              String?   @map("created_by_id") @db.Uuid
   updatedById              String?   @map("updated_by_id") @db.Uuid
   createdAt                DateTime  @default(now()) @map("created_at")
@@ -1768,6 +1783,7 @@ model AcademicCalendarEvent {
   @@index([calendarId, type, active, deletedAt])
   @@index([tenantId, startDate, endDate, active])
   @@index([sourceModule, sourceRefId])
+  @@index([recurrenceParentId])
   @@map("academic_calendar_events")
   @@schema("academic")
 }
