@@ -137,6 +137,7 @@ export class StudentPortalService {
       academicYear,
       examResults,
       libraryLoans,
+      primaryShift,
     ] = await Promise.all([
       this.academicEngine
         .getMyRegistration(user.tid, user.sub)
@@ -167,6 +168,12 @@ export class StudentPortalService {
         orderBy: { dueAt: 'asc' },
         take: 20,
       }),
+      student.primaryShiftId
+        ? this.prisma.shift.findFirst({
+            where: { id: student.primaryShiftId, tenantId: user.tid },
+            select: { id: true, name: true, code: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     const semesterSequence =
@@ -239,6 +246,9 @@ export class StudentPortalService {
         department: headerDepartment,
         semesterSequence,
         academicYear: academicYear?.name ?? null,
+        shiftId: primaryShift?.id ?? student.primaryShiftId ?? null,
+        shiftName: primaryShift?.name ?? null,
+        shiftCode: primaryShift?.code ?? null,
         rfidStatus: student.rfidNumber
           ? ('assigned' as const)
           : ('missing' as const),

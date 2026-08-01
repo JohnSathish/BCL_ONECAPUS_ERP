@@ -14,6 +14,10 @@ export type StudentPortalProfile = {
   department: string | null;
   semesterSequence: number | null;
   academicYear: string | null;
+  /** Primary shift (Day / Morning / …) from student record */
+  shiftId?: string | null;
+  shiftName?: string | null;
+  shiftCode?: string | null;
   rfidStatus: 'assigned' | 'missing';
   profileCompletion: number;
 };

@@ -37,6 +37,7 @@ export function StudentDashboardHeader({ data, loading }: Props) {
     { label: 'College Reg.', value: profile.enrollmentNumber?.trim() || '—' },
     { label: 'NEHU Reg.', value: profile.universityRegistrationNumber?.trim() || '—' },
     { label: 'Department', value: profile.department || '—' },
+    { label: 'Shift', value: profile.shiftName?.trim() || profile.shiftCode?.trim() || '—' },
     { label: 'Academic Year', value: profile.academicYear || '—' },
     {
       label: 'Semester',
@@ -87,16 +88,20 @@ export function StudentDashboardHeader({ data, loading }: Props) {
               {profile.department && profile.department !== profile.programLabel
                 ? ` · ${profile.department}`
                 : ''}
+              {profile.shiftName ? ` · ${profile.shiftName}` : ''}
             </p>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
           {chips.map((c) => (
             <div
               key={c.label}
               className={cn(
                 'rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/50',
+                c.label === 'Shift' &&
+                  c.value !== '—' &&
+                  'border-[#1e4d8c]/25 bg-[#1e4d8c]/5 dark:border-[#1e4d8c]/40',
               )}
             >
               <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">

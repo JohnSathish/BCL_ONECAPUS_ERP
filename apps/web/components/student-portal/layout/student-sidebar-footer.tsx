@@ -34,7 +34,14 @@ export function StudentSidebarFooter({ collapsed }: { collapsed: boolean }) {
   const programme =
     me?.programName || dashQ.data?.profile.programLabel || me?.department || 'Student';
   const sem = dashQ.data?.profile.semesterSequence;
-  const programmeLine = sem != null ? `${programme} · Semester ${romanSemester(sem)}` : programme;
+  const shift =
+    dashQ.data?.profile.shiftName?.trim() || dashQ.data?.profile.shiftCode?.trim() || null;
+  const programmeLine =
+    sem != null
+      ? `${programme} · Semester ${romanSemester(sem)}${shift ? ` · ${shift}` : ''}`
+      : shift
+        ? `${programme} · ${shift}`
+        : programme;
 
   if (collapsed) {
     return (
