@@ -89,7 +89,11 @@ export default function WelcomeScreen() {
   const stats = config?.portalHighlights?.stats;
   const bootstrapUpdates = config?.portalHighlights?.updates ?? [];
   const updates = bootstrapUpdates.length > 0 ? bootstrapUpdates : [...DEFAULT_PORTAL_UPDATES];
-  const notice = config?.maintenanceMessage?.trim() || null;
+  const loginNotices = config?.loginNotices;
+  const notice =
+    loginNotices?.showBanner === false
+      ? null
+      : loginNotices?.bannerTitle?.trim() || config?.maintenanceMessage?.trim() || null;
 
   const institutionName =
     config?.branding?.displayName?.trim() || school?.name || 'Your Institution';

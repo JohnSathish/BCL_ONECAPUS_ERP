@@ -2388,6 +2388,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],
           },
           {
+            label: 'Login Notice Board',
+            href: '/admin/administration/mobile-app',
+            permissions: ['mobile:settings:read', 'mobile:settings:manage'],
+          },
+          {
             label: 'Payment Gateway Management',
             href: '/admin/administration/payment-gateway',
             permissions: ['payment-gateway:read', 'payment-gateway:manage', 'fees:manage'],

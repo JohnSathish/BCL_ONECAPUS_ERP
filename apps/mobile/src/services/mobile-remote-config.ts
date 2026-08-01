@@ -25,6 +25,11 @@ export type BootstrapConfig = {
     primaryColor: string | null;
     displayName: string | null;
   };
+  loginNotices?: {
+    showBanner?: boolean;
+    bannerTitle?: string | null;
+    bannerSubtitle?: string | null;
+  };
   portalHighlights?: {
     stats: {
       students: number;

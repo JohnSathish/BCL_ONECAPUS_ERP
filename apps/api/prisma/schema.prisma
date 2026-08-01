@@ -643,6 +643,7 @@ model MobileAppSettings {
   studentDashboardConfig Json     @default("{}") @map("student_dashboard_config")
   staffDashboardConfig   Json     @default("{}") @map("staff_dashboard_config")
   brandingOverrides      Json     @default("{}") @map("branding_overrides")
+  loginNotices           Json     @default("{}") @map("login_notices")
   playStoreUrl           String?  @map("play_store_url")
   apkDownloadUrl         String?  @map("apk_download_url")
   releaseNotes           String?  @map("release_notes") @db.Text

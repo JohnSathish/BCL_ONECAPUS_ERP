@@ -73,6 +73,11 @@ export class UpdateMobileAppSettingsDto {
   @IsObject()
   brandingOverrides?: Record<string, unknown>;
 
+  /** Login-screen notice board (banner + Today's Updates). */
+  @IsOptional()
+  @IsObject()
+  loginNotices?: Record<string, unknown>;
+
   @IsOptional()
   @IsString()
   playStoreUrl?: string | null;

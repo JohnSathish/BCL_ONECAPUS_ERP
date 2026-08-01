@@ -14,6 +14,48 @@ import { isVersionBelow } from './utils/version.util';
 
 const CACHE_TTL = 900;
 
+export type LoginNoticesConfig = {
+  showBanner: boolean;
+  bannerTitle: string | null;
+  bannerSubtitle: string | null;
+  customUpdates: string[];
+  /** When custom updates exist, still append auto admissions/session lines. Default true. */
+  includeAutoUpdates: boolean;
+  includeAdmissions: boolean;
+  includeAcademicSession: boolean;
+  includeNepHint: boolean;
+};
+
+function normalizeLoginNotices(raw: unknown): LoginNoticesConfig {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const custom = Array.isArray(o.customUpdates)
+    ? (o.customUpdates as unknown[])
+        .map((x) => String(x ?? '').trim())
+        .filter(Boolean)
+    : typeof o.customUpdates === 'string'
+      ? String(o.customUpdates)
+          .split('\n')
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : [];
+  return {
+    showBanner: o.showBanner !== false,
+    bannerTitle:
+      typeof o.bannerTitle === 'string' && o.bannerTitle.trim()
+        ? o.bannerTitle.trim()
+        : null,
+    bannerSubtitle:
+      typeof o.bannerSubtitle === 'string' && o.bannerSubtitle.trim()
+        ? o.bannerSubtitle.trim()
+        : null,
+    customUpdates: custom,
+    includeAutoUpdates: o.includeAutoUpdates !== false,
+    includeAdmissions: o.includeAdmissions !== false,
+    includeAcademicSession: o.includeAcademicSession !== false,
+    includeNepHint: o.includeNepHint === true,
+  };
+}
+
 /** ICO/favicon URLs do not render in React Native — omit so the app uses its PNG fallback. */
 function mobileBootstrapLogoUrl(
   overrides: Record<string, string>,
@@ -99,6 +141,7 @@ export class MobileAppSettingsService {
       data.staffDashboardConfig = dto.staffDashboardConfig;
     if (dto.brandingOverrides !== undefined)
       data.brandingOverrides = dto.brandingOverrides;
+    if (dto.loginNotices !== undefined) data.loginNotices = dto.loginNotices;
     if (dto.playStoreUrl !== undefined) data.playStoreUrl = dto.playStoreUrl;
     if (dto.apkDownloadUrl !== undefined)
       data.apkDownloadUrl = dto.apkDownloadUrl;
@@ -195,17 +238,41 @@ export class MobileAppSettingsService {
       const featureFlags = this.mergeFeatureFlags(
         (settings as any).featureFlags,
       );
+      const notices = normalizeLoginNotices((settings as any).loginNotices);
+      const autoUpdates: string[] = [];
+      if (notices.includeAdmissions !== false && openIntake) {
+        autoUpdates.push(`Admissions open — ${openIntake.name}`);
+      }
+      if (notices.includeAcademicSession !== false && academicYear?.name) {
+        autoUpdates.push(`Academic session ${academicYear.name} active`);
+      }
+      if (notices.includeNepHint) {
+        autoUpdates.push('NEP 2020 curriculum enabled');
+      }
+      const customUpdates = notices.customUpdates;
+      const updates =
+        customUpdates.length > 0
+          ? notices.includeAutoUpdates === false
+            ? customUpdates
+            : [...customUpdates, ...autoUpdates]
+          : autoUpdates.length > 0
+            ? autoUpdates
+            : ['Campus updates will appear here'];
+
+      const isMaintenance = isStudent
+        ? settings.studentMaintenanceMode
+        : settings.staffMaintenanceMode;
+
       return {
         appType,
         appName: isStudent ? settings.studentAppName : settings.staffAppName,
         configVersion: (settings as any).configVersion ?? 1,
         ...versions,
-        maintenanceMode: isStudent
-          ? settings.studentMaintenanceMode
-          : settings.staffMaintenanceMode,
-        maintenanceMessage:
-          settings.maintenanceMessage ??
-          'The system is currently undergoing scheduled maintenance. Please try again later.',
+        maintenanceMode: isMaintenance,
+        maintenanceMessage: isMaintenance
+          ? (settings.maintenanceMessage ??
+            'The system is currently undergoing scheduled maintenance. Please try again later.')
+          : (settings.maintenanceMessage ?? null),
         featureFlags,
         menuVisibility: featureFlags,
         branding: {
@@ -218,6 +285,11 @@ export class MobileAppSettingsService {
             overrides.primaryColor ?? branding?.primaryColor ?? null,
           displayName: branding?.displayName ?? null,
         },
+        loginNotices: {
+          showBanner: notices.showBanner,
+          bannerTitle: notices.bannerTitle,
+          bannerSubtitle: notices.bannerSubtitle,
+        },
         portalHighlights: {
           stats: {
             students: studentCount,
@@ -225,13 +297,7 @@ export class MobileAppSettingsService {
             departments: departmentCount,
             academicYear: academicYear?.name ?? null,
           },
-          updates: [
-            ...(openIntake ? [`Admissions open — ${openIntake.name}`] : []),
-            ...(academicYear?.name
-              ? [`Academic session ${academicYear.name} active`]
-              : []),
-            'NEP 2020 curriculum enabled',
-          ],
+          updates,
         },
       };
     });

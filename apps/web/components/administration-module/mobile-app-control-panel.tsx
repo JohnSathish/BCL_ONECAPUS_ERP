@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CreditCard, LayoutDashboard, Smartphone } from 'lucide-react';
+import { Bell, CreditCard, LayoutDashboard, Megaphone, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import {
   fetchMobileAnalytics,
   fetchMobileAppSettings,
   updateMobileAppSettings,
+  type MobileAppSettings,
 } from '@/services/mobile-app';
 import { fetchFeeSettings } from '@/services/fee-cycle';
 import { MobileAppPhonePreview } from '@/components/administration-module/mobile-app-phone-preview';
@@ -109,9 +111,21 @@ export function MobileAppControlPanel() {
   });
 
   const s = settingsQ.data;
+  const notices = s?.loginNotices ?? {};
+  const [updatesDraft, setUpdatesDraft] = useState<string | null>(null);
+  const customUpdatesText = useMemo(() => {
+    if (updatesDraft !== null) return updatesDraft;
+    return (notices.customUpdates ?? []).join('\n');
+  }, [notices.customUpdates, updatesDraft]);
+
   if (!s) return <p className="text-sm text-muted-foreground">Loading mobile app settings…</p>;
 
   const save = (payload: Record<string, unknown>) => saveMut.mutate(payload);
+  const saveLoginNotices = (patch: NonNullable<MobileAppSettings['loginNotices']>) => {
+    const next = { ...(s.loginNotices ?? {}), ...patch };
+    save({ loginNotices: next });
+    if (patch.customUpdates !== undefined) setUpdatesDraft(null);
+  };
 
   const studentConfig = (s.studentDashboardConfig ?? {}) as Record<string, boolean>;
   const staffConfig = (s.staffDashboardConfig ?? {}) as Record<string, boolean>;
@@ -124,19 +138,167 @@ export function MobileAppControlPanel() {
           App Version & Mobile Config
         </h2>
         <p className="text-sm text-muted-foreground">
-          Force/soft updates, maintenance, feature flags, and dashboard cards — without a new app
-          store release. Config version: {s.configVersion ?? 1}
+          Force/soft updates, maintenance, login notice board, feature flags, and dashboard cards —
+          without a new app store release. Config version: {s.configVersion ?? 1}
         </p>
       </div>
 
-      <Tabs defaultValue="preview">
+      <Tabs defaultValue="notices">
         <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="notices">Login Notice Board</TabsTrigger>
           <TabsTrigger value="preview">UI Preview</TabsTrigger>
           <TabsTrigger value="config">App Configuration</TabsTrigger>
           <TabsTrigger value="student">Student Dashboard</TabsTrigger>
           <TabsTrigger value="staff">Staff Dashboard</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="notices" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Megaphone className="h-4 w-4" />
+                Login screen notice board
+              </CardTitle>
+              <CardDescription>
+                Controls the yellow banner, megaphone carousel, and &quot;Today&apos;s Updates&quot;
+                on the mobile login / welcome screens. Changes apply on next app open (bootstrap
+                refresh).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label>Show yellow banner</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Top strip with megaphone + View link
+                  </p>
+                </div>
+                <Switch
+                  checked={notices.showBanner !== false}
+                  onCheckedChange={(v) => saveLoginNotices({ showBanner: v })}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Banner title</Label>
+                  <Input
+                    key={`banner-title-${s.configVersion}`}
+                    defaultValue={notices.bannerTitle ?? ''}
+                    placeholder="e.g. Admissions open for 2026-27"
+                    onBlur={(e) => saveLoginNotices({ bannerTitle: e.target.value.trim() || null })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank to use the first update line (or maintenance message if set).
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Banner subtitle</Label>
+                  <Input
+                    key={`banner-sub-${s.configVersion}`}
+                    defaultValue={notices.bannerSubtitle ?? ''}
+                    placeholder="e.g. Tap View for details"
+                    onBlur={(e) =>
+                      saveLoginNotices({ bannerSubtitle: e.target.value.trim() || null })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Custom notice lines</Label>
+                <textarea
+                  className="min-h-[120px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  value={customUpdatesText}
+                  placeholder={'One notice per line\ne.g. Library closed on Saturday'}
+                  onChange={(e) => setUpdatesDraft(e.target.value)}
+                  onBlur={() => {
+                    const lines = customUpdatesText
+                      .split('\n')
+                      .map((x) => x.trim())
+                      .filter(Boolean);
+                    saveLoginNotices({ customUpdates: lines });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown in the rotating notice card and &quot;Today&apos;s Updates&quot;.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Include open admissions</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Auto: &quot;Admissions open — …&quot; from Admissions intakes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notices.includeAdmissions !== false}
+                    onCheckedChange={(v) => saveLoginNotices({ includeAdmissions: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Include academic session</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Auto: &quot;Academic session … active&quot; from published AY
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notices.includeAcademicSession !== false}
+                    onCheckedChange={(v) => saveLoginNotices({ includeAcademicSession: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Append auto lines after custom</Label>
+                    <p className="text-xs text-muted-foreground">
+                      When custom lines exist, still add admissions/session
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notices.includeAutoUpdates !== false}
+                    onCheckedChange={(v) => saveLoginNotices({ includeAutoUpdates: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Include NEP hint</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Adds &quot;NEP 2020 curriculum enabled&quot;
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notices.includeNepHint === true}
+                    onCheckedChange={(v) => saveLoginNotices({ includeNepHint: v })}
+                  />
+                </div>
+              </div>
+              {saveMut.isPending ? (
+                <p className="text-xs text-muted-foreground">Saving…</p>
+              ) : saveMut.isSuccess ? (
+                <p className="text-xs text-emerald-600">
+                  Saved. App will pick this up on next open.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Related auto sources</CardTitle>
+              <CardDescription>
+                These feed the automatic lines when the toggles above are on.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2 text-sm">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/admissions/intakes">Admissions intakes</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/organization">Academic years (Organization)</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="preview">
           <MobileAppPhonePreview

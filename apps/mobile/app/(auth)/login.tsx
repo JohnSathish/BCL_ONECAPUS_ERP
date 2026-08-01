@@ -120,8 +120,16 @@ export default function LoginScreen() {
 
   const academicYear = stats?.academicYear ?? DEFAULT_PORTAL_STATS.academicYear;
   const semesterLabel = getSemesterLabel();
-  const announcement = config?.maintenanceMessage?.trim() || updates[0] || null;
-  const announceDetail = updates[1] ?? 'Tap View for details';
+  const loginNotices = config?.loginNotices;
+  const announcement =
+    loginNotices?.showBanner === false
+      ? null
+      : loginNotices?.bannerTitle?.trim() ||
+        config?.maintenanceMessage?.trim() ||
+        updates[0] ||
+        null;
+  const announceDetail =
+    loginNotices?.bannerSubtitle?.trim() || updates[1] || 'Tap View for details';
 
   const surface = scheme === 'dark' ? '#1e293b' : '#ffffff';
   const pageBg = scheme === 'dark' ? '#0f172a' : '#eef2ff';

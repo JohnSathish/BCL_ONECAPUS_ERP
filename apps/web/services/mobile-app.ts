@@ -18,6 +18,16 @@ export type MobileAppSettings = {
   studentDashboardConfig: Record<string, boolean>;
   staffDashboardConfig: Record<string, boolean>;
   brandingOverrides: Record<string, string>;
+  loginNotices?: {
+    showBanner?: boolean;
+    bannerTitle?: string | null;
+    bannerSubtitle?: string | null;
+    customUpdates?: string[];
+    includeAutoUpdates?: boolean;
+    includeAdmissions?: boolean;
+    includeAcademicSession?: boolean;
+    includeNepHint?: boolean;
+  };
   playStoreUrl?: string | null;
   apkDownloadUrl?: string | null;
   releaseNotes?: string | null;
