@@ -1,0 +1,1349 @@
+{
+  "source": "Revised_Compressed_Affiliated_Templates_20-07-2023.xlsx",
+  "generatedAt": "2026-07-31T04:41:36.809Z",
+  "tableCount": 26,
+  "tables": [
+    {
+      "code": "1.1",
+      "sheetName": "1.1",
+      "title": "1.1 Number of students year wise during the last five years",
+      "metricCodes": ["1.1", "1.1.1", "1.1.2", "1.1.3"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name",
+          "label": "Name",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "student_enrollment_number",
+          "label": "Student enrollment number",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "date_of_enrolment",
+          "label": "Date of enrolment",
+          "dataType": "date",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "1.1"
+      },
+      "sortOrder": 0
+    },
+    {
+      "code": "3.1",
+      "sheetName": "3.1",
+      "title": "3.1 Expenditure excluding salary component year wise during the last five years (INR in lakhs)",
+      "metricCodes": ["3.1", "3.1.1", "3.1.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "expenditure_for_infrastructure_development_and_a",
+          "label": "Expenditure for infrastructure development and augmentation (INR in Lakh) = A",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "expenditure_on_maintenance_of_academic_facilitie",
+          "label": "Expenditure on maintenance of academic facilities (excluding salary for human resources) (INR in Lakh) = B",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "expenditure_on_maintenance_of_physical_facilitie",
+          "label": "Expenditure on maintenance of physical facilities (excluding salary for human resources) (INR in Lakh) = C",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "other_expenses_excluding_salary_inr_in_lakh_d",
+          "label": "Other expenses  excluding Salary (INR in Lakh) = D",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "total_expenditure_excluding_salary_inr_in_lakh_e",
+          "label": "Total expenditure excluding Salary (INR in Lakh) = E\n(E = A+B+C+D)",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.1"
+      },
+      "sortOrder": 1
+    },
+    {
+      "code": "2.1_2.2_2.4.2",
+      "sheetName": "2.1, 2.2 &2.4.2",
+      "title": "2.1 Number of full time teachers during the last five years \n(Without repeat count)",
+      "metricCodes": ["2.1", "2.2", "2.4.1", "2.4.2", "2.4.3"],
+      "columns": [
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net_",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__2",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__3",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__4",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__5",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__6",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__7",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__8",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_4_2_percentage_of_full_time_teachers_with_net__9",
+          "label": "2.4.2 Percentage of full time teachers with NET/SET/SLET/ Ph. D./D.Sc. / D.Litt./L.L.D. during the last five years  (consider only highest degree for count)",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 2,
+        "yearScoped": false,
+        "officialSheetName": "2.1, 2.2 &2.4.2"
+      },
+      "sortOrder": 2
+    },
+    {
+      "code": "1.2.1_1.2.2",
+      "sheetName": "1.2.1 & 1.2.2",
+      "title": "1.2.1 Number of Certificate/Value added courses offered and online courses of MOOCs, SWAYAM, NPTEL etc.  where the students of the institution have enrolled and successfully completed during the last five years)",
+      "metricCodes": ["1.2.1", "1.2.2"],
+      "columns": [
+        {
+          "key": "year_1",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_2",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_3",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_4",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_5",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_6",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_7",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 2,
+        "yearScoped": false,
+        "officialSheetName": "1.2.1 & 1.2.2"
+      },
+      "sortOrder": 3
+    },
+    {
+      "code": "1.3.2",
+      "sheetName": "1.3.2",
+      "title": "1.3.2 Percentage  of students undertaking project work/field work/internship (Data for the latest completed academic year)",
+      "metricCodes": ["1.3.2"],
+      "columns": [
+        {
+          "key": "programme_name",
+          "label": "Programme name",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "program_code",
+          "label": "Program Code",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "list_of_students_undertaking_project_work_field_",
+          "label": "List of students undertaking project work/field work/internship",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "link_to_the_relevant_document",
+          "label": "Link to the relevant document",
+          "dataType": "url",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "1.3.2"
+      },
+      "sortOrder": 4
+    },
+    {
+      "code": "2.1.1_2.1.2",
+      "sheetName": "2.1.1&2.1.2",
+      "title": "2.1.1 Enrolment Percentage",
+      "metricCodes": ["2.1.1", "2.1.2"],
+      "columns": [
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_2",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_3",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_4",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_5",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_6",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_7",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_8",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_9",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_10",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_11",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_12",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_13",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "2_1_2_percentage_of_seats_filled_against_seats_r_14",
+          "label": "2.1.2  Percentage of seats filled against seats reserved for various categories (SC, ST, OBC etc. as per applicable reservation policy) during the last five years ( exclusive of supernumerary seats)",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": true,
+        "officialSheetName": "2.1.1&2.1.2"
+      },
+      "sortOrder": 5
+    },
+    {
+      "code": "2.6.2",
+      "sheetName": "2.6.2",
+      "title": "2.6.3Pass percentage of Students during last five years  (excluding backlog students)",
+      "metricCodes": ["2.6.2", "2.6.1", "2.6.3"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "program_code",
+          "label": "Program Code",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "program_name",
+          "label": "Program Name",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "number_of_students_appeared_in_the_final_year_ex",
+          "label": "Number of students appeared in the final year examination",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "number_of_students_passed_in_final_year_examinat",
+          "label": "Number of students passed in final year examination",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "2.6.2"
+      },
+      "sortOrder": 6
+    },
+    {
+      "code": "2.7.1",
+      "sheetName": "2.7.1",
+      "title": "2.7 Student Satisfaction Survey",
+      "metricCodes": ["2.7.1"],
+      "columns": [
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard_",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__2",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__3",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__4",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__5",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__6",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__7",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__8",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "2_7_1_online_student_satisfaction_survey_regard__9",
+          "label": "2.7.1 Online student satisfaction survey regard to teaching learning process (all currently enrolled students).\ndetails of the students in the format mentioned below should be uploaded",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "2.7.1"
+      },
+      "sortOrder": 7
+    },
+    {
+      "code": "3.1.1",
+      "sheetName": "3.1.1",
+      "title": "3.1.1 Grants received from Government and non-governmental agencies for research projects / endowments in the institution during the last five years (INR in Lakhs)",
+      "metricCodes": ["3.1.1"],
+      "columns": [
+        {
+          "key": "name_of_the_research_project_endowment",
+          "label": "Name of the research project/ endowment",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_principal_investigator_co_investigat",
+          "label": "Name of the Principal Investigator/Co-investigator",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "department_of_principal_investigator",
+          "label": "Department of Principal Investigator",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "year_of_award",
+          "label": "Year of Award",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "amount_sanctioned",
+          "label": "Amount Sanctioned",
+          "dataType": "number",
+          "yearScoped": false
+        },
+        {
+          "key": "duration_of_the_project",
+          "label": "Duration of the project",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_funding_agency",
+          "label": "Name of the Funding Agency",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "type_government_non_government",
+          "label": "Type  (Government/non-Government)",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.1.1"
+      },
+      "sortOrder": 8
+    },
+    {
+      "code": "3.2.2",
+      "sheetName": "3.2.2",
+      "title": "3.2.2 Number of workshops/seminars/conferences including programs conducted on Research Methodology, Intellectual Property Rights (IPR) and entrepreneurship during the last five years",
+      "metricCodes": ["3.2.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_workshop_seminar_conference",
+          "label": "Name of the workshop/ seminar/ conference",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "number_of_participants",
+          "label": "Number of Participants",
+          "dataType": "number",
+          "yearScoped": false
+        },
+        {
+          "key": "date_from_to",
+          "label": "Date From – To",
+          "dataType": "date",
+          "yearScoped": false
+        },
+        {
+          "key": "link_to_the_activity_report_on_the_website",
+          "label": "Link to the Activity report on the website",
+          "dataType": "url",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.2.2"
+      },
+      "sortOrder": 9
+    },
+    {
+      "code": "3.3.1",
+      "sheetName": "3.3.1",
+      "title": "3.3.1 Number of research papers published per teacher in the Journals notified on UGC CARE list during the last five years",
+      "metricCodes": ["3.3.1"],
+      "columns": [
+        {
+          "key": "title_of_paper",
+          "label": "Title of paper",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_author_s",
+          "label": "Name of the author/s",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "department_of_the_teacher",
+          "label": "Department of the teacher",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_journal",
+          "label": "Name of journal",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "calendar_year_of_publication",
+          "label": "Calendar Year of publication",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "issn_number",
+          "label": "ISSN number",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "link_to_the_recognition_in_ugc_enlistment_of_the",
+          "label": "Link to the recognition in UGC enlistment of the Journal /Digital Object Identifier (doi) number",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "link_to_the_recognition_in_ugc_enlistment_of_the_2",
+          "label": "Link to the recognition in UGC enlistment of the Journal /Digital Object Identifier (doi) number",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "link_to_the_recognition_in_ugc_enlistment_of_the_3",
+          "label": "Link to the recognition in UGC enlistment of the Journal /Digital Object Identifier (doi) number",
+          "dataType": "url",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.3.1"
+      },
+      "sortOrder": 10
+    },
+    {
+      "code": "3.3.2",
+      "sheetName": "3.3.2",
+      "title": "3.3.2 Number of books and chapters in edited volumes/books published and papers  published in national/ international conference proceedings per teacher during last five year",
+      "metricCodes": ["3.3.2"],
+      "columns": [
+        {
+          "key": "sl_no",
+          "label": "Sl. No.",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_teacher",
+          "label": "Name of the teacher",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "title_of_the_book_chapters_published",
+          "label": "Title of the book/chapters  published",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "title_of_the_paper",
+          "label": "Title of the paper",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "title_of_the_proceedings_of_the_conference",
+          "label": "Title of the proceedings of the conference",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_conference",
+          "label": "Name of the conference",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "national_international",
+          "label": "National / International",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "calendar_year_of_publication",
+          "label": "Calendar Year of publication",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "isbn_number_of_the_proceeding",
+          "label": "ISBN number of the proceeding",
+          "dataType": "number",
+          "yearScoped": false
+        },
+        {
+          "key": "affiliating_institute_at_the_time_of_publication",
+          "label": "Affiliating Institute at the time of publication",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_publisher",
+          "label": "Name of the publisher",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.3.2"
+      },
+      "sortOrder": 11
+    },
+    {
+      "code": "3.4.3",
+      "sheetName": "3.4.3",
+      "title": "3.4.3 Number of extension and outreach programs conducted by the institution through organized forums including NSS/NCC with involvement of community during the last five years",
+      "metricCodes": ["3.4.3"],
+      "columns": [
+        {
+          "key": "name_of_the_activity",
+          "label": "Name of the activity",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "organising_unit_agency_collaborating_agency",
+          "label": "Organising unit/ agency/ collaborating agency",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_scheme",
+          "label": "Name of the scheme",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "year_of_the_activity",
+          "label": "Year of the activity",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.4.3"
+      },
+      "sortOrder": 12
+    },
+    {
+      "code": "3.5.1",
+      "sheetName": "3.5.1",
+      "title": "3.5.1. Number of functional MoUs/linkages with institutions/ industries in India and abroad for internship, on-the-job training, project work, student / faculty exchange and collaborative research  during the last five years",
+      "metricCodes": ["3.5.1"],
+      "columns": [
+        {
+          "key": "sl_no",
+          "label": "Sl. No.",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_mou_linkage",
+          "label": "Name of the MoU / linkage",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_institution_industry_with_whom_the_m",
+          "label": "Name of the  institution /  industry with whom the MoU / linkage is made, with contact details",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "year_of_signing_mou_linkage",
+          "label": "Year of signing MoU /  linkage",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "purpose_of_the_mou_linkage_nternship_on_the_job_",
+          "label": "Purpose of the MoU/Linkage (nternship, on-the-job training, project work, student / faculty exchange and collaborative research)",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "duration_of_mou_linkage",
+          "label": "Duration of MoU /  linkage",
+          "dataType": "url",
+          "yearScoped": false
+        },
+        {
+          "key": "list_the_actual_activities_under_each_mou_linkag",
+          "label": "List the  actual  activities under each MOU/ Linkage  and web -links year-wise",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "link_to_the_relevant_document",
+          "label": "Link to the relevant document",
+          "dataType": "url",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "3.5.1"
+      },
+      "sortOrder": 13
+    },
+    {
+      "code": "4.1.2",
+      "sheetName": "4.1.2",
+      "title": "4.1.2 Percentage of expenditure for infrastructure development and  augmentation excluding salary during the last five years",
+      "metricCodes": ["4.1.2"],
+      "columns": [
+        {
+          "key": "year_1",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_2",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_3",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_4",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "4.1.2"
+      },
+      "sortOrder": 14
+    },
+    {
+      "code": "4.4.1",
+      "sheetName": "4.4.1",
+      "title": "4.4.1 Percentage expenditure incurred on maintenance of physical facilities and academic support facilities excluding salary component, during the last five years",
+      "metricCodes": ["4.4.1"],
+      "columns": [
+        {
+          "key": "year_1",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_2",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_3",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_4",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "4.4.1"
+      },
+      "sortOrder": 15
+    },
+    {
+      "code": "5.1.1",
+      "sheetName": "5.1.1",
+      "title": "5.1.1 Percentage of students benefited by scholarships and freeships provided by the institution, government and non-government bodies, industries, individuals, philanthropists during the last five years",
+      "metricCodes": ["5.1.1"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_scheme",
+          "label": "Name of the scheme",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "government_non_government",
+          "label": "Government/Non-government",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_individual_organisation",
+          "label": "Name of the individual/organisation",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "number_of_students_benefited",
+          "label": "Number of students benefited",
+          "dataType": "number",
+          "yearScoped": false
+        },
+        {
+          "key": "amount_in_inr",
+          "label": "Amount \n(in INR)",
+          "dataType": "number",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.1.1"
+      },
+      "sortOrder": 16
+    },
+    {
+      "code": "5.1.2",
+      "sheetName": "5.1.2",
+      "title": "5.1.2 Following capacity development and skills enhancement activities are organised for improving students’ capability\n1. Soft skills \n2. Language and communication skills \n3. Life skills (Yoga, physical fitness, health and hygiene, self-employment and entrepreneurial skills)\n4. Awareness of trends in technology",
+      "metricCodes": ["5.1.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_capacity_development_and_skills_enha",
+          "label": "Name of the capacity development and skills enhancement program",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "period_from_date_to_date",
+          "label": "Period (from date - to date)",
+          "dataType": "date",
+          "yearScoped": false
+        },
+        {
+          "key": "number_of_students_enrolled",
+          "label": "Number of students enrolled",
+          "dataType": "number",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_agencies_experts_involved_with_conta",
+          "label": "Name of the agencies/experts involved with contact details (if any)",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.1.2"
+      },
+      "sortOrder": 17
+    },
+    {
+      "code": "5.1.3",
+      "sheetName": "5.1.3",
+      "title": "5.1.3 Percentage of students benefitted by guidance for competitive examinations and career counselling offered by the institution \nduring the last five years",
+      "metricCodes": ["5.1.3"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "guidance_for_competitive_examinations",
+          "label": "Guidance for competitive examinations",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "guidance_for_competitive_examinations_2",
+          "label": "Guidance for competitive examinations",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "guidance_for_competitive_examinations_3",
+          "label": "Guidance for competitive examinations",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "details_of_career_counselling",
+          "label": "Details of career counselling",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "details_of_career_counselling_2",
+          "label": "Details of career counselling",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "details_of_career_counselling_3",
+          "label": "Details of career counselling",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.1.3"
+      },
+      "sortOrder": 18
+    },
+    {
+      "code": "5.2.1",
+      "sheetName": "5.2.1",
+      "title": "5.2.1 Percentage of placement of outgoing students and students progressing to higher education during the last five years",
+      "metricCodes": ["5.2.1"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_student_who_has_been_placed",
+          "label": "Name of student who has been placed",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "program_graduated_from",
+          "label": "Program graduated from",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "year_of_graduation",
+          "label": "Year of graduation",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_employer_with_contact_details",
+          "label": "Name of the  employer with contact details",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "pay_package_at_appointment_in_inr_per_annum",
+          "label": "Pay package at appointment \n(In INR per annum)",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.2.1"
+      },
+      "sortOrder": 19
+    },
+    {
+      "code": "5.2.2",
+      "sheetName": "5.2.2",
+      "title": "5.2.2 Percentage of students qualifying in state/national/ international level examinations during the last five years \n(eg: IIT/JAM/NET/SLET/GATE/GMAT/GPAT/CLAT/CAT/ GRE/TOEFL/ IELTS/Civil Services/State government examinations etc.)",
+      "metricCodes": ["5.2.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "registration_number_roll_number_for_the_exam",
+          "label": "Registration number/roll number for the exam",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "names_of_students_qualified",
+          "label": "Names of students qualified",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_qualifying_exam",
+          "label": "Name of the qualifying exam",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.2.2"
+      },
+      "sortOrder": 20
+    },
+    {
+      "code": "5.3.1",
+      "sheetName": "5.3.1",
+      "title": "5.3.1 Number of awards/medals for outstanding performance in sports/cultural activities at University/state/national / international level during the last five years",
+      "metricCodes": ["5.3.1"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_award_medal",
+          "label": "Name of the award/ medal",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "team_individual",
+          "label": "Team / Individual",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "level_of_competition_university_state_national_i",
+          "label": "Level of competition (University / State / National / International)",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "nature_of_competition_sports_cultural",
+          "label": "Nature of competition (Sports / Cultural)",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_student_s",
+          "label": "Name of the student(s)",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.3.1"
+      },
+      "sortOrder": 21
+    },
+    {
+      "code": "5.3.2",
+      "sheetName": "5.3.2",
+      "title": "5.3.2 Average number of sports and cultural programs in which students of the Institution participated during last five years \n(organised by the institution/other institutions)",
+      "metricCodes": ["5.3.2"],
+      "columns": [
+        {
+          "key": "year_1",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_2",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_3",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "year_1_4",
+          "label": "Year 1",
+          "dataType": "number",
+          "yearScoped": true
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "5.3.2"
+      },
+      "sortOrder": 22
+    },
+    {
+      "code": "6.3.2",
+      "sheetName": "6.3.2",
+      "title": "6.3.2 Percentage of teachers provided with financial support to attend conferences/workshop and towards  membership fee of professional bodies during the last five years",
+      "metricCodes": ["6.3.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_teacher",
+          "label": "Name of teacher",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_conference_workshop_attended_for_which_f",
+          "label": "Name of conference/ workshop attended for which financial support provided",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "name_of_the_professional_body_for_which_membersh",
+          "label": "Name of the professional body for which membership fee is provided",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "amount_of_support_received_in_inr",
+          "label": "Amount of support received (in INR)",
+          "dataType": "number",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "6.3.2"
+      },
+      "sortOrder": 23
+    },
+    {
+      "code": "6.3.3",
+      "sheetName": "6.3.3",
+      "title": "6.3.3 Percentage of teaching and non-teaching staff participating in Faculty development Programmes (FDP), Management Development Programmes (MDPs) professional development /administrative training programs during the last five years",
+      "metricCodes": ["6.3.3"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "name_of_the_participant",
+          "label": "Name of the participant",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "designation",
+          "label": "Designation",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "title_of_the_fdp_mdp_professional_development_ad",
+          "label": "Title of the FDP /MDP/ professional development / administrative training program",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "dates_from_to_dd_mm_yyyy",
+          "label": "Dates (from-to) (DD-MM-YYYY)",
+          "dataType": "date",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "6.3.3"
+      },
+      "sortOrder": 24
+    },
+    {
+      "code": "6.5.2",
+      "sheetName": "6.5.2",
+      "title": "6.5.2 Quality assurance initiatives of the institution include:\n1. Regular meeting of Internal Quality Assurance Cell (IQAC); quality improvement initiatives identified and implemented\n2. Academic and Administrative Audit (AAA) and follow-up action taken\n3. Collaborative quality initiatives with other institution(s)\n4. Participation in NIRF and other recognized rankings\n5. Any other quality audit/accreditation recognized by state, national or international agencies such as NAAC, NBA etc.",
+      "metricCodes": ["6.5.2"],
+      "columns": [
+        {
+          "key": "year",
+          "label": "Year",
+          "dataType": "number",
+          "yearScoped": true
+        },
+        {
+          "key": "date_of_iqac_meetings",
+          "label": "Date of IQAC Meetings",
+          "dataType": "date",
+          "yearScoped": false
+        },
+        {
+          "key": "major_decisions_on_quality_initiatives",
+          "label": "Major decisions on quality initiatives",
+          "dataType": "string",
+          "yearScoped": false
+        },
+        {
+          "key": "implementation_details",
+          "label": "Implementation details",
+          "dataType": "string",
+          "yearScoped": false
+        }
+      ],
+      "layoutHints": {
+        "headerRowIndex": 1,
+        "yearScoped": false,
+        "officialSheetName": "6.5.2"
+      },
+      "sortOrder": 25
+    }
+  ]
+}

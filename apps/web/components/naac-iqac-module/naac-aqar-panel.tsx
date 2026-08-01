@@ -111,27 +111,39 @@ export function NaacAqarPanel({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(detail.sections ?? []).map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded border p-3">
-                <div>
-                  <p className="font-medium">{s.sectionKey}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {s.completionPct}% ·{' '}
-                    {s.lastSyncedAt
-                      ? `Synced ${new Date(s.lastSyncedAt).toLocaleString()}`
-                      : 'Not synced'}
-                  </p>
+            {(detail.sections ?? []).map((s) => {
+              const content = (s.content ?? {}) as {
+                _sources?: string[];
+                _meta?: { syncedFrom?: string[]; syncedAt?: string };
+              };
+              const sources = content._sources ?? content._meta?.syncedFrom ?? [];
+              return (
+                <div key={s.id} className="flex items-center justify-between rounded border p-3">
+                  <div>
+                    <p className="font-medium">{s.sectionKey}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.completionPct}% ·{' '}
+                      {s.lastSyncedAt
+                        ? `Synced ${new Date(s.lastSyncedAt).toLocaleString()}`
+                        : 'Not synced'}
+                    </p>
+                    {sources.length ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Sources: {sources.join(', ')}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={syncMut.isPending}
+                    onClick={() => syncMut.mutate({ aqarId: detail.id, sectionKey: s.sectionKey })}
+                  >
+                    Sync from ERP
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={syncMut.isPending}
-                  onClick={() => syncMut.mutate({ aqarId: detail.id, sectionKey: s.sectionKey })}
-                >
-                  Sync from ERP
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

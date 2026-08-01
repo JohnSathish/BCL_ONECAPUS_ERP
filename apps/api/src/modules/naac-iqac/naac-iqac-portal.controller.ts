@@ -25,6 +25,7 @@ import {
 import { NaacAchievementService } from './services/naac-achievement.service';
 import { NaacDashboardService } from './services/naac-dashboard.service';
 import { NaacDepartmentService } from './services/naac-department.service';
+import { NaacMetricWorkspaceService } from './services/naac-metric-workspace.service';
 
 const NIQ_PORTAL = [
   'naac-iqac:portal',
@@ -40,12 +41,32 @@ export class NaacIqacPortalController {
     private readonly dashboard: NaacDashboardService,
     private readonly achievements: NaacAchievementService,
     private readonly department: NaacDepartmentService,
+    private readonly workspaces: NaacMetricWorkspaceService,
   ) {}
 
   @Get('dashboard')
   @RequireAnyPermission(...NIQ_PORTAL)
   portalDashboard(@CurrentUser() user: JwtUser) {
     return this.dashboard.dashboard(user.tid);
+  }
+
+  @Get('workspaces')
+  @RequireAnyPermission(...NIQ_PORTAL)
+  myWorkspaces(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.workspaces.myWorkspaces(user, academicYear);
+  }
+
+  @Get('metrics/:code/workspace')
+  @RequireAnyPermission(...NIQ_PORTAL)
+  metricWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('code') code: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.workspaces.getWorkspaceByMetricCode(user, code, academicYear);
   }
 
   @Get('staff-context')

@@ -36,215 +36,1029 @@
       "description": "Green campus, audits, inclusiveness, best practices, distinctiveness"
     }
   ],
+  "keyIndicators": [
+    {
+      "criterion": 1,
+      "code": "1.1",
+      "title": "Curriculum Design and Development",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 1,
+      "code": "1.2",
+      "title": "Academic Flexibility",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 1,
+      "code": "1.3",
+      "title": "Curriculum Enrichment",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 1,
+      "code": "1.4",
+      "title": "Feedback System",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 2,
+      "code": "2.1",
+      "title": "Student Enrolment and Profile",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 2,
+      "code": "2.2",
+      "title": "Catering to Student Diversity",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 2,
+      "code": "2.3",
+      "title": "Teaching-Learning Process",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 2,
+      "code": "2.4",
+      "title": "Teacher Profile and Quality",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 2,
+      "code": "2.5",
+      "title": "Evaluation Process and Reforms",
+      "sortOrder": 5
+    },
+    {
+      "criterion": 2,
+      "code": "2.6",
+      "title": "Student Performance and Learning Outcomes",
+      "sortOrder": 6
+    },
+    {
+      "criterion": 2,
+      "code": "2.7",
+      "title": "Student Satisfaction Survey",
+      "sortOrder": 7
+    },
+    {
+      "criterion": 3,
+      "code": "3.1",
+      "title": "Resource Mobilization for Research",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 3,
+      "code": "3.2",
+      "title": "Innovation Ecosystem",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 3,
+      "code": "3.3",
+      "title": "Research Publications and Awards",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 3,
+      "code": "3.4",
+      "title": "Extension Activities",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 3,
+      "code": "3.5",
+      "title": "Collaboration",
+      "sortOrder": 5
+    },
+    {
+      "criterion": 4,
+      "code": "4.1",
+      "title": "Physical Facilities",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 4,
+      "code": "4.2",
+      "title": "Library as a Learning Resource",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 4,
+      "code": "4.3",
+      "title": "IT Infrastructure",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 4,
+      "code": "4.4",
+      "title": "Maintenance of Campus Infrastructure",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 5,
+      "code": "5.1",
+      "title": "Student Support",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 5,
+      "code": "5.2",
+      "title": "Student Progression",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 5,
+      "code": "5.3",
+      "title": "Student Participation and Activities",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 5,
+      "code": "5.4",
+      "title": "Alumni Engagement",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 6,
+      "code": "6.1",
+      "title": "Institutional Vision and Leadership",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 6,
+      "code": "6.2",
+      "title": "Strategy Development and Deployment",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 6,
+      "code": "6.3",
+      "title": "Faculty Empowerment Strategies",
+      "sortOrder": 3
+    },
+    {
+      "criterion": 6,
+      "code": "6.4",
+      "title": "Financial Management and Resource Mobilization",
+      "sortOrder": 4
+    },
+    {
+      "criterion": 6,
+      "code": "6.5",
+      "title": "Internal Quality Assurance System",
+      "sortOrder": 5
+    },
+    {
+      "criterion": 7,
+      "code": "7.1",
+      "title": "Institutional Values and Social Responsibilities",
+      "sortOrder": 1
+    },
+    {
+      "criterion": 7,
+      "code": "7.2",
+      "title": "Best Practices",
+      "sortOrder": 2
+    },
+    {
+      "criterion": 7,
+      "code": "7.3",
+      "title": "Institutional Distinctiveness",
+      "sortOrder": 3
+    }
+  ],
   "metrics": [
     {
       "criterion": 1,
+      "keyIndicator": "1.1",
       "code": "1.1.1",
-      "title": "Curricula developed and implemented",
+      "title": "Curricula developed and implemented have relevance to local/national/global needs",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 1,
+      "keyIndicator": "1.1",
       "code": "1.1.2",
-      "title": "Academic flexibility / certificate courses",
-      "dataType": "document",
+      "title": "Percentage of Programmes where syllabus revision was carried out",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "programmes"
+    },
+    {
+      "criterion": 1,
+      "keyIndicator": "1.1",
+      "code": "1.1.3",
+      "title": "Average percentage of courses having focus on employability/entrepreneurship/skill development",
+      "dataType": "numeric",
+      "metricType": "QNM",
       "isMandatory": false
     },
     {
       "criterion": 1,
+      "keyIndicator": "1.2",
       "code": "1.2.1",
-      "title": "Add-on / value added courses",
-      "dataType": "document",
-      "isMandatory": false
+      "title": "Percentage of new courses introduced",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "courses"
     },
     {
       "criterion": 1,
+      "keyIndicator": "1.2",
+      "code": "1.2.2",
+      "title": "Percentage of Programmes in which Choice Based Credit System (CBCS)/elective course system has been implemented",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "programmes"
+    },
+    {
+      "criterion": 1,
+      "keyIndicator": "1.3",
+      "code": "1.3.1",
+      "title": "Institution integrates crosscutting issues relevant to Professional Ethics, Gender, Human Values, Environment and Sustainability",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 1,
+      "keyIndicator": "1.3",
       "code": "1.3.2",
-      "title": "Students enrolled in certificate/add-on courses",
+      "title": "Number of value-added courses offered",
       "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 1,
+      "keyIndicator": "1.3",
+      "code": "1.3.3",
+      "title": "Percentage of students enrolled in value-added courses",
+      "dataType": "numeric",
+      "metricType": "QNM",
       "isMandatory": false
     },
     {
       "criterion": 1,
+      "keyIndicator": "1.4",
       "code": "1.4.1",
-      "title": "Structured feedback on curriculum",
+      "title": "Structured feedback for design and review of syllabus",
       "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 1,
+      "keyIndicator": "1.4",
+      "code": "1.4.2",
+      "title": "Feedback process of the Institution",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 2,
+      "keyIndicator": "2.1",
       "code": "2.1.1",
-      "title": "Student enrolment and profile",
+      "title": "Enrolment percentage",
       "dataType": "numeric",
-      "isMandatory": true
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "enrolmentPct"
     },
     {
       "criterion": 2,
+      "keyIndicator": "2.1",
       "code": "2.1.2",
-      "title": "Seats filled against reserved categories",
+      "title": "Percentage of seats filled against reserved categories",
       "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "reservedSeatsFilledPct"
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.2",
+      "code": "2.2.1",
+      "title": "The institution assesses learning levels of students and organises special programmes",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 2,
+      "keyIndicator": "2.2",
+      "code": "2.2.2",
+      "title": "Student-Full time teacher ratio",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "studentTeacherRatio"
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.3",
+      "code": "2.3.1",
+      "title": "Student centric methods for enhancing learning experiences",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.3",
+      "code": "2.3.2",
+      "title": "Teachers use ICT enabled tools including online resources",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.3",
+      "code": "2.3.3",
+      "title": "Ratio of mentor to students for academic and other related issues",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "mentorStudentRatio"
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.4",
+      "code": "2.4.1",
+      "title": "Average percentage of full time teachers against sanctioned posts",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "facultyAgainstPosts"
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.4",
       "code": "2.4.2",
-      "title": "Faculty with Ph.D. / NET / SLET",
+      "title": "Percentage of full time teachers with Ph.D./D.M/M.Ch./D.N.B Superspeciality/D.Sc./D.Litt.",
       "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "phdFacultyPct"
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.4",
+      "code": "2.4.3",
+      "title": "Average teaching experience of full time teachers",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.5",
+      "code": "2.5.1",
+      "title": "Mechanism of internal assessment is transparent and robust",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 2,
+      "keyIndicator": "2.5",
+      "code": "2.5.2",
+      "title": "Mechanism to deal with examination related grievances",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.6",
+      "code": "2.6.1",
+      "title": "Programme and course outcomes are stated and displayed",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.6",
+      "code": "2.6.2",
+      "title": "Attainment of programme outcomes and course outcomes",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 2,
+      "keyIndicator": "2.6",
       "code": "2.6.3",
-      "title": "Pass percentage of final year students",
+      "title": "Pass percentage of students",
       "dataType": "numeric",
-      "isMandatory": true
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "passPercentage"
     },
     {
       "criterion": 2,
+      "keyIndicator": "2.7",
       "code": "2.7.1",
-      "title": "Student satisfaction survey",
+      "title": "Online student satisfaction survey regarding teaching learning process",
       "dataType": "document",
-      "isMandatory": false
+      "metricType": "QNM",
+      "isMandatory": true
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.1",
       "code": "3.1.1",
-      "title": "Grants for research projects",
-      "dataType": "document",
+      "title": "Grants received from Government and non-governmental agencies for research projects",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 3,
+      "keyIndicator": "3.1",
+      "code": "3.1.2",
+      "title": "Percentage of teachers recognized as research guides",
+      "dataType": "numeric",
+      "metricType": "QNM",
       "isMandatory": false
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.2",
+      "code": "3.2.1",
+      "title": "Institution has created an ecosystem for innovations",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 3,
+      "keyIndicator": "3.2",
       "code": "3.2.2",
-      "title": "Workshops/seminars on research methodology",
-      "dataType": "document",
-      "isMandatory": false
+      "title": "Number of workshops/seminars conducted on Research Methodology, IP, Entrepreneurship",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.3",
       "code": "3.3.1",
-      "title": "Research papers per teacher in refereed journals",
+      "title": "Number of research papers published per teacher in the Journals notified on UGC website",
       "dataType": "numeric",
-      "isMandatory": true
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "publicationsPerTeacher"
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.3",
+      "code": "3.3.2",
+      "title": "Number of books and chapters in edited volumes/books published",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false,
+      "erpSourceKey": "publications"
+    },
+    {
+      "criterion": 3,
+      "keyIndicator": "3.4",
       "code": "3.4.1",
-      "title": "Extension and outreach programs",
+      "title": "Extension activities in the neighbourhood community",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.4",
+      "code": "3.4.2",
+      "title": "Awards and recognitions received for extension activities",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": false
+    },
+    {
+      "criterion": 3,
+      "keyIndicator": "3.4",
       "code": "3.4.3",
-      "title": "Students participating in extension activities",
+      "title": "Number of extension and outreach programs conducted",
       "dataType": "numeric",
-      "isMandatory": true
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "extensionActivities"
     },
     {
       "criterion": 3,
+      "keyIndicator": "3.5",
       "code": "3.5.1",
-      "title": "MoUs with institutions/industry",
+      "title": "Number of MoUs, collaborations / linkages for Faculty exchange, Internship, Field trip, On-the-job training, research",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "mous"
+    },
+    {
+      "criterion": 3,
+      "keyIndicator": "3.5",
+      "code": "3.5.2",
+      "title": "Number of functional MoUs with institutions of national, international importance",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false,
+      "erpSourceKey": "mous"
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.1",
+      "code": "4.1.1",
+      "title": "Availability of adequate infrastructure and physical facilities",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 4,
+      "keyIndicator": "4.1",
       "code": "4.1.2",
-      "title": "Expenditure on infrastructure augmentation",
+      "title": "Percentage of expenditure excluding salary for infrastructure augmentation",
       "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "classroomCount"
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.1",
+      "code": "4.1.3",
+      "title": "Percentage of classrooms and seminar halls with ICT-enabled facilities",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "ictClassroomPct"
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.1",
+      "code": "4.1.4",
+      "title": "Average percentage of expenditure for infrastructure augmentation",
+      "dataType": "numeric",
+      "metricType": "QNM",
       "isMandatory": false
     },
     {
       "criterion": 4,
+      "keyIndicator": "4.2",
+      "code": "4.2.1",
+      "title": "Library is automated using Integrated Library Management System (ILMS)",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.2",
+      "code": "4.2.2",
+      "title": "The institution has subscription for e-resources",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.2",
+      "code": "4.2.3",
+      "title": "Average annual expenditure for purchase of books/e-books and subscription to journals/e-journals",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "libraryBookTitles"
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.2",
+      "code": "4.2.4",
+      "title": "Percentage per day usage of library by teachers and students",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false,
+      "erpSourceKey": "libraryFootfall"
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.3",
+      "code": "4.3.1",
+      "title": "Institution frequently updates its IT facilities including Wi-Fi",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.3",
       "code": "4.3.2",
-      "title": "Library expenditure per student",
+      "title": "Student – Computer ratio",
       "dataType": "numeric",
-      "isMandatory": false
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "studentComputerRatio"
     },
     {
       "criterion": 4,
+      "keyIndicator": "4.3",
+      "code": "4.3.3",
+      "title": "Bandwidth of internet connection in the Institution",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.4",
       "code": "4.4.1",
-      "title": "ICT facilities and maintenance",
-      "dataType": "document",
-      "isMandatory": true
-    },
-    {
-      "criterion": 5,
-      "code": "5.1.1",
-      "title": "Scholarships and freeships",
-      "dataType": "document",
-      "isMandatory": true
-    },
-    {
-      "criterion": 5,
-      "code": "5.2.1",
-      "title": "Placement and higher studies",
+      "title": "Percentage of expenditure incurred on maintenance of infrastructure",
       "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 4,
+      "keyIndicator": "4.4",
+      "code": "4.4.2",
+      "title": "Procedures and systems for maintaining and utilizing physical, academic and support facilities",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 5,
+      "keyIndicator": "5.1",
+      "code": "5.1.1",
+      "title": "Percentage of students benefited by scholarships and freeships provided by the Government",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "scholarshipRecipients"
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.1",
+      "code": "5.1.2",
+      "title": "Percentage of students benefited by scholarships, freeships etc. provided by the institution / non-government agencies",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "scholarshipRecipients"
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.1",
+      "code": "5.1.3",
+      "title": "Capacity building and skills enhancement initiatives",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.1",
+      "code": "5.1.4",
+      "title": "The Institution has a transparent mechanism for timely redressal of student grievances",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.2",
+      "code": "5.2.1",
+      "title": "Percentage of placement of outgoing students",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "placementOffers"
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.2",
+      "code": "5.2.2",
+      "title": "Percentage of students progressing to higher education",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "higherStudies"
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.2",
+      "code": "5.2.3",
+      "title": "Percentage of students qualifying in state/national/ international level examinations",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.3",
       "code": "5.3.1",
-      "title": "Sports and cultural activities",
+      "title": "Number of awards/medals for outstanding performance in sports/cultural activities",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "studentAchievements"
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.3",
+      "code": "5.3.2",
+      "title": "Institution facilitates students’ representation and engagement in various administrative, co-curricular and extracurricular activities",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
+      "criterion": 5,
+      "keyIndicator": "5.3",
+      "code": "5.3.3",
+      "title": "Average number of sports and cultural events/competitions organised",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.4",
+      "code": "5.4.1",
+      "title": "There is a registered Alumni Association that contributes significantly",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 5,
+      "keyIndicator": "5.4",
+      "code": "5.4.2",
+      "title": "Alumni contribution during the last five years",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false
+    },
+    {
       "criterion": 6,
+      "keyIndicator": "6.1",
       "code": "6.1.1",
-      "title": "Institutional vision and leadership",
+      "title": "The governance of the institution is reflective of and in tune with the vision and mission",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 6,
+      "keyIndicator": "6.1",
+      "code": "6.1.2",
+      "title": "The effective leadership is visible in various institutional practices such as decentralization and participative management",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.2",
+      "code": "6.2.1",
+      "title": "The institutional Strategic/ perspective plan is effectively deployed",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.2",
       "code": "6.2.2",
-      "title": "IQAC composition and meetings",
+      "title": "The functioning of the institutional bodies is effective and efficient as visible from policies, administrative setup, appointment and service rules, procedures, etc.",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 6,
+      "keyIndicator": "6.2",
+      "code": "6.2.3",
+      "title": "Implementation of e-governance in areas of operation",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.3",
+      "code": "6.3.1",
+      "title": "The institution has effective welfare measures for teaching and non-teaching staff",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.3",
       "code": "6.3.2",
-      "title": "Faculty development programmes",
+      "title": "Percentage of teachers provided with financial support to attend conferences/workshops",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "meetings"
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.3",
+      "code": "6.3.3",
+      "title": "Percentage of teaching and non-teaching staff participating in Faculty development Programmes (FDP), Management Development Programmes (MDPs) professional development /administrative training programs",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": true,
+      "erpSourceKey": "meetings"
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.4",
+      "code": "6.4.1",
+      "title": "Institution has strategies for mobilization and optimal utilization of resources and funds from various sources",
       "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 6,
+      "keyIndicator": "6.4",
+      "code": "6.4.2",
+      "title": "Funds / Grants received from non-government bodies, individuals, philanthropers",
+      "dataType": "numeric",
+      "metricType": "QNM",
+      "isMandatory": false,
+      "erpSourceKey": "governanceDocuments"
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.4",
+      "code": "6.4.3",
+      "title": "Institutional strategies for mobilization of funds and the optimal utilization of resources",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.5",
+      "code": "6.5.1",
+      "title": "Internal Quality Assurance Cell (IQAC) has contributed significantly for institutionalizing the quality assurance strategies and processes",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.5",
       "code": "6.5.2",
-      "title": "Internal quality assurance mechanisms",
+      "title": "The institution reviews its teaching learning process, structures & methodologies of operations and learning outcomes at periodic intervals through IQAC",
       "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 6,
+      "keyIndicator": "6.5",
+      "code": "6.5.3",
+      "title": "Quality assurance initiatives of the institution",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true,
+      "erpSourceKey": "completedAtrItems"
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.1",
+      "title": "Measures initiated by the Institution for the promotion of gender equity",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 7,
+      "keyIndicator": "7.1",
       "code": "7.1.2",
-      "title": "Environmental consciousness initiatives",
+      "title": "The Institution has facilities and initiatives for alternate sources of energy and energy conservation measures",
       "dataType": "document",
-      "isMandatory": false
-    },
-    {
-      "criterion": 7,
-      "code": "7.1.4",
-      "title": "Inclusive environment practices",
-      "dataType": "document",
-      "isMandatory": false
-    },
-    {
-      "criterion": 7,
-      "code": "7.2.1",
-      "title": "Best practices",
-      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     },
     {
       "criterion": 7,
-      "code": "7.3.1",
-      "title": "Institutional distinctiveness",
+      "keyIndicator": "7.1",
+      "code": "7.1.3",
+      "title": "Describe the facilities in the Institution for the management of degradable and non-degradable waste",
       "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.4",
+      "title": "Water conservation facilities available in the Institution",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.5",
+      "title": "Green campus initiatives",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.6",
+      "title": "Quality audits on environment and energy",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.7",
+      "title": "The Institution has disabled-friendly, barrier free environment",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.8",
+      "title": "Describe the Institutional efforts/initiatives in providing an inclusive environment",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.9",
+      "title": "Sensitization of students and employees of the Institution to the constitutional obligations",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.10",
+      "title": "The Institution has a prescribed code of conduct for students, teachers, administrators and other staff",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.1",
+      "code": "7.1.11",
+      "title": "Institution celebrates / organizes national and international commemorative days, events and festivals",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": false
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.2",
+      "code": "7.2.1",
+      "title": "Describe two best practices successfully implemented by the Institution as per NAAC format",
+      "dataType": "document",
+      "metricType": "QLM",
+      "isMandatory": true
+    },
+    {
+      "criterion": 7,
+      "keyIndicator": "7.3",
+      "code": "7.3.1",
+      "title": "Portray the performance of the Institution in one area distinctive to its priority and thrust",
+      "dataType": "document",
+      "metricType": "QLM",
       "isMandatory": true
     }
   ]

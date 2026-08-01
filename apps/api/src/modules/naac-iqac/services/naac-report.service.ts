@@ -5,6 +5,7 @@ import { StorageService } from '../../../shared/storage/storage.service';
 import type { ReportExportDto } from '../dto/naac-iqac.dto';
 import { naacDb } from './naac-prisma.util';
 import { NaacEvidenceService } from './naac-evidence.service';
+import { NaacDvvService } from './naac-dvv.service';
 
 @Injectable()
 export class NaacReportService {
@@ -12,6 +13,7 @@ export class NaacReportService {
     private readonly prisma: PrismaService,
     private readonly evidence: NaacEvidenceService,
     private readonly storage: StorageService,
+    private readonly dvv: NaacDvvService,
   ) {}
 
   private db() {
@@ -60,9 +62,86 @@ export class NaacReportService {
     }
 
     if (dto.reportType === 'dvv-checklist') {
+      const readiness = await this.dvv.readiness(tenantId, dto.academicYear);
+      if (dto.format === 'csv') {
+        const metrics =
+          (readiness as { metrics?: Array<Record<string, unknown>> })
+            ?.metrics ?? [];
+        const header =
+          'Metric,Title,EvidenceCount,CoverageScore,Status,Notes\n';
+        const body = metrics
+          .map((m) =>
+            [
+              m.code ?? m.metricCode ?? '',
+              m.title ?? '',
+              m.evidenceCount ?? '',
+              m.coverageScore ?? m.score ?? '',
+              m.status ?? '',
+              m.message ?? m.notes ?? '',
+            ]
+              .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+              .join(','),
+          )
+          .join('\n');
+        return {
+          format: 'csv',
+          content: header + body,
+          rowCount: metrics.length,
+          readiness,
+        };
+      }
+      return {
+        format: dto.format ?? 'json',
+        academicYear: dto.academicYear ?? null,
+        readiness,
+      };
+    }
+
+    if (dto.reportType === 'ssr-pack-manifest') {
+      const clarifications = await this.db()
+        .naacDvvClarification.findMany({
+          where: {
+            tenantId,
+            ...(dto.academicYear ? { academicYear: dto.academicYear } : {}),
+          },
+          select: {
+            id: true,
+            queryCode: true,
+            title: true,
+            status: true,
+            metric: { select: { code: true } },
+          },
+          take: 200,
+        })
+        .catch(() => []);
+
       return {
         format: 'json',
-        message: 'Use GET /dvv/readiness for DVV checklist',
+        reportType: 'ssr-pack-manifest',
+        academicYear: dto.academicYear ?? null,
+        generatedAt: new Date().toISOString(),
+        components: {
+          evidenceIndex: { available: true, endpoint: 'POST /reports/export' },
+          evidencePackZip: {
+            available: true,
+            endpoint: 'GET /reports/evidence-pack',
+          },
+          qnmsWorkbook: {
+            available: true,
+            endpoint: 'GET /reports/naac-qnms-workbook',
+          },
+          dvvReadiness: {
+            available: true,
+            endpoint: 'GET /dvv/readiness',
+          },
+          aqar: { available: true, path: '/admin/naac/aqar' },
+          extendedProfile: {
+            available: true,
+            path: '/admin/naac/extended-profile',
+          },
+        },
+        openClarifications: clarifications,
+        note: 'Full narrative SSR builder is out of scope; use these components for the affiliated-college submission pack.',
       };
     }
 

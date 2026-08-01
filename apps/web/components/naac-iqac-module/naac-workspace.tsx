@@ -12,12 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
   downloadNaacEvidencePack,
+  downloadNaacQnmsWorkbook,
   exportNaacReport,
-  fetchNaacCriteria,
   fetchNaacDashboard,
   fetchNaacDepartmentDashboard,
   fetchNaacPortalDepartment,
-  fetchNaacDvvReadiness,
   fetchNaacEvidence,
   fetchNaacIqacSummary,
   fetchNaacVault,
@@ -29,12 +28,16 @@ import { NaacAqarPanel } from '@/components/naac-iqac-module/naac-aqar-panel';
 import { NaacCalendarPanel } from '@/components/naac-iqac-module/naac-calendar-panel';
 import { NaacDepartmentPanel } from '@/components/naac-iqac-module/naac-department-panel';
 import { NaacFacultyPanel } from '@/components/naac-iqac-module/naac-faculty-panel';
+import { NaacMetricWorkspacePanel } from '@/components/naac-iqac-module/naac-metric-workspace-panel';
 import { NaacMouPanel } from '@/components/naac-iqac-module/naac-mou-panel';
 import { NaacSettingsPanel } from '@/components/naac-iqac-module/naac-settings-panel';
 import { NaacStudentPanel } from '@/components/naac-iqac-module/naac-student-panel';
+import { NaacExtendedProfilePanel } from '@/components/naac-iqac-module/naac-extended-profile-panel';
+import { NaacDvvPanel } from '@/components/naac-iqac-module/naac-dvv-panel';
 import { downloadBlob } from '@/utils/download-blob';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { useSearchParams } from 'next/navigation';
 
 function scoreTone(score: number) {
   if (score >= 80) return 'text-emerald-600';
@@ -108,9 +111,12 @@ export function NaacWorkspace({
 }) {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const metricFromQuery = searchParams.get('metric');
   const [selectedAqarId, setSelectedAqarId] = useState<string | null>(null);
   const [evidenceCriterion, setEvidenceCriterion] = useState('');
   const [evidenceYear, setEvidenceYear] = useState('2025-26');
+  const [reportYear, setReportYear] = useState('2025-26');
   const [vaultUploadKey, setVaultUploadKey] = useState(0);
   const [error, setError] = useState('');
 
@@ -129,11 +135,6 @@ export function NaacWorkspace({
       }),
     enabled: enabled && page === 'evidence',
   });
-  const criteriaQ = useQuery({
-    queryKey: ['naac-criteria'],
-    queryFn: fetchNaacCriteria,
-    enabled: enabled && page === 'criteria',
-  });
   const vaultQ = useQuery({
     queryKey: ['naac-vault'],
     queryFn: () => fetchNaacVault({ limit: 50 }),
@@ -148,11 +149,6 @@ export function NaacWorkspace({
     queryKey: ['naac-iqac'],
     queryFn: fetchNaacIqacSummary,
     enabled: enabled && page === 'iqac',
-  });
-  const dvvQ = useQuery({
-    queryKey: ['naac-dvv'],
-    queryFn: () => fetchNaacDvvReadiness(),
-    enabled: enabled && page === 'dvv',
   });
 
   const vaultMut = useMutation({
@@ -212,12 +208,33 @@ export function NaacWorkspace({
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Dept Pending</CardTitle>
+                <CardTitle className="text-sm">Pending Approvals</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{dashboard.pending.departmentPending}</p>
+                <p className="text-3xl font-bold">
+                  {dashboard.pending.pendingApproval ??
+                    dashboard.workspaceRollup?.pendingApproval ??
+                    0}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Overdue:{' '}
+                  {dashboard.pending.overdueDeadlines ??
+                    dashboard.workspaceRollup?.overdueDeadlines ??
+                    0}
+                </p>
               </CardContent>
             </Card>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Extended Profile — pull ERP counts for AQAR / metric QNMs
+            </span>
+            <Link
+              href="/admin/naac/extended-profile"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Open Extended Profile
+            </Link>
           </div>
           <Card>
             <CardHeader>
@@ -229,7 +246,7 @@ export function NaacWorkspace({
                   key={c.criterion}
                   criterion={c.criterion}
                   title={c.title}
-                  score={c.score}
+                  score={c.progressPct ?? c.score}
                 />
               ))}
             </CardContent>
@@ -243,7 +260,22 @@ export function NaacWorkspace({
                 {Object.entries(dashboard.aggregates).map(([k, v]) => (
                   <div key={k} className="rounded border p-2">
                     <p className="text-muted-foreground capitalize">{k}</p>
-                    <p className="text-xl font-semibold">{v.value}</p>
+                    <p className="text-xl font-semibold">
+                      {v.value == null ? '—' : String(v.value)}
+                      {v.unit ? (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          {v.unit}
+                        </span>
+                      ) : null}
+                    </p>
+                    {v.pending ? (
+                      <Badge variant="outline" className="mt-1 text-[10px]">
+                        pending
+                      </Badge>
+                    ) : null}
+                    {v.message ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">{v.message}</p>
+                    ) : null}
                   </div>
                 ))}
               </CardContent>
@@ -270,32 +302,27 @@ export function NaacWorkspace({
     }
 
     if (page === 'criteria') {
-      if (criteriaQ.isLoading) return <Loader2 className="h-6 w-6 animate-spin" />;
       return (
-        <div className="space-y-4">
-          {(criteriaQ.data ?? []).map((c) => (
-            <Card key={c.id}>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Criterion {c.criterion}: {c.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-3 text-sm text-muted-foreground">{c.description}</p>
-                <DataTable
-                  rows={(c.metrics ?? []).map((m) => ({
-                    code: m.code,
-                    title: m.title,
-                    type: m.dataType,
-                    mandatory: m.isMandatory ? 'Yes' : 'No',
-                  }))}
-                  columns={['code', 'title', 'type', 'mandatory']}
-                />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <NaacMetricWorkspacePanel
+          mode="tree"
+          portalMode={portalMode}
+          initialMetricCode={metricFromQuery}
+        />
       );
+    }
+
+    if (page === 'my-metrics') {
+      return (
+        <NaacMetricWorkspacePanel
+          mode="inbox"
+          portalMode={portalMode}
+          initialMetricCode={metricFromQuery}
+        />
+      );
+    }
+
+    if (page === 'extended-profile') {
+      return <NaacExtendedProfilePanel />;
     }
 
     if (page === 'evidence') {
@@ -448,38 +475,7 @@ export function NaacWorkspace({
     }
 
     if (page === 'dvv') {
-      const dvv = dvvQ.data;
-      return (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>DVV Readiness — {dvv?.readinessScore ?? 0}%</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              <div className="rounded border p-3">
-                <p className="text-sm text-muted-foreground">Metrics Missing</p>
-                <p className="text-2xl font-bold text-rose-600">{dvv?.documentsMissing ?? 0}</p>
-              </div>
-              <div className="rounded border p-3">
-                <p className="text-sm text-muted-foreground">Faculty Pending</p>
-                <p className="text-2xl font-bold">{dvv?.facultyPending ?? 0}</p>
-              </div>
-              <div className="rounded border p-3">
-                <p className="text-sm text-muted-foreground">Depts Pending</p>
-                <p className="text-2xl font-bold">{dvv?.departmentsPending?.length ?? 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <DataTable
-            rows={(dvv?.metricsMissing ?? []).map((m) => ({
-              code: m.code,
-              title: m.title,
-              criterion: m.criterion,
-            }))}
-            columns={['code', 'title', 'criterion']}
-          />
-        </div>
-      );
+      return <NaacDvvPanel />;
     }
 
     if (page === 'calendar') {
@@ -492,45 +488,104 @@ export function NaacWorkspace({
           <CardHeader>
             <CardTitle>NAAC Reports & Export</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              disabled={exportMut.isPending}
-              onClick={() =>
-                exportMut.mutate({
-                  reportType: 'evidence-index',
-                  format: 'json',
-                  academicYear: '2025-26',
-                })
-              }
-            >
-              Export Evidence Index (JSON)
-            </Button>
-            <Button
-              variant="outline"
-              disabled={exportMut.isPending}
-              onClick={() =>
-                exportMut.mutate({
-                  reportType: 'evidence-index',
-                  format: 'csv',
-                  academicYear: '2025-26',
-                })
-              }
-            >
-              Export Evidence Index (CSV)
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                try {
-                  const res = await downloadNaacEvidencePack({ academicYear: '2025-26' });
-                  downloadBlob(res.data, 'naac-evidence-pack.zip');
-                } catch (e) {
-                  setError(apiErrorMessage(e, 'ZIP export failed'));
+          <CardContent className="space-y-4">
+            <div className="max-w-xs space-y-1">
+              <Label>Academic year</Label>
+              <Input
+                value={reportYear}
+                onChange={(e) => setReportYear(e.target.value)}
+                placeholder="2025-26"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Affiliated-college submission pack: evidence index, ZIP pack, QNM workbook, and DVV
+              checklist. Narrative SSR text is drafted in AQAR / metric workspaces.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={exportMut.isPending}
+                onClick={() =>
+                  exportMut.mutate({
+                    reportType: 'evidence-index',
+                    format: 'json',
+                    academicYear: reportYear,
+                  })
                 }
-              }}
-            >
-              Download Evidence Pack (ZIP)
-            </Button>
+              >
+                Evidence Index (JSON)
+              </Button>
+              <Button
+                variant="outline"
+                disabled={exportMut.isPending}
+                onClick={() =>
+                  exportMut.mutate({
+                    reportType: 'evidence-index',
+                    format: 'csv',
+                    academicYear: reportYear,
+                  })
+                }
+              >
+                Evidence Index (CSV)
+              </Button>
+              <Button
+                variant="outline"
+                disabled={exportMut.isPending}
+                onClick={() =>
+                  exportMut.mutate({
+                    reportType: 'dvv-checklist',
+                    format: 'json',
+                    academicYear: reportYear,
+                  })
+                }
+              >
+                DVV Checklist (JSON)
+              </Button>
+              <Button
+                variant="outline"
+                disabled={exportMut.isPending}
+                onClick={() =>
+                  exportMut.mutate({
+                    reportType: 'ssr-pack-manifest',
+                    format: 'json',
+                    academicYear: reportYear,
+                  })
+                }
+              >
+                SSR Pack Manifest
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const res = await downloadNaacEvidencePack({
+                      academicYear: reportYear,
+                    });
+                    downloadBlob(res.data, `naac-evidence-pack-${reportYear}.zip`);
+                  } catch (e) {
+                    setError(apiErrorMessage(e, 'ZIP export failed'));
+                  }
+                }}
+              >
+                Evidence Pack (ZIP)
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    await downloadNaacQnmsWorkbook(reportYear);
+                  } catch (e) {
+                    setError(apiErrorMessage(e, 'QNMs workbook export failed'));
+                  }
+                }}
+              >
+                QNMs Workbook (XLSX)
+              </Button>
+            </div>
+            {exportMut.data ? (
+              <pre className="max-h-64 overflow-auto rounded border bg-muted/40 p-3 text-xs">
+                {JSON.stringify(exportMut.data, null, 2)}
+              </pre>
+            ) : null}
           </CardContent>
         </Card>
       );
@@ -546,18 +601,18 @@ export function NaacWorkspace({
     dashboard,
     dashboardQ,
     evidenceQ,
-    criteriaQ,
     vaultQ,
     deptQ,
     iqacQ,
-    dvvQ,
     evidenceCriterion,
     evidenceYear,
+    reportYear,
     vaultUploadKey,
     vaultMut,
     exportMut,
     portalMode,
     selectedAqarId,
+    metricFromQuery,
   ]);
 
   return (

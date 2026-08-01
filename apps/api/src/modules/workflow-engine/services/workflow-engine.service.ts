@@ -228,8 +228,15 @@ export class WorkflowEngineService {
   async action(
     user: JwtUser,
     instanceId: string,
-    action: 'APPROVE' | 'REJECT' | 'COMPLETE',
+    action:
+      | 'APPROVE'
+      | 'REJECT'
+      | 'COMPLETE'
+      | 'REQUEST_CHANGES'
+      | 'COMMENT'
+      | 'REOPEN',
     note?: string,
+    opts?: { skipRoleCheck?: boolean },
   ) {
     const instance = await this.db().workflowInstance.findFirst({
       where: { id: instanceId, tenantId: user.tid },
@@ -238,16 +245,98 @@ export class WorkflowEngineService {
       },
     });
     if (!instance) throw new NotFoundException('Workflow instance not found');
+
+    if (action === 'COMMENT') {
+      if (!note?.trim()) throw new BadRequestException('Comment required');
+      await this.db().workflowAction.create({
+        data: {
+          tenantId: user.tid,
+          instanceId: instance.id,
+          action: 'COMMENT',
+          note: note.trim(),
+          actorId: user.sub,
+        },
+      });
+      await this.db().workflowAuditLog.create({
+        data: {
+          tenantId: user.tid,
+          instanceId: instance.id,
+          event: 'COMMENT',
+          actorId: user.sub,
+          payload: { note: note.trim() },
+        },
+      });
+      return instance;
+    }
+
+    if (action === 'REOPEN') {
+      const first =
+        (instance.definition.steps as Array<{ stepOrder: number }>)[0]
+          ?.stepOrder ?? 1;
+      const updated = await this.db().workflowInstance.update({
+        where: { id: instance.id },
+        data: {
+          status: 'IN_PROGRESS',
+          currentStepOrder: first,
+          completedAt: null,
+        },
+      });
+      await this.db().workflowAction.create({
+        data: {
+          tenantId: user.tid,
+          instanceId: instance.id,
+          action: 'REOPEN',
+          note: note ?? null,
+          actorId: user.sub,
+        },
+      });
+      await this.db().workflowAuditLog.create({
+        data: {
+          tenantId: user.tid,
+          instanceId: instance.id,
+          event: 'REOPEN',
+          actorId: user.sub,
+          payload: { note },
+        },
+      });
+      return updated;
+    }
+
+    const openOk =
+      OPEN_STATUSES.includes(instance.status) ||
+      (action === 'REQUEST_CHANGES' && instance.status === 'IN_PROGRESS');
     if (!OPEN_STATUSES.includes(instance.status)) {
       throw new BadRequestException('Workflow instance is not open');
     }
+    void openOk;
+    void opts;
 
     const steps = instance.definition.steps as Array<{
       id: string;
       stepOrder: number;
+      assigneeRole?: string | null;
+      assigneePermission?: string | null;
     }>;
     const currentStep =
       steps.find((s) => s.stepOrder === instance.currentStepOrder) ?? steps[0];
+
+    // Soft permission check when assigneePermission set (unless skipped by facade)
+    if (!opts?.skipRoleCheck && currentStep?.assigneePermission) {
+      const meta = (instance.definition.metadata ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const override = String(meta.overridePermission ?? '');
+      const allowed =
+        user.permissions?.includes(currentStep.assigneePermission) ||
+        (override && user.permissions?.includes(override)) ||
+        user.permissions?.includes('workflow:manage');
+      if (!allowed) {
+        throw new BadRequestException(
+          `Permission ${currentStep.assigneePermission} required for this step`,
+        );
+      }
+    }
 
     await this.db().workflowAction.create({
       data: {
@@ -267,6 +356,10 @@ export class WorkflowEngineService {
     if (action === 'REJECT') {
       nextStatus = 'REJECTED';
       completedAt = new Date();
+    } else if (action === 'REQUEST_CHANGES') {
+      nextStatus = 'CHANGES_REQUESTED';
+      nextStep = steps[0]?.stepOrder ?? 1;
+      completedAt = null;
     } else if (action === 'COMPLETE') {
       nextStatus = 'COMPLETED';
       completedAt = new Date();
@@ -335,6 +428,43 @@ export class WorkflowEngineService {
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,
+    });
+  }
+
+  async getTimeline(tenantId: string, instanceId: string) {
+    const instance = await this.db().workflowInstance.findFirst({
+      where: { id: instanceId, tenantId },
+    });
+    if (!instance) throw new NotFoundException('Workflow instance not found');
+    const [actions, audits] = await Promise.all([
+      this.db().workflowAction.findMany({
+        where: { tenantId, instanceId },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.db().workflowAuditLog.findMany({
+        where: { tenantId, instanceId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return { actions, audits };
+  }
+
+  async findOpenForEntity(
+    tenantId: string,
+    entityType: string,
+    entityId: string,
+  ) {
+    return this.db().workflowInstance.findFirst({
+      where: {
+        tenantId,
+        entityType,
+        entityId,
+        status: { in: [...OPEN_STATUSES, 'CHANGES_REQUESTED'] },
+      },
+      include: {
+        definition: { include: { steps: { orderBy: { stepOrder: 'asc' } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 

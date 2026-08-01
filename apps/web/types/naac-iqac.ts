@@ -12,8 +12,157 @@ export type NaacMetric = {
   title: string;
   description?: string;
   dataType: string;
+  metricType?: string;
   isMandatory: boolean;
+  weightage?: number | null;
   criterion?: { criterion: number; title: string };
+};
+
+export type NaacWorkspaceSummary = {
+  id: string;
+  status: string;
+  progressPct: number;
+  deadline?: string | null;
+  evidenceCount?: number;
+  commentCount?: number;
+  assignees?: Array<{ id: string; staffProfileId: string; role: string }>;
+};
+
+export type NaacTreeMetric = {
+  id: string;
+  code: string;
+  title: string;
+  dataType: string;
+  metricType: string;
+  isMandatory: boolean;
+  weightage?: number | null;
+  workspace: NaacWorkspaceSummary | null;
+};
+
+export type NaacCriteriaTree = {
+  academicYear: string;
+  criteria: Array<{
+    id: string;
+    criterion: number;
+    title: string;
+    description?: string | null;
+    progressPct: number;
+    approvedCount: number;
+    metricCount: number;
+    keyIndicators: Array<{
+      id: string;
+      code: string;
+      title: string;
+      metrics: NaacTreeMetric[];
+    }>;
+    metrics: NaacTreeMetric[];
+  }>;
+};
+
+export type NaacMetricWorkspaceDetail = {
+  academicYear: string;
+  metric: NaacMetric & {
+    erpSourceKey?: string | null;
+    criterion?: { criterion: number; title: string };
+    keyIndicator?: { code: string; title: string } | null;
+  };
+  workspace: {
+    id: string;
+    status: string;
+    progressPct: number;
+    deadline?: string | null;
+    narrativeDraft?: string | null;
+    erpSourceHints?: {
+      metricCode?: string | null;
+      erpSourceKey?: string | null;
+      primary?: Record<string, unknown> | null;
+      related?: Record<string, unknown>;
+      pulledAt?: string;
+    } | null;
+    assignments: Array<{
+      id: string;
+      staffProfileId: string;
+      role: string;
+      staff?: {
+        id: string;
+        fullName: string;
+        employeeCode: string;
+      } | null;
+    }>;
+    evidence: Array<{
+      id: string;
+      title: string;
+      evidenceType: string;
+      verificationStatus: string;
+      notes?: string | null;
+      versions: Array<{
+        id: string;
+        versionNo: number;
+        fileName?: string | null;
+        externalUrl?: string | null;
+        changeNote?: string | null;
+        createdAt: string;
+      }>;
+    }>;
+    comments: Array<{
+      id: string;
+      body: string;
+      authorId?: string | null;
+      createdAt: string;
+    }>;
+    approvals: Array<{
+      id: string;
+      step: string;
+      remark?: string | null;
+      actorId?: string | null;
+      createdAt: string;
+    }>;
+  };
+  history: Array<{
+    id: string;
+    action: string;
+    actorId?: string | null;
+    createdAt: string;
+    payload?: Record<string, unknown>;
+  }>;
+  approval?: {
+    exists: boolean;
+    pendingRole?: string | null;
+    instance?: { id?: string; status?: string; currentStepOrder?: number } | null;
+    steps?: Array<{
+      stepOrder: number;
+      name: string;
+      assigneeRole?: string | null;
+      done?: boolean;
+      current?: boolean;
+    }>;
+  };
+  approvalTimeline?: Array<{
+    id: string;
+    event: string;
+    note?: string | null;
+    at: string;
+  }>;
+};
+
+export type NaacMyWorkspaces = {
+  academicYear: string;
+  scope: string;
+  items: Array<{
+    id: string;
+    status: string;
+    progressPct: number;
+    deadline?: string | null;
+    metric: {
+      code: string;
+      title: string;
+      isMandatory?: boolean;
+      criterion?: { criterion: number; title: string };
+      keyIndicator?: { code: string; title: string } | null;
+    };
+    assignments: Array<{ staffProfileId: string; role: string }>;
+    _count?: { evidence: number; comments: number };
+  }>;
 };
 
 export type NaacEvidenceTag = {
@@ -56,6 +205,9 @@ export type NaacDashboard = {
     score: number;
     evidenceCount: number;
     metricCount: number;
+    approvedCount?: number;
+    overdueCount?: number;
+    progressPct?: number;
     status: string;
   }>;
   pending: {
@@ -63,9 +215,27 @@ export type NaacDashboard = {
     departmentPending: number;
     facultyPending: number;
     metricsPending: number;
+    pendingApproval?: number;
+    overdueDeadlines?: number;
+    changesRequested?: number;
+  };
+  workspaceRollup?: {
+    pendingApproval: number;
+    overdueDeadlines: number;
+    changesRequested: number;
   };
   upcomingDeadlines: NaacCalendarEvent[];
-  aggregates: Record<string, { value: number; source: string; asOf: string }>;
+  aggregates: Record<
+    string,
+    {
+      value: number | null;
+      source: string;
+      asOf: string;
+      pending?: boolean;
+      message?: string;
+      unit?: string;
+    }
+  >;
 };
 
 export type NaacAqar = {
@@ -183,6 +353,8 @@ export type NaacListResponse<T> = {
 export type NaacPage =
   | 'dashboard'
   | 'criteria'
+  | 'my-metrics'
+  | 'extended-profile'
   | 'evidence'
   | 'vault'
   | 'aqar'

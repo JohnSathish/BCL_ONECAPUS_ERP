@@ -406,3 +406,145 @@ export class ReportExportDto {
   @IsString()
   academicYear?: string;
 }
+
+export class CriteriaTreeQueryDto {
+  @IsOptional()
+  @IsString()
+  academicYear?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsUUID()
+  assigneeId?: string;
+
+  @IsOptional()
+  @IsString()
+  mandatoryOnly?: string;
+}
+
+export class UpdateWorkspaceDto {
+  @IsOptional()
+  @Type(() => Number)
+  progressPct?: number;
+
+  @IsOptional()
+  @IsString()
+  deadline?: string | null;
+
+  @IsOptional()
+  @IsString()
+  narrativeDraft?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  erpSourceHints?: Record<string, unknown>;
+}
+
+export class CreateAssignmentDto {
+  @IsUUID()
+  staffProfileId!: string;
+
+  @IsString()
+  role!: string;
+}
+
+export class CreateWorkspaceEvidenceDto {
+  @IsString()
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  evidenceType?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  externalUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  storageKey?: string;
+
+  @IsOptional()
+  @IsString()
+  fileName?: string;
+
+  @IsOptional()
+  @IsString()
+  mimeType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  fileSize?: number;
+
+  @IsOptional()
+  @IsString()
+  changeNote?: string;
+}
+
+export class CreateEvidenceVersionDto {
+  @IsOptional()
+  @IsString()
+  externalUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  changeNote?: string;
+
+  @IsOptional()
+  @IsString()
+  storageKey?: string;
+
+  @IsOptional()
+  @IsString()
+  fileName?: string;
+
+  @IsOptional()
+  @IsString()
+  mimeType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  fileSize?: number;
+}
+
+export class VerifyEvidenceDto {
+  @IsString()
+  verificationStatus!: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class WorkflowActionDto {
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}
+
+export class CreateWorkspaceCommentDto {
+  @IsString()
+  body!: string;
+}
+
+export class UpsertTableRowsDto {
+  rows!: Array<{
+    id?: string;
+    rowIndex?: number;
+    cells: Record<string, unknown>;
+    source?: string;
+    locked?: boolean;
+  }>;
+}

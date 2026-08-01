@@ -88,22 +88,79 @@ export class NaacAqarService {
     if (!section) throw new NotFoundException('AQAR section not found');
 
     let content: Record<string, unknown> = {};
+    let sources: string[] = [];
+
     if (dto.sectionKey.startsWith('criterion_')) {
       const criterion = parseInt(dto.sectionKey.replace('criterion_', ''), 10);
-      content = await this.aggregator.forCriterion(tenantId, criterion);
+      const aggregates = await this.aggregator.forCriterion(
+        tenantId,
+        criterion,
+      );
+      const workspaceHints = await this.workspaceHintsForCriterion(
+        tenantId,
+        aqar.academicYear,
+        criterion,
+      );
+      content = {
+        ...aggregates,
+        erpHints: workspaceHints,
+        _meta: {
+          syncedFrom: ['aggregator', 'metricWorkspaces'],
+          syncedAt: new Date().toISOString(),
+        },
+      };
+      sources = ['criterionAggregates', 'workspaceErpHints'];
     } else if (dto.sectionKey === 'profile') {
-      content = { institutionProfile: aqar.institutionProfile ?? {} };
+      const extended = await this.db().naacExtendedProfile.findUnique({
+        where: {
+          tenantId_academicYear: {
+            tenantId,
+            academicYear: aqar.academicYear,
+          },
+        },
+      });
+      const live = await this.aggregator.pullExtendedProfile(
+        tenantId,
+        aqar.academicYear,
+      );
+      content = {
+        institutionProfile:
+          aqar.institutionProfile ??
+          (extended?.sections as { institutionProfile?: unknown })
+            ?.institutionProfile ??
+          {},
+        extendedProfile: extended?.sections ?? live,
+        extendedProfileLastPulledAt: extended?.lastPulledAt ?? null,
+        _meta: {
+          syncedFrom: extended
+            ? ['naacExtendedProfile', 'aqarInstitutionProfile']
+            : ['liveErpPull', 'aqarInstitutionProfile'],
+          syncedAt: new Date().toISOString(),
+        },
+      };
+      sources = extended
+        ? ['extendedProfile', 'institutionProfile']
+        : ['liveErpPull', 'institutionProfile'];
     } else {
       content = {
         synced: true,
         message: 'Manual section — attach evidence via repository',
+        _meta: {
+          syncedFrom: ['manual'],
+          syncedAt: new Date().toISOString(),
+        },
       };
+      sources = ['manual'];
     }
 
     const completionPct = Object.keys(content).length > 0 ? 60 : 0;
     await this.db().naacAqarSection.update({
       where: { id: section.id },
-      data: { content, completionPct, lastSyncedAt: new Date() },
+      data: {
+        content: { ...content, _sources: sources },
+        completionPct,
+        lastSyncedAt: new Date(),
+      },
     });
 
     const sections = await this.db().naacAqarSection.findMany({
@@ -120,5 +177,54 @@ export class NaacAqarService {
     });
 
     return this.getById(tenantId, aqarId);
+  }
+
+  private async workspaceHintsForCriterion(
+    tenantId: string,
+    academicYear: string,
+    criterion: number,
+  ) {
+    const rows = await this.db().naacMetricWorkspace.findMany({
+      where: {
+        tenantId,
+        academicYear,
+        metric: { criterion: { criterion } },
+        status: {
+          in: [
+            'APPROVED',
+            'LOCKED',
+            'IN_PROGRESS',
+            'SUBMITTED',
+            'UNDER_REVIEW',
+            'EVIDENCE_PENDING',
+          ],
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        progressPct: true,
+        erpSourceHints: true,
+        metric: { select: { code: true, title: true, erpSourceKey: true } },
+      },
+      take: 200,
+    });
+    return rows.map(
+      (r: {
+        id: string;
+        status: string;
+        progressPct: number;
+        erpSourceHints: unknown;
+        metric: { code: string; title: string; erpSourceKey: string | null };
+      }) => ({
+        workspaceId: r.id,
+        metricCode: r.metric.code,
+        title: r.metric.title,
+        erpSourceKey: r.metric.erpSourceKey,
+        status: r.status,
+        progressPct: r.progressPct,
+        hints: r.erpSourceHints,
+      }),
+    );
   }
 }

@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { StorageModule } from '../../shared/storage/storage.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { GovernanceModule } from '../governance/governance.module';
+import { WorkflowEngineModule } from '../workflow-engine/workflow-engine.module';
 import { NaacIqacController } from './naac-iqac.controller';
 import { NaacIqacPortalController } from './naac-iqac-portal.controller';
 import { FeedbackSurveyController } from './feedback-survey.controller';
@@ -25,9 +26,17 @@ import { NaacIntegrationService } from './services/naac-integration.service';
 import { NaacReportService } from './services/naac-report.service';
 import { NaacVaultService } from './services/naac-vault.service';
 import { FeedbackSurveyService } from './services/feedback-survey.service';
+import { NaacMetricWorkspaceService } from './services/naac-metric-workspace.service';
+import { NaacExtendedProfileService } from './services/naac-extended-profile.service';
+import { NaacMetricTableService } from './services/naac-metric-table.service';
 
 @Module({
-  imports: [StorageModule, GovernanceModule, CommunicationModule],
+  imports: [
+    StorageModule,
+    GovernanceModule,
+    CommunicationModule,
+    forwardRef(() => WorkflowEngineModule),
+  ],
   controllers: [
     NaacIqacController,
     NaacIqacPortalController,
@@ -50,8 +59,17 @@ import { FeedbackSurveyService } from './services/feedback-survey.service';
     NaacDvvService,
     NaacReportService,
     FeedbackSurveyService,
+    NaacMetricWorkspaceService,
+    NaacExtendedProfileService,
+    NaacMetricTableService,
   ],
-  exports: [NaacEvidenceService, NaacDashboardService, FeedbackSurveyService],
+  exports: [
+    NaacEvidenceService,
+    NaacDashboardService,
+    FeedbackSurveyService,
+    NaacMetricWorkspaceService,
+    NaacExtendedProfileService,
+    NaacMetricTableService,
+  ],
 })
 export class NaacIqacModule {}
-// NIMS Phase 1 — NAAC & IQAC institutional compliance platform

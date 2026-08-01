@@ -2,21 +2,23 @@
 
 import { useState } from 'react';
 import { NaacWorkspace } from '@/components/naac-iqac-module/naac-workspace';
+import { NaacMetricWorkspacePanel } from '@/components/naac-iqac-module/naac-metric-workspace-panel';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { cn } from '@/utils/cn';
 
-type StaffNaacTab = 'department' | 'faculty';
+type StaffNaacTab = 'my-metrics' | 'department' | 'faculty';
 
 const TABS: { id: StaffNaacTab; label: string }[] = [
+  { id: 'my-metrics', label: 'My Metrics' },
   { id: 'department', label: 'Department' },
   { id: 'faculty', label: 'My Achievements' },
 ];
 
 export default function StaffNaacPage() {
   const session = useRequireAuth();
-  const [tab, setTab] = useState<StaffNaacTab>('department');
+  const [tab, setTab] = useState<StaffNaacTab>('my-metrics');
 
   if (!session) return null;
 
@@ -35,7 +37,11 @@ export default function StaffNaacPage() {
           </Button>
         ))}
       </div>
-      <NaacWorkspace page={tab} portalMode />
+      {tab === 'my-metrics' ? (
+        <NaacMetricWorkspacePanel mode="inbox" portalMode />
+      ) : (
+        <NaacWorkspace page={tab} portalMode />
+      )}
     </DashboardShell>
   );
 }

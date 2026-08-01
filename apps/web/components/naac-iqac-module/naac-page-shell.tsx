@@ -8,6 +8,8 @@ import type { NaacPage } from '@/types/naac-iqac';
 const TITLES: Record<NaacPage, string> = {
   dashboard: 'NAAC & IQAC Dashboard',
   criteria: 'Criteria & Metrics',
+  'my-metrics': 'My Metrics',
+  'extended-profile': 'Extended Profile',
   evidence: 'Evidence Repository',
   vault: 'Document Vault',
   aqar: 'AQAR Management',
@@ -16,7 +18,7 @@ const TITLES: Record<NaacPage, string> = {
   student: 'Student Achievements',
   mous: 'MoU Management',
   iqac: 'IQAC Activities',
-  dvv: 'DVV Readiness',
+  dvv: 'DVV Clarifications',
   calendar: 'NAAC Calendar',
   reports: 'NAAC Reports',
   settings: 'NAAC Settings',

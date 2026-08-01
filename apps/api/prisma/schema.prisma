@@ -10544,7 +10544,8 @@ model NaacCriterion {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  metrics NaacMetric[]
+  metrics        NaacMetric[]
+  keyIndicators  NaacKeyIndicator[]
 
   @@unique([tenantId, criterion])
   @@index([tenantId])
@@ -10552,24 +10553,335 @@ model NaacCriterion {
   @@schema("naac")
 }
 
+model NaacKeyIndicator {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  criterionId  String   @map("criterion_id") @db.Uuid
+  code         String
+  title        String
+  description  String?
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  criterion NaacCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  metrics   NaacMetric[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, criterionId])
+  @@map("naac_key_indicators")
+  @@schema("naac")
+}
+
 model NaacMetric {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  criterionId     String   @map("criterion_id") @db.Uuid
+  keyIndicatorId  String?  @map("key_indicator_id") @db.Uuid
+  code            String
+  title           String
+  description     String?
+  dataType        String   @default("document") @map("data_type")
+  metricType      String   @default("QLM") @map("metric_type")
+  weightage       Float?
+  parentCode      String?  @map("parent_code")
+  benchmarkNotes  String?  @map("benchmark_notes")
+  erpSourceKey    String?  @map("erp_source_key")
+  isMandatory     Boolean  @default(false) @map("is_mandatory")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  criterion     NaacCriterion     @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  keyIndicator  NaacKeyIndicator? @relation(fields: [keyIndicatorId], references: [id], onDelete: SetNull)
+  workspaces    NaacMetricWorkspace[]
+  dvvClarifications NaacDvvClarification[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, criterionId])
+  @@index([tenantId, keyIndicatorId])
+  @@index([tenantId, erpSourceKey])
+  @@map("naac_metrics")
+  @@schema("naac")
+}
+
+model NaacMetricWorkspace {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @map("tenant_id") @db.Uuid
+  metricId                String    @map("metric_id") @db.Uuid
+  academicYear            String    @map("academic_year")
+  status                  String    @default("NOT_STARTED")
+  progressPct             Float     @default(0) @map("progress_pct")
+  deadline                DateTime? @db.Date
+  narrativeDraft          String?   @map("narrative_draft")
+  erpSourceHints          Json?     @map("erp_source_hints")
+  criterionCoordinatorId  String?   @map("criterion_coordinator_id") @db.Uuid
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  metric       NaacMetric              @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  assignments  NaacMetricAssignment[]
+  evidence     NaacEvidenceItem[]
+  comments     NaacMetricComment[]
+  approvals    NaacMetricApproval[]
+  tableDatasets NaacMetricTableDataset[]
+  dvvClarifications NaacDvvClarification[]
+
+  @@unique([tenantId, metricId, academicYear])
+  @@index([tenantId, academicYear, status])
+  @@index([tenantId, status])
+  @@map("naac_metric_workspaces")
+  @@schema("naac")
+}
+
+model NaacMetricAssignment {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  staffProfileId String   @map("staff_profile_id") @db.Uuid
+  role           String
+  assignedById   String?  @map("assigned_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace NaacMetricWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, staffProfileId, role])
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, workspaceId])
+  @@map("naac_metric_assignments")
+  @@schema("naac")
+}
+
+model NaacEvidenceItem {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
+  title              String
+  evidenceType       String   @default("FILE") @map("evidence_type")
+  verificationStatus String   @default("PENDING") @map("verification_status")
+  notes              String?
+  createdById        String?  @map("created_by_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  workspace NaacMetricWorkspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions  NaacEvidenceVersion[]
+
+  @@index([tenantId, workspaceId])
+  @@index([tenantId, verificationStatus])
+  @@map("naac_evidence_items")
+  @@schema("naac")
+}
+
+model NaacEvidenceVersion {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  evidenceItemId  String   @map("evidence_item_id") @db.Uuid
+  versionNo       Int      @map("version_no")
+  storageKey      String?  @map("storage_key")
+  fileName        String?  @map("file_name")
+  mimeType        String?  @map("mime_type")
+  fileSize        Int?     @map("file_size")
+  externalUrl     String?  @map("external_url")
+  changeNote      String?  @map("change_note")
+  uploadedById    String?  @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  evidenceItem NaacEvidenceItem @relation(fields: [evidenceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceItemId, versionNo])
+  @@index([tenantId, evidenceItemId])
+  @@map("naac_evidence_versions")
+  @@schema("naac")
+}
+
+model NaacMetricComment {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
-  criterionId String   @map("criterion_id") @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  body        String
+  authorId    String?  @map("author_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace NaacMetricWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workspaceId, createdAt])
+  @@map("naac_metric_comments")
+  @@schema("naac")
+}
+
+model NaacMetricApproval {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  step        String
+  remark      String?
+  actorId     String?  @map("actor_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace NaacMetricWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workspaceId, createdAt])
+  @@map("naac_metric_approvals")
+  @@schema("naac")
+}
+
+model NaacAuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  action     String
+  actorId    String?  @map("actor_id") @db.Uuid
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, entityType, entityId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("naac_audit_events")
+  @@schema("naac")
+}
+
+model NaacMetricTableDefinition {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
   code        String
+  sheetName   String   @map("sheet_name")
   title       String
-  description String?
-  dataType    String   @default("document") @map("data_type")
-  isMandatory Boolean  @default(false) @map("is_mandatory")
+  metricCodes Json     @map("metric_codes")
+  columns     Json
+  layoutHints Json?    @map("layout_hints")
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  criterion NaacCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  datasets NaacMetricTableDataset[]
 
   @@unique([tenantId, code])
-  @@index([tenantId, criterionId])
-  @@map("naac_metrics")
+  @@index([tenantId, sortOrder])
+  @@map("naac_metric_table_definitions")
+  @@schema("naac")
+}
+
+model NaacMetricTableDataset {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
+  tableDefinitionId  String   @map("table_definition_id") @db.Uuid
+  academicYear       String   @map("academic_year")
+  yearIndex          Int      @default(1) @map("year_index")
+  lastPulledAt       DateTime? @map("last_pulled_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  workspace       NaacMetricWorkspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tableDefinition NaacMetricTableDefinition  @relation(fields: [tableDefinitionId], references: [id], onDelete: Cascade)
+  rows            NaacMetricTableRow[]
+
+  @@unique([workspaceId, tableDefinitionId, yearIndex])
+  @@index([tenantId, academicYear])
+  @@index([tenantId, workspaceId])
+  @@map("naac_metric_table_datasets")
+  @@schema("naac")
+}
+
+model NaacMetricTableRow {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  datasetId  String   @map("dataset_id") @db.Uuid
+  rowIndex   Int      @map("row_index")
+  cells      Json
+  source     String   @default("MANUAL")
+  locked     Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  dataset NaacMetricTableDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, rowIndex])
+  @@index([tenantId, datasetId])
+  @@map("naac_metric_table_rows")
+  @@schema("naac")
+}
+
+model NaacDvvClarification {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  metricId           String    @map("metric_id") @db.Uuid
+  workspaceId        String?   @map("workspace_id") @db.Uuid
+  academicYear       String    @map("academic_year")
+  queryCode          String    @map("query_code")
+  title              String
+  naacQueryText      String    @map("naac_query_text") @db.Text
+  status             String    @default("OPEN")
+  assignedFacultyId  String?   @map("assigned_faculty_id") @db.Uuid
+  workflowInstanceId String?   @map("workflow_instance_id") @db.Uuid
+  dueDate            DateTime? @map("due_date")
+  createdById        String?   @map("created_by_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  metric     NaacMetric              @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  workspace  NaacMetricWorkspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  evidenceLinks NaacDvvEvidenceLink[]
+  responses  NaacDvvResponseDraft[]
+  comments   NaacDvvComment[]
+
+  @@unique([tenantId, academicYear, queryCode])
+  @@index([tenantId, status])
+  @@index([tenantId, metricId])
+  @@index([tenantId, assignedFacultyId])
+  @@map("naac_dvv_clarifications")
+  @@schema("naac")
+}
+
+model NaacDvvEvidenceLink {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  clarificationId String   @map("clarification_id") @db.Uuid
+  evidenceItemId  String?  @map("evidence_item_id") @db.Uuid
+  vaultDocumentId String?  @map("vault_document_id") @db.Uuid
+  note            String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  clarification NaacDvvClarification @relation(fields: [clarificationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clarificationId])
+  @@map("naac_dvv_evidence_links")
+  @@schema("naac")
+}
+
+model NaacDvvResponseDraft {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  clarificationId String   @map("clarification_id") @db.Uuid
+  versionNo       Int      @map("version_no")
+  body            String   @db.Text
+  attachmentKey   String?  @map("attachment_key")
+  attachmentName  String?  @map("attachment_name")
+  createdById     String?  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  clarification NaacDvvClarification @relation(fields: [clarificationId], references: [id], onDelete: Cascade)
+
+  @@unique([clarificationId, versionNo])
+  @@index([tenantId, clarificationId])
+  @@map("naac_dvv_response_drafts")
+  @@schema("naac")
+}
+
+model NaacDvvComment {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  clarificationId String   @map("clarification_id") @db.Uuid
+  body            String   @db.Text
+  authorId        String?  @map("author_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  clarification NaacDvvClarification @relation(fields: [clarificationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clarificationId])
+  @@map("naac_dvv_comments")
   @@schema("naac")
 }
 
@@ -10793,6 +11105,22 @@ model NaacSettings {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("naac_settings")
+  @@schema("naac")
+}
+
+model NaacExtendedProfile {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  academicYear String   @map("academic_year")
+  sections     Json     @default("{}")
+  lastPulledAt DateTime? @map("last_pulled_at")
+  pulledById   String?  @map("pulled_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, academicYear])
+  @@index([tenantId, lastPulledAt])
+  @@map("naac_extended_profiles")
   @@schema("naac")
 }
 

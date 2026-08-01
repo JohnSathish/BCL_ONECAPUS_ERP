@@ -34,10 +34,15 @@ import {
   CreateDepartmentSubmissionDto,
   CreateEvidenceTagDto,
   CreateFacultyAchievementDto,
+  CreateAssignmentDto,
+  CreateEvidenceVersionDto,
   CreateMetricDto,
   CreateMouActivityDto,
   CreateMouDto,
   CreateStudentAchievementDto,
+  CreateWorkspaceCommentDto,
+  CreateWorkspaceEvidenceDto,
+  CriteriaTreeQueryDto,
   EvidenceSearchDto,
   ListQueryDto,
   ReportExportDto,
@@ -47,7 +52,11 @@ import {
   UpdateAqarDto,
   UpdateMetricDto,
   UpdateSettingsDto,
+  UpdateWorkspaceDto,
+  UpsertTableRowsDto,
   VaultUploadDto,
+  VerifyEvidenceDto,
+  WorkflowActionDto,
 } from './dto/naac-iqac.dto';
 import {
   NaacAchievementService,
@@ -65,6 +74,9 @@ import { NaacDepartmentService } from './services/naac-department.service';
 import { NaacDvvService } from './services/naac-dvv.service';
 import { NaacEvidenceService } from './services/naac-evidence.service';
 import { NaacIntegrationService } from './services/naac-integration.service';
+import { NaacMetricWorkspaceService } from './services/naac-metric-workspace.service';
+import { NaacExtendedProfileService } from './services/naac-extended-profile.service';
+import { NaacMetricTableService } from './services/naac-metric-table.service';
 import { NaacReportService } from './services/naac-report.service';
 import { NaacVaultService } from './services/naac-vault.service';
 
@@ -98,6 +110,9 @@ export class NaacIqacController {
     private readonly dvv: NaacDvvService,
     private readonly reports: NaacReportService,
     private readonly aggregator: NaacAggregatorService,
+    private readonly workspaces: NaacMetricWorkspaceService,
+    private readonly extendedProfile: NaacExtendedProfileService,
+    private readonly metricTables: NaacMetricTableService,
   ) {}
 
   @Get('constants')
@@ -432,12 +447,137 @@ export class NaacIqacController {
   }
 
   @Get('dvv/readiness')
-  @RequireAnyPermission(...NIQ_REPORTS)
+  @RequireAnyPermission(...NIQ_REPORTS, ...NIQ_READ)
   dvvReadiness(
     @CurrentUser() user: JwtUser,
     @Query('academicYear') academicYear?: string,
   ) {
     return this.dvv.readiness(user.tid, academicYear);
+  }
+
+  @Get('dvv/clarifications')
+  @RequireAnyPermission(...NIQ_READ)
+  listDvvClarifications(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYear') academicYear?: string,
+    @Query('status') status?: string,
+    @Query('metricCode') metricCode?: string,
+    @Query('assignedToMe') assignedToMe?: string,
+  ) {
+    return this.dvv.listClarifications(user, {
+      academicYear,
+      status,
+      metricCode,
+      assignedToMe,
+    });
+  }
+
+  @Post('dvv/clarifications')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  createDvvClarification(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      metricCode: string;
+      academicYear?: string;
+      queryCode: string;
+      title: string;
+      naacQueryText: string;
+      dueDate?: string;
+      assignedFacultyId?: string;
+    },
+  ) {
+    return this.dvv.createClarification(user, body);
+  }
+
+  @Get('dvv/clarifications/:id')
+  @RequireAnyPermission(...NIQ_READ)
+  getDvvClarification(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.dvv.getClarification(user, id);
+  }
+
+  @Patch('dvv/clarifications/:id')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  updateDvvClarification(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      title?: string;
+      naacQueryText?: string;
+      status?: string;
+      assignedFacultyId?: string | null;
+      dueDate?: string | null;
+    },
+  ) {
+    return this.dvv.updateClarification(user, id, body);
+  }
+
+  @Post('dvv/clarifications/:id/evidence-links')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  addDvvEvidenceLink(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      evidenceItemId?: string;
+      vaultDocumentId?: string;
+      note?: string;
+    },
+  ) {
+    return this.dvv.addEvidenceLink(user, id, body);
+  }
+
+  @Post('dvv/clarifications/:id/responses')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  upsertDvvResponse(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { body: string },
+  ) {
+    return this.dvv.upsertResponse(user, id, body.body);
+  }
+
+  @Post('dvv/clarifications/:id/comments')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  addDvvComment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { body: string },
+  ) {
+    return this.dvv.addComment(user, id, body.body);
+  }
+
+  @Post('dvv/clarifications/:id/submit-for-review')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  submitDvvForReview(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body?: { remark?: string },
+  ) {
+    return this.dvv.submitForReview(user, id, body?.remark);
+  }
+
+  @Post('dvv/clarifications/:id/approval/:action')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  dvvApprovalAct(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('action') action: string,
+    @Body() body?: { note?: string },
+  ) {
+    const allowed = [
+      'APPROVE',
+      'REQUEST_CHANGES',
+      'REJECT',
+      'REOPEN',
+      'COMMENT',
+    ] as const;
+    const act = action.toUpperCase() as (typeof allowed)[number];
+    if (!allowed.includes(act)) {
+      return { error: 'Invalid action' };
+    }
+    return this.dvv.approvalAct(user, id, act, body?.note);
   }
 
   @Get('calendar')
@@ -503,5 +643,273 @@ export class NaacIqacController {
   @RequireAnyPermission(...NIQ_READ)
   getAggregates(@CurrentUser() user: JwtUser) {
     return this.aggregator.summary(user.tid);
+  }
+
+  // ── Metric Workspace ──────────────────────────────────────────────
+
+  @Get('criteria/tree')
+  @RequireAnyPermission(...NIQ_READ)
+  criteriaTree(
+    @CurrentUser() user: JwtUser,
+    @Query() query: CriteriaTreeQueryDto,
+  ) {
+    return this.workspaces.getCriteriaTree(user, query);
+  }
+
+  @Get('my/workspaces')
+  @RequireAnyPermission(...NIQ_READ)
+  myWorkspaces(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.workspaces.myWorkspaces(user, academicYear);
+  }
+
+  @Get('metrics/:code/workspace')
+  @RequireAnyPermission(...NIQ_READ)
+  metricWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('code') code: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.workspaces.getWorkspaceByMetricCode(user, code, academicYear);
+  }
+
+  @Patch('workspaces/:id')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  patchWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkspaceDto,
+  ) {
+    return this.workspaces.patchWorkspace(user, id, dto);
+  }
+
+  @Post('workspaces/:id/assignments')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  addAssignment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CreateAssignmentDto,
+  ) {
+    return this.workspaces.addAssignment(user, id, dto);
+  }
+
+  @Delete('workspaces/:id/assignments/:assignmentId')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  removeAssignment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.workspaces.removeAssignment(user, id, assignmentId);
+  }
+
+  @Post('workspaces/:id/evidence')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  addWorkspaceEvidence(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CreateWorkspaceEvidenceDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.workspaces.addEvidence(user, id, dto, file);
+  }
+
+  @Post('evidence-items/:id/versions')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  addEvidenceVersion(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CreateEvidenceVersionDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.workspaces.addEvidenceVersion(user, id, dto, file);
+  }
+
+  @Patch('evidence-items/:id/verify')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  verifyEvidenceItem(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: VerifyEvidenceDto,
+  ) {
+    return this.workspaces.verifyEvidence(user, id, dto);
+  }
+
+  @Post('workspaces/:id/submit')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  submitWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: WorkflowActionDto,
+  ) {
+    return this.workspaces.submit(user, id, dto.remark);
+  }
+
+  @Post('workspaces/:id/verify')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  verifyWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: WorkflowActionDto,
+  ) {
+    return this.workspaces.verify(user, id, dto.remark);
+  }
+
+  @Post('workspaces/:id/approve')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  approveWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: WorkflowActionDto,
+  ) {
+    return this.workspaces.approve(user, id, dto.remark);
+  }
+
+  @Post('workspaces/:id/reject')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  rejectWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: WorkflowActionDto,
+  ) {
+    return this.workspaces.reject(user, id, dto.remark);
+  }
+
+  @Post('workspaces/:id/reopen')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  reopenWorkspace(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: WorkflowActionDto,
+  ) {
+    return this.workspaces.reopen(user, id, dto.remark);
+  }
+
+  @Get('workspaces/:id/comments')
+  @RequireAnyPermission(...NIQ_READ)
+  listWorkspaceComments(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.workspaces.listComments(user, id);
+  }
+
+  @Post('workspaces/:id/comments')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  addWorkspaceComment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: CreateWorkspaceCommentDto,
+  ) {
+    return this.workspaces.addComment(user, id, dto.body);
+  }
+
+  // ── Extended Profile + ERP pull ───────────────────────────────────
+
+  @Get('extended-profile')
+  @RequireAnyPermission(...NIQ_READ)
+  getExtendedProfile(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.extendedProfile.get(user.tid, academicYear);
+  }
+
+  @Post('extended-profile/pull')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  pullExtendedProfile(
+    @CurrentUser() user: JwtUser,
+    @Body() body?: { academicYear?: string },
+  ) {
+    return this.extendedProfile.pull(user, body?.academicYear);
+  }
+
+  @Post('workspaces/:id/pull-erp')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  pullWorkspaceErp(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.extendedProfile.pullWorkspaceErp(user, id);
+  }
+
+  @Post('workspaces/pull-erp-bulk')
+  @RequireAnyPermission(...NIQ_MANAGE)
+  pullErpBulk(
+    @CurrentUser() user: JwtUser,
+    @Query('criterion') criterion?: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.extendedProfile.pullErpBulk(user, {
+      criterion: criterion ? parseInt(criterion, 10) : undefined,
+      academicYear,
+    });
+  }
+
+  // ── Official NAAC Excel data tables ───────────────────────────────
+
+  @Get('metrics/:code/tables')
+  @RequireAnyPermission(...NIQ_READ)
+  listMetricTables(
+    @CurrentUser() user: JwtUser,
+    @Param('code') code: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.metricTables.listTablesForMetric(user, code, academicYear);
+  }
+
+  @Get('datasets/:id')
+  @RequireAnyPermission(...NIQ_READ)
+  getDataset(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.metricTables.getDataset(user, id);
+  }
+
+  @Get('datasets/:id/rows')
+  @RequireAnyPermission(...NIQ_READ)
+  getDatasetRows(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.metricTables.getDataset(user, id);
+  }
+
+  @Patch('datasets/:id/rows')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  upsertDatasetRows(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpsertTableRowsDto,
+  ) {
+    return this.metricTables.upsertRows(user, id, dto.rows ?? []);
+  }
+
+  @Post('datasets/:id/pull-erp')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  pullDatasetErp(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.metricTables.pullErp(user, id);
+  }
+
+  @Post('datasets/:id/import-xlsx')
+  @RequireAnyPermission(...NIQ_COLLECT)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  importDatasetXlsx(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.metricTables.importXlsx(user, id, file);
+  }
+
+  @Get('datasets/:id/export-xlsx')
+  @RequireAnyPermission(...NIQ_READ)
+  exportDatasetXlsx(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.metricTables.exportXlsx(user, id);
+  }
+
+  @Get('reports/naac-qnms-workbook')
+  @RequireAnyPermission('naac-iqac:reports', 'naac-iqac:manage')
+  exportQnmsWorkbook(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.metricTables.exportWorkbook(user, academicYear);
   }
 }
