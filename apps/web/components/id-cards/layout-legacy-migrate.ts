@@ -12,24 +12,36 @@ function isLayoutV1(layout: IdCardLayoutInput): layout is IdCardLayoutV1 {
   );
 }
 
-/** Refresh library layouts when seed revision is ahead; preserve tenant/designer edits otherwise. */
+/**
+ * Library revision sync — never wipe front/back elements.
+ * Tenant/designer edits stay; only meta.layoutRevision can catch up for bookkeeping.
+ * Use gallery "reset to library" (or re-seed) when a deliberate seed refresh is needed.
+ */
 function upgradeBuiltinLibraryLayout(stored: IdCardLayoutV1): IdCardLayoutV1 {
   const code = libraryCodeFromLayout(stored) ?? stored.meta?.libraryCode;
   if (!code) return stored;
   const latest = getBuiltinTemplateLayout(code);
   if (!latest) return stored;
 
+  if (stored.meta?.customized === true) return stored;
+
   const storedRev = stored.meta?.layoutRevision ?? 0;
   const latestRev = latest.meta?.layoutRevision ?? 0;
   if (storedRev >= latestRev) return stored;
 
   return {
-    version: 1,
-    meta: { ...latest.meta, ...stored.meta, libraryCode: code, layoutRevision: latestRev },
+    ...stored,
+    meta: {
+      ...latest.meta,
+      ...stored.meta,
+      libraryCode: code,
+      layoutRevision: latestRev,
+    },
     frontBackground: stored.frontBackground ?? latest.frontBackground ?? null,
     backBackground: stored.backBackground ?? latest.backBackground ?? null,
-    front: latest.front,
-    back: latest.back,
+    // Keep stored elements — silent wipe was breaking production cards.
+    front: stored.front,
+    back: stored.back,
   };
 }
 

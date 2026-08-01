@@ -1,13 +1,11 @@
-import { API_BASE_URL } from '@/lib/http/env';
+import { API_BASE_URL, getRealtimeOrigin } from '@/lib/http/env';
 
 function apiOrigin(): string {
   if (API_BASE_URL.startsWith('http')) {
     return API_BASE_URL.replace(/\/api\/?$/, '');
   }
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  return 'http://localhost:3000';
+  // Prefer Nest origin so Puppeteer PDF and browser both load /uploads without needing Next proxy.
+  return getRealtimeOrigin();
 }
 
 /** Resolve API-hosted upload paths to absolute URLs for images and downloads. */

@@ -45,6 +45,7 @@ import { pickDefaultTemplate } from '@/components/id-cards/id-card-template-util
 import { normalizeIdCardLayout } from '@/components/id-cards/layout-legacy-migrate';
 import { resolveInstitutionSignatureUrl } from '@/components/id-cards/resolve-institution-signature-url';
 import { openCr80PrintPreview } from '@/components/id-cards/print-cr80-id-card';
+import { assertPdfBlob } from '@/components/id-cards/id-card-pdf-blob';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -322,7 +323,7 @@ export function StaffIdCardProductionCenter() {
         signatureUrl,
       });
       const html = buildCr80PrintHtmlDocument(frontHtml, backHtml);
-      const blob = await renderIdCardPdf(html);
+      const blob = await assertPdfBlob(await renderIdCardPdf(html));
       downloadBlob(blob, `${model.holder.employeeId.replace(/\s+/g, '-')}-id-card.pdf`);
     } catch (e) {
       setMessage(apiErrorMessage(e, 'PDF generation failed'));
@@ -411,7 +412,7 @@ export function StaffIdCardProductionCenter() {
           }
         },
       });
-      downloadBlob(result.blob, staffBulkPdfFilename(departmentName));
+      downloadBlob(await assertPdfBlob(result.blob), staffBulkPdfFilename(departmentName));
       const parts = [`Exported ${result.exported} staff (${result.exported * 2} pages).`];
       if (result.skipped > 0) parts.push(`${result.skipped} staff skipped (no card record).`);
       if (result.capped)

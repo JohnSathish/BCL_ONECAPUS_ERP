@@ -35,7 +35,7 @@ import type { IdCardTypeScale } from './id-card-typography';
 
 export type FieldRenderOptions = {
   stylePreset?: IdCardLayoutMeta['stylePreset'];
-  photoShape?: 'square' | 'circle';
+  photoShape?: 'square' | 'circle' | 'rounded';
   signatureUrl?: string | null;
   side?: 'front' | 'back';
   /** Designer element style.fontSize (pt) — scales Pursuit type when set. */
@@ -76,7 +76,9 @@ function headerGradient(
 }
 
 function photoRadius(shape: FieldRenderOptions['photoShape']) {
-  return shape === 'circle' ? '50%' : '1.2mm';
+  if (shape === 'circle') return '50%';
+  if (shape === 'rounded') return '2.5mm';
+  return '1.2mm';
 }
 
 export function escHtml(s: string) {

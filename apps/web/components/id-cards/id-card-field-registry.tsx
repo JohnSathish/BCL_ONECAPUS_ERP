@@ -354,7 +354,13 @@ export function renderIdCardField(
       const borderColor =
         stylePreset === 'gold' ? '#ca8a04' : isPursuitExcellence(stylePreset) ? PE_NAVY : accent;
       const radius =
-        photoShape === 'circle' ? '50%' : isPursuitExcellence(stylePreset) ? '1.4mm' : '1.2mm';
+        photoShape === 'circle'
+          ? '50%'
+          : photoShape === 'rounded'
+            ? '2.5mm'
+            : isPursuitExcellence(stylePreset)
+              ? '1.4mm'
+              : '1.2mm';
       if (model.holder.photoUrl) {
         return (
           // eslint-disable-next-line @next/next/no-img-element

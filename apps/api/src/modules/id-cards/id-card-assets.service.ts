@@ -54,4 +54,28 @@ export class IdCardAssetsService {
       mimeType: valid.mimetype,
     };
   }
+
+  async uploadSignature(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<IdCardBackgroundUploadResult> {
+    const valid = validateIdCardBackgroundImage(file);
+    const dir = join(this.uploadRoot, tenantId, 'id-cards', 'signatures');
+    await mkdir(dir, { recursive: true });
+
+    const ext = extensionForBackgroundMime(valid.mimetype);
+    const filename = `principal-${Date.now()}.${ext}`;
+    await writeFile(join(dir, filename), valid.buffer);
+
+    const dims = readImageDimensions(valid.buffer, valid.mimetype);
+    const publicPath = `/uploads/tenants/${tenantId}/id-cards/signatures/${filename}`;
+
+    return {
+      imageUrl: publicPath,
+      naturalWidth: dims?.width ?? null,
+      naturalHeight: dims?.height ?? null,
+      fileSizeBytes: valid.size,
+      mimeType: valid.mimetype,
+    };
+  }
 }

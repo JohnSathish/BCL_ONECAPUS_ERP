@@ -24,15 +24,34 @@ export class IdCardDocumentService {
     });
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'load', timeout });
+      // domcontentloaded avoids hanging forever on external QR/photo URLs.
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout });
+      // Allow photos/QR/signature hosted on Nest to finish loading before capture.
+      try {
+        await page.waitForNetworkIdle({ idleTime: 500, timeout: 15_000 });
+      } catch {
+        this.logger.warn(
+          'ID card PDF: network idle wait skipped (external assets may still be loading)',
+        );
+      }
+      // Brief settle for late image decode after network idle.
+      await new Promise((r) => setTimeout(r, 400));
       const pdf = await page.pdf({
         width: `${CR80_WIDTH_MM}mm`,
         height: `${CR80_HEIGHT_MM}mm`,
         printBackground: true,
-        preferCSSPageSize: true,
+        preferCSSPageSize: false,
         margin: { top: '0', right: '0', bottom: '0', left: '0' },
       });
+      if (!pdf?.length) {
+        throw new Error('Puppeteer returned an empty PDF buffer');
+      }
       return Buffer.from(pdf);
+    } catch (err) {
+      this.logger.error(
+        `ID card PDF render failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw err;
     } finally {
       await browser.close();
     }

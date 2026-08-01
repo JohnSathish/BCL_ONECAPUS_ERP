@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { IdCardElement } from '@/types/id-card-template';
 import type { IdCardFieldKey, IdCardLayoutV1 } from '@/types/id-card-template';
 import type { IdCardModel } from '@/types/id-card';
@@ -19,6 +19,18 @@ import {
   type AlignmentGuideLine,
   type GuideBox,
 } from './id-card-alignment-guides';
+import {
+  PALETTE_ELEMENT_MIME,
+  getFieldDisplayName,
+  parsePalettePayload,
+} from './id-card-element-catalog';
+import {
+  applyBindingToPlainText,
+  cssTextTransform,
+  elementChromeStyle,
+  elementFieldChromeStyle,
+  photoBorderRadius,
+} from './id-card-element-style';
 
 type Props = {
   model: IdCardModel;
@@ -46,8 +58,8 @@ type Props = {
   onBackgroundChange?: (
     patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
   ) => void;
-  /** Palette field drop at cursor (mm coords relative to card). */
-  onPaletteDrop?: (fieldKey: string, xMm: number, yMm: number) => void;
+  /** Palette drop at cursor (mm coords relative to card). Accepts field key or JSON payload. */
+  onPaletteDrop?: (payload: string, xMm: number, yMm: number) => void;
 };
 
 const cardStyle = {
@@ -58,6 +70,84 @@ const cardStyle = {
 };
 
 const PALETTE_MIME = 'application/x-id-card-field';
+
+function ShapePreview({ element }: { element: IdCardElement }) {
+  const kind = element.shapeKind ?? 'rectangle';
+  const fill =
+    element.style?.backgroundColor ??
+    (kind === 'line' || kind === 'divider' ? '#0f172a' : '#e2e8f0');
+  const stroke = element.style?.borderColor;
+  const strokeW = element.style?.borderWidthMm ?? 0;
+  const opacity = element.style?.opacity ?? 1;
+  const radius = element.style?.borderRadiusMm ?? 0;
+
+  if (kind === 'line' || kind === 'divider') {
+    return (
+      <div className="flex h-full w-full items-center" style={{ opacity }}>
+        <div
+          className="w-full"
+          style={{
+            height: `${Math.max(0.2, element.height)}mm`,
+            background: fill,
+            borderRadius: `${radius}mm`,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (kind === 'circle') {
+    return (
+      <div
+        className="h-full w-full"
+        style={{
+          borderRadius: '50%',
+          background: fill,
+          opacity,
+          border: strokeW && stroke ? `${strokeW}mm solid ${stroke}` : undefined,
+          boxSizing: 'border-box',
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="h-full w-full"
+      style={{
+        borderRadius: `${radius}mm`,
+        background: fill,
+        opacity,
+        border: strokeW && stroke ? `${strokeW}mm solid ${stroke}` : undefined,
+        boxSizing: 'border-box',
+      }}
+    />
+  );
+}
+
+function StaticTextPreview({ element }: { element: IdCardElement }) {
+  const raw = element.content ?? element.label ?? 'Text';
+  const text = applyBindingToPlainText(raw, element.binding);
+  return (
+    <div
+      className="h-full w-full overflow-hidden break-words"
+      style={elementChromeStyle(element.style)}
+    >
+      {element.binding?.showLabel && element.label ? (
+        <div className="mb-0.5 text-[0.7em] opacity-70">{element.label}</div>
+      ) : null}
+      <div
+        style={{
+          textTransform: cssTextTransform(
+            element.binding?.textTransform,
+          ) as CSSProperties['textTransform'],
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
 
 export function Cr80CardRenderer({
   model,
@@ -96,7 +186,7 @@ export function Cr80CardRenderer({
 
   const siblingBoxes = useMemo(() => {
     return elements
-      .filter((el) => el.type === 'field' && el.style?.visible !== false)
+      .filter((el) => el.style?.visible !== false)
       .map((el): GuideBox & { id: string } => ({
         id: el.id,
         x: el.x,
@@ -106,9 +196,14 @@ export function Cr80CardRenderer({
       }));
   }, [elements]);
 
-  const renderElement = (element: IdCardElement) => {
-    if (element.type !== 'field' || !element.fieldKey || element.style?.visible === false)
-      return null;
+  const renderElementContent = (element: IdCardElement): ReactNode => {
+    if (element.type === 'shape') {
+      return <ShapePreview element={element} />;
+    }
+    if (element.type === 'text') {
+      return <StaticTextPreview element={element} />;
+    }
+    if (!element.fieldKey) return null;
     const content = renderIdCardField(element.fieldKey as IdCardFieldKey, model, accent, primary, {
       stylePreset,
       photoShape: element.style?.photoShape,
@@ -117,11 +212,52 @@ export function Cr80CardRenderer({
       fontSize: element.style?.fontSize,
     });
     if (!content) return null;
+    const showLabel = element.binding?.showLabel;
+    const label = getFieldDisplayName(element.fieldKey, element.label);
+    const prefix = element.binding?.prefix;
+    const suffix = element.binding?.suffix;
+    return (
+      <>
+        {showLabel ? <div className="mb-0.5 text-[0.7em] opacity-70">{label}</div> : null}
+        {prefix || suffix ? (
+          <div className="flex h-[calc(100%-0.5em)] min-h-0 w-full items-center justify-center gap-0.5 overflow-hidden">
+            {prefix ? <span className="shrink-0 text-[0.85em] opacity-80">{prefix}</span> : null}
+            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{content}</div>
+            {suffix ? <span className="shrink-0 text-[0.85em] opacity-80">{suffix}</span> : null}
+          </div>
+        ) : (
+          content
+        )}
+      </>
+    );
+  };
+
+  const renderElement = (element: IdCardElement) => {
+    if (element.style?.visible === false) return null;
+    if (element.type === 'field' && !element.fieldKey) return null;
+
+    const content = renderElementContent(element);
+    if (!content) return null;
 
     const selected = selectedElementId === element.id;
-    const locked = lockedElementIds?.has(element.id);
+    const locked = lockedElementIds?.has(element.id) || element.locked === true;
+    const overflow = element.type === 'field' ? idCardFieldOverflow(element.fieldKey) : 'hidden';
 
-    const overflow = idCardFieldOverflow(element.fieldKey);
+    const chrome: CSSProperties =
+      element.type === 'shape'
+        ? { opacity: 1 }
+        : {
+            ...(element.type === 'field'
+              ? elementFieldChromeStyle(element.style)
+              : elementChromeStyle(element.style)),
+            // photo shape border-radius override on container when photo
+            ...(element.fieldKey === 'photo'
+              ? { borderRadius: photoBorderRadius(element.style?.photoShape), overflow: 'hidden' }
+              : {}),
+            textTransform: cssTextTransform(
+              element.binding?.textTransform,
+            ) as CSSProperties['textTransform'],
+          };
 
     const box = (
       <div
@@ -132,18 +268,7 @@ export function Cr80CardRenderer({
           designMode && selected && 'ring-2 ring-primary ring-offset-1',
           designMode && !selected && 'hover:ring-1 hover:ring-primary/30',
         )}
-        style={{
-          textAlign: element.style?.align ?? 'center',
-          fontSize: element.style?.fontSize ? `${element.style.fontSize}px` : undefined,
-          fontWeight: element.style?.fontWeight,
-          color: element.style?.color,
-          backgroundColor: element.style?.backgroundColor,
-          opacity: element.style?.opacity,
-          border:
-            element.style?.borderWidthMm && element.style?.borderColor
-              ? `${element.style.borderWidthMm}mm solid ${element.style.borderColor}`
-              : undefined,
-        }}
+        style={chrome}
         onClick={
           designMode
             ? (e) => {
@@ -237,6 +362,7 @@ export function Cr80CardRenderer({
     if (!designMode || !onPaletteDrop) return;
     if (
       e.dataTransfer.types.includes(PALETTE_MIME) ||
+      e.dataTransfer.types.includes(PALETTE_ELEMENT_MIME) ||
       e.dataTransfer.types.includes('text/plain')
     ) {
       e.preventDefault();
@@ -246,14 +372,17 @@ export function Cr80CardRenderer({
 
   const handlePaletteDrop = (e: React.DragEvent) => {
     if (!designMode || !onPaletteDrop) return;
-    const fieldKey = e.dataTransfer.getData(PALETTE_MIME) || e.dataTransfer.getData('text/plain');
-    if (!fieldKey) return;
+    const raw =
+      e.dataTransfer.getData(PALETTE_ELEMENT_MIME) ||
+      e.dataTransfer.getData(PALETTE_MIME) ||
+      e.dataTransfer.getData('text/plain');
+    if (!raw || !parsePalettePayload(raw)) return;
     e.preventDefault();
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const xMm = screenPxToMm(e.clientX - rect.left, designZoom);
     const yMm = screenPxToMm(e.clientY - rect.top, designZoom);
-    onPaletteDrop(fieldKey, xMm, yMm);
+    onPaletteDrop(raw, xMm, yMm);
   };
 
   return (

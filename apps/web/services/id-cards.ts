@@ -210,12 +210,34 @@ export async function renderIdCardPdf(
   html: string,
   opts?: { testMode?: boolean; pageCount?: number; timeoutMs?: number },
 ): Promise<Blob> {
-  const res = await api.post(
-    '/v1/id-cards/render-pdf',
-    { html, testMode: opts?.testMode, pageCount: opts?.pageCount },
-    { responseType: 'blob', timeout: opts?.timeoutMs ?? 120_000 },
-  );
-  return res.data as Blob;
+  try {
+    const res = await api.post(
+      '/v1/id-cards/render-pdf',
+      { html, testMode: opts?.testMode, pageCount: opts?.pageCount },
+      { responseType: 'blob', timeout: opts?.timeoutMs ?? 120_000 },
+    );
+    return res.data as Blob;
+  } catch (err: unknown) {
+    // Axios with responseType:blob puts error JSON in err.response.data as a Blob.
+    const axiosErr = err as { response?: { data?: Blob }; message?: string };
+    const data = axiosErr.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        try {
+          const json = JSON.parse(text) as { message?: string | string[] };
+          const msg = Array.isArray(json.message) ? json.message.join(', ') : json.message;
+          throw new Error(msg || text.slice(0, 400) || 'PDF render failed');
+        } catch (inner) {
+          if (inner instanceof Error && inner.message !== text.slice(0, 400)) throw inner;
+          throw new Error(text.slice(0, 400) || 'PDF render failed');
+        }
+      } catch (parsed) {
+        if (parsed instanceof Error && parsed.message !== 'PDF render failed') throw parsed;
+      }
+    }
+    throw err instanceof Error ? err : new Error(axiosErr.message || 'PDF render failed');
+  }
 }
 
 export type IdCardBackgroundUploadResult = {
@@ -241,6 +263,15 @@ export async function uploadIdCardBackground(
     form,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   );
+  return data;
+}
+
+export async function uploadIdCardSignature(file: File): Promise<IdCardSettings> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<IdCardSettings>('/v1/id-cards/settings/signature-upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return data;
 }
 

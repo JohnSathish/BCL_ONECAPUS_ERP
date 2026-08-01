@@ -140,7 +140,7 @@ export class IdCardsService {
     await this.ensureLibraryTemplates(tenantId);
   }
 
-  /** Seed v1 gallery templates for new tenants; refresh Pursuit layout when revision bumps. */
+  /** Seed v1 gallery templates for new tenants only (never overwrite existing layouts). */
   private async ensureLibraryTemplates(tenantId: string) {
     for (const seed of LIBRARY_TEMPLATE_SEEDS) {
       const existing = await this.db().idCardTemplate.findFirst({
@@ -148,20 +148,8 @@ export class IdCardsService {
       });
 
       if (existing) {
-        if (seed.code === 'dbc-pursuit-excellence') {
-          const seedRev =
-            (seed.layout as { meta?: { layoutRevision?: number } })?.meta
-              ?.layoutRevision ?? 0;
-          const existingRev =
-            (existing.layout as { meta?: { layoutRevision?: number } } | null)
-              ?.meta?.layoutRevision ?? 0;
-          if (existingRev < seedRev) {
-            await this.db().idCardTemplate.update({
-              where: { id: existing.id },
-              data: { layout: seed.layout },
-            });
-          }
-        }
+        // Never overwrite tenant layouts on revision bump — that wiped designer/production
+        // customizations. New tenants still get seeds via create below.
         continue;
       }
 
@@ -810,9 +798,17 @@ export class IdCardsService {
 
   async updateSettings(tenantId: string, dto: UpdateIdCardSettingsDto) {
     await this.ensureDefaults(tenantId);
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.institutionSignatureUrl !== undefined) {
+      data.institutionSignatureUrl =
+        dto.institutionSignatureUrl &&
+        String(dto.institutionSignatureUrl).trim()
+          ? String(dto.institutionSignatureUrl).trim()
+          : null;
+    }
     return this.db().idCardSettings.update({
       where: { tenantId },
-      data: dto,
+      data,
     });
   }
 

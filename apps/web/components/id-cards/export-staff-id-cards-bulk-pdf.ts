@@ -8,6 +8,7 @@ import {
 } from '@/components/id-cards/build-staff-id-card-model-from-profile';
 import { enhanceStaffCardModel } from '@/components/id-cards/enhance-staff-card-model';
 import { normalizeIdCardLayout } from '@/components/id-cards/layout-legacy-migrate';
+import { assertPdfBlob } from '@/components/id-cards/id-card-pdf-blob';
 import type { IdCardIssue, IdCardSettings } from '@/services/id-cards';
 import { fetchAllStaffIdCardIssues, renderIdCardPdf } from '@/services/id-cards';
 import { fetchAllStaff } from '@/services/staff';
@@ -118,10 +119,12 @@ export async function exportStaffIdCardsBulkPdf(options: {
 
   onProgress?.({ phase: 'rendering', done: 0, total: pageCount });
 
-  const blob = await renderIdCardPdf(html, {
-    pageCount,
-    timeoutMs: Math.min(600_000, 90_000 + pageCount * 2_000),
-  });
+  const blob = await assertPdfBlob(
+    await renderIdCardPdf(html, {
+      pageCount,
+      timeoutMs: Math.min(600_000, 90_000 + pageCount * 2_000),
+    }),
+  );
 
   return { blob, exported: exportRows.length, skipped, capped };
 }

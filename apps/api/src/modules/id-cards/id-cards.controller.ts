@@ -211,6 +211,25 @@ export class IdCardsController {
     });
   }
 
+  @Post('settings/signature-upload')
+  @RequireAnyPermission(...ID_CARD_MANAGE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ID_CARD_BACKGROUND_MAX_BYTES },
+    }),
+  )
+  async uploadInstitutionSignature(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const uploaded = await this.idCardAssets.uploadSignature(user.tid, file);
+    return this.idCards.updateSettings(user.tid, {
+      institutionSignatureUrl: uploaded.imageUrl,
+    });
+  }
+
   @Get('templates')
   @RequireAnyPermission(...ID_CARD_READ)
   templates(@CurrentUser() user: JwtUser) {

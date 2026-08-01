@@ -182,12 +182,32 @@ export function IdCardWorkspace({ page = 'dashboard' }: { page?: IdCardPage }) {
   });
 
   const settingsMut = useMutation({
-    mutationFn: (payload: { qrPrefix?: string; validityYears?: number }) =>
-      updateIdCardSettings(payload),
+    mutationFn: (
+      payload: Partial<{
+        qrPrefix: string;
+        validityYears: number;
+        institutionSignatureUrl: string | null;
+        showBloodGroup: boolean;
+        showRfidOnCard: boolean;
+        watermarkEnabled: boolean;
+      }>,
+    ) => updateIdCardSettings(payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['id-cards', 'settings'] });
       setMessage('Settings saved.');
     },
+  });
+
+  const signatureUploadMut = useMutation({
+    mutationFn: async (file: File) => {
+      const { uploadIdCardSignature } = await import('@/services/id-cards');
+      return uploadIdCardSignature(file);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['id-cards', 'settings'] });
+      setMessage('Principal signature uploaded.');
+    },
+    onError: (e) => setMessage(apiErrorMessage(e, 'Signature upload failed')),
   });
 
   if (page === 'dashboard') {
@@ -597,11 +617,12 @@ export function IdCardWorkspace({ page = 'dashboard' }: { page?: IdCardPage }) {
 
   if (page === 'settings') {
     const s = settingsQ.data;
+    const signaturePreview = resolveInstitutionSignatureUrl(s?.institutionSignatureUrl);
     return (
       <GlassCard className="space-y-4 p-6">
         <Settings className="h-6 w-6 text-primary" />
         <h3 className="font-semibold">ID card settings</h3>
-        <div className="grid max-w-md gap-3">
+        <div className="grid max-w-lg gap-4">
           <div>
             <label className="text-xs font-medium">QR prefix (e.g. DBC)</label>
             <Input
@@ -617,6 +638,80 @@ export function IdCardWorkspace({ page = 'dashboard' }: { page?: IdCardPage }) {
               onBlur={(e) => settingsMut.mutate({ validityYears: Number(e.target.value) })}
             />
           </div>
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <label className="text-xs font-medium">Principal signature</label>
+            <p className="text-[11px] text-muted-foreground">
+              Used by the Principal Signature field on ID card templates. Upload an image or paste a
+              URL.
+            </p>
+            {signaturePreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={signaturePreview}
+                alt="Principal signature"
+                className="h-16 max-w-full object-contain bg-white"
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">No signature set.</p>
+            )}
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) signatureUploadMut.mutate(file);
+                e.target.value = '';
+              }}
+            />
+            <div>
+              <label className="text-[10px] uppercase text-muted-foreground">
+                Or signature URL
+              </label>
+              <Input
+                defaultValue={s?.institutionSignatureUrl ?? ''}
+                placeholder="/uploads/... or https://..."
+                onBlur={(e) =>
+                  settingsMut.mutate({
+                    institutionSignatureUrl: e.target.value.trim() || null,
+                  })
+                }
+              />
+            </div>
+            {s?.institutionSignatureUrl ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => settingsMut.mutate({ institutionSignatureUrl: null })}
+              >
+                Clear signature
+              </Button>
+            ) : null}
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={s?.showBloodGroup ?? true}
+              onChange={(e) => settingsMut.mutate({ showBloodGroup: e.target.checked })}
+            />
+            Show blood group on cards (when present)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={s?.showRfidOnCard ?? true}
+              onChange={(e) => settingsMut.mutate({ showRfidOnCard: e.target.checked })}
+            />
+            Show RFID number on cards
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={s?.watermarkEnabled ?? false}
+              onChange={(e) => settingsMut.mutate({ watermarkEnabled: e.target.checked })}
+            />
+            Enable watermark field styling
+          </label>
           <p className="text-xs text-muted-foreground">
             Card size: CR80 portrait {s?.cardWidthMm ?? '53.98'} × {s?.cardHeightMm ?? '85.6'} mm ·
             Barcode: {s?.barcodeFormat ?? 'CODE128'}

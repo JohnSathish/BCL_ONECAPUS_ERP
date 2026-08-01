@@ -8,6 +8,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class StudentIdCardPrintRequestDto {
@@ -150,9 +151,11 @@ export class UpdateIdCardSettingsDto {
   @IsOptional()
   showRfidOnCard?: boolean;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  institutionSignatureUrl?: string;
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  institutionSignatureUrl?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

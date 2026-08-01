@@ -7,6 +7,7 @@ import { enhanceStudentCardModel } from '@/components/id-cards/enhance-student-c
 import { normalizeIdCardLayout } from '@/components/id-cards/layout-legacy-migrate';
 import type { IdCardIssue, IdCardSettings } from '@/services/id-cards';
 import { fetchAllStudentIdCardIssues, renderIdCardPdf } from '@/services/id-cards';
+import { assertPdfBlob } from '@/components/id-cards/id-card-pdf-blob';
 import { fetchAllStudents, fetchStudentProfile } from '@/services/students';
 import type { InstitutionBranding } from '@/types/branding';
 import type { IdCardLayoutV1 } from '@/types/id-card-template';
@@ -142,10 +143,12 @@ export async function exportStudentIdCardsBulkPdf(options: {
 
   onProgress?.({ phase: 'rendering', done: 0, total: pageCount });
 
-  const blob = await renderIdCardPdf(html, {
-    pageCount,
-    timeoutMs: Math.min(600_000, 90_000 + pageCount * 2_000),
-  });
+  const blob = await assertPdfBlob(
+    await renderIdCardPdf(html, {
+      pageCount,
+      timeoutMs: Math.min(600_000, 90_000 + pageCount * 2_000),
+    }),
+  );
 
   return { blob, exported: exportRows.length, skipped, capped };
 }

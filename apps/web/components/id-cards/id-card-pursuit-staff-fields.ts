@@ -137,7 +137,8 @@ export function renderPursuitStaffFieldHtml(
         : '';
     case 'photo': {
       const peStyle = staffPhotoBorderStyle();
-      const radius = photoShape === 'circle' ? '50%' : peStyle.borderRadius;
+      const radius =
+        photoShape === 'circle' ? '50%' : photoShape === 'rounded' ? '2.5mm' : peStyle.borderRadius;
       const border = `border:${peStyle.borderWidth} ${peStyle.borderStyle} ${peStyle.borderColor};border-radius:${radius};`;
       if (holder.photoUrl) {
         return `<img src="${escHtml(holder.photoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;${border}display:block;" />`;

@@ -1,3 +1,17 @@
+/**
+ * ID Card Layout v1
+ * ----------------
+ * Stored as IdCardTemplate.layout (JSON). Coordinates are mm on a CR80 face.
+ *
+ * Element types:
+ * - field  — dynamic data via fieldKey (DB/registry mapping). `label` is display-only.
+ * - text   — static copy in `content`
+ * - shape  — rectangle | circle | line | divider via shapeKind
+ *
+ * Optional `binding` (prefix/suffix/transform/showLabel) applies to field/text display
+ * without changing fieldKey. Unknown keys must be ignored for forward compatibility.
+ */
+
 export type IdCardBackgroundFit = 'stretch' | 'contain' | 'cover' | 'original';
 
 export type IdCardBackgroundLayer = {
@@ -13,17 +27,44 @@ export type IdCardBackgroundLayer = {
   naturalHeight?: number | null;
 };
 
+export type IdCardTextTransform = 'none' | 'uppercase' | 'lowercase' | 'titlecase';
+export type IdCardShapeKind = 'rectangle' | 'circle' | 'line' | 'divider';
+export type IdCardPhotoShape = 'square' | 'circle' | 'rounded';
+export type IdCardShadow = 'none' | 'sm' | 'md';
+export type IdCardObjectFit = 'contain' | 'cover' | 'stretch';
+
+export type IdCardElementBinding = {
+  prefix?: string;
+  suffix?: string;
+  textTransform?: IdCardTextTransform;
+  /** When true, show display label above the value */
+  showLabel?: boolean;
+  characterLimit?: number;
+};
+
 export type IdCardElementStyle = {
+  /** Font size in pt (designer + print). On dynamic fields, scales Pursuit type; not applied as wrapper CSS. */
   fontSize?: number;
   fontWeight?: 'normal' | 'medium' | 'semibold' | 'bold' | 'extrabold';
   align?: 'left' | 'center' | 'right';
   visible?: boolean;
-  photoShape?: 'square' | 'circle';
+  photoShape?: IdCardPhotoShape;
   color?: string;
   backgroundColor?: string;
   opacity?: number;
   borderColor?: string;
   borderWidthMm?: number;
+  fontFamily?: string;
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline';
+  /** Letter spacing in px */
+  letterSpacing?: number;
+  lineHeight?: number;
+  paddingMm?: number;
+  borderRadiusMm?: number;
+  shadow?: IdCardShadow;
+  rotationDeg?: number;
+  objectFit?: IdCardObjectFit;
 };
 
 export type IdCardLayoutMeta = {
@@ -43,6 +84,8 @@ export type IdCardLayoutMeta = {
     | 'pursuit-staff';
   /** Bump when library seed should refresh tenant copies of this layout. */
   layoutRevision?: number;
+  /** Set on designer save — blocks silent library element replace / API seed overwrite. */
+  customized?: boolean;
   /** blank = built-in designer; background-upload = Photoshop/Canva workflow */
   creationMethod?: 'blank' | 'background-upload';
   /** Reserved for future PSD import pipeline */
@@ -51,13 +94,23 @@ export type IdCardLayoutMeta = {
     sourceFileName?: string;
     importedAt?: string;
   };
+  /** Reserved for Phase C multi-size canvas (CR80 / A4 / custom). */
+  canvasPreset?: 'cr80' | 'a4-portrait' | 'a4-landscape' | 'custom';
 };
 
 export type IdCardElement = {
   id: string;
   type: 'field' | 'shape' | 'text';
+  /** Registry / DB field key — never rename when changing display label */
   fieldKey?: string;
+  /** Editable display label (e.g. "Class & Section"); does not change fieldKey */
   label?: string;
+  /** Static text body when type === 'text' */
+  content?: string;
+  shapeKind?: IdCardShapeKind;
+  binding?: IdCardElementBinding;
+  /** Persist lock on the element (designer also tracks session locks) */
+  locked?: boolean;
   x: number;
   y: number;
   width: number;

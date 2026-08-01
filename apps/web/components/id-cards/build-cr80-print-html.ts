@@ -1,11 +1,23 @@
-import type { IdCardFieldKey, IdCardLayoutV1 } from '@/types/id-card-template';
+import type {
+  IdCardElement,
+  IdCardFieldKey,
+  IdCardLayoutV1,
+  IdCardPhotoShape,
+} from '@/types/id-card-template';
 import type { IdCardModel } from '@/types/id-card';
 import { CR80_HEIGHT_MM, CR80_WIDTH_MM } from './cr80-constants';
 import { normalizeIdCardLayout } from './layout-legacy-migrate';
 import type { EvolisFeedOptions, PrintCalibration } from './cr80-designer-constants';
-import { renderFieldHtml } from './id-card-field-content';
+import { renderFieldHtml, escHtml } from './id-card-field-content';
 import { idCardFieldOverflow } from './id-card-field-overflow';
 import { backgroundPrintHtml, backgroundForSide } from './id-card-background-utils';
+import {
+  elementChromeStyleHtml,
+  elementFieldChromeStyleHtml,
+  fieldLabelCaptionHtml,
+  renderShapeHtml,
+  renderStaticTextHtml,
+} from './id-card-element-style';
 
 export type Cr80PrintPurpose = 'preview' | 'evolis';
 
@@ -25,7 +37,7 @@ function fieldHtml(
   primary: string,
   accent: string,
   layout: IdCardLayoutV1,
-  photoShape?: 'square' | 'circle',
+  photoShape?: IdCardPhotoShape,
   signatureUrl?: string | null,
   side?: 'front' | 'back',
   fontSize?: number | null,
@@ -40,6 +52,43 @@ function fieldHtml(
     side,
     fontSize,
   });
+}
+
+function elementPrintInner(
+  el: IdCardElement,
+  model: IdCardModel,
+  primary: string,
+  accent: string,
+  layout: IdCardLayoutV1,
+  signatureUrl?: string | null,
+  side?: 'front' | 'back',
+): string {
+  if (el.type === 'shape') return renderShapeHtml(el);
+  if (el.type === 'text') return renderStaticTextHtml(el);
+  if (!el.fieldKey) return '';
+  const html = fieldHtml(
+    el.fieldKey as IdCardFieldKey,
+    model,
+    primary,
+    accent,
+    layout,
+    el.style?.photoShape,
+    signatureUrl,
+    side,
+    el.style?.fontSize,
+  );
+  if (!html) return '';
+  const prefix = el.binding?.prefix
+    ? `<span style="font-size:0.85em;opacity:0.8;">${escHtml(el.binding.prefix)}</span>`
+    : '';
+  const suffix = el.binding?.suffix
+    ? `<span style="font-size:0.85em;opacity:0.8;">${escHtml(el.binding.suffix)}</span>`
+    : '';
+  const caption = fieldLabelCaptionHtml(el);
+  if (prefix || suffix) {
+    return `${caption}<div style="display:flex;align-items:center;justify-content:center;gap:0.5mm;width:100%;height:100%;overflow:hidden;">${prefix}<div style="flex:1;min-width:0;overflow:hidden;">${html}</div>${suffix}</div>`;
+  }
+  return `${caption}${html}`;
 }
 
 function sideHtml(
@@ -62,22 +111,16 @@ function sideHtml(
   const backgroundLayer = background ? backgroundPrintHtml(background) : '';
 
   const fields = [...elements]
-    .filter((el) => el.style?.visible !== false && el.fieldKey)
+    .filter((el) => el.style?.visible !== false)
     .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
     .map((el) => {
-      const html = fieldHtml(
-        el.fieldKey as IdCardFieldKey,
-        model,
-        primary,
-        accent,
-        resolved,
-        el.style?.photoShape,
-        signatureUrl,
-        side,
-        el.style?.fontSize,
-      );
+      const html = elementPrintInner(el, model, primary, accent, resolved, signatureUrl, side);
       if (!html) return '';
-      const overflow = idCardFieldOverflow(el.fieldKey);
+      const overflow = el.type === 'field' ? idCardFieldOverflow(el.fieldKey) : 'hidden';
+      const chrome =
+        el.type === 'field'
+          ? elementFieldChromeStyleHtml(el.style)
+          : elementChromeStyleHtml(el.style);
       const styleBits = [
         `position:absolute`,
         `left:${el.x}mm`,
@@ -86,12 +129,8 @@ function sideHtml(
         `height:${el.height}mm`,
         `overflow:${overflow}`,
         `z-index:${el.zIndex ?? 1}`,
-        `text-align:${el.style?.align ?? 'center'}`,
-      ];
-      if (el.style?.fontWeight) styleBits.push(`font-weight:${el.style.fontWeight}`);
-      if (el.style?.color) styleBits.push(`color:${el.style.color}`);
-      if (el.style?.backgroundColor) styleBits.push(`background-color:${el.style.backgroundColor}`);
-      if (el.style?.opacity != null) styleBits.push(`opacity:${el.style.opacity}`);
+        chrome,
+      ].filter(Boolean);
       return `<div style="${styleBits.join(';')};">${html}</div>`;
     })
     .join('');

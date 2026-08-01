@@ -15,11 +15,8 @@ import {
   ArrowDown,
   ArrowUp,
   Copy,
-  Eye,
   EyeOff,
   Grid3X3,
-  GripVertical,
-  Image,
   Lock,
   Magnet,
   Maximize2,
@@ -27,7 +24,6 @@ import {
   Redo2,
   RotateCcw,
   Save,
-  Search,
   Undo2,
   Unlock,
 } from 'lucide-react';
@@ -35,11 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Cr80CardBack,
-  Cr80CardFront,
-  PALETTE_MIME,
-} from '@/components/id-cards/cr80-card-renderer';
+import { Cr80CardBack, Cr80CardFront } from '@/components/id-cards/cr80-card-renderer';
 import {
   cardCanvasSizePx,
   CR80_GRID_MM,
@@ -68,7 +60,6 @@ import {
   type CardAlignment,
   type PreviewDataId,
 } from '@/components/id-cards/designer-utils';
-import { paletteKeysForHolderType } from '@/components/id-cards/id-card-field-registry';
 import { normalizeIdCardLayout } from '@/components/id-cards/layout-legacy-migrate';
 import { openCr80PrintPreview } from '@/components/id-cards/print-cr80-id-card';
 import { previewModelForDesigner } from '@/components/id-cards/sample-id-card-models';
@@ -82,15 +73,24 @@ import {
   updateIdCardTemplate,
 } from '@/services/id-cards';
 import { resolveInstitutionSignatureUrl } from '@/components/id-cards/resolve-institution-signature-url';
-import { IdCardBackgroundUploader } from '@/components/id-cards/id-card-background-uploader';
 import {
-  BACKGROUND_FIT_OPTIONS,
   BACKGROUND_SELECTION_BACK,
   BACKGROUND_SELECTION_FRONT,
   backgroundForSide,
   defaultBackgroundLayer,
   isBackgroundSelection,
 } from '@/components/id-cards/id-card-background-utils';
+import {
+  FIELD_DEFAULT_LABELS,
+  parsePalettePayload,
+} from '@/components/id-cards/id-card-element-catalog';
+import {
+  createElementFromCatalogItem,
+  createElementFromPayload,
+} from '@/components/id-cards/create-id-card-element';
+import { DesignerElementsPanel } from '@/components/id-cards-module/designer-elements-panel';
+import { DesignerLayersPanel } from '@/components/id-cards-module/designer-layers-panel';
+import { DesignerPropertiesPanel } from '@/components/id-cards-module/designer-properties-panel';
 import type {
   IdCardBackgroundLayer,
   IdCardElement,
@@ -100,76 +100,8 @@ import type {
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-function newElement(
-  fieldKey: string,
-  side: 'front' | 'back',
-  layout: IdCardLayoutV1,
-  at?: { x: number; y: number },
-): IdCardElement {
-  const existing = side === 'front' ? layout.front : layout.back;
-  const width = fieldKey === 'holderAddress' ? 48 : fieldKey === 'photo' ? 30 : 46;
-  const height =
-    fieldKey === 'holderAddress' ? 9 : fieldKey === 'photo' ? 28 : fieldKey === 'qr' ? 14 : 8;
-  const fallbackY =
-    existing.length > 0 ? Math.min(75, Math.max(...existing.map((e) => e.y + e.height)) + 2) : 10;
-  const x = at ? Math.max(0, Math.min(CR80_WIDTH_MM - width, at.x - width / 2)) : 4;
-  const y = at ? Math.max(0, Math.min(CR80_HEIGHT_MM - height, at.y - height / 2)) : fallbackY;
-  return {
-    id: `${fieldKey}-${Date.now()}`,
-    type: 'field',
-    fieldKey,
-    x,
-    y,
-    width,
-    height,
-    zIndex: existing.length + 1,
-    style: { visible: true, align: 'center' },
-  };
-}
-
-export const FIELD_LABELS: Record<string, string> = {
-  headerBand: 'Header',
-  watermark: 'Watermark',
-  logo: 'Logo',
-  collegeName: 'College Name',
-  collegeAddress: 'College Address',
-  affiliationLine: 'Affiliation',
-  accreditationLine: 'Accreditation',
-  photo: 'Photo',
-  name: 'Name',
-  roleLabel: 'Role',
-  subtitle: 'Department Subtitle',
-  registrationNumber: 'Reg No',
-  rollNumber: 'Roll No',
-  department: 'Department',
-  programme: 'Programme',
-  semester: 'Semester',
-  gender: 'Gender',
-  fatherName: 'Father Name',
-  motherName: 'Mother Name',
-  holderAddress: 'Student address',
-  bloodGroup: 'Blood Group',
-  qr: 'QR Code',
-  barcode: 'Barcode',
-  validity: 'Validity',
-  validityBlock: 'Validity Block',
-  emergencyContact: 'Emergency Contact',
-  rfidNumber: 'RFID Number',
-  securityHologram: 'Security Hologram',
-  memberId: 'Member ID',
-  validityFooter: 'Footer',
-  verificationInfo: 'Verification',
-  address: 'College address',
-  terms: 'Terms',
-  principalSignature: 'Principal Signature',
-  footerBand: 'Footer Band',
-  contact: 'Contact Block',
-  email: 'Email',
-  phone: 'Phone',
-  joiningDate: 'Joining Date',
-  employeeId: 'Employee ID',
-  designation: 'Designation',
-};
+/** @deprecated Prefer FIELD_DEFAULT_LABELS / getFieldDisplayName from element catalog */
+export const FIELD_LABELS = FIELD_DEFAULT_LABELS;
 
 export function IdCardDesignerStudio() {
   const qc = useQueryClient();
@@ -234,8 +166,14 @@ export function IdCardDesignerStudio() {
 
   useEffect(() => {
     if (selectedTemplate) {
-      replaceLayout(normalizeIdCardLayout(selectedTemplate.layout, selectedTemplate.holderType));
+      const next = normalizeIdCardLayout(selectedTemplate.layout, selectedTemplate.holderType);
+      replaceLayout(next);
       setTemplateName(selectedTemplate.name);
+      const locked = new Set<string>();
+      for (const el of [...next.front, ...next.back]) {
+        if (el.locked) locked.add(el.id);
+      }
+      setLockedIds(locked);
     }
   }, [selectedTemplate, replaceLayout]);
 
@@ -248,6 +186,13 @@ export function IdCardDesignerStudio() {
   const side = viewMode === 'back' ? 'back' : 'front';
   const allElements = [...layout.front, ...layout.back];
   const selectedElement = allElements.find((e) => e.id === selectedElementId) ?? null;
+  const effectiveLockedIds = useMemo(() => {
+    const next = new Set(lockedIds);
+    for (const el of allElements) {
+      if (el.locked) next.add(el.id);
+    }
+    return next;
+  }, [lockedIds, allElements]);
   const selectedSide: 'front' | 'back' =
     selectedElement && layout.back.some((e) => e.id === selectedElement.id) ? 'back' : 'front';
   const backgroundSideSelected: 'front' | 'back' | null = isBackgroundSelection(selectedElementId)
@@ -296,9 +241,16 @@ export function IdCardDesignerStudio() {
     mutationFn: () =>
       updateIdCardTemplate(selectedTemplateId, {
         name: templateName.trim() || selectedTemplate?.name,
-        layout,
+        layout: {
+          ...layout,
+          meta: { ...layout.meta, customized: true },
+        },
       }),
     onSuccess: () => {
+      setLayout((prev) => ({
+        ...prev,
+        meta: { ...prev.meta, customized: true },
+      }));
       void qc.invalidateQueries({ queryKey: ['id-cards', 'templates'] });
       setMessage('Template saved.');
     },
@@ -331,6 +283,14 @@ export function IdCardDesignerStudio() {
         cardSide,
         els.map((e) => (e.id === selectedElementId ? { ...e, ...patch } : e)),
       );
+      if (typeof patch.locked === 'boolean') {
+        setLockedIds((prev) => {
+          const next = new Set(prev);
+          if (patch.locked) next.add(selectedElementId);
+          else next.delete(selectedElementId);
+          return next;
+        });
+      }
     },
     [selectedElementId, layout.front, layout.back, updateElementsForSide],
   );
@@ -389,9 +349,12 @@ export function IdCardDesignerStudio() {
     [selectedBackground, backgroundSideSelected, selectedElement, updateSelected, updateBackground],
   );
 
-  const addField = (fieldKey: string, at?: { x: number; y: number }) => {
+  const addCatalogItem = (
+    item: Parameters<typeof createElementFromCatalogItem>[0],
+    at?: { x: number; y: number },
+  ) => {
     const cardSide = viewMode === 'both' ? selectedSide : side;
-    const el = newElement(fieldKey, cardSide, layout, at);
+    const el = createElementFromCatalogItem(item, cardSide, layout, at);
     if (at) {
       el.x = snapMm(el.x, CR80_GRID_MM, snapToGrid);
       el.y = snapMm(el.y, CR80_GRID_MM, snapToGrid);
@@ -400,9 +363,11 @@ export function IdCardDesignerStudio() {
     setSelectedElementId(el.id);
   };
 
-  const addFieldAtCursor = useCallback(
-    (fieldKey: string, xMm: number, yMm: number, dropSide: 'front' | 'back') => {
-      const el = newElement(fieldKey, dropSide, layout, { x: xMm, y: yMm });
+  const addPayloadAtCursor = useCallback(
+    (raw: string, xMm: number, yMm: number, dropSide: 'front' | 'back') => {
+      const payload = parsePalettePayload(raw);
+      if (!payload) return;
+      const el = createElementFromPayload(payload, dropSide, layout, { x: xMm, y: yMm });
       el.x = snapMm(el.x, CR80_GRID_MM, snapToGrid);
       el.y = snapMm(el.y, CR80_GRID_MM, snapToGrid);
       updateElementsForSide(dropSide, [...(dropSide === 'front' ? layout.front : layout.back), el]);
@@ -452,21 +417,27 @@ export function IdCardDesignerStudio() {
       if (!selectedElement) return;
       const cardSide = layout.front.some((e) => e.id === selectedElement.id) ? 'front' : 'back';
       const els = cardSide === 'front' ? layout.front : layout.back;
-      const copy = {
-        ...selectedElement,
-        id: `${selectedElement.fieldKey}-${Date.now()}`,
+      const copy: IdCardElement = {
+        ...structuredClone(selectedElement),
+        id:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? `${selectedElement.type}-${crypto.randomUUID()}`
+            : `${selectedElement.type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         x: selectedElement.x + 2,
         y: selectedElement.y + 2,
+        zIndex: els.length + 1,
       };
       updateElementsForSide(cardSide, [...els, copy]);
       setSelectedElementId(copy.id);
     },
     toggleLock: () => {
-      if (!selectedElementId) return;
+      if (!selectedElement) return;
+      const nextLocked = !(selectedElement.locked || lockedIds.has(selectedElement.id));
+      updateSelected({ locked: nextLocked });
       setLockedIds((prev) => {
         const next = new Set(prev);
-        if (next.has(selectedElementId)) next.delete(selectedElementId);
-        else next.add(selectedElementId);
+        if (nextLocked) next.add(selectedElement.id);
+        else next.delete(selectedElement.id);
         return next;
       });
     },
@@ -497,16 +468,18 @@ export function IdCardDesignerStudio() {
     setZoom(Math.min(2, Math.max(0.25, Math.min(zw, zh))));
   };
 
-  const palette = selectedTemplate ? paletteKeysForHolderType(selectedTemplate.holderType) : [];
-  const filteredPalette = palette.filter((key) => {
-    const label = FIELD_LABELS[key] ?? key;
-    const q = componentSearch.trim().toLowerCase();
-    return !q || label.toLowerCase().includes(q) || key.toLowerCase().includes(q);
-  });
-  const sortedLayers = [...(viewMode === 'both' ? allElements : elements)].sort(
-    (a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0),
-  );
   const layersSide = viewMode === 'both' ? selectedSide : side;
+  // Always list one face only — front/back templates often reuse the same element ids (e.g. "logo").
+  const layerSource = layersSide === 'front' ? layout.front : layout.back;
+  const sortedLayers = [...layerSource].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+
+  /** Phase B hook: selectedIds prepared; Phase A uses single selection. */
+  const selectedIds = useMemo(
+    () =>
+      selectedElementId && !isBackgroundSelection(selectedElementId) ? [selectedElementId] : [],
+    [selectedElementId],
+  );
+  void selectedIds;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -592,15 +565,15 @@ export function IdCardDesignerStudio() {
     showGrid,
     showSafeMargin,
     showPrintArea,
-    lockedElementIds: lockedIds,
+    lockedElementIds: effectiveLockedIds,
     signatureUrl,
     backgroundSelected: selectedElementId === BACKGROUND_SELECTION_FRONT,
     onSelectBackground: () => setSelectedElementId(BACKGROUND_SELECTION_FRONT),
     onBackgroundChange: (
       patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
     ) => updateBackground('front', patch),
-    onPaletteDrop: (fieldKey: string, xMm: number, yMm: number) =>
-      addFieldAtCursor(fieldKey, xMm, yMm, 'front'),
+    onPaletteDrop: (payload: string, xMm: number, yMm: number) =>
+      addPayloadAtCursor(payload, xMm, yMm, 'front'),
   };
 
   const backCanvasProps = {
@@ -612,8 +585,8 @@ export function IdCardDesignerStudio() {
     onBackgroundChange: (
       patch: Partial<Pick<IdCardBackgroundLayer, 'x' | 'y' | 'width' | 'height'>>,
     ) => updateBackground('back', patch),
-    onPaletteDrop: (fieldKey: string, xMm: number, yMm: number) =>
-      addFieldAtCursor(fieldKey, xMm, yMm, 'back'),
+    onPaletteDrop: (payload: string, xMm: number, yMm: number) =>
+      addPayloadAtCursor(payload, xMm, yMm, 'back'),
   };
 
   return (
@@ -710,8 +683,8 @@ export function IdCardDesignerStudio() {
           <Button
             type="button"
             size="sm"
-            onClick={() =>
-              openCr80PrintPreview({
+            onClick={() => {
+              void openCr80PrintPreview({
                 model: previewModel,
                 layout,
                 holderType: selectedTemplate?.holderType,
@@ -719,8 +692,8 @@ export function IdCardDesignerStudio() {
                 purpose: 'preview',
                 testMode: testPrintMode,
                 signatureUrl,
-              })
-            }
+              }).catch((e) => setMessage(apiErrorMessage(e, 'Print preview failed')));
+            }}
           >
             <Printer className="mr-1 h-3.5 w-3.5" /> Print Preview
           </Button>
@@ -728,8 +701,8 @@ export function IdCardDesignerStudio() {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() =>
-              openCr80PrintPreview({
+            onClick={() => {
+              void openCr80PrintPreview({
                 model: previewModel,
                 layout,
                 holderType: selectedTemplate?.holderType,
@@ -738,8 +711,8 @@ export function IdCardDesignerStudio() {
                 purpose: 'evolis',
                 testMode: testPrintMode,
                 signatureUrl,
-              })
-            }
+              }).catch((e) => setMessage(apiErrorMessage(e, 'Evolis export failed')));
+            }}
           >
             Evolis Export
           </Button>
@@ -873,64 +846,22 @@ export function IdCardDesignerStudio() {
                 )}
                 onClick={() => setLeftTab(tab)}
               >
-                {tab}
+                {tab === 'components' ? 'Elements' : tab}
               </button>
             ))}
           </div>
           <div className="flex-1 overflow-auto p-2 text-xs">
             {leftTab === 'components' && (
-              <div className="space-y-2">
-                <div className="rounded-md border border-primary/30 bg-primary/5 p-2">
-                  <p className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-primary">
-                    <Image className="h-3.5 w-3.5" /> + Background Image
-                  </p>
-                  <IdCardBackgroundUploader
-                    side={activeCardSide}
-                    templateId={selectedTemplateId || undefined}
-                    existingUrl={backgroundForSide(layout, activeCardSide)?.imageUrl}
-                    onUploaded={(result) => applyBackgroundUpload(activeCardSide, result)}
-                    compact
-                  />
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {activeCardSide === 'front' ? 'Front' : 'Back'} side · layer 0 (bottom)
-                  </p>
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
-                  <Input
-                    placeholder="Search components…"
-                    value={componentSearch}
-                    onChange={(e) => setComponentSearch(e.target.value)}
-                    className="h-8 pl-7 text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  {filteredPalette.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      draggable
-                      className="flex w-full cursor-grab items-center rounded-md border border-border px-2 py-1.5 text-left active:cursor-grabbing hover:bg-muted"
-                      onClick={() => addField(key)}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(PALETTE_MIME, key);
-                        e.dataTransfer.setData('text/plain', key);
-                        e.dataTransfer.effectAllowed = 'copy';
-                      }}
-                    >
-                      + {FIELD_LABELS[key] ?? key}
-                    </button>
-                  ))}
-                  {filteredPalette.length === 0 ? (
-                    <p className="py-4 text-center text-muted-foreground">
-                      No matching components.
-                    </p>
-                  ) : null}
-                  <p className="pt-1 text-[10px] text-muted-foreground">
-                    Drag onto the card or click to add.
-                  </p>
-                </div>
-              </div>
+              <DesignerElementsPanel
+                holderType={selectedTemplate?.holderType}
+                search={componentSearch}
+                onSearchChange={setComponentSearch}
+                layout={layout}
+                activeCardSide={activeCardSide}
+                templateId={selectedTemplateId || undefined}
+                onBackgroundUploaded={(result) => applyBackgroundUpload(activeCardSide, result)}
+                onAddItem={(item) => addCatalogItem(item)}
+              />
             )}
             {leftTab === 'templates' && (
               <div className="space-y-2">
@@ -968,81 +899,17 @@ export function IdCardDesignerStudio() {
               </div>
             )}
             {leftTab === 'layers' && (
-              <ul className="space-y-1">
-                {sortedLayers.map((el, index) => {
-                  const hidden = el.style?.visible === false;
-                  const locked = lockedIds.has(el.id);
-                  return (
-                    <li
-                      key={el.id}
-                      draggable
-                      onDragStart={() => setLayerDragIndex(index)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (layerDragIndex != null && layerDragIndex !== index) {
-                          reorderLayers(layersSide, layerDragIndex, index);
-                        }
-                        setLayerDragIndex(null);
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={cn(
-                          'flex w-full items-center gap-1 rounded px-1 py-1',
-                          selectedElementId === el.id
-                            ? 'bg-primary/10 text-primary'
-                            : 'hover:bg-muted',
-                          hidden && 'opacity-50',
-                        )}
-                        onClick={() => setSelectedElementId(el.id)}
-                      >
-                        <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate text-left">
-                          {FIELD_LABELS[el.fieldKey ?? ''] ?? el.fieldKey}
-                        </span>
-                        {locked ? <Lock className="h-2.5 w-2.5 shrink-0" /> : null}
-                        {hidden ? (
-                          <EyeOff className="h-2.5 w-2.5 shrink-0" />
-                        ) : (
-                          <Eye className="h-2.5 w-2.5 shrink-0 opacity-30" />
-                        )}
-                        <span className="text-[10px] text-muted-foreground">z{el.zIndex ?? 0}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-                {backgroundForSide(layout, layersSide) ? (
-                  <li className="mt-2 border-t border-border pt-2">
-                    <button
-                      type="button"
-                      className={cn(
-                        'flex w-full items-center gap-1 rounded px-1 py-1',
-                        isBackgroundSelection(selectedElementId) &&
-                          ((layersSide === 'front' &&
-                            selectedElementId === BACKGROUND_SELECTION_FRONT) ||
-                            (layersSide === 'back' &&
-                              selectedElementId === BACKGROUND_SELECTION_BACK))
-                          ? 'bg-violet-500/10 text-violet-700'
-                          : 'hover:bg-muted',
-                      )}
-                      onClick={() =>
-                        setSelectedElementId(
-                          layersSide === 'front'
-                            ? BACKGROUND_SELECTION_FRONT
-                            : BACKGROUND_SELECTION_BACK,
-                        )
-                      }
-                    >
-                      <Image className="h-3 w-3 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate text-left">Background Image</span>
-                      {backgroundForSide(layout, layersSide)?.locked ? (
-                        <Lock className="h-2.5 w-2.5 shrink-0" />
-                      ) : null}
-                      <span className="text-[10px] text-muted-foreground">z0</span>
-                    </button>
-                  </li>
-                ) : null}
-              </ul>
+              <DesignerLayersPanel
+                layers={sortedLayers}
+                layersSide={layersSide}
+                layout={layout}
+                selectedElementId={selectedElementId}
+                lockedIds={effectiveLockedIds}
+                layerDragIndex={layerDragIndex}
+                onLayerDragIndex={setLayerDragIndex}
+                onSelect={setSelectedElementId}
+                onReorder={(from, to) => reorderLayers(layersSide, from, to)}
+              />
             )}
           </div>
         </aside>
@@ -1078,332 +945,86 @@ export function IdCardDesignerStudio() {
         {/* Right properties */}
         <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-muted/10 p-3 text-xs">
           <p className="font-semibold">Properties</p>
-          {selectedBackground && backgroundSideSelected ? (
-            <div className="mt-2 space-y-2">
-              <p className="text-muted-foreground">
-                Background Image ({backgroundSideSelected === 'front' ? 'Front' : 'Back'})
-              </p>
-              <IdCardBackgroundUploader
-                side={backgroundSideSelected}
-                templateId={selectedTemplateId || undefined}
-                existingUrl={selectedBackground.imageUrl}
-                onUploaded={(result) => applyBackgroundUpload(backgroundSideSelected, result)}
-                compact
-              />
-              <div className="grid grid-cols-2 gap-2">
-                {(['x', 'y', 'width', 'height'] as const).map((prop) => (
-                  <div key={prop}>
-                    <Label className="text-[10px] uppercase">{prop} (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      className="h-8"
-                      value={selectedBackground[prop]}
-                      disabled={selectedBackground.locked}
-                      onChange={(e) =>
-                        updateBackground(backgroundSideSelected, {
-                          [prop]: Number(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase">Fit</Label>
-                <select
-                  className="h-8 w-full rounded-md border border-border bg-background px-2"
-                  value={selectedBackground.fit ?? 'cover'}
-                  onChange={(e) =>
-                    updateBackground(backgroundSideSelected, {
-                      fit: e.target.value as IdCardBackgroundLayer['fit'],
-                    })
-                  }
-                >
-                  {BACKGROUND_FIT_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase">Opacity</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  className="h-8"
-                  value={selectedBackground.opacity ?? 1}
-                  onChange={(e) =>
-                    updateBackground(backgroundSideSelected, { opacity: Number(e.target.value) })
-                  }
-                />
-              </div>
-              {selectedBackground.naturalWidth && selectedBackground.naturalHeight ? (
-                <p className="text-[10px] text-muted-foreground">
-                  Original: {selectedBackground.naturalWidth}×{selectedBackground.naturalHeight}px ·
-                  stored lossless
-                </p>
-              ) : null}
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={selectedBackground.locked ?? false}
-                  onChange={(e) =>
-                    updateBackground(backgroundSideSelected, { locked: e.target.checked })
-                  }
-                />
-                Lock background (prevent move/resize)
-              </label>
+          <DesignerPropertiesPanel
+            selectedElement={selectedElement}
+            selectedBackground={selectedBackground}
+            backgroundSideSelected={backgroundSideSelected}
+            templateId={selectedTemplateId || undefined}
+            onUpdateElement={updateSelected}
+            onUpdateBackground={updateBackground}
+            onBackgroundUploaded={(side, result) => applyBackgroundUpload(side, result)}
+            onRemoveBackground={removeBackground}
+          />
+          {(selectedElement || selectedBackground) && (
+            <div className="mt-3 flex flex-wrap gap-1 border-t border-border pt-3">
               <Button
                 type="button"
                 size="sm"
-                variant="destructive"
-                className="w-full"
-                onClick={() => removeBackground(backgroundSideSelected)}
+                variant="outline"
+                className="h-7 px-2"
+                onClick={layerActions.bringForward}
+                disabled={!selectedElement}
               >
-                Remove Background
+                <ArrowUp className="h-3 w-3" />
               </Button>
-            </div>
-          ) : selectedElement ? (
-            <div className="mt-2 space-y-2">
-              <p className="text-muted-foreground">
-                {FIELD_LABELS[selectedElement.fieldKey ?? ''] ?? selectedElement.fieldKey}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {(['x', 'y', 'width', 'height'] as const).map((prop) => (
-                  <div key={prop}>
-                    <Label className="text-[10px] uppercase">{prop} (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      className="h-8"
-                      value={selectedElement[prop]}
-                      onChange={(e) => updateSelected({ [prop]: Number(e.target.value) || 0 })}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[10px] uppercase">Font size (pt)</Label>
-                  <Input
-                    type="number"
-                    className="h-8"
-                    value={selectedElement.style?.fontSize ?? 6}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: { ...selectedElement.style, fontSize: Number(e.target.value) || 6 },
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-[10px] uppercase">Font weight</Label>
-                  <select
-                    className="h-8 w-full rounded-md border border-border bg-background px-2"
-                    value={selectedElement.style?.fontWeight ?? 'bold'}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: {
-                          ...selectedElement.style,
-                          fontWeight: e.target.value as NonNullable<
-                            typeof selectedElement.style
-                          >['fontWeight'],
-                        },
-                      })
-                    }
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="medium">Medium</option>
-                    <option value="semibold">Semibold</option>
-                    <option value="bold">Bold</option>
-                    <option value="extrabold">Extra bold</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase">Text align</Label>
-                <select
-                  className="h-8 w-full rounded-md border border-border bg-background px-2"
-                  value={selectedElement.style?.align ?? 'center'}
-                  onChange={(e) =>
-                    updateSelected({
-                      style: {
-                        ...selectedElement.style,
-                        align: e.target.value as 'left' | 'center' | 'right',
-                      },
-                    })
-                  }
-                >
-                  <option value="left">Left</option>
-                  <option value="center">Center</option>
-                  <option value="right">Right</option>
-                </select>
-              </div>
-              {selectedElement.fieldKey === 'photo' ? (
-                <div>
-                  <Label className="text-[10px] uppercase">Photo shape</Label>
-                  <select
-                    className="h-8 w-full rounded-md border border-border bg-background px-2"
-                    value={selectedElement.style?.photoShape ?? 'square'}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: {
-                          ...selectedElement.style,
-                          photoShape: e.target.value as 'square' | 'circle',
-                        },
-                      })
-                    }
-                  >
-                    <option value="square">Square</option>
-                    <option value="circle">Circle</option>
-                  </select>
-                </div>
-              ) : null}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[10px] uppercase">Text color</Label>
-                  <Input
-                    type="color"
-                    className="h-8 p-1"
-                    value={selectedElement.style?.color ?? '#0f172a'}
-                    onChange={(e) =>
-                      updateSelected({ style: { ...selectedElement.style, color: e.target.value } })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-[10px] uppercase">Background</Label>
-                  <Input
-                    type="color"
-                    className="h-8 p-1"
-                    value={selectedElement.style?.backgroundColor ?? '#ffffff'}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: { ...selectedElement.style, backgroundColor: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[10px] uppercase">Opacity</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    className="h-8"
-                    value={selectedElement.style?.opacity ?? 1}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: { ...selectedElement.style, opacity: Number(e.target.value) },
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-[10px] uppercase">Border (mm)</Label>
-                  <Input
-                    type="number"
-                    step={0.1}
-                    min={0}
-                    className="h-8"
-                    value={selectedElement.style?.borderWidthMm ?? 0}
-                    onChange={(e) =>
-                      updateSelected({
-                        style: {
-                          ...selectedElement.style,
-                          borderWidthMm: Number(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase">Border color</Label>
-                <Input
-                  type="color"
-                  className="h-8 p-1"
-                  value={selectedElement.style?.borderColor ?? '#cbd5e1'}
-                  onChange={(e) =>
-                    updateSelected({
-                      style: { ...selectedElement.style, borderColor: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-wrap gap-1 pt-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2"
-                  onClick={layerActions.bringForward}
-                >
-                  <ArrowUp className="h-3 w-3" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2"
-                  onClick={layerActions.sendBackward}
-                >
-                  <ArrowDown className="h-3 w-3" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2"
-                  onClick={layerActions.duplicate}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2"
-                  onClick={layerActions.toggleLock}
-                >
-                  {lockedIds.has(selectedElement.id) ? (
-                    <Lock className="h-3 w-3" />
-                  ) : (
-                    <Unlock className="h-3 w-3" />
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2"
-                  onClick={layerActions.toggleHide}
-                >
-                  <EyeOff className="h-3 w-3" />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={layerActions.sendBackward}
+                disabled={!selectedElement}
+              >
+                <ArrowDown className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={layerActions.duplicate}
+                disabled={!selectedElement}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={layerActions.toggleLock}
+                disabled={!selectedElement}
+              >
+                {selectedElement &&
+                (lockedIds.has(selectedElement.id) || selectedElement.locked) ? (
+                  <Lock className="h-3 w-3" />
+                ) : (
+                  <Unlock className="h-3 w-3" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={layerActions.toggleHide}
+                disabled={!selectedElement}
+              >
+                <EyeOff className="h-3 w-3" />
+              </Button>
               <Button
                 type="button"
                 size="sm"
                 variant="destructive"
-                className="w-full"
+                className="h-7 flex-1"
                 onClick={layerActions.remove}
               >
                 Remove
               </Button>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="w-full text-[10px] text-muted-foreground">
                 Arrow keys nudge · Shift = 1mm · Del removes
               </p>
             </div>
-          ) : (
-            <p className="mt-2 text-muted-foreground">Select an element on the canvas.</p>
           )}
 
           <div className="mt-6 border-t border-border pt-3">
