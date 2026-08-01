@@ -9,6 +9,11 @@ export type FacultyTodayClass = {
   shiftName?: string | null;
   offeringSectionId?: string | null;
   status?: string;
+  /** Institution calendar date YYYY-MM-DD */
+  classDate?: string;
+  classDateLabel?: string;
+  isToday?: boolean;
+  attendancePending?: boolean;
 };
 
 export type FacultyPendingAction = {

@@ -45,6 +45,18 @@ function formatTimeRange(cls: FacultyTodayClass) {
   return `${cls.startTime} – ${cls.endTime}`;
 }
 
+function formatClassDate(cls: FacultyTodayClass) {
+  if (cls.classDateLabel?.trim()) return cls.classDateLabel.trim();
+  if (!cls.classDate) return null;
+  const d = new Date(`${cls.classDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return cls.classDate;
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function FacultyHomeScreen() {
   const router = useRouter();
   const { home, loading, refreshHome } = useFacultyPortal();
@@ -157,9 +169,13 @@ export default function FacultyHomeScreen() {
           onPressNotifications={() => router.push('/(staff)/(tabs)/notifications' as never)}
         />
 
-        {/* Today's schedule — top priority */}
+        {/* Today's schedule + backlog pending attendance */}
         <SectionTitle
-          title="Today's Classes"
+          title={
+            todayClasses.some((c) => c.isToday === false || c.attendancePending)
+              ? 'Classes & Pending Attendance'
+              : "Today's Classes"
+          }
           action="Full Timetable"
           onAction={() => router.push('/(staff)/timetable' as never)}
         />
@@ -171,32 +187,68 @@ export default function FacultyHomeScreen() {
             </Text>
           </View>
         ) : (
-          todayClasses.map((cls) => (
-            <View key={cls.id} style={styles.classCard}>
-              <View style={styles.classHeader}>
-                <Text style={styles.classTime}>{formatTimeRange(cls)}</Text>
-                {cls.shiftName ? (
-                  <View style={styles.shiftBadge}>
-                    <Text style={styles.shiftBadgeText}>{cls.shiftName}</Text>
+          todayClasses.map((cls) => {
+            const dateLabel = formatClassDate(cls);
+            const isBacklog = cls.isToday === false;
+            const showPending =
+              Boolean(cls.attendancePending) || String(cls.status ?? '').toUpperCase() === 'OPEN';
+            // mobile-home may prefix backlog date into shiftName for older builds — avoid duplicate.
+            const shiftLabel =
+              cls.shiftName && dateLabel && cls.shiftName.startsWith(dateLabel)
+                ? cls.shiftName
+                    .slice(dateLabel.length)
+                    .replace(/^\s*·\s*/, '')
+                    .trim()
+                : cls.shiftName;
+            return (
+              <View key={cls.id} style={[styles.classCard, showPending && styles.classCardPending]}>
+                <View style={styles.classHeader}>
+                  <Text style={styles.classTime}>{formatTimeRange(cls)}</Text>
+                  <View style={styles.classBadges}>
+                    {dateLabel ? (
+                      <View style={[styles.dateBadge, isBacklog && styles.dateBadgeBacklog]}>
+                        <Text
+                          style={[styles.dateBadgeText, isBacklog && styles.dateBadgeTextBacklog]}
+                        >
+                          {dateLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {shiftLabel ? (
+                      <View style={styles.shiftBadge}>
+                        <Text style={styles.shiftBadgeText}>{shiftLabel}</Text>
+                      </View>
+                    ) : null}
                   </View>
+                </View>
+                {showPending ? (
+                  <Text style={styles.pendingHint}>
+                    {isBacklog
+                      ? `Attendance pending for ${dateLabel ?? 'this class date'}`
+                      : 'Attendance pending for today'}
+                  </Text>
                 ) : null}
-              </View>
-              <Text style={styles.classSubject}>{cls.subject}</Text>
-              <Text style={styles.classMeta}>
-                {formatSemester(cls.semesterNo)}
-                {cls.sectionCode ? ` · ${cls.sectionCode}` : ''}
-                {cls.classroom ? ` · Room ${cls.classroom}` : ''}
-              </Text>
-              <Pressable
-                style={styles.classAction}
-                onPress={() => router.push('/(staff)/(tabs)/attendance' as never)}
-              >
-                <Text style={styles.classActionText}>
-                  {cls.status === 'scheduled' ? 'Start Attendance' : 'View Class'}
+                <Text style={styles.classSubject}>{cls.subject}</Text>
+                <Text style={styles.classMeta}>
+                  {formatSemester(cls.semesterNo)}
+                  {cls.sectionCode ? ` · ${cls.sectionCode}` : ''}
+                  {cls.classroom ? ` · Room ${cls.classroom}` : ''}
                 </Text>
-              </Pressable>
-            </View>
-          ))
+                <Pressable
+                  style={styles.classAction}
+                  onPress={() => router.push('/(staff)/(tabs)/attendance' as never)}
+                >
+                  <Text style={styles.classActionText}>
+                    {showPending
+                      ? 'Mark Attendance'
+                      : cls.status === 'scheduled'
+                        ? 'Start Attendance'
+                        : 'View Class'}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })
         )}
 
         {/* Pending actions */}
@@ -541,8 +593,27 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: facultyTheme.primaryLight,
   },
-  classHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  classTime: { fontSize: 13, fontWeight: '800', color: facultyTheme.text },
+  classCardPending: {
+    borderLeftColor: facultyTheme.urgent,
+    backgroundColor: '#FFFBFB',
+  },
+  classHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  classTime: { fontSize: 13, fontWeight: '800', color: facultyTheme.text, flexShrink: 1 },
+  classBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
+  dateBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  dateBadgeBacklog: { backgroundColor: '#FEE2E2' },
+  dateBadgeText: { fontSize: 10, fontWeight: '800', color: facultyTheme.text },
+  dateBadgeTextBacklog: { color: facultyTheme.urgent },
   shiftBadge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 8,
@@ -550,6 +621,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   shiftBadgeText: { fontSize: 10, fontWeight: '700', color: facultyTheme.primaryLight },
+  pendingHint: { fontSize: 11, fontWeight: '700', color: facultyTheme.urgent },
   classSubject: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
   classMeta: { fontSize: 12, color: facultyTheme.textMuted },
   classAction: {

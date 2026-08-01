@@ -219,7 +219,17 @@ export function StaffMobileDashboard({ data, loading }: Props) {
                   >
                     <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-muted-foreground">{slot.startTime}</p>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {slot.startTime}
+                        {slot.classDateLabel || slot.classDate
+                          ? ` · ${slot.classDateLabel ?? slot.classDate}`
+                          : ''}
+                      </p>
+                      {slot.attendancePending || String(slot.status).toUpperCase() === 'OPEN' ? (
+                        <p className="text-[10px] font-semibold text-rose-600">
+                          Attendance pending
+                        </p>
+                      ) : null}
                       <p className="text-sm font-semibold leading-tight">{slot.subject}</p>
                       {slot.classroom ? (
                         <p className="flex items-center gap-1 text-[11px] text-muted-foreground">

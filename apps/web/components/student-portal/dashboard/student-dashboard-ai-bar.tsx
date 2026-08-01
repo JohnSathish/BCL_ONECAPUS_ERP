@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const CHIPS = [
@@ -14,16 +14,16 @@ const CHIPS = [
 export function StudentDashboardAiBar({ firstName }: { firstName?: string }) {
   const name = firstName || 'there';
   return (
-    <div className="sticky bottom-2 z-20 mt-4 rounded-2xl border border-[#1e4d8c]/25 bg-[#152a45] p-3 text-white shadow-lg sm:p-4">
+    <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#0f2744] via-[#152a45] to-[#1a3a66] p-3 text-white shadow-lg sm:p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1e4d8c] ring-2 ring-[#c9a227]/50">
-            <Sparkles className="h-5 w-5 text-[#c9a227]" />
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+            <Bot className="h-5 w-5 text-sky-200" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold">Hi {name}! I&apos;m your campus assistant.</p>
-            <p className="text-xs text-sky-100/90">
-              Ask about classes, fees, results, timetable — or open Support Centre chat.
+            <p className="text-xs text-sky-100/80">
+              Ask about classes, fees, results, or open Support Centre chat.
             </p>
           </div>
         </div>
@@ -32,7 +32,7 @@ export function StudentDashboardAiBar({ firstName }: { firstName?: string }) {
             <Link
               key={c.href + c.label}
               href={c.href}
-              className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium backdrop-blur transition hover:bg-white/20"
+              className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-medium backdrop-blur transition hover:bg-white/20"
             >
               {c.label}
             </Link>
@@ -40,7 +40,7 @@ export function StudentDashboardAiBar({ firstName }: { firstName?: string }) {
           <Button
             asChild
             size="sm"
-            className="rounded-xl bg-[#c9a227] font-semibold text-slate-900 hover:bg-[#d4b03a]"
+            className="rounded-full bg-amber-400 px-4 font-bold text-slate-900 hover:bg-amber-300"
           >
             <Link href="/student/support/chat">Ask Now</Link>
           </Button>

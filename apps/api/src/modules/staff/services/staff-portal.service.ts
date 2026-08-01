@@ -11,7 +11,13 @@ import { BirthdayQueryService } from '../../communication/services/birthday-quer
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { AcademicCalendarService } from '../../academic-calendar/academic-calendar.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
-import { getZonedHour } from '../../../common/utils/time-greeting';
+import {
+  dateKeyToUtcMidnight,
+  formatInstitutionDateLabel,
+  getZonedDateKey,
+  getZonedHour,
+  getZonedWeekday,
+} from '../../../common/utils/time-greeting';
 
 const PRESENT_ATTENDANCE_STATUSES = new Set([
   'PRESENT',
@@ -376,7 +382,15 @@ export class StaffPortalService {
         ? (this.prisma as any).studentAttendanceSession.count({
             where: {
               tenantId: user.tid,
-              sessionDate: today,
+              // Include backlog OPEN sessions (prior days), not only "today".
+              sessionDate: {
+                gte: dateKeyToUtcMidnight(
+                  getZonedDateKey(
+                    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                  ),
+                ),
+                lte: dateKeyToUtcMidnight(getZonedDateKey()),
+              },
               deletedAt: null,
               status: 'OPEN',
               primaryFacultyId: staff.id,
@@ -539,13 +553,17 @@ export class StaffPortalService {
 
     const studentsTaught = subjects.reduce((sum, s) => sum + s.studentCount, 0);
     const weeklyWorkloadTarget = Math.max(weeklyClasses, credits || 18);
-    const todayClassCount = todaySchedule.length;
+    const todayClassCount = todaySchedule.filter((s) => s.isToday).length;
     const attendanceSubmittedPercent =
       todayClassCount > 0
         ? Math.round(
-            ((todayClassCount - attendancePending) / todayClassCount) * 100,
+            ((todayClassCount - Math.min(attendancePending, todayClassCount)) /
+              todayClassCount) *
+              100,
           )
-        : 100;
+        : attendancePending > 0
+          ? 0
+          : 100;
 
     const discussionRepliesPending = profile.isTeaching
       ? await this.countPendingDiscussionReplies(user.tid, user.sub, staff.id)
@@ -903,8 +921,13 @@ export class StaffPortalService {
   }
 
   async getTodaySchedule(tenantId: string, staffProfileId: string) {
-    const today = startOfDay(new Date());
-    const dayOfWeek = new Date().getDay();
+    const todayKey = getZonedDateKey();
+    const today = dateKeyToUtcMidnight(todayKey);
+    const dayOfWeek = getZonedWeekday();
+    const lookbackKey = getZonedDateKey(
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    );
+    const lookback = dateKeyToUtcMidnight(lookbackKey);
 
     type TodaySlot = {
       id: string;
@@ -919,21 +942,33 @@ export class StaffPortalService {
       shiftId: string | null;
       shiftCode: string | null;
       shiftName: string | null;
+      /** Institution calendar date (YYYY-MM-DD) for this class / session. */
+      classDate: string;
+      classDateLabel: string;
+      isToday: boolean;
+      attendancePending: boolean;
     };
 
     const slotByKey = new Map<string, TodaySlot>();
 
     const slotDedupeKey = (slot: TodaySlot) =>
-      // Same faculty cannot teach two real classes in the identical time window.
-      // Ignore subject/shift differences so plan entries + generated attendance
-      // sessions collapse to one card (e.g. Day Shift vs Classes duplicate).
-      [slot.startTime, slot.endTime, slot.semesterNo ?? ''].join('|');
+      // Same faculty cannot teach two real classes in the identical time window
+      // on the same calendar day. Include date so backlog pending sessions stay
+      // distinct from today's timetable slots.
+      [
+        slot.classDate,
+        slot.startTime,
+        slot.endTime,
+        slot.semesterNo ?? '',
+      ].join('|');
 
     const slotRichness = (slot: TodaySlot) =>
       (slot.shiftId ? 4 : 0) +
       (slot.shiftName ? 2 : 0) +
       (slot.offeringSectionId ? 2 : 0) +
-      (slot.classroom ? 1 : 0);
+      (slot.classroom ? 1 : 0) +
+      (slot.attendancePending ? 3 : 0) +
+      (slot.classDate ? 1 : 0);
 
     const pushSlot = (slot: TodaySlot) => {
       // Publish generates attendance sessions from the same plan entries; those
@@ -1060,6 +1095,10 @@ export class StaffPortalService {
         shiftId,
         shiftCode: shift?.code ?? null,
         shiftName: shift?.name ?? null,
+        classDate: todayKey,
+        classDateLabel: formatInstitutionDateLabel(todayKey),
+        isToday: true,
+        attendancePending: false,
       });
     }
 
@@ -1140,20 +1179,31 @@ export class StaffPortalService {
           shiftId: entry.shiftId,
           shiftCode: shift?.code ?? null,
           shiftName: shift?.name ?? null,
+          classDate: todayKey,
+          classDateLabel: formatInstitutionDateLabel(todayKey),
+          isToday: true,
+          attendancePending: false,
         });
       }
     }
 
+    // Today’s generated sessions + backlog OPEN sessions (prior days still pending).
     const attendanceSessions = await (
       this.prisma as any
     ).studentAttendanceSession.findMany({
       where: {
         tenantId,
         primaryFacultyId: staffProfileId,
-        sessionDate: today,
         deletedAt: null,
+        OR: [
+          { sessionDate: today },
+          {
+            status: 'OPEN',
+            sessionDate: { gte: lookback, lt: today },
+          },
+        ],
       },
-      orderBy: { startTime: 'asc' },
+      orderBy: [{ sessionDate: 'desc' }, { startTime: 'asc' }],
     });
 
     if (attendanceSessions.length) {
@@ -1218,6 +1268,14 @@ export class StaffPortalService {
           : undefined;
         const shiftId = section?.shiftId ?? null;
         const shift = shiftId ? shiftMap.get(shiftId) : undefined;
+        // @db.Date values are UTC midnight for the calendar day — prefer ISO date key.
+        const classDate =
+          session.sessionDate instanceof Date
+            ? session.sessionDate.toISOString().slice(0, 10)
+            : String(session.sessionDate).slice(0, 10);
+        const isToday = classDate === todayKey;
+        const attendancePending =
+          String(session.status ?? '').toUpperCase() === 'OPEN';
         pushSlot({
           id: session.id,
           startTime: session.startTime ? formatTime(session.startTime) : '—',
@@ -1231,13 +1289,21 @@ export class StaffPortalService {
           shiftId,
           shiftCode: shift?.code ?? null,
           shiftName: shift?.name ?? null,
+          classDate,
+          classDateLabel: formatInstitutionDateLabel(classDate),
+          isToday,
+          attendancePending,
         });
       }
     }
 
-    return Array.from(slotByKey.values()).sort((a, b) =>
-      a.startTime.localeCompare(b.startTime),
-    );
+    return Array.from(slotByKey.values()).sort((a, b) => {
+      // Pending backlog first (oldest pending date), then today's schedule by time.
+      if (a.isToday !== b.isToday) return a.isToday ? 1 : -1;
+      const byDate = a.classDate.localeCompare(b.classDate);
+      if (byDate !== 0) return byDate;
+      return a.startTime.localeCompare(b.startTime);
+    });
   }
 
   async getTodayScheduleForUser(user: JwtUser) {

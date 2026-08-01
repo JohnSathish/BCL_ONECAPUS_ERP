@@ -119,6 +119,11 @@ export type StaffTimetableSlot = {
   shiftId?: string | null;
   shiftCode?: string | null;
   shiftName?: string | null;
+  /** Institution calendar date YYYY-MM-DD */
+  classDate?: string;
+  classDateLabel?: string;
+  isToday?: boolean;
+  attendancePending?: boolean;
 };
 
 export type StaffSubjectCard = {

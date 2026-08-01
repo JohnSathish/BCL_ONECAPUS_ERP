@@ -3,15 +3,14 @@
 import { ErpWorkspace } from '@/components/erp/erp-workspace-shell';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { PortalCalendarWidget } from '@/components/portal/portal-calendar-widget';
 import { StudentAcademicProgressCard } from '@/components/student-portal/dashboard/student-academic-progress-card';
-import { StudentActivitySummaryCard } from '@/components/student-portal/dashboard/student-activity-summary-card';
 import {
   StudentAnnouncementsCard,
-  StudentRemindersCard,
+  StudentLatestUpdatesCard,
 } from '@/components/student-portal/dashboard/student-announcements-reminders';
 import { StudentDashboardAiBar } from '@/components/student-portal/dashboard/student-dashboard-ai-bar';
 import { StudentDashboardHeader } from '@/components/student-portal/dashboard/student-dashboard-header';
+import { StudentQuickLinksCard } from '@/components/student-portal/dashboard/student-quick-links-card';
 import { StudentQuickStats } from '@/components/student-portal/dashboard/student-quick-stats';
 import { StudentSubjectsTable } from '@/components/student-portal/dashboard/student-subjects-table';
 import { TodayTimetableWidget } from '@/components/student-portal/widgets/today-timetable-widget';
@@ -36,7 +35,6 @@ export function StudentDashboardPage() {
   const attendanceQ = useStudentDashboardWidget('attendance');
   const feesQ = useStudentDashboardWidget('fees');
   const timetableQ = useStudentDashboardWidget('timetable');
-  const lmsQ = useStudentDashboardWidget('lms');
   const examsQ = useStudentDashboardWidget('examinations');
   const notificationsQ = useStudentDashboardWidget('notifications');
   const calendarQ = useStudentDashboardWidget('calendar');
@@ -48,7 +46,6 @@ export function StudentDashboardPage() {
         ...shell,
         todayTimetable: timetableQ.data ?? [],
         fees: feesQ.data ?? shell.fees,
-        lms: lmsQ.data ?? shell.lms,
         examinations: examsQ.data ?? shell.examinations,
         library: libraryQ.data ? { ...shell.library, ...libraryQ.data } : shell.library,
         health: healthQ.data ?? {
@@ -65,16 +62,14 @@ export function StudentDashboardPage() {
   const firstName = displayName.split(/\s+/)[0];
 
   return (
-    <DashboardShell
-      role="student"
-      title="Student Dashboard"
-      subtitle={
-        firstName
-          ? `Welcome back, ${firstName}! Keep learning, keep growing.`
-          : 'Welcome back! Keep learning, keep growing.'
-      }
-    >
-      <ErpWorkspace className={cn('relative space-y-4 pb-2', compact && 'space-y-3')}>
+    <DashboardShell role="student" title="Student Dashboard">
+      <ErpWorkspace
+        className={cn(
+          'relative space-y-5 pb-4',
+          'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-[420px] before:bg-[radial-gradient(ellipse_at_top,_rgba(56,189,248,0.12),_transparent_55%),radial-gradient(ellipse_at_80%_0%,_rgba(167,139,250,0.10),_transparent_45%)]',
+          compact && 'space-y-3.5',
+        )}
+      >
         {isError ? (
           <QueryErrorPanel
             title="Unable to load student dashboard"
@@ -94,7 +89,7 @@ export function StudentDashboardPage() {
           libraryDueInDays={libraryQ.data?.dueInDays ?? shell?.library?.dueInDays ?? null}
         />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)]">
           <StudentSubjectsTable
             chips={shell?.academicChips}
             semesterSequence={shell?.profile.semesterSequence}
@@ -103,16 +98,9 @@ export function StudentDashboardPage() {
           <TodayTimetableWidget schedule={timetableQ.data} loading={timetableQ.isLoading} />
         </div>
 
+        <StudentDashboardAiBar firstName={firstName} />
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <PortalCalendarWidget
-            events={calendarQ.data}
-            loading={calendarQ.isLoading}
-            title="Calendar"
-          />
-          <StudentAcademicProgressCard
-            data={shellEnriched}
-            loading={shellLoading || healthQ.isLoading}
-          />
           <StudentAnnouncementsCard
             notifications={notificationsQ.data?.notifications}
             unreadCount={
@@ -120,18 +108,17 @@ export function StudentDashboardPage() {
             }
             loading={notificationsQ.isLoading}
           />
-          <StudentActivitySummaryCard />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-1">
-          <StudentRemindersCard
+          <StudentAcademicProgressCard
             data={shellEnriched}
-            calendarEvents={calendarQ.data}
-            loading={shellLoading || lmsQ.isLoading || feesQ.isLoading}
+            loading={shellLoading || healthQ.isLoading}
           />
+          <StudentLatestUpdatesCard
+            notifications={notificationsQ.data?.notifications}
+            calendarEvents={calendarQ.data}
+            loading={notificationsQ.isLoading || calendarQ.isLoading}
+          />
+          <StudentQuickLinksCard />
         </div>
-
-        <StudentDashboardAiBar firstName={firstName} />
       </ErpWorkspace>
     </DashboardShell>
   );

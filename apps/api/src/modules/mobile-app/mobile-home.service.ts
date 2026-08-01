@@ -74,6 +74,9 @@ export class MobileHomeService {
     const leave = dashboard.kpis?.leave;
     const salary = dashboard.kpis?.salary;
     const todaySchedule = dashboard.todaySchedule ?? [];
+    const classesTodayCount = todaySchedule.filter(
+      (slot: { isToday?: boolean }) => slot.isToday !== false,
+    ).length;
 
     const pendingActions = [
       ...(tasks?.attendancePending
@@ -144,9 +147,25 @@ export class MobileHomeService {
         isHod: dashboard.profile.isHod,
       },
       academicContext: dashboard.academicContext,
-      todayClasses: todaySchedule,
+      todayClasses: todaySchedule.map(
+        (slot: {
+          isToday?: boolean;
+          classDateLabel?: string;
+          shiftName?: string | null;
+          [key: string]: unknown;
+        }) => ({
+          ...slot,
+          // Older app builds only render shiftName — keep the class date visible there.
+          shiftName:
+            slot.isToday === false && slot.classDateLabel
+              ? [slot.classDateLabel, slot.shiftName]
+                  .filter(Boolean)
+                  .join(' · ')
+              : slot.shiftName,
+        }),
+      ),
       workloadSummary: {
-        classesToday: todaySchedule.length,
+        classesToday: classesTodayCount,
         attendancePending: tasks?.attendancePending ?? 0,
         marksPending: tasks?.lmsPendingEvaluations ?? 0,
         lessonPlansPending: tasks?.pendingLessonPlans ?? 0,

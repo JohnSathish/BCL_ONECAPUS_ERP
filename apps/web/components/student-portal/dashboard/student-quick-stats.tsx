@@ -2,27 +2,73 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Wallet } from 'lucide-react';
+import { BookOpen, Coins, GraduationCap, Medal } from 'lucide-react';
 import { DirectoryKpiSkeleton } from '@/components/students-module/directory/ui/directory-skeleton';
 import type { StudentDashboardView, StudentQuickStat } from '@/types/student-portal';
 import { cn } from '@/utils/cn';
 
-const TONE_VALUE: Record<string, string> = {
-  good: 'text-emerald-600 dark:text-emerald-400',
-  warn: 'text-amber-600 dark:text-amber-400',
-  bad: 'text-rose-600 dark:text-rose-400',
+type Theme = {
+  card: string;
+  label: string;
+  value: string;
+  accent: string;
+  ringTrack: string;
+  ring: string;
+};
+
+const THEMES: Record<string, Theme> = {
+  attendance: {
+    card: 'border-violet-200/70 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/40 dark:border-violet-900/40 dark:from-violet-950/40 dark:via-slate-900 dark:to-slate-900',
+    label: 'text-violet-700/80 dark:text-violet-300',
+    value: 'text-violet-900 dark:text-violet-100',
+    accent: 'text-violet-600',
+    ringTrack: '#ede9fe',
+    ring: '#7c3aed',
+  },
+  fees: {
+    card: 'border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 dark:border-amber-900/40 dark:from-amber-950/30 dark:via-slate-900 dark:to-slate-900',
+    label: 'text-amber-800/80 dark:text-amber-300',
+    value: 'text-amber-900 dark:text-amber-100',
+    accent: 'text-amber-700',
+    ringTrack: '#fef3c7',
+    ring: '#d97706',
+  },
+  cgpa: {
+    card: 'border-sky-200/70 bg-gradient-to-br from-sky-50 via-white to-blue-50/40 dark:border-sky-900/40 dark:from-sky-950/30 dark:via-slate-900 dark:to-slate-900',
+    label: 'text-sky-700/80 dark:text-sky-300',
+    value: 'text-sky-900 dark:text-sky-100',
+    accent: 'text-sky-600',
+    ringTrack: '#e0f2fe',
+    ring: '#0284c7',
+  },
+  credits: {
+    card: 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-teal-50/40 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900',
+    label: 'text-emerald-700/80 dark:text-emerald-300',
+    value: 'text-emerald-900 dark:text-emerald-100',
+    accent: 'text-emerald-600',
+    ringTrack: '#d1fae5',
+    ring: '#059669',
+  },
+  library: {
+    card: 'border-rose-200/70 bg-gradient-to-br from-rose-50 via-white to-pink-50/50 dark:border-rose-900/40 dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900',
+    label: 'text-rose-700/80 dark:text-rose-300',
+    value: 'text-rose-900 dark:text-rose-100',
+    accent: 'text-rose-600',
+    ringTrack: '#ffe4e6',
+    ring: '#e11d48',
+  },
 };
 
 function MiniBars({ values, color }: { values: number[]; color: string }) {
   const max = Math.max(...values, 1);
   return (
-    <div className="mt-3 flex h-8 items-end gap-0.5">
+    <div className="mt-3 flex h-9 items-end gap-1">
       {values.map((v, i) => (
         <div
           key={i}
-          className="w-1.5 rounded-sm opacity-80"
+          className="w-2 rounded-md opacity-90"
           style={{
-            height: `${Math.max(12, (v / max) * 100)}%`,
+            height: `${Math.max(18, (v / max) * 100)}%`,
             backgroundColor: color,
           }}
         />
@@ -31,48 +77,31 @@ function MiniBars({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-function Sparkline({ color }: { color: string }) {
-  return (
-    <svg className="mt-3 h-8 w-full" viewBox="0 0 100 28" preserveAspectRatio="none">
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        points="0,20 15,18 30,22 45,12 60,16 75,8 90,14 100,10"
-      />
-    </svg>
-  );
-}
-
-function AttendanceRing({ pct }: { pct: number }) {
-  const r = 16;
+function AttendanceRing({ pct, track, stroke }: { pct: number; track: string; stroke: string }) {
+  const r = 28;
   const circ = 2 * Math.PI * r;
   const offset = circ - (Math.max(0, Math.min(100, pct)) / 100) * circ;
   return (
-    <svg className="mt-2 h-10 w-10 -rotate-90" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r={r} fill="none" stroke="#e2e8f0" strokeWidth="4" />
-      <circle
-        cx="20"
-        cy="20"
-        r={r}
-        fill="none"
-        stroke="#10b981"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeDasharray={circ}
-        strokeDashoffset={offset}
-      />
-    </svg>
-  );
-}
-
-function CreditsBar({ percent }: { percent: number }) {
-  return (
-    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-      <div
-        className="h-full rounded-full bg-[#1e4d8c] transition-all"
-        style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
-      />
+    <div className="relative mx-auto mt-2 h-[72px] w-[72px]">
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke={track} strokeWidth="7" />
+        <circle
+          cx="36"
+          cy="36"
+          r={r}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-sm font-bold tabular-nums text-violet-900 dark:text-violet-100">
+          {Math.round(pct)}%
+        </span>
+      </div>
     </div>
   );
 }
@@ -80,37 +109,52 @@ function CreditsBar({ percent }: { percent: number }) {
 function StatCard({
   stat,
   delay,
-  visual,
+  theme,
+  children,
+  cta,
 }: {
   stat: StudentQuickStat;
   delay: number;
-  visual?: React.ReactNode;
+  theme: Theme;
+  children?: React.ReactNode;
+  cta?: string;
 }) {
   const inner = (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.2 }}
+      transition={{ delay, duration: 0.25 }}
+      whileHover={{ y: -3 }}
       className={cn(
-        'flex h-full flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900',
+        'flex h-full flex-col rounded-3xl border p-4 shadow-sm transition hover:shadow-md',
+        theme.card,
         stat.href && 'cursor-pointer',
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        {stat.title}
-      </p>
-      <p
-        className={cn(
-          'mt-2 text-2xl font-bold tracking-tight',
-          TONE_VALUE[stat.tone ?? 'neutral'] ?? 'text-slate-900 dark:text-white',
-        )}
-      >
-        {stat.value}
-      </p>
-      {stat.subvalue ? <p className="mt-0.5 text-xs text-slate-500">{stat.subvalue}</p> : null}
-      {visual}
-      {stat.key === 'fees' && stat.tone === 'warn' ? (
-        <span className="mt-auto pt-2 text-xs font-semibold text-[#1e4d8c]">Pay Now →</span>
+      <div className="flex items-start justify-between gap-2">
+        <p className={cn('text-[11px] font-bold uppercase tracking-wide', theme.label)}>
+          {stat.title}
+        </p>
+      </div>
+      {children}
+      {stat.key !== 'attendance' ? (
+        <p className={cn('mt-1 text-2xl font-bold tracking-tight tabular-nums', theme.value)}>
+          {stat.value}
+        </p>
+      ) : null}
+      {stat.subvalue ? (
+        <p
+          className={cn(
+            'mt-0.5 text-xs text-slate-500 dark:text-slate-400',
+            stat.key === 'attendance' &&
+              'text-center font-medium text-violet-700/80 dark:text-violet-300',
+          )}
+        >
+          {stat.subvalue}
+        </p>
+      ) : null}
+      {cta ? (
+        <span className={cn('mt-auto pt-3 text-xs font-semibold', theme.accent)}>{cta}</span>
       ) : null}
     </motion.div>
   );
@@ -149,24 +193,24 @@ function buildStats(data: StudentDashboardView): StudentQuickStat[] {
       value: data.examinations?.cgpa != null ? Number(data.examinations.cgpa).toFixed(2) : '—',
       href: '/student/results',
     } satisfies StudentQuickStat);
-  const credits = {
-    key: 'credits',
-    title: 'Credits Earned',
-    value: '—',
-    href: '/student/registration',
-  } satisfies StudentQuickStat;
+
+  const credits =
+    byKey.credits ??
+    ({
+      key: 'credits',
+      title: 'Credits Earned',
+      value: data.credits != null ? `${data.credits.earned} / ${data.credits.target}` : '—',
+      subvalue: data.credits != null ? 'Towards semester target' : undefined,
+      href: '/student/registration',
+    } satisfies StudentQuickStat);
+
   const library =
     byKey.library ??
     ({
       key: 'library',
       title: 'Library Books',
       value: String(data.library?.issuedBooks ?? 0),
-      subvalue:
-        data.library?.dueInDays != null
-          ? data.library.dueInDays >= 0
-            ? `Due in ${data.library.dueInDays} days`
-            : `Overdue by ${Math.abs(data.library.dueInDays)} days`
-          : 'Books issued',
+      subvalue: 'No books issued',
       href: '/student/library',
     } satisfies StudentQuickStat);
 
@@ -193,6 +237,7 @@ export function StudentQuickStats({
       return {
         ...s,
         value: `${Math.round(attendancePercent)}%`,
+        subvalue: 'Overall Attendance',
         tone:
           attendancePercent >= 75
             ? ('good' as const)
@@ -201,49 +246,91 @@ export function StudentQuickStats({
               : ('bad' as const),
       };
     }
-    if (s.key === 'library' && libraryIssued != null) {
+    if (s.key === 'credits' && data.credits) {
       return {
         ...s,
-        value: String(libraryIssued),
+        value: `${data.credits.earned} / ${data.credits.target}`,
+        subvalue: 'Credits this programme',
+      };
+    }
+    if (s.key === 'library') {
+      const issued = libraryIssued ?? data.library?.issuedBooks ?? 0;
+      return {
+        ...s,
+        value: String(issued),
         subvalue:
-          libraryDueInDays != null
-            ? libraryDueInDays >= 0
-              ? `Due in ${libraryDueInDays} day${libraryDueInDays === 1 ? '' : 's'}`
-              : `Overdue by ${Math.abs(libraryDueInDays)} day${Math.abs(libraryDueInDays) === 1 ? '' : 's'}`
-            : s.subvalue,
+          issued === 0
+            ? 'No books issued'
+            : libraryDueInDays != null
+              ? libraryDueInDays >= 0
+                ? `Due in ${libraryDueInDays} day${libraryDueInDays === 1 ? '' : 's'}`
+                : `Overdue by ${Math.abs(libraryDueInDays)} day${Math.abs(libraryDueInDays) === 1 ? '' : 's'}`
+              : 'Books issued',
       };
     }
     if (s.key === 'cgpa' && data.examinations?.cgpa != null && s.value === '—') {
-      return { ...s, value: Number(data.examinations.cgpa).toFixed(2) };
+      return { ...s, value: Number(data.examinations.cgpa).toFixed(2), subvalue: 'Cumulative GPA' };
+    }
+    if (s.key === 'fees' && data.fees?.status === 'PENDING') {
+      return {
+        ...s,
+        value: `Pending ₹${Number(data.fees.due).toLocaleString('en-IN')}`,
+        subvalue: data.fees.semesterLabel || 'Action needed',
+      };
     }
     return s;
   });
 
-  const attendancePct = Number.parseInt(stats[0]?.value ?? '0', 10) || 0;
-  const creditsPct = data.credits?.percent ?? null;
+  const attendancePct =
+    attendancePercent != null
+      ? attendancePercent
+      : Number.parseInt(stats.find((s) => s.key === 'attendance')?.value ?? '0', 10) || 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
       {stats.map((stat, i) => {
-        let visual: React.ReactNode = null;
+        const theme = THEMES[stat.key] ?? THEMES.cgpa;
+        let body: React.ReactNode = null;
+        let cta: string | undefined;
+
         if (stat.key === 'attendance') {
-          visual = <AttendanceRing pct={attendancePct} />;
-        } else if (stat.key === 'cgpa') {
-          visual = <MiniBars values={[6, 7, 6.5, 8, 7.5, 8.2, 8.4]} color="#1e4d8c" />;
-        } else if (stat.key === 'credits') {
-          visual = creditsPct != null ? <CreditsBar percent={creditsPct} /> : null;
-        } else if (stat.key === 'library') {
-          visual = <Sparkline color="#6366f1" />;
+          body = <AttendanceRing pct={attendancePct} track={theme.ringTrack} stroke={theme.ring} />;
+          cta = 'View Details →';
         } else if (stat.key === 'fees') {
-          visual = (
-            <div className="mt-3 flex items-center gap-1.5 text-slate-400">
-              <Wallet className="h-3.5 w-3.5" />
-              <span className="text-[10px]">Fee account</span>
+          body = (
+            <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+              <Coins className="h-5 w-5" />
             </div>
           );
+          cta = stat.tone === 'warn' || /pending/i.test(stat.value) ? 'Pay Now →' : 'View Fees →';
+        } else if (stat.key === 'cgpa') {
+          body = (
+            <div className="mt-1 flex items-end justify-between gap-2">
+              <MiniBars values={[6, 7, 6.5, 8, 7.5, 8.2, 8.4]} color={theme.ring} />
+              <GraduationCap className="mb-1 h-5 w-5 text-sky-500/70" />
+            </div>
+          );
+        } else if (stat.key === 'credits') {
+          body = (
+            <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              <Medal className="h-5 w-5" />
+            </div>
+          );
+          cta = 'View Progress →';
+        } else if (stat.key === 'library') {
+          body = (
+            <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+              <BookOpen className="h-5 w-5" />
+            </div>
+          );
+          cta = 'Go to Library →';
         }
 
-        return <StatCard key={stat.key} stat={stat} delay={i * 0.04} visual={visual} />;
+        return (
+          <StatCard key={stat.key} stat={stat} delay={i * 0.04} theme={theme} cta={cta}>
+            {body}
+          </StatCard>
+        );
       })}
     </div>
   );

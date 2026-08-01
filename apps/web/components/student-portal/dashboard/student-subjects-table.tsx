@@ -26,7 +26,7 @@ export function StudentSubjectsTable({
 }) {
   if (loading) {
     return (
-      <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="animate-pulse rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="h-5 w-40 rounded bg-muted" />
         <div className="mt-4 h-32 rounded bg-muted" />
       </div>
@@ -45,8 +45,8 @@ export function StudentSubjectsTable({
     semesterSequence != null ? (ROMAN[semesterSequence] ?? String(semesterSequence)) : null;
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+    <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
             My Current Subjects
@@ -58,7 +58,7 @@ export function StudentSubjectsTable({
         </div>
         <Link
           href="/student/registration"
-          className="text-xs font-medium text-[#1e4d8c] hover:underline dark:text-sky-300"
+          className="text-xs font-semibold text-sky-700 hover:underline dark:text-sky-300"
         >
           View all
         </Link>

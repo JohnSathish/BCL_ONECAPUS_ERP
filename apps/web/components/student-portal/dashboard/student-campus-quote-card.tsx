@@ -11,7 +11,7 @@ export function StudentCampusQuoteCard() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05, duration: 0.25 }}
-      className="relative hidden min-h-[148px] overflow-hidden rounded-2xl shadow-sm lg:block"
+      className="relative hidden min-h-[168px] overflow-hidden rounded-3xl shadow-md lg:block"
       aria-label="Campus inspiration"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

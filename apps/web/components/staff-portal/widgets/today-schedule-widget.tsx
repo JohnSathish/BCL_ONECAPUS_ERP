@@ -45,7 +45,11 @@ export function TodayScheduleWidget({
   return (
     <GlassCard className="p-5 lg:col-span-2" glow>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold tracking-tight">Today&apos;s Classes</h3>
+        <h3 className="text-sm font-semibold tracking-tight">
+          {schedule?.some((s) => s.isToday === false || s.attendancePending)
+            ? 'Classes & Pending Attendance'
+            : "Today's Classes"}
+        </h3>
         <Link href="/staff/academic/timetable" className="text-xs text-primary hover:underline">
           Full timetable
         </Link>
@@ -84,12 +88,32 @@ export function TodayScheduleWidget({
                             <Clock className="h-3.5 w-3.5" />
                             {slot.startTime}–{slot.endTime}
                           </span>
+                          {slot.classDateLabel || slot.classDate ? (
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide',
+                                slot.isToday === false || slot.attendancePending
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                                  : 'bg-muted text-foreground',
+                              )}
+                            >
+                              {slot.classDateLabel ?? slot.classDate}
+                            </span>
+                          ) : null}
                           {slot.shiftName || slot.shiftCode ? (
                             <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
                               {slot.shiftName ?? slot.shiftCode}
                             </span>
                           ) : null}
                         </p>
+                        {slot.attendancePending || String(slot.status).toUpperCase() === 'OPEN' ? (
+                          <p className="mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                            Attendance pending
+                            {slot.classDateLabel || slot.classDate
+                              ? ` · ${slot.classDateLabel ?? slot.classDate}`
+                              : ''}
+                          </p>
+                        ) : null}
                         <p className="mt-1 font-semibold">{slot.subject}</p>
                         <p className="text-xs text-muted-foreground">
                           {slot.semesterNo ? `Sem ${slot.semesterNo}` : '—'}
