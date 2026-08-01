@@ -3,8 +3,15 @@ export type WorkingDayStatus =
   | 'weekend'
   | 'saturday-working'
   | 'holiday'
+  | 'break'
+  | 'exam'
   | 'optional'
   | 'empty';
+
+export type WorkingCalendarEvent = {
+  title: string;
+  type: string;
+};
 
 export type WorkingCalendarDay = {
   id: string;
@@ -15,6 +22,8 @@ export type WorkingCalendarDay = {
   description: string;
   isWorkingDay: boolean;
   isHighlighted: boolean;
+  dayKind?: string;
+  events?: WorkingCalendarEvent[];
 };
 
 export type WorkingCalendarMonth = {
@@ -30,5 +39,5 @@ export type DayVisual = {
   status: WorkingDayStatus;
   label: string;
   title?: string;
-  events: string[];
+  events: WorkingCalendarEvent[];
 };

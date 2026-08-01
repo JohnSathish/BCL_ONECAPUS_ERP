@@ -179,11 +179,17 @@ export function dayKindBadge(kind?: string | null) {
   if (k.includes('HOLIDAY') || k === 'WEATHER_CLOSURE') {
     return { label: 'HOLIDAY', className: 'bg-rose-100 text-rose-700' };
   }
+  if (k === 'BREAK') {
+    return { label: 'BREAK', className: 'bg-slate-100 text-slate-700' };
+  }
   if (k.includes('EXAM')) {
     return { label: 'EXAM', className: 'bg-orange-100 text-orange-700' };
   }
   if (k === 'WORKING' || k === 'WORKING_DAY' || k.includes('CLASS')) {
     return { label: 'WORKING', className: 'bg-emerald-100 text-emerald-700' };
+  }
+  if (k === 'NON_WORKING') {
+    return { label: 'OFF', className: 'bg-slate-100 text-slate-600' };
   }
   return { label: k || 'DAY', className: 'bg-slate-100 text-slate-600' };
 }

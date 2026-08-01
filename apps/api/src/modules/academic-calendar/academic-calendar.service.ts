@@ -180,6 +180,19 @@ export class AcademicCalendarService {
         updatedById: user.sub,
       },
     });
+    // Central calendar: Publish makes active events visible on the college website.
+    await this.prisma.academicCalendarEvent.updateMany({
+      where: {
+        tenantId: user.tid,
+        calendarId,
+        deletedAt: null,
+        active: true,
+      },
+      data: {
+        publishedToWebsite: true,
+        visibility: 'PUBLIC',
+      },
+    });
     return this.getCalendar(user.tid, calendarId);
   }
 
@@ -443,8 +456,11 @@ export class AcademicCalendarService {
         departmentIds: dto.departmentIds
           ? (dto.departmentIds as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull,
-        visibility: dto.visibility ?? 'INTERNAL',
-        publishedToWebsite: Boolean(dto.publishedToWebsite),
+        visibility: dto.visibility ?? 'PUBLIC',
+        publishedToWebsite:
+          dto.publishedToWebsite !== undefined
+            ? Boolean(dto.publishedToWebsite)
+            : true,
         active: dto.active ?? true,
         color: dto.color?.trim() || null,
         icon: dto.icon?.trim() || null,
@@ -868,8 +884,11 @@ export class AcademicCalendarService {
       departmentIds: input.departmentIds?.length
         ? (input.departmentIds as unknown as Prisma.InputJsonValue)
         : Prisma.JsonNull,
-      visibility: input.visibility ?? 'INTERNAL',
-      publishedToWebsite: Boolean(input.publishedToWebsite),
+      visibility: input.visibility ?? 'PUBLIC',
+      publishedToWebsite:
+        input.publishedToWebsite !== undefined
+          ? Boolean(input.publishedToWebsite)
+          : true,
       sourceModule: input.sourceModule,
       sourceRefId: input.sourceRefId,
       active: true,

@@ -3,10 +3,12 @@
 import { CalendarDays, CircleDot } from 'lucide-react';
 
 const ITEMS = [
-  { label: 'Working Day', className: 'bg-[#22C55E]' },
-  { label: 'Weekend', className: 'bg-[#2563EB]' },
-  { label: 'Working on Saturday', className: 'bg-[#F59E0B]' },
+  { label: 'Working', className: 'bg-[#22C55E]' },
+  { label: 'Weekend', className: 'bg-[#F43F5E]' },
+  { label: 'Working Saturday', className: 'bg-[#F59E0B]' },
   { label: 'Holiday', className: 'bg-[#EF4444]' },
+  { label: 'Break', className: 'bg-[#64748B]' },
+  { label: 'Exam', className: 'bg-[#EA580C]' },
   { label: 'Optional Holiday', className: 'bg-violet-500' },
 ] as const;
 
@@ -27,7 +29,8 @@ export function LegendCard() {
       </ul>
       <p className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-[#94A3B8]">
         <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-        Saturday may be a working day depending on the published handbook calendar.
+        Events come from the ERP Academic Calendar. Update once in Academics → Academic Calendar,
+        then Publish to Website.
       </p>
     </section>
   );

@@ -2,6 +2,11 @@ import 'server-only';
 
 import { fetchCms, isRecord } from '@/lib/cms-client';
 
+export type PublicPlannerEvent = {
+  title: string;
+  type: string;
+};
+
 export type PublicPlannerDay = {
   id: string;
   date: string;
@@ -11,6 +16,8 @@ export type PublicPlannerDay = {
   description: string;
   isWorkingDay: boolean;
   isHighlighted: boolean;
+  dayKind?: string;
+  events?: PublicPlannerEvent[];
 };
 
 export type PublicPlannerMonth = {
@@ -30,10 +37,24 @@ export type PublicAcademicPlanner = {
   endDate: string;
   status: string;
   months: PublicPlannerMonth[];
+  source?: string;
 };
+
+function mapEvent(row: Record<string, unknown>): PublicPlannerEvent | null {
+  if (typeof row.title !== 'string' || !row.title.trim()) return null;
+  return {
+    title: row.title.trim(),
+    type: typeof row.type === 'string' ? row.type : 'OTHER',
+  };
+}
 
 function mapDay(row: Record<string, unknown>): PublicPlannerDay | null {
   if (typeof row.id !== 'string' || typeof row.date !== 'string') return null;
+  const events = Array.isArray(row.events)
+    ? row.events
+        .map((item) => (isRecord(item) ? mapEvent(item) : null))
+        .filter((item): item is PublicPlannerEvent => Boolean(item))
+    : undefined;
   return {
     id: row.id,
     date: row.date,
@@ -43,6 +64,8 @@ function mapDay(row: Record<string, unknown>): PublicPlannerDay | null {
     description: typeof row.description === 'string' ? row.description : '',
     isWorkingDay: Boolean(row.isWorkingDay),
     isHighlighted: Boolean(row.isHighlighted),
+    dayKind: typeof row.dayKind === 'string' ? row.dayKind : undefined,
+    events,
   };
 }
 
@@ -67,7 +90,7 @@ function mapMonth(row: Record<string, unknown>): PublicPlannerMonth | null {
 }
 
 export async function getPublicAcademicPlanner(): Promise<PublicAcademicPlanner | null> {
-  const payload = await fetchCms('academic-planner', {}, 120, 8000);
+  const payload = await fetchCms('academic-planner', {}, 60, 8000);
   if (!isRecord(payload)) return null;
   if (typeof payload.id !== 'string' || typeof payload.title !== 'string') return null;
   const months = Array.isArray(payload.months)
@@ -83,5 +106,6 @@ export async function getPublicAcademicPlanner(): Promise<PublicAcademicPlanner 
     endDate: typeof payload.endDate === 'string' ? payload.endDate : '',
     status: typeof payload.status === 'string' ? payload.status : 'PUBLISHED',
     months,
+    source: typeof payload.source === 'string' ? payload.source : undefined,
   };
 }

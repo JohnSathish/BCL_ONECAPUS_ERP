@@ -89,8 +89,8 @@ function TimetablePrintPageContent() {
         <div>
           <p className="text-sm font-semibold text-gray-900">Timetable Print Preview</p>
           <p className="text-xs text-gray-600">
-            A4 landscape. With no semester filter, Sem 1 / 3 / 5 each print on their own page so
-            nothing is cut off.
+            A4 landscape. All active semesters (e.g. 1, 3, 5) print on one page. Choose a single
+            semester to print that semester only.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -424,13 +424,13 @@ export function AcademicCalendarWorkspace() {
                   onClick={() =>
                     publishAcademicCalendar(calendarId)
                       .then(() => {
-                        setMessage('Published');
+                        setMessage('Published — events now sync to the college website calendar');
                         invalidate();
                       })
                       .catch((e) => setMessage(apiErrorMessage(e)))
                   }
                 >
-                  Publish
+                  Publish to Website
                 </Button>
                 <Button
                   variant="outline"

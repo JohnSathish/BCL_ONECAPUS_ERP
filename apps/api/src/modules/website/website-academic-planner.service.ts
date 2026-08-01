@@ -8,8 +8,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
 import {
   parseDateOnly,
-  statusLabelForType,
   toDateOnlyIso,
+  type DayKind,
 } from '../academic-calendar/academic-calendar.types';
 import { WebsiteService } from './website.service';
 
@@ -29,6 +29,11 @@ const MONTH_NAMES = [
   'DECEMBER',
 ] as const;
 
+export type PlannerEventDto = {
+  title: string;
+  type: string;
+};
+
 export type PlannerDayDto = {
   id: string;
   date: string;
@@ -38,6 +43,8 @@ export type PlannerDayDto = {
   description: string;
   isWorkingDay: boolean;
   isHighlighted: boolean;
+  dayKind?: DayKind | string;
+  events?: PlannerEventDto[];
 };
 
 export type PlannerMonthDto = {
@@ -429,7 +436,7 @@ export class WebsiteAcademicPlannerService {
   }
 
   private async getPublicFromErpCalendar(tenantId: string, slug?: string) {
-    const calendar = await this.prisma.academicCalendar.findFirst({
+    const published = await this.prisma.academicCalendar.findMany({
       where: {
         tenantId,
         deletedAt: null,
@@ -437,17 +444,32 @@ export class WebsiteAcademicPlannerService {
         academicYear: { deletedAt: null },
       },
       include: { academicYear: true },
-      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      orderBy: [{ academicYear: { startDate: 'desc' } }],
     });
+    if (!published.length) return null;
+
+    const todayIso = toDateOnlyIso(new Date());
+    const today = parseDateOnly(todayIso);
+
+    let calendar =
+      published.find((row) => {
+        const start = row.academicYear.startDate.getTime();
+        const end = row.academicYear.endDate.getTime();
+        return start <= today.getTime() && today.getTime() <= end;
+      }) ?? published[0];
+
+    if (slug) {
+      const bySlug = published.find(
+        (row) => this.slugify(row.academicYear.name || row.title) === slug,
+      );
+      if (!bySlug) return null;
+      calendar = bySlug;
+    }
+
     if (!calendar?.academicYear) return null;
 
     const year = calendar.academicYear;
     const derivedSlug = this.slugify(year.name || calendar.title);
-    if (slug && slug !== derivedSlug) {
-      // Allow CMS slug match to fall through when ERP slug does not match.
-      return null;
-    }
-
     const from = toDateOnlyIso(year.startDate);
     const to = toDateOnlyIso(year.endDate);
     const resolved = await this.workingDays.resolveRange(tenantId, from, to, {
@@ -456,22 +478,21 @@ export class WebsiteAcademicPlannerService {
     });
 
     const dayRows = resolved.map((day) => {
-      const primary = day.events[0];
-      const statusLabel = primary
-        ? statusLabelForType(primary.type)
-        : day.dayKind === 'WEEKEND'
-          ? 'Weekend'
-          : day.isWorkingDay
-            ? 'Working'
-            : 'Non-working';
-      const description = day.events.map((e) => e.title).join('\n');
+      const events = day.events.map((e) => ({
+        title: e.title,
+        type: e.type,
+      }));
+      const statusLabel = statusLabelFromDayKind(day.dayKind, day.isWorkingDay);
+      const description = events.map((e) => e.title).join('\n');
       return {
         id: `erp-${day.date}`,
         date: parseDateOnly(day.date),
         statusLabel,
         description,
         isWorkingDay: day.isWorkingDay,
-        isHighlighted: day.events.length > 0 && !day.isWorkingDay,
+        isHighlighted: events.length > 0 && !day.isWorkingDay,
+        dayKind: day.dayKind,
+        events,
       };
     });
 
@@ -489,6 +510,7 @@ export class WebsiteAcademicPlannerService {
       months: this.groupMonths(dayRows),
       source: 'ERP_ACADEMIC_CALENDAR',
       academicYearId: year.id,
+      academicYearName: year.name,
     };
   }
 
@@ -508,6 +530,8 @@ export class WebsiteAcademicPlannerService {
       description: string;
       isWorkingDay: boolean;
       isHighlighted: boolean;
+      dayKind?: string;
+      events?: PlannerEventDto[];
     }>,
   ): PlannerMonthDto[] {
     const map = new Map<string, PlannerMonthDto>();
@@ -569,8 +593,19 @@ export class WebsiteAcademicPlannerService {
     description: string;
     isWorkingDay: boolean;
     isHighlighted: boolean;
+    dayKind?: string;
+    events?: PlannerEventDto[];
   }): PlannerDayDto {
     const dow = row.date.getUTCDay();
+    const events = row.events?.length
+      ? row.events
+      : row.description
+        ? row.description
+            .split(/\n+|;\s*/)
+            .map((title) => title.trim())
+            .filter(Boolean)
+            .map((title) => ({ title, type: 'OTHER' }))
+        : [];
     return {
       id: row.id,
       date: row.date.toISOString().slice(0, 10),
@@ -580,6 +615,8 @@ export class WebsiteAcademicPlannerService {
       description: row.description,
       isWorkingDay: row.isWorkingDay,
       isHighlighted: row.isHighlighted,
+      dayKind: row.dayKind,
+      events,
     };
   }
 
@@ -623,5 +660,30 @@ export class WebsiteAcademicPlannerService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 80);
+  }
+}
+
+/** Website day badge label — mirrors ERP dayKind (WORKING / WEEKEND / BREAK…), not event type. */
+function statusLabelFromDayKind(
+  dayKind: DayKind | string,
+  isWorkingDay: boolean,
+): string {
+  switch (String(dayKind).toUpperCase()) {
+    case 'WORKING':
+    case 'HOLIDAY_CLASS':
+    case 'COMPENSATORY':
+      return 'Working';
+    case 'WEEKEND':
+      return 'Weekend';
+    case 'HOLIDAY':
+      return 'Holiday';
+    case 'BREAK':
+      return 'Break';
+    case 'EXAM':
+      return 'Exam';
+    case 'NON_WORKING':
+      return 'Non-working';
+    default:
+      return isWorkingDay ? 'Working' : 'Non-working';
   }
 }

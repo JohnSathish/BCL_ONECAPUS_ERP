@@ -41,7 +41,7 @@ export default async function AcademicCalendarPage({ searchParams }: Props) {
           <h1>{planner?.title ?? 'Academic Calendar'}</h1>
           <p>
             {planner
-              ? `${planner.startDate} to ${planner.endDate} · month-by-month class days, events and working-day totals.`
+              ? `${planner.startDate} to ${planner.endDate} · synced from the ERP Academic Calendar · month-by-month class days, events and working-day totals.`
               : 'The academic calendar will appear here once an ERP Academic Calendar is published for this academic year.'}
           </p>
         </div>

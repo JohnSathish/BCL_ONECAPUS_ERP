@@ -82,8 +82,8 @@ export function AcademicCalendarEventFormDialog({
       visibilityStudents: true,
       visibilityStaff: true,
       visibilityParents: false,
-      visibilityPublic: false,
-      publishedToWebsite: false,
+      visibilityPublic: true,
+      publishedToWebsite: true,
       isRecurring: false,
       recurrenceFreq: 'NONE',
       organizerName: '',
@@ -139,8 +139,8 @@ export function AcademicCalendarEventFormDialog({
         visibilityStudents: true,
         visibilityStaff: true,
         visibilityParents: false,
-        visibilityPublic: false,
-        publishedToWebsite: false,
+        visibilityPublic: true,
+        publishedToWebsite: true,
         isRecurring: false,
         recurrenceFreq: 'NONE',
         organizerName: '',
@@ -271,7 +271,13 @@ export function AcademicCalendarEventFormDialog({
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...form.register('publishedToWebsite')} /> Publish to website
+              (college calendar)
             </label>
+            <p className="text-xs text-muted-foreground">
+              On by default. ERP Academic Calendar is the single source for{' '}
+              <code className="text-[11px]">/academics/calendar</code> after you click Publish on
+              the calendar.
+            </p>
           </div>
 
           <div className="space-y-2 rounded-md border border-border p-3">
