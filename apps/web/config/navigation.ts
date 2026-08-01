@@ -2586,7 +2586,7 @@ export const STUDENT_NAV: NavGroup[] = [
       { label: 'Results', href: '/student/results', icon: BarChart3 },
       { label: 'Subjects', href: '/student/registration', icon: ClipboardList },
       { label: 'LMS', href: '/student/lms', icon: GraduationCap },
-      { label: 'Academic Calendar', href: '/student/notifications', icon: CalendarDays },
+      { label: 'Academic Calendar', href: '/student/calendar', icon: CalendarDays },
       { label: 'Examinations', href: '/student/examinations', icon: Ticket },
       { label: 'Syllabus', href: '/student/syllabus-repository', icon: Library },
       { label: 'Question Bank', href: '/student/question-bank', icon: HelpCircle },

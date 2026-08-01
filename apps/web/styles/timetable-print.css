@@ -34,6 +34,26 @@ body.timetable-print-mode {
   line-height: 1.25;
 }
 
+.timetable-print-pack {
+  display: block;
+  width: 100%;
+}
+
+.timetable-print-pack .timetable-print-document {
+  margin: 0 auto 1.5rem;
+}
+
+.timetable-print-sheet-banner {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111827;
+  background: #e5e7eb;
+  border: 1px solid #9ca3af;
+  border-radius: 0.375rem;
+}
+
 .timetable-print-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -324,11 +344,18 @@ body.timetable-print-mode {
   }
 
   .timetable-print-toolbar,
+  .timetable-print-sheet-banner,
   .no-print {
     display: none !important;
   }
 
-  .timetable-print-document {
+  .timetable-print-pack {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .timetable-print-document,
+  .timetable-print-sheet {
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
@@ -337,6 +364,22 @@ body.timetable-print-mode {
     padding: 0 !important;
     overflow: visible !important;
     display: block !important;
+  }
+
+  /* One semester per A4 landscape sheet */
+  .timetable-print-sheet {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .timetable-print-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .timetable-print-sheet + .timetable-print-sheet {
+    break-before: page;
+    page-break-before: always;
   }
 
   .timetable-print-table {

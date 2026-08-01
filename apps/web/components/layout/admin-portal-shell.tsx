@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { WorkspaceThemeEffect } from '@/components/layout/workspace-theme-effect';
@@ -9,6 +10,18 @@ import { cn } from '@/utils/cn';
 /** Persistent admin chrome — sidebar mounts once per admin session. */
 export function AdminPortalShell({ children }: { children: React.ReactNode }) {
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
+  const pathname = usePathname();
+  const isTimetablePrint = pathname?.startsWith('/admin/academics/timetable/print');
+
+  // Dedicated print tab: no sidebar / bottom nav / viewport clip so all periods print.
+  if (isTimetablePrint) {
+    return (
+      <div className="min-h-dvh w-full bg-background">
+        <WorkspaceThemeEffect />
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-dvh max-h-dvh w-full max-w-full overflow-hidden bg-background">
@@ -26,7 +39,6 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
           collapsed ? 'md:pl-[72px]' : 'md:pl-[260px] lg:pl-[280px]',
         )}
       >
-        {/* Bounded flex child so page shells (DashboardShell) can scroll internally. */}
         <div
           id="main-content"
           tabIndex={-1}

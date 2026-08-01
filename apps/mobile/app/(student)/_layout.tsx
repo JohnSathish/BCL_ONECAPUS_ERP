@@ -55,6 +55,7 @@ export default function StudentLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="attendance" />
           <Stack.Screen name="timetable" />
+          <Stack.Screen name="calendar" />
           <Stack.Screen name="exam-schedule" />
           <Stack.Screen name="examination-fees" />
           <Stack.Screen name="results" />

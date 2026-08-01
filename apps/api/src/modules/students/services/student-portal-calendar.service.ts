@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { AcademicCalendarService } from '../../academic-calendar/academic-calendar.service';
 import { ENROLLED_LINE_STATUSES } from '../../lms/constants/lms.constants';
 import { MoodleCalendarService } from '../../moodle/moodle-calendar.service';
 
@@ -16,6 +17,7 @@ export class StudentPortalCalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly moodleCalendar: MoodleCalendarService,
+    private readonly academicCalendar: AcademicCalendarService,
   ) {}
 
   async buildForStudent(
@@ -206,6 +208,16 @@ export class StudentPortalCalendarService {
         title: me.title,
         subtitle: me.subtitle ?? 'Moodle',
       });
+    }
+
+    const academicEvents = await this.academicCalendar.listPortalEvents(
+      tenantId,
+      'students',
+      from,
+      to,
+    );
+    for (const ev of academicEvents) {
+      events.push(ev);
     }
 
     return events.sort((a, b) => a.date.localeCompare(b.date));

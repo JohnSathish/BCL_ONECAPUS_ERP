@@ -15,6 +15,7 @@ import { LmsModule } from '../lms/lms.module';
 import { MoodleModule } from '../moodle/moodle.module';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { TimetableEngineModule } from '../timetable-engine/timetable-engine.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { StudentBulkUpdateController } from './bulk-update/student-bulk-update.controller';
 import { StudentBulkSectionWriterService } from './bulk-update/student-bulk-section-writer.service';
 import { StudentBulkUpdateProcessor } from './bulk-update/student-bulk-update.processor';
@@ -75,6 +76,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
     TimetableEngineModule,
     LibraryModule,
     IdCardsModule,
+    AcademicCalendarModule,
   ],
   controllers: [
     StudentPortalController,

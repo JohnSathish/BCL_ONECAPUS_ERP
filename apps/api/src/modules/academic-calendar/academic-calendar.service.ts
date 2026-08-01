@@ -12,12 +12,14 @@ import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ACADEMIC_CALENDAR_EVENT_TYPES,
+  EXAM_TYPES,
   defaultColorForType,
   defaultCreatesAttendanceSession,
   defaultIsWorkingDayForType,
   filterGroupForType,
   mapStaffHolidayType,
   parseDateOnly,
+  statusLabelForType,
   toDateOnlyIso,
   type CalendarAttachmentMeta,
   type CalendarVisibilityFlags,
@@ -967,6 +969,134 @@ export class AcademicCalendarService {
     },
   ) {
     return this.engine.resolveRange(tenantId, from, to, ctx);
+  }
+
+  /**
+   * Portal-facing events from PUBLISHED Academic Calendars (student / staff dashboards + mobile).
+   * Filters by visibilityFlags; skips engine noise (WORKING_DAY / WEEKEND).
+   */
+  async listPortalEvents(
+    tenantId: string,
+    audience: 'students' | 'staff',
+    from: Date,
+    to: Date,
+  ): Promise<
+    Array<{
+      id: string;
+      date: string;
+      type: 'exam' | 'holiday' | 'assignment' | 'fee' | 'event';
+      title: string;
+      subtitle?: string | null;
+    }>
+  > {
+    const rows = await this.prisma.academicCalendarEvent.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        active: true,
+        startDate: { lte: to },
+        endDate: { gte: from },
+        type: { notIn: ['WORKING_DAY', 'WEEKEND'] },
+        calendar: {
+          deletedAt: null,
+          status: 'PUBLISHED',
+        },
+      },
+      orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
+      take: 500,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        description: true,
+        startDate: true,
+        endDate: true,
+        visibility: true,
+        visibilityFlags: true,
+        venue: true,
+      },
+    });
+
+    const out: Array<{
+      id: string;
+      date: string;
+      type: 'exam' | 'holiday' | 'assignment' | 'fee' | 'event';
+      title: string;
+      subtitle?: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      if (
+        !this.portalAudienceAllowed(
+          row.visibilityFlags,
+          audience,
+          row.visibility,
+        )
+      ) {
+        continue;
+      }
+      const startIso = toDateOnlyIso(row.startDate);
+      const endIso = toDateOnlyIso(row.endDate);
+      const rangeStart =
+        startIso > toDateOnlyIso(from) ? startIso : toDateOnlyIso(from);
+      const rangeEnd = endIso < toDateOnlyIso(to) ? endIso : toDateOnlyIso(to);
+      // Emit one chip per day in the visible range (capped for long breaks).
+      let cursor = parseDateOnly(rangeStart);
+      const last = parseDateOnly(rangeEnd);
+      let dayCount = 0;
+      while (cursor.getTime() <= last.getTime() && dayCount < 31) {
+        const dateIso = toDateOnlyIso(cursor);
+        out.push({
+          id: `academic-${row.id}-${dateIso}`,
+          date: dateIso,
+          type: this.portalTypeForAcademicEvent(row.type),
+          title: row.title,
+          subtitle:
+            [statusLabelForType(row.type), row.venue?.trim() || null]
+              .filter(Boolean)
+              .join(' · ') || statusLabelForType(row.type),
+        });
+        cursor = new Date(cursor.getTime() + 86_400_000);
+        dayCount += 1;
+      }
+    }
+
+    return out;
+  }
+
+  private portalAudienceAllowed(
+    flags: unknown,
+    audience: 'students' | 'staff',
+    visibility: string,
+  ): boolean {
+    const parsed =
+      flags && typeof flags === 'object' && !Array.isArray(flags)
+        ? (flags as CalendarVisibilityFlags)
+        : {};
+    if (audience === 'students') {
+      if (typeof parsed.students === 'boolean') return parsed.students;
+      // Default: PUBLIC always; INTERNAL allowed unless explicitly opted out
+      return visibility === 'PUBLIC' || parsed.students !== false;
+    }
+    if (typeof parsed.staff === 'boolean') return parsed.staff;
+    return visibility === 'PUBLIC' || parsed.staff !== false;
+  }
+
+  private portalTypeForAcademicEvent(
+    type: string,
+  ): 'exam' | 'holiday' | 'assignment' | 'fee' | 'event' {
+    if (EXAM_TYPES.has(type) || type === 'HALL_TICKET' || type === 'RESULT') {
+      return 'exam';
+    }
+    if (
+      type.includes('HOLIDAY') ||
+      type === 'WEATHER_CLOSURE' ||
+      type === 'TEACHING_BREAK'
+    ) {
+      return 'holiday';
+    }
+    if (type === 'FEE_DUE' || type === 'FEE_FINE_START') return 'fee';
+    return 'event';
   }
 
   async listPublicWebsiteEvents(tenantId: string, limit = 12) {

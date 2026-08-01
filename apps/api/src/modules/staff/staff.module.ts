@@ -8,6 +8,7 @@ import { CommunicationModule } from '../communication/communication.module';
 import { GovernanceModule } from '../governance/governance.module';
 import { LmsModule } from '../lms/lms.module';
 import { MoodleModule } from '../moodle/moodle.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { AdministrationModule } from '../administration/administration.module';
 import { ShiftsModule } from '../shifts/shifts.module';
 import { StaffImportCommitService } from './import/staff-import-commit.service';
@@ -47,6 +48,7 @@ import { StaffProfileReviewService } from './services/staff-profile-review.servi
     forwardRef(() => GovernanceModule),
     LmsModule,
     MoodleModule,
+    AcademicCalendarModule,
     ImportModule,
     QueueModule,
     LicensingModule,

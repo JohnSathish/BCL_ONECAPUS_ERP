@@ -26,6 +26,13 @@ export type StudentHomeSnapshot = {
   academicChips?: { category: string; label: string; courseTitle: string }[];
   unreadNotificationCount?: number;
   quickStats?: { key: string; title: string; value: string; tone?: string }[];
+  calendarEvents?: {
+    id: string;
+    date: string;
+    type?: string;
+    title: string;
+    subtitle?: string | null;
+  }[];
 };
 
 type StudentPortalContextValue = {

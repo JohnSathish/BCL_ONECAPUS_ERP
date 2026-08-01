@@ -44,6 +44,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         keywords: ['schedule', 'class'],
       },
       {
+        id: 'calendar',
+        label: 'Academic Calendar',
+        href: '/(student)/calendar',
+        keywords: ['calendar', 'holiday', 'event', 'exam'],
+      },
+      {
         id: 'assignments',
         label: 'Assignments',
         href: '/(student)/assignments',

@@ -13,13 +13,18 @@ export class MobileHomeService {
   ) {}
 
   async studentHome(user: JwtUser) {
-    const [dashboard, config] = await Promise.all([
+    const [dashboard, config, calendarEvents] = await Promise.all([
       this.studentPortal.getDashboard(user),
       this.settings.getConfigPayload(user.tid, 'STUDENT'),
+      this.studentPortal.getDashboardWidgetCalendar(user).catch(() => []),
     ]);
     const enabledCards = Object.entries(config.dashboardCards)
       .filter(([, on]) => on)
       .map(([key]) => key);
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = (calendarEvents ?? [])
+      .filter((ev) => ev.date >= today)
+      .slice(0, 12);
     return {
       profile: {
         ...dashboard.profile,
@@ -46,6 +51,7 @@ export class MobileHomeService {
           : null,
       },
       unreadNotificationCount: dashboard.unreadNotificationCount,
+      calendarEvents: upcoming,
       enabledCards,
       dashboardCards: config.dashboardCards,
     };

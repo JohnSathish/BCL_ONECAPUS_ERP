@@ -9,6 +9,7 @@ import { AcademicLifecycleService } from '../../academic-lifecycle/academic-life
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { BirthdayQueryService } from '../../communication/services/birthday-query.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
+import { AcademicCalendarService } from '../../academic-calendar/academic-calendar.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { getZonedHour } from '../../../common/utils/time-greeting';
 
@@ -59,6 +60,7 @@ export class StaffPortalService {
     private readonly notifications: UserNotificationsService,
     private readonly lms: LmsDashboardService,
     private readonly birthdays: BirthdayQueryService,
+    private readonly academicCalendar: AcademicCalendarService,
   ) {}
 
   async resolveStaffProfile(tenantId: string, userId: string) {
@@ -348,6 +350,7 @@ export class StaffPortalService {
       pendingLessonPlans,
       examDutyAssigned,
       calendarHolidays,
+      academicPortalEvents,
       governanceMemberships,
       governancePendingAtr,
       governancePendingTasks,
@@ -404,6 +407,12 @@ export class StaffPortalService {
         },
         select: { id: true, name: true, holidayDate: true, holidayType: true },
       }),
+      this.academicCalendar.listPortalEvents(
+        user.tid,
+        'staff',
+        monthStart,
+        calendarEnd,
+      ),
       (this.prisma as any).governanceCommitteeMember
         .count({
           where: { tenantId: user.tid, userId: user.sub, status: 'ACTIVE' },
@@ -507,13 +516,16 @@ export class StaffPortalService {
       governanceUpcomingMeetings,
     };
 
-    const calendarEvents = calendarHolidays.map((h) => ({
-      id: `holiday-${h.id}`,
-      date: h.holidayDate.toISOString().slice(0, 10),
-      type: 'holiday' as const,
-      title: h.name,
-      subtitle: h.holidayType,
-    }));
+    const calendarEvents = [
+      ...calendarHolidays.map((h) => ({
+        id: `holiday-${h.id}`,
+        date: h.holidayDate.toISOString().slice(0, 10),
+        type: 'holiday' as const,
+        title: h.name,
+        subtitle: h.holidayType,
+      })),
+      ...academicPortalEvents,
+    ].sort((a, b) => a.date.localeCompare(b.date));
 
     const notifications = notificationRows.map((n) => ({
       id: n.id,

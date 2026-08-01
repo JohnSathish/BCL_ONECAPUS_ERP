@@ -108,6 +108,26 @@ export default function StudentHomeScreen() {
           onPressNotifications={() => router.push('/(student)/(tabs)/notifications' as never)}
         />
 
+        <Pressable
+          style={styles.snapshotCard}
+          onPress={() => router.push('/(student)/calendar' as never)}
+        >
+          <Text style={styles.sectionTitle}>📅 Academic Calendar</Text>
+          {(home?.calendarEvents ?? []).length === 0 ? (
+            <Text style={styles.widgetLine}>Holidays, meetings, exams and fee due dates.</Text>
+          ) : (
+            (home?.calendarEvents ?? []).slice(0, 4).map((ev) => (
+              <View key={ev.id} style={styles.snapshotRow}>
+                <Text style={styles.snapshotLabel}>{ev.date.slice(5)}</Text>
+                <Text style={styles.snapshotValue} numberOfLines={1}>
+                  {ev.title}
+                </Text>
+              </View>
+            ))
+          )}
+          <Text style={styles.actionText}>View full calendar →</Text>
+        </Pressable>
+
         {academicChips.length > 0 ? (
           <Pressable
             style={styles.snapshotCard}
