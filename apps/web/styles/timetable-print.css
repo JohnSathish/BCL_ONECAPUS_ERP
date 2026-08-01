@@ -28,70 +28,74 @@ body.timetable-print-mode {
   color: #111;
   border: 1px solid #d1d5db;
   box-shadow: 0 4px 24px rgb(0 0 0 / 8%);
-  padding: 14mm 12mm 16mm;
+  padding: 10mm 10mm 12mm;
   font-family: var(--font-geist-sans, 'Segoe UI', Arial, sans-serif);
-  font-size: 10pt;
-  line-height: 1.35;
+  font-size: 9pt;
+  line-height: 1.25;
 }
 
 .timetable-print-header {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 12px 16px;
+  gap: 8px 12px;
   align-items: center;
-  border-bottom: 2px solid #111;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
+  border-bottom: 1.5px solid #111;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
 }
 
 .timetable-print-logo {
-  width: 56px;
-  height: 56px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
 }
 
 .timetable-print-logo-placeholder {
-  width: 56px;
-  height: 56px;
+  width: 42px;
+  height: 42px;
   border: 1px solid #9ca3af;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9pt;
+  font-size: 8pt;
   font-weight: 700;
   color: #374151;
 }
 
 .timetable-print-institution-name {
-  font-size: 16pt;
+  font-size: 13pt;
   font-weight: 700;
   letter-spacing: 0.02em;
   margin: 0;
+  line-height: 1.2;
 }
 
 .timetable-print-institution-sub {
-  font-size: 9pt;
+  font-size: 8pt;
   color: #374151;
-  margin: 2px 0 0;
+  margin: 1px 0 0;
+  line-height: 1.2;
 }
 
 .timetable-print-title {
-  font-size: 13pt;
+  font-size: 11pt;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 5px;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
 }
 
 .timetable-print-meta {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin-bottom: 10px;
-  font-size: 9pt;
+  gap: 3px 10px;
+  margin-bottom: 6px;
+  font-size: 7.5pt;
   border: 1px solid #9ca3af;
-  padding: 8px 10px;
+  padding: 4px 8px;
+  line-height: 1.2;
 }
 
 .timetable-print-meta dt {
@@ -112,7 +116,7 @@ body.timetable-print-mode {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 8.5pt;
+  font-size: 7.5pt;
 }
 
 .timetable-print-table thead {
@@ -123,7 +127,7 @@ body.timetable-print-mode {
 .timetable-print-table td {
   border: 1px solid #111;
   vertical-align: top;
-  padding: 5px 6px;
+  padding: 3px 4px;
   word-wrap: break-word;
 }
 
@@ -132,13 +136,16 @@ body.timetable-print-mode {
   color: #111 !important;
   font-weight: 700;
   text-align: center;
+  font-size: 7.5pt;
+  padding: 3px 4px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
 .timetable-print-table .time-col {
-  width: 88px;
+  width: 78px;
   font-weight: 600;
+  font-size: 7pt;
   background: #f3f4f6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -148,16 +155,17 @@ body.timetable-print-mode {
   background: #fef3c7 !important;
   text-align: center;
   font-weight: 700;
-  font-size: 8pt;
-  letter-spacing: 0.08em;
+  font-size: 7pt;
+  letter-spacing: 0.06em;
+  padding: 2px 4px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
 .timetable-print-slot {
   border: 1px solid #374151;
-  padding: 4px 5px;
-  margin-bottom: 4px;
+  padding: 2px 3px;
+  margin-bottom: 2px;
   background: #fff;
   page-break-inside: avoid;
   break-inside: avoid;
@@ -170,74 +178,115 @@ body.timetable-print-mode {
 .timetable-print-slot-head {
   display: flex;
   justify-content: space-between;
-  gap: 4px;
+  gap: 3px;
   font-weight: 700;
-  font-size: 8pt;
+  font-size: 7pt;
+  line-height: 1.15;
 }
 
 .timetable-print-slot-cat {
   border: 1px solid #111;
-  padding: 0 4px;
-  font-size: 7pt;
+  padding: 0 3px;
+  font-size: 6pt;
   font-weight: 600;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .timetable-print-slot-title {
-  margin: 2px 0 0;
-  font-size: 7.5pt;
+  margin: 1px 0 0;
+  font-size: 6.5pt;
+  line-height: 1.2;
+  max-height: 2.4em;
+  overflow: hidden;
+}
+
+.timetable-print-slot-faculty {
+  margin: 1px 0 0;
+  font-size: 6pt;
+  line-height: 1.2;
+  color: #111827;
+  max-height: 1.2em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .timetable-print-slot-meta {
-  margin: 3px 0 0;
-  font-size: 7pt;
+  margin: 1px 0 0;
+  font-size: 6pt;
+  line-height: 1.15;
   color: #1f2937;
 }
 
 .timetable-print-empty {
   color: #6b7280;
   text-align: center;
-  font-size: 8pt;
+  font-size: 7pt;
 }
 
 .timetable-print-legend {
-  margin-top: 10px;
+  margin-top: 5px;
   border-top: 1px solid #9ca3af;
-  padding-top: 8px;
-  page-break-inside: avoid;
-  break-inside: avoid;
+  padding-top: 4px;
 }
 
 .timetable-print-legend-title {
-  font-size: 8pt;
+  font-size: 7pt;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin: 0 0 3px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .timetable-print-legend-items {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 10px;
-  font-size: 7.5pt;
+  gap: 3px 6px;
+  font-size: 6.5pt;
+  line-height: 1.2;
 }
 
 .timetable-print-legend-item {
   border: 1px solid #374151;
-  padding: 2px 6px;
+  padding: 1px 4px;
   font-weight: 600;
 }
 
+.timetable-print-staff-directory {
+  margin-top: 4px;
+  border-top: 1px solid #9ca3af;
+  padding-top: 4px;
+}
+
+.timetable-print-staff-directory-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  font-size: 6.5pt;
+  line-height: 1.25;
+}
+
+.timetable-print-staff-directory-item {
+  border: 1px solid #374151;
+  padding: 1px 5px;
+  background: #f9fafb;
+}
+
+.timetable-print-staff-directory-item strong {
+  font-weight: 800;
+}
+
 .timetable-print-footer {
-  margin-top: 10px;
-  padding-top: 6px;
+  margin-top: 4px;
+  padding-top: 3px;
   border-top: 1px solid #9ca3af;
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 7.5pt;
+  gap: 8px;
+  font-size: 6.5pt;
   color: #374151;
+  line-height: 1.2;
 }
 
 .timetable-print-page-number::after {
@@ -254,7 +303,7 @@ body.timetable-print-mode {
 @media print {
   @page {
     size: A4 landscape;
-    margin: 10mm 8mm 14mm;
+    margin: 6mm 6mm 6mm;
   }
 
   html,
@@ -262,11 +311,13 @@ body.timetable-print-mode {
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
   }
 
   .timetable-print-shell {
     background: #fff !important;
     padding: 0 !important;
+    min-height: 0 !important;
   }
 
   .timetable-print-toolbar,
@@ -283,6 +334,7 @@ body.timetable-print-mode {
     padding: 0;
   }
 
+  /* Keep routine + legend + footer together on one sheet when possible */
   .timetable-print-table tr {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -292,17 +344,19 @@ body.timetable-print-mode {
     display: table-header-group;
   }
 
+  .timetable-print-legend,
+  .timetable-print-staff-directory,
   .timetable-print-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    border-top: 1px solid #9ca3af;
-    background: #fff;
-    padding: 4mm 8mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-before: avoid;
+    break-before: avoid;
   }
 
-  .timetable-print-document {
-    padding-bottom: 12mm;
+  /* In-flow footer so it prints with the legend (fixed was clipping / Page 0 of 0) */
+  .timetable-print-footer {
+    position: static;
+    background: transparent;
+    padding: 3px 0 0;
   }
 }

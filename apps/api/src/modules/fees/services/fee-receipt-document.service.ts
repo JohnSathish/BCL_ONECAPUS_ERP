@@ -5,6 +5,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { StorageService } from '../../../shared/storage/storage.service';
 import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import {
+  buildBulkFeeReceiptA4Html,
   buildFeeReceiptHtml,
   buildFeeReceiptStorageKey,
   FEE_RECEIPT_TEMPLATE_VERSION,
@@ -13,6 +14,7 @@ import {
   resolveFeeReceiptBranding,
   resolveReceiptLines,
   resolveReceiptTemplateFormat,
+  wrapHalfReceiptOnA4,
   type ReceiptTemplateFormat,
 } from '../templates/fee-receipt.template';
 
@@ -86,55 +88,20 @@ export class FeeReceiptDocumentService {
     const format = resolveReceiptTemplateFormat(
       settings.metadata as Record<string, unknown> | null,
     );
-    const sheets: string[] = [];
+    const receiptHtmlList: string[] = [];
 
     for (const receiptId of receiptIds) {
       const payload = await this.buildReceiptPayload(tenantId, receiptId);
-      const html = buildFeeReceiptHtml(payload, format);
-      const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
-      sheets.push(`<div class="receipt-sheet">${body}</div>`);
+      // Always render half-sized body for 2-up packing; thermal stays as-is via format
+      const sheetFormat: ReceiptTemplateFormat =
+        format === 'thermal' ? 'thermal' : 'half';
+      receiptHtmlList.push(buildFeeReceiptHtml(payload, sheetFormat));
     }
 
-    const perPage = layout === 'two_per_page' ? 2 : 1;
-    const pages: string[] = [];
-    for (let i = 0; i < sheets.length; i += perPage) {
-      const chunk = sheets
-        .slice(i, i + perPage)
-        .join('<div class="cut-line"></div>');
-      pages.push(`<div class="a4-page">${chunk}</div>`);
-    }
-
-    const merged = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
-      @page { size: A4 portrait; margin: 0; }
-      body { margin: 0; font-family: Inter, Roboto, sans-serif; background: #fff; }
-      .a4-page {
-        width: 210mm; height: 297mm; page-break-after: always;
-        display: flex; flex-direction: column; box-sizing: border-box;
-      }
-      .receipt-sheet {
-        flex: 0 0 148mm;
-        height: 148mm;
-        overflow: hidden;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      .cut-line {
-        border-top: 1px dashed #94a3b8;
-        margin: 0;
-        flex-shrink: 0;
-        position: relative;
-      }
-      .cut-line::after {
-        content: '✂ cut here';
-        position: absolute;
-        right: 8mm;
-        top: -7px;
-        font-size: 7px;
-        color: #94a3b8;
-        background: #fff;
-        padding: 0 4px;
-      }
-    </style></head><body>${pages.join('')}</body></html>`;
+    const merged =
+      format === 'thermal'
+        ? receiptHtmlList.join('')
+        : buildBulkFeeReceiptA4Html(receiptHtmlList, layout);
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -299,6 +266,7 @@ export class FeeReceiptDocumentService {
 
     const payload = await this.buildReceiptPayload(tenantId, receiptId);
     const html = buildFeeReceiptHtml(payload, format);
+    const renderHtml = format === 'half' ? wrapHalfReceiptOnA4(html) : html;
     const pdfOpts = receiptPdfOptions(format);
 
     const browser = await puppeteer.launch({
@@ -308,7 +276,7 @@ export class FeeReceiptDocumentService {
     let buffer: Buffer;
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'load', timeout: 15000 });
+      await page.setContent(renderHtml, { waitUntil: 'load', timeout: 15000 });
       buffer = Buffer.from(await page.pdf(pdfOpts));
     } finally {
       await browser.close();

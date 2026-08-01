@@ -2,12 +2,31 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 
-export const FEE_RECEIPT_TEMPLATE_VERSION = 'v6';
+export function resolveAssetSrc(assetUrl?: string | null): string | null {
+  if (!assetUrl) return null;
+  if (/^https?:\/\//i.test(assetUrl) || assetUrl.startsWith('data:')) return assetUrl;
+  const cleaned = assetUrl.replace(/^\/+/, '');
+  const candidates = [
+    join(process.cwd(), 'storage', cleaned),
+    join(process.cwd(), 'apps', 'api', 'storage', cleaned),
+    join(process.cwd(), cleaned),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return pathToFileURL(candidate).href;
+  }
+  return assetUrl.startsWith('/') ? assetUrl : `/${cleaned}`;
+}
+
+async function resolvePdfImageSrcAsync(assetUrl?: string | null): Promise<string | null> {
+  return resolveAssetSrc(assetUrl);
+}
+
+export const FEE_RECEIPT_TEMPLATE_VERSION = 'v10';
 
 export type ReceiptTemplateFormat = 'full' | 'half' | 'thermal';
 
 export const RECEIPT_TEMPLATE_LABELS: Record<ReceiptTemplateFormat, string> = {
-  full: 'Full A4 receipt (detailed)',
+  full: 'Full A4 portrait receipt (official)',
   half: 'Half A4 receipt (compact, 2 per sheet)',
   thermal: 'Thermal printer receipt (80mm)',
 };
@@ -61,6 +80,9 @@ export type FeeReceiptHtmlInput = {
   transactionRef: string;
   utrNumber?: string | null;
   collectedBy: string;
+  /** Authorized fee collection center (Net Café / CSC) when paid via center portal. */
+  collectionCenterName?: string | null;
+  operatorName?: string | null;
   verifyUrl: string;
 };
 
@@ -76,24 +98,44 @@ export function inr(amount: number) {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function resolveAssetSrc(assetUrl?: string | null): string | null {
-  if (!assetUrl) return null;
-  if (
-    assetUrl.startsWith('http://') ||
-    assetUrl.startsWith('https://') ||
-    assetUrl.startsWith('data:')
-  )
-    return assetUrl;
-  if (assetUrl.startsWith('/uploads/') || assetUrl.startsWith('/branding/')) {
-    const candidates = [
-      join(process.cwd(), assetUrl.replace(/^\//, '')),
-      join(process.cwd(), '..', 'web', 'public', assetUrl.replace(/^\//, '')),
-    ];
-    for (const absolute of candidates) {
-      if (existsSync(absolute)) return pathToFileURL(absolute).href;
+export function formatBillingPeriodLabel(period?: string | null): string {
+  if (!period?.trim()) return '—';
+  const trimmed = period.trim();
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(trimmed);
+  if (monthMatch) {
+    const monthIndex = Number(monthMatch[2]) - 1;
+    if (monthIndex >= 0 && monthIndex <= 11) {
+      return new Date(Number(monthMatch[1]), monthIndex, 1).toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+      });
     }
   }
-  return null;
+  if (/^CYCLE-/i.test(trimmed)) {
+    return trimmed.replace(/^CYCLE-/i, 'Admission Cycle ');
+  }
+  return trimmed;
+}
+
+function billingPeriodSortKey(period: string): string {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(period.trim());
+  return monthMatch ? period.trim() : `z-${period}`;
+}
+
+function collectFormattedBillingPeriods(
+  allocations: Array<{ demand?: Record<string, unknown> }>,
+): string[] {
+  const rawPeriods = allocations
+    .map((allocation) => {
+      const demand = allocation.demand;
+      const metadata = demand?.metadata as { feeCycleName?: string } | undefined;
+      return String(demand?.billingPeriod ?? metadata?.feeCycleName ?? '').trim();
+    })
+    .filter(Boolean);
+  const unique = [...new Set(rawPeriods)].sort((a, b) =>
+    billingPeriodSortKey(a).localeCompare(billingPeriodSortKey(b)),
+  );
+  return unique.map((period) => formatBillingPeriodLabel(period)).filter((label) => label !== '—');
 }
 
 const ONES = [
@@ -189,6 +231,10 @@ function mapDemandAllocation(demand: Record<string, unknown>, amount: number): F
   const metadata = (demand.metadata as Record<string, unknown> | undefined) ?? {};
   const demandType = String(demand.demandType ?? 'GENERAL');
   const lines = (demand.lines as Array<{ name: string }> | undefined) ?? [];
+  const billingPeriod = String(demand.billingPeriod ?? '').trim();
+  const periodLabel = formatBillingPeriodLabel(
+    billingPeriod || String(metadata.feeCycleName ?? ''),
+  );
 
   let component = 'Fee';
   if (demandType === 'MONTHLY_TUITION') component = 'Monthly Fee';
@@ -196,49 +242,43 @@ function mapDemandAllocation(demand: Record<string, unknown>, amount: number): F
   else if (lines.some((l) => /tuition|monthly/i.test(l.name))) component = 'Monthly Fee';
 
   const feeHead =
-    String(metadata.feeCycleName ?? '') ||
-    String(demand.billingPeriod ?? '') ||
-    String(demand.demandNo ?? 'Fee');
+    periodLabel !== '—'
+      ? periodLabel
+      : String(metadata.feeCycleName ?? '') || billingPeriod || String(demand.demandNo ?? 'Fee');
 
-  const description =
-    lines.length > 0
-      ? lines.map((l) => l.name).join(' · ')
-      : demandType === 'MONTHLY_TUITION'
-        ? `Monthly tuition · ${feeHead}`
-        : String(metadata.covers ?? metadata.description ?? component);
+  const lineNames = lines.length > 0 ? lines.map((l) => l.name).join(' · ') : '';
+  let description = lineNames;
+  if (demandType === 'MONTHLY_TUITION' && periodLabel !== '—') {
+    description = lineNames ? `${lineNames} · ${periodLabel}` : `Monthly tuition · ${periodLabel}`;
+  } else if (!description) {
+    description = String(metadata.covers ?? metadata.description ?? component);
+  }
 
   return { component, feeHead, description, amount };
 }
 
 export function resolveFeeCycleLabel(receipt: Record<string, unknown>) {
-  const payment = receipt.payment as
-    | { allocations?: Array<{ demand?: Record<string, unknown> }> }
-    | undefined;
-  const allocations = payment?.allocations ?? [];
-  if (allocations.length === 1) {
-    const demand = allocations[0].demand;
-    const metadata = demand?.metadata as { feeCycleName?: string } | undefined;
-    const receiptDemand = receipt.demand as
-      | { metadata?: { feeCycleName?: string }; billingPeriod?: string }
-      | undefined;
-    return (
-      metadata?.feeCycleName ??
-      demand?.billingPeriod ??
-      receiptDemand?.metadata?.feeCycleName ??
-      '—'
-    );
+  const allocations =
+    (receipt.payment as { allocations?: Array<{ demand?: Record<string, unknown> }> } | undefined)
+      ?.allocations ?? [];
+  if (allocations.length) {
+    const periods = collectFormattedBillingPeriods(allocations);
+    if (periods.length) return periods.join(', ');
   }
-  if (allocations.length > 1) return 'Multiple fee heads';
+
   const receiptDemand = receipt.demand as
     | { metadata?: { feeCycleName?: string }; billingPeriod?: string }
     | undefined;
-  return receiptDemand?.metadata?.feeCycleName ?? receiptDemand?.billingPeriod ?? '—';
+  const fallback = formatBillingPeriodLabel(
+    receiptDemand?.billingPeriod ?? receiptDemand?.metadata?.feeCycleName ?? '',
+  );
+  return fallback !== '—' ? fallback : '—';
 }
 
 export function buildFeeReceiptStorageKey(
   tenantId: string,
   receiptNo: string,
-  format: ReceiptTemplateFormat = 'half',
+  format: ReceiptTemplateFormat = 'full',
 ) {
   return `fee-receipts/${tenantId}/${receiptNo.replace(/\//g, '_')}_${FEE_RECEIPT_TEMPLATE_VERSION}_${format}.pdf`;
 }
@@ -254,14 +294,13 @@ export function receiptPdfOptions(format: ReceiptTemplateFormat) {
         margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' },
       };
     case 'half':
-      // Half of portrait A4: 210mm wide × 148mm tall (two stack on one A4 when cut)
+      // Half content is wrapped onto A4 (top 148mm + cut line) so printers don't scale up
       return {
-        width: '210mm',
-        height: '148mm',
+        format: 'A4' as const,
         landscape: false,
         preferCSSPageSize: true,
         printBackground: true,
-        margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' },
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
       };
     case 'thermal':
       return {
@@ -276,7 +315,11 @@ export function receiptPdfOptions(format: ReceiptTemplateFormat) {
 }
 
 function formatReceiptDate(date: Date) {
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function formatReceiptDateTime(date: Date) {
@@ -302,30 +345,145 @@ function formatReceiptDateCompact(date: Date) {
   return `${day} ${month} ${date.getFullYear()}`;
 }
 
-function linePeriod(line: FeeReceiptLine, feeCycle: string) {
-  if (/^\d{4}-\d{2}$/.test(line.feeHead)) return line.feeHead;
-  if (/monthly/i.test(line.component) && feeCycle !== '—') return feeCycle;
-  return line.feeHead || '—';
+function linePeriod(line: FeeReceiptLine) {
+  if (line.feeHead && line.feeHead !== '—') return line.feeHead;
+  return '—';
 }
 
 export function buildFeeReceiptHtml(
   data: FeeReceiptHtmlInput,
   format: ReceiptTemplateFormat = 'half',
 ) {
-  if (format === 'full') return buildFullFeeReceiptHtml(data);
+  if (format === 'half') return buildHalfCompactFeeReceiptHtml(data);
   if (format === 'thermal') return buildThermalFeeReceiptHtml(data);
-  return buildHalfCompactFeeReceiptHtml(data);
+  return buildFullFeeReceiptHtml(data);
+}
+
+/** Extract `<style>` blocks and body inner HTML from a receipt document. */
+export function extractFeeReceiptStyleAndBody(html: string): {
+  style: string;
+  body: string;
+} {
+  const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(
+    (m) => m[1] ?? '',
+  );
+  const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
+  return { style: styleBlocks.join('\n'), body };
+}
+
+const A4_HALF_SHEET_LAYOUT_CSS = `
+  @page { size: A4 portrait; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .a4-page {
+    width: 210mm;
+    height: 297mm;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+  .receipt-sheet {
+    flex: 0 0 148mm;
+    height: 148mm;
+    max-height: 148mm;
+    overflow: hidden;
+    padding: 4mm 5mm;
+    box-sizing: border-box;
+  }
+  .receipt-sheet-empty {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .cut-line {
+    border-top: 1px dashed #94a3b8;
+    margin: 0;
+    flex-shrink: 0;
+    position: relative;
+    height: 0;
+  }
+  .cut-line::after {
+    content: '✂ cut here';
+    position: absolute;
+    right: 8mm;
+    top: -7px;
+    font-size: 7px;
+    color: #94a3b8;
+    background: #fff;
+    padding: 0 4px;
+  }
+`;
+
+/** Place a half receipt in the top 148mm of an A4 page with a cut guide. */
+export function wrapHalfReceiptOnA4(html: string): string {
+  const { style, body } = extractFeeReceiptStyleAndBody(html);
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    ${A4_HALF_SHEET_LAYOUT_CSS}
+    ${style}
+  </style>
+</head>
+<body>
+  <div class="a4-page">
+    <div class="receipt-sheet">${body}</div>
+    <div class="cut-line"></div>
+    <div class="receipt-sheet-empty"></div>
+  </div>
+</body>
+</html>`;
+}
+
+/** Build merged A4 document for bulk print (1 or 2 receipts per page). */
+export function buildBulkFeeReceiptA4Html(
+  receiptHtmlList: string[],
+  layout: 'single' | 'two_per_page' = 'two_per_page',
+): string {
+  const styles: string[] = [];
+  const sheets: string[] = [];
+  for (const html of receiptHtmlList) {
+    const { style, body } = extractFeeReceiptStyleAndBody(html);
+    if (style) styles.push(style);
+    sheets.push(`<div class="receipt-sheet">${body}</div>`);
+  }
+  const perPage = layout === 'two_per_page' ? 2 : 1;
+  const pages: string[] = [];
+  for (let i = 0; i < sheets.length; i += perPage) {
+    const chunk = sheets.slice(i, i + perPage);
+    if (chunk.length === 1 && layout === 'two_per_page') {
+      pages.push(
+        `<div class="a4-page">${chunk[0]}<div class="cut-line"></div><div class="receipt-sheet-empty"></div></div>`,
+      );
+    } else if (chunk.length === 1) {
+      pages.push(`<div class="a4-page">${chunk[0]}<div class="receipt-sheet-empty"></div></div>`);
+    } else {
+      pages.push(`<div class="a4-page">${chunk[0]}<div class="cut-line"></div>${chunk[1]}</div>`);
+    }
+  }
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    ${A4_HALF_SHEET_LAYOUT_CSS}
+    ${styles.join('\n')}
+  </style>
+</head>
+<body>${pages.join('')}</body>
+</html>`;
 }
 
 function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
   const b = data.branding;
-  const primary = '#0F172A';
-  const secondary = '#1E293B';
-  const accent = '#2563EB';
-  const success = '#16A34A';
+  const primary = b.primaryColor || '#0b2e59';
   const muted = '#64748B';
   const bg = '#F8FAFC';
   const paidAt = data.paidAt ?? data.date;
+  const paidAtText = formatReceiptDateTime(paidAt);
+  const dateText = formatReceiptDateCompact(data.date).toUpperCase();
+  const statusOk = /success|paid/i.test(data.paymentStatus);
+  const academicYear = academicYearFromDate(data.date);
 
   const logoBlock = b.logoSrc
     ? `<img class="logo" src="${b.logoSrc}" alt="" />`
@@ -336,289 +494,401 @@ function buildHalfCompactFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       (line, index) => `
       <tr>
         <td class="c">${index + 1}</td>
-        <td>${escapeHtml(line.component)}</td>
-        <td>${escapeHtml(linePeriod(line, data.feeCycle))}</td>
-        <td>${escapeHtml(line.description)}</td>
+        <td>${escapeHtml(line.component || feeHeadLabel(line))}</td>
+        <td>${escapeHtml(line.feeHead || linePeriod(line))}</td>
+        <td>${escapeHtml(line.description || '—')}</td>
         <td class="amt">${inr(line.amount)}</td>
       </tr>`,
     )
     .join('');
 
-  const statusClass = /success|paid/i.test(data.paymentStatus) ? 'status-ok' : 'status-warn';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(data.verifyUrl)}`;
-  const verifyHost = data.verifyUrl.replace(/^https?:\/\//, '');
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent(data.verifyUrl)}`;
+  const verifyShort = data.verifyUrl.replace(/^https?:\/\//, '').replace(/\?.*$/, '');
 
-  const affiliation = b.affiliationLine ? `(${escapeHtml(b.affiliationLine)})` : '';
-  const accreditation = [
-    b.accreditationLine,
-    b.establishedYear ? `ESTD. ${b.establishedYear}` : null,
-  ]
-    .filter(Boolean)
-    .join(' | ');
+  const phone = b.phone ?? '+91 9402152496';
+  const email = b.email ?? 'accounts@donboscocollege.ac.in';
+  const website = (b.website ?? 'https://donboscocollege.ac.in').replace(/^https?:\/\//, '');
+  const address = b.addressLine ?? 'Tura, West Garo Hills, Meghalaya - 794002';
+  const affiliation = [b.affiliationLine, b.accreditationLine].filter(Boolean).join(' | ');
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    /* Half of portrait A4 — 210mm × 148mm, not landscape */
-    @page { size: 210mm 148mm; margin: 8mm; }
+    /* Content sized for one half of A4 portrait (210mm × 148mm slot) */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: Inter, Roboto, 'Segoe UI', sans-serif;
-      font-size: 8px;
-      line-height: 1.35;
-      color: ${primary};
+      font-family: 'Segoe UI', Inter, Arial, sans-serif;
+      font-size: 7.5px;
+      line-height: 1.25;
+      color: #1a2332;
       background: #fff;
     }
-    .receipt { width: 100%; }
+    .receipt { width: 100%; height: 100%; }
 
-    .top {
+    .header {
       display: grid;
-      grid-template-columns: 52px 1fr 118px;
-      gap: 8px;
+      grid-template-columns: 42px 1fr 112px;
+      gap: 6px;
       align-items: start;
-      padding-bottom: 6px;
+      padding-bottom: 4px;
       border-bottom: 2px solid ${primary};
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
-    .logo { width: 48px; height: 48px; object-fit: contain; border-radius: 50%; }
+    .logo { width: 40px; height: 40px; object-fit: contain; border-radius: 50%; }
     .logo-ph {
-      width: 48px; height: 48px; border-radius: 50%;
-      border: 1.5px solid ${secondary};
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1.5px solid ${primary};
       display: flex; align-items: center; justify-content: center;
-      text-align: center; font-size: 6px; font-weight: 700;
-      color: ${secondary}; line-height: 1.15; padding: 4px;
+      text-align: center; font-size: 5.5px; font-weight: 700;
+      color: ${primary}; line-height: 1.1; padding: 3px;
       background: ${bg};
     }
-    .college { text-align: center; padding-top: 1px; }
-    .college h1 {
-      font-size: 13px; font-weight: 800; color: ${primary};
-      letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.15;
+    .institution { text-align: center; padding-top: 0; }
+    .inst-name {
+      margin: 0;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: ${primary};
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      line-height: 1.15;
     }
-    .college .addr { font-size: 7px; color: ${muted}; margin-top: 2px; }
-    .college .aff { font-size: 6.5px; color: ${muted}; margin-top: 1px; }
-    .college .motto { font-size: 6.5px; color: ${muted}; font-style: italic; margin-top: 2px; }
-
-    .rcpt-side { text-align: right; }
-    .rcpt-badge {
-      background: ${primary}; color: #fff;
-      font-size: 7px; font-weight: 800; letter-spacing: 0.4px;
-      padding: 3px 6px; text-transform: uppercase;
-      display: inline-block; margin-bottom: 4px;
+    .inst-line { margin: 1px 0 0; font-size: 6.5px; color: #475569; line-height: 1.2; }
+    .inst-motto {
+      margin: 2px 0 0;
+      font-size: 7px;
+      font-weight: 700;
+      color: ${primary};
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
-    .rcpt-no-box {
-      border: 1.5px solid ${accent};
-      border-radius: 3px; overflow: hidden;
-      text-align: center; margin-bottom: 3px;
+    .receipt-badge {
+      display: block;
+      width: 100%;
+      background: ${primary};
+      color: #fff;
+      font-size: 6.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 4px;
+      text-align: center;
+      border-radius: 3px 3px 0 0;
     }
-    .rcpt-no-label {
-      background: ${secondary}; color: #fff;
-      font-size: 6px; font-weight: 700; padding: 2px 4px;
-      text-transform: uppercase; letter-spacing: 0.3px;
+    .receipt-no-wrap {
+      border: 1.5px solid ${primary};
+      border-top: 0;
+      border-radius: 0 0 3px 3px;
+      overflow: hidden;
+      background: #fff;
+      text-align: center;
+      margin-bottom: 2px;
     }
-    .rcpt-no-value {
-      background: #fff; color: ${accent};
-      font-size: 8px; font-weight: 800; padding: 4px 5px;
+    .receipt-no-label {
+      font-size: 5.5px;
+      font-weight: 700;
+      color: ${muted};
+      text-transform: uppercase;
+      padding: 2px 4px 0;
+    }
+    .receipt-no-value {
+      font-size: 7.5px;
+      font-weight: 800;
+      color: ${primary};
+      padding: 1px 4px 3px;
       font-family: Consolas, monospace;
+      word-break: break-all;
     }
-    .rcpt-date { font-size: 7px; color: ${muted}; font-weight: 600; }
+    .receipt-date {
+      margin: 0;
+      font-size: 6.5px;
+      font-weight: 700;
+      color: ${primary};
+      text-align: center;
+    }
 
-    .dual {
+    .panels {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 6px;
+      gap: 5px;
+      margin-bottom: 4px;
     }
     .panel {
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
+      border: 1px solid #d7e0ea;
+      border-radius: 3px;
       overflow: hidden;
       background: #fff;
     }
     .panel-head {
       background: ${primary};
       color: #fff;
-      font-size: 7px; font-weight: 700;
+      font-size: 6.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      letter-spacing: 0.35px;
-      padding: 4px 6px;
-    }
-    .panel-body { padding: 5px 6px; background: ${bg}; }
-    .kv {
-      display: grid;
-      grid-template-columns: 72px 1fr;
-      gap: 2px 6px;
-      font-size: 7.5px;
-      margin-bottom: 2px;
-    }
-    .kv .k { color: ${muted}; font-weight: 600; }
-    .kv .v { color: ${primary}; font-weight: 600; }
-    .status-ok { color: ${success} !important; font-weight: 800 !important; }
-    .status-warn { color: #b45309 !important; font-weight: 800 !important; }
-
-    .fee-title {
-      font-size: 7px; font-weight: 800; color: ${primary};
-      text-transform: uppercase; letter-spacing: 0.35px;
-      margin-bottom: 3px;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 7.5px; }
-    thead th {
-      background: ${primary}; color: #fff;
-      font-size: 6.5px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.25px;
-      padding: 4px 5px; text-align: left;
-      border-right: 1px solid rgba(255,255,255,0.12);
-    }
-    thead th:last-child { border-right: none; text-align: right; }
-    tbody td {
-      border: 1px solid #e2e8f0;
       padding: 3px 5px;
-      vertical-align: top;
-      color: ${primary};
     }
-    td.c { text-align: center; width: 22px; color: ${muted}; }
+    .panel-body { padding: 3px 5px; background: ${bg}; }
+    .field {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 2px 4px;
+      margin: 0 0 1px;
+      font-size: 7px;
+      line-height: 1.2;
+    }
+    .field strong { color: ${muted}; font-weight: 600; }
+    .field span { color: #0f172a; font-weight: 700; word-break: break-word; }
+    .status-pill {
+      display: inline-block;
+      padding: 0 6px;
+      border-radius: 999px;
+      font-size: 6px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+    .status-ok { background: #e8f7ef; color: #0f7a45; }
+    .status-pending { background: #fff7ed; color: #b45309; }
+
+    .table-title {
+      background: ${primary};
+      color: #fff;
+      font-size: 6.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 5px;
+      border-radius: 3px 3px 0 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 7px; }
+    thead th {
+      background: #e8eef6;
+      color: ${primary};
+      font-size: 6px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      text-align: left;
+      padding: 2px 4px;
+      border: 1px solid #d7e0ea;
+    }
+    thead th:last-child { text-align: right; }
+    tbody td {
+      border: 1px solid #d7e0ea;
+      padding: 2px 4px;
+      vertical-align: top;
+    }
+    td.c { text-align: center; width: 18px; color: ${muted}; }
     td.amt { text-align: right; font-weight: 700; white-space: nowrap; }
-    tr.total td {
-      background: ${bg};
-      border-top: 2px solid ${primary};
-      font-weight: 800; font-size: 8px; color: ${primary};
+    tr.total-row td {
+      background: #eef3f9;
+      font-weight: 800;
+      color: ${primary};
+      border-top: 1.5px solid ${primary};
     }
 
     .words {
-      margin: 5px 0 6px;
-      padding: 4px 6px;
+      margin: 3px 0;
+      padding: 2px 5px;
       background: ${bg};
       border: 1px dashed #cbd5e1;
       border-radius: 3px;
-      font-size: 7.5px;
-      color: ${muted};
+      font-size: 7px;
+      color: #475569;
     }
     .words strong { color: ${primary}; }
 
-    .bottom {
+    .footer-panels {
       display: grid;
-      grid-template-columns: 1fr 1fr 0.75fr;
-      gap: 8px;
-      align-items: end;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 6px;
+      grid-template-columns: 1.1fr 1fr 1.1fr;
+      gap: 5px;
+      margin-bottom: 3px;
     }
-    .qr-wrap { display: flex; gap: 6px; align-items: center; }
-    .qr-wrap img { width: 52px; height: 52px; border: 1px solid #e2e8f0; }
-    .qr-meta { font-size: 6.5px; color: ${muted}; line-height: 1.4; }
-    .qr-meta strong { display: block; color: ${primary}; font-size: 7px; margin-bottom: 2px; }
-    .sign-box { text-align: center; }
-    .sign-scribble {
-      height: 22px; margin-bottom: 2px;
-      font-family: 'Segoe Script', cursive;
-      font-size: 14px; color: ${accent};
+    .box {
+      border: 1px solid #d7e0ea;
+      border-radius: 3px;
+      padding: 4px 5px;
+      background: #fff;
+      min-height: 52px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .box h4 {
+      margin: 0 0 2px;
+      font-size: 6.5px;
+      font-weight: 800;
+      color: ${primary};
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .box p { margin: 0; font-size: 6px; color: ${muted}; line-height: 1.3; }
+    .qr { text-align: center; }
+    .qr img { width: 40px; height: 40px; }
+    .sign-script {
+      margin: 4px 0 2px;
+      font-family: 'Segoe Script', 'Brush Script MT', cursive;
+      font-size: 14px;
+      color: ${primary};
+      line-height: 1;
+      text-align: center;
     }
     .sign-line {
-      border-top: 1px solid ${secondary};
-      padding-top: 3px;
-      font-size: 7px; font-weight: 700;
+      border-top: 1px solid #94a3b8;
+      padding-top: 2px;
+      text-align: center;
+      font-size: 6.5px;
+      font-weight: 800;
       color: ${primary};
     }
-    .thanks {
-      text-align: right;
-      font-size: 11px; font-weight: 800;
-      color: ${accent};
-      letter-spacing: 0.5px;
+    .thanks { text-align: center; justify-content: center; align-items: center; }
+    .thanks-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e8f7ef;
+      color: #0f7a45;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      margin: 0 auto 3px;
     }
-    .thanks small {
-      display: block;
+
+    .contact-bar {
+      background: #e8eef6;
+      color: ${primary};
+      border-radius: 3px;
+      padding: 2px 5px;
       font-size: 6px;
-      font-weight: 500;
+      font-weight: 600;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
+      margin-bottom: 2px;
+    }
+    .keep {
+      text-align: center;
+      font-size: 6px;
       color: ${muted};
-      margin-top: 2px;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 2px;
     }
   </style>
 </head>
 <body>
   <div class="receipt">
-    <header class="top">
+    <div class="header">
       <div>${logoBlock}</div>
-      <div class="college">
-        <h1>${escapeHtml(b.collegeName)}</h1>
-        ${b.addressLine ? `<p class="addr">${escapeHtml(b.addressLine)}</p>` : ''}
-        ${affiliation ? `<p class="aff">${affiliation}${accreditation ? ` · ${escapeHtml(accreditation)}` : ''}</p>` : accreditation ? `<p class="aff">${escapeHtml(accreditation)}</p>` : ''}
-        ${b.motto ? `<p class="motto">${escapeHtml(b.motto)}</p>` : ''}
+      <div class="institution">
+        <h1 class="inst-name">${escapeHtml(b.collegeName)}</h1>
+        <p class="inst-line">${escapeHtml(address)}</p>
+        ${affiliation ? `<p class="inst-line">${escapeHtml(affiliation)}</p>` : ''}
+        ${b.motto ? `<p class="inst-motto">${escapeHtml(b.motto)}</p>` : ''}
       </div>
-      <div class="rcpt-side">
-        <div class="rcpt-badge">Official Fee Receipt</div>
-        <div class="rcpt-no-box">
-          <div class="rcpt-no-label">Receipt No.</div>
-          <div class="rcpt-no-value">${escapeHtml(data.receiptNo)}</div>
+      <div>
+        <div class="receipt-badge">Official Fee Receipt</div>
+        <div class="receipt-no-wrap">
+          <div class="receipt-no-label">Receipt No.</div>
+          <div class="receipt-no-value">${escapeHtml(data.receiptNo)}</div>
         </div>
-        <div class="rcpt-date">DATE: ${formatReceiptDateCompact(data.date)}</div>
+        <p class="receipt-date">DATE: ${escapeHtml(dateText)}</p>
       </div>
-    </header>
+    </div>
 
-    <div class="dual">
+    <div class="panels">
       <div class="panel">
         <div class="panel-head">Student Details</div>
         <div class="panel-body">
-          <div class="kv"><span class="k">Name</span><span class="v">${escapeHtml(data.studentName)}</span></div>
-          <div class="kv"><span class="k">Enrollment</span><span class="v">${escapeHtml(data.enrollmentNumber)}</span></div>
-          <div class="kv"><span class="k">Programme</span><span class="v">${escapeHtml(data.programme)}</span></div>
-          <div class="kv"><span class="k">Semester</span><span class="v">${escapeHtml(data.semester)}</span></div>
-          <div class="kv"><span class="k">Fee Cycle</span><span class="v">${escapeHtml(data.feeCycle)}</span></div>
+          <p class="field"><strong>Name</strong><span>${escapeHtml(data.studentName)}</span></p>
+          <p class="field"><strong>Roll Number</strong><span>${escapeHtml(data.enrollmentNumber || data.applicationNo || '—')}</span></p>
+          <p class="field"><strong>Programme</strong><span>${escapeHtml(data.programme || '—')}</span></p>
+          <p class="field"><strong>Semester</strong><span>${escapeHtml(data.semester || '—')}</span></p>
+          <p class="field"><strong>Fee Period</strong><span>${escapeHtml(data.feeCycle || '—')}</span></p>
+          <p class="field"><strong>Academic Year</strong><span>${escapeHtml(academicYear)}</span></p>
         </div>
       </div>
       <div class="panel">
         <div class="panel-head">Payment Details</div>
         <div class="panel-body">
-          <div class="kv"><span class="k">Mode</span><span class="v">${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></div>
-          <div class="kv"><span class="k">Transaction</span><span class="v">${escapeHtml(data.transactionRef)}</span></div>
-          ${data.utrNumber ? `<div class="kv"><span class="k">UTR</span><span class="v">${escapeHtml(data.utrNumber)}</span></div>` : ''}
-          <div class="kv"><span class="k">Payment Date</span><span class="v">${formatReceiptDateTime(paidAt)}</span></div>
-          <div class="kv"><span class="k">Collected By</span><span class="v">${escapeHtml(data.collectedBy)}</span></div>
-          <div class="kv"><span class="k">Status</span><span class="v ${statusClass}">${escapeHtml(data.paymentStatus)}</span></div>
+          <p class="field"><strong>Mode</strong><span>${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></p>
+          <p class="field"><strong>Transaction ID</strong><span>${escapeHtml(data.transactionRef)}</span></p>
+          ${data.utrNumber ? `<p class="field"><strong>UTR No.</strong><span>${escapeHtml(data.utrNumber)}</span></p>` : ''}
+          <p class="field"><strong>Payment Date</strong><span>${escapeHtml(paidAtText)}</span></p>
+          <p class="field"><strong>Collected By</strong><span>${escapeHtml(data.collectedBy || 'Accounts Office')}</span></p>
+          ${
+            data.operatorName
+              ? `<p class="field"><strong>Operator</strong><span>${escapeHtml(data.operatorName)}</span></p>`
+              : ''
+          }
+          ${
+            data.collectionCenterName
+              ? `<p class="field"><strong>Net Café</strong><span>${escapeHtml(data.collectionCenterName)}</span></p>`
+              : ''
+          }
+          <p class="field"><strong>Status</strong><span class="status-pill ${statusOk ? 'status-ok' : 'status-pending'}">${escapeHtml(data.paymentStatus)}</span></p>
         </div>
       </div>
     </div>
 
-    <div class="fee-title">Fee Details</div>
+    <div class="table-title">Fee Details</div>
     <table>
       <thead>
         <tr>
-          <th>Sl.</th>
+          <th style="width:22px">Sl.</th>
           <th>Fee Head</th>
-          <th>Period</th>
+          <th>Period / Semester</th>
           <th>Description</th>
-          <th>Amount (₹)</th>
+          <th style="width:70px">Amount (₹)</th>
         </tr>
       </thead>
       <tbody>
         ${lineRows}
-        <tr class="total">
-          <td colspan="4">Total Paid</td>
+        <tr class="total-row">
+          <td colspan="4">TOTAL PAID</td>
           <td class="amt">${inr(data.amount)}</td>
         </tr>
       </tbody>
     </table>
 
-    <p class="words"><strong>In words:</strong> ${amountInWords(data.amount)}</p>
+    <p class="words"><strong>In Words:</strong> ${escapeHtml(amountInWords(data.amount))}</p>
 
-    <footer class="bottom">
-      <div class="qr-wrap">
-        <img src="${qrUrl}" alt="Verify" />
-        <div class="qr-meta">
-          <strong>Verify Receipt</strong>
-          Scan QR or visit<br/>${escapeHtml(verifyHost)}
+    <div class="footer-panels">
+      <div class="box qr">
+        <h4>Verify Receipt</h4>
+        <div>
+          <img src="${qrUrl}" alt="Verify receipt QR" />
+          <p style="margin-top:2px">${escapeHtml(verifyShort)}</p>
+          <p>${escapeHtml(data.receiptNo)}</p>
         </div>
       </div>
-      <div class="sign-box">
-        <div class="sign-scribble">Authorized</div>
-        <div class="sign-line">Authorized Signatory</div>
+      <div class="box">
+        <h4>Authorized Signatory</h4>
+        <div>
+          <div class="sign-script">Authorized</div>
+          <div class="sign-line">College Accounts Office</div>
+        </div>
       </div>
-      <div class="thanks">
-        THANK YOU!
-        <small>Computer-generated receipt</small>
+      <div class="box thanks">
+        <div>
+          <div class="thanks-check">✓</div>
+          <h4>Thank You!</h4>
+          <p>Computer generated — no physical signature required.</p>
+        </div>
       </div>
-    </footer>
+    </div>
+
+    <div class="contact-bar">
+      <span>${escapeHtml(phone)}</span>
+      <span>${escapeHtml(email)}</span>
+      <span>${escapeHtml(website)}</span>
+      <span>${escapeHtml(address)}</span>
+    </div>
+    <p class="keep">— Keep this receipt for your records —</p>
   </div>
 </body>
 </html>`;
@@ -668,110 +938,94 @@ function buildThermalFeeReceiptHtml(data: FeeReceiptHtmlInput) {
 
 function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
   const b = data.branding;
-  const primary = b.primaryColor || '#1e3a5f';
-  const accent = b.accentColor || '#c8102e';
+  const primary = b.primaryColor || '#0b2e59';
   const paidAt = data.paidAt ?? data.date;
-  const paidAtText = paidAt.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const dateText = data.date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const paidAtText = formatReceiptDateTime(paidAt);
+  const dateText = formatReceiptDateCompact(data.date).toUpperCase();
+  const statusOk = /success|paid/i.test(data.paymentStatus);
 
   const logoBlock = b.logoSrc
     ? `<img class="logo" src="${b.logoSrc}" alt="" />`
-    : `<div class="logo-placeholder">${b.logoPlaceholder ?? 'College<br/>Logo'}</div>`;
+    : `<div class="logo-ph">${b.logoPlaceholder ?? 'College<br/>Logo'}</div>`;
 
-  const watermark = b.logoSrc
-    ? `<img class="watermark" src="${b.logoSrc}" alt="" />`
-    : `<div class="watermark-text">${escapeHtml(b.collegeName.split(' ').slice(0, 2).join(' '))}</div>`;
+  const watermark = b.logoSrc ? `<img class="watermark" src="${b.logoSrc}" alt="" />` : '';
 
   const lineRows = data.lines
     .map(
       (line, index) => `
       <tr>
-        <td class="center">${index + 1}</td>
-        <td>${escapeHtml(line.component)}</td>
-        <td>${escapeHtml(line.feeHead)}</td>
-        <td>${escapeHtml(line.description)}</td>
+        <td class="c">${index + 1}</td>
+        <td>${escapeHtml(line.component || feeHeadLabel(line))}</td>
+        <td>${escapeHtml(line.feeHead || '—')}</td>
+        <td>${escapeHtml(line.description || '—')}</td>
         <td class="amt">${inr(line.amount)}</td>
       </tr>`,
     )
     .join('');
 
-  const statusClass = /success|paid/i.test(data.paymentStatus) ? 'status-ok' : 'status-pending';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(data.verifyUrl)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(data.verifyUrl)}`;
+  const verifyShort = data.verifyUrl.replace(/^https?:\/\//, '').replace(/\?.*$/, '');
 
-  const footerContact = [
-    b.addressLine ? `📍 ${b.addressLine}` : null,
-    b.phone ? `📞 ${b.phone}` : null,
-    b.email ? `✉ ${b.email}` : null,
-    b.website ? `🌐 ${b.website}` : null,
-  ]
-    .filter(Boolean)
-    .join(' &nbsp;|&nbsp; ');
+  const phone = b.phone ?? '+91 9402152496';
+  const email = b.email ?? 'accounts@donboscocollege.ac.in';
+  const website = (b.website ?? 'https://donboscocollege.ac.in').replace(/^https?:\/\//, '');
+  const address = b.addressLine ?? 'Tura, West Garo Hills, Meghalaya - 794002';
+  const academicYear = academicYearFromDate(data.date);
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <style>
-    @page { margin: 14mm 12mm; }
+    @page { size: A4 portrait; margin: 10mm; }
     * { box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0;
       padding: 0;
-      color: #1f2937;
+      font-family: 'Segoe UI', Inter, Arial, sans-serif;
+      color: #1a2332;
       font-size: 11px;
-      line-height: 1.45;
+      line-height: 1.4;
+      background: #fff;
     }
     .sheet {
       position: relative;
-      min-height: 260mm;
-      padding: 0 2px;
+      min-height: 277mm;
       overflow: hidden;
     }
-    .watermark, .watermark-text {
+    .watermark {
       position: absolute;
       left: 50%;
-      top: 48%;
+      top: 46%;
       transform: translate(-50%, -50%);
+      width: 280px;
+      height: 280px;
+      object-fit: contain;
       opacity: 0.05;
       z-index: 0;
       pointer-events: none;
     }
-    .watermark { width: 320px; height: 320px; object-fit: contain; }
-    .watermark-text {
-      font-size: 56px;
-      font-weight: 800;
-      color: ${primary};
-      text-align: center;
-      white-space: nowrap;
-    }
     .content { position: relative; z-index: 1; }
-
     .header {
       display: grid;
-      grid-template-columns: 88px 1fr 190px;
-      gap: 14px;
+      grid-template-columns: 84px 1fr 168px;
+      gap: 12px;
       align-items: start;
       padding-bottom: 12px;
       border-bottom: 3px solid ${primary};
       margin-bottom: 14px;
     }
-    .logo { width: 76px; height: 76px; object-fit: contain; }
-    .logo-placeholder {
-      width: 76px;
-      height: 76px;
-      border: 2px solid ${primary};
+    .logo {
+      width: 78px;
+      height: 78px;
+      object-fit: contain;
       border-radius: 50%;
+    }
+    .logo-ph {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      border: 2px solid ${primary};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -779,7 +1033,7 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       font-size: 9px;
       font-weight: 700;
       color: ${primary};
-      line-height: 1.2;
+      line-height: 1.15;
       padding: 6px;
       background: #f8fafc;
     }
@@ -790,45 +1044,61 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       font-size: 22px;
       font-weight: 700;
       color: ${primary};
-      letter-spacing: 0.4px;
+      letter-spacing: 0.3px;
       text-transform: uppercase;
     }
-    .inst-line { margin: 2px 0 0; font-size: 10px; color: #475569; }
-    .inst-motto { margin: 4px 0 0; font-size: 9px; color: #64748b; font-style: italic; }
-
-    .receipt-box { text-align: right; }
-    .receipt-title {
-      margin: 0 0 8px;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.6px;
+    .inst-line { margin: 3px 0 0; font-size: 10.5px; color: #475569; }
+    .inst-motto {
+      margin: 8px 0 0;
+      font-size: 12px;
+      font-weight: 700;
       color: ${primary};
+      letter-spacing: 0.12em;
       text-transform: uppercase;
+    }
+    .receipt-badge {
+      display: inline-block;
+      width: 100%;
+      background: ${primary};
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 7px 8px;
+      text-align: center;
+      border-radius: 4px 4px 0 0;
     }
     .receipt-no-wrap {
       border: 2px solid ${primary};
-      border-radius: 4px;
+      border-top: 0;
+      border-radius: 0 0 4px 4px;
       overflow: hidden;
-      background: ${primary};
+      background: #fff;
+      text-align: center;
+      margin-bottom: 6px;
     }
     .receipt-no-label {
-      color: #fff;
       font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.5px;
-      padding: 4px 8px;
+      color: #64748b;
       text-transform: uppercase;
+      padding: 5px 6px 0;
     }
     .receipt-no-value {
-      background: #fff;
-      color: ${accent};
       font-size: 12px;
       font-weight: 800;
-      padding: 8px 10px;
+      color: ${primary};
+      padding: 2px 6px 7px;
       font-family: Consolas, monospace;
     }
-    .receipt-date { margin-top: 8px; font-size: 10px; color: #334155; }
-
+    .receipt-date {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: ${primary};
+      text-align: center;
+    }
     .panels {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -836,7 +1106,7 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       margin-bottom: 14px;
     }
     .panel {
-      border: 1px solid #cbd5e1;
+      border: 1px solid #d7e0ea;
       border-radius: 6px;
       overflow: hidden;
       background: #fff;
@@ -844,54 +1114,67 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
     .panel-head {
       background: ${primary};
       color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      padding: 7px 10px;
+      padding: 8px 10px;
     }
-    .panel-body { padding: 10px 12px; }
-    .field { margin: 0 0 6px; font-size: 10.5px; }
-    .field strong { color: #334155; font-weight: 700; }
-    .field span { color: #111827; }
-
-    .table-wrap {
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      overflow: hidden;
-      margin-bottom: 10px;
-      background: #fff;
+    .panel-body { padding: 10px 12px; background: #f8fafc; }
+    .field {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 6px;
+      margin: 0 0 6px;
+      font-size: 11px;
     }
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
+    .field:last-child { margin-bottom: 0; }
+    .field strong { color: #64748b; font-weight: 600; }
+    .field span { color: #0f172a; font-weight: 700; word-break: break-word; }
+    .status-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .status-ok { background: #e8f7ef; color: #0f7a45; }
+    .status-pending { background: #fff7ed; color: #b45309; }
+    .table-title {
       background: ${primary};
       color: #fff;
-      font-size: 10px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
-      padding: 8px 8px;
-      text-align: left;
-      border-right: 1px solid rgba(255,255,255,0.15);
+      padding: 8px 10px;
+      border-radius: 6px 6px 0 0;
     }
-    thead th:last-child { border-right: none; text-align: right; }
-    tbody td {
-      border-top: 1px solid #e2e8f0;
-      border-right: 1px solid #f1f5f9;
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    thead th {
+      background: #e8eef6;
+      color: ${primary};
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-align: left;
       padding: 8px;
-      font-size: 10.5px;
+      border: 1px solid #d7e0ea;
+    }
+    thead th:last-child { text-align: right; }
+    tbody td {
+      border: 1px solid #d7e0ea;
+      padding: 7px 8px;
       vertical-align: top;
     }
-    tbody td:last-child { border-right: none; }
-    tbody tr:nth-child(even) td { background: #f8fafc; }
-    td.center { text-align: center; width: 34px; }
+    td.c { text-align: center; width: 36px; color: #64748b; }
     td.amt { text-align: right; font-weight: 700; white-space: nowrap; }
-    .total-row td {
-      background: #eff6ff !important;
-      border-top: 2px solid ${primary};
+    tr.total-row td {
+      background: #eef3f9;
       font-weight: 800;
-      font-size: 12px;
       color: ${primary};
+      border-top: 2px solid ${primary};
     }
     .words {
       margin: 0 0 14px;
@@ -899,62 +1182,87 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
       background: #f8fafc;
       border: 1px dashed #cbd5e1;
       border-radius: 6px;
-      font-size: 10.5px;
-      color: #334155;
+      font-size: 11px;
     }
-
     .footer-panels {
       display: grid;
-      grid-template-columns: 1.1fr 1fr 0.9fr;
-      gap: 10px;
-      margin-top: 8px;
+      grid-template-columns: 1.1fr 1fr 1.1fr;
+      gap: 12px;
       margin-bottom: 14px;
     }
-    .note-box {
-      border: 1px solid #cbd5e1;
+    .box {
+      border: 1px solid #d7e0ea;
       border-radius: 6px;
-      padding: 10px;
+      padding: 12px;
       background: #fff;
-      min-height: 108px;
-    }
-    .note-title { margin: 0 0 6px; font-size: 10px; font-weight: 800; color: ${primary}; text-transform: uppercase; }
-    .note-body { margin: 0; font-size: 9.5px; color: #475569; line-height: 1.5; }
-    .sign-box {
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 10px;
-      text-align: center;
-      background: #fff;
-      min-height: 108px;
+      min-height: 128px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
+    .box h4 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 800;
+      color: ${primary};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .box p { margin: 0; font-size: 10px; color: #64748b; line-height: 1.45; }
+    .qr { text-align: center; }
+    .qr img { width: 78px; height: 78px; }
+    .sign-script {
+      margin: 18px 0 4px;
+      font-family: 'Segoe Script', 'Brush Script MT', cursive;
+      font-size: 28px;
+      color: ${primary};
+      line-height: 1;
+      text-align: center;
+    }
     .sign-line {
-      margin-top: 28px;
       border-top: 1px solid #94a3b8;
       padding-top: 6px;
+      text-align: center;
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
       color: ${primary};
     }
-    .qr img { width: 72px; height: 72px; }
-    .qr p { margin: 4px 0 0; font-size: 9px; color: #64748b; }
-
-    .bottom-bar {
-      background: ${primary};
-      color: #fff;
-      border-radius: 4px;
-      padding: 9px 12px;
-      font-size: 9px;
+    .thanks { text-align: center; justify-content: center; }
+    .thanks-check {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #e8f7ef;
+      color: #0f7a45;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 10px;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 800;
+      margin: 0 auto 8px;
     }
-    .bottom-bar a { color: #dbeafe; text-decoration: none; }
-    .status-ok { color: #047857; font-weight: 800; }
-    .status-pending { color: #b45309; font-weight: 800; }
+    .bottom-bar {
+      background: #e8eef6;
+      color: ${primary};
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 10.5px;
+      font-weight: 600;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .notes {
+      border: 1px solid #d7e0ea;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      font-size: 10px;
+      color: #475569;
+    }
+    .notes strong { color: ${primary}; }
+    .notes ul { margin: 6px 0 0; padding-left: 16px; }
   </style>
 </head>
 <body>
@@ -965,19 +1273,18 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
         <div>${logoBlock}</div>
         <div class="institution">
           <h1 class="inst-name">${escapeHtml(b.collegeName)}</h1>
-          ${b.addressLine ? `<p class="inst-line">${escapeHtml(b.addressLine)}</p>` : ''}
+          <p class="inst-line">${escapeHtml(address)}</p>
           ${b.affiliationLine ? `<p class="inst-line">${escapeHtml(b.affiliationLine)}</p>` : ''}
           ${b.accreditationLine ? `<p class="inst-line">${escapeHtml(b.accreditationLine)}</p>` : ''}
-          ${b.establishedYear ? `<p class="inst-line">ESTD. ${escapeHtml(b.establishedYear)}</p>` : ''}
           ${b.motto ? `<p class="inst-motto">${escapeHtml(b.motto)}</p>` : ''}
         </div>
         <div class="receipt-box">
-          <p class="receipt-title">Official Fee Receipt</p>
+          <div class="receipt-badge">Official Fee Receipt</div>
           <div class="receipt-no-wrap">
             <div class="receipt-no-label">Receipt No.</div>
             <div class="receipt-no-value">${escapeHtml(data.receiptNo)}</div>
           </div>
-          <p class="receipt-date"><strong>Date:</strong> ${dateText}</p>
+          <p class="receipt-date">DATE: ${escapeHtml(dateText)}</p>
         </div>
       </div>
 
@@ -985,36 +1292,42 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
         <div class="panel">
           <div class="panel-head">Student Details</div>
           <div class="panel-body">
-            <p class="field"><strong>Student Name:</strong> <span>${escapeHtml(data.studentName)}</span></p>
-            <p class="field"><strong>Enrollment No.:</strong> <span>${escapeHtml(data.enrollmentNumber)}</span></p>
-            <p class="field"><strong>Application No.:</strong> <span>${escapeHtml(data.applicationNo)}</span></p>
-            <p class="field"><strong>Programme:</strong> <span>${escapeHtml(data.programme)}</span></p>
-            <p class="field"><strong>Semester:</strong> <span>${escapeHtml(data.semester)}</span></p>
-            <p class="field"><strong>Fee Cycle:</strong> <span>${escapeHtml(data.feeCycle)}</span></p>
+            <p class="field"><strong>Name</strong><span>${escapeHtml(data.studentName)}</span></p>
+            <p class="field"><strong>Roll Number</strong><span>${escapeHtml(data.enrollmentNumber || data.applicationNo || '—')}</span></p>
+            <p class="field"><strong>Programme</strong><span>${escapeHtml(data.programme || '—')}</span></p>
+            <p class="field"><strong>Semester</strong><span>${escapeHtml(data.semester || '—')}</span></p>
+            <p class="field"><strong>Fee Period</strong><span>${escapeHtml(data.feeCycle || '—')}</span></p>
+            <p class="field"><strong>Academic Year</strong><span>${escapeHtml(academicYear)}</span></p>
           </div>
         </div>
         <div class="panel">
           <div class="panel-head">Payment Details</div>
           <div class="panel-body">
-            <p class="field"><strong>Payment Mode:</strong> <span>${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></p>
-            <p class="field"><strong>Transaction Ref.:</strong> <span>${escapeHtml(data.transactionRef)}</span></p>
-            ${data.utrNumber ? `<p class="field"><strong>UTR No.:</strong> <span>${escapeHtml(data.utrNumber)}</span></p>` : ''}
-            <p class="field"><strong>Payment Date/Time:</strong> <span>${paidAtText}</span></p>
-            <p class="field"><strong>Collected By:</strong> <span>${escapeHtml(data.collectedBy)}</span></p>
-            <p class="field"><strong>Payment Status:</strong> <span class="${statusClass}">${escapeHtml(data.paymentStatus)}</span></p>
+            <p class="field"><strong>Mode</strong><span>${escapeHtml(data.paymentMode.replace(/_/g, ' '))}</span></p>
+            <p class="field"><strong>Transaction ID</strong><span>${escapeHtml(data.transactionRef)}</span></p>
+            ${data.utrNumber ? `<p class="field"><strong>UTR No.</strong><span>${escapeHtml(data.utrNumber)}</span></p>` : ''}
+            <p class="field"><strong>Payment Date</strong><span>${escapeHtml(paidAtText)}</span></p>
+            <p class="field"><strong>Collected By</strong><span>${escapeHtml(data.collectedBy || 'Accounts Office')}</span></p>
+            ${
+              data.collectionCenterName
+                ? `<p class="field"><strong>Collection Center</strong><span>${escapeHtml(data.collectionCenterName)}</span></p>`
+                : ''
+            }
+            <p class="field"><strong>Status</strong><span class="status-pill ${statusOk ? 'status-ok' : 'status-pending'}">${escapeHtml(data.paymentStatus)}</span></p>
           </div>
         </div>
       </div>
 
       <div class="table-wrap">
+        <div class="table-title">Fee Details</div>
         <table>
           <thead>
             <tr>
-              <th>Sl. No.</th>
-              <th>Fee Component</th>
+              <th style="width:40px">Sl.</th>
               <th>Fee Head</th>
+              <th>Period / Semester</th>
               <th>Description</th>
-              <th>Amount (₹)</th>
+              <th style="width:110px">Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -1027,35 +1340,47 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
         </table>
       </div>
 
-      <p class="words"><strong>Amount in words:</strong> (${amountInWords(data.amount)})</p>
+      <p class="words"><strong>In Words:</strong> ${escapeHtml(amountInWords(data.amount))}</p>
 
       <div class="footer-panels">
-        <div class="note-box">
-          <p class="note-title">Thank you!</p>
-          <p class="note-body">
-            Thank you for your payment. Please retain this receipt for your records.
-            ${b.motto ? `<br/><em>${escapeHtml(b.motto)}</em>` : ''}
-          </p>
-        </div>
-        <div class="note-box">
-          <p class="note-title">Important</p>
-          <p class="note-body">
-            This is a computer-generated official fee receipt. It does not require a physical signature.
-            For verification, scan the QR code or visit the verify link on the college portal.
-          </p>
-        </div>
-        <div class="sign-box">
-          <div class="qr">
-            <img src="${qrUrl}" alt="Verify receipt" />
-            <p>Scan to Verify</p>
+        <div class="box qr">
+          <h4>Verify Receipt</h4>
+          <div>
+            <img src="${qrUrl}" alt="Verify receipt QR" />
+            <p style="margin-top:6px">${escapeHtml(verifyShort)}</p>
+            <p>${escapeHtml(data.receiptNo)}</p>
           </div>
-          <div class="sign-line">Authorized Signatory</div>
+        </div>
+        <div class="box">
+          <h4>Authorized Signatory</h4>
+          <div>
+            <div class="sign-script">Authorized</div>
+            <div class="sign-line">College Accounts Office</div>
+          </div>
+        </div>
+        <div class="box thanks">
+          <div>
+            <div class="thanks-check">✓</div>
+            <h4>Thank You!</h4>
+            <p>This is a computer generated receipt and does not require any physical signature.</p>
+          </div>
         </div>
       </div>
 
       <div class="bottom-bar">
-        <span>${footerContact || escapeHtml(b.collegeName)}</span>
-        <span>Verify: <a href="${escapeHtml(data.verifyUrl)}">${escapeHtml(data.verifyUrl)}</a></span>
+        <span>${escapeHtml(phone)}</span>
+        <span>${escapeHtml(email)}</span>
+        <span>${escapeHtml(website)}</span>
+        <span>${escapeHtml(address)}</span>
+      </div>
+
+      <div class="notes">
+        <strong>Important</strong>
+        <ul>
+          <li>Please keep this receipt for your academic and fee records.</li>
+          <li>This receipt is valid for verification via QR code or receipt number on the college payment portal.</li>
+          <li>For discrepancies, contact the Accounts Office during working hours (Mon–Fri, 9:00 AM – 4:30 PM).</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -1063,39 +1388,14 @@ function buildFullFeeReceiptHtml(data: FeeReceiptHtmlInput) {
 </html>`;
 }
 
-export async function resolveFeeReceiptBranding(
-  db: {
-    tenant: {
-      findUnique: (args: {
-        where: { id: string };
-        select: { name: true };
-      }) => Promise<{ name: string } | null>;
-    };
-    tenantBranding: {
-      findUnique: (args: {
-        where: { tenantId: string };
-        select: {
-          displayName: true;
-          address: true;
-          badges: true;
-          logoUrl: true;
-          primaryColor: true;
-          accentColor: true;
-          portalSubtitle: true;
-        };
-      }) => Promise<{
-        displayName?: string | null;
-        address?: string | null;
-        badges?: unknown;
-        logoUrl?: string | null;
-        primaryColor?: string | null;
-        accentColor?: string | null;
-        portalSubtitle?: string | null;
-      } | null>;
-    };
-  },
-  tenantId: string,
-) {
+function academicYearFromDate(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth(); // 0-based; academic year typically starts in July
+  if (month >= 6) return `${year} – ${year + 1}`;
+  return `${year - 1} – ${year}`;
+}
+
+export async function resolveFeeReceiptBranding(db: Record<string, any>, tenantId: string) {
   const [tenant, branding] = await Promise.all([
     db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
     db.tenantBranding.findUnique({
@@ -1118,28 +1418,31 @@ export async function resolveFeeReceiptBranding(
 
   const affiliationLine =
     badges.find((b) => /affiliated|nehu/i.test(b)) ??
-    (isDbc ? 'Affiliated to North Eastern Hill University, Shillong' : null);
+    (isDbc ? 'Affiliated to North Eastern Hill University (NEHU), Shillong' : null);
   const accreditationLine =
-    badges.find((b) => /naac/i.test(b)) ?? (isDbc ? 'NAAC Accredited' : null);
+    badges.find((b) => /2\(f\)|12\(B\)|ugc|naac/i.test(b)) ??
+    (isDbc ? 'Recognized under 2(f) & 12(B) of UGC Act' : null);
 
   const logoUrl = (branding?.logoUrl as string | null) ?? null;
-  const logoSrc = resolveAssetSrc(logoUrl);
+  const logoSrc = await resolvePdfImageSrcAsync(logoUrl);
 
   return {
     collegeName: displayName.toUpperCase(),
-    addressLine: (branding?.address as string | null) ?? null,
+    addressLine:
+      (branding?.address as string | null) ??
+      (isDbc ? 'Tura, West Garo Hills, Meghalaya - 794002' : null),
     affiliationLine,
     accreditationLine,
     motto: isDbc ? 'In Pursuit of Excellence' : null,
-    establishedYear: isDbc ? '1970' : null,
+    establishedYear: isDbc ? '1987' : null,
     logoSrc,
     logoPlaceholder: isDbc
       ? 'Don Bosco<br/>College<br/>Tura'
       : displayName.split(' ').slice(0, 3).join('<br/>'),
-    primaryColor: (branding?.primaryColor as string | null) ?? '#1e3a5f',
-    accentColor: (branding?.accentColor as string | null) ?? '#c8102e',
-    phone: isDbc ? '+91 98562 12345 / +91 94025 67890' : null,
+    primaryColor: (branding?.primaryColor as string | null) ?? '#0b2e59',
+    accentColor: (branding?.accentColor as string | null) ?? '#c79a2b',
+    phone: isDbc ? '+91 9402152496' : null,
     email: isDbc ? 'accounts@donboscocollege.ac.in' : null,
-    website: isDbc ? 'https://erp.donboscocollege.ac.in' : null,
+    website: isDbc ? 'https://donboscocollege.ac.in' : null,
   } satisfies FeeReceiptBranding;
 }

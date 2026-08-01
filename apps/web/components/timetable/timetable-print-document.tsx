@@ -3,7 +3,12 @@
 import { useMemo } from 'react';
 import type { TimetableContext, TimetableMatrix, TimetablePlan } from '@/services/timetable';
 import type { BrandingDocumentContext } from '@/lib/branding-document';
-import { timetableEntryDisplay } from '@/lib/timetable/entry-display';
+import {
+  collectTimetableStaffDirectory,
+  formatTimetableFacultyShortLabel,
+  timetableEntryDisplay,
+} from '@/lib/timetable/entry-display';
+import type { TimetableEntry } from '@/services/timetable';
 
 const LEGEND = [
   { code: 'MAJOR', label: 'Major / Core' },
@@ -39,6 +44,10 @@ export function TimetablePrintDocument({
   const rows = matrix?.rows ?? [];
   const days = matrix?.days ?? [];
   const timeRows = useMemo(() => groupRowsByTime(rows), [rows]);
+  const staffDirectory = useMemo(() => {
+    const entries = rows.flatMap((row) => row.entries as TimetableEntry[]);
+    return collectTimetableStaffDirectory(entries);
+  }, [rows]);
 
   const shiftName = resolveShiftName(plan, context);
   const streamName =
@@ -174,6 +183,21 @@ export function TimetablePrintDocument({
         </div>
       </section>
 
+      {staffDirectory.length ? (
+        <section className="timetable-print-staff-directory">
+          <p className="timetable-print-legend-title">Staff Directory (Short Name → Full Name)</p>
+          <div className="timetable-print-staff-directory-items">
+            {staffDirectory.map((staff) => (
+              <span key={staff.shortCode} className="timetable-print-staff-directory-item">
+                <strong>{staff.shortCode}</strong>
+                <span aria-hidden> – </span>
+                {staff.fullName}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <footer className="timetable-print-footer">
         <span>
           Generated {formatDateTime(generatedAt)} · {institutionName} · Confidential — for academic
@@ -209,24 +233,22 @@ function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], da
             {!display.categoryOnly ? (
               <p className="timetable-print-slot-title">{display.title}</p>
             ) : null}
+            {overlay ? (
+              <p className="timetable-print-slot-faculty">
+                Original Faculty: {overlay.originalStaffName}
+                {' · '}
+                Handled By: {overlay.handledByName}
+                {' · '}
+                {overlay.reasonLabel}
+              </p>
+            ) : entry.staffProfile || !display.categoryOnly ? (
+              <p className="timetable-print-slot-faculty">
+                {formatTimetableFacultyShortLabel(entry.staffProfile)}
+              </p>
+            ) : null}
             <p className="timetable-print-slot-meta">
               Sem {entry.semesterSequence ?? '-'}
               {entry.sectionCode ? ` · Sec ${entry.sectionCode}` : ''}
-              {overlay ? (
-                <>
-                  {' · '}
-                  Original Faculty: {overlay.originalStaffName}
-                  {' · '}
-                  Handled By: {overlay.handledByName}
-                  {' · '}
-                  {overlay.reasonLabel}
-                </>
-              ) : (
-                <>
-                  {' · '}
-                  {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'}
-                </>
-              )}
               {' · '}
               {entry.classroom?.code ?? 'Room TBA'}
               {entry.isCombined ? ' · Combined' : ''}

@@ -252,7 +252,26 @@ export class TimetableRoutineExcelService {
         return keys.map((k) => [k, s] as const);
       }),
     );
-    const roomByCode = new Map(rooms.map((r) => [r.code.toUpperCase(), r]));
+    const roomByCode = new Map<string, (typeof rooms)[number]>();
+    for (const room of rooms) {
+      const code = String(room.code ?? '')
+        .trim()
+        .toUpperCase();
+      if (code) {
+        roomByCode.set(code, room);
+        if (code.startsWith('ROOM-')) {
+          roomByCode.set(code.slice('ROOM-'.length), room);
+        } else {
+          roomByCode.set(`ROOM-${code}`, room);
+        }
+      }
+      const shortName = String(
+        (room as { shortName?: string | null }).shortName ?? '',
+      )
+        .trim()
+        .toUpperCase();
+      if (shortName) roomByCode.set(shortName, room);
+    }
     const results: any[] = [];
     let success = 0;
     let warnings = 0;

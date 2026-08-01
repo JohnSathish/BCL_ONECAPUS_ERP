@@ -57,3 +57,58 @@ export function timetableEntryDisplay(
     categoryOnly: false as const,
   };
 }
+
+type TimetableStaffLabel =
+  | {
+      shortCode?: string | null;
+      fullName?: string | null;
+    }
+  | null
+  | undefined;
+
+/** Prefer "SX – Full Name" when both exist; avoid doubling if name already starts with the code. */
+export function formatTimetableFacultyLabel(staff: TimetableStaffLabel) {
+  const code = String(staff?.shortCode ?? '').trim();
+  const name = String(staff?.fullName ?? '').trim();
+  if (!code && !name) return 'Faculty TBA';
+  if (code && name) {
+    const nameStartsWithCode =
+      name.toUpperCase().startsWith(`${code.toUpperCase()} `) ||
+      name.toUpperCase().startsWith(`${code.toUpperCase()}–`) ||
+      name.toUpperCase().startsWith(`${code.toUpperCase()}-`) ||
+      name.toUpperCase() === code.toUpperCase();
+    if (nameStartsWithCode) return name;
+    return `${code} – ${name}`;
+  }
+  return code || name;
+}
+
+/** Print/grid short label: abbreviation only (directory below carries full names). */
+export function formatTimetableFacultyShortLabel(staff: TimetableStaffLabel) {
+  const code = String(staff?.shortCode ?? '').trim();
+  if (code) return code;
+  const name = String(staff?.fullName ?? '').trim();
+  return name || 'Faculty TBA';
+}
+
+export type TimetableStaffDirectoryEntry = {
+  shortCode: string;
+  fullName: string;
+};
+
+/** Unique short-code → full-name rows for a matrix (for print staff directory). */
+export function collectTimetableStaffDirectory(
+  entries: Array<{ staffProfile?: TimetableStaffLabel }>,
+): TimetableStaffDirectoryEntry[] {
+  const byCode = new Map<string, TimetableStaffDirectoryEntry>();
+  for (const entry of entries) {
+    const code = String(entry.staffProfile?.shortCode ?? '').trim();
+    const name = String(entry.staffProfile?.fullName ?? '').trim();
+    if (!code || !name) continue;
+    const key = code.toUpperCase();
+    if (!byCode.has(key)) byCode.set(key, { shortCode: code, fullName: name });
+  }
+  return Array.from(byCode.values()).sort((a, b) =>
+    a.shortCode.localeCompare(b.shortCode, undefined, { sensitivity: 'base' }),
+  );
+}

@@ -26,7 +26,7 @@ import {
   openTimetablePrint,
   type TimetablePrintParams,
 } from '@/lib/timetable/open-timetable-print';
-import { timetableEntryDisplay } from '@/lib/timetable/entry-display';
+import { formatTimetableFacultyLabel, timetableEntryDisplay } from '@/lib/timetable/entry-display';
 import { cn } from '@/utils/cn';
 
 const categoryClasses: Record<string, string> = {
@@ -599,9 +599,6 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
           {display.code}
         </p>
       ) : null}
-      <p className="mt-2 text-[11px]">
-        Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'}
-      </p>
       {overlay ? (
         <div className="mt-2 space-y-0.5 text-[11px]">
           <p className="opacity-90">
@@ -612,15 +609,15 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
           </p>
           <p className="text-[10px] opacity-75">{overlay.reasonLabel}</p>
         </div>
-      ) : (
-        <p className="text-[11px] opacity-80">
-          {entry.staffProfile?.shortCode ?? entry.staffProfile?.fullName ?? 'Faculty TBA'} ·{' '}
-          {entry.classroom?.code ?? 'Room TBA'}
+      ) : entry.staffProfile || !display.categoryOnly ? (
+        <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug opacity-90">
+          {formatTimetableFacultyLabel(entry.staffProfile)}
         </p>
-      )}
-      {!overlay ? null : (
-        <p className="mt-1 text-[11px] opacity-80">{entry.classroom?.code ?? 'Room TBA'}</p>
-      )}
+      ) : null}
+      <p className="mt-1.5 text-[11px] opacity-80">
+        Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'} ·{' '}
+        {entry.classroom?.code ?? 'Room TBA'}
+      </p>
       {entry.isCombined ? <p className="mt-1 text-[10px] font-semibold">Combined class</p> : null}
     </div>
   );

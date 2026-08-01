@@ -11,6 +11,7 @@ import {
   resolveFeeReceiptBranding,
   resolveReceiptLines,
   resolveReceiptTemplateFormat,
+  wrapHalfReceiptOnA4,
 } from '../lib/fee-receipt.template';
 
 function storageRoot() {
@@ -175,6 +176,7 @@ export async function generateFeeReceiptPdf(tenantId: string, receiptId: string)
     },
     format,
   );
+  const renderHtml = format === 'half' ? wrapHalfReceiptOnA4(html) : html;
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -184,7 +186,7 @@ export async function generateFeeReceiptPdf(tenantId: string, receiptId: string)
   let buffer: Buffer;
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    await page.setContent(renderHtml, { waitUntil: 'domcontentloaded' });
     buffer = Buffer.from(await page.pdf(receiptPdfOptions(format)));
   } finally {
     await browser.close();
