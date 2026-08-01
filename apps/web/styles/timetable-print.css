@@ -34,6 +34,16 @@ body.timetable-print-mode {
   line-height: 1.25;
 }
 
+.timetable-print-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.timetable-print-pack .timetable-print-document {
+  margin: 0 auto;
+}
+
 .timetable-print-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -334,7 +344,21 @@ body.timetable-print-mode {
     padding: 0;
   }
 
-  /* Keep routine + legend + footer together on one sheet when possible */
+  .timetable-print-pack {
+    gap: 0;
+  }
+
+  /* One semester per landscape A4 page when printing all semesters */
+  .timetable-print-sheet {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .timetable-print-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
   .timetable-print-table tr {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -349,11 +373,8 @@ body.timetable-print-mode {
   .timetable-print-footer {
     page-break-inside: avoid;
     break-inside: avoid;
-    page-break-before: avoid;
-    break-before: avoid;
   }
 
-  /* In-flow footer so it prints with the legend (fixed was clipping / Page 0 of 0) */
   .timetable-print-footer {
     position: static;
     background: transparent;

@@ -42,12 +42,81 @@ export function TimetablePrintDocument({
   generatedAt = new Date(),
 }: TimetablePrintDocumentProps) {
   const rows = matrix?.rows ?? [];
+  const allowedSemesters =
+    (plan?.metadata as { allowedSemesters?: number[] } | undefined)?.allowedSemesters ??
+    context?.allowedSemesters ??
+    [];
+
+  const printSemesters = useMemo(() => {
+    if (semesterFilter) return [semesterFilter];
+    const present = new Set<number>();
+    for (const row of rows) {
+      for (const entry of row.entries as TimetableEntry[]) {
+        if (entry.semesterSequence != null && entry.semesterSequence !== undefined) {
+          present.add(Number(entry.semesterSequence));
+        }
+      }
+    }
+    const ordered = allowedSemesters.map(Number).filter((sem) => present.has(sem));
+    const extras = Array.from(present)
+      .filter((sem) => !ordered.includes(sem))
+      .sort((a, b) => a - b);
+    const list = [...ordered, ...extras];
+    // Fallback: one combined sheet if entries have no semester tags
+    return list.length ? list : [null];
+  }, [allowedSemesters, rows, semesterFilter]);
+
+  const multiPage = printSemesters.length > 1;
+
+  return (
+    <div className={multiPage ? 'timetable-print-pack' : undefined}>
+      {printSemesters.map((sem, index) => (
+        <TimetablePrintSheet
+          key={sem == null ? 'all' : `sem-${sem}`}
+          matrix={matrix}
+          plan={plan}
+          context={context}
+          branding={branding}
+          semesterFilter={sem == null ? undefined : sem}
+          sectionFilter={sectionFilter}
+          generatedAt={generatedAt}
+          pageIndex={index + 1}
+          pageCount={printSemesters.length}
+          splitBySemester={multiPage}
+        />
+      ))}
+    </div>
+  );
+}
+
+type SheetProps = TimetablePrintDocumentProps & {
+  pageIndex: number;
+  pageCount: number;
+  splitBySemester: boolean;
+};
+
+function TimetablePrintSheet({
+  matrix,
+  plan,
+  context,
+  branding,
+  semesterFilter,
+  sectionFilter,
+  generatedAt = new Date(),
+  pageIndex,
+  pageCount,
+  splitBySemester,
+}: SheetProps) {
+  const filteredRows = useMemo(
+    () => filterRowsBySemester(matrix?.rows ?? [], semesterFilter),
+    [matrix?.rows, semesterFilter],
+  );
   const days = matrix?.days ?? [];
-  const timeRows = useMemo(() => groupRowsByTime(rows), [rows]);
+  const timeRows = useMemo(() => groupRowsByTime(filteredRows), [filteredRows]);
   const staffDirectory = useMemo(() => {
-    const entries = rows.flatMap((row) => row.entries as TimetableEntry[]);
+    const entries = filteredRows.flatMap((row) => row.entries as TimetableEntry[]);
     return collectTimetableStaffDirectory(entries);
-  }, [rows]);
+  }, [filteredRows]);
 
   const shiftName = resolveShiftName(plan, context);
   const streamName =
@@ -68,9 +137,10 @@ export function TimetablePrintDocument({
   const campusLine = [branding?.campusName, branding?.address].filter(Boolean).join(' · ');
   const documentTitle = matrix?.summary?.title ?? plan?.name ?? 'Weekly Class Routine';
   const statusLabel = plan?.status ? plan.status.toUpperCase() : 'DRAFT';
+  const semesterLabel = semesterFilter ? `Semester ${semesterFilter}` : 'All semesters in plan';
 
   return (
-    <article className="timetable-print-document">
+    <article className="timetable-print-document timetable-print-sheet">
       <header className="timetable-print-header">
         {branding?.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -93,7 +163,10 @@ export function TimetablePrintDocument({
         </div>
       </header>
 
-      <h2 className="timetable-print-title">Class Routine — {documentTitle}</h2>
+      <h2 className="timetable-print-title">
+        Class Routine — {documentTitle}
+        {splitBySemester && semesterFilter ? ` — Semester ${semesterFilter}` : ''}
+      </h2>
 
       <dl className="timetable-print-meta">
         <div>
@@ -117,7 +190,7 @@ export function TimetablePrintDocument({
         </div>
         <div>
           <dt>Semester Filter</dt>
-          <dd>{semesterFilter ? `Semester ${semesterFilter}` : 'All semesters in plan'}</dd>
+          <dd>{semesterLabel}</dd>
         </div>
         <div>
           <dt>Section / Class</dt>
@@ -202,6 +275,9 @@ export function TimetablePrintDocument({
         <span>
           Generated {formatDateTime(generatedAt)} · {institutionName} · Confidential — for academic
           use
+          {splitBySemester
+            ? ` · Sheet ${pageIndex} of ${pageCount}${semesterFilter ? ` (Sem ${semesterFilter})` : ''}`
+            : ''}
         </span>
         <span className="timetable-print-page-number" />
       </footer>
@@ -209,12 +285,28 @@ export function TimetablePrintDocument({
   );
 }
 
+function filterRowsBySemester(
+  rows: TimetableMatrix['rows'],
+  semesterFilter?: number,
+): TimetableMatrix['rows'] {
+  if (!semesterFilter) return rows;
+  return rows.map((row) => {
+    if (row.isBreak || row.isLunch) return row;
+    return {
+      ...row,
+      entries: (row.entries as TimetableEntry[]).filter(
+        (entry) => Number(entry.semesterSequence) === Number(semesterFilter),
+      ),
+    };
+  });
+}
+
 function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], dayValue: number) {
   const rows = timeRow.byDay.get(dayValue) ?? [];
   if (!rows.length && dayValue === 6) {
     return <span className="timetable-print-empty">Half Day</span>;
   }
-  const entries = rows.flatMap((row) => row.entries);
+  const entries = rows.flatMap((row) => row.entries as TimetableEntry[]);
   if (!entries.length) {
     return <span className="timetable-print-empty">—</span>;
   }
