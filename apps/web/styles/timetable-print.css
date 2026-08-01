@@ -35,13 +35,23 @@ body.timetable-print-mode {
 }
 
 .timetable-print-pack {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  display: block;
+  width: 100%;
 }
 
 .timetable-print-pack .timetable-print-document {
-  margin: 0 auto;
+  margin: 0 auto 1.5rem;
+}
+
+.timetable-print-sheet-banner {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111827;
+  background: #e5e7eb;
+  border: 1px solid #9ca3af;
+  border-radius: 0.375rem;
 }
 
 .timetable-print-header {
@@ -299,8 +309,9 @@ body.timetable-print-mode {
   line-height: 1.2;
 }
 
-.timetable-print-page-number::after {
-  content: 'Page ' counter(page) ' of ' counter(pages);
+.timetable-print-page-number {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .timetable-print-loading {
@@ -313,7 +324,7 @@ body.timetable-print-mode {
 @media print {
   @page {
     size: A4 landscape;
-    margin: 6mm 6mm 6mm;
+    margin: 6mm;
   }
 
   html,
@@ -322,41 +333,60 @@ body.timetable-print-mode {
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
+    overflow: visible !important;
   }
 
   .timetable-print-shell {
     background: #fff !important;
     padding: 0 !important;
     min-height: 0 !important;
+    overflow: visible !important;
   }
 
   .timetable-print-toolbar,
+  .timetable-print-sheet-banner,
   .no-print {
     display: none !important;
   }
 
-  .timetable-print-document {
-    max-width: none;
-    width: 100%;
-    margin: 0;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-  }
-
   .timetable-print-pack {
-    gap: 0;
+    display: block !important;
+    width: 100% !important;
   }
 
-  /* One semester per landscape A4 page when printing all semesters */
+  .timetable-print-document,
   .timetable-print-sheet {
-    page-break-after: always;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /*
+   * Flex/grid parents break Chrome page breaks — keep pack as block.
+   * Force each semester onto its own landscape sheet.
+   */
+  .timetable-print-sheet {
     break-after: page;
+    page-break-after: always;
   }
 
   .timetable-print-sheet:last-child {
-    page-break-after: auto;
     break-after: auto;
+    page-break-after: auto;
+  }
+
+  .timetable-print-sheet + .timetable-print-sheet {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .timetable-print-table {
+    page-break-inside: auto;
   }
 
   .timetable-print-table tr {

@@ -141,6 +141,15 @@ function TimetablePrintSheet({
 
   return (
     <article className="timetable-print-document timetable-print-sheet">
+      {splitBySemester ? (
+        <p className="timetable-print-sheet-banner no-print">
+          Sheet {pageIndex} of {pageCount}
+          {semesterFilter != null ? ` — Semester ${semesterFilter}` : ''}
+          {pageIndex === 1
+            ? ' · Scroll for remaining semesters · Print creates one A4 page each'
+            : ''}
+        </p>
+      ) : null}
       <header className="timetable-print-header">
         {branding?.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -279,7 +288,9 @@ function TimetablePrintSheet({
             ? ` · Sheet ${pageIndex} of ${pageCount}${semesterFilter ? ` (Sem ${semesterFilter})` : ''}`
             : ''}
         </span>
-        <span className="timetable-print-page-number" />
+        <span className="timetable-print-page-number">
+          {splitBySemester ? `Page ${pageIndex} of ${pageCount}` : 'Page 1 of 1'}
+        </span>
       </footer>
     </article>
   );
