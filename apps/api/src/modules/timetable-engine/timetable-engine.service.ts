@@ -1393,9 +1393,9 @@ export class TimetableEngineService {
     });
     if (!student) return { entries: [] };
 
-    // v3 key busts stale empty payloads cached before semester/course matching fix.
+    // v4: personalize category-only AEC/MDC/SEC/VTC/VAC slots with enrolled paper titles.
     const dateKey = new Date().toISOString().slice(0, 10);
-    const cacheKey = `timetable:student:v3:${student.id}:week:${dateKey}`;
+    const cacheKey = `timetable:student:v4:${student.id}:week:${dateKey}`;
     return this.cache.wrap(cacheKey, 60, () =>
       this.computeStudentWeek(user, student, filters),
     );
@@ -1421,9 +1421,16 @@ export class TimetableEngineService {
             createdAt: true,
             lines: {
               select: {
+                category: true,
                 offeringId: true,
                 offeringSectionId: true,
-                offering: { select: { id: true, courseId: true } },
+                offering: {
+                  select: {
+                    id: true,
+                    courseId: true,
+                    course: { select: { id: true, code: true, title: true } },
+                  },
+                },
               },
             },
           },
@@ -1577,6 +1584,76 @@ export class TimetableEngineService {
       for (const s of staff) staffById.set(s.id, s);
     }
 
+    /** First enrolled paper per FYUGP category (shared pool periods → student paper). */
+    const paperByCategory = new Map<
+      string,
+      {
+        offeringId: string;
+        offeringSectionId: string | null;
+        course: { id: string; code: string; title: string };
+      }
+    >();
+    for (const line of lines) {
+      const category = String(line.category ?? '').toUpperCase();
+      const course = line.offering?.course;
+      if (!category || !course || paperByCategory.has(category)) continue;
+      paperByCategory.set(category, {
+        offeringId: line.offeringId,
+        offeringSectionId: line.offeringSectionId ?? null,
+        course: {
+          id: course.id,
+          code: course.code,
+          title: course.title,
+        },
+      });
+    }
+
+    const facultyBySection = new Map<string, string>();
+    const personalizedSectionIds = [
+      ...new Set(
+        [...paperByCategory.values()]
+          .map((p) => p.offeringSectionId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (personalizedSectionIds.length) {
+      const sections = await this.prisma.offeringSection.findMany({
+        where: { tenantId: user.tid, id: { in: personalizedSectionIds } },
+        select: {
+          id: true,
+          staffProfile: {
+            select: { id: true, fullName: true, shortCode: true },
+          },
+        },
+      });
+      for (const section of sections) {
+        const staff = section.staffProfile;
+        if (!staff) continue;
+        facultyBySection.set(section.id, staff.id);
+        if (!staffById.has(staff.id)) {
+          staffById.set(staff.id, {
+            fullName: staff.fullName,
+            shortCode: staff.shortCode,
+          });
+        }
+      }
+    }
+
+    const poolCategories = new Set(['MDC', 'AEC', 'SEC', 'VTC', 'VAC']);
+    const isCategoryOnlyEntry = (entry: (typeof planEntries)[number]) => {
+      const meta = (entry.metadata ?? {}) as {
+        displayAsCategoryOnly?: boolean;
+      };
+      if (meta.displayAsCategoryOnly === true) return true;
+      const category = String(entry.fyugpCategory ?? '').toUpperCase();
+      if (!poolCategories.has(category)) return false;
+      return (
+        !entry.courseId &&
+        !entry.courseOfferingId &&
+        !entry.teachingSubjectGroupId
+      );
+    };
+
     const entries = planEntries.filter((entry) => {
       if (targetSemester == null) return true;
       if (entry.semesterSequence == null) return true;
@@ -1586,26 +1663,81 @@ export class TimetableEngineService {
     return {
       plan,
       entries: entries.map((entry) => {
-        const course = entry.courseId ? courseById.get(entry.courseId) : null;
-        const staff = entry.staffProfileId
-          ? staffById.get(entry.staffProfileId)
+        const meta = {
+          ...((entry.metadata ?? {}) as Record<string, unknown>),
+        };
+        let courseId = entry.courseId;
+        let courseOfferingId = entry.courseOfferingId;
+        let offeringSectionId = entry.offeringSectionId;
+        let staffProfileId = entry.staffProfileId;
+        let coursePayload: {
+          id: string | null;
+          code: string;
+          title: string;
+        } | null = null;
+
+        const linkedCourse = entry.courseId
+          ? courseById.get(entry.courseId)
           : null;
+        if (linkedCourse && entry.courseId) {
+          coursePayload = {
+            id: entry.courseId,
+            code: linkedCourse.code,
+            title: linkedCourse.title,
+          };
+        } else if (entry.teachingSubjectGroup) {
+          coursePayload = {
+            id: entry.teachingSubjectGroup.id,
+            code: entry.teachingSubjectGroup.code,
+            title: entry.teachingSubjectGroup.title,
+          };
+        }
+
+        if (isCategoryOnlyEntry(entry)) {
+          const category = String(entry.fyugpCategory ?? '').toUpperCase();
+          const paper = paperByCategory.get(category);
+          if (paper) {
+            courseId = paper.course.id;
+            courseOfferingId = paper.offeringId;
+            if (!offeringSectionId && paper.offeringSectionId) {
+              offeringSectionId = paper.offeringSectionId;
+            }
+            coursePayload = {
+              id: paper.course.id,
+              code: paper.course.code,
+              title: paper.course.title,
+            };
+            meta.displayAsCategoryOnly = false;
+            meta.resolvedFromRegistration = true;
+            meta.poolCategory = category;
+            if (!staffProfileId && paper.offeringSectionId) {
+              staffProfileId =
+                facultyBySection.get(paper.offeringSectionId) ?? null;
+            }
+          } else if (category) {
+            // No enrollment match — show category label rather than blank/"Class".
+            coursePayload = {
+              id: null,
+              code: category,
+              title: category,
+            };
+          }
+        }
+
+        const staff = staffProfileId ? staffById.get(staffProfileId) : null;
         return {
           ...entry,
+          courseId,
+          courseOfferingId,
+          offeringSectionId,
+          staffProfileId,
+          metadata: meta,
           startTime: formatShiftTime(entry.startTime),
           endTime: formatShiftTime(entry.endTime),
-          course: course
-            ? { id: entry.courseId, code: course.code, title: course.title }
-            : entry.teachingSubjectGroup
-              ? {
-                  id: entry.teachingSubjectGroup.id,
-                  code: entry.teachingSubjectGroup.code,
-                  title: entry.teachingSubjectGroup.title,
-                }
-              : null,
+          course: coursePayload,
           staffProfile: staff
             ? {
-                id: entry.staffProfileId,
+                id: staffProfileId,
                 fullName: staff.fullName,
                 shortCode: staff.shortCode,
               }
@@ -1622,6 +1754,7 @@ export class TimetableEngineService {
         courseCount: courseIds.length,
         groupCount: groupIds.length,
         entryCount: entries.length,
+        personalizedCategories: [...paperByCategory.keys()],
       },
     };
   }

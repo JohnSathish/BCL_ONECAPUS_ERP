@@ -427,14 +427,24 @@ export class StudentPortalService {
       const classroom = entry.classroomId
         ? classroomMap.get(String(entry.classroomId))
         : null;
+      const existingCourse = entry.course as
+        | { code?: string; title?: string }
+        | null
+        | undefined;
+      const course = offering?.course
+        ? { code: offering.course.code, title: offering.course.title }
+        : existingCourse?.title || existingCourse?.code
+          ? {
+              code: String(existingCourse.code ?? ''),
+              title: String(existingCourse.title ?? existingCourse.code ?? ''),
+            }
+          : null;
       return {
         ...entry,
-        course: offering?.course
-          ? { code: offering.course.code, title: offering.course.title }
-          : null,
+        course,
         staffProfile: staff
           ? { fullName: staff.fullName, shortCode: staff.shortCode }
-          : null,
+          : ((entry.staffProfile as object | null | undefined) ?? null),
         classroom: classroom
           ? { code: classroom.code, name: classroom.name }
           : null,
@@ -1196,9 +1206,21 @@ export class StudentPortalService {
             ?.category ??
           '',
       ).toUpperCase();
+      const enrolled =
+        lines.find((l) => l.offeringId === entry.courseOfferingId) ??
+        lines.find((l) => String(l.category ?? '').toUpperCase() === category);
+      const enrolledCourse =
+        enrolled?.offering?.course ??
+        (enrolled ? offeringMap.get(enrolled.offeringId)?.course : null);
       const title =
-        course?.title ?? group?.title ?? course?.code ?? group?.code ?? 'Class';
-      const code = course?.code ?? group?.code ?? null;
+        course?.title ??
+        group?.title ??
+        enrolledCourse?.title ??
+        course?.code ??
+        group?.code ??
+        enrolledCourse?.code ??
+        (category || 'Class');
+      const code = course?.code ?? group?.code ?? enrolledCourse?.code ?? null;
       return {
         time: `${start} – ${end}`,
         startTime: start,

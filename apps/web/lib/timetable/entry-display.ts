@@ -41,7 +41,29 @@ export function timetableEntryDisplay(
   >,
 ) {
   const category = (entry.fyugpCategory || entry.slotType || 'GENERAL').toUpperCase();
+  const personalizedTitle = entry.course?.title?.trim();
+  const personalizedCode = entry.course?.code?.trim();
+  // Student week may attach the enrolled paper while pool metadata still flags the period.
+  if (
+    personalizedTitle &&
+    (entry.metadata as { resolvedFromRegistration?: boolean } | null)?.resolvedFromRegistration
+  ) {
+    return {
+      category,
+      code: personalizedCode || category,
+      title: personalizedTitle,
+      categoryOnly: false as const,
+    };
+  }
   if (isCategoryOnlyTimetableEntry(entry)) {
+    if (personalizedTitle) {
+      return {
+        category,
+        code: personalizedCode || category,
+        title: personalizedTitle,
+        categoryOnly: false as const,
+      };
+    }
     return {
       category,
       code: category,
