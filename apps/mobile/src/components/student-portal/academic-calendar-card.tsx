@@ -67,19 +67,21 @@ export function AcademicCalendarCard({
                 <View style={[styles.dot, { backgroundColor: tone.fg }]} />
                 <View style={styles.body}>
                   <View style={styles.bodyTop}>
-                    <Text style={styles.eventIcon}>{tone.icon}</Text>
-                    <Text style={styles.eventTitle} numberOfLines={2}>
-                      {ev.title}
-                    </Text>
+                    <Text style={[styles.eventIcon, { color: tone.fg }]}>{tone.icon}</Text>
+                    <View style={styles.textCol}>
+                      <Text style={styles.eventTitle} numberOfLines={3}>
+                        {ev.title}
+                      </Text>
+                      {shouldShowTypeLabel(ev.type) ? (
+                        <Text style={[styles.typeLabel, { color: tone.fg }]}>{tone.label}</Text>
+                      ) : null}
+                      {ev.subtitle ? (
+                        <Text style={styles.eventMeta} numberOfLines={2}>
+                          {ev.subtitle}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                  {ev.subtitle ? (
-                    <Text style={styles.eventMeta} numberOfLines={2}>
-                      {ev.subtitle}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={[styles.typePill, { backgroundColor: tone.bg }]}>
-                  <Text style={[styles.typePillText, { color: tone.fg }]}>{tone.label}</Text>
                 </View>
               </View>
             );
@@ -92,6 +94,12 @@ export function AcademicCalendarCard({
       </Pressable>
     </View>
   );
+}
+
+/** Prefer icon/dot for generic meetings; keep a quiet label only for distinct types. */
+function shouldShowTypeLabel(type?: string | null) {
+  const key = String(type ?? '').toLowerCase();
+  return ['exam', 'holiday', 'assignment', 'fee', 'prayer'].includes(key);
 }
 
 const styles = StyleSheet.create({
@@ -157,25 +165,22 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 4,
   },
-  body: { flex: 1, gap: 2, paddingRight: 4 },
-  bodyTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  eventIcon: { fontSize: 14, marginTop: 1 },
+  body: { flex: 1, paddingRight: 2 },
+  bodyTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  eventIcon: { fontSize: 15, marginTop: 1 },
+  textCol: { flex: 1, gap: 2 },
   eventTitle: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: studentTheme.text,
-    lineHeight: 18,
+    lineHeight: 20,
   },
-  eventMeta: { fontSize: 11, color: studentTheme.textMuted, marginLeft: 20, lineHeight: 15 },
-  typePill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginTop: 2,
+  typeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  typePillText: { fontSize: 10, fontWeight: '800' },
+  eventMeta: { fontSize: 12, color: studentTheme.textMuted, lineHeight: 16 },
   cta: {
     backgroundColor: '#eff6ff',
     borderRadius: 12,
