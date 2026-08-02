@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { KeyRound, Loader2, Info } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { usePermissions } from '@/hooks/use-permissions';
 import { activateLicenseKey } from '@/services/licensing';
+import { apiErrorMessage } from '@/utils/api-error';
 
 const KEY_PATTERN = /^BCLK-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
 
@@ -19,9 +20,16 @@ function normalizeKeyInput(value: string): string {
 }
 
 export function LicenseActivationKeyForm({ onActivated }: Props) {
+  const { canAny } = usePermissions();
+  const canActivate = canAny('license:activate', 'tenant:manage', 'users:manage');
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [validateHint, setValidateHint] = useState<string | null>(null);
+  const [validateOk, setValidateOk] = useState(false);
+
+  if (!canActivate) return null;
 
   function validateFormat(raw: string): { ok: boolean; message: string } {
     const normalized = normalizeKeyInput(raw);
@@ -43,40 +51,41 @@ export function LicenseActivationKeyForm({ onActivated }: Props) {
   function onValidate() {
     const result = validateFormat(key);
     setValidateHint(result.message);
-    if (result.ok) toast.success(result.message);
-    else toast.error(result.message);
+    setValidateOk(result.ok);
+    setMessage(null);
+    setError(null);
   }
 
   async function onActivate() {
     const result = validateFormat(key);
     if (!result.ok) {
       setValidateHint(result.message);
-      toast.error(result.message);
+      setValidateOk(false);
+      setError(result.message);
+      setMessage(null);
       return;
     }
     setBusy(true);
     setValidateHint(null);
+    setError(null);
+    setMessage(null);
     try {
       const res = await activateLicenseKey(normalizeKeyInput(key));
       const till = res.license?.expiryDate
         ? new Date(res.license.expiryDate).toLocaleDateString()
         : null;
-      toast.success(till ? `License activated until ${till}` : 'License activated successfully');
+      setMessage(till ? `License activated until ${till}` : 'License activated successfully');
       setKey('');
       onActivated?.();
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e
-          ? String((e as { message: unknown }).message)
-          : 'Activation failed';
-      toast.error(msg);
+      setError(apiErrorMessage(e, 'Activation failed'));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50/80 to-white px-5 py-4">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
@@ -104,6 +113,8 @@ export function LicenseActivationKeyForm({ onActivated }: Props) {
               onChange={(e) => {
                 setKey(e.target.value);
                 setValidateHint(null);
+                setMessage(null);
+                setError(null);
               }}
               placeholder="Enter license key (e.g. BCLK-XXXX-XXXX-XXXX-XXXX)"
               className="h-11 font-mono text-sm"
@@ -111,17 +122,12 @@ export function LicenseActivationKeyForm({ onActivated }: Props) {
               spellCheck={false}
             />
             {validateHint ? (
-              <p
-                className={`text-xs ${
-                  validateHint.toLowerCase().includes('valid') &&
-                  !validateHint.toLowerCase().includes('invalid')
-                    ? 'text-emerald-600'
-                    : 'text-amber-700'
-                }`}
-              >
+              <p className={`text-xs ${validateOk ? 'text-emerald-600' : 'text-amber-700'}`}>
                 {validateHint}
               </p>
             ) : null}
+            {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
