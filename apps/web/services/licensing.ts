@@ -67,7 +67,12 @@ export type LicenseDetails =
 
 export async function activateLicenseKey(activationKey: string) {
   const { data } = await api.post('/v1/license/activate-key', { activationKey });
-  return data as { success: boolean; message: string; license: LicenseSummary };
+  return data as {
+    success: boolean;
+    message: string;
+    license: Pick<LicenseSummary, 'licenseNumber' | 'subscriptionPlan' | 'expiryDate'> &
+      Partial<LicenseSummary>;
+  };
 }
 
 export async function fetchLicenseSummary(): Promise<LicenseSummary> {

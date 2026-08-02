@@ -1,14 +1,25 @@
 'use client';
 
-import { Mail, Phone, ShieldCheck } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import {
+  Building2,
+  Calendar,
+  Headset,
+  KeyRound,
+  Mail,
+  Phone,
+  Shield,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LicenseActivationKeyForm } from '@/components/licensing/license-activation-key-form';
 import { ModuleEntitlementsPanel } from '@/components/licensing/module-entitlements-panel';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchLicenseDetails, type LicenseStatus } from '@/services/licensing';
 import { cn } from '@/utils/cn';
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/format-date';
 
 const STATUS_LABELS: Record<LicenseStatus, string> = {
   ACTIVE: 'Active',
@@ -16,6 +27,14 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
   GRACE_PERIOD: 'Grace Period',
   EXPIRED: 'Expired',
   SUSPENDED: 'Suspended',
+};
+
+const STATUS_PILL: Record<LicenseStatus, string> = {
+  ACTIVE: 'bg-emerald-100 text-emerald-800',
+  NEAR_EXPIRY: 'bg-amber-100 text-amber-900',
+  GRACE_PERIOD: 'bg-orange-100 text-orange-900',
+  EXPIRED: 'bg-red-100 text-red-800',
+  SUSPENDED: 'bg-slate-200 text-slate-700',
 };
 
 function UsageBar({ label, current, max }: { label: string; current: number; max: number | null }) {
@@ -36,11 +55,16 @@ function UsageBar({ label, current, max }: { label: string; current: number; max
 
 export function LicenseDetailsPage() {
   const enabled = useAuthQueryEnabled();
+  const qc = useQueryClient();
   const details = useQuery({
     queryKey: ['license', 'details'],
     queryFn: fetchLicenseDetails,
     enabled,
   });
+
+  function refreshLicense() {
+    void qc.invalidateQueries({ queryKey: ['license'] });
+  }
 
   if (details.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading license details…</p>;
@@ -56,17 +80,72 @@ export function LicenseDetailsPage() {
 
   const data = details.data;
   const hasLicense = data.hasLicense !== false;
+  const status = hasLicense && 'status' in data ? data.status : null;
+  const validTill =
+    hasLicense && 'expiryDate' in data && data.expiryDate
+      ? formatDisplayDate(data.expiryDate)
+      : hasLicense
+        ? 'Lifetime'
+        : '—';
+  const institutionName =
+    hasLicense && 'institutionName' in data ? data.institutionName : 'Institution';
+  const licenseType = hasLicense && 'licenseType' in data ? data.licenseType : '—';
+  const plan =
+    hasLicense && 'subscriptionPlan' in data ? data.subscriptionPlan : 'ERP Subscription';
+  const startDate = hasLicense && 'startDate' in data ? formatDisplayDateTime(data.startDate) : '—';
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Institution License</h2>
-        <p className="text-sm text-muted-foreground">
-          View subscription status or activate a license key from BaseCode Labs.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
+            <Shield className="h-6 w-6" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">License</h2>
+            <p className="mt-1 max-w-xl text-sm text-slate-500">
+              Manage your institution license, modules and subscription details.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                License Status
+              </p>
+              <div className="mt-1.5">
+                {status ? (
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                      STATUS_PILL[status],
+                    )}
+                  >
+                    {STATUS_LABELS[status]}
+                  </span>
+                ) : (
+                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    Not activated
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="border-l border-slate-100 pl-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Valid Till
+              </p>
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                {validTill}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <LicenseActivationKeyForm />
+      <LicenseActivationKeyForm onActivated={refreshLicense} />
 
       <ModuleEntitlementsPanel />
 
@@ -202,6 +281,34 @@ export function LicenseDetailsPage() {
         </>
       )}
 
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
+        <MetaCell
+          icon={Calendar}
+          label="Activation Date"
+          primary={startDate}
+          secondary={hasLicense && 'licenseNumber' in data ? data.licenseNumber : undefined}
+        />
+        <MetaCell
+          icon={UserRound}
+          label="Activated By"
+          primary="—"
+          secondary="Tracked on key redemption"
+        />
+        <MetaCell icon={KeyRound} label="License Type" primary={licenseType} secondary={plan} />
+        <MetaCell
+          icon={Building2}
+          label="Institution"
+          primary={institutionName}
+          secondary={undefined}
+        />
+        <MetaCell
+          icon={Headset}
+          label="Support"
+          primary={data.renewalContact.email}
+          secondary={data.renewalContact.mobile}
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Renewal contact</CardTitle>
@@ -219,6 +326,31 @@ export function LicenseDetailsPage() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function MetaCell({
+  icon: Icon,
+  label,
+  primary,
+  secondary,
+}: {
+  icon: typeof Calendar;
+  label: string;
+  primary: string;
+  secondary?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{primary}</p>
+        {secondary ? <p className="truncate text-xs text-slate-500">{secondary}</p> : null}
+      </div>
     </div>
   );
 }
