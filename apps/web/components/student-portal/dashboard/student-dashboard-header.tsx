@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Building2, CalendarDays, GraduationCap, Hash, IdCard, Layers, Sun } from 'lucide-react';
 import { StudentName } from '@/components/students/student-name';
 import { StudentCampusQuoteCard } from '@/components/student-portal/dashboard/student-campus-quote-card';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import type { StudentDashboardView } from '@/types/student-portal';
 import { getLocalGreeting } from '@/utils/student-portal-utils';
 import { cn } from '@/utils/cn';
@@ -44,7 +44,7 @@ export function StudentDashboardHeader({ data, loading }: Props) {
 
   const { profile } = data;
   const greeting = getLocalGreeting();
-  const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
+  const photoSrc = profile.photoUrl ? resolveUploadAvatarUrl(profile.photoUrl) : null;
   const displayName = profile.displayFullName?.trim() || profile.fullName;
   const firstName = displayName.split(/\s+/)[0] || displayName;
 

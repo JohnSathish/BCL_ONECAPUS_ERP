@@ -17,9 +17,10 @@ import {
 import { GlassCard } from '@/components/erp/glass-card';
 import { Button } from '@/components/ui/button';
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import { uploadMyPhoto } from '@/services/staff';
 import type { StaffMeProfile } from '@/types/staff-portal';
+import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
 function CompletionRing({ pct }: { pct: number }) {
@@ -67,14 +68,17 @@ export function StaffProfileHero({
   onViewCompletion,
 }: {
   profile: StaffMeProfile;
-  onPhotoSaved: () => void;
+  onPhotoSaved: (photoUrl?: string) => void;
   onViewCompletion: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const pct = profile.profileCompletion ?? 0;
-  const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
+  const effectivePhoto = localPhotoUrl || profile.photoUrl;
+  const photoSrc = effectivePhoto ? resolveUploadAvatarUrl(effectivePhoto) : null;
   const status = (profile.status ?? '').toUpperCase();
 
   async function onCopyCode() {
@@ -87,6 +91,21 @@ export function StaffProfileHero({
     }
   }
 
+  async function handlePhoto(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const res = await uploadMyPhoto(file);
+      setLocalPhotoUrl(res.photoUrl);
+      onPhotoSaved(res.photoUrl);
+    } catch (e) {
+      setUploadError(apiErrorMessage(e, 'Photo upload failed'));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
   return (
     <GlassCard className="overflow-hidden rounded-[18px] border-slate-200/80 p-0 shadow-sm">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.7fr)_minmax(240px,0.9fr)]">
@@ -96,6 +115,7 @@ export function StaffProfileHero({
             {photoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                key={photoSrc}
                 src={photoSrc}
                 alt=""
                 className="h-24 w-24 rounded-full object-cover ring-4 ring-slate-100"
@@ -117,15 +137,12 @@ export function StaffProfileHero({
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/*"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                setUploading(true);
-                void uploadMyPhoto(f)
-                  .then(onPhotoSaved)
-                  .finally(() => setUploading(false));
+                void handlePhoto(f);
               }}
             />
           </div>
@@ -138,6 +155,8 @@ export function StaffProfileHero({
               {profile.designation ?? '—'}
               {profile.department ? ` – ${profile.department}` : ''}
             </p>
+            {uploading ? <p className="mt-1 text-xs text-slate-500">Uploading photo…</p> : null}
+            {uploadError ? <p className="mt-1 text-xs text-destructive">{uploadError}</p> : null}
             <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <button
                 type="button"

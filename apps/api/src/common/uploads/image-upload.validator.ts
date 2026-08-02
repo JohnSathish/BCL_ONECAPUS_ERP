@@ -57,7 +57,14 @@ function assertDimensions(
   kind: ImageUploadKind,
 ) {
   if (!dims) return;
-  const max = kind === 'logo' ? 2048 : kind === 'favicon' ? 512 : 4096;
+  const max =
+    kind === 'logo'
+      ? 2048
+      : kind === 'favicon'
+        ? 512
+        : kind === 'profile'
+          ? 8192
+          : 4096;
   const min = kind === 'logo' ? 64 : kind === 'favicon' ? 16 : 32;
   if (dims.width > max || dims.height > max) {
     throw new BadRequestException(

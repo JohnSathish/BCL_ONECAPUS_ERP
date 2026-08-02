@@ -80,6 +80,24 @@ export function resolveUploadAssetUrlForPrint(path?: string | null): string | un
   return `${nestUploadOrigin()}${uploads}`;
 }
 
+/** Cache-bust profile photos (static uploads are cached as immutable 7d). */
+export function withUploadCacheBust(
+  resolvedUrl?: string | null,
+  storagePath?: string | null,
+): string | undefined {
+  if (!resolvedUrl) return undefined;
+  if (resolvedUrl.startsWith('blob:') || resolvedUrl.startsWith('data:')) return resolvedUrl;
+  const stamped = storagePath?.match(/photo-(\d+)\./)?.[1];
+  const v = stamped ?? encodeURIComponent(storagePath || resolvedUrl);
+  return `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}v=${v}`;
+}
+
+/** Resolve upload path and append a stable cache-buster for avatar display. */
+export function resolveUploadAvatarUrl(path?: string | null): string | undefined {
+  const base = resolveUploadAssetUrl(path);
+  return withUploadCacheBust(base, path);
+}
+
 /** @deprecated Use resolveUploadAssetUrl */
 export const resolveBrandingAssetUrl = resolveUploadAssetUrl;
 

@@ -49,6 +49,16 @@ export function resolveUploadAssetUrl(path?: string | null): string | undefined 
   return `${origin}/uploads/${normalized.replace(/^\/+/, '')}`;
 }
 
+/** Cache-bust profile photos cached as immutable static assets. */
+export function resolveUploadAvatarUrl(path?: string | null): string | undefined {
+  const base = resolveUploadAssetUrl(path);
+  if (!base) return undefined;
+  if (base.startsWith('file:') || base.startsWith('content:')) return base;
+  const stamped = path?.match(/photo-(\d+)\./)?.[1];
+  const v = stamped ?? encodeURIComponent(path || base);
+  return `${base}${base.includes('?') ? '&' : '?'}v=${v}`;
+}
+
 export function resolveCollegeLogoUri(
   branding?: { logoUrl?: string | null },
   extraCandidates: Array<string | null | undefined> = [],

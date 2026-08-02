@@ -6,7 +6,7 @@ import { CalendarDays, CheckSquare, ClipboardList, GraduationCap, Wallet } from 
 import { AnimatedCounter } from '@/components/dashboard/animated-counter';
 import { DirectoryKpiSkeleton } from '@/components/students-module/directory/ui/directory-skeleton';
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import type { StaffDashboardData } from '@/types/staff-portal';
 import { cn } from '@/utils/cn';
 
@@ -38,7 +38,7 @@ export function StaffDashboardHeader({ data, loading }: Props) {
   }
 
   const { profile, academicContext } = data;
-  const photoSrc = profile.photoUrl ? resolveUploadAssetUrl(profile.photoUrl) : null;
+  const photoSrc = profile.photoUrl ? resolveUploadAvatarUrl(profile.photoUrl) : null;
   const greeting = getLocalGreeting();
 
   return (

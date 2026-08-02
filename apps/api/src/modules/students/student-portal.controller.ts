@@ -200,6 +200,25 @@ export class StudentPortalController {
     return this.portalProfile.submitIdCardPrintRequest(user, dto);
   }
 
+  @Post('me/photo')
+  @RequireAnyPermission('student:portal:self')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_FILE_BYTES },
+    }),
+  )
+  uploadMyPhoto(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.portalProfile.uploadMyPhoto(user, file);
+  }
+
   @Post('me/documents')
   @RequireAnyPermission('student:portal:self')
   @ApiConsumes('multipart/form-data')

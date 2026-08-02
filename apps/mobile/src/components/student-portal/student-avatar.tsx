@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { resolveUploadAssetUrl } from '@/utils/upload-asset-url';
+import { resolveUploadAvatarUrl } from '@/utils/upload-asset-url';
 import { studentTheme } from './theme';
 
 type StudentAvatarProps = {
@@ -24,8 +24,12 @@ export function StudentAvatar({
     .map((part) => part.charAt(0))
     .join('')
     .toUpperCase();
-  const src = !failed ? resolveUploadAssetUrl(photoUrl) : undefined;
+  const src = !failed ? resolveUploadAvatarUrl(photoUrl) : undefined;
   const fontSize = Math.round(size * 0.38);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [photoUrl]);
 
   return (
     <View
@@ -41,6 +45,7 @@ export function StudentAvatar({
     >
       {src ? (
         <Image
+          key={src}
           source={{ uri: src }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           onError={() => setFailed(true)}

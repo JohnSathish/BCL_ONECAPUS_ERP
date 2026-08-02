@@ -8,7 +8,7 @@ import { join } from 'path';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   extensionForMime,
-  validateBrandingImage,
+  validateProfileImage,
 } from '../../../common/uploads/image-upload.validator';
 import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
 
@@ -32,7 +32,8 @@ export class StaffAssetsService {
     _actorId?: string,
   ) {
     await this.assertStaff(tenantId, staffProfileId);
-    validateBrandingImage(file, 'logo');
+    // Profile photos use profile limits (5MB / 4096px), not logo branding rules.
+    validateProfileImage(file);
 
     const dir = join(this.uploadRoot, tenantId, 'staff', staffProfileId);
     await mkdir(dir, { recursive: true });

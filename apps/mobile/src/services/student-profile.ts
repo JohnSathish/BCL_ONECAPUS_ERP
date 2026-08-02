@@ -133,3 +133,16 @@ export function uploadMyDocument(
     body: form,
   });
 }
+
+export function uploadMyPhoto(file: { uri: string; name?: string; mimeType?: string }) {
+  const form = new FormData();
+  form.append('file', {
+    uri: file.uri,
+    name: file.name ?? 'photo.jpg',
+    type: file.mimeType ?? 'image/jpeg',
+  } as unknown as Blob);
+  return apiFetch<{ photoUrl: string; photoPath: string }>('/v1/students/me/photo', {
+    method: 'POST',
+    body: form,
+  });
+}

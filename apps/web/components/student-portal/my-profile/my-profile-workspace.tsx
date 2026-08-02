@@ -29,7 +29,9 @@ import {
 } from '@/services/student-profile-verification';
 import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
 import { normalizeClass12Stream } from '@/services/class12-subjects';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import { api } from '@/services/api';
+import { uploadStudentPortalPhoto } from '@/services/student-portal';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -197,7 +199,11 @@ export function MyProfileWorkspace({ section }: { section: SectionKey }) {
 
   return (
     <div className="space-y-4 pb-24">
-      <ProfileHeroCard bootstrap={bootstrap} onJump={(href) => router.push(href)} />
+      <ProfileHeroCard
+        bootstrap={bootstrap}
+        onJump={(href) => router.push(href)}
+        onPhotoUpdated={() => void refresh()}
+      />
 
       {!canEditProfile ? (
         <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -336,23 +342,68 @@ function ProfileSkeleton() {
 function ProfileHeroCard({
   bootstrap,
   onJump,
+  onPhotoUpdated,
 }: {
   bootstrap: ProfileBootstrap;
   onJump: (href: string) => void;
+  onPhotoUpdated?: () => void;
 }) {
   const s = bootstrap.student;
   const percent = bootstrap.completion.percent ?? 0;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const effectivePhoto = localPhoto || s.photoPath;
+  const photoSrc = effectivePhoto ? resolveUploadAvatarUrl(effectivePhoto) : null;
+
+  async function handlePhoto(file: File) {
+    setUploading(true);
+    setPhotoError(null);
+    try {
+      const res = await uploadStudentPortalPhoto(file);
+      setLocalPhoto(res.photoUrl || res.photoPath);
+      onPhotoUpdated?.();
+    } catch (e) {
+      setPhotoError(apiErrorMessage(e, 'Photo upload failed'));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-muted text-2xl font-semibold text-muted-foreground">
-            {s.photoPath ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.photoPath} alt="" className="h-full w-full object-cover" />
-            ) : (
-              (s.fullName ?? 'S').slice(0, 1).toUpperCase()
-            )}
+          <div className="relative">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-muted text-2xl font-semibold text-muted-foreground">
+              {photoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={photoSrc} src={photoSrc} alt="" className="h-full w-full object-cover" />
+              ) : (
+                (s.fullName ?? 'S').slice(0, 1).toUpperCase()
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Change photo"
+              disabled={uploading}
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white shadow ring-2 ring-white disabled:opacity-60"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-3 w-3" />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handlePhoto(f);
+              }}
+            />
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{s.fullName ?? 'Student'}</h1>
@@ -362,6 +413,8 @@ function ProfileHeroCard({
                 .join(' · ') || '—'}
             </p>
             <p className="text-xs text-muted-foreground">{s.department ?? ''}</p>
+            {uploading ? <p className="text-xs text-muted-foreground">Uploading photo…</p> : null}
+            {photoError ? <p className="text-xs text-destructive">{photoError}</p> : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">

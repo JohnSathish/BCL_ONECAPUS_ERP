@@ -87,6 +87,15 @@ export async function uploadStudentPortalDocument(documentType: string, file: Fi
   return data;
 }
 
+export async function uploadStudentPortalPhoto(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post('/v1/students/me/photo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data as { photoUrl: string; photoPath: string };
+}
+
 export async function fetchStudentDeviceSessions(): Promise<{
   lastLoginAt?: string | null;
   devices: Array<{

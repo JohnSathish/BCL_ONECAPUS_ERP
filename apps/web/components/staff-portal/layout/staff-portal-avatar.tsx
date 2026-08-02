@@ -1,6 +1,6 @@
 'use client';
 
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import { cn } from '@/utils/cn';
 
 const SIZE = {
@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function StaffPortalAvatar({ photoUrl, name, size = 'md', className }: Props) {
-  const photoSrc = photoUrl ? resolveUploadAssetUrl(photoUrl) : null;
+  const photoSrc = photoUrl ? resolveUploadAvatarUrl(photoUrl) : null;
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -30,6 +30,7 @@ export function StaffPortalAvatar({ photoUrl, name, size = 'md', className }: Pr
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        key={photoSrc}
         src={photoSrc}
         alt=""
         className={cn(

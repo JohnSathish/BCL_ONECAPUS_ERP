@@ -455,7 +455,7 @@ export default function CompleteProfileScreen() {
       await uploadMyDocument(documentType, file);
       setMessage(
         documentType === 'PHOTO'
-          ? 'Passport photo uploaded for verification.'
+          ? 'Passport photo uploaded. Your profile photo was updated and is pending verification.'
           : 'Class XII marksheet uploaded for verification.',
       );
       await refresh();

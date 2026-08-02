@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 
 type Props = {
   photoPath?: string | null;
@@ -12,20 +12,11 @@ type Props = {
   pending?: boolean;
 };
 
-function photoVersionKey(path?: string | null): string | undefined {
-  if (!path) return undefined;
-  const stamped = path.match(/photo-(\d+)\./);
-  if (stamped?.[1]) return stamped[1];
-  return path;
-}
-
 export function StudentPhotoUpload({ photoPath, disabled, onSelect, pending }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const baseUrl = photoPath?.startsWith('blob:') ? photoPath : resolveUploadAssetUrl(photoPath);
-  const resolvedPhoto =
-    baseUrl && photoPath && !photoPath.startsWith('blob:')
-      ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${photoVersionKey(photoPath)}`
-      : baseUrl;
+  const resolvedPhoto = photoPath?.startsWith('blob:')
+    ? photoPath
+    : resolveUploadAvatarUrl(photoPath);
 
   return (
     <div className="flex items-center gap-3">

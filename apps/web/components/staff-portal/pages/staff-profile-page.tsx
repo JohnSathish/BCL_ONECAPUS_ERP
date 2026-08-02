@@ -182,7 +182,15 @@ export function StaffProfilePage() {
   }
 
   const profile = me.data;
-  const refreshMe = () => void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] });
+  const refreshMe = (photoUrl?: string) => {
+    if (photoUrl) {
+      qc.setQueryData(['staff-portal', 'me'], (prev: typeof profile | undefined) =>
+        prev ? { ...prev, photoUrl } : prev,
+      );
+    }
+    void qc.invalidateQueries({ queryKey: ['staff-portal', 'me'] });
+    void qc.invalidateQueries({ queryKey: ['staff-portal', 'dashboard'] });
+  };
 
   return (
     <DashboardShell role="staff" title="My Profile">
@@ -291,7 +299,7 @@ function PersonalTab({
   onSaved,
 }: {
   profile: NonNullable<ReturnType<typeof useStaffMe>['data']>;
-  onSaved: () => void;
+  onSaved: (photoUrl?: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
@@ -335,7 +343,10 @@ function PersonalTab({
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            void uploadMyPhoto(f).then(onSaved);
+            void uploadMyPhoto(f)
+              .then((res) => onSaved(res.photoUrl))
+              .catch(() => onSaved());
+            e.target.value = '';
           }}
         />
       </div>

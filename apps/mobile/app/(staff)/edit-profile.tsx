@@ -211,10 +211,12 @@ export default function EditProfileScreen() {
     setPhotoUploading(true);
     try {
       const mime = asset.mimeType ?? 'image/jpeg';
-      await uploadFacultyPhoto(asset.uri, mime);
+      const res = await uploadFacultyPhoto(asset.uri, mime);
+      if (res?.photoUrl) setPhotoUri(res.photoUrl);
       await refreshHome();
     } catch {
       Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+      setPhotoUri(null);
     } finally {
       setPhotoUploading(false);
     }

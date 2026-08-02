@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { validateProfileImage } from '../../../common/uploads/image-upload.validator';
 import { PrismaService } from '../../../database/prisma.service';
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
@@ -519,6 +520,37 @@ export class StudentPortalProfileService {
       user.sub,
     );
 
+    // Passport / profile PHOTO uploads should also refresh the avatar shown
+    // on dashboards (photoPath), not only the verification document list.
+    let photoPath: string | null = null;
+    if (
+      (normalized === 'PHOTO' || normalized === 'PASSPORT_PHOTO') &&
+      typeof doc.filePath === 'string' &&
+      doc.filePath
+    ) {
+      try {
+        validateProfileImage(file);
+        const fullName =
+          student.masterProfile?.fullName ??
+          student.enrollmentNumber ??
+          'Student';
+        await this.prisma.studentProfile.upsert({
+          where: { studentId: student.id },
+          create: {
+            tenantId: user.tid,
+            studentId: student.id,
+            fullName,
+            photoPath: doc.filePath,
+          },
+          update: { photoPath: doc.filePath },
+        });
+        photoPath = doc.filePath;
+      } catch {
+        // Document upload already succeeded; keep that result if photo
+        // validation is stricter than document MIME checks.
+      }
+    }
+
     await this.prisma.auditLog.create({
       data: {
         tenantId: user.tid,
@@ -531,6 +563,7 @@ export class StudentPortalProfileService {
           documentType: normalized,
           status: 'PENDING',
           fileName: file.originalname,
+          photoPath,
         },
       },
     });
@@ -538,8 +571,35 @@ export class StudentPortalProfileService {
     return {
       ...doc,
       status: 'PENDING',
-      message: 'Document uploaded and pending admin verification.',
+      photoPath,
+      message:
+        photoPath != null
+          ? 'Photo uploaded and pending admin verification. Your profile photo was updated.'
+          : 'Document uploaded and pending admin verification.',
     };
+  }
+
+  async uploadMyPhoto(user: JwtUser, file: Express.Multer.File) {
+    const student = await this.portal.resolveStudent(user);
+    await this.changeRequests.assertStudentCanEditProfile(user.tid, student.id);
+    const result = await this.assets.uploadPhoto(
+      user.tid,
+      student.id,
+      file,
+      user.sub,
+    );
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tid,
+        userId: user.sub,
+        module: 'student_portal',
+        action: 'student.photo_uploaded',
+        entityType: 'student_profile',
+        entityId: student.id,
+        metadata: { photoPath: result.photoPath },
+      },
+    });
+    return { photoUrl: result.photoPath, photoPath: result.photoPath };
   }
 
   async listDeviceSessions(tenantId: string, userId: string) {
