@@ -14,6 +14,7 @@ import { StudentAttendanceService } from '../../student-attendance/student-atten
 import { TimetableEngineService } from '../../timetable-engine/timetable-engine.service';
 import { StudentsService } from '../students.service';
 import { StudentPortalCalendarService } from './student-portal-calendar.service';
+import { getZonedWeekday } from '../../../common/utils/time-greeting';
 
 const SNAPSHOT_CATEGORY_LABELS: Record<string, string> = {
   MAJOR: 'Major',
@@ -47,6 +48,21 @@ function parseTimeToMinutes(time: string): number | null {
   const match24 = raw.match(/^(\d{1,2}):(\d{2})/);
   if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
   return null;
+}
+
+/** Normalize timetable times to "09:45 AM" (drop seconds / ISO noise). */
+function formatDisplayTime(time: string): string {
+  const raw = String(time ?? '').trim();
+  if (!raw) return '—';
+  const mins = parseTimeToMinutes(raw);
+  if (mins == null) {
+    return raw.replace(/:(\d{2}):\d{2}\b/, ':$1').replace(/\s+/g, ' ');
+  }
+  const hour24 = Math.floor(mins / 60);
+  const minute = mins % 60;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
 function isCurrentSlot(startTime: string, endTime: string) {
@@ -1151,7 +1167,56 @@ export class StudentPortalService {
     const targetCredits =
       programVersion?.structureTemplate?.semesterCreditTarget ?? 20;
 
-    const today = new Date().getDay();
+    const mapTimetableSlot = (entry: Record<string, unknown>) => {
+      const offering = entry.courseOfferingId
+        ? offeringMap.get(String(entry.courseOfferingId))
+        : null;
+      const course = (entry.course ?? offering?.course) as
+        | { code?: string; title?: string }
+        | null
+        | undefined;
+      const group = entry.teachingSubjectGroup as
+        | { code?: string; title?: string; fyugpCategory?: string }
+        | null
+        | undefined;
+      const staff = entry.staffProfile as
+        | { fullName?: string; shortCode?: string | null }
+        | null
+        | undefined;
+      const start = formatDisplayTime(String(entry.startTime ?? ''));
+      const end = formatDisplayTime(String(entry.endTime ?? ''));
+      const roomId = entry.classroomId as string | undefined;
+      const sectionId = entry.offeringSectionId
+        ? String(entry.offeringSectionId)
+        : null;
+      const category = String(
+        group?.fyugpCategory ??
+          entry.fyugpCategory ??
+          lines.find((l) => l.offeringId === entry.courseOfferingId)
+            ?.category ??
+          '',
+      ).toUpperCase();
+      const title =
+        course?.title ?? group?.title ?? course?.code ?? group?.code ?? 'Class';
+      const code = course?.code ?? group?.code ?? null;
+      return {
+        time: `${start} – ${end}`,
+        startTime: start,
+        endTime: end,
+        title,
+        courseCode: code,
+        category: category || null,
+        facultyName:
+          staff?.fullName ??
+          (sectionId ? facultyBySection.get(sectionId) : null) ??
+          null,
+        room: roomId ? (classroomMap.get(roomId) ?? null) : null,
+        isCurrent: isCurrentSlot(start, end),
+        isPast: isPastSlot(end),
+      };
+    };
+
+    const today = getZonedWeekday();
     const todayClasses = (weekTimetable.entries ?? [])
       .filter((e) => e.dayOfWeek === today)
       .sort(
@@ -1159,21 +1224,7 @@ export class StudentPortalService {
           (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
           (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
       )
-      .map((entry) => {
-        const offering = entry.courseOfferingId
-          ? offeringMap.get(String(entry.courseOfferingId))
-          : null;
-        const start = String(entry.startTime ?? '');
-        const title =
-          offering?.course?.title ?? offering?.course?.code ?? 'Class';
-        const roomId = entry.classroomId as string | undefined;
-        return {
-          time: start,
-          title,
-          room: roomId ? (classroomMap.get(roomId) ?? null) : null,
-          isCurrent: isCurrentSlot(start, String(entry.endTime ?? '')),
-        };
-      });
+      .map((entry) => mapTimetableSlot(entry as Record<string, unknown>));
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const weeklyTimetable = dayNames.map((day, dayOfWeek) => ({
@@ -1186,17 +1237,7 @@ export class StudentPortalService {
             (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
             (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
         )
-        .map((entry) => {
-          const offering = entry.courseOfferingId
-            ? offeringMap.get(String(entry.courseOfferingId))
-            : null;
-          const roomId = entry.classroomId as string | undefined;
-          return {
-            time: `${entry.startTime ?? ''} – ${entry.endTime ?? ''}`,
-            title: offering?.course?.title ?? offering?.course?.code ?? 'Class',
-            room: roomId ? (classroomMap.get(roomId) ?? null) : null,
-          };
-        }),
+        .map((entry) => mapTimetableSlot(entry as Record<string, unknown>)),
     }));
 
     const attendanceBySubject = (attendance?.subjects ?? []).map(

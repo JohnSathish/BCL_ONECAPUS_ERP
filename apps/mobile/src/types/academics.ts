@@ -20,6 +20,19 @@ export type AcademicSubjectCard = {
   offeringSectionId: string | null;
 };
 
+export type TimetableSlot = {
+  time: string;
+  startTime?: string;
+  endTime?: string;
+  title: string;
+  courseCode?: string | null;
+  category?: string | null;
+  facultyName?: string | null;
+  room: string | null;
+  isCurrent?: boolean;
+  isPast?: boolean;
+};
+
 export type StudentAcademicsPayload = {
   header: {
     academicYear: string | null;
@@ -45,16 +58,11 @@ export type StudentAcademicsPayload = {
     presentCount: number;
     totalSessions: number;
   }[];
-  todayClasses: {
-    time: string;
-    title: string;
-    room: string | null;
-    isCurrent: boolean;
-  }[];
+  todayClasses: TimetableSlot[];
   weeklyTimetable: {
     day: string;
     dayOfWeek: number;
-    slots: { time: string; title: string; room: string | null }[];
+    slots: TimetableSlot[];
   }[];
   semesterProgress: {
     category: string;
