@@ -23,7 +23,13 @@ export type StudentHomeSnapshot = {
   };
   fees?: { due?: number; paid?: number; status?: string; semesterLabel?: string };
   attendance?: { percentage?: number | null };
-  academicChips?: { category: string; label: string; courseTitle: string }[];
+  academicChips?: {
+    category: string;
+    label: string;
+    courseTitle: string;
+    credits?: number | null;
+    courseCode?: string | null;
+  }[];
   unreadNotificationCount?: number;
   quickStats?: { key: string; title: string; value: string; tone?: string }[];
   calendarEvents?: {

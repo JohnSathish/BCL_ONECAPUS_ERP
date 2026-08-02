@@ -12,17 +12,22 @@ import {
 import { useRouter } from 'expo-router';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { studentTheme } from '@/components/student-portal/theme';
+import { categoryTone } from '@/components/student-portal/category-tones';
+import {
+  TodayClassesEmptyCard,
+  WeeklyTimetablePanel,
+} from '@/components/student-portal/weekly-timetable-panel';
 import { fetchStudentAcademics } from '@/services/academics';
 import type { AcademicSubjectCard, StudentAcademicsPayload } from '@/types/academics';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  MAJOR: '#1d4ed8',
-  MINOR: '#7c3aed',
-  MDC: '#0d9488',
-  AEC: '#d97706',
+  MAJOR: '#047857',
+  MINOR: '#5b21b6',
+  MDC: '#c2410c',
+  AEC: '#6d28d9',
   SEC: '#be185d',
   VAC: '#64748b',
-  VTC: '#2563eb',
+  VTC: '#0f766e',
 };
 
 export default function StudentAcademicsScreen() {
@@ -140,26 +145,32 @@ export default function StudentAcademicsScreen() {
 
         <SectionTitle>Faculty & Classroom</SectionTitle>
         <View style={styles.tableCard}>
-          {subjects.map((subject) => (
-            <View key={`faculty-${subject.id}`} style={styles.tableRow}>
-              <View style={styles.tableMain}>
-                <Text style={styles.tableTitle}>{subject.courseTitle}</Text>
-                <Text style={styles.tableMeta}>
-                  {subject.facultyName ? `Faculty: ${subject.facultyName}` : 'Faculty: TBA'}
-                  {subject.room ? ` • Room ${subject.room}` : ''}
-                </Text>
+          {subjects.map((subject) => {
+            const tone = categoryTone(subject.category);
+            return (
+              <View
+                key={`faculty-${subject.id}`}
+                style={[styles.featuredRow, { borderLeftColor: tone.dot }]}
+              >
+                <View style={styles.tableMain}>
+                  <Text style={styles.tableTitle}>{subject.courseTitle}</Text>
+                  <Text style={styles.tableMeta}>
+                    {subject.facultyName ? `Faculty: ${subject.facultyName}` : 'Faculty: TBA'}
+                    {subject.room ? ` • Room ${subject.room}` : ''}
+                  </Text>
+                </View>
+                <Text style={styles.tableCredits}>{subject.credits} cr</Text>
               </View>
-              <Text style={styles.tableCredits}>{subject.credits} cr</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <SectionTitle>Today's Classes</SectionTitle>
-        <View style={styles.widgetCard}>
-          {(data?.todayClasses ?? []).length === 0 ? (
-            <Text style={styles.muted}>No classes scheduled for today.</Text>
-          ) : (
-            data?.todayClasses.map((slot) => (
+        {(data?.todayClasses ?? []).length === 0 ? (
+          <TodayClassesEmptyCard />
+        ) : (
+          <View style={styles.widgetCard}>
+            {data?.todayClasses.map((slot) => (
               <View
                 key={`${slot.time}-${slot.title}`}
                 style={[styles.classRow, slot.isCurrent && styles.classRowCurrent]}
@@ -170,24 +181,15 @@ export default function StudentAcademicsScreen() {
                   {slot.room ? <Text style={styles.classMeta}>Room {slot.room}</Text> : null}
                 </View>
               </View>
-            ))
-          )}
-        </View>
+            ))}
+          </View>
+        )}
 
         <SectionTitle>Weekly Timetable</SectionTitle>
-        {(data?.weeklyTimetable ?? [])
-          .filter((day) => day.slots.length > 0)
-          .map((day) => (
-            <View key={day.day} style={styles.widgetCard}>
-              <Text style={styles.dayTitle}>{day.day}</Text>
-              {day.slots.map((slot) => (
-                <Text key={`${day.day}-${slot.time}-${slot.title}`} style={styles.widgetLine}>
-                  {slot.time} — {slot.title}
-                  {slot.room ? ` (${slot.room})` : ''}
-                </Text>
-              ))}
-            </View>
-          ))}
+        <WeeklyTimetablePanel
+          weeklyTimetable={data?.weeklyTimetable ?? []}
+          todayClasses={data?.todayClasses}
+        />
 
         <SectionTitle>Attendance by Subject</SectionTitle>
         <View style={styles.attendanceGrid}>
@@ -483,6 +485,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: studentTheme.border,
     overflow: 'hidden',
+    gap: 8,
+    padding: 10,
+  },
+  featuredRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    borderLeftWidth: 4,
   },
   tableRow: {
     flexDirection: 'row',
@@ -494,7 +510,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   tableMain: { flex: 1 },
-  tableTitle: { fontSize: 14, fontWeight: '600', color: studentTheme.text },
+  tableTitle: { fontSize: 14, fontWeight: '700', color: studentTheme.text },
   tableMeta: { marginTop: 2, fontSize: 12, color: studentTheme.textMuted },
   tableCredits: { fontSize: 12, fontWeight: '700', color: studentTheme.primaryLight },
   widgetCard: {
@@ -515,7 +531,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   classRowCurrent: { backgroundColor: '#eff6ff', borderRadius: 10, paddingHorizontal: 8 },
-  classTime: { width: 52, fontSize: 12, fontWeight: '700', color: studentTheme.primaryLight },
+  classTime: { width: 72, fontSize: 12, fontWeight: '700', color: studentTheme.primaryLight },
   classBody: { flex: 1 },
   classTitle: { fontSize: 14, fontWeight: '600', color: studentTheme.text },
   classMeta: { fontSize: 12, color: studentTheme.textMuted, marginTop: 2 },

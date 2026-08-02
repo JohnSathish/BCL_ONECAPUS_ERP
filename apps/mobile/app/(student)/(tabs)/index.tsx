@@ -10,6 +10,8 @@ import { DeviceSessionsPanel } from '@/components/auth/device-sessions-panel';
 import { COLLEGE_NAME, isMvpStudentCard } from '@/constants/release';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
 import { ProfileCompletionCard } from '@/components/student-portal/profile-completion-card';
+import { AcademicCalendarCard } from '@/components/student-portal/academic-calendar-card';
+import { AcademicSnapshotCard } from '@/components/student-portal/academic-snapshot-card';
 import { BirthdaysTodayCard } from '@/components/notifications/birthdays-today-card';
 import {
   fetchStudentHomeWidgets,
@@ -108,52 +110,15 @@ export default function StudentHomeScreen() {
           onPressNotifications={() => router.push('/(student)/(tabs)/notifications' as never)}
         />
 
-        <Pressable
-          style={styles.snapshotCard}
-          onPress={() => router.push('/(student)/calendar' as never)}
-        >
-          <Text style={styles.sectionTitle}>📅 Academic Calendar</Text>
-          {(home?.calendarEvents ?? []).length === 0 ? (
-            <Text style={styles.widgetLine}>Holidays, meetings, exams and fee due dates.</Text>
-          ) : (
-            (home?.calendarEvents ?? []).slice(0, 4).map((ev) => (
-              <View key={ev.id} style={styles.snapshotRow}>
-                <Text style={styles.snapshotLabel}>{ev.date.slice(5)}</Text>
-                <Text style={styles.snapshotValue} numberOfLines={1}>
-                  {ev.title}
-                </Text>
-              </View>
-            ))
-          )}
-          <Text style={styles.actionText}>View full calendar →</Text>
-        </Pressable>
+        <AcademicCalendarCard
+          events={home?.calendarEvents ?? []}
+          onViewAll={() => router.push('/(student)/calendar' as never)}
+        />
 
-        {academicChips.length > 0 ? (
-          <Pressable
-            style={styles.snapshotCard}
-            onPress={() => router.push('/(student)/(tabs)/academics' as never)}
-          >
-            <Text style={styles.sectionTitle}>📚 Academic Snapshot</Text>
-            {academicChips.map((chip) => (
-              <View key={`${chip.category}-${chip.courseTitle}`} style={styles.snapshotRow}>
-                <Text style={styles.snapshotLabel}>{chip.label}</Text>
-                <Text style={styles.snapshotValue}>{chip.courseTitle}</Text>
-              </View>
-            ))}
-            <Text style={styles.actionText}>View Full Academic Profile →</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            style={styles.snapshotCard}
-            onPress={() => router.push('/(student)/(tabs)/academics' as never)}
-          >
-            <Text style={styles.sectionTitle}>📚 My Academics</Text>
-            <Text style={styles.widgetLine}>
-              View your Major, MDC, AEC, SEC, and VTC registration details.
-            </Text>
-            <Text style={styles.actionText}>Open My Academics →</Text>
-          </Pressable>
-        )}
+        <AcademicSnapshotCard
+          chips={academicChips}
+          onOpen={() => router.push('/(student)/(tabs)/academics' as never)}
+        />
 
         <Text style={styles.sectionHeading}>Quick Actions</Text>
         <View style={styles.quickGrid}>
@@ -366,28 +331,6 @@ const styles = StyleSheet.create({
   },
   badgeLabel: { color: '#bfdbfe', fontSize: 10, textTransform: 'uppercase' },
   badgeValue: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 },
-  snapshotCard: {
-    backgroundColor: studentTheme.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: studentTheme.border,
-    gap: 6,
-  },
-  snapshotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 4,
-  },
-  snapshotLabel: { fontSize: 13, color: studentTheme.textMuted, fontWeight: '600' },
-  snapshotValue: {
-    flex: 1,
-    fontSize: 13,
-    color: studentTheme.text,
-    fontWeight: '600',
-    textAlign: 'right',
-  },
   sectionHeading: { fontSize: 16, fontWeight: '700', color: studentTheme.text, marginTop: 4 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   quickAction: {
