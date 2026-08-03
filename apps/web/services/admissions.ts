@@ -203,14 +203,53 @@ export async function fetchAdmissionsFunnel(cycleId?: string) {
   const { data } = await api.get('/v1/admissions/admin/analytics/funnel', {
     params: cycleId ? { cycleId } : undefined,
   });
-  return data;
+  return data as {
+    registered: number;
+    formStarted: number;
+    submitted: number;
+    paid: number;
+    verified: number;
+    shortlisted: number;
+    allotted: number;
+    enrolled: number;
+  };
 }
 
 export async function fetchProgramBreakdown(cycleId?: string) {
   const { data } = await api.get('/v1/admissions/admin/analytics/programs', {
     params: cycleId ? { cycleId } : undefined,
   });
-  return data;
+  return data as Array<{
+    program: { code: string; name: string };
+    total: number;
+    byStatus: Record<string, number>;
+  }>;
+}
+
+export async function fetchShiftFillRate(cycleId: string) {
+  const { data } = await api.get('/v1/admissions/admin/analytics/shift-fill', {
+    params: { cycleId },
+  });
+  return data as Array<{
+    intake: {
+      id: string;
+      name: string;
+      program: { id: string; code: string; name: string } | null;
+    };
+    shifts: Array<{
+      shift: { id: string; code: string; name: string } | null;
+      totalSeats: number;
+      allocated: number;
+      fillRate: number;
+    }>;
+  }>;
+}
+
+export async function fetchDailyRegistrations(cycleId: string, days = 7) {
+  const { data } = await api.get('/v1/admissions/admin/analytics/daily', {
+    params: { cycleId, days },
+  });
+  return data as Array<{ date: string; count: number }>;
 }
 
 export async function enrollFromApplicationAdmin(
