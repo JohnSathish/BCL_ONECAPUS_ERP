@@ -1,19 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Mail, User } from 'lucide-react';
-import { fetchPortalInfo, requestApplicantPasswordReset } from '@/services/admissions-portal';
+import {
+  AdmissionsAuthCard,
+  AdmissionsAuthCardHeader,
+  AdmissionsAuthLayout,
+  AdmissionsHelpDeskBox,
+} from '@/components/admissions-portal/admissions-auth-layout';
+import { resolvePortalCycleSettings } from '@/components/admissions-portal/cycle-settings';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { fetchPortalInfo, requestApplicantPasswordReset } from '@/services/admissions-portal';
 import { apiErrorMessage } from '@/utils/api-error';
 
 export default function ApplicantForgotPasswordPage() {
   const portalInfo = useQuery({ queryKey: ['admissions-portal-info'], queryFn: fetchPortalInfo });
   const branding = portalInfo.data?.branding;
+  const help = useMemo(
+    () => resolvePortalCycleSettings({ portalInfo: portalInfo.data }),
+    [portalInfo.data],
+  );
+
+  const collegeName = branding?.displayName ?? 'Don Bosco College Tura';
+  const portalSubtitle =
+    branding?.portalSubtitle?.trim() ||
+    portalInfo.data?.cycle?.title ||
+    'Admission Portal 2026–2027';
 
   const [mode, setMode] = useState<'email' | 'applicationNumber'>('email');
   const [value, setValue] = useState('');
@@ -35,44 +49,32 @@ export default function ApplicantForgotPasswordPage() {
   });
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center px-4 py-10"
-      style={{
-        backgroundColor: '#e8f0fe',
-        backgroundImage: 'radial-gradient(circle, #94a3b8 1px, transparent 1px)',
-        backgroundSize: '18px 18px',
-      }}
+    <AdmissionsAuthLayout
+      collegeName={collegeName}
+      portalSubtitle={portalSubtitle}
+      logoUrl={branding?.logoUrl}
+      admissionsOpen={portalInfo.data?.isOpen !== false}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-        <div className="text-center">
-          {branding?.logoUrl ? (
-            <Image
-              src={branding.logoUrl}
-              alt=""
-              width={64}
-              height={64}
-              className="mx-auto h-16 w-16 rounded-full object-contain"
-              unoptimized
-            />
-          ) : null}
-          <h1 className="mt-4 text-xl font-bold text-[#1a2b4b]">Forgot password</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Enter your registered email or application number. We will email a reset link to the
-            address on your application.
-          </p>
-        </div>
+      <AdmissionsAuthCard>
+        <AdmissionsAuthCardHeader
+          collegeName={collegeName}
+          portalSubtitle={portalSubtitle}
+          logoUrl={branding?.logoUrl}
+          title="Forgot password"
+          description="Enter your registered email or application number. We will email a reset link to the address on your application."
+        />
 
-        <div className="mt-6 flex rounded-lg border border-slate-200 p-1 text-sm">
+        <div className="mt-6 flex rounded-full border border-slate-200 p-1 text-sm">
           <button
             type="button"
-            className={`flex-1 rounded-md px-3 py-2 font-medium ${mode === 'email' ? 'bg-[#1a2b4b] text-white' : 'text-slate-600'}`}
+            className={`flex-1 rounded-full px-3 py-2 font-medium ${mode === 'email' ? 'bg-[#0b2545] text-white' : 'text-slate-600'}`}
             onClick={() => setMode('email')}
           >
             Email
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-md px-3 py-2 font-medium ${mode === 'applicationNumber' ? 'bg-[#1a2b4b] text-white' : 'text-slate-600'}`}
+            className={`flex-1 rounded-full px-3 py-2 font-medium ${mode === 'applicationNumber' ? 'bg-[#0b2545] text-white' : 'text-slate-600'}`}
             onClick={() => setMode('applicationNumber')}
           >
             Application no.
@@ -89,59 +91,58 @@ export default function ApplicantForgotPasswordPage() {
           }}
         >
           <div>
-            <Label htmlFor="reset-identifier">
+            <label className="text-sm font-medium text-slate-700">
               {mode === 'email' ? 'Registered email' : 'Application number'}
-            </Label>
-            <div className="relative mt-1">
+            </label>
+            <div className="relative mt-1.5">
               {mode === 'email' ? (
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               ) : (
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               )}
-              <Input
+              <input
                 id="reset-identifier"
-                className="pl-10 bg-[#fefce8]"
-                placeholder={mode === 'email' ? 'applicant@example.com' : 'DBCT26-0001'}
+                className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
+                placeholder={mode === 'email' ? 'you@example.com' : 'DBCT26-0001'}
                 required
               />
             </div>
           </div>
 
           {message ? (
-            <p className={`text-sm ${mutation.isError ? 'text-red-600' : 'text-emerald-700'}`}>
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
               {message}
             </p>
           ) : null}
-
           {devLink ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-              <p className="font-semibold">Dev preview (SMTP not configured)</p>
-              <a href={devLink} className="mt-1 block break-all text-[#2563eb] hover:underline">
-                {devLink}
-              </a>
-            </div>
+            <p className="break-all rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Dev reset link: {devLink}
+            </p>
           ) : null}
 
           <Button
             type="submit"
             disabled={mutation.isPending || !value.trim()}
-            className="w-full rounded-full bg-[#2563eb] py-6"
+            className="h-12 w-full rounded-full bg-[#2563eb] hover:bg-blue-700"
           >
             {mutation.isPending ? 'Sending…' : 'Send reset link'}
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-600">
-          <Link
-            href="/admissions-portal/login"
-            className="font-semibold text-[#2563eb] hover:underline"
-          >
-            Back to login
-          </Link>
-        </p>
-      </div>
-    </div>
+        <div className="mt-6 space-y-4">
+          <AdmissionsHelpDeskBox phone={help.helpDesk.phone} email={help.helpDesk.email} />
+          <p className="text-center text-sm text-slate-600">
+            <Link
+              href="/admissions-portal/login"
+              className="font-semibold text-blue-700 hover:underline"
+            >
+              Back to login
+            </Link>
+          </p>
+        </div>
+      </AdmissionsAuthCard>
+    </AdmissionsAuthLayout>
   );
 }

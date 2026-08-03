@@ -38,7 +38,7 @@ export function parsePortalCycleSettings(
     applicationNumberPrefix: s.applicationNumberPrefix?.trim() || 'DBCT26',
     helpDesk: {
       phone: s.helpDesk?.phone?.trim() || DEFAULT_HELP_PHONE,
-      email: s.helpDesk?.email?.trim() || undefined,
+      email: s.helpDesk?.email?.trim() || 'admission@donboscocollege.ac.in',
     },
   };
 }

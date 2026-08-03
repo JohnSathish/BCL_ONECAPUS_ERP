@@ -1,19 +1,26 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
-import { Lock, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Headset, Lock, User } from 'lucide-react';
+import {
+  AdmissionsAuthCard,
+  AdmissionsAuthCardHeader,
+  AdmissionsAuthFooterLinks,
+  AdmissionsAuthLayout,
+  AdmissionsHelpDeskBox,
+} from '@/components/admissions-portal/admissions-auth-layout';
+import { resolvePortalCycleSettings } from '@/components/admissions-portal/cycle-settings';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/use-auth';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { fetchPortalInfo, loginApplicant } from '@/services/admissions-portal';
 import { useAuthStore } from '@/store/auth-store';
-import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/utils/api-error';
 
 const schema = z.object({
@@ -40,6 +47,16 @@ function LoginForm() {
 
   const portalInfo = useQuery({ queryKey: ['admissions-portal-info'], queryFn: fetchPortalInfo });
   const branding = portalInfo.data?.branding;
+  const help = useMemo(
+    () => resolvePortalCycleSettings({ portalInfo: portalInfo.data }),
+    [portalInfo.data],
+  );
+
+  const collegeName = branding?.displayName ?? 'Don Bosco College Tura';
+  const portalSubtitle =
+    branding?.portalSubtitle?.trim() ||
+    portalInfo.data?.cycle?.title ||
+    'Admission Portal 2026–2027';
 
   const {
     register,
@@ -53,9 +70,9 @@ function LoginForm() {
   const onSubmit = async (values: FormValues) => {
     setError(null);
     try {
-      const session = await loginApplicant(values);
-      setSession(session);
-      tokenRefreshManager.scheduleProactiveRefresh(session);
+      const next = await loginApplicant(values);
+      setSession(next);
+      tokenRefreshManager.scheduleProactiveRefresh(next);
       router.replace('/admissions-portal/dashboard');
     } catch (e) {
       setError(apiErrorMessage(e, 'Login failed'));
@@ -64,7 +81,7 @@ function LoginForm() {
 
   if (!isReady) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#e8f0fe] text-sm text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-[#e8f1fb] text-sm text-slate-500">
         Loading…
       </div>
     );
@@ -72,52 +89,42 @@ function LoginForm() {
 
   if (session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#e8f0fe] text-sm text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-[#e8f1fb] text-sm text-slate-500">
         Redirecting…
       </div>
     );
   }
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center px-4 py-10"
-      style={{
-        backgroundColor: '#e8f0fe',
-        backgroundImage: 'radial-gradient(circle, #94a3b8 1px, transparent 1px)',
-        backgroundSize: '18px 18px',
-      }}
+    <AdmissionsAuthLayout
+      collegeName={collegeName}
+      portalSubtitle={portalSubtitle}
+      logoUrl={branding?.logoUrl}
+      admissionsOpen={portalInfo.data?.isOpen !== false}
+      openMessage={
+        portalInfo.data?.isOpen === false
+          ? portalInfo.data.message || 'Online admissions are currently closed.'
+          : undefined
+      }
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-        <div className="text-center">
-          {branding?.logoUrl ? (
-            <Image
-              src={branding.logoUrl}
-              alt=""
-              width={80}
-              height={80}
-              className="mx-auto h-20 w-20 rounded-full object-contain"
-              unoptimized
-            />
-          ) : null}
-          <h1 className="mt-4 text-xl font-bold text-[#1a2b4b]">
-            {branding?.displayName ?? 'Don Bosco College, Tura'}
-          </h1>
-          <p className="text-sm text-slate-500">Admission Portal 2026–2027</p>
-        </div>
-
-        <h2 className="mt-8 text-lg font-bold text-[#1a2b4b]">Applicant Login</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Use your application number or registered email, and the password from registration.
-        </p>
+      <AdmissionsAuthCard>
+        <AdmissionsAuthCardHeader
+          collegeName={collegeName}
+          portalSubtitle={portalSubtitle}
+          logoUrl={branding?.logoUrl}
+          title="Applicant Login"
+          description="Use your application number or registered email, and the password from registration."
+        />
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-700">Application Number / Email</span>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
-                className="h-11 w-full rounded-lg border border-slate-200 bg-[#fefce8] pl-10 pr-3 text-sm outline-none focus:border-[#2563eb]"
+                className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 placeholder="DBCT26-0001"
+                autoComplete="username"
                 {...register('applicationNumber')}
               />
             </div>
@@ -126,72 +133,84 @@ function LoginForm() {
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-700">Password</span>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-[#fefce8] pl-10 pr-16 text-sm outline-none focus:border-[#2563eb]"
+                className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-12 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                placeholder="Enter your password"
+                autoComplete="current-password"
                 {...register('password')}
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#2563eb]"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                 onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </label>
 
-          <Link
-            href="/admissions-portal/forgot-password"
-            className="text-sm text-[#2563eb] hover:underline"
-          >
-            Forgot password?
-          </Link>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <label className="flex items-center gap-2 text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                {...register('rememberMe')}
+              />
+              Remember me on this device
+            </label>
+            <Link
+              href="/admissions-portal/forgot-password"
+              className="font-semibold text-blue-700 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
           {resetSuccess ? (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               Password updated successfully. Sign in with your new password.
             </p>
           ) : null}
 
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" {...register('rememberMe')} />
-            Remember me on this device
-          </label>
+          {error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-          <div className="flex items-center gap-3 pt-2">
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 rounded-full bg-[#2563eb] py-6 text-base"
-            >
-              {isSubmitting ? 'Signing in…' : 'Sign In'}
-            </Button>
-            <Link href="/admissions-portal" className="text-sm text-[#2563eb] hover:underline">
-              Need help?
-            </Link>
-          </div>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="h-12 w-full rounded-full bg-[#2563eb] text-base font-semibold hover:bg-blue-700"
+          >
+            <Lock className="mr-2 h-4 w-4" />
+            {isSubmitting ? 'Signing in…' : 'Sign In'}
+            {!isSubmitting ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
+          </Button>
         </form>
 
-        <div className="mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/admissions-portal/register"
-            className="font-semibold text-[#2563eb] hover:underline"
-          >
-            Register here
-          </Link>
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Need help?
+          </span>
+          <div className="h-px flex-1 bg-slate-200" />
         </div>
 
-        <div className="mt-6 text-center text-xs text-slate-500">
-          <p className="font-semibold uppercase tracking-wide">Admission Help Desk:</p>
-          <p className="mt-1 text-[#2563eb]">+91 9402152496 / +91 9566363655</p>
+        <div className="space-y-4">
+          <div className="flex items-start gap-2">
+            <Headset className="mt-3 h-4 w-4 shrink-0 text-sky-700" />
+            <div className="min-w-0 flex-1">
+              <AdmissionsHelpDeskBox phone={help.helpDesk.phone} email={help.helpDesk.email} />
+            </div>
+          </div>
+          <AdmissionsAuthFooterLinks />
         </div>
-      </div>
-    </div>
+      </AdmissionsAuthCard>
+    </AdmissionsAuthLayout>
   );
 }
 
@@ -199,7 +218,9 @@ export default function ApplicantLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>
+        <div className="flex min-h-screen items-center justify-center bg-[#e8f1fb] text-slate-500">
+          Loading…
+        </div>
       }
     >
       <LoginForm />
