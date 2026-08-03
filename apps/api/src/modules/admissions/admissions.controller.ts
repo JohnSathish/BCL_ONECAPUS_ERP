@@ -16,6 +16,7 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
+import { AdmissionsService } from './admissions.service';
 import {
   CreateApplicationDto,
   CreateIntakeDto,
