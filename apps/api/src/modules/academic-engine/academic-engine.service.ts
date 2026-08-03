@@ -919,12 +919,22 @@ export class AcademicEngineService {
       registrationSource?: string;
       assignedById?: string;
       generatedBy?: string;
+      /** Admin managed endpoint may adjust electives after submit. */
+      allowNonDraftAdminEdit?: boolean;
       audit?: AcademicChangeAuditContext;
     },
   ) {
     const reg = await this.getRegistration(tenantId, registrationId);
-    if (reg.status !== 'draft') {
+    if (reg.status !== 'draft' && !opts?.allowNonDraftAdminEdit) {
       throw new BadRequestException('Only draft registrations can be edited');
+    }
+    if (reg.status !== 'draft' && opts?.allowNonDraftAdminEdit) {
+      // Keep submitted/approved/completed status; only rewrite lines + audit.
+      if (!opts.assignedById) {
+        throw new BadRequestException(
+          'Admin actor is required to edit a non-draft registration',
+        );
+      }
     }
 
     const beforeSnapshots =
@@ -995,8 +1005,15 @@ export class AcademicEngineService {
       data: {
         tenantId,
         registrationId,
-        action: 'lines_updated',
-        metadata: { lineCount: lines.length },
+        action:
+          reg.status === 'draft'
+            ? 'lines_updated'
+            : 'lines_updated_post_submit',
+        metadata: {
+          lineCount: lines.length,
+          previousStatus: reg.status,
+          allowNonDraftAdminEdit: Boolean(opts?.allowNonDraftAdminEdit),
+        },
       },
     });
 

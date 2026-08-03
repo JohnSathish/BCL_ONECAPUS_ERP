@@ -1117,6 +1117,7 @@ export class AcademicEngineController {
       await this.engine.updateRegistrationLines(user.tid, id, dto.lines, {
         registrationSource: 'ADMIN_ASSIGNED',
         assignedById: user.sub,
+        allowNonDraftAdminEdit: true,
         audit: {
           actorId: user.sub,
           actorRoles: user.roles,

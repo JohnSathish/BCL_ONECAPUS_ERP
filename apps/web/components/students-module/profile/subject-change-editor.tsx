@@ -140,6 +140,8 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
   const programmeName = context.data?.student.programCode ?? profile.programme ?? 'Programme';
   const registration = context.data?.registration;
   const registrationEditable = registration?.status === 'draft';
+  /** Admins may change electives (MDC/AEC/SEC/VTC) even after submit. */
+  const electivesEditable = Boolean(registration);
   const currentPrimaryShiftId =
     context.data?.student.primaryShiftId ?? profile.primaryShiftId ?? '';
   const shiftChanging = Boolean(shiftId && shiftId !== currentPrimaryShiftId);
@@ -465,10 +467,8 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
         return { auditCount, shiftTransferResult, onlyShiftTransfer: true as const };
       }
 
-      if (!registrationEditable) {
-        throw new Error(
-          'Only draft registrations can change subjects. Shift transfer alone is allowed on submitted registrations.',
-        );
+      if (!registration) {
+        throw new Error('No semester registration found for this student.');
       }
 
       const preservedLines: Array<{
@@ -483,8 +483,11 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
       }> = [];
 
       // Major papers: auto-resolved from department (never picked individually).
+      // On non-draft regs, keep existing majors unless draft editing of major is allowed.
       const majorPapers =
-        majorDepartmentEditable(semesterSequence) && selectedMajor?.papers?.length
+        registrationEditable &&
+        majorDepartmentEditable(semesterSequence) &&
+        selectedMajor?.papers?.length
           ? selectedMajor.papers
           : currentMajorPapers;
 
@@ -626,6 +629,14 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Semester {roman(semesterSequence)} controls
               </p>
+
+              {registration && !registrationEditable ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Registration status: <strong>{registration.status}</strong>. Electives (including
+                  VTC) can still be changed by admin; major department stays locked for this
+                  semester.
+                </div>
+              ) : null}
 
               <Field label="Programme">
                 <input className={inputClass} disabled value={programmeName} />
@@ -817,7 +828,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
                         <select
                           className={inputClass}
                           value={electives[category] ?? KEEP}
-                          disabled={!registrationEditable || catalogQ.isLoading}
+                          disabled={!electivesEditable || catalogQ.isLoading}
                           onChange={(event) =>
                             setElectives((current) => ({
                               ...current,
