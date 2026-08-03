@@ -104,8 +104,8 @@ export class StaffEmploymentService {
   }
 
   /**
-   * Suggest a free 2-letter short code for the campus.
-   * Never returns a code already allotted (except the current staff).
+   * Suggest a free 2-letter short code.
+   * Always checks staff_profiles in the DB for already allotted codes before returning.
    */
   async suggestUniqueShortCode(
     tenantId: string,
@@ -117,7 +117,7 @@ export class StaffEmploymentService {
       excludeStaffId?: string;
     } = {},
   ): Promise<{ shortCode: string; campusId: string | null }> {
-    const campusId =
+    let campusId =
       opts.campusId ??
       (await this.resolveCampusId(
         tenantId,
@@ -125,13 +125,31 @@ export class StaffEmploymentService {
         opts.primaryShiftId,
       ));
 
-    const candidates = this.buildShortCodeCandidates(fullName);
     if (!campusId) {
-      return { shortCode: candidates[0] ?? '', campusId: null };
+      const fallbackCampus = await this.prisma.campus.findFirst({
+        where: { tenantId, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      campusId = fallbackCampus?.id ?? null;
+    }
+
+    if (!campusId) {
+      throw new BadRequestException(
+        'Select a department or shift before suggesting a short code',
+      );
+    }
+
+    const candidates = this.buildShortCodeCandidates(fullName);
+    if (!candidates.length) {
+      throw new BadRequestException(
+        'Enter a staff full name before suggesting a short code',
+      );
     }
 
     const takenRows = await this.prisma.staffProfile.findMany({
       where: {
+        tenantId,
         campusId,
         deletedAt: null,
         shortCode: { not: null },
@@ -145,15 +163,36 @@ export class StaffEmploymentService {
         .filter(Boolean),
     );
 
+    const tryCode = async (code: string): Promise<string | null> => {
+      if (taken.has(code)) return null;
+      // Final DB guard (case-insensitive) before returning a suggestion
+      const clash = await this.prisma.staffProfile.findFirst({
+        where: {
+          tenantId,
+          campusId,
+          deletedAt: null,
+          shortCode: { equals: code, mode: 'insensitive' },
+          ...(opts.excludeStaffId ? { NOT: { id: opts.excludeStaffId } } : {}),
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        taken.add(code);
+        return null;
+      }
+      return code;
+    };
+
     for (const code of candidates) {
-      if (!taken.has(code)) return { shortCode: code, campusId };
+      const free = await tryCode(code);
+      if (free) return { shortCode: free, campusId };
     }
 
-    // Exhaustive AA–ZZ fallback (still two letters only)
     for (let a = 0; a < 26; a += 1) {
       for (let b = 0; b < 26; b += 1) {
         const code = String.fromCharCode(65 + a) + String.fromCharCode(65 + b);
-        if (!taken.has(code)) return { shortCode: code, campusId };
+        const free = await tryCode(code);
+        if (free) return { shortCode: free, campusId };
       }
     }
 

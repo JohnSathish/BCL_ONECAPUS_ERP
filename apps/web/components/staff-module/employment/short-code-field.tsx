@@ -35,6 +35,10 @@ export function ShortCodeField({
 
   async function handleSuggest() {
     if (!fullName?.trim() || disabled || suggesting) return;
+    if (!departmentId && !primaryShiftId && !campusId) {
+      setSuggestError('Select department or shift first, then click Suggest');
+      return;
+    }
     setSuggesting(true);
     setSuggestError(null);
     try {
@@ -48,7 +52,7 @@ export function ShortCodeField({
       if (result.shortCode) {
         onChange(normalizeShortCodeInput(result.shortCode));
       } else {
-        setSuggestError('Could not suggest a short code');
+        setSuggestError('Could not suggest a free short code');
       }
     } catch (err) {
       setSuggestError(apiErrorMessage(err));
@@ -89,7 +93,8 @@ export function ShortCodeField({
       {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
       {suggestError ? <p className="text-[11px] text-destructive">{suggestError}</p> : null}
       <p className="text-[10px] text-muted-foreground">
-        Uppercase, max 10 chars, unique per campus. Suggest skips codes already in use.
+        Uppercase, max 10 chars, unique per campus. Suggest checks the database and never returns an
+        already allotted code.
       </p>
     </div>
   );
