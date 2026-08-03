@@ -50,8 +50,9 @@ function useDebouncedStaffSave<T extends Record<string, unknown>>(
   const skipInitial = useRef(true);
   const mut = useMutation({
     mutationFn: (payload: T) => updateStaffProfileSection(staffId, sectionKey, payload),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       setMessage('Saved');
+      qc.setQueryData(['staff', staffId, 'profile'], updated);
       void qc.invalidateQueries({ queryKey: ['staff', staffId, 'profile'] });
       setTimeout(() => setMessage(''), 2000);
     },
@@ -100,6 +101,24 @@ export function StaffBasicSection({
     experienceYears: profile.experienceYears ?? undefined,
   });
   const { message, saving } = useDebouncedStaffSave(profile.id, 'basic', form, canEdit);
+
+  useEffect(() => {
+    setForm((f) => ({
+      ...f,
+      fullName: profile.fullName,
+      email: profile.email ?? '',
+      mobile: profile.mobile ?? '',
+      gender: profile.gender ?? '',
+      dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? '',
+      bloodGroupLookupId: profile.bloodGroupLookupId ?? '',
+      rfidNo: profile.rfidNo ?? '',
+      biometricId: profile.biometricId ?? '',
+      qualification: profile.qualification ?? '',
+      specialization: profile.specialization ?? '',
+      experienceYears: profile.experienceYears ?? undefined,
+    }));
+  }, [profile.id, profile.updatedAt]);
+
   const qc = useQueryClient();
   const [photoError, setPhotoError] = useState('');
 

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -187,6 +188,30 @@ export class StaffProfileService {
       payload,
     );
 
+    if (sectionKey === 'basic' && typeof payload.email === 'string') {
+      const nextEmail = payload.email.trim().toLowerCase();
+      if (nextEmail && staff.portalUserId) {
+        const emailTaken = await this.prisma.user.findFirst({
+          where: {
+            tenantId,
+            email: nextEmail,
+            deletedAt: null,
+            NOT: { id: staff.portalUserId },
+          },
+          select: { id: true },
+        });
+        if (emailTaken) {
+          throw new ConflictException(
+            'Email is already used by another portal login',
+          );
+        }
+        await this.prisma.user.update({
+          where: { id: staff.portalUserId },
+          data: { email: nextEmail },
+        });
+      }
+    }
+
     await this.prisma.staffProfile.update({
       where: { id: staffProfileId },
       data,
@@ -289,7 +314,9 @@ export class StaffProfileService {
             typeof payload.gender === 'string' ? payload.gender : undefined,
           dateOfBirth:
             typeof payload.dateOfBirth === 'string'
-              ? new Date(payload.dateOfBirth)
+              ? payload.dateOfBirth.trim()
+                ? new Date(payload.dateOfBirth)
+                : null
               : payload.dateOfBirth === null
                 ? null
                 : undefined,
