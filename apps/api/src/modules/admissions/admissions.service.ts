@@ -446,8 +446,12 @@ export class AdmissionsService {
   ) {
     const app = await this.prisma.admissionApplication.findFirst({
       where: { id, tenantId, deletedAt: null },
+      include: { cycle: { select: { status: true } } },
     });
     if (!app) throw new NotFoundException('Application not found');
+    if (app.cycle?.status === 'ARCHIVED') {
+      throw new BadRequestException('Archived cycles are read-only (payment)');
+    }
 
     const updated = await this.prisma.admissionApplication.update({
       where: { id },
@@ -488,8 +492,14 @@ export class AdmissionsService {
   ) {
     const app = await this.prisma.admissionApplication.findFirst({
       where: { id, tenantId, deletedAt: null },
+      include: { cycle: { select: { status: true } } },
     });
     if (!app) throw new NotFoundException('Application not found');
+    if (app.cycle?.status === 'ARCHIVED') {
+      throw new BadRequestException(
+        'Archived cycles are read-only (admission fee)',
+      );
+    }
     if (
       dto.status === 'PAID' ||
       dto.status === 'WAIVED' ||

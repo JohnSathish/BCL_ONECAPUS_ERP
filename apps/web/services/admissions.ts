@@ -175,6 +175,71 @@ export async function closeCycle(id: string) {
   return data;
 }
 
+export type CycleClonePreview = {
+  sourceCycleId: string;
+  sourceTitle: string;
+  sourceStatus: string;
+  academicYearName: string;
+  proposedPrefix: string;
+  proposedCode: string;
+  proposedTitle: string;
+  applicationSeqResetTo: number;
+  programCount: number;
+  intakeCount: number;
+  totalSeats: number;
+  warnings: string[];
+  formDocsTemplatesNote: string;
+};
+
+export async function previewCycleClone(params: {
+  sourceCycleId: string;
+  academicYearName: string;
+}): Promise<CycleClonePreview> {
+  const { data } = await api.get('/v1/admissions/admin/cycles/clone-preview', {
+    params,
+  });
+  return data;
+}
+
+export async function cloneAdmissionCycle(payload: {
+  sourceCycleId: string;
+  academicYearId?: string;
+  createAcademicYear?: {
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
+  applicationNumberPrefix?: string;
+  deadlineMode?: 'clear' | 'shiftYear' | 'keep';
+  archiveSource?: boolean;
+  title?: string;
+  registrationOpensAt?: string | null;
+  registrationClosesAt?: string | null;
+  applicationDeadline?: string | null;
+  paymentDeadline?: string | null;
+  settingsOverrides?: Record<string, unknown>;
+}) {
+  const { data } = await api.post('/v1/admissions/admin/cycles/clone', payload);
+  return data as {
+    cycle: AdmissionCycle & { id: string };
+    summary: {
+      programCount: number;
+      intakeCount: number;
+      seatCount: number;
+      applicationNumberPrefix: string;
+      applicationSeq: number;
+      sourceCycleId: string | null;
+      academicYearId: string;
+      academicYearName: string;
+    };
+  };
+}
+
+export async function archiveAdmissionCycle(id: string) {
+  const { data } = await api.post(`/v1/admissions/admin/cycles/${id}/archive`);
+  return data as AdmissionCycle;
+}
+
 export async function upsertIntakeShift(
   intakeId: string,
   payload: { shiftId: string; totalSeats: number; reservedSeats?: Record<string, number> },

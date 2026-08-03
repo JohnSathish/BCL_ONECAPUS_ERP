@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { AdmissionsCycleCloneWizard } from '@/components/admissions-module/admissions-cycle-clone-wizard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/use-auth';
@@ -18,6 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function AdmissionCyclesPage() {
   useRequireAuth();
+  const [wizardOpen, setWizardOpen] = useState(false);
   const { data: cycles = [], isLoading } = useQuery({
     queryKey: ['admission-cycles'],
     queryFn: () => fetchCycles(),
@@ -25,10 +28,11 @@ export default function AdmissionCyclesPage() {
 
   return (
     <DashboardShell role="admin" title="Admission Cycles">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Button variant="outline" asChild>
           <Link href="/admin/admissions">← Admissions</Link>
         </Button>
+        <Button onClick={() => setWizardOpen(true)}>Create New Admission Cycle</Button>
       </div>
 
       {isLoading ? (
@@ -60,6 +64,8 @@ export default function AdmissionCyclesPage() {
           ))}
         </div>
       )}
+
+      <AdmissionsCycleCloneWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </DashboardShell>
   );
 }

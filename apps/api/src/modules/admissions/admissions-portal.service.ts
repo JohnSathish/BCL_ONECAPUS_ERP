@@ -151,6 +151,11 @@ export class AdmissionsPortalService {
     }
 
     const cycle = portal.cycle;
+    if (cycle.status === 'ARCHIVED') {
+      throw new BadRequestException(
+        'Registration is closed for this admission cycle',
+      );
+    }
     const email = dto.email.trim().toLowerCase();
 
     const existing = await this.prisma.admissionApplication.findFirst({

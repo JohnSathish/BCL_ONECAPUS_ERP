@@ -21,6 +21,7 @@ import {
 } from '../../common/decorators/require-permissions.decorator';
 import { AdmissionsAnalyticsService } from './admissions-analytics.service';
 import { AdmissionsCycleService } from './admissions-cycle.service';
+import type { CycleSettings } from './admissions-cycle.service';
 import { AdmissionsDocumentService } from './admissions-document.service';
 import { AdmissionsEnrollmentService } from './admissions-enrollment.service';
 import { AdmissionsMeritService } from './admissions-merit.service';
@@ -28,6 +29,8 @@ import { AdmissionsApplicationDocumentService } from './admissions-application-d
 import { AdmissionsAllocationService } from './admissions-allocation.service';
 import { AdmissionsService } from './admissions.service';
 import {
+  CloneAdmissionCycleDto,
+  ClonePreviewQueryDto,
   GenerateMeritListDto,
   MarkAdmissionFeeDto,
   MarkPaymentDto,
@@ -60,6 +63,57 @@ export class AdmissionsAdminController {
   )
   listCycles(@CurrentUser() user: JwtUser, @Query('status') status?: string) {
     return this.cycles.listCycles(user.tid, status);
+  }
+
+  @Get('cycles/clone-preview')
+  @RequireAnyPermission('admissions:manage', 'admissions:configure')
+  clonePreview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ClonePreviewQueryDto,
+  ) {
+    return this.cycles.previewClone(
+      user.tid,
+      query.sourceCycleId,
+      query.academicYearName,
+    );
+  }
+
+  @Post('cycles/clone')
+  @RequirePermissions('admissions:manage')
+  cloneCycle(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CloneAdmissionCycleDto,
+  ) {
+    return this.cycles.cloneAdmissionCycle(user.tid, user.sub, {
+      sourceCycleId: dto.sourceCycleId,
+      academicYearId: dto.academicYearId,
+      createAcademicYear: dto.createAcademicYear,
+      applicationNumberPrefix: dto.applicationNumberPrefix,
+      deadlineMode: dto.deadlineMode ?? 'clear',
+      archiveSource: dto.archiveSource ?? false,
+      title: dto.title,
+      registrationOpensAt: dto.registrationOpensAt
+        ? new Date(dto.registrationOpensAt)
+        : dto.registrationOpensAt === null
+          ? null
+          : undefined,
+      registrationClosesAt: dto.registrationClosesAt
+        ? new Date(dto.registrationClosesAt)
+        : dto.registrationClosesAt === null
+          ? null
+          : undefined,
+      applicationDeadline: dto.applicationDeadline
+        ? new Date(dto.applicationDeadline)
+        : dto.applicationDeadline === null
+          ? null
+          : undefined,
+      paymentDeadline: dto.paymentDeadline
+        ? new Date(dto.paymentDeadline)
+        : dto.paymentDeadline === null
+          ? null
+          : undefined,
+      settingsOverrides: dto.settingsOverrides as CycleSettings | undefined,
+    });
   }
 
   @Get('cycles/:id')
@@ -96,7 +150,7 @@ export class AdmissionsAdminController {
         paymentDeadline: dto.paymentDeadline
           ? new Date(dto.paymentDeadline)
           : undefined,
-        settings: dto.settings,
+        settings: dto.settings as CycleSettings | undefined,
       },
       user.sub,
     );
@@ -112,6 +166,12 @@ export class AdmissionsAdminController {
   @RequirePermissions('admissions:configure')
   closeCycle(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.cycles.closeCycle(user.tid, id, user.sub);
+  }
+
+  @Post('cycles/:id/archive')
+  @RequirePermissions('admissions:manage')
+  archiveCycle(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.cycles.archiveCycle(user.tid, id, user.sub);
   }
 
   @Put('cycles/:cycleId/programs/:programId')

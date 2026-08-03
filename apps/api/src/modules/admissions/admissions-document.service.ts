@@ -43,10 +43,12 @@ export class AdmissionsDocumentService {
       include: { cycle: true },
     });
     if (!application) throw new NotFoundException('Application not found');
-    if (
-      !['draft', 'under_review'].includes(application.status) &&
-      application.cycle?.status !== 'ARCHIVED'
-    ) {
+    if (application.cycle?.status === 'ARCHIVED') {
+      throw new BadRequestException(
+        'Archived cycles are read-only (documents)',
+      );
+    }
+    if (!['draft', 'under_review'].includes(application.status)) {
       throw new BadRequestException(
         'Documents cannot be changed at this stage',
       );
@@ -102,9 +104,18 @@ export class AdmissionsDocumentService {
   ) {
     const doc = await this.prisma.admissionApplicationDocument.findFirst({
       where: { id: documentId, tenantId },
-      include: { application: true },
+      include: {
+        application: {
+          include: { cycle: { select: { status: true } } },
+        },
+      },
     });
     if (!doc) throw new NotFoundException('Document not found');
+    if (doc.application.cycle?.status === 'ARCHIVED') {
+      throw new BadRequestException(
+        'Archived cycles are read-only (document verify)',
+      );
+    }
 
     const updated = await this.prisma.admissionApplicationDocument.update({
       where: { id: documentId },

@@ -10,6 +10,7 @@ import {
   IsUUID,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
 
@@ -200,6 +201,79 @@ export class UpdateCycleDto {
 
   @IsOptional()
   settings?: Record<string, unknown>;
+}
+
+export class CreateAcademicYearInlineDto {
+  @IsString()
+  name!: string;
+
+  @IsString()
+  startDate!: string;
+
+  @IsString()
+  endDate!: string;
+
+  @IsOptional()
+  @IsUUID()
+  institutionId?: string;
+}
+
+export class CloneAdmissionCycleDto {
+  @IsOptional()
+  @IsUUID()
+  sourceCycleId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateAcademicYearInlineDto)
+  createAcademicYear?: CreateAcademicYearInlineDto;
+
+  @IsOptional()
+  @IsString()
+  applicationNumberPrefix?: string;
+
+  @IsOptional()
+  @IsIn(['clear', 'shiftYear', 'keep'])
+  deadlineMode?: 'clear' | 'shiftYear' | 'keep';
+
+  @IsOptional()
+  @IsBoolean()
+  archiveSource?: boolean;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationOpensAt?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationClosesAt?: string;
+
+  @IsOptional()
+  @IsString()
+  applicationDeadline?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentDeadline?: string;
+
+  @IsOptional()
+  settingsOverrides?: Record<string, unknown>;
+}
+
+export class ClonePreviewQueryDto {
+  @IsUUID()
+  sourceCycleId!: string;
+
+  @IsString()
+  academicYearName!: string;
 }
 
 export class VerifyDocumentDto {
