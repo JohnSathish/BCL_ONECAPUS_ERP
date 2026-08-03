@@ -137,6 +137,15 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(staff)/(tabs)' as Href;
   }
 
+  // Principal Desk — V1: open staff/principal home (full inbox is web Phase 2)
+  if (
+    lower.includes('/principal-desk') ||
+    lower.includes('principal_mail') ||
+    lower.includes('principal-mail')
+  ) {
+    return '/(staff)/(tabs)' as Href;
+  }
+
   return null;
 }
 

@@ -230,5 +230,11 @@ export const markAllNotificationsRead = () =>
 export const fetchNotificationPreferences = () =>
   api.get(`${base}/notifications/preferences`).then((res) => res.data);
 
-export const saveNotificationPreference = (channel: string, enabled: boolean) =>
-  api.post(`${base}/notifications/preferences`, { channel, enabled }).then((res) => res.data);
+export const saveNotificationPreference = (
+  channel: string,
+  enabled: boolean,
+  settings?: Record<string, unknown>,
+) =>
+  api
+    .post(`${base}/notifications/preferences`, { channel, enabled, settings })
+    .then((res) => res.data);

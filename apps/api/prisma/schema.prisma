@@ -16399,3 +16399,132 @@ model IntegrationConnector {
   @@map("integration_connectors")
   @@schema("platform")
 }
+
+// --- Principal Communication Hub (private Gmail client) ---
+
+model PrincipalMailboxAccount {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  ownerUserId     String    @map("owner_user_id") @db.Uuid
+  googleEmail     String    @map("google_email")
+  accountLabel    String    @default("PERSONAL") @map("account_label")
+  encryptedTokens String    @map("encrypted_tokens") @db.Text
+  scopes          String    @default("") @db.Text
+  historyId       String?   @map("history_id")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  messages     PrincipalMailMessage[]
+  drafts       PrincipalMailDraft[]
+  auditLogs    PrincipalMailAuditLog[]
+
+  @@unique([tenantId, ownerUserId, googleEmail])
+  @@index([tenantId, ownerUserId])
+  @@map("principal_mailbox_accounts")
+  @@schema("platform")
+}
+
+model PrincipalMailMessage {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  accountId         String    @map("account_id") @db.Uuid
+  gmailMessageId    String    @map("gmail_message_id")
+  gmailThreadId     String    @map("gmail_thread_id")
+  folder            String    @default("INBOX")
+  subject           String    @default("")
+  snippet           String    @default("") @db.Text
+  fromAddress       String    @default("") @map("from_address")
+  fromName          String?   @map("from_name")
+  toAddresses       Json      @default("[]") @map("to_addresses")
+  ccAddresses       Json      @default("[]") @map("cc_addresses")
+  bccAddresses      Json      @default("[]") @map("bcc_addresses")
+  bodyHtml          String?   @map("body_html") @db.Text
+  bodyText          String?   @map("body_text") @db.Text
+  labelIds          Json      @default("[]") @map("label_ids")
+  starred           Boolean   @default(false)
+  isRead            Boolean   @default(false) @map("is_read")
+  hasAttachment     Boolean   @default(false) @map("has_attachment")
+  importance        String    @default("NORMAL")
+  category          String    @default("Others")
+  receivedAt        DateTime  @map("received_at")
+  sentAt            DateTime? @map("sent_at")
+  internalDateMs    String?   @map("internal_date_ms")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  account     PrincipalMailboxAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  attachments PrincipalMailAttachment[]
+
+  @@unique([accountId, gmailMessageId])
+  @@index([tenantId, accountId, folder, receivedAt])
+  @@index([tenantId, accountId, starred])
+  @@index([tenantId, accountId, isRead])
+  @@map("principal_mail_messages")
+  @@schema("platform")
+}
+
+model PrincipalMailAttachment {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  messageId          String   @map("message_id") @db.Uuid
+  gmailAttachmentId  String   @map("gmail_attachment_id")
+  filename           String
+  mimeType           String   @map("mime_type")
+  sizeBytes          Int      @default(0) @map("size_bytes")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  message PrincipalMailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, messageId])
+  @@map("principal_mail_attachments")
+  @@schema("platform")
+}
+
+model PrincipalMailDraft {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  accountId    String    @map("account_id") @db.Uuid
+  toAddresses  Json      @default("[]") @map("to_addresses")
+  ccAddresses  Json      @default("[]") @map("cc_addresses")
+  bccAddresses Json      @default("[]") @map("bcc_addresses")
+  subject      String    @default("")
+  bodyHtml     String    @default("") @map("body_html") @db.Text
+  bodyText     String?   @map("body_text") @db.Text
+  replyToMessageId String? @map("reply_to_message_id") @db.Uuid
+  scheduledAt  DateTime? @map("scheduled_at")
+  priority     String    @default("NORMAL")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  account PrincipalMailboxAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, accountId])
+  @@map("principal_mail_drafts")
+  @@schema("platform")
+}
+
+model PrincipalMailAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  accountId  String?  @map("account_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent") @db.Text
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  account PrincipalMailboxAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, actorId, createdAt])
+  @@index([tenantId, accountId, createdAt])
+  @@map("principal_mail_audit_logs")
+  @@schema("platform")
+}

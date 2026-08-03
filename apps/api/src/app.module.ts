@@ -84,6 +84,7 @@ import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
 import { CampusAccessModule } from './modules/campus-access/campus-access.module';
 import { BackupEngineModule } from './modules/backup-engine/backup-engine.module';
 import { PrincipalDeskModule } from './modules/principal-desk/principal-desk.module';
+import { PrincipalCommsModule } from './modules/principal-comms/principal-comms.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { OfficialDocumentsModule } from './modules/official-documents/official-documents.module';
 import { AiAssistantModule } from './modules/ai-assistant/ai-assistant.module';
@@ -188,6 +189,7 @@ import { MoodleModule } from './modules/moodle/moodle.module';
     RealtimeModule,
     AdministrationModule,
     PrincipalDeskModule,
+    PrincipalCommsModule,
     MarketingModule,
     BackupEngineModule,
     OfficialDocumentsModule,

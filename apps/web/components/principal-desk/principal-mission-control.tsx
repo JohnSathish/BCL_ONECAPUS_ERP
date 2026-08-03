@@ -28,14 +28,66 @@ import {
 import { PrincipalDeskNav } from '@/components/principal-desk/principal-desk-nav';
 import { PrincipalMissionScanner } from '@/components/principal-desk/principal-mission-scanner';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
-import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchPrincipalDashboard } from '@/services/principal-desk';
+import { fetchPrincipalCommsStats } from '@/services/principal-comms';
 import type { PrincipalDeskDashboard } from '@/types/principal-desk';
 import { cn } from '@/utils/cn';
 
 function formatLakhs(n: number) {
   if (n >= 100_000) return `₹${(n / 100_000).toFixed(1)} L`;
   return money(n);
+}
+
+function PrincipalMailWidget() {
+  const { session } = useAuth();
+  const canAccess = (session?.user?.permissions ?? []).includes('principal-comms:access');
+  const enabled = useAuthQueryEnabled() && canAccess;
+  const { data } = useQuery({
+    queryKey: ['principal-comms', 'stats'],
+    queryFn: fetchPrincipalCommsStats,
+    enabled,
+    refetchInterval: 60_000,
+  });
+
+  if (!canAccess) return null;
+
+  return (
+    <SaaSCard className="p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold">Communication Hub</p>
+          <p className="text-[11px] text-muted-foreground">
+            {data?.connected
+              ? (data.googleEmail ?? 'Mailbox connected')
+              : 'Connect Google mailbox in Settings'}
+          </p>
+        </div>
+        <Link
+          href="/principal-desk/communication-hub"
+          className="text-xs font-medium text-indigo-600 hover:underline"
+        >
+          Open inbox →
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {[
+          { label: 'Unread', value: data?.unread ?? 0 },
+          { label: 'Starred', value: data?.starred ?? 0 },
+          { label: 'Today', value: data?.today ?? 0 },
+          { label: 'University', value: data?.university ?? 0 },
+          { label: 'Government', value: data?.government ?? 0 },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-lg bg-muted/50 px-2 py-2 text-center">
+            <p className="text-lg font-bold tabular-nums">
+              <AnimatedCounter value={kpi.value} />
+            </p>
+            <p className="text-[10px] text-muted-foreground">{kpi.label}</p>
+          </div>
+        ))}
+      </div>
+    </SaaSCard>
+  );
 }
 
 function healthColor(band: 'green' | 'orange' | 'red') {
@@ -522,6 +574,10 @@ export function PrincipalMissionControl() {
           >
             <motion.div variants={fadeUp}>
               <MissionHeader data={data} institutionName={institutionName} />
+            </motion.div>
+
+            <motion.div variants={fadeUp}>
+              <PrincipalMailWidget />
             </motion.div>
 
             <motion.div variants={fadeUp}>

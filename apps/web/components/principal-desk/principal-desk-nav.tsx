@@ -14,6 +14,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Mail,
   Megaphone,
   ScanLine,
   Users,
@@ -40,6 +41,12 @@ const NAV = [
   { href: '/principal-desk/committees', label: 'Committees', icon: Building2 },
   { href: '/principal-desk/events', label: 'Events', icon: Megaphone },
   { href: '/principal-desk/notices', label: 'Notices', icon: FileText },
+  {
+    href: '/principal-desk/communication-hub',
+    label: 'Communication Hub',
+    icon: Mail,
+    permission: 'principal-comms:access',
+  },
   { href: '/principal-desk/health', label: 'Institutional Health', icon: BarChart3 },
   { href: '/principal-desk/naac', label: 'NAAC Readiness', icon: Award },
   { href: '/principal-desk/reports', label: 'Reports', icon: GraduationCap },
@@ -50,6 +57,7 @@ export function PrincipalDeskNav() {
   const router = useRouter();
   const { session } = useAuth();
   const branding = useInstitutionBranding();
+  const permissions = session?.user?.permissions ?? [];
 
   const handleLogout = async () => {
     broadcastSessionMessage({ type: 'LOGOUT' });
@@ -63,6 +71,10 @@ export function PrincipalDeskNav() {
     router.replace('/principal-desk/login');
   };
 
+  const items = NAV.filter(
+    (item) => !('permission' in item && item.permission) || permissions.includes(item.permission!),
+  );
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-border/60 dark:bg-card/95">
       <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-3">
@@ -75,7 +87,7 @@ export function PrincipalDeskNav() {
           </p>
         </div>
         <nav className="hidden flex-1 items-center gap-1 overflow-x-auto lg:flex">
-          {NAV.map((item) => {
+          {items.map((item) => {
             const active = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
             const Icon = item.icon;
             return (
