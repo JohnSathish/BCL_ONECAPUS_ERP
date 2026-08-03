@@ -16,12 +16,11 @@ import {
   RequireAnyPermission,
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination.dto';
-import { AdmissionsService } from './admissions.service';
 import {
   CreateApplicationDto,
   CreateIntakeDto,
   GenerateMeritListDto,
+  ListApplicationsQueryDto,
   RunSeatAllocationDto,
   UpdateAllocationStatusDto,
   UpdateApplicationStatusDto,
@@ -52,28 +51,9 @@ export class AdmissionsController {
   @Get('applications')
   applications(
     @CurrentUser() user: JwtUser,
-    @Query() query: PaginationQueryDto,
-    @Query('intakeId') intakeId?: string,
-    @Query('cycleId') cycleId?: string,
-    @Query('status') status?: string,
-    @Query('paymentStatus') paymentStatus?: string,
-    @Query('documentVerificationStatus') documentVerificationStatus?: string,
-    @Query('paymentPending') paymentPending?: string,
-    @Query('documentPending') documentPending?: string,
-    @Query('admissionFeePending') admissionFeePending?: string,
+    @Query() query: ListApplicationsQueryDto,
   ) {
-    return this.admissions.listApplications(user.tid, {
-      ...query,
-      intakeId,
-      cycleId,
-      status,
-      paymentStatus,
-      documentVerificationStatus,
-      paymentPending: paymentPending === '1' || paymentPending === 'true',
-      documentPending: documentPending === '1' || documentPending === 'true',
-      admissionFeePending:
-        admissionFeePending === '1' || admissionFeePending === 'true',
-    });
+    return this.admissions.listApplications(user.tid, query);
   }
 
   @Post('applications')

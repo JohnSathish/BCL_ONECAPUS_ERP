@@ -1,5 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -10,6 +11,54 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
+
+function toOptionalBoolean({ value }: { value: unknown }): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true' || value === '1' || value === 1)
+    return true;
+  if (value === false || value === 'false' || value === '0' || value === 0)
+    return false;
+  return undefined;
+}
+
+/** Query filters for GET /admissions/applications */
+export class ListApplicationsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  intakeId?: string;
+
+  @IsOptional()
+  @IsString()
+  cycleId?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  documentVerificationStatus?: string;
+
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  paymentPending?: boolean;
+
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  documentPending?: boolean;
+
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  admissionFeePending?: boolean;
+}
 
 export class CreateIntakeDto {
   @IsString()
