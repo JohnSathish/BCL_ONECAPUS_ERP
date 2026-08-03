@@ -1,21 +1,62 @@
 'use client';
 
+import { useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
-import {
-  normalizeShortCodeInput,
-  suggestStaffShortCode,
-} from '@/components/staff-module/employment/employment-utils';
+import { normalizeShortCodeInput } from '@/components/staff-module/employment/employment-utils';
+import { suggestStaffShortCode } from '@/services/staff';
+import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
 type Props = {
   value: string;
   fullName?: string;
+  departmentId?: string | null;
+  primaryShiftId?: string | null;
+  campusId?: string | null;
+  excludeStaffId?: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   error?: string;
 };
 
-export function ShortCodeField({ value, fullName, onChange, disabled, error }: Props) {
+export function ShortCodeField({
+  value,
+  fullName,
+  departmentId,
+  primaryShiftId,
+  campusId,
+  excludeStaffId,
+  onChange,
+  disabled,
+  error,
+}: Props) {
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  async function handleSuggest() {
+    if (!fullName?.trim() || disabled || suggesting) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const result = await suggestStaffShortCode({
+        fullName: fullName.trim(),
+        departmentId: departmentId || undefined,
+        primaryShiftId: primaryShiftId || undefined,
+        campusId: campusId || undefined,
+        excludeStaffId,
+      });
+      if (result.shortCode) {
+        onChange(normalizeShortCodeInput(result.shortCode));
+      } else {
+        setSuggestError('Could not suggest a short code');
+      }
+    } catch (err) {
+      setSuggestError(apiErrorMessage(err));
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   return (
     <div className="space-y-1">
       <div className="flex gap-2">
@@ -34,20 +75,21 @@ export function ShortCodeField({ value, fullName, onChange, disabled, error }: P
         {fullName ? (
           <button
             type="button"
-            disabled={disabled}
+            disabled={disabled || suggesting}
             className={cn(
               buttonVariants({ variant: 'outline', size: 'sm' }),
               'h-8 shrink-0 text-xs',
             )}
-            onClick={() => onChange(suggestStaffShortCode(fullName))}
+            onClick={() => void handleSuggest()}
           >
-            Suggest
+            {suggesting ? '…' : 'Suggest'}
           </button>
         ) : null}
       </div>
       {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {suggestError ? <p className="text-[11px] text-destructive">{suggestError}</p> : null}
       <p className="text-[10px] text-muted-foreground">
-        Uppercase, max 10 chars, unique per campus
+        Uppercase, max 10 chars, unique per campus. Suggest skips codes already in use.
       </p>
     </div>
   );

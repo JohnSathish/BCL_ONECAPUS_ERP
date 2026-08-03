@@ -481,6 +481,10 @@ export function StaffEmploymentSection({
           <ShortCodeField
             value={form.shortCode}
             fullName={profile.fullName}
+            departmentId={form.departmentId}
+            primaryShiftId={form.primaryShiftId}
+            campusId={profile.campusId}
+            excludeStaffId={profile.id}
             disabled={!canEdit}
             onChange={(shortCode) => setForm((f) => ({ ...f, shortCode }))}
           />

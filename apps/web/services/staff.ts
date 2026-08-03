@@ -90,6 +90,17 @@ export async function createStaff(payload: CreateStaffPayload): Promise<StaffPro
   return data;
 }
 
+export async function suggestStaffShortCode(params: {
+  fullName: string;
+  departmentId?: string;
+  primaryShiftId?: string;
+  campusId?: string;
+  excludeStaffId?: string;
+}): Promise<{ shortCode: string; campusId: string | null }> {
+  const { data } = await api.get('/v1/staff/short-code/suggest', { params });
+  return data;
+}
+
 export async function updateStaff(id: string, payload: UpdateStaffPayload): Promise<StaffListItem> {
   const { data } = await api.patch(`/v1/staff/${id}`, payload);
   return data;

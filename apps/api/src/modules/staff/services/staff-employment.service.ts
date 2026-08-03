@@ -53,10 +53,113 @@ export class StaffEmploymentService {
   ) {}
 
   suggestShortCode(fullName: string): string {
-    const parts = fullName.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '';
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return this.buildShortCodeCandidates(fullName)[0] ?? '';
+  }
+
+  /** Preferred 2-letter candidates from a name (initials first). */
+  buildShortCodeCandidates(fullName: string): string[] {
+    const parts = fullName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => p.replace(/[^A-Za-z0-9]/g, ''))
+      .filter(Boolean);
+    if (parts.length === 0) return [];
+
+    const out: string[] = [];
+    const push = (code: string) => {
+      const normalized = code.toUpperCase().slice(0, 2);
+      if (normalized.length === 2 && !out.includes(normalized))
+        out.push(normalized);
+    };
+
+    if (parts.length === 1) {
+      const w = parts[0].toUpperCase();
+      if (w.length >= 2) push(w.slice(0, 2));
+      if (w.length >= 3) push(w[0] + w[2]);
+      if (w.length >= 4) push(w[0] + w[3]);
+    } else {
+      const first = parts[0].toUpperCase();
+      const last = parts[parts.length - 1].toUpperCase();
+      push(first[0] + last[0]);
+      if (first.length >= 2) push(first.slice(0, 2));
+      if (last.length >= 2) push(last.slice(0, 2));
+      if (last.length >= 2) push(first[0] + last[1]);
+      if (first.length >= 2) push(first[0] + first[1]);
+      if (parts.length >= 3) {
+        const mid = parts[1].toUpperCase();
+        push(first[0] + mid[0]);
+        push(mid[0] + last[0]);
+      }
+    }
+
+    // Same-letter start sweep from primary initial (still 2 letters)
+    const seed = out[0]?.[0] ?? 'A';
+    for (let i = 0; i < 26; i += 1) {
+      const second = String.fromCharCode(65 + i); // A-Z
+      push(seed + second);
+    }
+
+    return out;
+  }
+
+  /**
+   * Suggest a free 2-letter short code for the campus.
+   * Never returns a code already allotted (except the current staff).
+   */
+  async suggestUniqueShortCode(
+    tenantId: string,
+    fullName: string,
+    opts: {
+      departmentId?: string | null;
+      primaryShiftId?: string | null;
+      campusId?: string | null;
+      excludeStaffId?: string;
+    } = {},
+  ): Promise<{ shortCode: string; campusId: string | null }> {
+    const campusId =
+      opts.campusId ??
+      (await this.resolveCampusId(
+        tenantId,
+        opts.departmentId,
+        opts.primaryShiftId,
+      ));
+
+    const candidates = this.buildShortCodeCandidates(fullName);
+    if (!campusId) {
+      return { shortCode: candidates[0] ?? '', campusId: null };
+    }
+
+    const takenRows = await this.prisma.staffProfile.findMany({
+      where: {
+        campusId,
+        deletedAt: null,
+        shortCode: { not: null },
+        ...(opts.excludeStaffId ? { NOT: { id: opts.excludeStaffId } } : {}),
+      },
+      select: { shortCode: true },
+    });
+    const taken = new Set(
+      takenRows
+        .map((r) => (r.shortCode ?? '').trim().toUpperCase())
+        .filter(Boolean),
+    );
+
+    for (const code of candidates) {
+      if (!taken.has(code)) return { shortCode: code, campusId };
+    }
+
+    // Exhaustive AA–ZZ fallback (still two letters only)
+    for (let a = 0; a < 26; a += 1) {
+      for (let b = 0; b < 26; b += 1) {
+        const code = String.fromCharCode(65 + a) + String.fromCharCode(65 + b);
+        if (!taken.has(code)) return { shortCode: code, campusId };
+      }
+    }
+
+    throw new ConflictException(
+      'No free 2-letter short codes left on this campus',
+    );
   }
 
   normalizeShortCode(value: string | null | undefined): string | null {

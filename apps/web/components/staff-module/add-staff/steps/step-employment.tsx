@@ -177,6 +177,8 @@ export function StepEmployment({
             <ShortCodeField
               value={draft.shortCode}
               fullName={draft.fullName}
+              departmentId={draft.departmentId}
+              primaryShiftId={draft.primaryShiftId}
               onChange={(shortCode) => setDraft((d) => ({ ...d, shortCode }))}
             />
           </GlassField>

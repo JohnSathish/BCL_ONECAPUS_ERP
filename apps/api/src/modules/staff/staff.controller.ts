@@ -49,6 +49,7 @@ import {
   ListDesignationsQueryDto,
   ProvisionStaffPortalDto,
   StaffDirectoryQueryDto,
+  SuggestStaffShortCodeQueryDto,
   TeachingAssignmentContextQueryDto,
   UpdateStaffAdditionalRoleDto,
   UpdateStaffAwardDto,
@@ -183,6 +184,20 @@ export class StaffController {
     @Body() dto: GenerateEmployeeCodeDto,
   ) {
     return this.staff.generateEmployeeCode(user.tid, dto, user.sub);
+  }
+
+  @Get('short-code/suggest')
+  @RequireAnyPermission('staff:read', 'staff:manage')
+  suggestShortCode(
+    @CurrentUser() user: JwtUser,
+    @Query() query: SuggestStaffShortCodeQueryDto,
+  ) {
+    return this.employment.suggestUniqueShortCode(user.tid, query.fullName, {
+      departmentId: query.departmentId,
+      primaryShiftId: query.primaryShiftId,
+      campusId: query.campusId,
+      excludeStaffId: query.excludeStaffId,
+    });
   }
 
   @Post()

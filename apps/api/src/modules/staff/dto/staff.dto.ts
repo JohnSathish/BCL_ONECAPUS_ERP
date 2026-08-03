@@ -729,6 +729,28 @@ export class GenerateEmployeeCodeDto {
   staffProfileId?: string;
 }
 
+export class SuggestStaffShortCodeQueryDto {
+  @IsString()
+  @MinLength(1)
+  fullName!: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  primaryShiftId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  campusId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  excludeStaffId?: string;
+}
+
 export const STAFF_IMPORT_MODES = ['CREATE', 'MERGE', 'REPLACE'] as const;
 export type StaffImportMode = (typeof STAFF_IMPORT_MODES)[number];
 
