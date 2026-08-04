@@ -22,6 +22,14 @@ export type LeaveApplication = {
   totalDays?: number | string;
   reason?: string | null;
   status: string;
+  statusLabel?: string;
+  reviewedByName?: string | null;
+  reviewedByRole?: string | null;
+  reviewedAt?: string | null;
+  approvedByName?: string | null;
+  approvedByRole?: string | null;
+  approvedAt?: string | null;
+  remarks?: string | null;
   createdAt?: string;
   leaveType?: { id: string; code?: string; name?: string };
 };
@@ -46,21 +54,40 @@ export function applyLeave(payload: {
   });
 }
 
-export function formatLeaveStatus(status: string) {
-  switch (status) {
-    case 'PENDING':
-      return 'Pending';
-    case 'HOD_APPROVED':
-      return 'HOD Approved';
-    case 'APPROVED':
-      return 'Approved';
-    case 'REJECTED':
-      return 'Rejected';
-    case 'CANCELLED':
-      return 'Cancelled';
-    default:
-      return status;
+export function formatLeaveStatus(application: LeaveApplication | string) {
+  if (typeof application === 'string') {
+    switch (application) {
+      case 'PENDING':
+        return 'Pending';
+      case 'HOD_APPROVED':
+        return 'Approved by HOD';
+      case 'APPROVED':
+        return 'Approved';
+      case 'REJECTED':
+        return 'Rejected';
+      case 'CANCELLED':
+        return 'Cancelled';
+      default:
+        return application;
+    }
   }
+
+  if (application.statusLabel?.trim()) return application.statusLabel.trim();
+
+  const role = application.approvedByRole || application.reviewedByRole;
+  if (application.status === 'APPROVED') {
+    return role ? `Approved by ${role}` : 'Approved';
+  }
+  if (application.status === 'REJECTED') {
+    return role ? `Rejected by ${role}` : 'Rejected';
+  }
+  if (application.status === 'HOD_APPROVED') {
+    if (role && role.toLowerCase() !== 'hod') return `Approved by ${role}`;
+    return 'Approved by HOD';
+  }
+  if (application.status === 'PENDING') return 'Pending';
+  if (application.status === 'CANCELLED') return 'Cancelled';
+  return application.status;
 }
 
 export function leaveStatusColor(status: string) {
@@ -74,7 +101,7 @@ export function leaveStatusColor(status: string) {
     case 'PENDING':
       return '#D97706';
     default:
-      return '#6B7280';
+      return status.endsWith('_APPROVED') ? '#107C10' : '#6B7280';
   }
 }
 

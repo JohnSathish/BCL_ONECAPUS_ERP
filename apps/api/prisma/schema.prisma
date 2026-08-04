@@ -3989,8 +3989,11 @@ model StaffLeaveApplication {
   approvalStage   Int       @default(0) @map("approval_stage")
   attachmentUrl   String?   @map("attachment_url")
   reviewedById    String?   @map("reviewed_by_id") @db.Uuid
+  reviewedByName  String?   @map("reviewed_by_name")
+  reviewedByRole  String?   @map("reviewed_by_role")
   reviewedAt      DateTime? @map("reviewed_at")
   rejectionReason String?   @map("rejection_reason")
+  approvalRemarks String?   @map("approval_remarks")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

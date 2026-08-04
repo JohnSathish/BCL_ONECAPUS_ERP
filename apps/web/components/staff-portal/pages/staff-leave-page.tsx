@@ -13,6 +13,7 @@ import { useRequireStaffPortal } from '@/hooks/use-require-staff-portal';
 import {
   fetchPortalLeaveApplications,
   fetchPortalLeaveSummary,
+  formatStaffLeaveStatus,
   portalApplyLeave,
 } from '@/services/hr';
 import { fetchAttendanceSettings } from '@/services/staff-attendance';
@@ -159,11 +160,27 @@ export function StaffPortalLeavePage() {
           <h3 className="font-semibold">Recent Requests</h3>
           <ul className="mt-3 divide-y text-sm">
             {(appsQ.data ?? []).map((a) => (
-              <li key={a.id} className="flex justify-between py-2">
+              <li key={a.id} className="flex justify-between gap-3 py-2">
                 <span>
                   {a.leaveType?.name} · {a.fromDate.slice(0, 10)} → {a.toDate.slice(0, 10)}
+                  {a.status === 'APPROVED' && (a.approvedByRole || a.reviewedByRole) ? (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Approved by {a.approvedByRole || a.reviewedByRole}
+                      {a.approvedAt || a.reviewedAt
+                        ? ` · ${new Date(a.approvedAt || a.reviewedAt!).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`
+                        : ''}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{a.status}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
+                  {formatStaffLeaveStatus(a)}
+                </span>
               </li>
             ))}
             {!appsQ.data?.length ? (

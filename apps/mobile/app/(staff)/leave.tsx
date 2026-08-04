@@ -56,6 +56,8 @@ function LeaveTypeChip({
 
 function ApplicationRow({ application }: { application: LeaveApplication }) {
   const color = leaveStatusColor(application.status);
+  const statusText = formatLeaveStatus(application);
+  const approvedOn = application.approvedAt || application.reviewedAt;
   return (
     <View style={styles.historyRow}>
       <View style={styles.historyInfo}>
@@ -70,9 +72,24 @@ function ApplicationRow({ application }: { application: LeaveApplication }) {
             {application.reason}
           </Text>
         ) : null}
+        {application.status === 'APPROVED' &&
+        (application.approvedByRole || application.reviewedByRole) ? (
+          <Text style={styles.historyReason} numberOfLines={2}>
+            Approved by {application.approvedByRole || application.reviewedByRole}
+            {approvedOn
+              ? ` · ${new Date(approvedOn).toLocaleString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`
+              : ''}
+          </Text>
+        ) : null}
       </View>
       <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
-        <Text style={[styles.statusText, { color }]}>{formatLeaveStatus(application.status)}</Text>
+        <Text style={[styles.statusText, { color }]}>{statusText}</Text>
       </View>
     </View>
   );

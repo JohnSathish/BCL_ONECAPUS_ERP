@@ -61,6 +61,10 @@ export class ApproveLeaveDto {
   @IsOptional()
   @IsString()
   rejectionReason?: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
 }
 
 export class InitializeLeaveBalancesDto {

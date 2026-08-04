@@ -17,9 +17,35 @@ export type LeaveApplication = {
   totalDays: string | number;
   reason?: string;
   status: string;
+  statusLabel?: string;
+  reviewedByName?: string | null;
+  reviewedByRole?: string | null;
+  reviewedAt?: string | null;
+  approvedByName?: string | null;
+  approvedByRole?: string | null;
+  approvedAt?: string | null;
+  remarks?: string | null;
   staffProfile?: { fullName: string; employeeCode: string; department?: { name: string } };
   leaveType?: { code: string; name: string };
 };
+
+export function formatStaffLeaveStatus(application: LeaveApplication) {
+  if (application.statusLabel?.trim()) return application.statusLabel.trim();
+  const role = application.approvedByRole || application.reviewedByRole;
+  if (application.status === 'APPROVED') {
+    return role ? `Approved by ${role}` : 'Approved';
+  }
+  if (application.status === 'REJECTED') {
+    return role ? `Rejected by ${role}` : 'Rejected';
+  }
+  if (application.status === 'HOD_APPROVED') {
+    if (role && role.toLowerCase() !== 'hod') return `Approved by ${role}`;
+    return 'Approved by HOD';
+  }
+  if (application.status === 'PENDING') return 'Pending';
+  if (application.status === 'CANCELLED') return 'Cancelled';
+  return application.status;
+}
 
 export async function fetchLeaveBalances(params?: { staffProfileId?: string; year?: number }) {
   const { data } = await api.get<LeaveBalance[]>('/v1/hr/leave/balances', { params });
