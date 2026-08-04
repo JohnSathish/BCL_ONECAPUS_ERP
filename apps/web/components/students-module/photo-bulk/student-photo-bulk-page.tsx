@@ -412,8 +412,10 @@ export function StudentPhotoBulkPage() {
                   value={conflictStrategy}
                   onChange={(e) => setConflictStrategy(e.target.value as typeof conflictStrategy)}
                 >
-                  <option value="SKIP_EXISTING">Skip existing</option>
-                  <option value="REPLACE_EXISTING">Replace existing</option>
+                  <option value="SKIP_EXISTING">Skip existing (only if file is on disk)</option>
+                  <option value="REPLACE_EXISTING">
+                    Replace existing (use for re-upload / missing files)
+                  </option>
                   <option value="KEEP_BOTH">Keep both versions</option>
                 </select>
               </Field>
