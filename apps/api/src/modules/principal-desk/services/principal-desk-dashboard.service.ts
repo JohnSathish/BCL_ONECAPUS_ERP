@@ -6,6 +6,7 @@ import { NaacDashboardService } from '../../naac-iqac/services/naac-dashboard.se
 import { GovernanceDashboardService } from '../../governance/services/governance-dashboard.service';
 import { governanceDb } from '../../governance/services/governance-prisma.util';
 import { getZonedHour } from '../../../common/utils/time-greeting';
+import { PrincipalCommsMailboxService } from '../../principal-comms/services/principal-comms-mailbox.service';
 
 @Injectable()
 export class PrincipalDeskDashboardService {
@@ -14,6 +15,7 @@ export class PrincipalDeskDashboardService {
     private readonly dashboard: DashboardAnalyticsService,
     private readonly naac: NaacDashboardService,
     private readonly governance: GovernanceDashboardService,
+    private readonly mailbox: PrincipalCommsMailboxService,
   ) {}
 
   async getDashboard(user: JwtUser) {
@@ -33,6 +35,7 @@ export class PrincipalDeskDashboardService {
       committeeActivity,
       meetingsToday,
       calendarEvents,
+      mailStats,
     ] = await Promise.all([
       this.dashboard.getOperationsCenter(tenantId, {}, user),
       this.countLibraryOverdueStudents(tenantId),
@@ -45,6 +48,14 @@ export class PrincipalDeskDashboardService {
       this.committeePendingByName(tenantId),
       this.countMeetingsToday(tenantId, today, endOfDay),
       this.loadUpcomingAcademicEvents(tenantId, today),
+      this.mailbox.stats(tenantId, user.sub).catch(() => ({
+        connected: false,
+        unread: 0,
+        starred: 0,
+        today: 0,
+        university: 0,
+        government: 0,
+      })),
     ]);
 
     const pendingStaffLeave =
@@ -52,6 +63,16 @@ export class PrincipalDeskDashboardService {
     const feeDefaulters = ops.finance.defaulters;
     const attendanceRisk =
       ops.actions.find((a) => a.id === 'attendance')?.count ?? 0;
+    const admissionsToday =
+      ops.actions.find(
+        (a: { id: string }) =>
+          a.id === 'admissions' || a.id === 'registrations',
+      )?.count ?? 0;
+    const leavePendingTotal = pendingStaffLeave + pendingStudentLeave;
+    const unreadEmails = Number(mailStats.unread ?? 0);
+    const universityMail = Number(
+      (mailStats as { university?: number }).university ?? 0,
+    );
 
     const studentPresentPct =
       ops.institution.studentCount > 0
@@ -115,7 +136,7 @@ export class PrincipalDeskDashboardService {
         classesConductedToday: ops.academic.classesCompleted,
         feeDefaulters,
         libraryOverdueStudents,
-        leaveRequestsPending: pendingStaffLeave + pendingStudentLeave,
+        leaveRequestsPending: leavePendingTotal,
         pendingStaffLeave,
         pendingStudentLeave,
         upcomingEvents: calendarEvents.length,
@@ -130,6 +151,24 @@ export class PrincipalDeskDashboardService {
       announcements: ops.announcements,
       aiInsights: ops.aiInsights,
       intelligenceSummary,
+      executiveKpis: {
+        studentsOnCampus: ops.academic.studentsPresent,
+        staffOnDuty: ops.academic.facultyPresent,
+        admissionsToday,
+        feeCollectionToday: ops.finance.todayCollection ?? 0,
+        pendingApprovals: leavePendingTotal + admissionsToday,
+        unreadEmails,
+      },
+      navBadges: {
+        leavePending: leavePendingTotal,
+        unreadEmails,
+      },
+      mail: {
+        connected: Boolean(mailStats.connected),
+        unread: unreadEmails,
+        university: universityMail,
+        today: Number((mailStats as { today?: number }).today ?? 0),
+      },
       criticalAlerts: {
         attendanceRisk: {
           count: attendanceRisk,
@@ -147,7 +186,7 @@ export class PrincipalDeskDashboardService {
           href: '/principal-desk/health',
         },
         leavePending: {
-          count: pendingStaffLeave + pendingStudentLeave,
+          count: leavePendingTotal,
           href: '/principal-desk/leave',
         },
         committeeMeetingsToday: {

@@ -57,6 +57,7 @@ export type PrincipalDeskDashboard = {
     defaulters: number;
     todayCollection: number;
     monthCollection: number;
+    weekCollection?: number;
     collectionRate?: number;
   };
   actions: Array<{
@@ -98,6 +99,24 @@ export type PrincipalDeskDashboard = {
   intelligenceSummary: {
     salutation: string;
     bullets: string[];
+  };
+  executiveKpis: {
+    studentsOnCampus: number;
+    staffOnDuty: number;
+    admissionsToday: number;
+    feeCollectionToday: number;
+    pendingApprovals: number;
+    unreadEmails: number;
+  };
+  navBadges: {
+    leavePending: number;
+    unreadEmails: number;
+  };
+  mail?: {
+    connected: boolean;
+    unread: number;
+    university: number;
+    today: number;
   };
   criticalAlerts: PrincipalCriticalAlerts;
   operations: {

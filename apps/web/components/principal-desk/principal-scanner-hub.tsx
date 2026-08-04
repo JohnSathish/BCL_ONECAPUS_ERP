@@ -27,14 +27,17 @@ function isFastScan(keyTimes: number[], len: number) {
 export function PrincipalScannerHub({
   defaultMode = 'student',
   compact = false,
+  initialQuery,
 }: {
   defaultMode?: ScanMode;
   compact?: boolean;
+  initialQuery?: string;
 }) {
   const [mode, setMode] = useState<ScanMode>(defaultMode);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialQuery ?? '');
   const [keyTimes, setKeyTimes] = useState<number[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const bootstrapped = useRef(false);
 
   const studentMutation = useMutation({
     mutationFn: (q: string) => fetchStudentCommand(q),
@@ -67,6 +70,14 @@ export function PrincipalScannerHub({
   useEffect(() => {
     inputRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    const q = initialQuery?.trim();
+    if (!q || q.length < MIN_AUTO_LEN) return;
+    bootstrapped.current = true;
+    submit(q, defaultMode === 'staff' ? 'staff' : 'student');
+  }, [initialQuery, defaultMode, submit]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

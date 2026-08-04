@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { PrincipalPortalShell } from '@/components/principal-desk/layout/principal-portal-shell';
 import { canAccessAdminPortal, canAccessPrincipalDesk } from '@/lib/permissions/portal-access';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -24,5 +25,9 @@ export default function PrincipalDeskLayout({ children }: { children: React.Reac
     }
   }, [isReady, session, router, isLogin]);
 
-  return <div className="min-h-screen">{children}</div>;
+  if (isLogin) {
+    return <div className="min-h-screen">{children}</div>;
+  }
+
+  return <PrincipalPortalShell>{children}</PrincipalPortalShell>;
 }
