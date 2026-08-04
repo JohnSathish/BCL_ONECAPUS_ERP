@@ -54,16 +54,25 @@ export function normalizeAxiosError(error: unknown): ApiError {
     const status = error.response.status;
     const contentType = String(error.response.headers?.['content-type'] ?? '').toLowerCase();
     const rawData = error.response.data;
-    if (typeof rawData === 'string' && contentType.includes('text/html')) {
+
+    if (status === 413) {
       return new ApiError(
-        status >= 500 ? 'ServerError' : 'UnknownError',
-        'API returned an HTML page instead of JSON. The API proxy is misconfigured or the backend is unavailable.',
-        {
-          status,
-          detail: rawData.slice(0, 240),
-          cause: error,
-        },
+        'ValidationError',
+        'Upload too large for the server. Use a ZIP under 512 MB, or split into smaller batches.',
+        { status, cause: error },
       );
+    }
+
+    if (typeof rawData === 'string' && contentType.includes('text/html')) {
+      const hint =
+        status === 413
+          ? 'Upload too large for the gateway. Zip fewer photos or compress images (max ~512 MB).'
+          : 'API returned an HTML page instead of JSON. The API proxy is misconfigured or the backend is unavailable.';
+      return new ApiError(status >= 500 ? 'ServerError' : 'UnknownError', hint, {
+        status,
+        detail: rawData.slice(0, 240),
+        cause: error,
+      });
     }
 
     const data = rawData as

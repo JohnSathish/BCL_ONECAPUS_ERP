@@ -469,12 +469,14 @@ export function StudentPhotoBulkPage() {
               </div>
             </div>
 
-            <Field label="CSV mapping (optional: StudentIdentifier,PhotoFile)">
+            <Field label="CSV mapping (optional — not required for Roll Number matching)">
               <textarea
                 className="min-h-[88px] w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                 value={csvMap}
                 onChange={(e) => setCsvMap(e.target.value)}
-                placeholder={'Leave empty when filenames match roll numbers (e.g. BA25-002.JPG)'}
+                placeholder={
+                  'Leave empty when photo filenames match the selected identifier (e.g. BA25-002.JPG). Optional CSV columns: StudentIdentifier,PhotoFile'
+                }
               />
             </Field>
 
