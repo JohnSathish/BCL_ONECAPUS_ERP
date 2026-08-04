@@ -10,6 +10,7 @@ import {
   resolveMobileDeepLink,
   fallbackNotificationCenter,
 } from '@/services/notification-deep-link';
+import { emitNotificationsInvalidated } from '@/services/notifications-sync';
 import { getNotificationAttachments } from '@/utils/notification-attachments';
 
 try {
@@ -258,15 +259,28 @@ export async function trackPushOpened(link?: string) {
   }
 }
 
+function scheduleStaffInboxRefresh(source: 'push-received' | 'push-tap') {
+  emitNotificationsInvalidated({ source, reason: 'immediate' });
+  // In-app row may commit slightly after FCM delivery — retry once.
+  setTimeout(() => {
+    emitNotificationsInvalidated({ source, reason: 'retry' });
+  }, 900);
+}
+
 export function navigateFromPushLink(link?: string | null) {
-  const href = resolveMobileDeepLink(link);
-  if (href) {
-    router.push(href as never);
-    return;
-  }
-  // No link on the push → open the inbox so the user can read it.
   void getStoredAppType().then((appType) => {
-    router.push(fallbackNotificationCenter(appType === 'staff' ? 'staff' : 'student') as never);
+    // Staff: always open Notifications tab on push tap (Comm Center broadcasts).
+    if (appType === 'staff') {
+      router.push('/(staff)/(tabs)/notifications' as never);
+      scheduleStaffInboxRefresh('push-tap');
+      return;
+    }
+    const href = resolveMobileDeepLink(link);
+    if (href) {
+      router.push(href as never);
+      return;
+    }
+    router.push(fallbackNotificationCenter('student') as never);
   });
 }
 
@@ -280,18 +294,21 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   if (pdfUrl) {
     void openNotificationAttachment(pdfUrl, 'PDF attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
+      else scheduleStaffInboxRefresh('push-tap');
     });
     return;
   }
   if (fileUrl) {
     void openNotificationAttachment(fileUrl, fileName ?? 'File attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
+      else scheduleStaffInboxRefresh('push-tap');
     });
     return;
   }
   if (imageUrl && !link) {
     void openNotificationAttachment(imageUrl, 'Image attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
+      else scheduleStaffInboxRefresh('push-tap');
     });
     return;
   }
@@ -348,10 +365,14 @@ export function attachPushResponseListener() {
       handleNotificationResponse(response);
     });
   }
-  // Keep foreground arrivals visible in the system shade / banners.
+  // Foreground arrivals: refresh in-app Notifications inbox for staff.
   if (!receivedSub) {
     receivedSub = Notifications.addNotificationReceivedListener(() => {
-      // Handler above already shows alert/banner/list; listener kept for future analytics.
+      void getStoredAppType().then((appType) => {
+        if (appType === 'staff') {
+          scheduleStaffInboxRefresh('push-received');
+        }
+      });
     });
   }
 }

@@ -53,7 +53,8 @@ export function resolveNotificationLink(input: {
     if (trigger.includes('timetable')) return '/staff/academic/timetable';
     if (trigger.includes('lms')) return '/staff/academic/lms';
     if (trigger.includes('birthday')) return '/staff/dashboard#birthdays';
-    return '/staff/dashboard';
+    // Staff campaigns / circulars open the in-app Notifications inbox on mobile.
+    return '/staff/notifications';
   }
 
   if (type === 'PARENT' || input.roles?.includes('parent')) {

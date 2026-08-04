@@ -141,6 +141,9 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower === '/staff' || lower === '/staff/dashboard' || lower === '/faculty') {
     return '/(staff)/(tabs)' as Href;
   }
+  if (lower.includes('/staff/notifications') || lower.includes('/staff/alerts')) {
+    return '/(staff)/(tabs)/notifications' as Href;
+  }
   if (lower.includes('mark') || lower.includes('/marks')) {
     return '/(staff)/marks' as Href;
   }
@@ -149,9 +152,6 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   }
   if (lower.includes('payroll') || lower.includes('payslip')) {
     return '/(staff)/payroll' as Href;
-  }
-  if (lower.includes('/staff/notifications')) {
-    return '/(staff)/(tabs)/notifications' as Href;
   }
   if (lower.includes('/staff') || lower.includes('faculty')) {
     return '/(staff)/(tabs)' as Href;

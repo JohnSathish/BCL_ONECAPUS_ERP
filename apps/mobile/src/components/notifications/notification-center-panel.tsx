@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  type AppStateStatus,
   Image,
   Pressable,
   RefreshControl,
@@ -11,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   archiveNotification,
   dismissNotification,
@@ -25,6 +27,7 @@ import {
   resolveMobileDeepLink,
   isGenericNotificationLink,
 } from '@/services/notification-deep-link';
+import { onNotificationsInvalidated } from '@/services/notifications-sync';
 import { openNotificationAttachment, trackPushOpened } from '@/services/push-notifications';
 import type { UserNotification } from '@/types/notifications';
 import { attachmentUrlsFromMeta } from '@/utils/notification-attachments';
@@ -86,6 +89,34 @@ export function NotificationCenterPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Staff: refetch when a push arrives / is tapped, and whenever this screen is focused.
+  useFocusEffect(
+    useCallback(() => {
+      if (role !== 'staff') return undefined;
+      void load();
+      return undefined;
+    }, [role, load]),
+  );
+
+  useEffect(() => {
+    if (role !== 'staff') return undefined;
+    const unsubscribe = onNotificationsInvalidated(() => {
+      void load();
+      onChanged?.();
+    });
+    const onAppState = (next: AppStateStatus) => {
+      if (next === 'active') {
+        void load();
+        onChanged?.();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppState);
+    return () => {
+      unsubscribe();
+      sub.remove();
+    };
+  }, [role, load, onChanged]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
