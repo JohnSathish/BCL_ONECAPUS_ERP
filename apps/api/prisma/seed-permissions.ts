@@ -1086,6 +1086,13 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
       'Private Principal Communication Hub (mailbox) — Principal role only',
   },
   {
+    slug: 'principal-mobile:access',
+    resource: 'principal-mobile',
+    action: 'access',
+    description:
+      'Principal Mobile Executive Command Center — Principal role only',
+  },
+  {
     slug: 'cams:read',
     resource: 'cams',
     action: 'read',

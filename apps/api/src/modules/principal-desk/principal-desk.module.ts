@@ -5,6 +5,7 @@ import { GovernanceModule } from '../governance/governance.module';
 import { HrModule } from '../hr/hr.module';
 import { LibraryModule } from '../library/library.module';
 import { NaacIqacModule } from '../naac-iqac/naac-iqac.module';
+import { PrincipalCommsModule } from '../principal-comms/principal-comms.module';
 import { StaffModule } from '../staff/staff.module';
 import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { StudentsModule } from '../students/students.module';
@@ -15,6 +16,7 @@ import { PrincipalStudentCommandService } from './services/principal-student-com
 import { PrincipalAttendanceControlService } from './services/principal-attendance-control.service';
 import { PrincipalFeeDefaulterService } from './services/principal-fee-defaulter.service';
 import { PrincipalInstitutionalHealthService } from './services/principal-institutional-health.service';
+import { PrincipalMobileSummaryService } from './services/principal-mobile-summary.service';
 
 @Module({
   imports: [
@@ -27,10 +29,12 @@ import { PrincipalInstitutionalHealthService } from './services/principal-instit
     NaacIqacModule,
     HrModule,
     StudentsModule,
+    PrincipalCommsModule,
   ],
   controllers: [PrincipalDeskController],
   providers: [
     PrincipalDeskDashboardService,
+    PrincipalMobileSummaryService,
     PrincipalStudentCommandService,
     PrincipalStaffCommandService,
     PrincipalAttendanceControlService,

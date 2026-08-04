@@ -117,6 +117,26 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(student)/(tabs)' as Href;
   }
 
+  // Principal Desk / Communication Hub — before generic staff leave matching
+  if (lower.includes('/principal-desk/communication-hub/messages/')) {
+    const match = lower.match(/\/messages\/([a-z0-9-]+)/);
+    if (match?.[1]) return `/(principal)/mail/${match[1]}` as Href;
+    return '/(principal)/(tabs)/inbox' as Href;
+  }
+  if (
+    lower.includes('/principal-desk/communication-hub') ||
+    lower.includes('principal_mail') ||
+    lower.includes('principal-mail')
+  ) {
+    return '/(principal)/(tabs)/inbox' as Href;
+  }
+  if (lower.includes('/principal-desk/leave')) {
+    return '/(principal)/(tabs)/approvals' as Href;
+  }
+  if (lower.includes('/principal-desk')) {
+    return '/(principal)/(tabs)' as Href;
+  }
+
   // Staff / faculty
   if (lower === '/staff' || lower === '/staff/dashboard' || lower === '/faculty') {
     return '/(staff)/(tabs)' as Href;
@@ -124,7 +144,7 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('mark') || lower.includes('/marks')) {
     return '/(staff)/marks' as Href;
   }
-  if (lower.includes('leave')) {
+  if (lower.includes('/staff/leave') || lower.includes('/faculty/leave')) {
     return '/(staff)/leave' as Href;
   }
   if (lower.includes('payroll') || lower.includes('payslip')) {
@@ -134,15 +154,6 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
     return '/(staff)/(tabs)/notifications' as Href;
   }
   if (lower.includes('/staff') || lower.includes('faculty')) {
-    return '/(staff)/(tabs)' as Href;
-  }
-
-  // Principal Desk — V1: open staff/principal home (full inbox is web Phase 2)
-  if (
-    lower.includes('/principal-desk') ||
-    lower.includes('principal_mail') ||
-    lower.includes('principal-mail')
-  ) {
     return '/(staff)/(tabs)' as Href;
   }
 

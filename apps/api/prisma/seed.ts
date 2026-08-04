@@ -665,6 +665,7 @@ async function main() {
     'naac-iqac:reports',
     'principal-desk:access',
     'principal-comms:access',
+    'principal-mobile:access',
     'governance:read',
     'staff-attendance:leave-admin',
     'library:read',

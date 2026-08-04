@@ -24,7 +24,6 @@ type SessionUser = {
   allShifts?: boolean;
 };
 
-const PRINCIPAL_ROLES = new Set(['principal', 'vice-principal', 'erp-administrator']);
 const SHIFT_ADMIN_ROLES = new Set(['shift-admin', 'shift-academic-coordinator']);
 const FACULTY_ROLES = new Set(['faculty', 'staff']);
 const LIBRARY_ROLES = new Set(['librarian', 'library-operator']);
@@ -36,15 +35,15 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
 
   const isStudent = perms.includes('student:portal:self');
   const isStaff = perms.includes('staff:portal:self');
-  const isPrincipal =
-    perms.includes('principal-desk:access') || roles.some((r) => PRINCIPAL_ROLES.has(r));
+  /** Principal Mobile Command Center — principal role permission only (not VP/admin). */
+  const isPrincipalMobile = perms.includes('principal-mobile:access');
   const isShiftAdmin = roles.some((r) => SHIFT_ADMIN_ROLES.has(r));
   const isFaculty = roles.some((r) => FACULTY_ROLES.has(r));
   const isLibrary = roles.some((r) => LIBRARY_ROLES.has(r));
   const isFinance = roles.some((r) => FINANCE_ROLES.has(r));
   const isSuperAdmin = roles.includes('super-admin') || perms.includes('platform:admin');
 
-  if (isStudent && !isStaff && !isPrincipal && !isShiftAdmin && !isSuperAdmin) {
+  if (isStudent && !isStaff && !isPrincipalMobile && !isShiftAdmin && !isSuperAdmin) {
     return {
       persona: 'student',
       href: '/(student)/(tabs)' as Href,
@@ -54,13 +53,13 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
     };
   }
 
-  if (isPrincipal) {
+  if (isPrincipalMobile) {
     return {
       persona: 'principal',
-      href: '/(staff)/(tabs)' as Href,
+      href: '/(principal)/(tabs)' as Href,
       appType: 'staff',
-      title: 'Principal Dashboard',
-      subtitle: 'Institution overview & approvals',
+      title: 'Principal Command Center',
+      subtitle: 'Institution overview, approvals & mail',
     };
   }
 
@@ -136,5 +135,9 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
 
 export function canAccessMobile(user: SessionUser): boolean {
   const perms = user.permissions ?? [];
-  return perms.includes('student:portal:self') || perms.includes('staff:portal:self');
+  return (
+    perms.includes('student:portal:self') ||
+    perms.includes('staff:portal:self') ||
+    perms.includes('principal-mobile:access')
+  );
 }

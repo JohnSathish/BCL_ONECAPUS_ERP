@@ -4,7 +4,10 @@ import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
-import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import {
+  RequireAnyPermission,
+  RequirePermissions,
+} from '../../common/decorators/require-permissions.decorator';
 import { ApproveLeaveDto } from '../hr/dto/leave.dto';
 import { LeaveService } from '../hr/services/leave.service';
 import { NaacDashboardService } from '../naac-iqac/services/naac-dashboard.service';
@@ -15,6 +18,7 @@ import { PrincipalAttendanceControlService } from './services/principal-attendan
 import { PrincipalDeskDashboardService } from './services/principal-desk-dashboard.service';
 import { PrincipalFeeDefaulterService } from './services/principal-fee-defaulter.service';
 import { PrincipalInstitutionalHealthService } from './services/principal-institutional-health.service';
+import { PrincipalMobileSummaryService } from './services/principal-mobile-summary.service';
 import { PrincipalStaffCommandService } from './services/principal-staff-command.service';
 import { PrincipalStudentCommandService } from './services/principal-student-command.service';
 
@@ -25,6 +29,7 @@ import { PrincipalStudentCommandService } from './services/principal-student-com
 export class PrincipalDeskController {
   constructor(
     private readonly dashboardSvc: PrincipalDeskDashboardService,
+    private readonly mobileSummary: PrincipalMobileSummaryService,
     private readonly studentCommandSvc: PrincipalStudentCommandService,
     private readonly staffCommandSvc: PrincipalStaffCommandService,
     private readonly attendanceControlSvc: PrincipalAttendanceControlService,
@@ -36,6 +41,12 @@ export class PrincipalDeskController {
     private readonly governance: GovernanceDashboardService,
     private readonly committees: GovernanceCommitteeService,
   ) {}
+
+  @Get('mobile/summary')
+  @RequirePermissions('principal-mobile:access')
+  getMobileSummary(@CurrentUser() user: JwtUser) {
+    return this.mobileSummary.getSummary(user);
+  }
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: JwtUser) {
