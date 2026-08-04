@@ -73,6 +73,26 @@ export type PrincipalDeskDashboard = {
     label: string;
     href?: string;
   }>;
+  eventBoard?: {
+    stats: {
+      today: number;
+      thisWeek: number;
+      meetings: number;
+      holidays: number;
+    };
+    items: Array<{
+      id: string;
+      title: string;
+      category: string;
+      dayGroup: string;
+      time: string;
+      startAt: string;
+      venue?: string | null;
+      organizer?: string | null;
+      href?: string;
+      countdown: string;
+    }>;
+  };
   announcements: Array<{ title: string; date: string; href?: string }>;
   aiInsights: string[];
   intelligenceSummary: {

@@ -100,6 +100,7 @@ export class PrincipalDeskDashboardService {
       [],
       calendarEvents,
     );
+    const eventBoard = this.buildEventBoard(calendarEvents);
 
     return {
       greeting: ops.greeting,
@@ -125,6 +126,7 @@ export class PrincipalDeskDashboardService {
       actions: ops.actions,
       upcomingEvents,
       eventTimeline,
+      eventBoard,
       announcements: ops.announcements,
       aiInsights: ops.aiInsights,
       intelligenceSummary,
@@ -331,7 +333,7 @@ export class PrincipalDeskDashboardService {
           calendar: { deletedAt: null },
         },
         orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }, { title: 'asc' }],
-        take: 12,
+        take: 40,
         select: {
           id: true,
           title: true,
@@ -342,11 +344,135 @@ export class PrincipalDeskDashboardService {
           endTime: true,
           isAllDay: true,
           venue: true,
+          organizerName: true,
         },
       });
     } catch {
       return [];
     }
+  }
+
+  private mapEventCategory(type: string): string {
+    const t = (type ?? '').toUpperCase();
+    if (t.includes('HOLIDAY') || t.includes('VACATION')) return 'HOLIDAY';
+    if (
+      t.includes('MEETING') ||
+      t.includes('COMMITTEE') ||
+      t.includes('GOVERNANCE')
+    )
+      return 'MEETING';
+    if (t.includes('FEE') || t.includes('FINANCE') || t.includes('PAYMENT'))
+      return 'FINANCE';
+    if (t.includes('CULTUR') || t.includes('SPORT') || t.includes('FEST'))
+      return 'CULTURAL';
+    if (t.includes('EXAM') || t.includes('ACADEMIC') || t.includes('CLASS'))
+      return 'ACADEMIC';
+    if (t.includes('EVENT') || t.includes('INSTITUTION')) return 'ACADEMIC';
+    return 'ACADEMIC';
+  }
+
+  private countdownLabel(
+    start: Date,
+    startTime: string | null,
+    isAllDay: boolean,
+  ) {
+    const target = new Date(start);
+    if (!isAllDay && startTime) {
+      const [hh, mm] = startTime.split(':').map((x) => Number(x));
+      if (Number.isFinite(hh))
+        target.setHours(hh, Number.isFinite(mm) ? mm : 0, 0, 0);
+    } else {
+      target.setHours(0, 0, 0, 0);
+    }
+    const diffMs = target.getTime() - Date.now();
+    if (diffMs <= 0) {
+      const ended = Date.now() - target.getTime();
+      if (ended < 3_600_000) return 'Now';
+      return 'Started';
+    }
+    const mins = Math.round(diffMs / 60_000);
+    if (mins < 60) return `In ${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const rem = mins % 60;
+    if (hours < 24) return rem ? `In ${hours}h ${rem}m` : `In ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? 'In 1 day' : `In ${days} days`;
+  }
+
+  private buildEventBoard(
+    calendarEvents: Array<{
+      id: string;
+      title: string;
+      type: string;
+      startDate: Date;
+      endDate: Date;
+      startTime: string | null;
+      isAllDay: boolean;
+      venue: string | null;
+      organizerName: string | null;
+    }>,
+  ) {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setHours(23, 59, 59, 999);
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const todayStr = todayStart.toDateString();
+    const tomorrow = new Date(todayStart);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toDateString();
+
+    const dayGroupFor = (d: Date) =>
+      d.toDateString() === todayStr
+        ? 'Today'
+        : d.toDateString() === tomorrowStr
+          ? 'Tomorrow'
+          : d.toLocaleDateString('en-IN', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'short',
+            });
+
+    const items = calendarEvents.map((e) => {
+      const d = new Date(e.startDate);
+      const category = this.mapEventCategory(e.type);
+      const time =
+        !e.isAllDay && e.startTime ? e.startTime.slice(0, 5) : 'All day';
+      return {
+        id: e.id,
+        title: e.title,
+        category,
+        dayGroup: dayGroupFor(d),
+        time,
+        startAt: d.toISOString(),
+        venue: e.venue,
+        organizer: e.organizerName,
+        href: '/principal-desk/events',
+        countdown: this.countdownLabel(d, e.startTime, e.isAllDay),
+      };
+    });
+
+    const stats = {
+      today: calendarEvents.filter((e) => {
+        const s = new Date(e.startDate);
+        return s >= todayStart && s <= todayEnd;
+      }).length,
+      thisWeek: calendarEvents.filter((e) => {
+        const s = new Date(e.startDate);
+        return s >= todayStart && s < weekEnd;
+      }).length,
+      meetings: calendarEvents.filter(
+        (e) => this.mapEventCategory(e.type) === 'MEETING',
+      ).length,
+      holidays: calendarEvents.filter(
+        (e) => this.mapEventCategory(e.type) === 'HOLIDAY',
+      ).length,
+    };
+
+    return { stats, items };
   }
 
   private buildEventTimeline(
