@@ -38,6 +38,29 @@ import {
   TEACHING_SHIFT_CATEGORY_LABELS,
 } from '@/components/staff-module/employment/staff-shift-category';
 
+function sanitizeEmploymentPayload<T extends Record<string, unknown>>(values: T): T {
+  const next: Record<string, unknown> = { ...values };
+  for (const key of ['departmentId', 'designationId', 'primaryShiftId'] as const) {
+    if (next[key] === '') next[key] = null;
+  }
+  for (const key of [
+    'joiningDate',
+    'probationEndDate',
+    'confirmationDate',
+    'relievingDate',
+    'retirementDate',
+    'lastWorkingDate',
+  ] as const) {
+    if (next[key] === '') next[key] = null;
+  }
+  if (Array.isArray(next.additionalShiftIds)) {
+    next.additionalShiftIds = next.additionalShiftIds.filter(
+      (id) => typeof id === 'string' && id.trim().length > 0,
+    );
+  }
+  return next as T;
+}
+
 function useDebouncedStaffSave<T extends Record<string, unknown>>(
   staffId: string,
   sectionKey: StaffProfileSection,
@@ -49,7 +72,12 @@ function useDebouncedStaffSave<T extends Record<string, unknown>>(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipInitial = useRef(true);
   const mut = useMutation({
-    mutationFn: (payload: T) => updateStaffProfileSection(staffId, sectionKey, payload),
+    mutationFn: (payload: T) =>
+      updateStaffProfileSection(
+        staffId,
+        sectionKey,
+        sectionKey === 'employment' ? sanitizeEmploymentPayload(payload) : payload,
+      ),
     onSuccess: (updated) => {
       setMessage('Saved');
       qc.setQueryData(['staff', staffId, 'profile'], updated);

@@ -359,23 +359,30 @@ export class StaffEmploymentService {
     });
     if (!staff) throw new NotFoundException('Staff member not found');
 
+    // UI selects send "" for cleared optional UUIDs — Prisma UUID columns reject that (P2023).
+    const nullIfEmpty = (value: string | null | undefined) => {
+      if (value === undefined) return undefined;
+      if (value === null || String(value).trim() === '') return null;
+      return value;
+    };
+
     const departmentId =
       payload.departmentId !== undefined
-        ? payload.departmentId
+        ? nullIfEmpty(payload.departmentId)
         : staff.departmentId;
     let primaryShiftId =
       payload.primaryShiftId !== undefined
-        ? payload.primaryShiftId
+        ? nullIfEmpty(payload.primaryShiftId)
         : staff.primaryShiftId;
     let additionalShiftIds =
       payload.additionalShiftIds !== undefined
-        ? payload.additionalShiftIds
+        ? payload.additionalShiftIds.filter((id) => Boolean(id?.trim?.() ?? id))
         : undefined;
     const staffType =
       payload.staffType !== undefined ? payload.staffType : staff.staffType;
     const designationId =
       payload.designationId !== undefined
-        ? payload.designationId
+        ? nullIfEmpty(payload.designationId)
         : staff.designationId;
 
     const staffTypeChanging =
