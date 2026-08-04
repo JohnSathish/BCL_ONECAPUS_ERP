@@ -701,6 +701,12 @@ function PhotoBulkJobCard({
         Matched {job.matchedCount} · Assigned {job.assignedCount} · Skipped {job.skippedCount} ·
         Errors {job.errorCount}
       </div>
+      {job.status === 'FAILED' ? (
+        <p className="mt-1 text-destructive">
+          Assignment stalled or failed. Preview again (use Replace existing if photos are missing on
+          disk), then Upload &amp; Assign.
+        </p>
+      ) : null}
       {(job.status === 'COMPLETED' ||
         job.status === 'COMPLETED_WITH_ERRORS' ||
         job.status === 'FAILED') && (

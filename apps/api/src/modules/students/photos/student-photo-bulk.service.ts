@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { access, mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, join } from 'path';
 import JSZip from 'jszip';
 import sharp from 'sharp';
@@ -14,7 +14,10 @@ import { PrismaService } from '../../../database/prisma.service';
 import { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { StudentsService } from '../students.service';
 import { toStudentListQuery } from '../dto/students.dto';
-import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import {
+  resolvePublicUploadFsPath,
+  resolveTenantUploadRoot,
+} from '../../../common/uploads/upload-paths';
 import type {
   PhotoBulkApplyDto,
   PhotoBulkDeleteDto,
@@ -28,6 +31,8 @@ const MIN_IMAGE_BYTES = 20 * 1024;
 /** Total bytes across all files in one preview request (individual files mode). */
 const MAX_TOTAL_UPLOAD_BYTES = 512 * 1024 * 1024;
 const ASYNC_THRESHOLD = 200;
+/** Stuck async applies (API restart / crashed promise) older than this become FAILED. */
+const STUCK_PROCESSING_MS = 10 * 60 * 1000;
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const IMAGE_MIMES = new Set([
   'image/jpeg',
@@ -222,6 +227,7 @@ export class StudentPhotoBulkService {
   }
 
   async apply(user: JwtUser, dto: PhotoBulkApplyDto) {
+    await this.healStuckBatches(user.tid);
     const batch = await this.assertBatch(user.tid, dto.batchId);
     const stuckProcessing =
       batch.status === 'PROCESSING' &&
@@ -259,6 +265,18 @@ export class StudentPhotoBulkService {
         `Batch status is ${batch.status}, cannot apply`,
       );
     }
+
+    // Retry ERROR rows when re-applying a failed/stuck batch.
+    await (this.prisma as any).studentPhotoBulkChange.updateMany({
+      where: {
+        batchId: dto.batchId,
+        tenantId: user.tid,
+        status: 'ERROR',
+        studentId: { not: null },
+        stagedPath: { not: null },
+      },
+      data: { status: 'MATCHED', errorMessage: null },
+    });
 
     if (batch.matchedCount > ASYNC_THRESHOLD) {
       // Run in-process — the shared BullMQ "exports" queue has many processors and
@@ -354,7 +372,8 @@ export class StudentPhotoBulkService {
       try {
         const currentPhoto =
           change.student?.masterProfile?.photoPath ?? change.oldPhotoPath;
-        if (currentPhoto && conflict === 'SKIP_EXISTING') {
+        const existingOnDisk = await this.publicUploadExists(currentPhoto);
+        if (currentPhoto && conflict === 'SKIP_EXISTING' && existingOnDisk) {
           skipped += 1;
           await (this.prisma as any).studentPhotoBulkChange.update({
             where: { id: change.id },
@@ -433,6 +452,7 @@ export class StudentPhotoBulkService {
   }
 
   async listBatches(tenantId: string) {
+    await this.healStuckBatches(tenantId);
     return (this.prisma as any).studentPhotoBulkBatch.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -442,6 +462,7 @@ export class StudentPhotoBulkService {
   }
 
   async getBatch(tenantId: string, batchId: string) {
+    await this.healStuckBatches(tenantId);
     const batch = await (this.prisma as any).studentPhotoBulkBatch.findFirst({
       where: { id: batchId, tenantId },
       include: {
@@ -478,7 +499,7 @@ export class StudentPhotoBulkService {
       });
     }
     return {
-      path: join(process.cwd(), reportPath.replace(/^\/uploads\//, 'uploads/')),
+      path: resolvePublicUploadFsPath(reportPath),
     };
   }
 
@@ -555,10 +576,7 @@ export class StudentPhotoBulkService {
     for (const profile of profiles) {
       try {
         if (!profile.photoPath) continue;
-        const source = join(
-          process.cwd(),
-          profile.photoPath.replace(/^\/uploads\//, 'uploads/'),
-        );
+        const source = resolvePublicUploadFsPath(profile.photoPath);
         const dir = join(
           this.uploadRoot,
           user.tid,
@@ -688,16 +706,38 @@ export class StudentPhotoBulkService {
     keepBoth: boolean,
   ) {
     if (!stagedPath) throw new BadRequestException('Missing staged photo');
-    const source = join(
-      process.cwd(),
-      stagedPath.replace(/^\/uploads\//, 'uploads/'),
-    );
+    const source = resolvePublicUploadFsPath(stagedPath);
     const buffer = await readFile(source);
     const dir = join(this.uploadRoot, tenantId, 'students', studentId);
     await mkdir(dir, { recursive: true });
     const filename = keepBoth ? `profile-${Date.now()}.jpg` : 'photo.jpg';
     await writeFile(join(dir, filename), buffer);
     return `/uploads/tenants/${tenantId}/students/${studentId}/${filename}`;
+  }
+
+  private async publicUploadExists(publicPath: string | null | undefined) {
+    if (!publicPath) return false;
+    try {
+      await access(resolvePublicUploadFsPath(publicPath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Mark orphaned PROCESSING jobs FAILED so the UI stops spinning forever. */
+  private async healStuckBatches(tenantId: string) {
+    const cutoff = new Date(Date.now() - STUCK_PROCESSING_MS);
+    await (this.prisma as any).studentPhotoBulkBatch.updateMany({
+      where: {
+        tenantId,
+        status: 'PROCESSING',
+        assignedCount: 0,
+        appliedAt: null,
+        updatedAt: { lt: cutoff },
+      },
+      data: { status: 'FAILED' },
+    });
   }
 
   private async loadStudents(
