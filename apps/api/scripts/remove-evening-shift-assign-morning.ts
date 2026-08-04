@@ -283,6 +283,33 @@ async function main() {
     `  User shift assignments remapped: ${userShiftAssignmentsFixed}`,
   );
   console.log(`  Evening shifts soft-deleted: ${eveningsSoftDeleted}`);
+
+  // Normalize leftover EVENING rows (e.g. deletedAt set earlier but status still ACTIVE)
+  if (!dryRun) {
+    const leftover = await prisma.shift.updateMany({
+      where: {
+        tenantId: tenant.id,
+        OR: [
+          { code: { equals: 'EVENING', mode: 'insensitive' } },
+          { name: { contains: 'Evening', mode: 'insensitive' } },
+        ],
+        NOT: {
+          AND: [{ status: 'INACTIVE' }, { deletedAt: { not: null } }],
+        },
+      },
+      data: {
+        status: 'INACTIVE',
+        deletedAt: new Date(),
+        description:
+          'Soft-deleted: college no longer operates Evening Shift; staff moved to Morning.',
+      },
+    });
+    if (leftover.count > 0) {
+      console.log(
+        `Normalized ${leftover.count} leftover Evening Shift row(s) to INACTIVE + deleted`,
+      );
+    }
+  }
 }
 
 main()
