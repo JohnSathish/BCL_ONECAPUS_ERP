@@ -116,6 +116,33 @@ export function FeeSettingsPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
+            Automated Fee Emails
+          </CardTitle>
+          <CardDescription>
+            Controls scheduled fee due / pending reminder emails. Keep off until fee demand is
+            official. Admin can still send manual reminders from the fee desk.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>Enable automated fee pending emails</Label>
+              <p className="text-xs text-muted-foreground">
+                Due-today / due-soon reminders and demand-published emails.
+              </p>
+            </div>
+            <Switch
+              checked={s.automatedFeeEmailsEnabled === true}
+              onCheckedChange={(v) => saveMut.mutate({ automatedFeeEmailsEnabled: v })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card border-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             Collection Modes
           </CardTitle>
           <CardDescription>

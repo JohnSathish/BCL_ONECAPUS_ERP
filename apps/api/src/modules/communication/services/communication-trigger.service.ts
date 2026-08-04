@@ -31,6 +31,16 @@ export class CommunicationTriggerService {
     input: TriggerInput,
   ): Promise<{ campaignId?: string; skipped?: boolean }> {
     try {
+      if (this.isAutomatedFeeEmailTrigger(input)) {
+        const allowed = await this.isAutomatedFeeEmailsEnabled(input.tenantId);
+        if (!allowed) {
+          this.logger.debug(
+            `Skipping automated fee email ${input.triggerKey} — disabled in fee settings`,
+          );
+          return { skipped: true };
+        }
+      }
+
       if (!input.skipDedupe) {
         const existing = await this.prisma.communicationTriggerLog.findUnique({
           where: {
@@ -179,5 +189,28 @@ export class CommunicationTriggerService {
       select: { displayName: true },
     });
     return branding?.displayName ?? 'Institution';
+  }
+
+  /** Manual bulk reminders use trigger keys ending in `_manual` and stay allowed. */
+  private isAutomatedFeeEmailTrigger(input: TriggerInput): boolean {
+    const code = input.templateCode.toUpperCase();
+    if (code !== 'FEE_REMINDER' && code !== 'PARENT_FEE_REMINDER') return false;
+    if (input.triggerKey.endsWith('_manual')) return false;
+    return true;
+  }
+
+  private async isAutomatedFeeEmailsEnabled(
+    tenantId: string,
+  ): Promise<boolean> {
+    try {
+      const settings = await this.prisma.feeFinanceSettings.findUnique({
+        where: { tenantId },
+        select: { automatedFeeEmailsEnabled: true },
+      });
+      return settings?.automatedFeeEmailsEnabled === true;
+    } catch {
+      // Column missing before migrate — treat as disabled.
+      return false;
+    }
   }
 }

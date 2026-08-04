@@ -7055,6 +7055,8 @@ model FeeFinanceSettings {
   blockRegistrationOnDue Boolean @default(true) @map("block_registration_on_due")
   /// When false, students see a locked Fee Module (no dues/pay). Admin fee desk stays available.
   studentPortalFeesEnabled Boolean @default(true) @map("student_portal_fees_enabled")
+  /// When false, skip scheduled/auto fee pending emails (manual admin reminders still allowed).
+  automatedFeeEmailsEnabled Boolean @default(false) @map("automated_fee_emails_enabled")
   /// Desk default: NONE | cash | college_qr | gateway | cheque | dd | bank_transfer | other
   defaultPaymentMethod  String   @default("NONE") @map("default_payment_method")
   rememberLastPaymentMethod Boolean @default(false) @map("remember_last_payment_method")

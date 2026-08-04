@@ -56,6 +56,24 @@ export class CommunicationSchedulerService {
   }
 
   async scanTenantFeeReminders(tenantId: string) {
+    try {
+      const settings = await this.prisma.feeFinanceSettings.findUnique({
+        where: { tenantId },
+        select: { automatedFeeEmailsEnabled: true },
+      });
+      if (settings?.automatedFeeEmailsEnabled !== true) {
+        this.logger.debug(
+          `Skip fee due reminders for ${tenantId} — automated fee emails disabled`,
+        );
+        return;
+      }
+    } catch {
+      this.logger.debug(
+        `Skip fee due reminders for ${tenantId} — fee settings unavailable`,
+      );
+      return;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

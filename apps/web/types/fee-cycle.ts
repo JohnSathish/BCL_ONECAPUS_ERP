@@ -281,6 +281,8 @@ export type FeeFinanceSettings = {
   cashReceiptPrefix?: string;
   /** When false, students see a locked Fee Module (admin fee desk stays available). */
   studentPortalFeesEnabled?: boolean;
+  /** When true, scheduled/auto fee pending emails are sent. Default off. */
+  automatedFeeEmailsEnabled?: boolean;
   onlinePaymentEnabled: boolean;
   cashCollectionEnabled: boolean;
   collectionModes?: CollectionModesConfig;
