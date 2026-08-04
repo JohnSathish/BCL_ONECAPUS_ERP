@@ -1,10 +1,8 @@
 /**
- * Remove seeded demo staff/students from a production tenant (soft-delete).
+ * Soft-delete seeded demo staff/students (@demo.edu / DEMO-* enrollment).
  *
- * Targets records created by prisma/seed.ts:
- *   - Users with @demo.edu email
- *   - Students with enrollment numbers starting with DEMO-
- *   - Staff profiles linked to @demo.edu portal users or staff email
+ * For live hard-delete of "Demo Student ###" + @demo.edu staff/users, prefer:
+ *   scripts/purge-live-demo-people.ts (CONFIRM=YES)
  *
  * College setup (programs, fees, branding, roles) is NOT removed.
  *
