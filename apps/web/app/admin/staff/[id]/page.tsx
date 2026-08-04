@@ -52,7 +52,7 @@ export default function StaffProfilePage() {
               Teaching assignments
             </Link>
             <Link
-              href={`/admin/staff/portal-users?staff=${staffId}`}
+              href={`/admin/staff/${staffId}?tab=settings`}
               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 text-xs')}
             >
               Portal access

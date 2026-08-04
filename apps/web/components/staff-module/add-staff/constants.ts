@@ -50,6 +50,9 @@ export const STAFF_DOC_TYPES = [
 
 export const PORTAL_ROLE_OPTIONS = [
   { slug: 'faculty', label: 'Faculty' },
+  { slug: 'staff', label: 'Staff (office)' },
+  { slug: 'principal', label: 'Principal' },
+  { slug: 'vice-principal', label: 'Vice Principal' },
   { slug: 'shift', label: 'Shift In-charge' },
   { slug: 'librarian', label: 'Librarian' },
   { slug: 'accountant', label: 'Accountant' },

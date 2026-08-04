@@ -470,7 +470,7 @@ export const STAFF_PROFILE_TABS = [
   { key: 'leave', label: 'Leave' },
   { key: 'special-assignment', label: 'Special Assignment' },
   { key: 'audit', label: 'Audit' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'settings', label: 'Portal' },
 ] as const;
 
 export type StaffProfileTabKey = (typeof STAFF_PROFILE_TABS)[number]['key'];

@@ -11,6 +11,7 @@ import {
   StaffSalarySection,
   StaffSystemSection,
 } from '@/components/staff-module/profile/staff-profile-sections';
+import { StaffPortalSection } from '@/components/staff-module/profile/staff-portal-section';
 import { StaffDocumentsSection } from '@/components/staff-module/profile/staff-documents-section';
 import { AdminStaffIdCardPanel } from '@/components/id-cards/admin-staff-id-card-panel';
 import { StaffAccommodationSection } from '@/components/staff-module/profile/staff-accommodation-section';
@@ -200,14 +201,7 @@ function ProfileTabPanel({
     case 'audit':
       return <StaffSystemSection profile={profile} />;
     case 'settings':
-      return (
-        <ProfileTabStub
-          title="Settings"
-          description="Portal provisioning and access control."
-          href={`/admin/staff/portal-users?staff=${profile.id}`}
-          hrefLabel="Portal users"
-        />
-      );
+      return <StaffPortalSection profile={profile} onRefresh={onRefresh} />;
     default:
       return null;
   }
@@ -279,6 +273,14 @@ function ProfileSummarySidebar({ profile }: { profile: StaffProfile }) {
           <dd className="font-medium">
             {profile.portalActive ? 'Active' : profile.portalPending ? 'Pending' : 'None'}
           </dd>
+          {!profile.portalActive && !profile.portalPending ? (
+            <Link
+              href="?tab=settings"
+              className="mt-0.5 inline-block text-[10px] text-primary underline"
+            >
+              Create portal user
+            </Link>
+          ) : null}
         </div>
       </dl>
     </aside>
