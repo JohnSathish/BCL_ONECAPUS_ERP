@@ -89,6 +89,33 @@ export function FeeSettingsPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
+            Student Fee Module
+          </CardTitle>
+          <CardDescription>
+            When off, students see a locked Fee Module (Due ₹0) and cannot pay online. Admin fee
+            desk, structures, and configuration stay available.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>Enable student portal fees</Label>
+              <p className="text-xs text-muted-foreground">
+                Turn on only after official fee demand is ready to publish.
+              </p>
+            </div>
+            <Switch
+              checked={s.studentPortalFeesEnabled !== false}
+              onCheckedChange={(v) => saveMut.mutate({ studentPortalFeesEnabled: v })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card border-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             Collection Modes
           </CardTitle>
           <CardDescription>

@@ -229,7 +229,17 @@ export class FeesController {
 
   @Get('me/ledger')
   @RequireAnyPermission('fees:read', 'fees:manage', 'student:portal:self')
-  myLedger(@CurrentUser() user: JwtUser) {
+  async myLedger(@CurrentUser() user: JwtUser) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(user.tid))) {
+      return {
+        studentId: null,
+        entries: [],
+        demands: [],
+        payments: [],
+        receipts: [],
+        moduleLocked: true,
+      };
+    }
     return this.ledger.myLedger(user.tid, user.sub);
   }
 
@@ -244,7 +254,15 @@ export class FeesController {
 
   @Get('me/dues')
   @RequireAnyPermission('fees:read', 'fees:manage', 'student:portal:self')
-  myDues(@CurrentUser() user: JwtUser) {
+  async myDues(@CurrentUser() user: JwtUser) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(user.tid))) {
+      return {
+        studentId: null,
+        totalDue: 0,
+        demands: [],
+        moduleLocked: true,
+      };
+    }
     return this.ledger.myDues(user.tid, user.sub);
   }
 
@@ -661,6 +679,14 @@ export class FeesController {
     @Body() dto: Omit<GatewayPaymentDto, 'studentId'>,
     @Headers('x-client-type') clientType?: string,
   ) {
+    const unlocked = await this.financeSettings.isStudentPortalFeesEnabled(
+      user.tid,
+    );
+    if (!unlocked) {
+      throw new BadRequestException(
+        'The fee module has not been activated yet. Payments will open when the college publishes fee demand.',
+      );
+    }
     const ledger = await this.ledger.myLedger(user.tid, user.sub);
     if (!ledger.studentId)
       throw new BadRequestException(
@@ -959,6 +985,11 @@ export class FeesController {
       attachmentUrls?: string[];
     },
   ) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(user.tid))) {
+      throw new BadRequestException(
+        'The fee module has not been activated yet. Payments will open when the college publishes fee demand.',
+      );
+    }
     const account = await this.feeAccount.getMyAccount(user.tid, user.sub);
     if (!account.studentId)
       throw new BadRequestException(
@@ -981,6 +1012,11 @@ export class FeesController {
       channel?: 'OFFICE_QR' | 'PAYMENT_LINK' | 'STUDENT_PORTAL';
     },
   ) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(user.tid))) {
+      throw new BadRequestException(
+        'The fee module has not been activated yet. Payments will open when the college publishes fee demand.',
+      );
+    }
     const account = await this.feeAccount.getMyAccount(user.tid, user.sub);
     if (!account.studentId)
       throw new BadRequestException(

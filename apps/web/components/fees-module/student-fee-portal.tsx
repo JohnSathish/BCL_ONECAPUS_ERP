@@ -348,6 +348,31 @@ export function StudentFeePortal() {
     );
   }
 
+  if (account.moduleLocked) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4 rounded-2xl border bg-card p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-muted">
+          <Lock className="h-7 w-7" />
+        </div>
+        <h1 className="text-xl font-bold tracking-tight">Fee Module</h1>
+        <p className="text-sm text-muted-foreground">
+          {account.lockMessage ??
+            'The fee module has not been activated yet. Fee details will be available once the college officially publishes the fee demand.'}
+        </p>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">Due Amount</p>
+            <p className="font-semibold tabular-nums">₹0.00</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Demand Amount</p>
+            <p className="font-semibold tabular-nums">₹0.00</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 pb-24 lg:pb-4">
       <header className="rounded-2xl border bg-gradient-to-br from-primary/8 via-card to-card p-4 sm:p-5">

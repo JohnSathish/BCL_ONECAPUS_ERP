@@ -212,8 +212,17 @@ export class StudentPortalService {
       format,
     );
 
-    const feeDue = feeSummaryRow.totalOutstanding;
-    const feePaid = feeSummaryRow.totalPaid;
+    const feeDueRaw = feeSummaryRow.totalOutstanding;
+    const feePaidRaw = feeSummaryRow.totalPaid;
+    const feeSettings = await this.prisma.feeFinanceSettings
+      .findUnique({
+        where: { tenantId: user.tid },
+        select: { studentPortalFeesEnabled: true },
+      })
+      .catch(() => null);
+    const feesLocked = feeSettings?.studentPortalFeesEnabled === false;
+    const feeDue = feesLocked ? 0 : feeDueRaw;
+    const feePaid = feesLocked ? 0 : feePaidRaw;
 
     const profileCompletion = this.profileCompletion({
       hasPhoto: Boolean(student.masterProfile?.photoPath),
@@ -323,8 +332,15 @@ export class StudentPortalService {
       fees: {
         paid: feePaid,
         due: feeDue,
-        status: feeDue > 0 ? ('PENDING' as const) : ('PAID' as const),
-        semesterLabel: 'Current semester',
+        status: feesLocked
+          ? ('LOCKED' as const)
+          : feeDue > 0
+            ? ('PENDING' as const)
+            : ('PAID' as const),
+        semesterLabel: feesLocked
+          ? 'Fee module not activated'
+          : 'Current semester',
+        moduleLocked: feesLocked,
       },
       examinations: {
         hasResults: summaries.length > 0,
@@ -345,6 +361,29 @@ export class StudentPortalService {
 
   async getDashboardWidgetFees(user: JwtUser) {
     const student = await this.resolveStudent(user);
+    const feeSettings = await (
+      this.prisma as unknown as {
+        feeFinanceSettings: {
+          findUnique: (args: unknown) => Promise<{
+            studentPortalFeesEnabled: boolean;
+          } | null>;
+        };
+      }
+    ).feeFinanceSettings
+      .findUnique({
+        where: { tenantId: user.tid },
+        select: { studentPortalFeesEnabled: true },
+      })
+      .catch(() => null);
+    if (feeSettings?.studentPortalFeesEnabled === false) {
+      return {
+        paid: 0,
+        due: 0,
+        status: 'LOCKED',
+        semesterLabel: 'Fee module not activated',
+        moduleLocked: true,
+      };
+    }
     const summary = await this.feeSummary.get(user.tid, student.id);
     return {
       paid: summary.totalPaid,

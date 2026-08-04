@@ -7053,6 +7053,8 @@ model FeeFinanceSettings {
   officeQrEnabled       Boolean  @default(true) @map("office_qr_enabled")
   blockHallTicketOnDue  Boolean  @default(true) @map("block_hall_ticket_on_due")
   blockRegistrationOnDue Boolean @default(true) @map("block_registration_on_due")
+  /// When false, students see a locked Fee Module (no dues/pay). Admin fee desk stays available.
+  studentPortalFeesEnabled Boolean @default(true) @map("student_portal_fees_enabled")
   /// Desk default: NONE | cash | college_qr | gateway | cheque | dd | bank_transfer | other
   defaultPaymentMethod  String   @default("NONE") @map("default_payment_method")
   rememberLastPaymentMethod Boolean @default(false) @map("remember_last_payment_method")

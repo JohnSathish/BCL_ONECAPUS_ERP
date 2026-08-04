@@ -36,11 +36,39 @@ export class StudentFeeAccountService {
     if (!student) {
       return {
         studentId: null,
+        moduleLocked: false,
         summary: { totalOutstanding: 0, totalPaid: 0, outstanding: 0 },
         admissionCycles: [],
         monthlyFees: [],
         payableItems: [],
         receipts: [],
+      };
+    }
+    const settings = await this.financeSettings.get(tenantId);
+    // Student portal only — admin fee desk still uses getAccount() for real balances.
+    if (settings.studentPortalFeesEnabled === false) {
+      return {
+        studentId: student.id,
+        moduleLocked: true,
+        lockMessage:
+          'The fee module has not been activated yet. Fee details will be available once the college officially publishes the fee demand.',
+        summary: {
+          totalOutstanding: 0,
+          totalPaid: 0,
+          outstanding: 0,
+          totalOverdue: 0,
+          admissionOutstanding: 0,
+          monthlyOutstanding: 0,
+          feeStatus: 'CLEAR',
+          activeDemandCount: 0,
+        },
+        admissionCycles: [],
+        monthlyFees: [],
+        monthlyTracker: [],
+        payableItems: [],
+        receipts: [],
+        concessions: [],
+        studentPortal: settings.studentPortal,
       };
     }
     return this.getAccount(tenantId, student.id);

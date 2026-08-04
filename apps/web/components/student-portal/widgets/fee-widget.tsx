@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { IndianRupee } from 'lucide-react';
+import { IndianRupee, Lock } from 'lucide-react';
 
 import { GlassCard } from '@/components/erp/glass-card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,31 @@ export function FeeWidget({
       <GlassCard className="animate-pulse p-5">
         <div className="h-5 w-24 rounded bg-muted" />
         <div className="mt-4 h-16 rounded-xl bg-muted" />
+      </GlassCard>
+    );
+  }
+
+  if (fees?.moduleLocked || fees?.status === 'LOCKED') {
+    return (
+      <GlassCard className="p-5">
+        <div className="flex items-center gap-2">
+          <Lock className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold tracking-tight">Fee Module</h3>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          The fee module has not been activated yet. Details will appear when the college publishes
+          fee demand.
+        </p>
+        <div className="mt-4 space-y-2 rounded-xl border border-border/50 bg-background/40 p-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Due</span>
+            <span className="font-semibold">₹0</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Demand</span>
+            <span className="font-semibold">₹0</span>
+          </div>
+        </div>
       </GlassCard>
     );
   }

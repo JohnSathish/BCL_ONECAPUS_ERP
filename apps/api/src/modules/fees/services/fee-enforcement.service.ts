@@ -26,6 +26,10 @@ export class FeeEnforcementService {
     context: FeeEnforcementContext,
   ) {
     const config = await this.settings.get(tenantId);
+    // While student Fee Module is inactive, do not block academics on unpaid demands.
+    if (config.studentPortalFeesEnabled === false) {
+      return { blocked: false, outstandingAmount: 0, reasons: [] };
+    }
     if (context === 'HALL_TICKET' && !config.blockHallTicketOnDue) {
       return { blocked: false, outstandingAmount: 0, reasons: [] };
     }

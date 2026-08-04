@@ -136,7 +136,9 @@ export type ExternalFeePayment = {
 };
 
 export type StudentFeeAccount = {
-  studentId: string;
+  studentId: string | null;
+  moduleLocked?: boolean;
+  lockMessage?: string;
   student?: {
     enrollmentNumber: string;
     rollNumber?: string | null;
@@ -148,12 +150,12 @@ export type StudentFeeAccount = {
     status?: string;
   } | null;
   summary: {
-    totalDemand: number;
+    totalDemand?: number;
     totalPaid: number;
     outstanding: number;
-    overdue: number;
-    totalArrears: number;
-    totalDue: number;
+    overdue?: number;
+    totalArrears?: number;
+    totalDue?: number;
     concessionTotal?: number;
     scholarshipTotal?: number;
     admissionOutstanding?: number;
@@ -161,6 +163,9 @@ export type StudentFeeAccount = {
     admissionPaid?: number;
     monthlyPaid?: number;
     currentDue?: number;
+    totalOutstanding?: number;
+    feeStatus?: string;
+    activeDemandCount?: number;
   };
   admissionFeeStatus?: {
     status: string;
@@ -274,6 +279,8 @@ export type FeeFinanceSettings = {
   lateFeeAmount: number;
   receiptPrefix: string;
   cashReceiptPrefix?: string;
+  /** When false, students see a locked Fee Module (admin fee desk stays available). */
+  studentPortalFeesEnabled?: boolean;
   onlinePaymentEnabled: boolean;
   cashCollectionEnabled: boolean;
   collectionModes?: CollectionModesConfig;

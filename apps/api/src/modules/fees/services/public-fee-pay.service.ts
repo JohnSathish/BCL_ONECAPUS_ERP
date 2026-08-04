@@ -12,6 +12,7 @@ import { verifyTurnstileToken } from '../../../common/utils/turnstile.util';
 import { StudentFeeAccountService } from './student-fee-account.service';
 import { GatewayPaymentService } from './gateway-payment.service';
 import { FeeReceiptDocumentService } from './fee-receipt-document.service';
+import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import type {
   PublicFeeInitiateDto,
   PublicFeeLookupDto,
@@ -44,6 +45,7 @@ export class PublicFeePayService {
     private readonly feeAccounts: StudentFeeAccountService,
     private readonly gateways: GatewayPaymentService,
     private readonly receiptDocs: FeeReceiptDocumentService,
+    private readonly financeSettings: FeeFinanceSettingsService,
   ) {}
 
   private sessionSecret() {
@@ -233,6 +235,11 @@ export class PublicFeePayService {
     dto: PublicFeeLookupDto,
     meta?: { ipAddress?: string; userAgent?: string },
   ) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(tenantId))) {
+      throw new BadRequestException(
+        'The fee module has not been activated yet. Public fee payment is unavailable until the college publishes fee demand.',
+      );
+    }
     await this.assertCaptcha(dto, meta?.ipAddress);
     const q = dto.identifier.trim();
     if (q.length < 2) {
@@ -361,6 +368,11 @@ export class PublicFeePayService {
     dto: PublicFeeInitiateDto,
     meta?: { ipAddress?: string; userAgent?: string },
   ) {
+    if (!(await this.financeSettings.isStudentPortalFeesEnabled(tenantId))) {
+      throw new BadRequestException(
+        'The fee module has not been activated yet. Public fee payment is unavailable until the college publishes fee demand.',
+      );
+    }
     const session = this.verifyPaymentSession(dto.paymentSessionToken);
     if (session.tid !== tenantId) {
       throw new BadRequestException('Invalid payment session');

@@ -63,8 +63,9 @@ export type StudentDashboardView = {
   fees?: {
     paid: number;
     due: number;
-    status: 'PAID' | 'PENDING';
+    status: 'PAID' | 'PENDING' | 'LOCKED';
     semesterLabel: string;
+    moduleLocked?: boolean;
   };
   credits?: {
     earned: number;

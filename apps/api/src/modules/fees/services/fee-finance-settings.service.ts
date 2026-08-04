@@ -43,6 +43,7 @@ export type FeeFinanceSettingsDto = {
   officeQrEnabled?: boolean;
   blockHallTicketOnDue?: boolean;
   blockRegistrationOnDue?: boolean;
+  studentPortalFeesEnabled?: boolean;
   collectionModes?: Partial<CollectionModesConfig>;
   defaultPaymentMethod?: DefaultPaymentMethodValue | string;
   rememberLastPaymentMethod?: boolean;
@@ -75,6 +76,7 @@ export class FeeFinanceSettingsService {
       onlinePaymentEnabled: modes.gateway,
       officeQrEnabled: modes.upi_qr,
       cashReceiptPrefix: String(settings.cashReceiptPrefix ?? 'DBC/CASH'),
+      studentPortalFeesEnabled: settings.studentPortalFeesEnabled !== false,
       defaultPaymentMethod,
       rememberLastPaymentMethod: Boolean(
         settings.rememberLastPaymentMethod ?? false,
@@ -111,6 +113,11 @@ export class FeeFinanceSettingsService {
       ),
       metadata: settings.metadata ?? {},
     };
+  }
+
+  async isStudentPortalFeesEnabled(tenantId: string): Promise<boolean> {
+    const settings = await this.get(tenantId);
+    return settings.studentPortalFeesEnabled !== false;
   }
 
   async get(tenantId: string) {
@@ -190,6 +197,9 @@ export class FeeFinanceSettingsService {
           : {}),
         ...(dto.blockRegistrationOnDue !== undefined
           ? { blockRegistrationOnDue: dto.blockRegistrationOnDue }
+          : {}),
+        ...(dto.studentPortalFeesEnabled !== undefined
+          ? { studentPortalFeesEnabled: dto.studentPortalFeesEnabled }
           : {}),
         ...(dto.defaultPaymentMethod !== undefined
           ? {

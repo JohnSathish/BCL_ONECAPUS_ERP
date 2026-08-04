@@ -30,6 +30,16 @@ export class FeeSchedulerService {
     });
     for (const tenant of tenants) {
       try {
+        const settings = await this.db().feeFinanceSettings.findUnique({
+          where: { tenantId: tenant.id },
+          select: { studentPortalFeesEnabled: true },
+        });
+        if (settings?.studentPortalFeesEnabled === false) {
+          this.logger.log(
+            `Skipping monthly fee generation for tenant=${tenant.id} (student portal fees disabled)`,
+          );
+          continue;
+        }
         const result = await this.monthly.generateBulk(tenant.id);
         this.logger.log(
           `Monthly fees ${result.billingPeriod} tenant=${tenant.id}: created=${result.created} skipped=${result.skipped}`,
@@ -51,6 +61,11 @@ export class FeeSchedulerService {
     });
     for (const tenant of tenants) {
       try {
+        const settings = await this.db().feeFinanceSettings.findUnique({
+          where: { tenantId: tenant.id },
+          select: { studentPortalFeesEnabled: true },
+        });
+        if (settings?.studentPortalFeesEnabled === false) continue;
         const result = await this.fines.accrueForTenant(tenant.id);
         if (result.updated > 0) {
           this.logger.log(
