@@ -392,7 +392,7 @@ function ActionCenter() {
 function EventsTimeline({ data }: { data: PrincipalDeskDashboard }) {
   const grouped = useMemo(() => {
     const map = new Map<string, typeof data.eventTimeline>();
-    for (const item of data.eventTimeline) {
+    for (const item of data.eventTimeline ?? []) {
       const list = map.get(item.dayGroup) ?? [];
       list.push(item);
       map.set(item.dayGroup, list);
@@ -402,7 +402,15 @@ function EventsTimeline({ data }: { data: PrincipalDeskDashboard }) {
 
   return (
     <SaaSCard>
-      <SectionTitle title="Upcoming Events" subtitle="Timeline view" />
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <SectionTitle title="Upcoming Events" subtitle="Timeline view" />
+        <Link
+          href="/principal-desk/events"
+          className="shrink-0 text-xs font-medium text-indigo-600 hover:underline"
+        >
+          View all
+        </Link>
+      </div>
       {grouped.length === 0 ? (
         <p className="text-sm text-slate-500">No scheduled events in the near term.</p>
       ) : (

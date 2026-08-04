@@ -32,6 +32,7 @@ export class PrincipalDeskDashboardService {
       libraryStats,
       committeeActivity,
       meetingsToday,
+      calendarEvents,
     ] = await Promise.all([
       this.dashboard.getOperationsCenter(tenantId, {}, user),
       this.countLibraryOverdueStudents(tenantId),
@@ -43,6 +44,7 @@ export class PrincipalDeskDashboardService {
       this.libraryTodayStats(tenantId, today),
       this.committeePendingByName(tenantId),
       this.countMeetingsToday(tenantId, today, endOfDay),
+      this.loadUpcomingAcademicEvents(tenantId, today),
     ]);
 
     const pendingStaffLeave =
@@ -84,9 +86,19 @@ export class PrincipalDeskDashboardService {
       govBrief,
     });
 
+    const upcomingEvents = calendarEvents.map((e) => ({
+      date: e.startDate.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+      }),
+      label: e.title,
+      href: '/principal-desk/events',
+    }));
+
     const eventTimeline = this.buildEventTimeline(
-      ops.upcomingEvents,
-      govBrief?.upcomingMeetings ?? [],
+      upcomingEvents,
+      [],
+      calendarEvents,
     );
 
     return {
@@ -105,13 +117,13 @@ export class PrincipalDeskDashboardService {
         leaveRequestsPending: pendingStaffLeave + pendingStudentLeave,
         pendingStaffLeave,
         pendingStudentLeave,
-        upcomingEvents: ops.upcomingEvents?.length ?? 0,
+        upcomingEvents: calendarEvents.length,
       },
       pulse: ops.pulse,
       academic: ops.academic,
       finance: ops.finance,
       actions: ops.actions,
-      upcomingEvents: ops.upcomingEvents,
+      upcomingEvents,
       eventTimeline,
       announcements: ops.announcements,
       aiInsights: ops.aiInsights,
@@ -304,6 +316,39 @@ export class PrincipalDeskDashboardService {
     return { salutation, bullets: bullets.slice(0, 5) };
   }
 
+  private async loadUpcomingAcademicEvents(tenantId: string, today: Date) {
+    const horizon = new Date(today);
+    horizon.setDate(horizon.getDate() + 90);
+
+    try {
+      return await this.prisma.academicCalendarEvent.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          active: true,
+          endDate: { gte: today },
+          startDate: { lte: horizon },
+          calendar: { deletedAt: null },
+        },
+        orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }, { title: 'asc' }],
+        take: 12,
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          startDate: true,
+          endDate: true,
+          startTime: true,
+          endTime: true,
+          isAllDay: true,
+          venue: true,
+        },
+      });
+    } catch {
+      return [];
+    }
+  }
+
   private buildEventTimeline(
     opsEvents: Array<{ date: string; label: string; href?: string }>,
     govMeetings: Array<{
@@ -311,6 +356,14 @@ export class PrincipalDeskDashboardService {
       committee?: { name?: string; shortCode?: string };
       agenda?: string | null;
     }>,
+    calendarEvents: Array<{
+      title: string;
+      startDate: Date;
+      startTime: string | null;
+      isAllDay: boolean;
+      venue: string | null;
+      type: string;
+    }> = [],
   ) {
     const items: Array<{
       dayGroup: string;
@@ -325,21 +378,37 @@ export class PrincipalDeskDashboardService {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toDateString();
 
+    const dayGroupFor = (d: Date) =>
+      d.toDateString() === todayStr
+        ? 'Today'
+        : d.toDateString() === tomorrowStr
+          ? 'Tomorrow'
+          : d.toLocaleDateString('en-IN', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'short',
+            });
+
+    for (const e of calendarEvents) {
+      const d = new Date(e.startDate);
+      const time =
+        !e.isAllDay && e.startTime
+          ? e.startTime.slice(0, 5)
+          : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const venueSuffix = e.venue ? ` · ${e.venue}` : '';
+      items.push({
+        dayGroup: dayGroupFor(d),
+        time,
+        label: `${e.title}${venueSuffix}`,
+        href: '/principal-desk/events',
+      });
+    }
+
     for (const m of govMeetings) {
       if (!m.meetingDate) continue;
       const d = new Date(m.meetingDate);
-      const dayGroup =
-        d.toDateString() === todayStr
-          ? 'Today'
-          : d.toDateString() === tomorrowStr
-            ? 'Tomorrow'
-            : d.toLocaleDateString('en-IN', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'short',
-              });
       items.push({
-        dayGroup,
+        dayGroup: dayGroupFor(d),
         time: d.toLocaleTimeString('en-IN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -350,16 +419,19 @@ export class PrincipalDeskDashboardService {
       });
     }
 
-    for (const e of opsEvents) {
-      items.push({
-        dayGroup: 'Upcoming',
-        time: e.date,
-        label: e.label,
-        href: e.href ?? '/principal-desk/events',
-      });
+    // Fallback when calendar has nothing (exams / admissions from ops).
+    if (!calendarEvents.length) {
+      for (const e of opsEvents) {
+        items.push({
+          dayGroup: 'Upcoming',
+          time: e.date,
+          label: e.label,
+          href: e.href ?? '/principal-desk/events',
+        });
+      }
     }
 
-    return items.slice(0, 8);
+    return items.slice(0, 10);
   }
 
   private async libraryTodayStats(tenantId: string, today: Date) {
