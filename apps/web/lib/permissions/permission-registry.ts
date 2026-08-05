@@ -74,11 +74,19 @@ export const MODULE_PERMISSIONS = {
     'campus-competitions:certificates',
     'campus-competitions:self',
   ],
-  studentAttendance: ['students:read', 'students:manage', 'academic:read'],
+  studentAttendance: [
+    'students:read',
+    'students:manage',
+    'academic:read',
+    'student-attendance:view',
+    'student-attendance:admin',
+    'shift:attendance:manage',
+  ],
   staffAttendance: [
     'staff-attendance:view',
     'staff-attendance:edit',
     'staff-attendance:shift-admin',
+    'staff-attendance:leave-admin',
   ],
   examinations: [
     'exam:view',
@@ -210,6 +218,9 @@ export const MODULE_PERMISSIONS = {
     'accommodation:read',
     'accommodation:manage',
     'accommodation:reports',
+    'staff:read',
+    'staff-attendance:leave-admin',
+    'staff-attendance:view',
   ],
   assetLifecycle: ['inventory:read', 'inventory:manage'],
   dms: ['official-documents:read', 'official-documents:manage'],
@@ -629,7 +640,7 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { prefix: '/admin/programs', permissions: [...MODULE_PERMISSIONS.academics] },
   {
     prefix: '/admin/shifts',
-    permissions: [...MODULE_PERMISSIONS.shifts, ...MODULE_PERMISSIONS.academics],
+    permissions: ['shift:manage'],
   },
   {
     prefix: '/admin/organization/infrastructure',
