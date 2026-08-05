@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePrincipalDrawerOptional } from '@/components/principal-portal/principal-drawer-context';
 import { principalTheme, severityColor } from '@/components/principal-portal/theme';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { COLLEGE_NAME } from '@/constants/release';
@@ -81,6 +82,7 @@ function ActionIcon({ name, color }: { name?: string; color: string }) {
 export default function PrincipalHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const drawer = usePrincipalDrawerOptional();
   const [data, setData] = useState<PrincipalMobileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -207,7 +209,8 @@ export default function PrincipalHomeScreen() {
           <View style={styles.heroTop}>
             <Pressable
               hitSlop={10}
-              onPress={() => router.push('/(principal)/(tabs)/profile' as Href)}
+              onPress={() => drawer?.openDrawer()}
+              accessibilityLabel="Open Principal menu"
             >
               <Ionicons name="menu" size={24} color="#fff" />
             </Pressable>

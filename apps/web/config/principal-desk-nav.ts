@@ -48,8 +48,8 @@ export type PrincipalNavGroup = {
 };
 
 /**
- * Principal Desk sidebar IA.
- * Mail stays early in Overview (not removed/relocated out of primary access).
+ * Principal Desk sidebar IA (exact product order).
+ * Mail stays in Overview after Notifications — do not remove or relocate.
  */
 export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
   {
@@ -78,38 +78,25 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
     ],
   },
   {
-    id: 'students',
-    label: 'Student Management',
+    id: 'people',
+    label: 'People',
     defaultExpanded: true,
     items: [
       {
         href: '/principal-desk/student-lookup',
-        label: 'Student Quick Lookup',
+        label: 'Student Management',
         icon: ScanLine,
       },
-    ],
-  },
-  {
-    id: 'staff',
-    label: 'Staff Management',
-    defaultExpanded: true,
-    items: [
       {
         href: '/principal-desk/staff',
-        label: 'Staff Center',
+        label: 'Staff Management',
         icon: Users,
-      },
-      {
-        href: '/principal-desk/leave',
-        label: 'Leave Approvals',
-        icon: CalendarDays,
-        badgeKey: 'leavePending',
       },
     ],
   },
   {
-    id: 'academics-ops',
-    label: 'Academics & Operations',
+    id: 'operations',
+    label: 'Operations',
     defaultExpanded: true,
     items: [
       {
@@ -137,37 +124,24 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         label: 'Timetable',
         icon: CalendarRange,
       },
-    ],
-  },
-  {
-    id: 'campus',
-    label: 'Campus Services',
-    defaultExpanded: false,
-    items: [
       {
-        href: '/principal-desk/library',
-        label: 'Library Overview',
-        icon: Library,
-      },
-      {
-        href: '/principal-desk/hostel',
-        label: 'Hostel',
-        icon: School,
-        optional: true,
-      },
-      {
-        href: '/principal-desk/transport',
-        label: 'Transport',
-        icon: Bus,
-        optional: true,
+        href: '/principal-desk/leave',
+        label: 'Leave Approvals',
+        icon: CalendarDays,
+        badgeKey: 'leavePending',
       },
     ],
   },
   {
-    id: 'comms-gov',
-    label: 'Communication & Governance',
+    id: 'insights-comms',
+    label: 'Reports & Communication',
     defaultExpanded: true,
     items: [
+      {
+        href: '/principal-desk/reports',
+        label: 'Reports & Analytics',
+        icon: GraduationCap,
+      },
       {
         href: '/principal-desk/notices',
         label: 'Announcements',
@@ -188,22 +162,41 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         label: 'Complaints & Grievances',
         icon: MessageSquareWarning,
       },
+    ],
+  },
+  {
+    id: 'campus',
+    label: 'Campus Services',
+    defaultExpanded: false,
+    items: [
       {
-        href: '/principal-desk/committees',
-        label: 'Committees',
-        icon: Building2,
+        href: '/principal-desk/transport',
+        label: 'Transport',
+        icon: Bus,
+        optional: true,
+      },
+      {
+        href: '/principal-desk/hostel',
+        label: 'Hostel',
+        icon: School,
+        optional: true,
+      },
+      {
+        href: '/principal-desk/library',
+        label: 'Library Overview',
+        icon: Library,
       },
     ],
   },
   {
     id: 'insights',
-    label: 'Reports & Insights',
+    label: 'Intelligence',
     defaultExpanded: false,
     items: [
       {
-        href: '/principal-desk/reports',
-        label: 'Reports & Analytics',
-        icon: GraduationCap,
+        href: '/principal-desk/ai-insights',
+        label: 'AI Insights / Principal Assistant',
+        icon: Bot,
       },
       {
         href: '/principal-desk/health',
@@ -216,9 +209,9 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         icon: Award,
       },
       {
-        href: '/principal-desk/ai-insights',
-        label: 'AI Insights',
-        icon: Bot,
+        href: '/principal-desk/committees',
+        label: 'Committees',
+        icon: Building2,
       },
     ],
   },

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StudentCommandCardView } from '@/components/principal-portal/student-command-card';
+import { usePrincipalDrawerOptional } from '@/components/principal-portal/principal-drawer-context';
 import { principalTheme } from '@/components/principal-portal/theme';
 import { fetchStudentCommand } from '@/services/principal-desk';
 import type { StudentCommandCard } from '@/types/principal-desk';
@@ -22,6 +23,7 @@ const MIN_QUERY_LEN = 3;
 export default function PrincipalStudentLookupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const drawer = usePrincipalDrawerOptional();
   const [query, setQuery] = useState('');
   const [card, setCard] = useState<StudentCommandCard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,13 +62,21 @@ export default function PrincipalStudentLookupScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={principalTheme.text} />
+        <Pressable
+          hitSlop={10}
+          onPress={() => drawer?.openDrawer()}
+          style={styles.backBtn}
+          accessibilityLabel="Open menu"
+        >
+          <Ionicons name="menu" size={22} color={principalTheme.primaryAccent} />
         </Pressable>
         <View style={styles.headerTitles}>
           <Text style={styles.eyebrow}>Principal Desk</Text>
-          <Text style={styles.title}>Student Quick Lookup</Text>
+          <Text style={styles.title}>Student Management</Text>
         </View>
+        <Pressable hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="close" size={22} color={principalTheme.text} />
+        </Pressable>
       </View>
 
       <View style={styles.searchRow}>

@@ -4,11 +4,13 @@ import { useRouter, type Href } from 'expo-router';
 import { logout } from '@/auth/logout';
 import { getUserSnapshot } from '@/auth/session';
 import { PrincipalScreenShell } from '@/components/principal-portal/principal-screen-shell';
+import { usePrincipalDrawerOptional } from '@/components/principal-portal/principal-drawer-context';
 import { principalTheme } from '@/components/principal-portal/theme';
 import { COLLEGE_NAME, PRIVACY_POLICY_URL, TERMS_URL } from '@/constants/release';
 
 export default function PrincipalProfileScreen() {
   const router = useRouter();
+  const drawer = usePrincipalDrawerOptional();
   const [roles, setRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -18,13 +20,18 @@ export default function PrincipalProfileScreen() {
   }, []);
 
   return (
-    <PrincipalScreenShell title="Profile" subtitle="Principal account">
+    <PrincipalScreenShell title="Settings" subtitle="Principal account">
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <Text style={styles.name}>Principal</Text>
           <Text style={styles.meta}>{COLLEGE_NAME}</Text>
           <Text style={styles.meta}>Roles: {roles.join(', ') || 'principal'}</Text>
         </View>
+
+        <Text style={styles.section}>Command menu</Text>
+        <Pressable style={styles.linkRow} onPress={() => drawer?.openDrawer()}>
+          <Text style={styles.link}>Open sidebar navigation</Text>
+        </Pressable>
 
         <Text style={styles.section}>Mail & settings</Text>
         <Pressable
