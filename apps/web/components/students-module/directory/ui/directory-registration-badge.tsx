@@ -28,7 +28,7 @@ const DOT_STYLES: Record<MappingKey, string> = {
 };
 
 const LABELS: Record<MappingKey, string> = {
-  completed: 'Completed',
+  completed: 'Registered',
   pending: 'Pending',
   missing: 'Missing',
 };
