@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { PrismaService } from '../../../database/prisma.service';
 import { LeaveService } from '../../hr/services/leave.service';
 import { PrincipalCommsMailboxService } from '../../principal-comms/services/principal-comms-mailbox.service';
 import { StudentLeaveService } from '../../students/services/student-leave.service';
@@ -10,6 +11,7 @@ export type MobileAlertSeverity = 'critical' | 'high' | 'medium' | 'low';
 @Injectable()
 export class PrincipalMobileSummaryService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly dashboard: PrincipalDeskDashboardService,
     private readonly mailbox: PrincipalCommsMailboxService,
     private readonly leave: LeaveService,
@@ -17,7 +19,7 @@ export class PrincipalMobileSummaryService {
   ) {}
 
   async getSummary(user: JwtUser) {
-    const [desk, mail, staffLeave, studentLeave] = await Promise.all([
+    const [desk, mail, staffLeave, studentLeave, catalog] = await Promise.all([
       this.dashboard.getDashboard(user),
       this.mailbox.stats(user.tid, user.sub).catch(() => ({
         connected: false,
@@ -31,6 +33,7 @@ export class PrincipalMobileSummaryService {
         .listApplications(user.tid, { status: 'PENDING' })
         .catch(() => [] as unknown[]),
       this.studentLeave.listPending(user.tid).catch(() => [] as unknown[]),
+      this.loadCatalogCounts(user.tid),
     ]);
 
     const pendingApprovals = staffLeave.length + studentLeave.length;
@@ -39,19 +42,84 @@ export class PrincipalMobileSummaryService {
     );
     const admissionsToday = admissionsAction?.count ?? 0;
 
+    const studentsPresent = desk.snapshot?.studentsPresentToday ?? 0;
+    const studentsAbsent = desk.snapshot?.studentsAbsentToday ?? 0;
+    const staffPresent = desk.snapshot?.staffPresentToday ?? 0;
+    const staffAbsent = desk.snapshot?.staffAbsentToday ?? 0;
+    const studentTotal = desk.institution?.studentCount ?? 0;
+    const staffTotal = desk.institution?.staffCount ?? 0;
+    const studentsPct =
+      desk.academic?.studentAttendancePct ??
+      (studentsPresent + studentsAbsent > 0
+        ? Math.round(
+            (studentsPresent / (studentsPresent + studentsAbsent)) * 1000,
+          ) / 10
+        : null);
+    const staffPct =
+      desk.academic?.facultyAttendancePct ??
+      (staffPresent + staffAbsent > 0
+        ? Math.round((staffPresent / (staffPresent + staffAbsent)) * 1000) / 10
+        : null);
+    const overallPct =
+      studentsPct != null && staffPct != null
+        ? Math.round(((studentsPct + staffPct) / 2) * 10) / 10
+        : (studentsPct ?? staffPct ?? null);
+
+    const feeToday = desk.finance?.todayCollection ?? 0;
+    const feeMonth = desk.finance?.monthCollection ?? feeToday;
+    const sparkline: number[] = Array.isArray(desk.finance?.collectionSparkline)
+      ? desk.finance.collectionSparkline
+      : [];
+    const feeTrendPct = this.sparklineTrendPct(sparkline);
+
+    const departmentCount = catalog.departments;
+    const programs = catalog.programs;
+    const subjects = catalog.courses;
+    const semestersRunning =
+      Array.isArray(desk.institution?.activeSemesters) &&
+      desk.institution.activeSemesters.length > 0
+        ? desk.institution.activeSemesters.length
+        : desk.institution?.semester
+          ? 1
+          : catalog.activeSemesters;
+    const classesToday =
+      desk.snapshot?.classesConductedToday ??
+      desk.academic?.classesCompleted ??
+      desk.academic?.classesScheduled ??
+      0;
+
+    const shiftCount = catalog.shifts;
     const overview = {
-      studentsPresent: desk.snapshot?.studentsPresentToday ?? 0,
-      studentsAbsent: desk.snapshot?.studentsAbsentToday ?? 0,
-      staffPresent: desk.snapshot?.staffPresentToday ?? 0,
-      staffAbsent: desk.snapshot?.staffAbsentToday ?? 0,
+      studentsPresent,
+      studentsAbsent,
+      staffPresent,
+      staffAbsent,
       admissionsToday,
-      feeCollectionToday: desk.finance?.todayCollection ?? 0,
+      feeCollectionToday: feeToday,
+      feeCollectionMonth: feeMonth,
       pendingApprovals,
       unreadEmails: mail.unread ?? 0,
-      attendancePct: desk.academic?.studentAttendancePct ?? null,
+      attendancePct: overallPct,
+      studentsAttendancePct: studentsPct,
+      staffAttendancePct: staffPct,
+      classesToday,
+      departmentCount,
+      programCount: programs,
+      subjectCount: subjects,
+      semestersRunning,
+      shiftCount,
+      feeTrendPct,
+      notificationCount:
+        (mail.unread ?? 0) +
+        pendingApprovals +
+        (desk.navBadges?.leavePending ?? 0),
     };
 
-    const alerts = this.buildAlerts(desk, mail, pendingApprovals);
+    const alerts = this.buildAlerts(desk, mail, pendingApprovals).map((a) => ({
+      ...a,
+      actionHint: this.alertActionHint(a.id, a.severity),
+    }));
+
     const schedule = (desk.eventTimeline ?? [])
       .slice(0, 8)
       .map(
@@ -68,36 +136,57 @@ export class PrincipalMobileSummaryService {
         }),
       );
 
+    const notices = (desk.announcements ?? [])
+      .slice(0, 5)
+      .map(
+        (
+          item: { title: string; date: string; href?: string },
+          index: number,
+        ) => ({
+          id: `notice-${index}`,
+          title: item.title,
+          dateLabel: item.date,
+          tag: index === 0 ? 'New' : 'Notice',
+          href: this.toMobileHref(item.href),
+        }),
+      );
+
     const quickActions = [
+      {
+        id: 'notice',
+        label: 'Create Notice',
+        href: '/(principal)/compose',
+        icon: 'megaphone',
+      },
+      {
+        id: 'calendar',
+        label: 'Schedule Meeting',
+        href: '/(principal)/(tabs)#schedule',
+        icon: 'calendar',
+      },
+      {
+        id: 'reports',
+        label: 'View Reports',
+        href: '/(principal)/(tabs)',
+        icon: 'document',
+      },
       {
         id: 'approvals',
         label: 'Approve Leave',
         href: '/(principal)/(tabs)/approvals',
+        icon: 'person',
       },
       {
         id: 'inbox',
-        label: 'Read Emails',
+        label: 'Message Center',
         href: '/(principal)/(tabs)/inbox',
+        icon: 'chat',
       },
       {
-        id: 'compose',
-        label: 'Compose Email',
-        href: '/(principal)/compose',
-      },
-      {
-        id: 'calendar',
-        label: 'Calendar',
-        href: '/(principal)/(tabs)#schedule',
-      },
-      {
-        id: 'attendance',
-        label: 'Attendance',
-        href: '/(principal)/(tabs)',
-      },
-      {
-        id: 'notice',
-        label: 'Send Notice',
-        href: '/(principal)/compose',
+        id: 'circulars',
+        label: 'Circulars',
+        href: '/(principal)/(tabs)/inbox',
+        icon: 'list',
       },
     ];
 
@@ -114,8 +203,8 @@ export class PrincipalMobileSummaryService {
       institution: {
         academicYear: desk.institution?.academicYear ?? null,
         semester: desk.institution?.semester ?? null,
-        studentCount: desk.institution?.studentCount ?? 0,
-        staffCount: desk.institution?.staffCount ?? 0,
+        studentCount: studentTotal,
+        staffCount: staffTotal,
       },
       overview,
       mail: {
@@ -126,6 +215,7 @@ export class PrincipalMobileSummaryService {
       },
       alerts,
       schedule,
+      notices,
       quickActions,
       intelligence: {
         bullets: desk.intelligenceSummary?.bullets ?? desk.aiInsights ?? [],
@@ -133,6 +223,44 @@ export class PrincipalMobileSummaryService {
       campusHealth: desk.campusHealth ?? null,
       updatedAt: desk.updatedAt ?? new Date().toISOString(),
     };
+  }
+
+  private async loadCatalogCounts(tenantId: string) {
+    const [departments, programs, courses, shifts, activeSemesters] =
+      await Promise.all([
+        this.prisma.department.count({
+          where: { tenantId, deletedAt: null },
+        }),
+        this.prisma.program.count({
+          where: { tenantId, deletedAt: null },
+        }),
+        this.prisma.course.count({
+          where: { tenantId, deletedAt: null },
+        }),
+        this.prisma.shift.count({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        }),
+        this.prisma.semester.count({
+          where: { tenantId, deletedAt: null, isActive: true },
+        }),
+      ]);
+    return { departments, programs, courses, shifts, activeSemesters };
+  }
+
+  private sparklineTrendPct(sparkline: number[]) {
+    if (sparkline.length < 2) return null;
+    const prev = sparkline[sparkline.length - 2] ?? 0;
+    const curr = sparkline[sparkline.length - 1] ?? 0;
+    if (prev <= 0) return curr > 0 ? 100 : 0;
+    return Math.round(((curr - prev) / prev) * 1000) / 10;
+  }
+
+  private alertActionHint(id: string, severity: MobileAlertSeverity) {
+    if (id === 'leave-pending') return 'Review now';
+    if (id === 'attendance-risk') return 'Action required';
+    if (severity === 'critical') return 'Action required';
+    if (severity === 'high') return 'Review now';
+    return 'Check now';
   }
 
   private buildAlerts(
@@ -169,7 +297,7 @@ export class PrincipalMobileSummaryService {
     if (pendingApprovals > 0) {
       alerts.push({
         id: 'leave-pending',
-        title: 'Leave approvals pending',
+        title: `${pendingApprovals} leave request${pendingApprovals === 1 ? '' : 's'} pending approval`,
         severity: 'high',
         href: '/(principal)/(tabs)/approvals',
         count: pendingApprovals,
@@ -189,7 +317,7 @@ export class PrincipalMobileSummaryService {
     if (ca?.attendanceRisk?.count > 0) {
       alerts.push({
         id: 'attendance-risk',
-        title: 'Students below attendance threshold',
+        title: `${ca.attendanceRisk.count} students have irregular attendance`,
         severity: 'high',
         href: '/(principal)/(tabs)',
         count: ca.attendanceRisk.count,

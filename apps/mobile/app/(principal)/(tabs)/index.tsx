@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -8,21 +9,75 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import { PrincipalScreenShell } from '@/components/principal-portal/principal-screen-shell';
-import { principalTheme, severityColor, severityDot } from '@/components/principal-portal/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { principalTheme, severityColor } from '@/components/principal-portal/theme';
 import { COLLEGE_NAME } from '@/constants/release';
 import { fetchPrincipalMobileSummary } from '@/services/principal-desk';
 import type { PrincipalMobileSummary } from '@/types/principal-desk';
 import { formatInr } from '@/utils/currency';
+
+const SCREEN_W = Dimensions.get('window').width;
 
 function formatKpi(value: number, money = false) {
   if (money) return formatInr(value);
   return value.toLocaleString('en-IN');
 }
 
+function trendLabel(pct: number | null | undefined, fallback: string) {
+  if (pct == null || Number.isNaN(pct)) return fallback;
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct}% vs last period`;
+}
+
+function AttendanceRing({ pct }: { pct: number }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <View style={styles.ringWrap}>
+      <View style={styles.ringOuter}>
+        <View
+          style={[
+            styles.ringArc,
+            {
+              borderColor: principalTheme.primaryAccent,
+              // Visual fill cue — RN has no SVG ring by default; use layered circle.
+              borderTopColor: clamped >= 25 ? principalTheme.primaryAccent : principalTheme.border,
+              borderRightColor:
+                clamped >= 50 ? principalTheme.primaryAccent : principalTheme.border,
+              borderBottomColor:
+                clamped >= 75 ? principalTheme.primaryAccent : principalTheme.border,
+              borderLeftColor: clamped >= 12 ? principalTheme.primaryAccent : principalTheme.border,
+              transform: [{ rotate: '-45deg' }],
+            },
+          ]}
+        />
+        <View style={styles.ringInner}>
+          <Text style={styles.ringValue}>{clamped.toFixed(1)}%</Text>
+          <Text style={styles.ringCaption}>Overall{'\n'}Attendance</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ActionIcon({ name, color }: { name?: string; color: string }) {
+  const map: Record<string, keyof typeof Ionicons.glyphMap> = {
+    megaphone: 'megaphone',
+    calendar: 'calendar',
+    document: 'document-text',
+    person: 'person',
+    chat: 'chatbubbles',
+    list: 'list',
+  };
+  const glyph = (name && map[name]) || 'ellipse';
+  return <Ionicons name={glyph} size={22} color={color} />;
+}
+
 export default function PrincipalHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<PrincipalMobileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,205 +103,599 @@ export default function PrincipalHomeScreen() {
   }, [load]);
 
   const overview = data?.overview;
-  const kpis = [
-    { label: 'Students Present', value: overview?.studentsPresent ?? 0 },
-    { label: 'Staff Present', value: overview?.staffPresent ?? 0 },
-    { label: 'Admissions Today', value: overview?.admissionsToday ?? 0 },
-    {
-      label: 'Fee Collection',
-      value: overview?.feeCollectionToday ?? 0,
-      money: true,
-    },
-    { label: 'Pending Approvals', value: overview?.pendingApprovals ?? 0 },
-    { label: 'Unread Emails', value: overview?.unreadEmails ?? 0 },
+  const displayName = data?.greeting.userName || 'Principal';
+  const notifCount = overview?.notificationCount ?? overview?.unreadEmails ?? 0;
+
+  const kpis = useMemo(() => {
+    const o = overview;
+    if (!o) return [];
+    return [
+      {
+        id: 'students',
+        label: 'Students',
+        value: formatKpi(data?.institution.studentCount ?? 0),
+        hint: `${formatKpi(o.studentsPresent)} present today`,
+        icon: 'school' as const,
+        tint: '#3B82F6',
+        soft: '#EFF6FF',
+      },
+      {
+        id: 'staff',
+        label: 'Total Staff',
+        value: formatKpi(data?.institution.staffCount ?? 0),
+        hint: `${formatKpi(o.staffPresent)} on duty`,
+        icon: 'people' as const,
+        tint: '#10B981',
+        soft: '#ECFDF5',
+      },
+      {
+        id: 'departments',
+        label: 'Departments',
+        value: formatKpi(o.departmentCount ?? 0),
+        hint: o.shiftCount ? `Across ${o.shiftCount} shifts` : 'Active departments',
+        icon: 'business' as const,
+        tint: '#8B5CF6',
+        soft: '#F5F3FF',
+      },
+      {
+        id: 'classes',
+        label: 'Classes Today',
+        value: formatKpi(o.classesToday ?? 0),
+        hint: 'Across all shifts',
+        icon: 'book' as const,
+        tint: '#F97316',
+        soft: '#FFF7ED',
+      },
+      {
+        id: 'fees',
+        label: 'Fees Collection',
+        value: formatKpi(o.feeCollectionMonth ?? o.feeCollectionToday ?? 0, true),
+        hint: trendLabel(o.feeTrendPct, 'This month'),
+        icon: 'cash' as const,
+        tint: '#14B8A6',
+        soft: '#F0FDFA',
+      },
+    ];
+  }, [data?.institution.staffCount, data?.institution.studentCount, overview]);
+
+  const actionColors = [
+    principalTheme.purple,
+    principalTheme.accent,
+    principalTheme.info,
+    principalTheme.orange,
+    principalTheme.urgent,
+    principalTheme.teal,
   ];
 
+  const go = (href: string) => {
+    const cleaned = href.replace(/#.*$/, '') as Href;
+    router.push(cleaned);
+  };
+
+  if (loading && !data) {
+    return (
+      <View style={[styles.boot, { paddingTop: insets.top }]}>
+        <ActivityIndicator color={principalTheme.primaryAccent} size="large" />
+        <Text style={styles.bootText}>Loading Principal Dashboard…</Text>
+      </View>
+    );
+  }
+
+  const attendancePct = overview?.attendancePct ?? 0;
+  const studentsAtt = overview?.studentsAttendancePct ?? null;
+  const staffAtt = overview?.staffAttendancePct ?? null;
+
   return (
-    <PrincipalScreenShell title="Principal" subtitle={COLLEGE_NAME}>
-      {loading && !data ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={principalTheme.primaryAccent} />
-          <Text style={styles.muted}>Loading command center…</Text>
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.container}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
-          }
+    <View style={styles.root}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <LinearGradient
+          colors={[principalTheme.hero, principalTheme.heroDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + 10 }]}
         >
-          <View style={styles.hero}>
-            <Text style={styles.salutation}>
-              {data?.greeting.salutation || 'Good day'}, Principal
-            </Text>
-            <Text style={styles.college}>{COLLEGE_NAME}</Text>
-            <Text style={styles.date}>{data?.greeting.dateLabel || ''}</Text>
+          <View style={styles.heroTop}>
+            <Pressable
+              hitSlop={10}
+              onPress={() => router.push('/(principal)/(tabs)/profile' as Href)}
+            >
+              <Ionicons name="menu" size={24} color="#fff" />
+            </Pressable>
+            <View style={styles.heroTitles}>
+              <Text style={styles.heroTitle}>Principal Dashboard</Text>
+              <Text style={styles.heroSubtitle}>BCL OneCampus ERP</Text>
+            </View>
+            <View style={styles.heroIcons}>
+              <Pressable
+                style={styles.heroIconBtn}
+                onPress={() => router.push('/(principal)/(tabs)/inbox' as Href)}
+              >
+                <Ionicons name="notifications-outline" size={22} color="#fff" />
+                {notifCount > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{notifCount > 9 ? '9+' : notifCount}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+              <Pressable
+                style={styles.heroIconBtn}
+                onPress={() => go('/(principal)/(tabs)#schedule')}
+              >
+                <Ionicons name="calendar-outline" size={22} color="#fff" />
+              </Pressable>
+            </View>
           </View>
 
+          <View style={styles.welcomeRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {displayName
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((p) => p[0]?.toUpperCase() ?? '')
+                  .join('') || 'P'}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.welcome}>
+                Welcome back, <Text style={styles.welcomeName}>{displayName}</Text>
+              </Text>
+              <Text style={styles.roleLine}>Principal</Text>
+              <Text style={styles.collegeLine}>{COLLEGE_NAME}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.sheet}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Text style={styles.section}>Today&apos;s Overview</Text>
-          <View style={styles.kpiGrid}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.kpiStrip}
+          >
             {kpis.map((kpi) => (
-              <View key={kpi.label} style={styles.kpiCard}>
-                <Text style={styles.kpiValue}>{formatKpi(kpi.value, Boolean(kpi.money))}</Text>
+              <View key={kpi.id} style={styles.kpiCard}>
+                <View style={[styles.kpiIcon, { backgroundColor: kpi.soft }]}>
+                  <Ionicons name={kpi.icon} size={18} color={kpi.tint} />
+                </View>
                 <Text style={styles.kpiLabel}>{kpi.label}</Text>
+                <Text style={styles.kpiValue} numberOfLines={1}>
+                  {kpi.value}
+                </Text>
+                <Text style={styles.kpiHint} numberOfLines={2}>
+                  {kpi.hint}
+                </Text>
               </View>
             ))}
+          </ScrollView>
+
+          <View style={styles.twoCol}>
+            <View style={[styles.panel, styles.panelHalf]}>
+              <Text style={styles.panelTitle}>Attendance Overview</Text>
+              <AttendanceRing pct={attendancePct} />
+              <View style={styles.attRows}>
+                <View style={styles.attRow}>
+                  <Text style={styles.attLabel}>Students</Text>
+                  <Text style={styles.attValue}>
+                    {studentsAtt != null ? `${studentsAtt}%` : '—'}
+                  </Text>
+                </View>
+                <View style={styles.attRow}>
+                  <Text style={styles.attLabel}>Staff</Text>
+                  <Text style={styles.attValue}>{staffAtt != null ? `${staffAtt}%` : '—'}</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => go('/(principal)/(tabs)')}>
+                <Text style={styles.link}>View Attendance Report →</Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.panel, styles.panelHalf]}>
+              <Text style={styles.panelTitle}>Academic Overview</Text>
+              <View style={styles.academicGrid}>
+                <View style={styles.academicCell}>
+                  <Text style={styles.academicValue}>{formatKpi(overview?.programCount ?? 0)}</Text>
+                  <Text style={styles.academicLabel}>Programs</Text>
+                  <Text style={styles.academicHint}>Active</Text>
+                </View>
+                <View style={styles.academicCell}>
+                  <Text style={styles.academicValue}>
+                    {formatKpi(overview?.semestersRunning ?? 0)}
+                  </Text>
+                  <Text style={styles.academicLabel}>Semesters</Text>
+                  <Text style={styles.academicHint}>Running</Text>
+                </View>
+                <View style={styles.academicCell}>
+                  <Text style={styles.academicValue}>{formatKpi(overview?.subjectCount ?? 0)}</Text>
+                  <Text style={styles.academicLabel}>Subjects</Text>
+                  <Text style={styles.academicHint}>Offered</Text>
+                </View>
+                <View style={styles.academicCell}>
+                  <Text style={styles.academicValue}>
+                    {data?.campusHealth?.score != null ? `${data.campusHealth.score}` : '—'}
+                  </Text>
+                  <Text style={styles.academicLabel}>Campus</Text>
+                  <Text style={styles.academicHint}>Health score</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => go('/(principal)/(tabs)')}>
+                <Text style={styles.link}>View Academic Report →</Text>
+              </Pressable>
+            </View>
           </View>
 
-          <Text style={styles.section}>Quick Actions</Text>
-          <View style={styles.actionsRow}>
-            {(data?.quickActions ?? []).map((action) => (
-              <Pressable
-                key={action.id}
-                style={styles.actionChip}
-                onPress={() => {
-                  const href = action.href.replace(/#.*$/, '') as Href;
-                  router.push(href);
-                }}
-              >
-                <Text style={styles.actionText}>{action.label}</Text>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          </View>
+          <View style={styles.actionsGrid}>
+            {(data?.quickActions ?? []).map((action, index) => (
+              <Pressable key={action.id} style={styles.actionItem} onPress={() => go(action.href)}>
+                <View
+                  style={[
+                    styles.actionCircle,
+                    { backgroundColor: `${actionColors[index % actionColors.length]}22` },
+                  ]}
+                >
+                  <ActionIcon
+                    name={action.icon}
+                    color={actionColors[index % actionColors.length]}
+                  />
+                </View>
+                <Text style={styles.actionLabel} numberOfLines={2}>
+                  {action.label}
+                </Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={styles.section}>Priority Alerts</Text>
-          <View style={styles.card}>
-            {(data?.alerts ?? []).length === 0 ? (
-              <Text style={styles.muted}>No critical alerts right now.</Text>
-            ) : (
-              data?.alerts.map((alert) => (
-                <Pressable
-                  key={alert.id}
-                  style={styles.alertRow}
-                  onPress={() => {
-                    const href = alert.href.replace(/#.*$/, '') as Href;
-                    router.push(href);
-                  }}
-                >
-                  <Text style={styles.alertDot}>{severityDot[alert.severity] ?? '🔵'}</Text>
-                  <View style={styles.alertBody}>
-                    <Text
+          <View style={styles.twoCol}>
+            <View style={[styles.panel, styles.panelHalf]}>
+              <Text style={styles.panelTitle}>Important Alerts</Text>
+              {(data?.alerts ?? []).length === 0 ? (
+                <Text style={styles.muted}>No critical alerts right now.</Text>
+              ) : (
+                (data?.alerts ?? []).slice(0, 3).map((alert) => (
+                  <Pressable key={alert.id} style={styles.alertRow} onPress={() => go(alert.href)}>
+                    <View
                       style={[
-                        styles.alertTitle,
-                        { color: severityColor[alert.severity] ?? principalTheme.text },
+                        styles.alertIcon,
+                        {
+                          backgroundColor: `${severityColor[alert.severity] ?? principalTheme.info}18`,
+                        },
                       ]}
                     >
-                      {alert.title}
-                    </Text>
-                    {alert.count != null ? (
-                      <Text style={styles.muted}>Count: {alert.count}</Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-              ))
-            )}
-          </View>
+                      <Ionicons
+                        name={
+                          alert.severity === 'critical'
+                            ? 'alert-circle'
+                            : alert.severity === 'high'
+                              ? 'time'
+                              : 'information-circle'
+                        }
+                        size={16}
+                        color={severityColor[alert.severity] ?? principalTheme.info}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.alertTitle}>{alert.title}</Text>
+                      {alert.actionHint ? (
+                        <Text
+                          style={[
+                            styles.alertHint,
+                            {
+                              color: severityColor[alert.severity] ?? principalTheme.primaryAccent,
+                            },
+                          ]}
+                        >
+                          {alert.actionHint}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                ))
+              )}
+            </View>
 
-          <Text style={styles.section} nativeID="schedule">
-            Today&apos;s Schedule
-          </Text>
-          <View style={styles.card}>
-            {(data?.schedule ?? []).length === 0 ? (
-              <Text style={styles.muted}>No meetings or events scheduled nearby.</Text>
-            ) : (
-              data?.schedule.map((item, i) => (
-                <View key={`${item.dayGroup}-${i}`} style={styles.scheduleRow}>
-                  <View style={styles.scheduleMeta}>
-                    <Text style={styles.scheduleDay}>{item.dayGroup}</Text>
-                    <Text style={styles.scheduleTime}>{item.time}</Text>
-                  </View>
-                  <Text style={styles.scheduleLabel}>{item.label}</Text>
-                </View>
-              ))
-            )}
+            <View style={[styles.panel, styles.panelHalf]}>
+              <Text style={styles.panelTitle}>Recent Notices</Text>
+              {(data?.notices ?? []).length === 0 ? (
+                (data?.schedule ?? []).length === 0 ? (
+                  <Text style={styles.muted}>No recent notices.</Text>
+                ) : (
+                  (data?.schedule ?? []).slice(0, 3).map((item, i) => (
+                    <View key={`${item.label}-${i}`} style={styles.noticeRow}>
+                      <Text style={styles.noticeTitle} numberOfLines={2}>
+                        {item.label}
+                      </Text>
+                      <Text style={styles.noticeMeta}>
+                        {item.dayGroup} · {item.time}
+                      </Text>
+                    </View>
+                  ))
+                )
+              ) : (
+                (data?.notices ?? []).slice(0, 3).map((notice) => (
+                  <Pressable
+                    key={notice.id}
+                    style={styles.noticeRow}
+                    onPress={() => (notice.href ? go(notice.href) : undefined)}
+                  >
+                    <View style={styles.noticeHead}>
+                      <Text style={styles.noticeTitle} numberOfLines={2}>
+                        {notice.title}
+                      </Text>
+                      {notice.tag ? (
+                        <View style={styles.tag}>
+                          <Text style={styles.tagText}>{notice.tag}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.noticeMeta}>{notice.dateLabel}</Text>
+                  </Pressable>
+                ))
+              )}
+            </View>
           </View>
+        </View>
+      </ScrollView>
 
-          {(data?.intelligence.bullets?.length ?? 0) > 0 ? (
-            <>
-              <Text style={styles.section}>Executive Briefing</Text>
-              <View style={styles.card}>
-                {data?.intelligence.bullets.map((b, i) => (
-                  <Text key={`${i}-${b.slice(0, 12)}`} style={styles.bullet}>
-                    • {b}
-                  </Text>
-                ))}
-              </View>
-            </>
-          ) : null}
-        </ScrollView>
-      )}
-    </PrincipalScreenShell>
+      <Pressable
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
+        onPress={() => router.push('/(principal)/compose' as Href)}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 40, gap: 12 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  root: { flex: 1, backgroundColor: principalTheme.background },
+  boot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: principalTheme.background,
+  },
+  bootText: { color: principalTheme.textMuted, fontWeight: '600' },
   hero: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  heroTitles: { flex: 1 },
+  heroTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  heroSubtitle: { color: principalTheme.textOnHeroMuted, fontSize: 11, fontWeight: '600' },
+  heroIcons: { flexDirection: 'row', gap: 8 },
+  heroIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: principalTheme.urgent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  welcomeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  welcome: { color: principalTheme.textOnHeroMuted, fontSize: 13 },
+  welcomeName: { color: '#fff', fontWeight: '800' },
+  roleLine: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 },
+  collegeLine: { color: principalTheme.textOnHeroMuted, fontSize: 11, marginTop: 1 },
+  sheet: {
+    marginTop: -14,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  error: {
+    color: principalTheme.urgent,
+    backgroundColor: principalTheme.criticalBg,
+    padding: 10,
+    borderRadius: 10,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  kpiStrip: { gap: 10, paddingVertical: 4, paddingRight: 8 },
+  kpiCard: {
+    width: Math.min(148, SCREEN_W * 0.38),
     backgroundColor: principalTheme.surface,
     borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: principalTheme.border,
-    gap: 4,
-  },
-  salutation: { fontSize: 20, fontWeight: '800', color: principalTheme.text },
-  college: { fontSize: 14, fontWeight: '600', color: principalTheme.primaryAccent },
-  date: { fontSize: 12, color: principalTheme.textMuted },
-  section: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    color: principalTheme.textMuted,
-  },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  kpiCard: {
-    width: '48%',
-    flexGrow: 1,
-    backgroundColor: principalTheme.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: principalTheme.border,
     padding: 12,
+    borderWidth: 1,
+    borderColor: principalTheme.border,
     gap: 4,
   },
-  kpiValue: { fontSize: 18, fontWeight: '800', color: principalTheme.text },
+  kpiIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   kpiLabel: { fontSize: 11, color: principalTheme.textMuted, fontWeight: '600' },
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  actionChip: {
-    backgroundColor: principalTheme.primarySoft,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  actionText: { fontSize: 12, fontWeight: '700', color: principalTheme.primaryAccent },
-  card: {
+  kpiValue: { fontSize: 18, fontWeight: '800', color: principalTheme.text },
+  kpiHint: { fontSize: 10, color: principalTheme.accent, fontWeight: '600' },
+  twoCol: { gap: 10 },
+  panel: {
     backgroundColor: principalTheme.surface,
-    borderRadius: 14,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: principalTheme.border,
-    padding: 12,
     gap: 10,
   },
-  alertRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  alertDot: { fontSize: 14, marginTop: 2 },
-  alertBody: { flex: 1, gap: 2 },
-  alertTitle: { fontSize: 13, fontWeight: '700' },
-  scheduleRow: {
-    borderBottomWidth: 1,
+  panelHalf: { width: '100%' },
+  panelTitle: { fontSize: 14, fontWeight: '800', color: principalTheme.text },
+  ringWrap: { alignItems: 'center', paddingVertical: 4 },
+  ringOuter: {
+    width: 118,
+    height: 118,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringArc: {
+    position: 'absolute',
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    borderWidth: 10,
+  },
+  ringInner: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: principalTheme.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  ringValue: { fontSize: 18, fontWeight: '800', color: principalTheme.text },
+  ringCaption: {
+    fontSize: 9,
+    textAlign: 'center',
+    color: principalTheme.textMuted,
+    fontWeight: '600',
+    lineHeight: 12,
+  },
+  attRows: { gap: 6 },
+  attRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  attLabel: { fontSize: 12, color: principalTheme.textMuted, fontWeight: '600' },
+  attValue: { fontSize: 13, fontWeight: '800', color: principalTheme.accent },
+  link: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
+    color: principalTheme.primaryAccent,
+  },
+  academicGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  academicCell: {
+    width: '47%',
+    backgroundColor: principalTheme.primarySoft,
+    borderRadius: 12,
+    padding: 10,
+    gap: 2,
+  },
+  academicValue: { fontSize: 16, fontWeight: '800', color: principalTheme.text },
+  academicLabel: { fontSize: 11, fontWeight: '700', color: principalTheme.text },
+  academicHint: { fontSize: 10, color: principalTheme.textMuted },
+  sectionHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: principalTheme.text },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    backgroundColor: principalTheme.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: principalTheme.border,
+    padding: 12,
+  },
+  actionItem: { width: '30%', alignItems: 'center', gap: 6, marginBottom: 4 },
+  actionCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: 10,
+    textAlign: 'center',
+    fontWeight: '700',
+    color: principalTheme.text,
+  },
+  alertRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingVertical: 6 },
+  alertIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertTitle: { fontSize: 12, fontWeight: '700', color: principalTheme.text, lineHeight: 16 },
+  alertHint: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  noticeRow: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: principalTheme.border,
-    paddingBottom: 8,
     gap: 4,
   },
-  scheduleMeta: { flexDirection: 'row', justifyContent: 'space-between' },
-  scheduleDay: { fontSize: 11, fontWeight: '700', color: principalTheme.primaryAccent },
-  scheduleTime: { fontSize: 11, color: principalTheme.textSubtle, fontFamily: 'monospace' },
-  scheduleLabel: { fontSize: 13, fontWeight: '600', color: principalTheme.text },
-  bullet: { fontSize: 13, color: principalTheme.text, lineHeight: 20 },
-  muted: { fontSize: 13, color: principalTheme.textMuted },
-  error: { color: principalTheme.urgent, fontSize: 13 },
+  noticeHead: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  noticeTitle: { flex: 1, fontSize: 12, fontWeight: '700', color: principalTheme.text },
+  noticeMeta: { fontSize: 10, color: principalTheme.textMuted, fontWeight: '600' },
+  tag: {
+    backgroundColor: principalTheme.primarySoft,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  tagText: { fontSize: 9, fontWeight: '800', color: principalTheme.primaryAccent },
+  muted: { fontSize: 12, color: principalTheme.textMuted },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: principalTheme.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
 });

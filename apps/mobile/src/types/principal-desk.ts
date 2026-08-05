@@ -10,6 +10,7 @@ export type PrincipalMobileSummary = {
     semester: string | null;
     studentCount: number;
     staffCount: number;
+    name?: string | null;
   };
   overview: {
     studentsPresent: number;
@@ -18,9 +19,20 @@ export type PrincipalMobileSummary = {
     staffAbsent: number;
     admissionsToday: number;
     feeCollectionToday: number;
+    feeCollectionMonth?: number;
     pendingApprovals: number;
     unreadEmails: number;
     attendancePct: number | null;
+    studentsAttendancePct?: number | null;
+    staffAttendancePct?: number | null;
+    classesToday?: number;
+    departmentCount?: number;
+    programCount?: number;
+    subjectCount?: number;
+    semestersRunning?: number;
+    shiftCount?: number;
+    feeTrendPct?: number | null;
+    notificationCount?: number;
   };
   mail: {
     connected: boolean;
@@ -34,6 +46,7 @@ export type PrincipalMobileSummary = {
     severity: 'critical' | 'high' | 'medium' | 'low';
     href: string;
     count?: number;
+    actionHint?: string;
   }>;
   schedule: Array<{
     dayGroup: string;
@@ -41,7 +54,14 @@ export type PrincipalMobileSummary = {
     label: string;
     href: string;
   }>;
-  quickActions: Array<{ id: string; label: string; href: string }>;
+  notices?: Array<{
+    id: string;
+    title: string;
+    dateLabel: string;
+    tag?: string;
+    href?: string;
+  }>;
+  quickActions: Array<{ id: string; label: string; href: string; icon?: string }>;
   intelligence: { bullets: string[] };
   campusHealth: {
     score: number;
