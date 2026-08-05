@@ -8,7 +8,7 @@ export class PrincipalCommsSchedulerService {
 
   constructor(private readonly sync: PrincipalCommsSyncService) {}
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async pollMailboxes() {
     try {
       await this.sync.syncAllActiveAccounts();

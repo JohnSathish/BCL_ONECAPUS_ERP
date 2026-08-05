@@ -156,6 +156,12 @@ export class PrincipalMobileSummaryService {
 
     const quickActions = [
       {
+        id: 'student-lookup',
+        label: 'Find Student',
+        href: '/(principal)/student-lookup',
+        icon: 'search',
+      },
+      {
         id: 'notice',
         label: 'Create Notice',
         href: '/(principal)/compose',

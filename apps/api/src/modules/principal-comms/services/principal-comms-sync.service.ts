@@ -128,9 +128,10 @@ export class PrincipalCommsSyncService {
       accountId,
     );
     const accessToken = await this.auth.getValidAccessToken(account);
+    // Cron poll: recent inbox only (fast). Full sync (manual) keeps wide window.
     const queries = opts.full
       ? ['in:inbox newer_than:90d', 'in:sent newer_than:90d']
-      : ['in:inbox newer_than:7d', 'in:sent newer_than:7d'];
+      : ['in:inbox newer_than:2d is:unread', 'in:inbox newer_than:1d'];
 
     let imported = 0;
     let newCount = 0;
@@ -140,7 +141,7 @@ export class PrincipalCommsSyncService {
       do {
         const list = await this.gmail.listMessageIds(accessToken, {
           q,
-          maxResults: 50,
+          maxResults: opts.full ? 50 : 25,
           pageToken,
         });
         for (const row of list.messages ?? []) {
@@ -150,13 +151,17 @@ export class PrincipalCommsSyncService {
             ownerUserId,
             accessToken,
             row.id,
+            {
+              skipExisting: !opts.full,
+              googleEmail: account.googleEmail,
+            },
           );
           imported += 1;
           if (created) newCount += 1;
         }
         pageToken = list.nextPageToken;
         pages += 1;
-      } while (pageToken && pages < (opts.full ? 10 : 3));
+      } while (pageToken && pages < (opts.full ? 10 : 2));
     }
 
     await this.prisma.principalMailboxAccount.update({
@@ -173,6 +178,7 @@ export class PrincipalCommsSyncService {
     ownerUserId: string,
     accessToken: string,
     gmailMessageId: string,
+    opts: { skipExisting?: boolean; googleEmail?: string } = {},
   ): Promise<boolean> {
     const existing = await this.prisma.principalMailMessage.findUnique({
       where: {
@@ -180,6 +186,8 @@ export class PrincipalCommsSyncService {
       },
       select: { id: true },
     });
+    // Cron poll: skip known ids (notify only fires on create). Full sync refreshes bodies.
+    if (existing && opts.skipExisting) return false;
 
     const msg = await this.gmail.getMessage(
       accessToken,
@@ -282,6 +290,7 @@ export class PrincipalCommsSyncService {
           subject: saved.subject,
           from: saved.fromName || saved.fromAddress,
           category: saved.category,
+          googleEmail: opts.googleEmail,
         })
         .catch((err) =>
           this.logger.warn(`notify failed: ${(err as Error).message}`),

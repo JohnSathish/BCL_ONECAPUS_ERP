@@ -2,16 +2,25 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Award,
   BarChart3,
+  Bell,
   BookOpen,
+  Bot,
   Building2,
+  Bus,
   CalendarDays,
+  CalendarRange,
   ClipboardCheck,
   ClipboardList,
+  FileStack,
   FileText,
   GraduationCap,
   LayoutDashboard,
+  Library,
   Mail,
   Megaphone,
+  MessageSquareWarning,
+  School,
+  Settings,
   ScanLine,
   Users,
   Wallet,
@@ -26,19 +35,27 @@ export type PrincipalNavItem = {
   exact?: boolean;
   permission?: string;
   badgeKey?: PrincipalNavBadgeKey;
+  /** Soft-hide modules that are not rolled out for all campuses */
+  optional?: boolean;
 };
 
 export type PrincipalNavGroup = {
   id: string;
   label: string;
+  /** When false, section starts collapsed (desktop expanded sidebar). */
+  defaultExpanded?: boolean;
   items: PrincipalNavItem[];
 };
 
-/** Grouped Principal Desk nav — only routes that exist today. */
+/**
+ * Principal Desk sidebar IA (exact product order).
+ * Mail stays in Overview after Notifications — do not remove or relocate.
+ */
 export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
   {
-    id: 'executive',
-    label: 'Executive',
+    id: 'overview',
+    label: 'Overview',
+    defaultExpanded: true,
     items: [
       {
         href: '/principal-desk',
@@ -46,27 +63,66 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         icon: LayoutDashboard,
         exact: true,
       },
-    ],
-  },
-  {
-    id: 'students',
-    label: 'Student Management',
-    items: [
       {
-        href: '/principal-desk/student-lookup',
-        label: 'Student Lookup',
-        icon: ScanLine,
+        href: '/principal-desk/notifications',
+        label: 'Notifications',
+        icon: Bell,
+      },
+      {
+        href: '/principal-desk/communication-hub',
+        label: 'Mail',
+        icon: Mail,
+        permission: 'principal-comms:access',
+        badgeKey: 'unreadEmails',
       },
     ],
   },
   {
-    id: 'staff',
-    label: 'Staff Management',
+    id: 'people',
+    label: 'People',
+    defaultExpanded: true,
     items: [
       {
+        href: '/principal-desk/student-lookup',
+        label: 'Student Management',
+        icon: ScanLine,
+      },
+      {
         href: '/principal-desk/staff',
-        label: 'Staff Center',
+        label: 'Staff Management',
         icon: Users,
+      },
+    ],
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    defaultExpanded: true,
+    items: [
+      {
+        href: '/principal-desk/attendance',
+        label: 'Attendance Overview',
+        icon: ClipboardCheck,
+      },
+      {
+        href: '/principal-desk/fees',
+        label: 'Fee & Finance Summary',
+        icon: Wallet,
+      },
+      {
+        href: '/principal-desk/academic',
+        label: 'Academic Performance',
+        icon: BookOpen,
+      },
+      {
+        href: '/principal-desk/examinations',
+        label: 'Examination & Results',
+        icon: ClipboardList,
+      },
+      {
+        href: '/principal-desk/timetable',
+        label: 'Timetable',
+        icon: CalendarRange,
       },
       {
         href: '/principal-desk/leave',
@@ -74,78 +130,74 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         icon: CalendarDays,
         badgeKey: 'leavePending',
       },
-      {
-        href: '/principal-desk/attendance',
-        label: 'Attendance',
-        icon: ClipboardCheck,
-      },
     ],
   },
   {
-    id: 'academics',
-    label: 'Academics',
+    id: 'insights-comms',
+    label: 'Reports & Communication',
+    defaultExpanded: true,
     items: [
       {
-        href: '/principal-desk/academic',
-        label: 'Academic',
-        icon: BookOpen,
-      },
-      {
-        href: '/principal-desk/examinations',
-        label: 'Examinations',
-        icon: ClipboardList,
-      },
-      {
-        href: '/principal-desk/events',
-        label: 'Events',
-        icon: Megaphone,
-      },
-    ],
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    items: [
-      {
-        href: '/principal-desk/fees',
-        label: 'Fee Monitor',
-        icon: Wallet,
-      },
-    ],
-  },
-  {
-    id: 'communication',
-    label: 'Communication',
-    items: [
-      {
-        href: '/principal-desk/communication-hub',
-        label: 'Mail Center',
-        icon: Mail,
-        permission: 'principal-comms:access',
-        badgeKey: 'unreadEmails',
+        href: '/principal-desk/reports',
+        label: 'Reports & Analytics',
+        icon: GraduationCap,
       },
       {
         href: '/principal-desk/notices',
-        label: 'Notices',
-        icon: FileText,
+        label: 'Announcements',
+        icon: Megaphone,
+      },
+      {
+        href: '/principal-desk/events',
+        label: 'Events & Calendar',
+        icon: CalendarDays,
+      },
+      {
+        href: '/principal-desk/documents',
+        label: 'Documents & Circulars',
+        icon: FileStack,
+      },
+      {
+        href: '/principal-desk/grievances',
+        label: 'Complaints & Grievances',
+        icon: MessageSquareWarning,
       },
     ],
   },
   {
-    id: 'committees',
-    label: 'Committees',
+    id: 'campus',
+    label: 'Campus Services',
+    defaultExpanded: false,
     items: [
       {
-        href: '/principal-desk/committees',
-        label: 'Committee Activity',
-        icon: Building2,
+        href: '/principal-desk/transport',
+        label: 'Transport',
+        icon: Bus,
+        optional: true,
+      },
+      {
+        href: '/principal-desk/hostel',
+        label: 'Hostel',
+        icon: School,
+        optional: true,
+      },
+      {
+        href: '/principal-desk/library',
+        label: 'Library Overview',
+        icon: Library,
       },
     ],
   },
   {
-    id: 'analytics',
-    label: 'Analytics',
+    id: 'insights',
+    label: 'Intelligence',
+    defaultExpanded: false,
     items: [
+      {
+        href: '/principal-desk/ai-insights',
+        label: 'AI Insights / Principal Assistant',
+        icon: Bot,
+      },
       {
         href: '/principal-desk/health',
         label: 'Institutional Health',
@@ -157,9 +209,21 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         icon: Award,
       },
       {
-        href: '/principal-desk/reports',
-        label: 'Reports',
-        icon: GraduationCap,
+        href: '/principal-desk/committees',
+        label: 'Committees',
+        icon: Building2,
+      },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'System',
+    defaultExpanded: false,
+    items: [
+      {
+        href: '/principal-desk/settings',
+        label: 'Settings',
+        icon: Settings,
       },
     ],
   },

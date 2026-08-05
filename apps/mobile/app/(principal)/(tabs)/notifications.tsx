@@ -1,21 +1,29 @@
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { NotificationCenterPanel } from '@/components/notifications/notification-center-panel';
 import { PrincipalScreenShell } from '@/components/principal-portal/principal-screen-shell';
 import { principalTheme } from '@/components/principal-portal/theme';
 
 export default function PrincipalNotificationsScreen() {
   return (
-    <PrincipalScreenShell title="Notifications" subtitle="Institution alerts">
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.muted}>
-          Use the system notification center and Priority Alerts on Home. Dedicated notification
-          list will expand in a later release.
-        </Text>
-      </ScrollView>
+    <PrincipalScreenShell title="Notifications" subtitle="Mail · leave · campus alerts">
+      <View style={styles.root}>
+        <NotificationCenterPanel
+          role="staff"
+          theme={{
+            primary: principalTheme.primaryAccent,
+            surface: principalTheme.surface,
+            border: principalTheme.border,
+            text: principalTheme.text,
+            textMuted: principalTheme.textMuted,
+            textSubtle: principalTheme.textSubtle,
+            urgent: principalTheme.urgent,
+          }}
+        />
+      </View>
     </PrincipalScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
-  muted: { fontSize: 13, color: principalTheme.textMuted, lineHeight: 20 },
+  root: { flex: 1 },
 });

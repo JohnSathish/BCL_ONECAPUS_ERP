@@ -222,8 +222,17 @@ export default function DepartmentWorkloadPage() {
           </p>
           <h1 className="mt-2 text-2xl font-semibold">Department Workload Allocation</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Assign faculty and rooms to master slots for your department. Clash checks run on save.
-            Move draft rows through HOD and Academic Office approval before publish.
+            Assign faculty and rooms to master slots for your department&apos;s{' '}
+            <strong>Major / Minor</strong> papers. Clash checks run on save. Move draft rows through
+            HOD and Academic Office approval before publish. For{' '}
+            <strong>MDC / AEC / SEC / VAC / VTC</strong>, assign any-department faculty and slots on{' '}
+            <a
+              className="font-medium text-sky-800 underline-offset-2 hover:underline"
+              href="/admin/academics/elective-staff-allocation"
+            >
+              Elective Staff Allocation
+            </a>
+            .
           </p>
           <ol className="mt-4 max-w-3xl list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
             <li>Pick Odd/Even semester and the timetable plan for your shift.</li>

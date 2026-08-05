@@ -125,8 +125,10 @@ export default function PrincipalCommsSettingsPage() {
     >
       <div className="mx-auto max-w-3xl space-y-6">
         <p className="text-sm text-muted-foreground">
-          Connect your personal Google account or the Principal Office shared mailbox. Tokens are
-          encrypted server-side and never exposed to other roles.
+          You can connect multiple Gmail / Google Workspace accounts (for example college office and
+          personal) and switch between them in the Communication Hub inbox. Tokens are encrypted
+          server-side and never exposed to other roles. When adding another account, Google will ask
+          which Google identity to use.
         </p>
 
         {message ? (
@@ -188,7 +190,14 @@ export default function PrincipalCommsSettingsPage() {
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
                 >
                   <div>
-                    <p className="font-medium">{a.googleEmail}</p>
+                    <p className="font-medium">
+                      {a.googleEmail}
+                      {(a.unread ?? 0) > 0 ? (
+                        <span className="ml-2 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          {a.unread} unread
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-[11px] text-muted-foreground">
                       {a.accountLabel} · {a.status}
                       {a.lastSyncedAt

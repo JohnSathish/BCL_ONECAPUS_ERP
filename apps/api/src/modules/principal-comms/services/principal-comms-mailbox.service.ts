@@ -24,11 +24,30 @@ export class PrincipalCommsMailboxService {
     private readonly audit: PrincipalCommsAuditService,
   ) {}
 
-  async stats(tenantId: string, ownerUserId: string) {
-    const account = await this.prisma.principalMailboxAccount.findFirst({
-      where: { tenantId, ownerUserId, deletedAt: null, status: 'ACTIVE' },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listAccounts(tenantId: string, ownerUserId: string) {
+    const accounts = await this.auth.listAccounts(tenantId, ownerUserId);
+    return Promise.all(
+      accounts.map(async (account) => {
+        const unread = await this.prisma.principalMailMessage.count({
+          where: {
+            accountId: account.id,
+            deletedAt: null,
+            folder: 'INBOX',
+            isRead: false,
+          },
+        });
+        return { ...account, unread };
+      }),
+    );
+  }
+
+  async stats(tenantId: string, ownerUserId: string, accountId?: string) {
+    const account = accountId
+      ? await this.auth.requireOwnedAccount(tenantId, ownerUserId, accountId)
+      : await this.prisma.principalMailboxAccount.findFirst({
+          where: { tenantId, ownerUserId, deletedAt: null, status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
+        });
     if (!account) {
       return {
         connected: false,

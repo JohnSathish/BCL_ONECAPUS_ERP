@@ -68,7 +68,8 @@ export class PrincipalCommsGmailClient {
       response_type: 'code',
       scope: GMAIL_SCOPES,
       access_type: 'offline',
-      prompt: 'consent',
+      // consent = refresh_token; select_account = pick another Gmail when adding a 2nd mailbox
+      prompt: 'consent select_account',
       state,
       include_granted_scopes: 'true',
     });

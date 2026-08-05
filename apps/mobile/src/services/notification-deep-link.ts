@@ -118,6 +118,9 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   }
 
   // Principal Desk / Communication Hub — before generic staff leave matching
+  if (path.includes('/(principal)/mail/')) {
+    return path as Href;
+  }
   if (lower.includes('/principal-desk/communication-hub/messages/')) {
     const match = lower.match(/\/messages\/([a-z0-9-]+)/);
     if (match?.[1]) return `/(principal)/mail/${match[1]}` as Href;

@@ -23,6 +23,11 @@ import {
 } from '../../common/decorators/require-permissions.decorator';
 import { TimetableEngineService } from './timetable-engine.service';
 import { TeachingSubjectGroupService } from './teaching-subject-group.service';
+import { ElectiveStaffAllocationService } from './elective-staff-allocation.service';
+import {
+  AssignElectiveStaffDto,
+  ElectiveAllocationQueryDto,
+} from './dto/elective-staff-allocation.dto';
 import {
   CreateTeachingSubjectGroupDto,
   LinkTeachingSubjectGroupPaperDto,
@@ -39,6 +44,7 @@ export class TimetableEngineController {
   constructor(
     private readonly timetable: TimetableEngineService,
     private readonly subjectGroups: TeachingSubjectGroupService,
+    private readonly electiveAllocation: ElectiveStaffAllocationService,
   ) {}
 
   @Get('plans')
@@ -144,6 +150,78 @@ export class TimetableEngineController {
   )
   submitTeachingAllocations(@CurrentUser() user: JwtUser, @Body() dto: any) {
     return this.timetable.submitTeachingAllocations(user, dto);
+  }
+
+  @Get('elective-staff-allocation')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  listElectiveStaffAllocation(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ElectiveAllocationQueryDto,
+  ) {
+    return this.electiveAllocation.listRows(user, query);
+  }
+
+  @Get('elective-staff-allocation/faculty')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  listElectiveFaculty(
+    @CurrentUser() user: JwtUser,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    return this.electiveAllocation.listFacultyOptions(user, shiftId);
+  }
+
+  @Get('elective-staff-allocation/rooms')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  listElectiveRooms(@CurrentUser() user: JwtUser) {
+    return this.electiveAllocation.listRoomOptions(user);
+  }
+
+  @Get('elective-staff-allocation/slots')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  listElectiveSlots(
+    @CurrentUser() user: JwtUser,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    return this.electiveAllocation.listSlotOptions(user, shiftId);
+  }
+
+  @Get('elective-staff-allocation/departments')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  listElectiveDepartments(@CurrentUser() user: JwtUser) {
+    return this.electiveAllocation.listDepartments(user);
+  }
+
+  @Post('elective-staff-allocation/assign')
+  @RequireAnyPermission(
+    'shift:timetable:manage',
+    'academic:timetable:manage',
+    'staff:assign-subjects',
+  )
+  assignElectiveStaff(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: AssignElectiveStaffDto,
+  ) {
+    return this.electiveAllocation.assign(user, dto);
   }
 
   @Get('department-workload/plans')
