@@ -480,7 +480,7 @@ export class StaffProfileService {
       salaryStructure: staff.salaryStructure,
       portalUser: staff.portalUser,
       shiftAssignments: staff.shiftAssignments,
-      additionalRoles: staff.additionalRoles,
+      // Keep mapped { code, label } from directory — do not overwrite with Prisma shape.
       subjectAssignments: staff.subjectAssignments,
       offeringSections: staff.offeringSections,
       documents: staff.documents,
