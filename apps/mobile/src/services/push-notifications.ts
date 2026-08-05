@@ -5,7 +5,7 @@ import { Alert, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
-import { getAccessToken, getStoredAppType } from '@/auth/session';
+import { getAccessToken, getStoredAppType, getUserSnapshot } from '@/auth/session';
 import {
   resolveMobileDeepLink,
   fallbackNotificationCenter,
@@ -268,8 +268,23 @@ function scheduleStaffInboxRefresh(source: 'push-received' | 'push-tap') {
 }
 
 export function navigateFromPushLink(link?: string | null) {
-  void getStoredAppType().then((appType) => {
-    // Staff: always open Notifications tab on push tap (Comm Center broadcasts).
+  void (async () => {
+    const [appType, snapshot] = await Promise.all([getStoredAppType(), getUserSnapshot()]);
+    const isPrincipal = (snapshot?.permissions ?? []).includes('principal-mobile:access');
+
+    // Principal Command Center users share appType "staff" for device APIs, but must
+    // never be routed into Faculty Workspace on push tap.
+    if (isPrincipal) {
+      const href = resolveMobileDeepLink(link);
+      if (href && String(href).startsWith('/(principal)')) {
+        router.push(href as never);
+        return;
+      }
+      router.push('/(principal)/(tabs)/notifications' as never);
+      return;
+    }
+
+    // Faculty / other staff: always open Notifications tab on push tap.
     if (appType === 'staff') {
       router.push('/(staff)/(tabs)/notifications' as never);
       scheduleStaffInboxRefresh('push-tap');
@@ -281,7 +296,7 @@ export function navigateFromPushLink(link?: string | null) {
       return;
     }
     router.push(fallbackNotificationCenter('student') as never);
-  });
+  })();
 }
 
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
