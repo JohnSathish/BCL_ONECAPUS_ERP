@@ -71,6 +71,10 @@ function useDebouncedStaffSave<T extends Record<string, unknown>>(
   const [message, setMessage] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipInitial = useRef(true);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const pendingRef = useRef(false);
+
   const mut = useMutation({
     mutationFn: (payload: T) =>
       updateStaffProfileSection(
@@ -96,15 +100,46 @@ function useDebouncedStaffSave<T extends Record<string, unknown>>(
       skipInitial.current = false;
       return;
     }
+    pendingRef.current = true;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => mut.mutate(values), 1500);
+    timer.current = setTimeout(() => {
+      pendingRef.current = false;
+      mut.mutate(valuesRef.current);
+    }, 1500);
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      // Flush pending autosave when leaving the tab so HOD/roles are not lost.
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        void updateStaffProfileSection(
+          staffId,
+          sectionKey,
+          sectionKey === 'employment'
+            ? sanitizeEmploymentPayload(valuesRef.current)
+            : valuesRef.current,
+        )
+          .then((updated) => {
+            qc.setQueryData(['staff', staffId, 'profile'], updated);
+            void qc.invalidateQueries({ queryKey: ['staff', staffId, 'profile'] });
+          })
+          .catch(() => undefined);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(values), enabled]);
 
   return { saving: mut.isPending, message };
+}
+
+function additionalRoleCodesFromProfile(
+  roles: StaffProfile['additionalRoles'] | undefined,
+): string[] {
+  return (roles ?? [])
+    .map((r) => {
+      const raw = r as { code?: string; roleCode?: string };
+      return (raw.code ?? raw.roleCode)?.trim() ?? '';
+    })
+    .filter((code) => code.length > 0);
 }
 
 export function StaffBasicSection({
@@ -304,9 +339,7 @@ export function StaffEmploymentSection({
     primaryShiftId: profile.primaryShiftId ?? '',
     teachingShiftCategory: profile.teachingShiftCategory ?? 'DAY',
     additionalShiftIds: profile.additionalShiftIds ?? [],
-    additionalRoleCodes: (profile.additionalRoles ?? [])
-      .map((r) => r.code)
-      .filter((code): code is string => typeof code === 'string' && code.trim().length > 0),
+    additionalRoleCodes: additionalRoleCodesFromProfile(profile.additionalRoles),
     shortCode: profile.shortCode ?? '',
     joiningDate: profile.joiningDate?.slice(0, 10) ?? '',
     probationEndDate: profile.probationEndDate?.slice(0, 10) ?? '',
@@ -316,6 +349,29 @@ export function StaffEmploymentSection({
     lastWorkingDate: profile.lastWorkingDate?.slice(0, 10) ?? '',
     resignationReason: profile.resignationReason ?? '',
   });
+
+  useEffect(() => {
+    setForm((f) => ({
+      ...f,
+      staffType: profile.staffType,
+      employmentType: profile.employmentType,
+      status: profile.status,
+      departmentId: profile.departmentId ?? '',
+      designationId: profile.designationId ?? '',
+      primaryShiftId: profile.primaryShiftId ?? '',
+      teachingShiftCategory: profile.teachingShiftCategory ?? 'DAY',
+      additionalShiftIds: profile.additionalShiftIds ?? [],
+      additionalRoleCodes: additionalRoleCodesFromProfile(profile.additionalRoles),
+      shortCode: profile.shortCode ?? '',
+      joiningDate: profile.joiningDate?.slice(0, 10) ?? '',
+      probationEndDate: profile.probationEndDate?.slice(0, 10) ?? '',
+      confirmationDate: profile.confirmationDate?.slice(0, 10) ?? '',
+      relievingDate: profile.relievingDate?.slice(0, 10) ?? '',
+      retirementDate: profile.retirementDate?.slice(0, 10) ?? '',
+      lastWorkingDate: profile.lastWorkingDate?.slice(0, 10) ?? '',
+      resignationReason: profile.resignationReason ?? '',
+    }));
+  }, [profile.id, profile.updatedAt]);
 
   const designations = useQuery({
     queryKey: ['support-data', 'designations'],

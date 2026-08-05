@@ -219,6 +219,42 @@ export class StaffAdditionalRoleService {
       where: { id: departmentId, tenantId, deletedAt: null },
       data: { hodId: hodStaffId },
     });
+
+    // Public department pages only show HOD when showOnWebsite + ACTIVE.
+    if (hodStaffId) {
+      await this.prisma.staffProfile.updateMany({
+        where: { id: hodStaffId, tenantId, deletedAt: null },
+        data: { showOnWebsite: true },
+      });
+    }
+
+    await this.revalidateWebsiteDepartments(tenantId);
+  }
+
+  private async revalidateWebsiteDepartments(tenantId: string) {
+    const hook = process.env.WEBSITE_REVALIDATE_WEBHOOK_URL?.trim();
+    if (!hook) return;
+    try {
+      const secret =
+        process.env.WEBSITE_REVALIDATE_SECRET?.trim() ||
+        process.env.REVALIDATE_SECRET?.trim();
+      await fetch(hook, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(secret ? { 'x-revalidate-secret': secret } : {}),
+        },
+        body: JSON.stringify({
+          tenantId,
+          paths: ['/departments'],
+          tags: ['website-cms', 'website-departments'],
+          requestedAt: new Date().toISOString(),
+          reason: 'department_hod_changed',
+        }),
+      });
+    } catch {
+      // Non-blocking — HOD sync should succeed even if webhook is down.
+    }
   }
 
   private async assertStaff(tenantId: string, staffProfileId: string) {
