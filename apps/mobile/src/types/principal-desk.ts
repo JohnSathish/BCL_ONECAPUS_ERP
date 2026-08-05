@@ -4,6 +4,7 @@ export type PrincipalMobileSummary = {
     title: string;
     userName: string;
     dateLabel: string;
+    photoUrl?: string | null;
   };
   institution: {
     academicYear: string | null;

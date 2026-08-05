@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
 import { LeaveService } from '../../hr/services/leave.service';
 import { PrincipalCommsMailboxService } from '../../principal-comms/services/principal-comms-mailbox.service';
@@ -19,22 +20,24 @@ export class PrincipalMobileSummaryService {
   ) {}
 
   async getSummary(user: JwtUser) {
-    const [desk, mail, staffLeave, studentLeave, catalog] = await Promise.all([
-      this.dashboard.getDashboard(user),
-      this.mailbox.stats(user.tid, user.sub).catch(() => ({
-        connected: false,
-        unread: 0,
-        starred: 0,
-        today: 0,
-        university: 0,
-        government: 0,
-      })),
-      this.leave
-        .listApplications(user.tid, { status: 'PENDING' })
-        .catch(() => [] as unknown[]),
-      this.studentLeave.listPending(user.tid).catch(() => [] as unknown[]),
-      this.loadCatalogCounts(user.tid),
-    ]);
+    const [desk, mail, staffLeave, studentLeave, catalog, principalProfile] =
+      await Promise.all([
+        this.dashboard.getDashboard(user),
+        this.mailbox.stats(user.tid, user.sub).catch(() => ({
+          connected: false,
+          unread: 0,
+          starred: 0,
+          today: 0,
+          university: 0,
+          government: 0,
+        })),
+        this.leave
+          .listApplications(user.tid, { status: 'PENDING' })
+          .catch(() => [] as unknown[]),
+        this.studentLeave.listPending(user.tid).catch(() => [] as unknown[]),
+        this.loadCatalogCounts(user.tid),
+        this.resolvePrincipalProfile(user),
+      ]);
 
     const pendingApprovals = staffLeave.length + studentLeave.length;
     const admissionsAction = desk.actions?.find(
@@ -197,7 +200,9 @@ export class PrincipalMobileSummaryService {
           desk.greeting?.dayLabel ??
           'Good day',
         title: 'Principal',
-        userName: desk.greeting?.userName ?? 'Principal',
+        userName:
+          principalProfile.fullName || desk.greeting?.userName || 'Principal',
+        photoUrl: principalProfile.photoUrl,
         dateLabel: desk.greeting?.dateLabel ?? '',
       },
       institution: {
@@ -245,6 +250,44 @@ export class PrincipalMobileSummaryService {
         }),
       ]);
     return { departments, programs, courses, shifts, activeSemesters };
+  }
+
+  private async resolvePrincipalProfile(user: JwtUser): Promise<{
+    fullName: string | null;
+    photoUrl: string | null;
+  }> {
+    const portalUser = await this.prisma.user.findFirst({
+      where: { id: user.sub, tenantId: user.tid, deletedAt: null },
+      select: {
+        displayName: true,
+        email: true,
+        staffProfile: {
+          select: { fullName: true, photoUrl: true },
+        },
+      },
+    });
+
+    let fullName = portalUser?.staffProfile?.fullName?.trim() || null;
+    let photoUrl = toPublicUploadUrl(portalUser?.staffProfile?.photoUrl);
+
+    if ((!fullName || !photoUrl) && portalUser?.email) {
+      const byEmail = await this.prisma.staffProfile.findFirst({
+        where: {
+          tenantId: user.tid,
+          deletedAt: null,
+          email: { equals: portalUser.email, mode: 'insensitive' },
+        },
+        select: { fullName: true, photoUrl: true },
+      });
+      if (!fullName) fullName = byEmail?.fullName?.trim() || null;
+      if (!photoUrl) photoUrl = toPublicUploadUrl(byEmail?.photoUrl);
+    }
+
+    if (!fullName) {
+      fullName = portalUser?.displayName?.trim() || null;
+    }
+
+    return { fullName, photoUrl };
   }
 
   private sparklineTrendPct(sparkline: number[]) {
