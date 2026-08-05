@@ -279,7 +279,7 @@ async function loadTargetMaps(
       maxByProgram.set(code, { version: pv.version, id: pv.id });
     }
   }
-  for (const [code, v] of maxByProgram) {
+  for (const [code, v] of Array.from(maxByProgram.entries())) {
     programVersionsByKey.set(`${code}|*`, v.id);
   }
 
