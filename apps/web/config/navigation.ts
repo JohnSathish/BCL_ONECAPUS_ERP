@@ -593,12 +593,17 @@ export const ADMIN_NAV: NavGroup[] = [
           {
             label: 'Attendance',
             href: '/admin/staff/attendance',
-            permissions: ['staff:read', 'payroll:read'],
+            permissions: [
+              'staff:read',
+              'payroll:read',
+              'staff-attendance:view',
+              'staff-attendance:shift-admin',
+            ],
           },
           {
             label: 'Leave Management',
             href: '/admin/hr/leave',
-            permissions: ['staff:read', 'payroll:read'],
+            permissions: ['staff:read', 'payroll:read', 'staff-attendance:leave-admin'],
           },
           {
             label: 'Substitute Staff',
@@ -741,12 +746,12 @@ export const ADMIN_NAV: NavGroup[] = [
           {
             label: 'Shift Management',
             href: '/admin/shifts',
-            permissions: [...P.shifts, ...P.academics],
+            permissions: ['shift:manage'],
           },
           {
             label: 'Shift Faculty',
             href: '/admin/academics/shift-faculty',
-            permissions: ['shift:read', ...P.shifts, ...P.academics],
+            permissions: ['shift:read', ...P.academics],
           },
         ],
       },

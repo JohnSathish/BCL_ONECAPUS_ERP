@@ -187,6 +187,42 @@ export const SEED_PERMISSIONS: SeedPermission[] = [
     description: 'Bulk update NEP subject selections',
   },
   {
+    slug: 'student-attendance:view',
+    resource: 'student-attendance',
+    action: 'view',
+    description: 'View student attendance sessions and records',
+  },
+  {
+    slug: 'student-attendance:admin',
+    resource: 'student-attendance',
+    action: 'admin',
+    description: 'Administer student attendance for assigned scope',
+  },
+  {
+    slug: 'student-attendance:mark',
+    resource: 'student-attendance',
+    action: 'mark',
+    description: 'Mark student attendance',
+  },
+  {
+    slug: 'student-attendance:manage',
+    resource: 'student-attendance',
+    action: 'manage',
+    description: 'Manage student attendance configuration',
+  },
+  {
+    slug: 'student-attendance:reports',
+    resource: 'student-attendance',
+    action: 'reports',
+    description: 'View student attendance reports',
+  },
+  {
+    slug: 'student-attendance:correct',
+    resource: 'student-attendance',
+    action: 'correct',
+    description: 'Correct student attendance entries',
+  },
+  {
     slug: 'students:bulk-update:rollback',
     resource: 'students',
     action: 'bulk-update:rollback',

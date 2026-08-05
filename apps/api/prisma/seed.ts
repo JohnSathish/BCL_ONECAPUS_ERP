@@ -458,9 +458,8 @@ async function main() {
     'students:read',
     'reports:read',
   ]);
-  await upsertRole('shift-admin', 'Shift Admin', [
+  await upsertRole('shift-admin', 'Shift In-Charge (ERP)', [
     'shift:read',
-    'shift:manage',
     'shift:students:read',
     'shift:students:manage',
     'shift:timetable:manage',
@@ -470,6 +469,14 @@ async function main() {
     'students:read',
     'academic-engine:read',
     'reports:read',
+    'staff:read',
+    'staff-attendance:view',
+    'staff-attendance:shift-admin',
+    'staff-attendance:leave-admin',
+    'communication:read',
+    'communication:manage',
+    'student-attendance:view',
+    'student-attendance:admin',
   ]);
   await upsertRole('shift-academic-coordinator', 'Shift Academic Coordinator', [
     'shift:read',
