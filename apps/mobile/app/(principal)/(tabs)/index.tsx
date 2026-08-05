@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { principalTheme, severityColor } from '@/components/principal-portal/theme';
+import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { COLLEGE_NAME } from '@/constants/release';
 import { fetchPrincipalMobileSummary } from '@/services/principal-desk';
 import type { PrincipalMobileSummary } from '@/types/principal-desk';
@@ -104,6 +105,7 @@ export default function PrincipalHomeScreen() {
 
   const overview = data?.overview;
   const displayName = data?.greeting.userName || 'Principal';
+  const photoUrl = data?.greeting.photoUrl ?? null;
   const notifCount = overview?.notificationCount ?? overview?.unreadEmails ?? 0;
 
   const kpis = useMemo(() => {
@@ -233,16 +235,7 @@ export default function PrincipalHomeScreen() {
           </View>
 
           <View style={styles.welcomeRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {displayName
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((p) => p[0]?.toUpperCase() ?? '')
-                  .join('') || 'P'}
-              </Text>
-            </View>
+            <StudentAvatar name={displayName} photoUrl={photoUrl} size={48} style={styles.avatar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.welcome}>
                 Welcome back, <Text style={styles.welcomeName}>{displayName}</Text>
@@ -506,16 +499,10 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   welcomeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  avatarText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   welcome: { color: principalTheme.textOnHeroMuted, fontSize: 13 },
   welcomeName: { color: '#fff', fontWeight: '800' },
   roleLine: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 },

@@ -734,7 +734,7 @@ export class DashboardAnalyticsService {
     }
 
     const greeting = getDayPartGreeting(now);
-    const userName = user?.email?.split('@')[0] ?? 'Admin';
+    const userName = await this.resolveUserDisplayName(tenantId, user);
 
     const aiInsights: string[] = [];
     if (attendanceShortage > 0) {
@@ -1457,5 +1457,46 @@ export class DashboardAnalyticsService {
       label: e.label,
       value: Math.round(Number(e.value) * 0.42 * 100) / 100,
     }));
+  }
+
+  /** Prefer staff full name / user displayName over email local-part. */
+  private async resolveUserDisplayName(
+    tenantId: string,
+    user?: JwtUser | null,
+  ): Promise<string> {
+    if (!user?.sub) return 'Admin';
+    const row = await this.prisma.user.findFirst({
+      where: { id: user.sub, tenantId, deletedAt: null },
+      select: {
+        displayName: true,
+        email: true,
+        staffProfile: {
+          select: { fullName: true },
+        },
+      },
+    });
+    const staffName = row?.staffProfile?.fullName?.trim();
+    if (staffName) return staffName;
+
+    // Fallback: staff row linked by email (portal not attached yet)
+    if (row?.email) {
+      const byEmail = await this.prisma.staffProfile.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          email: { equals: row.email, mode: 'insensitive' },
+        },
+        select: { fullName: true },
+      });
+      if (byEmail?.fullName?.trim()) return byEmail.fullName.trim();
+    }
+
+    const display = row?.displayName?.trim();
+    if (display) return display;
+    const emailLocal = row?.email?.split('@')[0]?.trim();
+    if (emailLocal && emailLocal.toLowerCase() !== 'principal') {
+      return emailLocal;
+    }
+    return 'Principal';
   }
 }
