@@ -53,7 +53,7 @@ export const PORTAL_ROLE_OPTIONS = [
   { slug: 'staff', label: 'Staff (office)' },
   { slug: 'principal', label: 'Principal' },
   { slug: 'vice-principal', label: 'Vice Principal' },
-  { slug: 'shift', label: 'Shift In-charge' },
+  { slug: 'shift-admin', label: 'Shift In-Charge (ERP)' },
   { slug: 'librarian', label: 'Librarian' },
   { slug: 'accountant', label: 'Accountant' },
 ] as const;
