@@ -4776,8 +4776,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (!value) return null;
     const iso = parseFlexibleDate(value);
     if (!iso) return null;
-    const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? null : date;
+    const date = new Date(`${iso}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) return null;
+    const year = date.getUTCFullYear();
+    if (year < 1900 || year > new Date().getUTCFullYear() + 1) return null;
+    return date;
   }
 
   private parseResidenceType(hostelRaw: string) {

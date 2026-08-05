@@ -51,6 +51,17 @@ export function parseFlexibleDate(value: unknown): string | null {
   return null;
 }
 
+const MIN_YEAR = 1900;
+const MAX_YEAR_OFFSET = 1; // allow next calendar year (admission windows)
+
+function maxAllowedYear() {
+  return new Date().getUTCFullYear() + MAX_YEAR_OFFSET;
+}
+
+function isPlausibleYear(year: number) {
+  return Number.isInteger(year) && year >= MIN_YEAR && year <= maxAllowedYear();
+}
+
 /** Reject impossible calendar dates (e.g. month 13) that `new Date` cannot represent. */
 function toValidIsoDate(
   year: number,
@@ -61,6 +72,7 @@ function toValidIsoDate(
     !Number.isInteger(year) ||
     !Number.isInteger(month) ||
     !Number.isInteger(day) ||
+    !isPlausibleYear(year) ||
     month < 1 ||
     month > 12 ||
     day < 1 ||
@@ -79,9 +91,15 @@ function toValidIsoDate(
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function formatIsoDate(value: Date) {
+function formatIsoDate(value: Date): string | null {
   const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, '0');
-  const d = String(value.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const m = value.getMonth() + 1;
+  const d = value.getDate();
+  if (isPlausibleYear(y)) {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  // Excel serials are built with Date.UTC — fall back to UTC components.
+  const yUtc = value.getUTCFullYear();
+  if (!isPlausibleYear(yUtc)) return null;
+  return `${yUtc}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
 }
