@@ -54,6 +54,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(student)" />
         <Stack.Screen name="(staff)" />
+        <Stack.Screen name="(principal)" />
       </Stack>
     </SafeAreaProvider>
   );

@@ -28,7 +28,10 @@ export default function AuthSplashScreen() {
           await ensureDeviceId();
           const result = await bootstrapSession();
           const href = String(result.href);
-          const canOpenPush = href.startsWith('/(staff)') || href.startsWith('/(student)');
+          const canOpenPush =
+            href.startsWith('/(staff)') ||
+            href.startsWith('/(student)') ||
+            href.startsWith('/(principal)');
           // After session is ready: only honor a *fresh* notification tap.
           // Stale responses are ignored so normal opens land on Home with tabs.
           const openedFromPush = canOpenPush && (await consumeInitialPushResponse());

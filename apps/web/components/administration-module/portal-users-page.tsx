@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { AdminKpiStrip } from '@/components/administration-module/admin-kpi-strip';
 import { AdminPageHeader } from '@/components/administration-module/admin-page-header';
+import { PasswordResetSuccessDialog } from '@/components/administration-module/password-reset-success-dialog';
 import { PortalUserDrawer } from '@/components/administration-module/portal-user-drawer';
 import { PortalUsersBulkBar } from '@/components/administration-module/portal-users-bulk-bar';
 import { PortalUsersFilterRail } from '@/components/administration-module/portal-users-filter-rail';
@@ -48,6 +49,11 @@ export function PortalUsersPage() {
   const [filters, setFilters] = useState<PortalUserFilters>({ page: 1, limit: 25 });
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [passwordDialog, setPasswordDialog] = useState<{
+    open: boolean;
+    password: string | null;
+    user: PortalUserRow | null;
+  }>({ open: false, password: null, user: null });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawer, setDrawer] = useState<{
     open: boolean;
@@ -215,7 +221,12 @@ export function PortalUsersPage() {
                     ? { forceReset: true, resetToRoll: useRoll }
                     : { forceReset: true },
                 );
-                alert(`New password: ${res.generatedPassword ?? '(see audit log)'}`);
+                setPasswordDialog({
+                  open: true,
+                  password: res.generatedPassword ?? null,
+                  user: u,
+                });
+                invalidate();
               }}
               onForcePasswordReset={async (u) => {
                 await forcePortalUserPasswordReset(u.id);
@@ -231,7 +242,12 @@ export function PortalUsersPage() {
               }}
               onSendCredentials={async (u) => {
                 const res = await sendUserCredentials(u.id);
-                alert(`Credentials sent stub — password: ${res.generatedPassword ?? 'n/a'}`);
+                setPasswordDialog({
+                  open: true,
+                  password: res.generatedPassword ?? null,
+                  user: u,
+                });
+                invalidate();
               }}
               onImpersonate={(u) => impersonateMut.mutate(u.id)}
               canManage={canManageUsers}
@@ -294,6 +310,26 @@ export function PortalUsersPage() {
             if (drawer.mode === 'create') createMut.mutate(payload);
             else if (drawer.user) updateMut.mutate({ id: drawer.user.id, payload });
           }}
+        />
+
+        <PasswordResetSuccessDialog
+          open={passwordDialog.open}
+          password={passwordDialog.password}
+          userLabel={
+            passwordDialog.user?.displayName ||
+            passwordDialog.user?.name ||
+            passwordDialog.user?.email ||
+            null
+          }
+          email={passwordDialog.user?.email ?? null}
+          mobile={passwordDialog.user?.mobile ?? null}
+          onOpenChange={(open) =>
+            setPasswordDialog((prev) => ({
+              ...prev,
+              open,
+              ...(open ? {} : { password: null, user: null }),
+            }))
+          }
         />
 
         {(createMut.error || updateMut.error || impersonateMut.error) && (
