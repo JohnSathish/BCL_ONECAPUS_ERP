@@ -705,7 +705,7 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'academics',
         permissions: [...P.academics],
         activePattern:
-          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar|academics/shift-faculty)(?:/.*)?$',
+          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar|academics/shift-faculty|academics/elective-staff-allocation)(?:/.*)?$',
         children: [
           { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
           {
@@ -753,6 +753,16 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/academics/shift-faculty',
             permissions: ['shift:read', ...P.academics],
           },
+          {
+            label: 'Elective Staff Allocation',
+            href: '/admin/academics/elective-staff-allocation',
+            permissions: [
+              ...P.timetable,
+              'staff:assign-subjects',
+              'academic-engine:manage',
+              ...P.academics,
+            ],
+          },
         ],
       },
       {
@@ -783,7 +793,12 @@ export const ADMIN_NAV: NavGroup[] = [
           {
             label: 'Elective Staff Allocation',
             href: '/admin/academics/elective-staff-allocation',
-            permissions: [...P.timetable, 'staff:assign-subjects'],
+            permissions: [
+              ...P.timetable,
+              'staff:assign-subjects',
+              'academic-engine:manage',
+              ...P.academics,
+            ],
           },
           {
             label: 'Department Workload',
