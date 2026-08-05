@@ -12,6 +12,8 @@ import {
   REQUIRE_PERMISSIONS_KEY,
 } from '../decorators/require-permissions.decorator';
 
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+
 import type { JwtUser } from '../decorators/current-user.decorator';
 
 import { PermissionAuditService } from '../permissions/permission-audit.service';
@@ -30,6 +32,14 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
     const requiredAll = this.reflector.getAllAndOverride<string[]>(
       REQUIRE_PERMISSIONS_KEY,
 
