@@ -48,13 +48,13 @@ export class PrincipalCommsController {
   ) {}
 
   @Get('stats')
-  stats(@CurrentUser() user: JwtUser) {
-    return this.mailbox.stats(user.tid, user.sub);
+  stats(@CurrentUser() user: JwtUser, @Query('accountId') accountId?: string) {
+    return this.mailbox.stats(user.tid, user.sub, accountId);
   }
 
   @Get('accounts')
   listAccounts(@CurrentUser() user: JwtUser) {
-    return this.auth.listAccounts(user.tid, user.sub);
+    return this.mailbox.listAccounts(user.tid, user.sub);
   }
 
   @Post('accounts/oauth/start')

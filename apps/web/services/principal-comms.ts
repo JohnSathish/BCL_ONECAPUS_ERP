@@ -7,6 +7,7 @@ export type PrincipalMailboxAccount = {
   status: string;
   lastSyncedAt?: string | null;
   createdAt?: string;
+  unread?: number;
 };
 
 export type PrincipalMailListItem = {
@@ -52,8 +53,10 @@ export type PrincipalCommsStats = {
   government: number;
 };
 
-export async function fetchPrincipalCommsStats() {
-  const { data } = await api.get('/v1/principal-comms/stats');
+export async function fetchPrincipalCommsStats(accountId?: string) {
+  const { data } = await api.get('/v1/principal-comms/stats', {
+    params: accountId ? { accountId } : undefined,
+  });
   return data as PrincipalCommsStats;
 }
 

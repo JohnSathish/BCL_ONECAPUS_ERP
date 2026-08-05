@@ -1,0 +1,838 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import { PrismaService } from '../../database/prisma.service';
+import { TimetableAllocationService } from './timetable-allocation.service';
+
+export const ELECTIVE_FYUGP_CATEGORIES = [
+  'MDC',
+  'AEC',
+  'SEC',
+  'VAC',
+  'VTC',
+] as const;
+
+export type ElectiveFyugpCategory = (typeof ELECTIVE_FYUGP_CATEGORIES)[number];
+
+const DAY_NAMES = [
+  '',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+const FYUGP_SEMESTERS_BY_MODE: Record<'ODD' | 'EVEN', number[]> = {
+  ODD: [1, 3, 5],
+  EVEN: [2, 4, 6],
+};
+
+const DEFAULT_PERIODS: Array<{
+  periodNo: number;
+  label: string;
+  start: string;
+  end: string;
+}> = [
+  { periodNo: 1, label: 'Period 1', start: '09:00', end: '09:45' },
+  { periodNo: 2, label: 'Period 2', start: '09:45', end: '10:30' },
+  { periodNo: 3, label: 'Period 3', start: '10:45', end: '11:30' },
+  { periodNo: 4, label: 'Period 4', start: '11:30', end: '12:15' },
+  { periodNo: 5, label: 'Period 5', start: '13:00', end: '13:45' },
+  { periodNo: 6, label: 'Period 6', start: '13:45', end: '14:30' },
+  { periodNo: 7, label: 'Period 7', start: '14:45', end: '15:30' },
+  { periodNo: 8, label: 'Period 8', start: '15:30', end: '16:15' },
+];
+
+type ListFilters = {
+  academicYearId?: string;
+  shiftId?: string;
+  semesterMode?: string;
+  semesterSequence?: number;
+  category?: string;
+  q?: string;
+};
+
+export type AssignElectiveDto = {
+  courseOfferingId: string;
+  shiftId: string;
+  sectionCode?: string;
+  staffProfileId: string;
+  teachingDepartmentId?: string | null;
+  classroomId?: string | null;
+  capacity?: number | null;
+  workloadHours?: number | string | null;
+  dayOfWeek?: number | null;
+  periodNo?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  planId?: string | null;
+  timetablePlanEntryId?: string | null;
+  notes?: string | null;
+  academicYearId?: string | null;
+};
+
+@Injectable()
+export class ElectiveStaffAllocationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly allocations: TimetableAllocationService,
+  ) {}
+
+  async assertCanAssignElectives(user: JwtUser) {
+    const permissions = new Set(user.permissions ?? []);
+    if (
+      permissions.has('shift:timetable:manage') ||
+      permissions.has('academic:timetable:manage') ||
+      permissions.has('staff:assign-subjects')
+    ) {
+      return { isCentral: true as const, headedDepartmentIds: [] as string[] };
+    }
+    const headed = await this.allocations.departmentIdsForUser(
+      user.tid,
+      user.sub,
+    );
+    if (headed.length) {
+      return { isCentral: false as const, headedDepartmentIds: headed };
+    }
+    throw new ForbiddenException(
+      'Only Shift In-Charge, timetable managers, or HODs can assign elective faculty',
+    );
+  }
+
+  async listRows(user: JwtUser, filters: ListFilters = {}) {
+    await this.assertCanAssignElectives(user);
+    const semesterMode =
+      String(filters.semesterMode ?? 'ODD').toUpperCase() === 'EVEN'
+        ? 'EVEN'
+        : 'ODD';
+    const allowedSemesters = filters.semesterSequence
+      ? [filters.semesterSequence]
+      : FYUGP_SEMESTERS_BY_MODE[semesterMode];
+    const categoryFilter = this.normalizeCategory(filters.category);
+
+    const offerings = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        semesterSequence: { in: allowedSemesters },
+        OR: [
+          { category: { in: [...ELECTIVE_FYUGP_CATEGORIES] } },
+          {
+            categoryPoolId: { not: null },
+            categoryPool: {
+              categoryType: { in: [...ELECTIVE_FYUGP_CATEGORIES] },
+            },
+          },
+        ],
+      },
+      include: {
+        course: { include: { department: true } },
+        categoryPool: true,
+        programVersion: {
+          include: { program: { include: { department: true } } },
+        },
+        sections: {
+          where: {
+            tenantId: user.tid,
+            deletedAt: null,
+            status: { in: ['active', 'ACTIVE'] },
+            ...(filters.shiftId ? { shiftId: filters.shiftId } : {}),
+          },
+          include: {
+            shift: true,
+            classroom: true,
+            staffProfile: { include: { department: true } },
+          },
+          orderBy: { sectionCode: 'asc' },
+        },
+      },
+      orderBy: [
+        { semesterSequence: 'asc' },
+        { category: 'asc' },
+        { displayOrder: 'asc' },
+      ],
+      take: 500,
+    });
+
+    const sectionIds = offerings.flatMap((o) => o.sections.map((s) => s.id));
+    const planEntries = sectionIds.length
+      ? await this.prisma.timetablePlanEntry.findMany({
+          where: {
+            tenantId: user.tid,
+            offeringSectionId: { in: sectionIds },
+            deletedAt: null,
+            status: { not: 'CANCELLED' },
+            fyugpCategory: {
+              in: [...ELECTIVE_FYUGP_CATEGORIES],
+            },
+          },
+          orderBy: [{ dayOfWeek: 'asc' }, { periodNo: 'asc' }],
+        })
+      : [];
+    const entriesBySection = new Map<string, typeof planEntries>();
+    for (const entry of planEntries) {
+      if (!entry.offeringSectionId) continue;
+      const list = entriesBySection.get(entry.offeringSectionId) ?? [];
+      list.push(entry);
+      entriesBySection.set(entry.offeringSectionId, list);
+    }
+
+    const q = (filters.q ?? '').trim().toLowerCase();
+    const rows: Record<string, unknown>[] = [];
+
+    for (const offering of offerings) {
+      const category = this.resolveOfferingCategory(offering);
+      if (
+        !ELECTIVE_FYUGP_CATEGORIES.includes(category as ElectiveFyugpCategory)
+      ) {
+        continue;
+      }
+      if (categoryFilter && category !== categoryFilter) continue;
+
+      const course = offering.course;
+      const baseMeta = {
+        courseOfferingId: offering.id,
+        courseId: course.id,
+        subjectCode: course.code,
+        subjectName: course.title,
+        category,
+        semesterSequence: offering.semesterSequence,
+        homeDepartmentId: course.departmentId,
+        homeDepartment: course.department?.name ?? null,
+        poolName: offering.categoryPool?.name ?? null,
+        programme:
+          offering.programVersion?.program?.code ??
+          offering.programVersion?.program?.name ??
+          null,
+        weeklyHours:
+          Number(course.theoryHoursPerWeek ?? 0) ||
+          Number(course.credits ?? 0) ||
+          0,
+      };
+
+      if (!offering.sections.length) {
+        if (
+          q &&
+          !`${course.code} ${course.title} ${category}`
+            .toLowerCase()
+            .includes(q)
+        ) {
+          continue;
+        }
+        rows.push({
+          ...baseMeta,
+          id: `offering:${offering.id}`,
+          offeringSectionId: null,
+          sectionCode: null,
+          shiftId: filters.shiftId ?? null,
+          shift: null,
+          staffProfileId: null,
+          staffName: null,
+          staffCode: null,
+          staffDepartment: null,
+          classroomId: null,
+          classroom: null,
+          capacity: offering.capacity,
+          teachingDepartmentId: null,
+          slots: [],
+          status: 'UNASSIGNED',
+        });
+        continue;
+      }
+
+      for (const section of offering.sections) {
+        const rules = (section.reservationRules ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const slots = (entriesBySection.get(section.id) ?? []).map((entry) => ({
+          id: entry.id,
+          planId: entry.planId,
+          dayOfWeek: entry.dayOfWeek,
+          dayName: DAY_NAMES[entry.dayOfWeek] ?? `Day ${entry.dayOfWeek}`,
+          periodNo: entry.periodNo,
+          startTime: this.formatTime(entry.startTime),
+          endTime: this.formatTime(entry.endTime),
+          classroomId: entry.classroomId,
+          staffProfileId: entry.staffProfileId,
+        }));
+        if (
+          q &&
+          !`${course.code} ${course.title} ${category} ${section.sectionCode} ${section.staffProfile?.fullName ?? ''}`
+            .toLowerCase()
+            .includes(q)
+        ) {
+          continue;
+        }
+        rows.push({
+          ...baseMeta,
+          id: section.id,
+          offeringSectionId: section.id,
+          sectionCode: section.sectionCode,
+          shiftId: section.shiftId,
+          shift: section.shift?.name ?? null,
+          staffProfileId: section.staffProfileId,
+          staffName: section.staffProfile?.fullName ?? null,
+          staffCode: section.staffProfile?.employeeCode ?? null,
+          staffDepartment: section.staffProfile?.department?.name ?? null,
+          classroomId: section.classroomId,
+          classroom: section.classroom?.code ?? null,
+          capacity: section.capacity,
+          teachingDepartmentId:
+            (rules.teachingDepartmentId as string | undefined) ?? null,
+          slots,
+          status: section.staffProfileId
+            ? String(rules.allocationStatus ?? 'ASSIGNED')
+            : 'UNASSIGNED',
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  async listFacultyOptions(user: JwtUser, shiftId?: string) {
+    await this.assertCanAssignElectives(user);
+    const staff = await this.prisma.staffProfile.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        status: 'ACTIVE',
+        staffType: { in: ['TEACHING', 'teaching'] },
+      },
+      include: {
+        department: true,
+        workloads: true,
+        shiftAssignments: true,
+      },
+      orderBy: { fullName: 'asc' },
+      take: 500,
+    });
+    return staff
+      .filter((row) => {
+        if (!shiftId) return true;
+        return (
+          row.primaryShiftId === shiftId ||
+          row.shiftAssignments?.some((a) => a.shiftId === shiftId)
+        );
+      })
+      .map((row) => ({
+        id: row.id,
+        fullName: row.fullName,
+        employeeCode: row.employeeCode,
+        shortCode: row.shortCode,
+        departmentId: row.departmentId,
+        department: row.department?.name ?? null,
+        maxWeeklyHours: Number(row.workloads?.[0]?.weeklyHours ?? 24),
+      }));
+  }
+
+  async listRoomOptions(user: JwtUser) {
+    await this.assertCanAssignElectives(user);
+    const rooms = await this.prisma.classroom.findMany({
+      where: { tenantId: user.tid, deletedAt: null },
+      include: { roomType: true },
+      orderBy: { code: 'asc' },
+      take: 300,
+    });
+    return rooms.map((room) => ({
+      id: room.id,
+      code: room.code,
+      name: room.name,
+      capacity: room.capacity,
+      roomType: room.roomType?.name ?? null,
+    }));
+  }
+
+  async listSlotOptions(user: JwtUser, shiftId?: string) {
+    await this.assertCanAssignElectives(user);
+    const templates = await this.prisma.timetableSlotTemplate.findMany({
+      where: {
+        tenantId: user.tid,
+        ...(shiftId ? { shiftId } : {}),
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { periodNo: 'asc' }],
+      take: 200,
+    });
+    if (templates.length) {
+      const seen = new Set<string>();
+      return templates
+        .filter((t) => {
+          const key = `${t.dayOfWeek}-${t.periodNo}-${this.formatTime(t.startTime)}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((t) => ({
+          dayOfWeek: t.dayOfWeek,
+          dayName: DAY_NAMES[t.dayOfWeek] ?? `Day ${t.dayOfWeek}`,
+          periodNo: t.periodNo,
+          label: t.label,
+          startTime: this.formatTime(t.startTime),
+          endTime: this.formatTime(t.endTime),
+          slotTemplateId: t.id,
+        }));
+    }
+    const days = [1, 2, 3, 4, 5, 6];
+    return days.flatMap((dayOfWeek) =>
+      DEFAULT_PERIODS.map((p) => ({
+        dayOfWeek,
+        dayName: DAY_NAMES[dayOfWeek],
+        periodNo: p.periodNo,
+        label: p.label,
+        startTime: p.start,
+        endTime: p.end,
+        slotTemplateId: null as string | null,
+      })),
+    );
+  }
+
+  async listDepartments(user: JwtUser) {
+    await this.assertCanAssignElectives(user);
+    return this.prisma.department.findMany({
+      where: { tenantId: user.tid, deletedAt: null },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async assign(user: JwtUser, dto: AssignElectiveDto) {
+    await this.assertCanAssignElectives(user);
+    if (!dto.courseOfferingId?.trim()) {
+      throw new BadRequestException('courseOfferingId is required');
+    }
+    if (!dto.shiftId?.trim()) {
+      throw new BadRequestException('shiftId is required');
+    }
+    if (!dto.staffProfileId?.trim()) {
+      throw new BadRequestException('staffProfileId is required');
+    }
+
+    const offering = await this.prisma.courseOffering.findFirst({
+      where: {
+        tenantId: user.tid,
+        id: dto.courseOfferingId,
+        deletedAt: null,
+      },
+      include: {
+        course: true,
+        categoryPool: true,
+      },
+    });
+    if (!offering) throw new NotFoundException('Elective offering not found');
+    const category = this.resolveOfferingCategory(offering);
+    if (
+      !ELECTIVE_FYUGP_CATEGORIES.includes(category as ElectiveFyugpCategory)
+    ) {
+      throw new BadRequestException(
+        `Offering category ${category || '(empty)'} is not an elective (MDC/AEC/SEC/VAC/VTC)`,
+      );
+    }
+
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: {
+        tenantId: user.tid,
+        id: dto.staffProfileId,
+        deletedAt: null,
+        status: 'ACTIVE',
+      },
+    });
+    if (!staff) {
+      throw new BadRequestException('Invalid or inactive faculty selected');
+    }
+
+    const sectionCode = (dto.sectionCode ?? 'A').trim().toUpperCase() || 'A';
+    let section = await this.prisma.offeringSection.findFirst({
+      where: {
+        tenantId: user.tid,
+        courseOfferingId: offering.id,
+        shiftId: dto.shiftId,
+        sectionCode,
+        deletedAt: null,
+      },
+    });
+
+    if (!section) {
+      section = await this.prisma.offeringSection.create({
+        data: {
+          tenantId: user.tid,
+          courseOfferingId: offering.id,
+          shiftId: dto.shiftId,
+          sectionCode,
+          capacity: dto.capacity ?? offering.capacity ?? 40,
+          staffProfileId: dto.staffProfileId,
+          classroomId: dto.classroomId ?? null,
+          status: 'active',
+          reservationRules: {
+            teachingDepartmentId: dto.teachingDepartmentId ?? null,
+            allocationStatus: 'DRAFT',
+            notes: dto.notes ?? null,
+            electiveAllocation: true,
+          },
+        },
+      });
+    } else {
+      const rules = {
+        ...((section.reservationRules ?? {}) as object),
+        teachingDepartmentId: dto.teachingDepartmentId ?? null,
+        notes: dto.notes ?? null,
+        electiveAllocation: true,
+        allocationStatus: 'DRAFT',
+      };
+      section = await this.prisma.offeringSection.update({
+        where: { id: section.id },
+        data: {
+          capacity:
+            dto.capacity == null ? section.capacity : Number(dto.capacity),
+          classroomId:
+            dto.classroomId === undefined
+              ? section.classroomId
+              : dto.classroomId,
+          reservationRules: rules as object,
+        },
+      });
+    }
+
+    await this.allocations.saveRow(user.tid, {
+      offeringSectionId: section.id,
+      staffProfileId: dto.staffProfileId,
+      preferredRoomId: dto.classroomId ?? section.classroomId,
+      workloadHours: dto.workloadHours,
+      status: 'DRAFT',
+      notes: dto.notes,
+      academicYearId: dto.academicYearId ?? undefined,
+    });
+
+    let planEntry: {
+      id: string;
+      planId: string;
+      dayOfWeek: number;
+      periodNo: number | null;
+      startTime: Date;
+      endTime: Date;
+    } | null = null;
+    const conflicts: { type: string; message: string }[] = [];
+
+    const wantsSlot =
+      dto.dayOfWeek != null &&
+      (dto.periodNo != null || (dto.startTime && dto.endTime));
+
+    if (wantsSlot) {
+      const dayOfWeek = Number(dto.dayOfWeek);
+      if (dayOfWeek < 1 || dayOfWeek > 7) {
+        throw new BadRequestException('dayOfWeek must be 1–7 (Mon–Sun)');
+      }
+      const period =
+        dto.periodNo != null
+          ? DEFAULT_PERIODS.find((p) => p.periodNo === Number(dto.periodNo))
+          : null;
+      const startTime = this.parseTime(
+        dto.startTime ?? period?.start ?? '09:00',
+      );
+      const endTime = this.parseTime(dto.endTime ?? period?.end ?? '09:45');
+      const periodNo =
+        dto.periodNo != null
+          ? Number(dto.periodNo)
+          : (period?.periodNo ?? null);
+
+      const plan = await this.resolvePlan(
+        user,
+        dto.shiftId,
+        dto.planId,
+        dto.academicYearId,
+        offering.semesterSequence,
+      );
+
+      await this.ensureConflictFree(
+        user.tid,
+        {
+          excludeEntryId: dto.timetablePlanEntryId ?? undefined,
+          dayOfWeek,
+          periodNo,
+          startTime,
+          endTime,
+          staffProfileId: dto.staffProfileId,
+          classroomId: dto.classroomId ?? section.classroomId,
+        },
+        conflicts,
+      );
+      if (
+        conflicts.some(
+          (c) => c.type === 'FACULTY_CLASH' || c.type === 'ROOM_CLASH',
+        )
+      ) {
+        throw new BadRequestException({
+          message: conflicts.map((c) => c.message).join(' · '),
+          conflicts,
+        });
+      }
+
+      if (dto.timetablePlanEntryId) {
+        const existing = await this.prisma.timetablePlanEntry.findFirst({
+          where: {
+            tenantId: user.tid,
+            id: dto.timetablePlanEntryId,
+            deletedAt: null,
+          },
+        });
+        if (!existing) {
+          throw new NotFoundException('Timetable entry not found');
+        }
+        planEntry = await this.prisma.timetablePlanEntry.update({
+          where: { id: existing.id },
+          data: {
+            planId: plan.id,
+            shiftId: dto.shiftId,
+            dayOfWeek,
+            periodNo,
+            startTime,
+            endTime,
+            offeringSectionId: section.id,
+            courseOfferingId: offering.id,
+            courseId: offering.courseId,
+            staffProfileId: dto.staffProfileId,
+            classroomId: dto.classroomId ?? section.classroomId,
+            semesterSequence: offering.semesterSequence,
+            sectionCode: section.sectionCode,
+            fyugpCategory: category,
+            slotType: 'THEORY',
+            status: 'SCHEDULED',
+            source: 'MANUAL',
+            notes: dto.notes ?? existing.notes,
+            metadata: {
+              ...((existing.metadata ?? {}) as object),
+              electiveAllocation: true,
+              teachingDepartmentId: dto.teachingDepartmentId ?? null,
+              assignedById: user.sub,
+              assignedAt: new Date().toISOString(),
+            },
+          },
+        });
+      } else {
+        // Soft-replace prior elective slots for this section+day+period
+        await this.prisma.timetablePlanEntry.updateMany({
+          where: {
+            tenantId: user.tid,
+            offeringSectionId: section.id,
+            dayOfWeek,
+            ...(periodNo != null ? { periodNo } : {}),
+            deletedAt: null,
+            status: { not: 'CANCELLED' },
+          },
+          data: { deletedAt: new Date(), status: 'CANCELLED' },
+        });
+        planEntry = await this.prisma.timetablePlanEntry.create({
+          data: {
+            tenantId: user.tid,
+            planId: plan.id,
+            shiftId: dto.shiftId,
+            dayOfWeek,
+            periodNo,
+            startTime,
+            endTime,
+            offeringSectionId: section.id,
+            courseOfferingId: offering.id,
+            courseId: offering.courseId,
+            staffProfileId: dto.staffProfileId,
+            classroomId: dto.classroomId ?? section.classroomId,
+            semesterSequence: offering.semesterSequence,
+            sectionCode: section.sectionCode,
+            fyugpCategory: category,
+            slotType: 'THEORY',
+            status: 'SCHEDULED',
+            source: 'MANUAL',
+            notes: dto.notes ?? null,
+            metadata: {
+              electiveAllocation: true,
+              teachingDepartmentId: dto.teachingDepartmentId ?? null,
+              assignedById: user.sub,
+              assignedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    }
+
+    const rows = await this.listRows(user, {
+      shiftId: dto.shiftId,
+      semesterSequence: offering.semesterSequence ?? undefined,
+      category,
+    });
+    const row =
+      rows.find((r) => r.offeringSectionId === section!.id) ??
+      rows.find((r) => r.courseOfferingId === offering.id);
+
+    return {
+      row,
+      planEntry: planEntry
+        ? {
+            id: planEntry.id,
+            planId: planEntry.planId,
+            dayOfWeek: planEntry.dayOfWeek,
+            dayName: DAY_NAMES[planEntry.dayOfWeek],
+            periodNo: planEntry.periodNo,
+            startTime: this.formatTime(planEntry.startTime),
+            endTime: this.formatTime(planEntry.endTime),
+          }
+        : null,
+      conflicts,
+    };
+  }
+
+  private async resolvePlan(
+    user: JwtUser,
+    shiftId: string,
+    planId?: string | null,
+    academicYearId?: string | null,
+    semesterSequence?: number | null,
+  ) {
+    if (planId) {
+      const plan = await this.prisma.timetablePlan.findFirst({
+        where: { tenantId: user.tid, id: planId, deletedAt: null },
+      });
+      if (!plan) throw new NotFoundException('Timetable plan not found');
+      return plan;
+    }
+    const existing = await this.prisma.timetablePlan.findFirst({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        shiftId,
+        status: {
+          in: ['DRAFT', 'GENERATED', 'REVIEW', 'APPROVED', 'PUBLISHED'],
+        },
+        ...(academicYearId ? { academicYearId } : {}),
+      },
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+    });
+    if (existing) return existing;
+
+    return this.prisma.timetablePlan.create({
+      data: {
+        tenantId: user.tid,
+        shiftId,
+        academicYearId: academicYearId ?? undefined,
+        semesterSequence: semesterSequence ?? undefined,
+        name: 'Elective / Pool Timetable',
+        scopeType: 'SHIFT',
+        status: 'DRAFT',
+        approvalState: 'DRAFT',
+        metadata: {
+          electiveAllocationPlan: true,
+          createdById: user.sub,
+        },
+        createdById: user.sub,
+      },
+    });
+  }
+
+  private async ensureConflictFree(
+    tenantId: string,
+    input: {
+      excludeEntryId?: string;
+      dayOfWeek: number;
+      periodNo: number | null;
+      startTime: Date;
+      endTime: Date;
+      staffProfileId: string;
+      classroomId?: string | null;
+    },
+    sink: { type: string; message: string }[],
+  ) {
+    const facultyClash = await this.prisma.timetablePlanEntry.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        staffProfileId: input.staffProfileId,
+        dayOfWeek: input.dayOfWeek,
+        ...(input.excludeEntryId ? { id: { not: input.excludeEntryId } } : {}),
+        ...(input.periodNo != null
+          ? { periodNo: input.periodNo }
+          : {
+              startTime: { lt: input.endTime },
+              endTime: { gt: input.startTime },
+            }),
+      },
+      include: { plan: { select: { name: true } } },
+    });
+    if (facultyClash) {
+      sink.push({
+        type: 'FACULTY_CLASH',
+        message: `Faculty clash on ${DAY_NAMES[input.dayOfWeek]} period ${input.periodNo ?? ''} (${facultyClash.plan?.name ?? 'another plan'})`,
+      });
+    }
+
+    if (input.classroomId) {
+      const roomClash = await this.prisma.timetablePlanEntry.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+          classroomId: input.classroomId,
+          dayOfWeek: input.dayOfWeek,
+          ...(input.excludeEntryId
+            ? { id: { not: input.excludeEntryId } }
+            : {}),
+          ...(input.periodNo != null
+            ? { periodNo: input.periodNo }
+            : {
+                startTime: { lt: input.endTime },
+                endTime: { gt: input.startTime },
+              }),
+        },
+        include: { plan: { select: { name: true } } },
+      });
+      if (roomClash) {
+        sink.push({
+          type: 'ROOM_CLASH',
+          message: `Room clash on ${DAY_NAMES[input.dayOfWeek]} period ${input.periodNo ?? ''} (${roomClash.plan?.name ?? 'another plan'})`,
+        });
+      }
+    }
+  }
+
+  private resolveOfferingCategory(offering: {
+    category?: string | null;
+    categoryPool?: { categoryType?: string | null } | null;
+  }) {
+    return String(
+      offering.category ?? offering.categoryPool?.categoryType ?? '',
+    )
+      .trim()
+      .toUpperCase();
+  }
+
+  private normalizeCategory(value?: string) {
+    if (!value?.trim()) return null;
+    const cat = value.trim().toUpperCase();
+    return ELECTIVE_FYUGP_CATEGORIES.includes(cat as ElectiveFyugpCategory)
+      ? cat
+      : null;
+  }
+
+  private formatTime(value: Date | string | null | undefined) {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toISOString().slice(11, 16);
+  }
+
+  private parseTime(hhmm: string) {
+    const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(hhmm.trim());
+    if (!match) {
+      throw new BadRequestException(`Invalid time "${hhmm}" (use HH:mm)`);
+    }
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3] ?? 0);
+    return new Date(Date.UTC(1970, 0, 1, hours, minutes, seconds));
+  }
+}

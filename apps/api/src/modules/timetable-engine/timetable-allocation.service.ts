@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
+const ELECTIVE_FYUGP_CATEGORIES = ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'] as const;
+
 type AllocationFilters = {
   academicYearId?: string;
   streamId?: string;
@@ -28,6 +30,7 @@ type SaveAllocationDto = {
   labRequired?: boolean;
   status?: string;
   notes?: string | null;
+  academicYearId?: string | null;
 };
 
 const FYUGP_SEMESTERS_BY_MODE: Record<'ODD' | 'EVEN', number[]> = {
@@ -105,6 +108,7 @@ export class TimetableAllocationService {
         courseOffering: {
           include: {
             course: { include: { department: true } },
+            categoryPool: { select: { categoryType: true, name: true } },
             programVersion: {
               include: {
                 program: { include: { department: true } },
@@ -122,6 +126,7 @@ export class TimetableAllocationService {
 
     return sections
       .filter((section: any) => this.sectionMatchesStream(section, stream))
+      .filter((section: any) => !this.isElectiveCategory(section))
       .map((section: any) => this.toAllocationRow(section));
   }
 
@@ -530,6 +535,17 @@ export class TimetableAllocationService {
       .sort(
         (a, b) => b.score - a.score || a.fullName.localeCompare(b.fullName),
       )[0];
+  }
+
+  private isElectiveCategory(section: any) {
+    const category = String(
+      section?.courseOffering?.category ??
+        section?.courseOffering?.categoryPool?.categoryType ??
+        '',
+    )
+      .trim()
+      .toUpperCase();
+    return (ELECTIVE_FYUGP_CATEGORIES as readonly string[]).includes(category);
   }
 
   private sectionMatchesStream(section: any, stream: any) {

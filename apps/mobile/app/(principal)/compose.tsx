@@ -12,14 +12,21 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PrincipalScreenShell } from '@/components/principal-portal/principal-screen-shell';
 import { principalTheme } from '@/components/principal-portal/theme';
 import {
-  fetchPrincipalCommsStats,
+  fetchPrincipalMailboxAccounts,
   fetchPrincipalMessage,
+  getStoredMailboxAccountId,
   sendPrincipalMail,
+  setStoredMailboxAccountId,
+  type PrincipalMailboxAccount,
 } from '@/services/principal-comms';
 
 export default function PrincipalComposeScreen() {
   const router = useRouter();
-  const { replyTo } = useLocalSearchParams<{ replyTo?: string }>();
+  const { replyTo, accountId: accountIdParam } = useLocalSearchParams<{
+    replyTo?: string;
+    accountId?: string;
+  }>();
+  const [accounts, setAccounts] = useState<PrincipalMailboxAccount[]>([]);
   const [accountId, setAccountId] = useState('');
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -27,11 +34,24 @@ export default function PrincipalComposeScreen() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const fromEmail = accounts.find((a) => a.id === accountId)?.googleEmail;
+
   useEffect(() => {
     void (async () => {
       try {
-        const stats = await fetchPrincipalCommsStats();
-        if (stats.accountId) setAccountId(stats.accountId);
+        const [list, stored] = await Promise.all([
+          fetchPrincipalMailboxAccounts(),
+          getStoredMailboxAccountId(),
+        ]);
+        const active = (list ?? []).filter((a) => a.status === 'ACTIVE');
+        setAccounts(active);
+        const preferred =
+          (typeof accountIdParam === 'string' && accountIdParam) || stored || active[0]?.id || '';
+        const resolved =
+          preferred && active.some((a) => a.id === preferred) ? preferred : active[0]?.id || '';
+        setAccountId(resolved);
+        if (resolved) await setStoredMailboxAccountId(resolved);
+
         if (replyTo) {
           const msg = await fetchPrincipalMessage(replyTo);
           setTo(msg.fromAddress || '');
@@ -39,6 +59,10 @@ export default function PrincipalComposeScreen() {
           setBody(
             `\n\n---\nOn ${msg.receivedAt}, ${msg.fromName || msg.fromAddress} wrote:\n${msg.bodyText || msg.snippet}`,
           );
+          if (msg.account?.id) {
+            setAccountId(msg.account.id);
+            await setStoredMailboxAccountId(msg.account.id);
+          }
         }
       } catch (e) {
         Alert.alert('Compose unavailable', e instanceof Error ? e.message : 'Try again');
@@ -46,7 +70,7 @@ export default function PrincipalComposeScreen() {
         setLoading(false);
       }
     })();
-  }, [replyTo]);
+  }, [accountIdParam, replyTo]);
 
   async function send() {
     if (!accountId) {
@@ -84,7 +108,7 @@ export default function PrincipalComposeScreen() {
   return (
     <PrincipalScreenShell
       title={replyTo ? 'Reply' : 'Compose'}
-      subtitle="Principal Mail"
+      subtitle={fromEmail ?? 'Principal Mail'}
       rightSlot={
         <Pressable onPress={() => router.back()}>
           <Text style={styles.back}>Close</Text>
@@ -97,6 +121,32 @@ export default function PrincipalComposeScreen() {
         </View>
       ) : (
         <View style={styles.form}>
+          {accounts.length > 1 ? (
+            <View style={styles.fromRow}>
+              <Text style={styles.fromLabel}>From</Text>
+              <View style={styles.fromChips}>
+                {accounts.map((a) => (
+                  <Pressable
+                    key={a.id}
+                    style={[styles.fromChip, a.id === accountId && styles.fromChipActive]}
+                    onPress={() => {
+                      setAccountId(a.id);
+                      void setStoredMailboxAccountId(a.id);
+                    }}
+                  >
+                    <Text
+                      style={[styles.fromChipText, a.id === accountId && styles.fromChipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {a.googleEmail}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : fromEmail ? (
+            <Text style={styles.singleFrom}>From: {fromEmail}</Text>
+          ) : null}
           <TextInput
             style={styles.input}
             placeholder="To (comma-separated)"
@@ -133,6 +183,25 @@ export default function PrincipalComposeScreen() {
 const styles = StyleSheet.create({
   form: { flex: 1, padding: 16, gap: 10 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  fromRow: { gap: 6 },
+  fromLabel: { fontSize: 12, fontWeight: '700', color: principalTheme.textMuted },
+  fromChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fromChip: {
+    maxWidth: '100%',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: principalTheme.border,
+    backgroundColor: principalTheme.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  fromChipActive: {
+    borderColor: principalTheme.primaryAccent,
+    backgroundColor: principalTheme.primarySoft,
+  },
+  fromChipText: { fontSize: 12, color: principalTheme.textMuted, fontWeight: '600' },
+  fromChipTextActive: { color: principalTheme.primaryAccent, fontWeight: '800' },
+  singleFrom: { fontSize: 12, color: principalTheme.textMuted, fontWeight: '600' },
   input: {
     backgroundColor: principalTheme.surface,
     borderWidth: 1,

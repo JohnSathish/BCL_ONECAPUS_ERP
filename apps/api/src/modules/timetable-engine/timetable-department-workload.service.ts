@@ -19,6 +19,8 @@ const DAY_NAMES = [
   'Sunday',
 ];
 
+const ELECTIVE_FYUGP_CATEGORIES = new Set(['MDC', 'AEC', 'SEC', 'VAC', 'VTC']);
+
 const FYUGP_SEMESTERS_BY_MODE: Record<'ODD' | 'EVEN', number[]> = {
   ODD: [1, 3, 5],
   EVEN: [2, 4, 6],
@@ -332,7 +334,12 @@ export class TimetableDepartmentWorkloadService {
       return { entry, course, section, dept, departmentId, group };
     });
 
-    const filtered = enriched.filter(({ departmentId }) => {
+    const filtered = enriched.filter(({ departmentId, entry, group }) => {
+      const category = String(
+        entry.fyugpCategory ?? group?.fyugpCategory ?? '',
+      ).toUpperCase();
+      // Electives are managed on Elective Staff Allocation (cross-dept).
+      if (ELECTIVE_FYUGP_CATEGORIES.has(category)) return false;
       if (isCentral && !departmentIds.length) return true;
       if (!departmentId) return isCentral;
       return departmentIds.includes(departmentId);

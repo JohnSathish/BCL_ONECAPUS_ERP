@@ -1,8 +1,19 @@
 import { apiFetch } from '@/api/client';
-import type { PrincipalLeaveQueue, PrincipalMobileSummary } from '@/types/principal-desk';
+import type {
+  PrincipalLeaveQueue,
+  PrincipalMobileSummary,
+  StudentCommandCard,
+} from '@/types/principal-desk';
 
 export function fetchPrincipalMobileSummary() {
   return apiFetch<PrincipalMobileSummary>('/v1/principal-desk/mobile/summary');
+}
+
+export function fetchStudentCommand(q: string) {
+  const query = q.trim();
+  return apiFetch<StudentCommandCard>(
+    `/v1/principal-desk/student-command?q=${encodeURIComponent(query)}`,
+  );
 }
 
 export function fetchPrincipalLeaveQueue(type: 'staff' | 'student' | 'all' = 'all') {

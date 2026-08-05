@@ -116,4 +116,63 @@ export type PrincipalMailMessage = PrincipalMailListItem & {
     mimeType: string;
     sizeBytes: number;
   }>;
+  account?: { id: string; googleEmail: string };
+};
+
+export type StudentCommandCard = {
+  studentId: string;
+  basic: {
+    photoUrl?: string | null;
+    fullName: string;
+    enrollmentNumber: string;
+    rollNumber?: string | null;
+    abcId?: string | null;
+    rfidNumber?: string | null;
+    mobile?: string | null;
+    email?: string | null;
+  };
+  academic: {
+    programme?: string | null;
+    department?: string | null;
+    semester?: number | null;
+    batch?: string | null;
+    majorSubject?: string | null;
+    status: string;
+    statusLabel: string;
+  };
+  attendance: {
+    percentage: number | null;
+    band: 'green' | 'orange' | 'red' | 'neutral';
+    classesAttended: number;
+    classesConducted: number;
+  };
+  admitCard: {
+    eligible: boolean;
+    reasons: string[];
+    attendancePercent: number | null;
+    outstandingAmount: number;
+  };
+  fees: {
+    outstandingAmount: number;
+  };
+  library: {
+    booksIssued: number;
+    booksReturned: number;
+    booksCurrentlyHeld: number;
+    dueBooks: number;
+    fineAmount: number;
+  };
+  examination: {
+    internalMarksRecorded: number;
+    assignmentsPending: number;
+    examinationEligible: boolean;
+    backlogs: number;
+  };
+  hostel: {
+    isHosteller: boolean;
+    block?: string | null;
+    room?: string | null;
+    warden?: string | null;
+  };
+  scannedAt: string;
 };

@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
+  ChevronDown,
   FileText,
   Inbox,
   Mail,
   Paperclip,
+  Plus,
   RefreshCw,
   Send,
   Settings,
@@ -20,17 +22,20 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import {
   downloadPrincipalAttachment,
+  fetchPrincipalMailboxAccounts,
   fetchPrincipalMessage,
   fetchPrincipalMessages,
   principalMessageAction,
   sendPrincipalMail,
   syncPrincipalMailbox,
+  type PrincipalMailboxAccount,
   type PrincipalMailListItem,
   type PrincipalMailMessage,
 } from '@/services/principal-comms';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { formatDisplayDateTime } from '@/utils/format-date';
+import { extractLinkedFilesFromMailBody, stripLinkedFileMarkup } from '@/utils/mail-body-links';
 
 const FOLDERS = [
   { key: 'INBOX', label: 'Inbox', icon: Inbox },
@@ -42,8 +47,36 @@ const FOLDERS = [
   { key: 'TRASH', label: 'Trash', icon: Trash2 },
 ] as const;
 
+const ACTIVE_ACCOUNT_KEY = 'principal-comms-active-account-id';
+
 function hasPrincipalComms(permissions: string[] = []) {
   return permissions.includes('principal-comms:access');
+}
+
+function readStoredAccountId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(ACTIVE_ACCOUNT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeAccountId(id: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (id) localStorage.setItem(ACTIVE_ACCOUNT_KEY, id);
+    else localStorage.removeItem(ACTIVE_ACCOUNT_KEY);
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function resolveActiveAccountId(accounts: PrincipalMailboxAccount[], preferredId: string | null) {
+  const active = accounts.filter((a) => a.status === 'ACTIVE');
+  if (!active.length) return null;
+  if (preferredId && active.some((a) => a.id === preferredId)) return preferredId;
+  return active[0]!.id;
 }
 
 export function PrincipalCommunicationHub({
@@ -62,15 +95,41 @@ export function PrincipalCommunicationHub({
   const [selectedId, setSelectedId] = useState<string | null>(initialMessageId ?? null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [error, setError] = useState('');
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     if (initialMessageId) setSelectedId(initialMessageId);
   }, [initialMessageId]);
 
-  const listQuery = useQuery({
-    queryKey: ['principal-comms', 'messages', folder, q],
-    queryFn: () => fetchPrincipalMessages({ folder, q: q || undefined, take: 40 }),
+  const accountsQuery = useQuery({
+    queryKey: ['principal-comms', 'accounts'],
+    queryFn: fetchPrincipalMailboxAccounts,
     enabled: canAccess,
+  });
+
+  const accounts = useMemo(
+    () => (accountsQuery.data ?? []).filter((a) => a.status === 'ACTIVE'),
+    [accountsQuery.data],
+  );
+
+  useEffect(() => {
+    if (!accountsQuery.isSuccess) return;
+    const next = resolveActiveAccountId(accounts, readStoredAccountId());
+    setAccountId(next);
+    storeAccountId(next);
+  }, [accounts, accountsQuery.isSuccess]);
+
+  const listQuery = useQuery({
+    queryKey: ['principal-comms', 'messages', accountId, folder, q],
+    queryFn: () =>
+      fetchPrincipalMessages({
+        folder,
+        q: q || undefined,
+        take: 40,
+        accountId: accountId ?? undefined,
+      }),
+    enabled: canAccess && Boolean(accountId),
   });
 
   const messageQuery = useQuery({
@@ -80,7 +139,7 @@ export function PrincipalCommunicationHub({
   });
 
   const syncMut = useMutation({
-    mutationFn: () => syncPrincipalMailbox({ full: false }),
+    mutationFn: () => syncPrincipalMailbox({ accountId: accountId ?? undefined, full: false }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['principal-comms'] });
     },
@@ -99,8 +158,16 @@ export function PrincipalCommunicationHub({
   });
 
   const items = listQuery.data?.items ?? [];
-  const account = listQuery.data?.account;
   const message = messageQuery.data;
+  const account = accounts.find((a) => a.id === accountId) ?? listQuery.data?.account ?? null;
+
+  function switchAccount(id: string) {
+    setAccountId(id);
+    storeAccountId(id);
+    setSelectedId(null);
+    setAccountMenuOpen(false);
+    setError('');
+  }
 
   if (!canAccess) {
     return (
@@ -114,9 +181,67 @@ export function PrincipalCommunicationHub({
   return (
     <div className="flex min-h-[70vh] flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Mailbox — {account?.googleEmail ?? 'not connected'}
-        </p>
+        <div className="relative">
+          <button
+            type="button"
+            disabled={!accounts.length}
+            onClick={() => setAccountMenuOpen((v) => !v)}
+            className={cn(
+              'inline-flex max-w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-left text-sm hover:bg-muted/50',
+              !accounts.length && 'opacity-60',
+            )}
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 truncate">
+              {account?.googleEmail ?? 'No mailbox connected'}
+            </span>
+            {account?.unread ? (
+              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                {account.unread}
+              </span>
+            ) : null}
+            {accounts.length > 1 ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : null}
+          </button>
+          {accountMenuOpen && accounts.length > 0 ? (
+            <div className="absolute left-0 z-20 mt-1 w-72 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+              <p className="border-b border-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Switch mailbox
+              </p>
+              <ul className="max-h-64 overflow-y-auto py-1">
+                {accounts.map((a) => (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => switchAccount(a.id)}
+                      className={cn(
+                        'flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60',
+                        a.id === accountId && 'bg-primary/5',
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{a.googleEmail}</p>
+                        <p className="text-[11px] text-muted-foreground">{a.accountLabel}</p>
+                      </div>
+                      {(a.unread ?? 0) > 0 ? (
+                        <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+                          {a.unread}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/principal-desk/communication-hub/settings"
+                className="flex items-center gap-2 border-t border-border px-3 py-2.5 text-xs font-medium text-primary hover:bg-muted/40"
+                onClick={() => setAccountMenuOpen(false)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add another Google account
+              </Link>
+            </div>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -237,6 +362,7 @@ export function PrincipalCommunicationHub({
       {composeOpen && account ? (
         <ComposeModal
           accountId={account.id}
+          fromEmail={account.googleEmail}
           replyTo={message ?? null}
           onClose={() => setComposeOpen(false)}
           onSent={async () => {
@@ -302,6 +428,28 @@ function MessagePane({
     [message.toAddresses],
   );
 
+  const bodySource = useMemo(() => {
+    return [message.bodyText, message.bodyHtml, message.snippet].filter(Boolean).join('\n');
+  }, [message.bodyHtml, message.bodyText, message.snippet]);
+
+  const linkedFiles = useMemo(() => extractLinkedFilesFromMailBody(bodySource), [bodySource]);
+
+  const plainBody = useMemo(() => {
+    const primary =
+      message.bodyText?.trim() ||
+      (message.bodyHtml
+        ? message.bodyHtml
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        : '') ||
+      message.snippet ||
+      '';
+    return stripLinkedFileMarkup(primary);
+  }, [message.bodyHtml, message.bodyText, message.snippet]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap gap-1 border-b border-border p-2">
@@ -336,31 +484,49 @@ function MessagePane({
           {formatDisplayDateTime(message.receivedAt)} · {message.category}
         </p>
       </div>
-      {message.attachments?.length ? (
-        <div className="flex flex-wrap gap-2 border-b border-border px-4 py-2">
-          {message.attachments.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
-              onClick={async () => {
-                const file = await downloadPrincipalAttachment(a.id);
-                const bin = atob(file.dataBase64Url.replace(/-/g, '+').replace(/_/g, '/'));
-                const bytes = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-                const blob = new Blob([bytes], { type: file.mimeType });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = file.filename;
-                link.click();
-                URL.revokeObjectURL(url);
-              }}
-            >
-              <Paperclip className="mr-1 inline h-3 w-3" />
-              {a.filename}
-            </button>
-          ))}
+      {message.attachments?.length || linkedFiles.length ? (
+        <div className="space-y-2 border-b border-border px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Attachments
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(message.attachments ?? []).map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium hover:border-primary/40 hover:bg-primary/5"
+                onClick={async () => {
+                  const file = await downloadPrincipalAttachment(a.id);
+                  const bin = atob(file.dataBase64Url.replace(/-/g, '+').replace(/_/g, '/'));
+                  const bytes = new Uint8Array(bin.length);
+                  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+                  const blob = new Blob([bytes], { type: file.mimeType });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = file.filename || a.filename;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                {a.filename}
+              </button>
+            ))}
+            {linkedFiles.map((f) => (
+              <a
+                key={f.url}
+                href={f.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[12px] font-medium text-sky-900 hover:border-sky-400 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-100"
+              >
+                <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                {f.label}
+                <span className="text-[10px] font-normal opacity-70">Open</span>
+              </a>
+            ))}
+          </div>
         </div>
       ) : null}
       <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">
@@ -372,7 +538,7 @@ function MessagePane({
           />
         ) : (
           <pre className="whitespace-pre-wrap font-sans text-sm">
-            {message.bodyText || message.snippet}
+            {plainBody || message.snippet}
           </pre>
         )}
       </div>
@@ -382,11 +548,13 @@ function MessagePane({
 
 function ComposeModal({
   accountId,
+  fromEmail,
   replyTo,
   onClose,
   onSent,
 }: {
   accountId: string;
+  fromEmail: string;
   replyTo: PrincipalMailMessage | null;
   onClose: () => void;
   onSent: () => void;
@@ -429,7 +597,10 @@ function ComposeModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="w-full max-w-xl rounded-xl border border-border bg-background p-4 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold">{replyTo ? 'Reply' : 'Compose'}</h3>
+          <div>
+            <h3 className="font-semibold">{replyTo ? 'Reply' : 'Compose'}</h3>
+            <p className="text-[11px] text-muted-foreground">From: {fromEmail}</p>
+          </div>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             Close
           </Button>

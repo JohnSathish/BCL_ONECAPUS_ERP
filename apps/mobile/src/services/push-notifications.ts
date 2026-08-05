@@ -183,8 +183,16 @@ export function extractLinkFromNotification(
   content: Notifications.NotificationContent,
 ): string | undefined {
   const data = (content.data ?? {}) as Record<string, unknown>;
+  const mobilePath = data.mobilePath;
+  if (typeof mobilePath === 'string' && mobilePath.trim()) return mobilePath.trim();
   const link = data.link ?? data.url ?? data.path;
-  return typeof link === 'string' && link.trim() ? link.trim() : undefined;
+  if (typeof link === 'string' && link.trim()) return link.trim();
+  const type = typeof data.type === 'string' ? data.type.toUpperCase() : '';
+  const messageId = typeof data.messageId === 'string' ? data.messageId.trim() : '';
+  if (type === 'PRINCIPAL_MAIL' && messageId) {
+    return `/(principal)/mail/${messageId}`;
+  }
+  return undefined;
 }
 
 export function extractAttachmentUrls(content: Notifications.NotificationContent): {
@@ -280,7 +288,16 @@ export function navigateFromPushLink(link?: string | null) {
         router.push(href as never);
         return;
       }
-      router.push('/(principal)/(tabs)/notifications' as never);
+      // Raw expo path from push data.mobilePath
+      if (link?.includes('/(principal)/mail/')) {
+        router.push(link as never);
+        return;
+      }
+      if (link?.includes('/(principal)/')) {
+        router.push(link as never);
+        return;
+      }
+      router.push('/(principal)/(tabs)/inbox' as never);
       return;
     }
 

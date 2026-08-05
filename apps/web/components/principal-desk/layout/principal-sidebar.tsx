@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -26,10 +26,18 @@ function Badge({ count }: { count: number }) {
   if (!count || count <= 0) return null;
   const label = count > 99 ? '99+' : String(count);
   return (
-    <span className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+    <span className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
       {label}
     </span>
   );
+}
+
+function initialOpenGroups() {
+  const init: Record<string, boolean> = {};
+  for (const group of PRINCIPAL_DESK_NAV) {
+    init[group.id] = group.defaultExpanded !== false;
+  }
+  return init;
 }
 
 export function PrincipalSidebar() {
@@ -44,11 +52,7 @@ export function PrincipalSidebar() {
   const toggleSidebar = useDashboardUiStore((s) => s.toggleSidebar);
   const enabled = useAuthQueryEnabled();
 
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    for (const group of PRINCIPAL_DESK_NAV) init[group.id] = true;
-    return init;
-  });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpenGroups);
 
   const deskQ = useQuery({
     queryKey: ['principal-desk', 'dashboard'],
@@ -112,7 +116,7 @@ export function PrincipalSidebar() {
     <div className="flex h-full flex-col">
       <div
         className={cn(
-          'flex items-center gap-2 border-b border-white/10 px-3 py-4',
+          'flex items-center gap-2.5 border-b border-white/10 px-3 py-3.5',
           collapsed && 'justify-center px-2',
         )}
       >
@@ -121,26 +125,26 @@ export function PrincipalSidebar() {
           <img
             src={branding.branding.logoUrl}
             alt=""
-            className="h-9 w-9 rounded-lg object-contain bg-white/10 p-1"
+            className="h-10 w-10 rounded-xl object-contain bg-white/10 p-1 ring-1 ring-white/10"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500 text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white shadow-md shadow-indigo-900/40">
             {(branding.branding?.displayName ?? 'PC').slice(0, 2).toUpperCase()}
           </div>
         )}
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">
+            <p className="truncate text-sm font-semibold tracking-tight text-white">
               {branding.branding?.displayName ?? 'OneCampus'}
             </p>
-            <p className="truncate text-[10px] uppercase tracking-wider text-indigo-200/80">
-              Command Center
+            <p className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-indigo-200/85">
+              Principal Desk
             </p>
           </div>
         ) : null}
         <button
           type="button"
-          className="hidden rounded-md p-1.5 text-slate-300 hover:bg-white/10 hover:text-white md:inline-flex"
+          className="hidden rounded-lg p-1.5 text-slate-300 transition hover:bg-white/10 hover:text-white md:inline-flex"
           onClick={toggleSidebar}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
@@ -152,7 +156,7 @@ export function PrincipalSidebar() {
         </button>
         <button
           type="button"
-          className="inline-flex rounded-md p-1.5 text-slate-300 hover:bg-white/10 md:hidden"
+          className="inline-flex rounded-lg p-1.5 text-slate-300 hover:bg-white/10 md:hidden"
           onClick={() => setMobileNavOpen(false)}
           aria-label="Close menu"
         >
@@ -160,18 +164,27 @@ export function PrincipalSidebar() {
         </button>
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-3">
+      <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto px-2 py-3 scrollbar-thin">
         {visibleGroups.map((group) => {
           const expanded = collapsed ? true : openGroups[group.id] !== false;
           return (
-            <div key={group.id}>
+            <div key={group.id} className="rounded-xl bg-white/[0.02] p-1">
               {!collapsed ? (
                 <button
                   type="button"
-                  className="mb-1 flex w-full items-center justify-between px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-slate-200"
+                  className="mb-0.5 flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/5"
                   onClick={() => setOpenGroups((s) => ({ ...s, [group.id]: !expanded }))}
+                  aria-expanded={expanded}
                 >
-                  {group.label}
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    {group.label}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 text-slate-500 transition-transform',
+                      expanded ? 'rotate-0' : '-rotate-90',
+                    )}
+                  />
                 </button>
               ) : null}
               {expanded ? (
@@ -186,21 +199,33 @@ export function PrincipalSidebar() {
                           href={item.href}
                           title={item.label}
                           className={cn(
-                            'relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                            'relative flex items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] font-medium transition-colors',
                             collapsed && 'justify-center px-2',
                             active
-                              ? 'bg-indigo-600 text-white shadow-sm'
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/40'
                               : 'text-slate-300 hover:bg-white/10 hover:text-white',
                           )}
                         >
-                          <Icon className="h-4 w-4 shrink-0" />
+                          <span
+                            className={cn(
+                              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                              active ? 'bg-white/15' : 'bg-white/5',
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
                           {!collapsed ? (
                             <>
-                              <span className="truncate">{item.label}</span>
+                              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                              {item.optional ? (
+                                <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Opt
+                                </span>
+                              ) : null}
                               <Badge count={badge} />
                             </>
                           ) : badge > 0 ? (
-                            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-500" />
+                            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500" />
                           ) : null}
                         </Link>
                       </li>
@@ -218,11 +243,13 @@ export function PrincipalSidebar() {
           type="button"
           onClick={() => void handleLogout()}
           className={cn(
-            'flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white',
+            'flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white',
             collapsed && 'justify-center',
           )}
         >
-          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
+            <LogOut className="h-4 w-4 shrink-0" />
+          </span>
           {!collapsed ? <span>Sign Out</span> : null}
         </button>
       </div>
@@ -231,11 +258,11 @@ export function PrincipalSidebar() {
 
   return (
     <>
-      {/* Desktop / tablet persistent sidebar */}
+      {/* Desktop + tablet persistent sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-900/40 bg-[#0F172A] text-white md:flex md:flex-col',
-          'transition-[width] duration-200',
+          'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-900/50 bg-[#0B1220] text-white md:flex md:flex-col',
+          'transition-[width] duration-200 ease-out',
         )}
         style={{
           width: collapsed ? SIDEBAR_WIDTH.collapsed : SIDEBAR_WIDTH.desktop,
@@ -244,16 +271,16 @@ export function PrincipalSidebar() {
         {sidebarInner}
       </aside>
 
-      {/* Mobile drawer */}
+      {/* Phone drawer */}
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 md:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
             aria-label="Close menu overlay"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 w-[280px] bg-[#0F172A] shadow-2xl">
+          <aside className="absolute inset-y-0 left-0 w-[min(300px,88vw)] bg-[#0B1220] shadow-2xl">
             {sidebarInner}
           </aside>
         </div>

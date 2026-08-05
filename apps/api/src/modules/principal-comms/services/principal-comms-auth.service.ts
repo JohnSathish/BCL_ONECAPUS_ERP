@@ -134,7 +134,39 @@ export class PrincipalCommsAuthService {
       metadata: { googleEmail: email, accountLabel: payload.accountLabel },
     });
 
+    await this.ensurePrincipalMailPushPref(payload.tenantId, payload.userId);
+
     return account;
+  }
+
+  /** Turn on principalMail push preference when first connecting a mailbox (never forces off). */
+  private async ensurePrincipalMailPushPref(tenantId: string, userId: string) {
+    const existing = await this.prisma.notificationPreference.findUnique({
+      where: {
+        tenantId_userId_channel: { tenantId, userId, channel: 'PUSH' },
+      },
+    });
+    const settings = {
+      ...((existing?.settings ?? {}) as Record<string, unknown>),
+    };
+    if (settings.principalMail === false) return;
+    settings.principalMail = true;
+    await this.prisma.notificationPreference.upsert({
+      where: {
+        tenantId_userId_channel: { tenantId, userId, channel: 'PUSH' },
+      },
+      create: {
+        tenantId,
+        userId,
+        channel: 'PUSH',
+        enabled: true,
+        settings,
+      },
+      update: {
+        enabled: existing?.enabled !== false,
+        settings,
+      },
+    });
   }
 
   async disconnect(

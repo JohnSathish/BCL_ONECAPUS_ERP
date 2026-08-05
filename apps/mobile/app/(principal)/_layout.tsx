@@ -51,6 +51,7 @@ export default function PrincipalLayout() {
       <Stack.Screen name="mail/[id]" />
       <Stack.Screen name="compose" />
       <Stack.Screen name="leave/[id]" />
+      <Stack.Screen name="student-lookup" />
     </Stack>
   );
 }

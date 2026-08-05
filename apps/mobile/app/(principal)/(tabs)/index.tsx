@@ -71,6 +71,8 @@ function ActionIcon({ name, color }: { name?: string; color: string }) {
     person: 'person',
     chat: 'chatbubbles',
     list: 'list',
+    search: 'search',
+    school: 'school',
   };
   const glyph = (name && map[name]) || 'ellipse';
   return <Ionicons name={glyph} size={22} color={color} />;
@@ -216,7 +218,13 @@ export default function PrincipalHomeScreen() {
             <View style={styles.heroIcons}>
               <Pressable
                 style={styles.heroIconBtn}
-                onPress={() => router.push('/(principal)/(tabs)/inbox' as Href)}
+                onPress={() => router.push('/(principal)/student-lookup' as Href)}
+              >
+                <Ionicons name="search-outline" size={22} color="#fff" />
+              </Pressable>
+              <Pressable
+                style={styles.heroIconBtn}
+                onPress={() => router.push('/(principal)/(tabs)/notifications' as Href)}
               >
                 <Ionicons name="notifications-outline" size={22} color="#fff" />
                 {notifCount > 0 ? (

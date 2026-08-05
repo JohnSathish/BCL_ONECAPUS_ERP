@@ -18,6 +18,7 @@ import { TimetableSlotRuleService } from './timetable-slot-rule.service';
 import { TimetableStreamMasterService } from './timetable-stream-master.service';
 import { TimetableWorkloadService } from './timetable-workload.service';
 import { TimetableDepartmentWorkloadService } from './timetable-department-workload.service';
+import { ElectiveStaffAllocationService } from './elective-staff-allocation.service';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { TimetableDepartmentWorkloadService } from './timetable-department-workl
     TimetableSlotRuleService,
     TimetableReadinessService,
     TimetableDepartmentWorkloadService,
+    ElectiveStaffAllocationService,
   ],
   exports: [TimetableEngineService],
 })

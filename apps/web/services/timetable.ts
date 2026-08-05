@@ -806,3 +806,134 @@ export async function transitionDepartmentWorkloadStatus(payload: {
   const { data } = await api.post('/v1/timetable/department-workload/status', payload);
   return data as { updated: number; status: string };
 }
+
+export type ElectiveAllocationRow = {
+  id: string;
+  courseOfferingId: string;
+  courseId?: string;
+  offeringSectionId?: string | null;
+  subjectCode?: string | null;
+  subjectName?: string | null;
+  category?: string | null;
+  semesterSequence?: number | null;
+  homeDepartmentId?: string | null;
+  homeDepartment?: string | null;
+  poolName?: string | null;
+  programme?: string | null;
+  weeklyHours?: number;
+  sectionCode?: string | null;
+  shiftId?: string | null;
+  shift?: string | null;
+  staffProfileId?: string | null;
+  staffName?: string | null;
+  staffCode?: string | null;
+  staffDepartment?: string | null;
+  classroomId?: string | null;
+  classroom?: string | null;
+  capacity?: number;
+  teachingDepartmentId?: string | null;
+  status?: string | null;
+  slots?: Array<{
+    id: string;
+    planId: string;
+    dayOfWeek: number;
+    dayName: string;
+    periodNo?: number | null;
+    startTime?: string;
+    endTime?: string;
+    classroomId?: string | null;
+    staffProfileId?: string | null;
+  }>;
+};
+
+export async function fetchElectiveStaffAllocations(params?: {
+  academicYearId?: string;
+  shiftId?: string;
+  semesterMode?: string;
+  semesterSequence?: number;
+  category?: string;
+  q?: string;
+}) {
+  const { data } = await api.get('/v1/timetable/elective-staff-allocation', { params });
+  return data as ElectiveAllocationRow[];
+}
+
+export async function fetchElectiveFacultyOptions(shiftId?: string) {
+  const { data } = await api.get('/v1/timetable/elective-staff-allocation/faculty', {
+    params: shiftId ? { shiftId } : undefined,
+  });
+  return data as Array<{
+    id: string;
+    fullName: string;
+    employeeCode?: string | null;
+    shortCode?: string | null;
+    departmentId?: string | null;
+    department?: string | null;
+    maxWeeklyHours?: number;
+  }>;
+}
+
+export async function fetchElectiveRoomOptions() {
+  const { data } = await api.get('/v1/timetable/elective-staff-allocation/rooms');
+  return data as Array<{
+    id: string;
+    code: string;
+    name?: string | null;
+    capacity?: number | null;
+    roomType?: string | null;
+  }>;
+}
+
+export async function fetchElectiveSlotOptions(shiftId?: string) {
+  const { data } = await api.get('/v1/timetable/elective-staff-allocation/slots', {
+    params: shiftId ? { shiftId } : undefined,
+  });
+  return data as Array<{
+    dayOfWeek: number;
+    dayName: string;
+    periodNo: number;
+    label: string;
+    startTime: string;
+    endTime: string;
+    slotTemplateId?: string | null;
+  }>;
+}
+
+export async function fetchElectiveDepartments() {
+  const { data } = await api.get('/v1/timetable/elective-staff-allocation/departments');
+  return data as Array<{ id: string; name: string; code?: string | null }>;
+}
+
+export async function assignElectiveStaff(payload: {
+  courseOfferingId: string;
+  shiftId: string;
+  staffProfileId: string;
+  sectionCode?: string;
+  teachingDepartmentId?: string | null;
+  classroomId?: string | null;
+  capacity?: number | null;
+  workloadHours?: number | null;
+  dayOfWeek?: number | null;
+  periodNo?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  planId?: string | null;
+  timetablePlanEntryId?: string | null;
+  notes?: string | null;
+  academicYearId?: string | null;
+}) {
+  const { data } = await api.post('/v1/timetable/elective-staff-allocation/assign', payload);
+  return data as {
+    row: ElectiveAllocationRow | null;
+    planEntry: {
+      id: string;
+      planId: string;
+      dayOfWeek: number;
+      dayName: string;
+      periodNo?: number | null;
+      startTime: string;
+      endTime: string;
+    } | null;
+    conflicts: Array<{ type: string; message: string }>;
+  };
+}
