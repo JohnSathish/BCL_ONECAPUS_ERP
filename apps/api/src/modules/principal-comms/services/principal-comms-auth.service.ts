@@ -3,7 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { PrincipalCommsAuditService } from './principal-comms-audit.service';
 import { PrincipalCommsGmailClient } from './principal-comms-gmail.client';
@@ -20,15 +21,19 @@ type OauthStatePayload = {
   exp: number;
 };
 
+/**
+ * OAuth CSRF state must survive API restarts and multi-instance load balancing.
+ * Previously this used an in-memory Map which caused "OAuth state expired or invalid"
+ * whenever the process that started OAuth was not the one handling the callback.
+ */
 @Injectable()
 export class PrincipalCommsAuthService {
-  private readonly stateSecrets = new Map<string, OauthStatePayload>();
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly gmail: PrincipalCommsGmailClient,
     private readonly vault: PrincipalCommsTokenVault,
     private readonly audit: PrincipalCommsAuditService,
+    private readonly config: ConfigService,
   ) {}
 
   listAccounts(tenantId: string, ownerUserId: string) {
@@ -53,15 +58,12 @@ export class PrincipalCommsAuthService {
   ) {
     this.gmail.assertConfigured();
     const nonce = randomBytes(16).toString('hex');
-    const state = createHash('sha256')
-      .update(`${tenantId}:${userId}:${nonce}`)
-      .digest('hex');
-    this.stateSecrets.set(state, {
+    const state = this.signState({
       tenantId,
       userId,
       accountLabel,
       nonce,
-      exp: Date.now() + 10 * 60 * 1000,
+      exp: Date.now() + 15 * 60 * 1000,
     });
     return {
       authUrl: this.gmail.buildAuthUrl(state),
@@ -74,9 +76,11 @@ export class PrincipalCommsAuthService {
     state: string,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    const payload = this.stateSecrets.get(state);
-    this.stateSecrets.delete(state);
-    if (!payload || payload.exp < Date.now()) {
+    if (!code?.trim() || !state?.trim()) {
+      throw new ForbiddenException('OAuth state expired or invalid');
+    }
+    const payload = this.verifyState(state);
+    if (!payload) {
       throw new ForbiddenException('OAuth state expired or invalid');
     }
 
@@ -207,5 +211,59 @@ export class PrincipalCommsAuthService {
       data: { encryptedTokens: this.vault.encryptTokens(tokens) },
     });
     return tokens.accessToken;
+  }
+
+  private stateSigningKey(): string {
+    return (
+      this.config.get<string>('PRINCIPAL_COMMS_TOKEN_KEY') ||
+      this.config.get<string>('ENCRYPTION_KEY') ||
+      this.config.get<string>('JWT_SECRET') ||
+      'principal-comms-oauth-dev-only'
+    );
+  }
+
+  private signState(payload: OauthStatePayload): string {
+    const body = Buffer.from(JSON.stringify(payload), 'utf8').toString(
+      'base64url',
+    );
+    const sig = createHmac('sha256', this.stateSigningKey())
+      .update(body)
+      .digest('base64url');
+    return `${body}.${sig}`;
+  }
+
+  private verifyState(state: string): OauthStatePayload | null {
+    const dot = state.lastIndexOf('.');
+    if (dot <= 0) return null;
+    const body = state.slice(0, dot);
+    const sig = state.slice(dot + 1);
+    if (!body || !sig) return null;
+
+    const expected = createHmac('sha256', this.stateSigningKey())
+      .update(body)
+      .digest('base64url');
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return null;
+    }
+
+    try {
+      const payload = JSON.parse(
+        Buffer.from(body, 'base64url').toString('utf8'),
+      ) as OauthStatePayload;
+      if (
+        !payload?.tenantId ||
+        !payload?.userId ||
+        !payload?.nonce ||
+        typeof payload.exp !== 'number'
+      ) {
+        return null;
+      }
+      if (payload.exp < Date.now()) return null;
+      return payload;
+    } catch {
+      return null;
+    }
   }
 }
