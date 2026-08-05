@@ -37,6 +37,12 @@ services:
       MOODLE_SSO_SECRET: ${MOODLE_SSO_SECRET:-}
       MOODLE_TOKEN_ENCRYPTION_KEY: ${MOODLE_TOKEN_ENCRYPTION_KEY:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Principal Communication Hub — Gmail OAuth (must be present in /opt/nep-erp/.env)
+      GOOGLE_COMMS_CLIENT_ID: ${GOOGLE_COMMS_CLIENT_ID:-}
+      GOOGLE_COMMS_CLIENT_SECRET: ${GOOGLE_COMMS_CLIENT_SECRET:-}
+      GOOGLE_COMMS_REDIRECT_URI: ${GOOGLE_COMMS_REDIRECT_URI:-}
+      WEB_APP_URL: ${WEB_APP_URL:-}
+      PRINCIPAL_COMMS_TOKEN_KEY: ${PRINCIPAL_COMMS_TOKEN_KEY:-}
       UPLOAD_ROOT: /data/uploads
       STORAGE_ROOT: /data/storage
       BACKUP_ROOT: /data/backups
