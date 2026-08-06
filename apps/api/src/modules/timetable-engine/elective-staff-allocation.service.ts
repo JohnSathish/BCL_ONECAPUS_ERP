@@ -206,7 +206,7 @@ export class ElectiveStaffAllocationService {
         semesterSequence: offering.semesterSequence,
         homeDepartmentId: course.departmentId,
         homeDepartment: course.department?.name ?? null,
-        poolName: offering.categoryPool?.name ?? null,
+        poolName: offering.categoryPool?.poolName ?? null,
         programme:
           offering.programVersion?.program?.code ??
           offering.programVersion?.program?.name ??

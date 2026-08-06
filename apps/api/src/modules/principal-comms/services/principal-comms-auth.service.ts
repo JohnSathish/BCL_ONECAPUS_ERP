@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { PrincipalCommsAuditService } from './principal-comms-audit.service';
@@ -148,9 +149,10 @@ export class PrincipalCommsAuthService {
     });
     const settings = {
       ...((existing?.settings ?? {}) as Record<string, unknown>),
-    };
+    } as Record<string, unknown>;
     if (settings.principalMail === false) return;
     settings.principalMail = true;
+    const settingsJson = settings as Prisma.InputJsonValue;
     await this.prisma.notificationPreference.upsert({
       where: {
         tenantId_userId_channel: { tenantId, userId, channel: 'PUSH' },
@@ -160,11 +162,11 @@ export class PrincipalCommsAuthService {
         userId,
         channel: 'PUSH',
         enabled: true,
-        settings,
+        settings: settingsJson,
       },
       update: {
         enabled: existing?.enabled !== false,
-        settings,
+        settings: settingsJson,
       },
     });
   }

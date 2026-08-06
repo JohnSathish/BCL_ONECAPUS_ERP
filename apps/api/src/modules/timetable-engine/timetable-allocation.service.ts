@@ -108,7 +108,7 @@ export class TimetableAllocationService {
         courseOffering: {
           include: {
             course: { include: { department: true } },
-            categoryPool: { select: { categoryType: true, name: true } },
+            categoryPool: { select: { categoryType: true, poolName: true } },
             programVersion: {
               include: {
                 program: { include: { department: true } },
