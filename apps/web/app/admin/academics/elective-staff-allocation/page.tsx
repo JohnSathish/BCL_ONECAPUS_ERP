@@ -418,6 +418,7 @@ export default function ElectiveStaffAllocationPage() {
                     <option key={f.id} value={f.id}>
                       {f.fullName}
                       {f.department ? ` · ${f.department}` : ''}
+                      {f.staffType ? ` · ${String(f.staffType).replace(/_/g, ' ')}` : ''}
                       {f.employeeCode ? ` (${f.employeeCode})` : ''}
                     </option>
                   ))}

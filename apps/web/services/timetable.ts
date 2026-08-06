@@ -869,6 +869,7 @@ export async function fetchElectiveFacultyOptions(shiftId?: string) {
     shortCode?: string | null;
     departmentId?: string | null;
     department?: string | null;
+    staffType?: string | null;
     maxWeeklyHours?: number;
   }>;
 }

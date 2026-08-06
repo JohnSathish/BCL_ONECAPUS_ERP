@@ -305,7 +305,21 @@ export class ElectiveStaffAllocationService {
         tenantId: user.tid,
         deletedAt: null,
         status: 'ACTIVE',
-        staffType: { in: ['TEACHING', 'teaching'] },
+        // VTC/MDC/etc. often taught by accountants, lab staff, guests — not only TEACHING.
+        staffType: {
+          in: [
+            'TEACHING',
+            'teaching',
+            'NON_TEACHING',
+            'non_teaching',
+            'GUEST',
+            'guest',
+            'VISITING',
+            'visiting',
+            'CONTRACT',
+            'contract',
+          ],
+        },
       },
       include: {
         department: true,
@@ -330,6 +344,7 @@ export class ElectiveStaffAllocationService {
         shortCode: row.shortCode,
         departmentId: row.departmentId,
         department: row.department?.name ?? null,
+        staffType: row.staffType,
         maxWeeklyHours: Number(row.workloads?.[0]?.weeklyHours ?? 24),
       }));
   }
