@@ -267,12 +267,15 @@ export async function trackPushOpened(link?: string) {
   }
 }
 
-function scheduleStaffInboxRefresh(source: 'push-received' | 'push-tap') {
+function scheduleInboxRefresh(source: 'push-received' | 'push-tap') {
   emitNotificationsInvalidated({ source, reason: 'immediate' });
   // In-app row may commit slightly after FCM delivery — retry once.
   setTimeout(() => {
     emitNotificationsInvalidated({ source, reason: 'retry' });
   }, 900);
+  setTimeout(() => {
+    emitNotificationsInvalidated({ source, reason: 'retry-late' });
+  }, 2500);
 }
 
 export function navigateFromPushLink(link?: string | null) {
@@ -283,6 +286,7 @@ export function navigateFromPushLink(link?: string | null) {
     // Principal Command Center users share appType "staff" for device APIs, but must
     // never be routed into Faculty Workspace on push tap.
     if (isPrincipal) {
+      scheduleInboxRefresh('push-tap');
       const href = resolveMobileDeepLink(link);
       if (href && String(href).startsWith('/(principal)')) {
         router.push(href as never);
@@ -297,16 +301,18 @@ export function navigateFromPushLink(link?: string | null) {
         router.push(link as never);
         return;
       }
-      router.push('/(principal)/(tabs)/inbox' as never);
+      router.push('/(principal)/(tabs)/notifications' as never);
       return;
     }
 
     // Faculty / other staff: always open Notifications tab on push tap.
     if (appType === 'staff') {
       router.push('/(staff)/(tabs)/notifications' as never);
-      scheduleStaffInboxRefresh('push-tap');
+      scheduleInboxRefresh('push-tap');
       return;
     }
+
+    scheduleInboxRefresh('push-tap');
     const href = resolveMobileDeepLink(link);
     if (href) {
       router.push(href as never);
@@ -326,21 +332,21 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   if (pdfUrl) {
     void openNotificationAttachment(pdfUrl, 'PDF attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
-      else scheduleStaffInboxRefresh('push-tap');
+      else scheduleInboxRefresh('push-tap');
     });
     return;
   }
   if (fileUrl) {
     void openNotificationAttachment(fileUrl, fileName ?? 'File attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
-      else scheduleStaffInboxRefresh('push-tap');
+      else scheduleInboxRefresh('push-tap');
     });
     return;
   }
   if (imageUrl && !link) {
     void openNotificationAttachment(imageUrl, 'Image attachment').then((opened) => {
       if (!opened) navigateFromPushLink(link);
-      else scheduleStaffInboxRefresh('push-tap');
+      else scheduleInboxRefresh('push-tap');
     });
     return;
   }
@@ -397,14 +403,10 @@ export function attachPushResponseListener() {
       handleNotificationResponse(response);
     });
   }
-  // Foreground arrivals: refresh in-app Notifications inbox for staff.
+  // Foreground arrivals: refresh in-app Notifications inbox (student + staff).
   if (!receivedSub) {
     receivedSub = Notifications.addNotificationReceivedListener(() => {
-      void getStoredAppType().then((appType) => {
-        if (appType === 'staff') {
-          scheduleStaffInboxRefresh('push-received');
-        }
-      });
+      scheduleInboxRefresh('push-received');
     });
   }
 }

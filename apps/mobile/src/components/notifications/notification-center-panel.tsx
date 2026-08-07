@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   AppState,
   type AppStateStatus,
   Image,
@@ -29,6 +28,7 @@ import {
 } from '@/services/notification-deep-link';
 import { onNotificationsInvalidated } from '@/services/notifications-sync';
 import { openNotificationAttachment, trackPushOpened } from '@/services/push-notifications';
+import { NotificationMessageModal } from '@/components/notifications/notification-message-modal';
 import type { UserNotification } from '@/types/notifications';
 import { attachmentUrlsFromMeta } from '@/utils/notification-attachments';
 import { isSupportedRemoteImageUrl } from '@/utils/upload-asset-url';
@@ -49,6 +49,12 @@ type ThemeColors = {
   urgent?: string;
 };
 
+type MessageModalState = {
+  title: string;
+  body: string;
+  actions?: Array<{ label: string; onPress: () => void; primary?: boolean }>;
+};
+
 const FILTERS: { id: NotificationFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'unread', label: 'Unread' },
@@ -56,7 +62,7 @@ const FILTERS: { id: NotificationFilter; label: string }[] = [
 ];
 
 export function NotificationCenterPanel({
-  role,
+  role: _role,
   theme,
   onChanged,
 }: {
@@ -71,6 +77,7 @@ export function NotificationCenterPanel({
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [detail, setDetail] = useState<MessageModalState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,17 +97,16 @@ export function NotificationCenterPanel({
     void load();
   }, [load]);
 
-  // Staff: refetch when a push arrives / is tapped, and whenever this screen is focused.
+  // Refetch whenever this tab is focused (student + staff).
   useFocusEffect(
     useCallback(() => {
-      if (role !== 'staff') return undefined;
       void load();
       return undefined;
-    }, [role, load]),
+    }, [load]),
   );
 
+  // Push arrivals / taps invalidate the inbox for all roles.
   useEffect(() => {
-    if (role !== 'staff') return undefined;
     const unsubscribe = onNotificationsInvalidated(() => {
       void load();
       onChanged?.();
@@ -116,7 +122,7 @@ export function NotificationCenterPanel({
       unsubscribe();
       sub.remove();
     };
-  }, [role, load, onChanged]);
+  }, [load, onChanged]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -162,38 +168,52 @@ export function NotificationCenterPanel({
     const landsOnInbox =
       !href || hrefStr.includes('/notifications') || isGenericNotificationLink(item.link);
 
-    // Campaign / generic links: show the message (and image if present).
+    // Campaign / generic links: show the enhanced message popup.
     if (landsOnInbox) {
+      const body = item.body?.trim() || 'No additional details.';
+      const title = item.title || 'Notification';
       if (imageUrl && isSupportedRemoteImageUrl(imageUrl)) {
-        Alert.alert(item.title || 'Notification', item.body?.trim() || 'Attachment available.', [
-          { text: 'View image', onPress: () => void openNotificationAttachment(imageUrl, 'Image') },
-          ...(all.length > 1
-            ? [
-                {
-                  text: 'Open attachment',
-                  onPress: () =>
-                    void openNotificationAttachment(
-                      all.find((a) => a.type !== 'image')?.url ?? imageUrl,
-                      'Attachment',
-                    ),
-                },
-              ]
-            : []),
-          { text: 'OK' },
-        ]);
+        setDetail({
+          title,
+          body: body === 'No additional details.' ? 'Attachment available.' : body,
+          actions: [
+            {
+              label: 'View image',
+              onPress: () => void openNotificationAttachment(imageUrl, 'Image'),
+            },
+            ...(all.length > 1
+              ? [
+                  {
+                    label: 'Open attachment',
+                    onPress: () =>
+                      void openNotificationAttachment(
+                        all.find((a) => a.type !== 'image')?.url ?? imageUrl,
+                        'Attachment',
+                      ),
+                  },
+                ]
+              : []),
+            { label: 'OK', primary: true, onPress: () => undefined },
+          ],
+        });
         return;
       }
       if (all.length) {
-        Alert.alert(item.title || 'Notification', item.body?.trim() || 'Attachment available.', [
-          {
-            text: 'Open attachment',
-            onPress: () => void openNotificationAttachment(all[0].url, all[0].name ?? 'Attachment'),
-          },
-          { text: 'OK' },
-        ]);
+        setDetail({
+          title,
+          body: body === 'No additional details.' ? 'Attachment available.' : body,
+          actions: [
+            {
+              label: 'Open attachment',
+              onPress: () =>
+                void openNotificationAttachment(all[0].url, all[0].name ?? 'Attachment'),
+            },
+            { label: 'OK', primary: true, onPress: () => undefined },
+          ],
+        });
         return;
       }
-      Alert.alert(item.title || 'Notification', item.body?.trim() || 'No additional details.');
+      setDetail({ title, body });
       return;
     }
     router.push(href as never);
@@ -240,150 +260,162 @@ export function NotificationCenterPanel({
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.filterRow}>
-        {FILTERS.map((f) => {
-          const active = filter === f.id;
-          return (
-            <Pressable
-              key={f.id}
-              style={[
-                styles.chip,
-                {
-                  borderColor: theme.border,
-                  backgroundColor: active ? `${theme.primary}18` : theme.surface,
-                },
-              ]}
-              onPress={() => setFilter(f.id)}
-            >
-              <Text
-                style={{
-                  color: active ? theme.primary : theme.textMuted,
-                  fontWeight: '700',
-                  fontSize: 12,
-                }}
+    <>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.filterRow}>
+          {FILTERS.map((f) => {
+            const active = filter === f.id;
+            return (
+              <Pressable
+                key={f.id}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: theme.border,
+                    backgroundColor: active ? `${theme.primary}18` : theme.surface,
+                  },
+                ]}
+                onPress={() => setFilter(f.id)}
               >
-                {f.label}
-                {f.id === 'unread' && unread > 0 ? ` (${unread})` : ''}
-              </Text>
-            </Pressable>
-          );
-        })}
-        {unread > 0 && filter !== 'archived' ? (
-          <Pressable onPress={() => void onMarkAll()} style={styles.markAll}>
-            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>Mark all</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search notifications…"
-        placeholderTextColor={theme.textSubtle ?? theme.textMuted}
-        style={[
-          styles.search,
-          { borderColor: theme.border, backgroundColor: theme.surface, color: theme.text },
-        ]}
-      />
-
-      {message ? (
-        <Text style={{ color: theme.urgent ?? '#DC2626', fontSize: 13 }}>{message}</Text>
-      ) : null}
-
-      {visible.length === 0 ? (
-        <Text style={[styles.muted, { color: theme.textMuted }]}>No notifications found.</Text>
-      ) : (
-        visible.map((item) => {
-          const isUnread = !item.readAt;
-          const category =
-            item.metadata && typeof item.metadata === 'object'
-              ? String((item.metadata as Record<string, unknown>).category ?? '')
-              : '';
-          const { imageUrl, pdfUrl, files, all } = attachmentUrlsFromMeta(item);
-          return (
-            <View
-              key={item.id}
-              style={[
-                styles.card,
-                {
-                  borderColor: isUnread ? '#BFDBFE' : theme.border,
-                  backgroundColor: isUnread ? '#F8FBFF' : theme.surface,
-                },
-              ]}
-            >
-              <Pressable onPress={() => void onOpen(item)}>
-                <View style={styles.cardTop}>
-                  <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  {isUnread ? (
-                    <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-                  ) : null}
-                </View>
-                {item.body ? (
-                  <Text style={[styles.body, { color: theme.textMuted }]} numberOfLines={3}>
-                    {item.body}
-                  </Text>
-                ) : null}
-                {imageUrl && isSupportedRemoteImageUrl(imageUrl) ? (
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.attachmentImage}
-                    resizeMode="cover"
-                  />
-                ) : null}
-                {pdfUrl ? (
-                  <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>
-                    PDF attachment — tap to open
-                  </Text>
-                ) : null}
-                {files.map((f) => (
-                  <Text
-                    key={f.url}
-                    style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}
-                  >
-                    {f.name ?? 'File'} — tap to open
-                  </Text>
-                ))}
-                {!pdfUrl && !files.length && all.some((a) => a.type === 'file') ? null : null}
-                <Text style={[styles.when, { color: theme.textSubtle ?? theme.textMuted }]}>
-                  {formatWhen(item.createdAt)}
-                  {category ? ` · ${category}` : ''}
-                  {item.type ? ` · ${item.type}` : ''}
-                  {all.length ? ` · ${all.length} attachment${all.length === 1 ? '' : 's'}` : ''}
+                <Text
+                  style={{
+                    color: active ? theme.primary : theme.textMuted,
+                    fontWeight: '700',
+                    fontSize: 12,
+                  }}
+                >
+                  {f.label}
+                  {f.id === 'unread' && unread > 0 ? ` (${unread})` : ''}
                 </Text>
               </Pressable>
-              <View style={styles.actions}>
-                {filter !== 'archived' ? (
-                  <Pressable onPress={() => void onArchive(item.id)}>
+            );
+          })}
+          {unread > 0 && filter !== 'archived' ? (
+            <Pressable onPress={() => void onMarkAll()} style={styles.markAll}>
+              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>
+                Mark all
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search notifications…"
+          placeholderTextColor={theme.textSubtle ?? theme.textMuted}
+          style={[
+            styles.search,
+            { borderColor: theme.border, backgroundColor: theme.surface, color: theme.text },
+          ]}
+        />
+
+        {message ? (
+          <Text style={{ color: theme.urgent ?? '#DC2626', fontSize: 13 }}>{message}</Text>
+        ) : null}
+
+        {visible.length === 0 ? (
+          <Text style={[styles.muted, { color: theme.textMuted }]}>No notifications found.</Text>
+        ) : (
+          visible.map((item) => {
+            const isUnread = !item.readAt;
+            const category =
+              item.metadata && typeof item.metadata === 'object'
+                ? String((item.metadata as Record<string, unknown>).category ?? '')
+                : '';
+            const { imageUrl, pdfUrl, files, all } = attachmentUrlsFromMeta(item);
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.card,
+                  {
+                    borderColor: isUnread ? '#BFDBFE' : theme.border,
+                    backgroundColor: isUnread ? '#F8FBFF' : theme.surface,
+                  },
+                ]}
+              >
+                <Pressable onPress={() => void onOpen(item)}>
+                  <View style={styles.cardTop}>
+                    <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    {isUnread ? (
+                      <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </View>
+                  {item.body ? (
+                    <Text style={[styles.body, { color: theme.textMuted }]} numberOfLines={3}>
+                      {item.body}
+                    </Text>
+                  ) : null}
+                  {imageUrl && isSupportedRemoteImageUrl(imageUrl) ? (
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.attachmentImage}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                  {pdfUrl ? (
                     <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>
-                      Archive
+                      PDF attachment — tap to open
+                    </Text>
+                  ) : null}
+                  {files.map((f) => (
+                    <Text
+                      key={f.url}
+                      style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}
+                    >
+                      {f.name ?? 'File'} — tap to open
+                    </Text>
+                  ))}
+                  <Text style={[styles.when, { color: theme.textSubtle ?? theme.textMuted }]}>
+                    {formatWhen(item.createdAt)}
+                    {category ? ` · ${category}` : ''}
+                    {item.type ? ` · ${item.type}` : ''}
+                    {all.length ? ` · ${all.length} attachment${all.length === 1 ? '' : 's'}` : ''}
+                  </Text>
+                </Pressable>
+                <View style={styles.actions}>
+                  {filter !== 'archived' ? (
+                    <Pressable onPress={() => void onArchive(item.id)}>
+                      <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12 }}>
+                        Archive
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable onPress={() => void onDismiss(item.id)}>
+                    <Text
+                      style={{ color: theme.urgent ?? '#DC2626', fontWeight: '700', fontSize: 12 }}
+                    >
+                      Delete
                     </Text>
                   </Pressable>
-                ) : null}
-                <Pressable onPress={() => void onDismiss(item.id)}>
-                  <Text
-                    style={{ color: theme.urgent ?? '#DC2626', fontWeight: '700', fontSize: 12 }}
-                  >
-                    Delete
-                  </Text>
-                </Pressable>
-                <Pressable onPress={() => void onOpen(item)}>
-                  <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 12 }}>
-                    Open
-                  </Text>
-                </Pressable>
+                  <Pressable onPress={() => void onOpen(item)}>
+                    <Text style={{ color: theme.textMuted, fontWeight: '700', fontSize: 12 }}>
+                      Open
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          );
-        })
-      )}
-    </ScrollView>
+            );
+          })
+        )}
+      </ScrollView>
+
+      <NotificationMessageModal
+        visible={Boolean(detail)}
+        title={detail?.title ?? ''}
+        body={detail?.body ?? ''}
+        primaryColor={theme.primary}
+        actions={detail?.actions}
+        onClose={() => setDetail(null)}
+      />
+    </>
   );
 }
 
