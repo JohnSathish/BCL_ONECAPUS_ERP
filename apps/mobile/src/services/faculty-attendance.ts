@@ -18,6 +18,8 @@ export type FacultyAttendanceSession = {
   counts?: { total?: number; present?: number; absent?: number; other?: number };
   rosterSize?: number | null;
   timetableLinked?: boolean;
+  collectionUnit?: string | null;
+  attendanceMode?: string | null;
 };
 
 export type AttendanceRosterStudent = {

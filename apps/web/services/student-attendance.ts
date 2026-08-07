@@ -42,6 +42,17 @@ export type StudentAttendanceSession = {
   rosterSize?: number | null;
   timetableLinked?: boolean;
   timetablePlanName?: string | null;
+  collectionUnit?: string | null;
+  attendanceMode?: string | null;
+  aggregationUnit?: 'PERIOD' | 'DAY' | 'SESSION' | null;
+  unitLabels?: {
+    working: string;
+    present: string;
+    absent: string;
+    percentageHint: string;
+  } | null;
+  allowEditAfterSubmit?: boolean;
+  defaultAttendanceStatus?: 'P' | 'A';
 };
 
 export type StudentAttendanceRosterRow = {
@@ -182,9 +193,28 @@ export async function fetchMyStudentAttendance() {
 export type AttendancePolicy = {
   id: string;
   tenantId: string;
-  attendanceMode: 'FIRST_LAST' | 'EVERY_PERIOD';
+  attendanceMode:
+    | 'PERIOD_WISE'
+    | 'ONCE_PER_DAY'
+    | 'MORNING_AFTERNOON'
+    | 'FIRST_LAST'
+    | 'EVERY_PERIOD';
+  canonicalMode?: 'PERIOD_WISE' | 'ONCE_PER_DAY' | 'MORNING_AFTERNOON' | 'FIRST_LAST';
   shortageThresholdPct: number;
   defaulterThresholdPct: number;
+  allowEditAfterSubmit?: boolean;
+  attendanceCutoffTime?: string | null;
+  lateGraceMinutes?: number | null;
+  latePolicy?: 'NONE' | 'MARK_LATE';
+  defaultAttendanceStatus?: 'P' | 'A';
+  weekendHolidayHandling?: 'SKIP_NON_WORKING' | 'ALLOW_IF_GENERATED';
+  aggregationUnit?: 'PERIOD' | 'DAY' | 'SESSION';
+  unitLabels?: {
+    working: string;
+    present: string;
+    absent: string;
+    percentageHint: string;
+  };
 };
 
 export async function fetchAttendancePolicy() {
@@ -192,11 +222,7 @@ export async function fetchAttendancePolicy() {
   return data;
 }
 
-export async function updateAttendancePolicy(payload: {
-  attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
-  shortageThresholdPct?: number;
-  defaulterThresholdPct?: number;
-}) {
+export async function updateAttendancePolicy(payload: Partial<AttendancePolicy>) {
   const { data } = await api.patch<AttendancePolicy>('/v1/student-attendance/policy', payload);
   return data;
 }

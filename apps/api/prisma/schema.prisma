@@ -1165,10 +1165,20 @@ model TenantExaminationSettings {
 model TenantAttendancePolicy {
   id                    String   @id @default(uuid()) @db.Uuid
   tenantId              String   @unique @map("tenant_id") @db.Uuid
-  /// FIRST_LAST | EVERY_PERIOD
+  /// PERIOD_WISE | ONCE_PER_DAY | MORNING_AFTERNOON | FIRST_LAST | EVERY_PERIOD (legacy)
   attendanceMode        String   @default("FIRST_LAST") @map("attendance_mode")
   shortageThresholdPct  Decimal  @default(75) @map("shortage_threshold_pct") @db.Decimal(5, 2)
   defaulterThresholdPct Decimal  @default(60) @map("defaulter_threshold_pct") @db.Decimal(5, 2)
+  allowEditAfterSubmit  Boolean  @default(false) @map("allow_edit_after_submit")
+  /// Local HH:mm cutoff for faculty marking; null = no clock cutoff
+  attendanceCutoffTime  String?  @map("attendance_cutoff_time")
+  lateGraceMinutes      Int?     @map("late_grace_minutes")
+  /// NONE | MARK_LATE
+  latePolicy            String   @default("NONE") @map("late_policy")
+  /// Default roster status before marking: P | A
+  defaultAttendanceStatus String @default("P") @map("default_attendance_status")
+  /// SKIP_NON_WORKING | ALLOW_IF_GENERATED
+  weekendHolidayHandling String @default("SKIP_NON_WORKING") @map("weekend_holiday_handling")
   metadata              Json     @default("{}")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")

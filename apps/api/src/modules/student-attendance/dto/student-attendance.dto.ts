@@ -158,8 +158,19 @@ export class AttendanceEligibilityQueryDto {
 
 export class UpdateAttendancePolicyDto {
   @IsOptional()
-  @IsIn(['FIRST_LAST', 'EVERY_PERIOD'])
-  attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
+  @IsIn([
+    'PERIOD_WISE',
+    'ONCE_PER_DAY',
+    'MORNING_AFTERNOON',
+    'FIRST_LAST',
+    'EVERY_PERIOD',
+  ])
+  attendanceMode?:
+    | 'PERIOD_WISE'
+    | 'ONCE_PER_DAY'
+    | 'MORNING_AFTERNOON'
+    | 'FIRST_LAST'
+    | 'EVERY_PERIOD';
 
   @IsOptional()
   @Type(() => Number)
@@ -168,6 +179,31 @@ export class UpdateAttendancePolicyDto {
   @IsOptional()
   @Type(() => Number)
   defaulterThresholdPct?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  allowEditAfterSubmit?: boolean;
+
+  @IsOptional()
+  @IsString()
+  attendanceCutoffTime?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  lateGraceMinutes?: number | null;
+
+  @IsOptional()
+  @IsIn(['NONE', 'MARK_LATE'])
+  latePolicy?: 'NONE' | 'MARK_LATE';
+
+  @IsOptional()
+  @IsIn(['P', 'A'])
+  defaultAttendanceStatus?: 'P' | 'A';
+
+  @IsOptional()
+  @IsIn(['SKIP_NON_WORKING', 'ALLOW_IF_GENERATED'])
+  weekendHolidayHandling?: 'SKIP_NON_WORKING' | 'ALLOW_IF_GENERATED';
 }
 
 export class AttendanceReportQueryDto extends AttendanceSessionQueryDto {

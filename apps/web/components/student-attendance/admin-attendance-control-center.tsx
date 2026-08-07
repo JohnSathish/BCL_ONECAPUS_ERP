@@ -24,12 +24,12 @@ import {
   fetchStudentAttendanceSummaries,
   generateStudentAttendanceSessions,
   recalculateStudentAttendanceEligibility,
-  updateAttendancePolicy,
   updateStudentAttendanceSessionState,
   type StudentAttendanceSession,
 } from '@/services/student-attendance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import Link from 'next/link';
 
 export function AdminAttendanceControlCenter() {
   const qc = useQueryClient();
@@ -107,22 +107,22 @@ export function AdminAttendanceControlCenter() {
     onError: (error) => setMessage(apiErrorMessage(error, 'Could not recalculate eligibility')),
   });
 
-  const policyMut = useMutation({
-    mutationFn: (attendanceMode: 'FIRST_LAST' | 'EVERY_PERIOD') =>
-      updateAttendancePolicy({ attendanceMode }),
-    onSuccess: async (policy) => {
-      setMessage(
-        `Attendance mode set to ${
-          policy.attendanceMode === 'FIRST_LAST' ? 'First & Last Period' : 'Every Period'
-        }.`,
-      );
-      await refreshAll();
-    },
-    onError: (error) => setMessage(apiErrorMessage(error, 'Could not update policy')),
-  });
-
   const stats = dashboard.data ?? {};
   const shortageCount = stats.shortageStudents ?? 0;
+  const modeLabel = (() => {
+    const mode = policyQ.data?.attendanceMode ?? stats.attendanceMode;
+    if (mode === 'ONCE_PER_DAY') return 'Once Per Day (First Period)';
+    if (mode === 'MORNING_AFTERNOON') return 'Morning & Afternoon Sessions';
+    if (mode === 'PERIOD_WISE' || mode === 'EVERY_PERIOD') return 'Period-wise';
+    if (mode === 'FIRST_LAST') return 'First & Last Period';
+    return mode ?? '—';
+  })();
+  const sessionLabel =
+    stats.aggregationUnit === 'DAY'
+      ? 'Today Classes'
+      : stats.aggregationUnit === 'SESSION'
+        ? 'Today Sessions (AM/PM)'
+        : 'Today Sessions';
   const lowSummaries = useMemo(
     () => (summaries.data ?? []).filter((row: any) => Number(row.percentage ?? 0) < 75).slice(0, 8),
     [summaries.data],
@@ -190,29 +190,22 @@ export function AdminAttendanceControlCenter() {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border/50 bg-background/60 p-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Attendance counting policy
+              Attendance collection mode
             </p>
             <p className="text-sm text-muted-foreground">
-              DBC default is First &amp; Last period. Switch to Every Period when needed.
+              Current: <span className="font-medium text-foreground">{modeLabel}</span>
+              {stats.unitLabels?.percentageHint ? ` · ${stats.unitLabels.percentageHint}` : ''}
             </p>
           </div>
-          <select
-            value={policyQ.data?.attendanceMode ?? 'FIRST_LAST'}
-            disabled={policyMut.isPending || policyQ.isLoading}
-            onChange={(event) =>
-              policyMut.mutate(event.target.value as 'FIRST_LAST' | 'EVERY_PERIOD')
-            }
-            className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
-          >
-            <option value="FIRST_LAST">First &amp; Last Period</option>
-            <option value="EVERY_PERIOD">Every Period</option>
-          </select>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/settings/attendance">Attendance Settings</Link>
+          </Button>
         </div>
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">
         <KpiCard
-          label="Today Sessions"
+          label={sessionLabel}
           value={stats.today?.sessions ?? 0}
           icon={<CalendarDays className="h-5 w-5" />}
         />

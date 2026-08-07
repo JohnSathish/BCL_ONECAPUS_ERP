@@ -2487,6 +2487,11 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/organization',
             permissions: ['org:read', 'org:manage'],
           },
+          {
+            label: 'Attendance Settings',
+            href: '/admin/settings/attendance',
+            permissions: ['attendance:read', 'attendance:manage', 'org:manage'],
+          },
         ],
       },
     ],

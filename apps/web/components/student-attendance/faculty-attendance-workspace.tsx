@@ -26,6 +26,7 @@ import {
   type AttendanceStatusCode,
 } from '@/components/student-attendance/attendance-status-config';
 import {
+  fetchAttendancePolicy,
   fetchFacultyTodayAttendance,
   fetchStudentAttendanceRoster,
   markStudentAttendance,
@@ -50,6 +51,11 @@ export function FacultyAttendanceWorkspace() {
   const [message, setMessage] = useState('');
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const policyQ = useQuery({
+    queryKey: ['student-attendance', 'policy'],
+    queryFn: fetchAttendancePolicy,
+  });
 
   const sessions = useQuery({
     queryKey: ['student-attendance', 'faculty-today'],
@@ -273,7 +279,25 @@ export function FacultyAttendanceWorkspace() {
     setMessage('');
   };
 
-  const isLocked = roster.data?.session.status === 'LOCKED';
+  const isLocked =
+    roster.data?.session.status === 'LOCKED' || roster.data?.session.status === 'FROZEN';
+
+  const modeBanner = (() => {
+    const mode = policyQ.data?.attendanceMode ?? roster.data?.session?.attendanceMode;
+    if (mode === 'ONCE_PER_DAY') {
+      return 'Daily attendance — mark once in the first period. Status applies for the whole working day.';
+    }
+    if (mode === 'MORNING_AFTERNOON') {
+      return 'Morning & afternoon attendance — mark each session (AM / PM) separately.';
+    }
+    if (mode === 'PERIOD_WISE' || mode === 'EVERY_PERIOD') {
+      return 'Period-wise attendance — mark every scheduled class period.';
+    }
+    if (mode === 'FIRST_LAST') {
+      return 'First & last period mode — only first and last teaching periods require marking.';
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-4">
@@ -287,6 +311,11 @@ export function FacultyAttendanceWorkspace() {
             <p className="text-sm text-muted-foreground">
               Mark all present, then tap only exceptions. Changes save automatically.
             </p>
+            {modeBanner ? (
+              <p className="mt-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                {modeBanner}
+              </p>
+            ) : null}
           </div>
           <Button onClick={() => sessions.refetch()} variant="outline" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />

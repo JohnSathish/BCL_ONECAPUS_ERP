@@ -45,6 +45,7 @@ export class StudentAttendanceService {
 
   async dashboard(tenantId: string) {
     const today = this.startOfDay(new Date());
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
     const [sessions, marked, unmarked, entries, shortage] = await Promise.all([
       (this.prisma as any).studentAttendanceSession.count({
         where: { tenantId, sessionDate: today, deletedAt: null },
@@ -84,6 +85,9 @@ export class StudentAttendanceService {
         return acc;
       }, {}),
       shortageStudents: shortage,
+      attendanceMode: policy.attendanceMode,
+      aggregationUnit: policy.aggregationUnit,
+      unitLabels: policy.unitLabels,
     };
   }
 
@@ -92,11 +96,15 @@ export class StudentAttendanceService {
     dto: GenerateAttendanceSessionsDto,
   ) {
     const sessionDate = this.startOfDay(dto.date);
+    const policy = await this.attendancePolicy.getOrCreate(user.tid);
     const dayResolution = await this.workingDays.resolveDay(
       user.tid,
       sessionDate,
     );
+    const skipNonWorking =
+      policy.weekendHolidayHandling !== 'ALLOW_IF_GENERATED';
     if (
+      skipNonWorking &&
       !dayResolution.isWorkingDay &&
       !dayResolution.createsAttendanceSession
     ) {
@@ -105,6 +113,7 @@ export class StudentAttendanceService {
         skipped: true,
         reason: `Non-working day (${dayResolution.dayKind})`,
         day: dayResolution,
+        attendanceMode: policy.attendanceMode,
         removedDuplicates: 0,
       };
     }
@@ -173,24 +182,20 @@ export class StudentAttendanceService {
     });
 
     const dedupedEntries = this.deduplicateTimetableEntries(entries);
-    const policy = await this.attendancePolicy.getOrCreate(user.tid);
-    const teachingPeriodNos = [
-      ...new Set(
-        dedupedEntries
-          .map((e) => e.periodNo)
-          .filter((n): n is number => typeof n === 'number' && n > 0),
-      ),
-    ];
-    const countableEntries = dedupedEntries.filter((entry) =>
-      this.attendancePolicy.isPeriodCountable(
-        policy.attendanceMode,
-        entry.periodNo,
-        teachingPeriodNos,
-      ),
+    const enrichedForPolicy = dedupedEntries.map((entry: any) => ({
+      ...entry,
+      sectionCode: entry.sectionCode ?? null,
+      isBreak:
+        Number(entry.periodNo ?? 0) <= 0 ||
+        ['BREAK', 'LUNCH'].includes(String(entry.slotType ?? '').toUpperCase()),
+    }));
+    const resolved = this.attendancePolicy.resolveCountableEntries(
+      policy.attendanceMode,
+      enrichedForPolicy,
     );
 
     let created = 0;
-    for (const entry of countableEntries) {
+    for (const { entry, collectionUnit } of resolved) {
       const metadata = (entry.metadata ?? {}) as Record<string, unknown>;
       const facultyTeam = Array.isArray(metadata.facultyTeam)
         ? metadata.facultyTeam
@@ -201,6 +206,18 @@ export class StudentAttendanceService {
             entry.teachingSubjectGroupId,
           )
         : [];
+      const sessionMeta = {
+        facultyTeam,
+        fyugpCategory: entry.fyugpCategory,
+        generatedFrom: 'TIMETABLE',
+        teachingSubjectGroupId: entry.teachingSubjectGroupId,
+        linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
+        timetablePlanId: entry.planId,
+        timetablePlanName: entry.plan?.name,
+        collectionUnit,
+        attendanceMode: policy.attendanceMode,
+        cohortKey: this.attendancePolicy.cohortKey(entry),
+      };
       await (this.prisma as any).studentAttendanceSession.upsert({
         where: {
           tenantId_timetablePlanEntryId_sessionDate: {
@@ -231,30 +248,14 @@ export class StudentAttendanceService {
           primaryFacultyId: entry.staffProfileId,
           status: 'OPEN',
           lockAt: this.addHours(new Date(), 24),
-          metadata: {
-            facultyTeam,
-            fyugpCategory: entry.fyugpCategory,
-            generatedFrom: 'TIMETABLE',
-            teachingSubjectGroupId: entry.teachingSubjectGroupId,
-            linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
-            timetablePlanId: entry.planId,
-            timetablePlanName: entry.plan?.name,
-          },
+          metadata: sessionMeta,
         },
         update: {
           teachingSubjectGroupId: entry.teachingSubjectGroupId,
           courseId: entry.courseId,
           periodNo: entry.periodNo,
           primaryFacultyId: entry.staffProfileId,
-          metadata: {
-            facultyTeam,
-            fyugpCategory: entry.fyugpCategory,
-            generatedFrom: 'TIMETABLE',
-            teachingSubjectGroupId: entry.teachingSubjectGroupId,
-            linkedPaperIds: linkedPapers.map((p: any) => p.courseId),
-            timetablePlanId: entry.planId,
-            timetablePlanName: entry.plan?.name,
-          },
+          metadata: sessionMeta,
         },
       });
       created += 1;
@@ -270,14 +271,16 @@ export class StudentAttendanceService {
       created,
       considered: entries.length,
       deduped: dedupedEntries.length,
+      attendanceMode: policy.attendanceMode,
       removedDuplicates,
       publishedPlansOnly: !dto.timetablePlanId,
     });
     return {
       considered: entries.length,
       deduped: dedupedEntries.length,
-      countable: countableEntries.length,
+      countable: resolved.length,
       attendanceMode: policy.attendanceMode,
+      aggregationUnit: policy.aggregationUnit,
       created,
       removedDuplicates,
     };
@@ -445,6 +448,8 @@ export class StudentAttendanceService {
       include: { entries: true },
     });
     if (!session) throw new NotFoundException('Attendance session not found');
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    const defaultStatus = policy.defaultAttendanceStatus;
 
     let students: any[] = [];
     if (session.teachingSubjectGroupId) {
@@ -474,8 +479,17 @@ export class StudentAttendanceService {
     const entryByStudent = new Map<string, any>(
       session.entries.map((entry: any) => [entry.studentId, entry]),
     );
+    const enriched = await this.enrichSession(session);
     return {
-      session: await this.enrichSession(session),
+      session: {
+        ...enriched,
+        collectionUnit: (session.metadata as any)?.collectionUnit ?? null,
+        attendanceMode: policy.attendanceMode,
+        aggregationUnit: policy.aggregationUnit,
+        unitLabels: policy.unitLabels,
+        allowEditAfterSubmit: policy.allowEditAfterSubmit,
+        defaultAttendanceStatus: defaultStatus,
+      },
       students: students.map((student: any) => ({
         id: student.id,
         rollNumber: student.rollNumber,
@@ -485,7 +499,7 @@ export class StudentAttendanceService {
           student.masterProfile?.fullName ??
           student.user?.displayName ??
           student.enrollmentNumber,
-        status: entryByStudent.get(student.id)?.status ?? 'P',
+        status: entryByStudent.get(student.id)?.status ?? defaultStatus,
         remarks: entryByStudent.get(student.id)?.remarks ?? '',
       })),
     };
@@ -498,9 +512,16 @@ export class StudentAttendanceService {
     );
     const session = await this.assertOpenSession(user.tid, sessionId);
     await this.assertCanMark(user, session);
+    const policy = await this.attendancePolicy.getOrCreate(user.tid);
     const now = new Date();
+    const applyLate =
+      policy.latePolicy === 'MARK_LATE' &&
+      this.isPastLateGrace(session, policy.lateGraceMinutes, now);
+
     await this.prisma.$transaction(async (tx) => {
       for (const entry of dto.entries) {
+        let status = entry.status;
+        if (applyLate && status === 'P') status = 'L';
         await (tx as any).studentAttendanceEntry.upsert({
           where: {
             sessionId_studentId: { sessionId, studentId: entry.studentId },
@@ -509,14 +530,14 @@ export class StudentAttendanceService {
             tenantId: user.tid,
             sessionId,
             studentId: entry.studentId,
-            status: entry.status,
+            status,
             minutesPresent: entry.minutesPresent,
             remarks: entry.remarks,
             markedById: user.sub,
             markedAt: now,
           },
           update: {
-            status: entry.status,
+            status,
             minutesPresent: entry.minutesPresent,
             remarks: entry.remarks,
             markedById: user.sub,
@@ -547,6 +568,7 @@ export class StudentAttendanceService {
       await this.audit(user, 'MARK_SESSION', sessionId, null, {
         mode: dto.mode,
         count: dto.entries.length,
+        lateApplied: applyLate,
       });
     } catch (err) {
       this.logger.error(
@@ -555,6 +577,19 @@ export class StudentAttendanceService {
       );
     }
     return this.roster(user.tid, sessionId);
+  }
+
+  private isPastLateGrace(
+    session: { startTime?: Date | null; sessionDate?: Date },
+    graceMinutes: number | null,
+    now: Date,
+  ) {
+    if (!session.startTime) return false;
+    const start = new Date(session.sessionDate ?? now);
+    const t = new Date(session.startTime);
+    start.setHours(t.getUTCHours(), t.getUTCMinutes(), 0, 0);
+    const grace = graceMinutes == null ? 0 : Number(graceMinutes);
+    return now.getTime() > start.getTime() + grace * 60_000;
   }
 
   async correctSession(
@@ -730,9 +765,20 @@ export class StudentAttendanceService {
   async updatePolicy(
     tenantId: string,
     dto: {
-      attendanceMode?: 'FIRST_LAST' | 'EVERY_PERIOD';
+      attendanceMode?:
+        | 'PERIOD_WISE'
+        | 'ONCE_PER_DAY'
+        | 'MORNING_AFTERNOON'
+        | 'FIRST_LAST'
+        | 'EVERY_PERIOD';
       shortageThresholdPct?: number;
       defaulterThresholdPct?: number;
+      allowEditAfterSubmit?: boolean;
+      attendanceCutoffTime?: string | null;
+      lateGraceMinutes?: number | null;
+      latePolicy?: 'NONE' | 'MARK_LATE';
+      defaultAttendanceStatus?: 'P' | 'A';
+      weekendHolidayHandling?: 'SKIP_NON_WORKING' | 'ALLOW_IF_GENERATED';
     },
   ) {
     return this.attendancePolicy.update(tenantId, dto);
@@ -744,6 +790,7 @@ export class StudentAttendanceService {
       select: { id: true },
     });
     if (!student) return { subjects: [], overall: null, alerts: [] };
+    const policy = await this.attendancePolicy.getOrCreate(user.tid);
     const subjects = await this.summaries(user.tid, { studentId: student.id });
     const percentages = subjects.map((row: any) => Number(row.percentage ?? 0));
     const overall = percentages.length
@@ -756,6 +803,9 @@ export class StudentAttendanceService {
     return {
       subjects,
       overall,
+      attendanceMode: policy.attendanceMode,
+      aggregationUnit: policy.aggregationUnit,
+      unitLabels: policy.unitLabels,
       alerts: subjects
         .filter((row: any) => Number(row.percentage ?? 0) < 75)
         .map((row: any) => ({
@@ -769,7 +819,11 @@ export class StudentAttendanceService {
     };
   }
 
-  private async assertOpenSession(tenantId: string, sessionId: string) {
+  private async assertOpenSession(
+    tenantId: string,
+    sessionId: string,
+    options?: { allowPrivilegedCorrection?: boolean },
+  ) {
     const session = await (
       this.prisma as any
     ).studentAttendanceSession.findFirst({
@@ -781,7 +835,66 @@ export class StudentAttendanceService {
         `Attendance session is ${session.status.toLowerCase()}`,
       );
     }
+
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+
+    if (
+      !options?.allowPrivilegedCorrection &&
+      !policy.allowEditAfterSubmit &&
+      session.status === 'LOCKED'
+    ) {
+      throw new BadRequestException(
+        'Editing attendance after lock/submission is disabled for this institution. Request an admin correction.',
+      );
+    }
+
+    if (!options?.allowPrivilegedCorrection && policy.attendanceCutoffTime) {
+      const cutoff = this.parseCutoffOnSessionDate(
+        session.sessionDate,
+        policy.attendanceCutoffTime,
+      );
+      if (cutoff && Date.now() > cutoff.getTime()) {
+        throw new BadRequestException(
+          `Attendance cutoff time (${policy.attendanceCutoffTime}) has passed for this day`,
+        );
+      }
+    }
+
+    if (
+      !options?.allowPrivilegedCorrection &&
+      session.lockAt &&
+      Date.now() > new Date(session.lockAt).getTime() &&
+      session.status === 'OPEN'
+    ) {
+      throw new BadRequestException(
+        'Attendance window for this session has expired',
+      );
+    }
+
     return session;
+  }
+
+  private parseCutoffOnSessionDate(
+    sessionDate: Date,
+    hhmm: string,
+  ): Date | null {
+    const match = String(hhmm)
+      .trim()
+      .match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours > 23 ||
+      minutes > 59
+    ) {
+      return null;
+    }
+    const d = new Date(sessionDate);
+    d.setHours(hours, minutes, 0, 0);
+    return d;
   }
 
   private async assertCanMark(user: JwtUser, session: any) {
@@ -1053,7 +1166,13 @@ export class StudentAttendanceService {
             session: sessionFilter,
           },
           include: {
-            session: { select: { periodNo: true, sessionDate: true } },
+            session: {
+              select: {
+                periodNo: true,
+                sessionDate: true,
+                metadata: true,
+              },
+            },
           },
         });
 
@@ -1067,16 +1186,31 @@ export class StudentAttendanceService {
           byDate.set(dateKey, bucket);
         }
 
-        const counted = allEntries.filter((row: any) => {
+        const countableRows = allEntries.filter((row: any) => {
           if (NEUTRAL_STATUSES.has(row.status)) return false;
           const dateKey = this.localDateString(row.session?.sessionDate);
           const teachingNos = byDate.get(dateKey) ?? [];
-          return this.attendancePolicy.isPeriodCountable(
-            policy.attendanceMode,
-            row.session?.periodNo,
-            teachingNos,
-          );
+          const collectionUnit =
+            (row.session?.metadata as any)?.collectionUnit ?? null;
+          return this.attendancePolicy.isEntryCountable({
+            mode: policy.attendanceMode,
+            periodNo: row.session?.periodNo,
+            teachingPeriodNos: teachingNos,
+            collectionUnit,
+          });
         });
+
+        // Day mode: one countable unit per calendar date (whole-day mark).
+        let counted = countableRows;
+        if (this.attendancePolicy.isDayAggregationMode(policy.attendanceMode)) {
+          const byDay = new Map<string, any>();
+          for (const row of countableRows) {
+            const dateKey = this.localDateString(row.session?.sessionDate);
+            if (!byDay.has(dateKey)) byDay.set(dateKey, row);
+          }
+          counted = [...byDay.values()];
+        }
+
         const present = counted.filter((row: any) =>
           PRESENT_STATUSES.has(row.status),
         ).length;
@@ -1097,6 +1231,8 @@ export class StudentAttendanceService {
             ? { teachingSubjectGroupId: session.teachingSubjectGroupId }
             : {}),
           attendanceMode: policy.attendanceMode,
+          aggregationUnit: policy.aggregationUnit,
+          unitLabels: policy.unitLabels,
         };
         // Prisma compound unique upsert rejects null keys; use find+update/create.
         await this.upsertAttendanceSummary({
@@ -1290,6 +1426,14 @@ export class StudentAttendanceService {
       classroom,
       timetableLinked: Boolean(session.timetablePlanEntryId),
       timetablePlanName,
+      collectionUnit:
+        typeof sessionMetadata.collectionUnit === 'string'
+          ? sessionMetadata.collectionUnit
+          : null,
+      attendanceMode:
+        typeof sessionMetadata.attendanceMode === 'string'
+          ? sessionMetadata.attendanceMode
+          : null,
       location: classroom
         ? {
             roomCode: classroom.code,
@@ -1350,13 +1494,19 @@ export class StudentAttendanceService {
       byDate.set(dateKey, bucket);
     }
 
-    const countableSessions = sessions.filter((session: any) =>
-      this.attendancePolicy.isPeriodCountable(
-        policy.attendanceMode,
-        session.periodNo,
-        byDate.get(this.localDateString(session.sessionDate)) ?? [],
-      ),
+    let countableSessions = sessions.filter((session: any) =>
+      this.attendancePolicy.isEntryCountable({
+        mode: policy.attendanceMode,
+        periodNo: session.periodNo,
+        teachingPeriodNos:
+          byDate.get(this.localDateString(session.sessionDate)) ?? [],
+        collectionUnit: (session.metadata as any)?.collectionUnit ?? null,
+      }),
     );
+
+    if (this.attendancePolicy.isDayAggregationMode(policy.attendanceMode)) {
+      // One session per cohort-date already expected; also collapse student counts by day.
+    }
 
     const studentIds = [
       ...new Set(
@@ -1404,10 +1554,15 @@ export class StudentAttendanceService {
       presentCount: number;
       absentCount: number;
       medicalLeaveCount: number;
+      _dayKeys?: Set<string>;
     };
     const map = new Map<string, Agg>();
+    const dayMode = this.attendancePolicy.isDayAggregationMode(
+      policy.attendanceMode,
+    );
 
     for (const session of countableSessions) {
+      const dateKey = this.localDateString(session.sessionDate);
       for (const entry of session.entries ?? []) {
         if (NEUTRAL_STATUSES.has(entry.status)) continue;
         if (query.studentId && entry.studentId !== query.studentId) continue;
@@ -1424,7 +1579,16 @@ export class StudentAttendanceService {
           presentCount: 0,
           absentCount: 0,
           medicalLeaveCount: 0,
+          _dayKeys: new Set<string>(),
         };
+        if (dayMode) {
+          const dayBucket = `${dateKey}`;
+          if (existing._dayKeys?.has(dayBucket)) {
+            map.set(entry.studentId, existing);
+            continue;
+          }
+          existing._dayKeys?.add(dayBucket);
+        }
         existing.totalSessions += 1;
         if (PRESENT_STATUSES.has(entry.status)) existing.presentCount += 1;
         if (ABSENT_STATUSES.has(entry.status)) existing.absentCount += 1;
@@ -1434,17 +1598,22 @@ export class StudentAttendanceService {
     }
 
     const rows = Array.from(map.values())
-      .map((row) => ({
-        ...row,
-        percentage: row.totalSessions
-          ? Math.round((row.presentCount / row.totalSessions) * 10000) / 100
-          : 0,
-      }))
+      .map((row) => {
+        const { _dayKeys, ...rest } = row;
+        return {
+          ...rest,
+          percentage: rest.totalSessions
+            ? Math.round((rest.presentCount / rest.totalSessions) * 10000) / 100
+            : 0,
+        };
+      })
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
     return {
       type: query.scope,
       attendanceMode: policy.attendanceMode,
+      aggregationUnit: policy.aggregationUnit,
+      unitLabels: policy.unitLabels,
       from: this.localDateString(range.from),
       to: this.localDateString(range.to),
       shortageThresholdPct: policy.shortageThresholdPct,
@@ -1452,6 +1621,7 @@ export class StudentAttendanceService {
       summary: {
         students: rows.length,
         sessions: countableSessions.length,
+        workingUnits: rows.reduce((s, r) => s + r.totalSessions, 0),
         averagePercentage: rows.length
           ? Math.round(
               (rows.reduce((sum, row) => sum + row.percentage, 0) /
@@ -1491,6 +1661,8 @@ export class StudentAttendanceService {
     return {
       type: 'defaulters',
       attendanceMode: policy.attendanceMode,
+      aggregationUnit: policy.aggregationUnit,
+      unitLabels: policy.unitLabels,
       from: periodReport.from,
       to: periodReport.to,
       shortageThresholdPct: policy.shortageThresholdPct,

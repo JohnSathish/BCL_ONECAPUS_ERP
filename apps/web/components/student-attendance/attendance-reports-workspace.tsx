@@ -35,6 +35,13 @@ type ReportPayload = {
   from: string;
   to: string;
   attendanceMode: string;
+  aggregationUnit?: 'PERIOD' | 'DAY' | 'SESSION';
+  unitLabels?: {
+    working: string;
+    present: string;
+    absent: string;
+    percentageHint: string;
+  };
   shortageThresholdPct?: number;
   defaulterThresholdPct?: number;
   summary: Record<string, number>;
@@ -93,8 +100,9 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
         <div>
           <h1 className="text-xl font-semibold">{TITLES[kind]}</h1>
           <p className="text-sm text-muted-foreground">
-            Percentages follow the tenant attendance policy (First &amp; Last or Every Period).
+            Percentages follow the institution attendance collection mode.
             {report?.attendanceMode ? ` Current mode: ${report.attendanceMode}.` : ''}
+            {report?.unitLabels?.percentageHint ? ` ${report.unitLabels.percentageHint}.` : ''}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -191,7 +199,7 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Students" value={report?.summary?.students ?? rows.length} />
         <SummaryCard
-          label={kind === 'defaulters' ? 'Detained' : 'Sessions'}
+          label={kind === 'defaulters' ? 'Detained' : (report?.unitLabels?.working ?? 'Sessions')}
           value={
             kind === 'defaulters'
               ? (report?.summary?.detained ?? 0)
@@ -214,9 +222,9 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
             <tr>
               <th className="px-3 py-2">Roll</th>
               <th className="px-3 py-2">Student</th>
-              <th className="px-3 py-2">Sessions</th>
-              <th className="px-3 py-2">Present</th>
-              <th className="px-3 py-2">Absent</th>
+              <th className="px-3 py-2">{report?.unitLabels?.working ?? 'Sessions'}</th>
+              <th className="px-3 py-2">{report?.unitLabels?.present ?? 'Present'}</th>
+              <th className="px-3 py-2">{report?.unitLabels?.absent ?? 'Absent'}</th>
               <th className="px-3 py-2">%</th>
               {kind === 'defaulters' ? <th className="px-3 py-2">Status</th> : null}
             </tr>

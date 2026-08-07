@@ -101,6 +101,19 @@ export default function FacultyAttendanceScreen() {
           ) : null}
         </View>
 
+        {sessions[0]?.attendanceMode === 'ONCE_PER_DAY' ||
+        sessions.some((s) => String((s as any).collectionUnit ?? '') === 'DAY') ? (
+          <Text style={styles.modeHint}>
+            Daily attendance — mark once in the first period for the whole working day.
+          </Text>
+        ) : sessions.some((s) =>
+            ['MORNING', 'AFTERNOON'].includes(String((s as any).collectionUnit ?? '')),
+          ) ? (
+          <Text style={styles.modeHint}>
+            Morning & afternoon attendance — mark each session separately.
+          </Text>
+        ) : null}
+
         {loading ? (
           <ActivityIndicator color={facultyTheme.primaryLight} style={{ marginTop: 24 }} />
         ) : sessions.length === 0 ? (
@@ -188,6 +201,17 @@ const styles = StyleSheet.create({
   summaryLockedValue: { color: '#C2410C' },
   summaryLabel: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2, fontWeight: '600' },
   empty: { fontSize: 13, color: facultyTheme.textMuted, marginTop: 12 },
+  modeHint: {
+    fontSize: 12,
+    color: facultyTheme.textMuted,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: facultyTheme.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
   card: {
     backgroundColor: facultyTheme.surface,
     borderRadius: 14,

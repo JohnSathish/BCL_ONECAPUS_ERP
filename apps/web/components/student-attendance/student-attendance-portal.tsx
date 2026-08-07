@@ -24,6 +24,9 @@ export function StudentAttendancePortal() {
 
   const data = attendance.data ?? { subjects: [], overall: null, alerts: [] };
   const overall = data.overall == null ? null : Number(data.overall);
+  const unitHint = (data as any).unitLabels?.percentageHint as string | undefined;
+  const presentLabel = (data as any).unitLabels?.present ?? 'Present';
+  const workingLabel = (data as any).unitLabels?.working ?? 'Sessions';
 
   return (
     <div className="space-y-5">
@@ -33,6 +36,7 @@ export function StudentAttendancePortal() {
         <p className="text-sm text-muted-foreground">
           Track subject-wise attendance, overall percentage, and shortage warnings for the current
           semester.
+          {unitHint ? ` ${unitHint}` : ''}
         </p>
       </section>
 
@@ -82,8 +86,8 @@ export function StudentAttendancePortal() {
                       Subject {subject.courseId?.slice(0, 8) ?? '—'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Present {subject.presentCount}/{subject.totalSessions} · Absent{' '}
-                      {subject.absentCount}
+                      {presentLabel} {subject.presentCount}/{subject.totalSessions} ({workingLabel})
+                      · Absent {subject.absentCount}
                     </p>
                   </div>
                   <span
