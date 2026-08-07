@@ -128,7 +128,11 @@ export default function ElectiveStaffAllocationPage() {
       number,
       { periodNo: number; label: string; startTime: string; endTime: string }
     >();
-    for (const slot of slotsQ.data ?? []) {
+    // Prefer Monday (day 1) times when deduping — matches Day Shift master grid.
+    const ordered = [...(slotsQ.data ?? [])].sort(
+      (a, b) => a.dayOfWeek - b.dayOfWeek || a.periodNo - b.periodNo,
+    );
+    for (const slot of ordered) {
       if (!map.has(slot.periodNo)) {
         map.set(slot.periodNo, {
           periodNo: slot.periodNo,
@@ -138,7 +142,12 @@ export default function ElectiveStaffAllocationPage() {
         });
       }
     }
-    return [...map.values()].sort((a, b) => a.periodNo - b.periodNo);
+    return [...map.values()].sort((a, b) => {
+      // Teaching order: 1..6 then BREAK (0) after period 3 visually — keep numeric sort but
+      // show break after P3 by putting 0 between 3 and 4.
+      const rank = (n: number) => (n === 0 ? 3.5 : n);
+      return rank(a.periodNo) - rank(b.periodNo);
+    });
   }, [slotsQ.data]);
 
   const dayChoices = useMemo(() => {
