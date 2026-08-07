@@ -880,6 +880,13 @@ export class WebsiteService {
     dto: CreateWebsiteFyugInterestDto,
     photograph?: Express.Multer.File,
   ) {
+    const window = await this.getFyugInterestRegistrationWindow(tenantId);
+    if (!window.acceptingRegistrations) {
+      throw new BadRequestException(
+        window.message ??
+          'Registration closed — the last date for interest registration has passed.',
+      );
+    }
     if (dto.company) {
       throw new BadRequestException('Automated submission rejected');
     }
@@ -1001,6 +1008,65 @@ export class WebsiteService {
       status: 'accepted' as const,
       createdAt: row.createdAt,
     };
+  }
+
+  /** Published last date for FYUG interest form (IST). */
+  static readonly FYUG_INTEREST_DEFAULT_CLOSES_AT = new Date(
+    '2026-08-06T23:59:59+05:30',
+  );
+
+  async getFyugInterestRegistrationWindow(tenantId: string) {
+    const site = await this.getOrCreateSite(tenantId);
+    const settings = (site.settingsJson ?? {}) as Record<string, unknown>;
+    const fyug = (settings.fyugInterest ?? {}) as Record<string, unknown>;
+    const closesAtRaw =
+      typeof fyug.closesAt === 'string' && fyug.closesAt.trim()
+        ? new Date(fyug.closesAt)
+        : WebsiteService.FYUG_INTEREST_DEFAULT_CLOSES_AT;
+    const closesAt = Number.isNaN(closesAtRaw.getTime())
+      ? WebsiteService.FYUG_INTEREST_DEFAULT_CLOSES_AT
+      : closesAtRaw;
+
+    let acceptingRegistrations: boolean;
+    if (typeof fyug.acceptingRegistrations === 'boolean') {
+      acceptingRegistrations = fyug.acceptingRegistrations;
+    } else {
+      acceptingRegistrations = Date.now() <= closesAt.getTime();
+    }
+
+    return {
+      acceptingRegistrations,
+      closesAt: closesAt.toISOString(),
+      source:
+        typeof fyug.acceptingRegistrations === 'boolean'
+          ? ('manual' as const)
+          : ('deadline' as const),
+      message: acceptingRegistrations
+        ? null
+        : 'Registration closed — the last date for interest registration has passed.',
+    };
+  }
+
+  async updateFyugInterestRegistrationWindow(
+    tenantId: string,
+    input: { acceptingRegistrations: boolean; closesAt?: string | null },
+  ) {
+    const site = await this.getOrCreateSite(tenantId);
+    const settings = {
+      ...((site.settingsJson ?? {}) as Record<string, unknown>),
+    };
+    const previous = (settings.fyugInterest ?? {}) as Record<string, unknown>;
+    settings.fyugInterest = {
+      ...previous,
+      acceptingRegistrations: Boolean(input.acceptingRegistrations),
+      ...(input.closesAt !== undefined ? { closesAt: input.closesAt } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.websiteSite.update({
+      where: { id: site.id },
+      data: { settingsJson: settings as Prisma.InputJsonValue },
+    });
+    return this.getFyugInterestRegistrationWindow(tenantId);
   }
 
   async listFyugInterests(

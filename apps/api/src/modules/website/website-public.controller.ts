@@ -257,6 +257,16 @@ export class WebsitePublicController {
   }
 
   @Public()
+  @Get('fyug-interest/window')
+  async fyugInterestWindow(
+    @Req() req: Request,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.website.getFyugInterestRegistrationWindow(tenant.id);
+  }
+
+  @Public()
   @Post('fyug-interest')
   @UseInterceptors(
     FileInterceptor('photograph', {

@@ -76,8 +76,13 @@ function daysUntilFormClose() {
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
+function isInterestRegistrationClosed() {
+  return Date.now() > FORM_DEADLINE.getTime();
+}
+
 export default function FyugInterestPage() {
   const daysLeft = daysUntilFormClose();
+  const registrationClosed = isInterestRegistrationClosed();
 
   return (
     <main id="main" className="fyug-page">
@@ -112,7 +117,11 @@ export default function FyugInterestPage() {
 
           <div className="fyug-hero-grid">
             <div className="fyug-hero-copy">
-              <p className="fyug-session-badge">Admission Open · NEP 2020</p>
+              <p className="fyug-session-badge">
+                {registrationClosed
+                  ? 'Interest registration closed · NEP 2020'
+                  : 'Admission Open · NEP 2020'}
+              </p>
               <h1>
                 <span className="fyug-hero-title-main">Fourth-Year UG</span>
                 <span className="fyug-hero-title-accent">Admission</span>
@@ -121,11 +130,19 @@ export default function FyugInterestPage() {
                 Bonafide students of any NEHU-affiliated college (including Don Bosco College, Tura)
                 who have successfully cleared the Semester VI FYUP (NEP 2020) examination.
               </p>
-              <a className="fyug-hero-cta" href="#fyug-form">
-                <PencilLine aria-hidden />
-                <span>Register Now</span>
-                <ChevronRight aria-hidden />
-              </a>
+              {registrationClosed ? (
+                <a className="fyug-hero-cta" href="#fyug-form">
+                  <Clock3 aria-hidden />
+                  <span>Registration closed</span>
+                  <ChevronRight aria-hidden />
+                </a>
+              ) : (
+                <a className="fyug-hero-cta" href="#fyug-form">
+                  <PencilLine aria-hidden />
+                  <span>Register Now</span>
+                  <ChevronRight aria-hidden />
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -166,11 +183,13 @@ export default function FyugInterestPage() {
             You may take admission if you have cleared the 6th Semester Examination 2026.
           </p>
           <p className="fyug-dates-urgency">
-            {daysLeft === 0
-              ? 'Last day to collect the form is today.'
-              : daysLeft === 1
-                ? '1 day left to collect the form.'
-                : `${daysLeft} days left to collect the form.`}
+            {registrationClosed
+              ? 'Interest registration is closed — the last date has passed.'
+              : daysLeft === 0
+                ? 'Last day to collect the form is today.'
+                : daysLeft === 1
+                  ? '1 day left to collect the form.'
+                  : `${daysLeft} days left to collect the form.`}
           </p>
         </div>
       </section>
@@ -198,8 +217,8 @@ export default function FyugInterestPage() {
               Fill the Interest Registration Form online. Share this page link or scan the QR code
               on the college notice to register from your phone.
             </p>
-            <a className="fyug-scan-link" href="#fyug-form">
-              Open registration form
+            <a className="fyug-scan-link" href={registrationClosed ? '#fyug-form' : '#fyug-form'}>
+              {registrationClosed ? 'View registration notice' : 'Open registration form'}
               <ChevronRight aria-hidden />
             </a>
           </div>
@@ -209,7 +228,11 @@ export default function FyugInterestPage() {
       <section className="shell fyug-eligibility">
         <div className="fyug-mkt-head">
           <h2>Eligibility</h2>
-          <a href="#fyug-form">Register now</a>
+          {registrationClosed ? (
+            <span>Registration closed</span>
+          ) : (
+            <a href="#fyug-form">Register now</a>
+          )}
         </div>
         <p className="fyug-eligibility-intro">
           Only students having <strong>120 credits</strong> and <strong>no back papers</strong> at
@@ -260,7 +283,24 @@ export default function FyugInterestPage() {
       </section>
 
       <section className="shell fyug-layout" id="fyug-form">
-        <FyugInterestForm />
+        {registrationClosed ? (
+          <div className="fyug-closed-notice" role="status">
+            <Clock3 aria-hidden />
+            <div>
+              <h2>Registration closed</h2>
+              <p>
+                Interest registration for the Fourth-Year Undergraduate Honours Programme is closed
+                — the last date has passed (6 August 2026). For enquiries, please contact the
+                Admission Office.
+              </p>
+              <p>
+                Phone: +91 94021 52496 / +91 96784 02086 · Email: principal@donboscocollege.ac.in
+              </p>
+            </div>
+          </div>
+        ) : (
+          <FyugInterestForm />
+        )}
       </section>
 
       <div className="fyug-sticky-cta" role="region" aria-label="Quick registration actions">
@@ -268,10 +308,17 @@ export default function FyugInterestPage() {
           <Phone aria-hidden />
           <span>Contact</span>
         </a>
-        <a className="fyug-sticky-main" href="#fyug-form">
-          <PencilLine aria-hidden />
-          <span>Register Now</span>
-        </a>
+        {registrationClosed ? (
+          <a className="fyug-sticky-main" href="tel:+919402152496">
+            <Phone aria-hidden />
+            <span>Contact Office</span>
+          </a>
+        ) : (
+          <a className="fyug-sticky-main" href="#fyug-form">
+            <PencilLine aria-hidden />
+            <span>Register Now</span>
+          </a>
+        )}
         <a
           className="fyug-sticky-side fyug-sticky-wa"
           href="https://wa.me/919402152496"

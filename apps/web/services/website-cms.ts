@@ -534,6 +534,21 @@ export const fetchWebsiteFyugInterestStats = () =>
     .get<import('@/types/website-cms').WebsiteFyugInterestStats>(`${base}/fyug-interest/stats`)
     .then((response) => response.data);
 
+export const fetchWebsiteFyugInterestWindow = () =>
+  api
+    .get<{
+      acceptingRegistrations: boolean;
+      closesAt: string;
+      source: 'manual' | 'deadline';
+      message: string | null;
+    }>(`${base}/fyug-interest/window`)
+    .then((response) => response.data);
+
+export const updateWebsiteFyugInterestWindow = (payload: {
+  acceptingRegistrations: boolean;
+  closesAt?: string | null;
+}) => api.patch(`${base}/fyug-interest/window`, payload).then((response) => response.data);
+
 export const downloadWebsiteFyugInterestExcel = async () => {
   const { downloadBlob } = await import('@/utils/download-blob');
   const { data } = await api.get(`${base}/fyug-interest/export.xlsx`, {

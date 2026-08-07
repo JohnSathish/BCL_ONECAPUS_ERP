@@ -1579,6 +1579,37 @@
   }
 }
 
+.fyug-closed-notice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
+  background: linear-gradient(180deg, #fff 0%, #f7fafc 100%);
+  padding: 22px 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.fyug-closed-notice svg {
+  width: 28px;
+  height: 28px;
+  color: #b45309;
+  margin-top: 2px;
+}
+
+.fyug-closed-notice h2 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.fyug-closed-notice p {
+  margin: 0 0 8px;
+  color: #475569;
+  line-height: 1.55;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fyug-hero,
   .fyug-entrance,

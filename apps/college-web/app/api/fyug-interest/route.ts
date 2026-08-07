@@ -11,6 +11,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // Hard stop if past published last date (API also enforces).
+  const formClosesAt = new Date('2026-08-06T23:59:59+05:30');
+  if (Date.now() > formClosesAt.getTime()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: 'Registration closed — the last date for interest registration has passed.',
+      },
+      { status: 400 },
+    );
+  }
+
   const base = cmsBase();
   if (!base) {
     return NextResponse.json(

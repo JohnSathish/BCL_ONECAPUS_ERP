@@ -880,6 +880,22 @@ export class WebsiteAdminController {
     return this.website.deleteNewsletterSubscriber(user.tid, subscriberId);
   }
 
+  @Get('fyug-interest/window')
+  @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
+  fyugInterestWindow(@CurrentUser() user: JwtUser) {
+    return this.website.getFyugInterestRegistrationWindow(user.tid);
+  }
+
+  @Patch('fyug-interest/window')
+  @RequireAnyPermission('website:edit', 'website:manage')
+  updateFyugInterestWindow(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: { acceptingRegistrations: boolean; closesAt?: string | null },
+  ) {
+    return this.website.updateFyugInterestRegistrationWindow(user.tid, body);
+  }
+
   @Get('fyug-interest')
   @RequireAnyPermission('website:read', 'website:edit', 'website:manage')
   fyugInterests(

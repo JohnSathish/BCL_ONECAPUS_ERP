@@ -52,6 +52,8 @@ import {
   deleteWebsiteNewsletterSubscriber,
   fetchWebsiteFyugInterests,
   fetchWebsiteFyugInterestStats,
+  fetchWebsiteFyugInterestWindow,
+  updateWebsiteFyugInterestWindow,
   downloadWebsiteFyugInterestExcel,
   downloadWebsiteFyugInterestPdf,
   fetchWebsiteCalendarItems,
@@ -2671,6 +2673,7 @@ function FyugInterestView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState('');
+  const qc = useQueryClient();
   const rows = useQuery({
     queryKey: ['website', 'fyug-interest'],
     queryFn: () => fetchWebsiteFyugInterests({ take: 500 }),
@@ -2679,13 +2682,76 @@ function FyugInterestView() {
     queryKey: ['website', 'fyug-interest', 'stats'],
     queryFn: fetchWebsiteFyugInterestStats,
   });
+  const windowQ = useQuery({
+    queryKey: ['website', 'fyug-interest', 'window'],
+    queryFn: fetchWebsiteFyugInterestWindow,
+  });
+  const windowMut = useMutation({
+    mutationFn: (acceptingRegistrations: boolean) =>
+      updateWebsiteFyugInterestWindow({ acceptingRegistrations }),
+    onSuccess: async (data) => {
+      setMessage(
+        data.acceptingRegistrations
+          ? 'Interest registration reopened.'
+          : 'Interest registration closed — new submissions are blocked.',
+      );
+      await qc.invalidateQueries({ queryKey: ['website', 'fyug-interest', 'window'] });
+    },
+    onError: (err) => setMessage(apiErrorMessage(err)),
+  });
 
   if (!rows.data) return <QueryState loading={rows.isLoading} error={rows.error} />;
 
   const s = stats.data;
+  const accepting = windowQ.data?.acceptingRegistrations ?? false;
 
   return (
     <div className="space-y-4">
+      <CompactCard>
+        <CompactCardHeader
+          title="Interest registration window"
+          description="Stop or reopen new Interest Registration submissions for FYUG 2026. Closing rejects public form posts even if someone still has the page open."
+        />
+        <CompactCardBody className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">
+              Status:{' '}
+              <span className={accepting ? 'text-emerald-700' : 'text-rose-700'}>
+                {windowQ.isLoading
+                  ? 'Loading…'
+                  : accepting
+                    ? 'Accepting new registrations'
+                    : 'Closed — not accepting new registrations'}
+              </span>
+            </p>
+            {windowQ.data?.closesAt ? (
+              <p className="text-xs text-muted-foreground">
+                Published last date: {new Date(windowQ.data.closesAt).toLocaleString()}
+                {windowQ.data.source === 'manual' ? ' · Manual override' : ' · Following deadline'}
+              </p>
+            ) : null}
+            {message ? <p className="mt-1 text-xs text-muted-foreground">{message}</p> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={windowMut.isPending || !accepting}
+              onClick={() => windowMut.mutate(false)}
+            >
+              Close registration
+            </Button>
+            <Button
+              type="button"
+              disabled={windowMut.isPending || accepting}
+              onClick={() => windowMut.mutate(true)}
+            >
+              Reopen registration
+            </Button>
+          </div>
+        </CompactCardBody>
+      </CompactCard>
+
       {s ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

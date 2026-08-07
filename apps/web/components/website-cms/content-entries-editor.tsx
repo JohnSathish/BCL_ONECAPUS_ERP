@@ -152,6 +152,17 @@ export function ContentEntriesEditor({
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not publish entry')),
   });
 
+  const rows = (entries.data ?? []) as EntryRow[];
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const summaryText = String(row.data?.summary ?? row.data?.quote ?? '');
+      const haystack = `${row.title} ${row.slug} ${row.status} ${summaryText}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [rows, search]);
+
   if (!types.data) {
     return <p className="text-sm text-muted-foreground">Loading content types…</p>;
   }
@@ -171,17 +182,6 @@ export function ContentEntriesEditor({
       </CompactCard>
     );
   }
-
-  const rows = (entries.data ?? []) as EntryRow[];
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => {
-      const summaryText = String(row.data?.summary ?? row.data?.quote ?? '');
-      const haystack = `${row.title} ${row.slug} ${row.status} ${summaryText}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [rows, search]);
 
   return (
     <div className="space-y-4">
