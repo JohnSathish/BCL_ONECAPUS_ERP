@@ -6,6 +6,24 @@ import { navigation as seedNavigation } from '@/lib/navigation';
 export type NavItem = { label: string; href: string; children?: NavItem[] };
 export type NavGroup = { label: string; items: Array<[string, string]>; children?: NavItem[] };
 
+/** Interest registration closed — keep out of menus even if CMS still has the item. */
+const HIDDEN_NAV_HREFS = new Set(['/admission/fyug-2026']);
+
+function isHiddenHref(href: string) {
+  const normalized = href.trim().replace(/\/+$/, '') || '/';
+  if (HIDDEN_NAV_HREFS.has(normalized)) return true;
+  return normalized.includes('/admission/fyug-2026');
+}
+
+function stripHiddenNavItems(items: NavItem[]): NavItem[] {
+  return items
+    .filter((item) => !isHiddenHref(item.href))
+    .map((item) => ({
+      ...item,
+      ...(item.children?.length ? { children: stripHiddenNavItems(item.children) } : {}),
+    }));
+}
+
 function mapTree(items: unknown[]): NavItem[] {
   const rows: NavItem[] = [];
   for (const item of items) {
@@ -16,7 +34,7 @@ function mapTree(items: unknown[]): NavItem[] {
     const children = Array.isArray(item.children) ? mapTree(item.children) : [];
     rows.push({ label, href: url, ...(children.length ? { children } : {}) });
   }
-  return rows;
+  return stripHiddenNavItems(rows);
 }
 
 function treeToGroups(items: NavItem[]): NavGroup[] {
@@ -32,7 +50,9 @@ function treeToGroups(items: NavItem[]): NavGroup[] {
 function seedAsGroups(): NavGroup[] {
   return seedNavigation.map((group) => ({
     label: group.label,
-    items: group.items.map(([label, href]) => [label, href] as [string, string]),
+    items: group.items
+      .filter(([, href]) => !isHiddenHref(href))
+      .map(([label, href]) => [label, href] as [string, string]),
   }));
 }
 

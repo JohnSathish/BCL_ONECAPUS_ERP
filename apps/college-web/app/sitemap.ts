@@ -26,7 +26,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/departments',
     '/academics/programmes',
     '/admission/apply',
-    '/admission/fyug-2026',
     '/campus-life/clubs',
     '/research/cell',
     '/iqac',

@@ -71,13 +71,16 @@ const processSteps = [
 
 const FORM_DEADLINE = new Date('2026-08-06T23:59:59+05:30');
 
+/** Hard stop after last date — keep closed until Admin reopens (API) and this flag is revised. */
+const FORCE_INTEREST_REGISTRATION_CLOSED = true;
+
 function daysUntilFormClose() {
   const ms = FORM_DEADLINE.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
 function isInterestRegistrationClosed() {
-  return Date.now() > FORM_DEADLINE.getTime();
+  return FORCE_INTEREST_REGISTRATION_CLOSED || Date.now() > FORM_DEADLINE.getTime();
 }
 
 export default function FyugInterestPage() {

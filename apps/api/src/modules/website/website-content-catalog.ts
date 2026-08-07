@@ -194,7 +194,6 @@ export const HEADER_MENU_CATALOG: CatalogMenuNode[] = [
     url: '/admission/apply',
     children: [
       { label: 'Apply Online', url: '/admission/apply' },
-      { label: 'FYUG 4th Year Interest', url: '/admission/fyug-2026' },
       { label: 'Prospectus', url: '/admission/prospectus' },
       { label: 'Eligibility', url: '/admission/eligibility' },
       { label: 'Scholarships', url: '/admission/scholarships' },

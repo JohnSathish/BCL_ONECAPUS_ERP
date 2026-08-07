@@ -1031,7 +1031,17 @@ export class WebsiteService {
     if (typeof fyug.acceptingRegistrations === 'boolean') {
       acceptingRegistrations = fyug.acceptingRegistrations;
     } else {
+      // Past published last date → closed until Admin explicitly reopens.
       acceptingRegistrations = Date.now() <= closesAt.getTime();
+    }
+
+    // Extra safety: never auto-open after the 2026 interest deadline unless
+    // Admin set acceptingRegistrations=true (manual reopen).
+    if (
+      typeof fyug.acceptingRegistrations !== 'boolean' &&
+      Date.now() > WebsiteService.FYUG_INTEREST_DEFAULT_CLOSES_AT.getTime()
+    ) {
+      acceptingRegistrations = false;
     }
 
     return {

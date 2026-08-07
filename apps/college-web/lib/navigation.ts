@@ -30,7 +30,6 @@ export const navigation = [
     label: 'Admission',
     items: [
       ['Apply Online', '/admission/apply'],
-      ['FYUG 4th Year Interest', '/admission/fyug-2026'],
       ['Prospectus', '/admission/prospectus'],
       ['Eligibility', '/admission/eligibility'],
       ['Scholarships', '/admission/scholarships'],

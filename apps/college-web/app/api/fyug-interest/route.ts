@@ -2,24 +2,32 @@ import { NextResponse } from 'next/server';
 import { cmsBase, cmsHeaders, safeTenant } from '@/lib/cms-client';
 import { fyugInterestSchema, rateLimit } from '@/lib/forms';
 
+const CLOSED_MESSAGE = 'Registration closed — the last date for interest registration has passed.';
+
+async function isRegistrationAccepting(base: string): Promise<boolean> {
+  try {
+    const url = new URL(`${base}/v1/website/public/fyug-interest/window`);
+    const tenant = safeTenant();
+    if (tenant) url.searchParams.set('tenant', tenant);
+    const response = await fetch(url, {
+      headers: { ...cmsHeaders() },
+      signal: AbortSignal.timeout(8000),
+      cache: 'no-store',
+    });
+    if (!response.ok) return false;
+    const data = (await response.json()) as { acceptingRegistrations?: boolean };
+    return Boolean(data.acceptingRegistrations);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   const rate = rateLimit(request, 'fyug-interest', 4);
   if (!rate.allowed) {
     return NextResponse.json(
       { ok: false, message: 'Too many submissions. Please try again later.' },
       { status: 429, headers: { 'Retry-After': String(rate.retryAfter) } },
-    );
-  }
-
-  // Hard stop if past published last date (API also enforces).
-  const formClosesAt = new Date('2026-08-06T23:59:59+05:30');
-  if (Date.now() > formClosesAt.getTime()) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: 'Registration closed — the last date for interest registration has passed.',
-      },
-      { status: 400 },
     );
   }
 
@@ -32,6 +40,11 @@ export async function POST(request: Request) {
       },
       { status: 503 },
     );
+  }
+
+  const accepting = await isRegistrationAccepting(base);
+  if (!accepting) {
+    return NextResponse.json({ ok: false, message: CLOSED_MESSAGE }, { status: 400 });
   }
 
   let form: FormData;
