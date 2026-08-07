@@ -26,11 +26,29 @@ export const updateWebsiteSettings = (payload: WebsiteSettings) =>
 export const fetchWebsitePages = () =>
   api.get<WebsitePage[]>(`${base}/pages`).then((response) => response.data);
 
+/** API AdminWebsitePageDto whitelist — omit read-only list fields (path, authorName, createdAt, sections). */
+function toAdminPageWritePayload(payload: Partial<WebsitePage>) {
+  const body: Record<string, unknown> = {};
+  if (payload.title !== undefined) body.title = payload.title;
+  if (payload.slug !== undefined) body.slug = payload.slug;
+  if (payload.excerpt !== undefined) body.excerpt = payload.excerpt;
+  if (payload.status !== undefined) body.status = payload.status;
+  if (payload.template !== undefined) body.template = payload.template;
+  if (payload.seoTitle !== undefined) body.seoTitle = payload.seoTitle;
+  if (payload.seoDescription !== undefined) body.seoDescription = payload.seoDescription;
+  if (payload.publishedAt !== undefined) body.publishedAt = payload.publishedAt;
+  return body;
+}
+
 export const createWebsitePage = (payload: Partial<WebsitePage>) =>
-  api.post<WebsitePage>(`${base}/pages`, payload).then((response) => response.data);
+  api
+    .post<WebsitePage>(`${base}/pages`, toAdminPageWritePayload(payload))
+    .then((response) => response.data);
 
 export const updateWebsitePage = (id: string, payload: Partial<WebsitePage>) =>
-  api.patch<WebsitePage>(`${base}/pages/${id}`, payload).then((response) => response.data);
+  api
+    .patch<WebsitePage>(`${base}/pages/${id}`, toAdminPageWritePayload(payload))
+    .then((response) => response.data);
 
 export const createWebsiteSection = (pageId: string, payload: Partial<WebsitePageSection>) =>
   api

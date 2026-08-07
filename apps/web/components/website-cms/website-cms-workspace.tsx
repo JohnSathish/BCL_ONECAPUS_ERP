@@ -677,8 +677,18 @@ function PageDetails({
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(page);
+  useEffect(() => setDraft(page), [page]);
   const save = useMutation({
-    mutationFn: () => updateWebsitePage(page.id, draft),
+    mutationFn: () =>
+      updateWebsitePage(page.id, {
+        title: draft.title,
+        slug: draft.slug,
+        status: draft.status,
+        template: draft.template,
+        excerpt: draft.excerpt,
+        seoTitle: draft.seoTitle,
+        seoDescription: draft.seoDescription,
+      }),
     onSuccess: () => {
       onMessage('Page details saved.');
       void queryClient.invalidateQueries({ queryKey: ['website', 'pages'] });
@@ -1517,7 +1527,6 @@ function PublishingView({ onMessage }: { onMessage: (message: string) => void })
                       variant="outline"
                       onClick={() =>
                         updateWebsitePage(page.id, {
-                          ...page,
                           status: page.status === 'DRAFT' ? 'IN_REVIEW' : 'PUBLISHED',
                         }).then(() => {
                           onMessage(
