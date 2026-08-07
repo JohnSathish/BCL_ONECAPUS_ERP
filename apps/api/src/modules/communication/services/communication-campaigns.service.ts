@@ -128,11 +128,19 @@ export class CommunicationCampaignsService {
     });
 
     // Resolve audience + deliver in the worker so the HTTP request stays under the web timeout.
-    await this.queue.enqueueNotification({
-      jobType: 'campaign-prepare-and-deliver',
-      tenantId: user.tid,
-      campaignId,
-    });
+    try {
+      await this.queue.enqueueNotification({
+        jobType: 'campaign-prepare-and-deliver',
+        tenantId: user.tid,
+        campaignId,
+      });
+    } catch (error) {
+      await this.prisma.communicationCampaign.update({
+        where: { id: campaignId },
+        data: { status: campaign.status },
+      });
+      throw error;
+    }
 
     return { campaignId, recipientCount: 0, status: 'SENDING' };
   }

@@ -15,15 +15,16 @@ export class QueueService {
     const isCampaignJob = jobType.startsWith('campaign-');
     const campaignId = payload.campaignId ? String(payload.campaignId) : '';
     // Collapse duplicate prepare/deliver enqueues (stall retries) for the same campaign.
+    // BullMQ forbids ":" in custom jobIds (Redis key separator) — use "__".
     let jobId: string | undefined;
     if (isCampaignJob && campaignId) {
       if (
         jobType === 'campaign-prepare-and-deliver' ||
         jobType === 'campaign-deliver'
       ) {
-        jobId = `${jobType}:${campaignId}`;
+        jobId = `${jobType}__${campaignId}`;
       } else if (jobType === 'campaign-deliver-batch') {
-        jobId = `${jobType}:${campaignId}:${payload.offset ?? 0}:${payload.limit ?? 40}`;
+        jobId = `${jobType}__${campaignId}__${payload.offset ?? 0}__${payload.limit ?? 40}`;
       }
       // campaign-deliver-retry stays unique per call so operators can requeue failures.
     }
