@@ -92,20 +92,27 @@ export class CommunicationDeliveryService {
   }
 
   async deliverCampaign(tenantId: string, campaignId: string) {
+    const campaignRow = await this.prisma.communicationCampaign.findFirst({
+      where: { id: campaignId, tenantId },
+      select: { status: true, metadata: true },
+    });
+    if (!campaignRow) {
+      return { sentCount: 0, failedCount: 0, recipientCount: 0 };
+    }
+    if (campaignRow.status === 'SENT' || campaignRow.status === 'CANCELLED') {
+      return { sentCount: 0, failedCount: 0, recipientCount: 0, skipped: true };
+    }
+
     const total = await this.prisma.communicationRecipient.count({
       where: { tenantId, campaignId },
     });
     if (!total) {
-      const campaign = await this.prisma.communicationCampaign.findFirst({
-        where: { id: campaignId, tenantId },
-        select: { metadata: true },
-      });
       await this.prisma.communicationCampaign.update({
         where: { id: campaignId },
         data: {
           status: 'FAILED',
           metadata: {
-            ...((campaign?.metadata as object) ?? {}),
+            ...((campaignRow.metadata as object) ?? {}),
             failureReason: 'No recipients to deliver',
           },
         },
@@ -172,7 +179,7 @@ export class CommunicationDeliveryService {
     campaignId: string,
     offset = 0,
     limit = 40,
-    options?: { finalize?: boolean; recipientId?: string },
+    options?: { finalize?: boolean; recipientId?: string; channel?: string },
   ) {
     const campaign = await this.prisma.communicationCampaign.findFirst({
       where: { id: campaignId, tenantId },
@@ -182,7 +189,17 @@ export class CommunicationDeliveryService {
       return;
     }
 
-    const channels = (campaign.channels as string[]) ?? ['IN_APP'];
+    // Full re-deliver of a finished campaign can create duplicate inbox rows.
+    if (
+      !options?.recipientId &&
+      (campaign.status === 'SENT' || campaign.status === 'CANCELLED')
+    ) {
+      return { sentCount: 0, failedCount: 0, recipientCount: 0, skipped: true };
+    }
+
+    const channels = options?.channel
+      ? [options.channel]
+      : ((campaign.channels as string[]) ?? ['IN_APP']);
     const metadata = (campaign.metadata ?? {}) as Record<string, unknown>;
     const variables = (metadata.variables ?? {}) as Record<string, string>;
     const brandingCtx = await this.brandedLayout.resolveContext(tenantId);
@@ -230,6 +247,17 @@ export class CommunicationDeliveryService {
 
     for (const recipient of recipients) {
       for (const channel of channels) {
+        if (
+          await this.channelAlreadySucceeded(
+            tenantId,
+            campaignId,
+            recipient.id,
+            channel,
+          )
+        ) {
+          continue;
+        }
+
         if (channel === 'SMS') {
           if (!recipient.phone) {
             await this.logDelivery({
@@ -528,6 +556,29 @@ export class CommunicationDeliveryService {
             continue;
           }
 
+          const existingInbox = await this.prisma.userNotification.findFirst({
+            where: {
+              tenantId,
+              userId: recipient.userId,
+              campaignId,
+            },
+            select: { id: true },
+          });
+          if (existingInbox) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'DELIVERED',
+              provider: 'in_app',
+              providerRef: existingInbox.id,
+              errorMessage: 'Skipped duplicate in-app notification',
+            });
+            sentCount++;
+            continue;
+          }
+
           const triggerKey = String(metadata.trigger ?? '');
           const notificationLink = resolveNotificationLink({
             recipientType: recipient.recipientType,
@@ -661,6 +712,25 @@ export class CommunicationDeliveryService {
         deliveredAt: input.status === 'DELIVERED' ? new Date() : undefined,
       },
     });
+  }
+
+  private async channelAlreadySucceeded(
+    tenantId: string,
+    campaignId: string,
+    recipientId: string,
+    channel: string,
+  ) {
+    const existing = await this.prisma.communicationDeliveryLog.findFirst({
+      where: {
+        tenantId,
+        campaignId,
+        recipientId,
+        channel,
+        status: { in: ['SENT', 'DELIVERED', 'SKIPPED'] },
+      },
+      select: { id: true },
+    });
+    return Boolean(existing);
   }
 
   private coalesceRendered(...candidates: Array<string | null | undefined>) {

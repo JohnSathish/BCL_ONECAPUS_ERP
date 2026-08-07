@@ -55,8 +55,10 @@ export class CommunicationNotificationProcessor extends WorkerHost {
       const recipientId = job.data.recipientId
         ? String(job.data.recipientId)
         : undefined;
+      const channel = job.data.channel ? String(job.data.channel) : undefined;
       return this.delivery.deliverCampaignBatch(tenantId, campaignId, 0, 1, {
         recipientId,
+        channel,
       });
     }
 

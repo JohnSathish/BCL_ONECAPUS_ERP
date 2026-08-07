@@ -189,6 +189,22 @@ export class CommunicationCampaignsService {
       }
     }
 
+    // If a prior deliver pass already logged successes, skip re-enqueue
+    // (BullMQ stall/retries can re-run prepare while status is still SENDING).
+    const alreadyDelivered = await this.prisma.communicationDeliveryLog.count({
+      where: {
+        tenantId,
+        campaignId,
+        status: { in: ['SENT', 'DELIVERED'] },
+      },
+    });
+    if (alreadyDelivered > 0) {
+      const recipientCount = await this.prisma.communicationRecipient.count({
+        where: { tenantId, campaignId },
+      });
+      return { recipientCount, status: 'SENDING', skippedDeliverEnqueue: true };
+    }
+
     await this.queue.enqueueNotification({
       jobType: 'campaign-deliver',
       tenantId,

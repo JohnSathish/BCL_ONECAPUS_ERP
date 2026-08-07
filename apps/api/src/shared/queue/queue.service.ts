@@ -10,19 +10,44 @@ export class QueueService {
     @InjectQueue('backups') private readonly backups: Queue,
   ) {}
 
-  enqueueNotification(payload: Record<string, unknown>) {
-    const isCampaignJob = String(payload.jobType ?? '').startsWith('campaign-');
-    return this.notifications.add('send', payload, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 3000 },
-      ...(isCampaignJob
-        ? {
-            // College-wide prepares can take minutes; avoid stalled/lock loss.
-            removeOnComplete: 100,
-            removeOnFail: 200,
-          }
-        : {}),
-    });
+  async enqueueNotification(payload: Record<string, unknown>) {
+    const jobType = String(payload.jobType ?? '');
+    const isCampaignJob = jobType.startsWith('campaign-');
+    const campaignId = payload.campaignId ? String(payload.campaignId) : '';
+    // Collapse duplicate prepare/deliver enqueues (stall retries) for the same campaign.
+    let jobId: string | undefined;
+    if (isCampaignJob && campaignId) {
+      if (
+        jobType === 'campaign-prepare-and-deliver' ||
+        jobType === 'campaign-deliver'
+      ) {
+        jobId = `${jobType}:${campaignId}`;
+      } else if (jobType === 'campaign-deliver-batch') {
+        jobId = `${jobType}:${campaignId}:${payload.offset ?? 0}:${payload.limit ?? 40}`;
+      }
+      // campaign-deliver-retry stays unique per call so operators can requeue failures.
+    }
+    try {
+      return await this.notifications.add('send', payload, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 3000 },
+        ...(jobId ? { jobId } : {}),
+        ...(isCampaignJob
+          ? {
+              // College-wide prepares can take minutes; avoid stalled/lock loss.
+              removeOnComplete: 100,
+              removeOnFail: 200,
+            }
+          : {}),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Same campaign already queued/active — treat as success (at-least-once enqueue).
+      if (jobId && /already exists|duplicat/i.test(message)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async getNotificationQueueStats() {
