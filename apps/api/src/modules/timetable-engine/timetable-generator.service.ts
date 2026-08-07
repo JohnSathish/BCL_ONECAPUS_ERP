@@ -860,18 +860,36 @@ export class TimetableGeneratorService {
   private hasInstitutionalDayShiftShape(slots: Slot[]) {
     const monday = slots.filter((slot) => slot.dayOfWeek === 1);
     const saturday = slots.filter((slot) => slot.dayOfWeek === 6);
+    const breakSlot = monday.find(
+      (slot) =>
+        (slot.isBreak || slot.isLunch) &&
+        this.timeToMinutes(slot.startTime) ===
+          this.timeStringToMinutes('12:10') &&
+        this.timeToMinutes(slot.endTime) === this.timeStringToMinutes('12:40'),
+    );
+    const p1 = monday.find(
+      (slot) =>
+        slot.periodNo === 1 &&
+        this.timeToMinutes(slot.startTime) ===
+          this.timeStringToMinutes('09:45') &&
+        this.timeToMinutes(slot.endTime) === this.timeStringToMinutes('10:40'),
+    );
+    const p6 = monday.find(
+      (slot) =>
+        slot.periodNo === 6 &&
+        this.timeToMinutes(slot.startTime) ===
+          this.timeStringToMinutes('14:10') &&
+        this.timeToMinutes(slot.endTime) === this.timeStringToMinutes('15:00'),
+    );
     return (
-      monday.length === 8 &&
-      saturday.length === 4 &&
-      monday.some(
-        (slot) =>
-          (slot.isBreak || slot.isLunch) &&
-          this.timeToMinutes(slot.startTime) ===
-            this.timeStringToMinutes('12:45') &&
-          this.timeToMinutes(slot.endTime) ===
-            this.timeStringToMinutes('13:15'),
-      ) &&
-      saturday.every((slot) => slot.periodNo <= 4)
+      monday.length === 7 &&
+      saturday.length === 3 &&
+      Boolean(breakSlot) &&
+      Boolean(p1) &&
+      Boolean(p6) &&
+      saturday.every(
+        (slot) => Number(slot.periodNo) > 0 && Number(slot.periodNo) <= 3,
+      )
     );
   }
 

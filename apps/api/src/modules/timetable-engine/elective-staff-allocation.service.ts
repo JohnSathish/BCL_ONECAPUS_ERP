@@ -34,21 +34,24 @@ const FYUGP_SEMESTERS_BY_MODE: Record<'ODD' | 'EVEN', number[]> = {
   EVEN: [2, 4, 6],
 };
 
-const DEFAULT_PERIODS: Array<{
+/** Don Bosco Day Shift master grid (matches printed Arts/Science/Commerce routine). */
+const INSTITUTIONAL_DAY_SHIFT_PERIODS: Array<{
   periodNo: number;
   label: string;
   start: string;
   end: string;
+  isBreak?: boolean;
 }> = [
-  { periodNo: 1, label: 'Period 1', start: '09:00', end: '09:45' },
-  { periodNo: 2, label: 'Period 2', start: '09:45', end: '10:30' },
-  { periodNo: 3, label: 'Period 3', start: '10:45', end: '11:30' },
-  { periodNo: 4, label: 'Period 4', start: '11:30', end: '12:15' },
-  { periodNo: 5, label: 'Period 5', start: '13:00', end: '13:45' },
-  { periodNo: 6, label: 'Period 6', start: '13:45', end: '14:30' },
-  { periodNo: 7, label: 'Period 7', start: '14:45', end: '15:30' },
-  { periodNo: 8, label: 'Period 8', start: '15:30', end: '16:15' },
+  { periodNo: 1, label: 'Period 1', start: '09:45', end: '10:40' },
+  { periodNo: 2, label: 'Period 2', start: '10:40', end: '11:25' },
+  { periodNo: 3, label: 'Period 3', start: '11:25', end: '12:10' },
+  { periodNo: 0, label: 'BREAK', start: '12:10', end: '12:40', isBreak: true },
+  { periodNo: 4, label: 'Period 4', start: '12:40', end: '13:25' },
+  { periodNo: 5, label: 'Period 5', start: '13:25', end: '14:10' },
+  { periodNo: 6, label: 'Period 6', start: '14:10', end: '15:00' },
 ];
+
+const DEFAULT_PERIODS = INSTITUTIONAL_DAY_SHIFT_PERIODS;
 
 type ListFilters = {
   academicYearId?: string;
@@ -368,6 +371,39 @@ export class ElectiveStaffAllocationService {
 
   async listSlotOptions(user: JwtUser, shiftId?: string) {
     await this.assertCanAssignElectives(user);
+
+    let useInstitutionalDayShift = !shiftId;
+    if (shiftId) {
+      const shift = await this.prisma.shift.findFirst({
+        where: { tenantId: user.tid, id: shiftId, deletedAt: null },
+        select: { code: true, name: true },
+      });
+      useInstitutionalDayShift = this.isInstitutionalDayShift(shift ?? {});
+    }
+
+    // Day Shift: always expose the published college grid (ignore stale templates).
+    if (useInstitutionalDayShift) {
+      const days = [1, 2, 3, 4, 5, 6];
+      return days.flatMap((dayOfWeek) => {
+        const periods =
+          dayOfWeek === 6
+            ? INSTITUTIONAL_DAY_SHIFT_PERIODS.filter(
+                (p) => p.periodNo > 0,
+              ).slice(0, 3)
+            : INSTITUTIONAL_DAY_SHIFT_PERIODS;
+        return periods.map((p) => ({
+          dayOfWeek,
+          dayName: DAY_NAMES[dayOfWeek],
+          periodNo: p.periodNo,
+          label: p.label,
+          startTime: p.start,
+          endTime: p.end,
+          isBreak: Boolean(p.isBreak),
+          slotTemplateId: null as string | null,
+        }));
+      });
+    }
+
     const templates = await this.prisma.timetableSlotTemplate.findMany({
       where: {
         tenantId: user.tid,
@@ -392,6 +428,7 @@ export class ElectiveStaffAllocationService {
           label: t.label,
           startTime: this.formatTime(t.startTime),
           endTime: this.formatTime(t.endTime),
+          isBreak: Boolean((t as any).isBreak || (t as any).isLunch),
           slotTemplateId: t.id,
         }));
     }
@@ -404,8 +441,22 @@ export class ElectiveStaffAllocationService {
         label: p.label,
         startTime: p.start,
         endTime: p.end,
+        isBreak: Boolean(p.isBreak),
         slotTemplateId: null as string | null,
       })),
+    );
+  }
+
+  private isInstitutionalDayShift(shift: {
+    code?: string | null;
+    name?: string | null;
+  }) {
+    const text = `${shift.code ?? ''} ${shift.name ?? ''}`.toLowerCase();
+    return (
+      !text.trim() ||
+      text.includes('day') ||
+      text.includes('shift ii') ||
+      text.includes('shift_ii')
     );
   }
 
@@ -549,9 +600,9 @@ export class ElectiveStaffAllocationService {
           ? DEFAULT_PERIODS.find((p) => p.periodNo === Number(dto.periodNo))
           : null;
       const startTime = this.parseTime(
-        dto.startTime ?? period?.start ?? '09:00',
+        dto.startTime ?? period?.start ?? '09:45',
       );
-      const endTime = this.parseTime(dto.endTime ?? period?.end ?? '09:45');
+      const endTime = this.parseTime(dto.endTime ?? period?.end ?? '10:40');
       const periodNo =
         dto.periodNo != null
           ? Number(dto.periodNo)
