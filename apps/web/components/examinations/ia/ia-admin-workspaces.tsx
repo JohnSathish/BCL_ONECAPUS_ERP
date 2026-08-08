@@ -8,6 +8,7 @@ import {
   Download,
   Loader2,
   Plus,
+  Printer,
   Save,
   Send,
   Sparkles,
@@ -20,11 +21,13 @@ import {
   createIaScheme,
   createIaSession,
   downloadIaNehuExport,
+  downloadIaNoticeboardRoutinePdf,
   fetchFacultyIaSubjects,
   fetchIaAdminDashboard,
   fetchIaConsolidationSheets,
   fetchIaDefaulters,
   fetchIaExams,
+  fetchIaNoticeboardRoutineHtml,
   fetchIaPapers,
   fetchIaRoster,
   fetchIaSchemes,
@@ -39,7 +42,30 @@ import {
   updateIaSettings,
   type IaComponent,
 } from '@/services/examinations-ia';
+import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+
+function formatPaperClock(value: string | Date | null | undefined) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'string') {
+    const match = value.match(/T(\d{2}):(\d{2})/) ?? value.match(/^(\d{1,2}):(\d{2})/);
+    if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  // Prisma TIME is stored on 1970-01-01; use UTC hours to avoid TZ skew.
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+function formatPaperDate(value: string | Date | null | undefined) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function Kpi({ label, value }: { label: string; value: number | string }) {
   return (
@@ -285,7 +311,7 @@ export function IaTimetableWorkspace() {
   const exams = useQuery({ queryKey: ['ia', 'exams'], queryFn: fetchIaExams });
   const papers = useQuery({ queryKey: ['ia', 'papers'], queryFn: () => fetchIaPapers() });
   const [sessionId, setSessionId] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState('2026-08-24');
   const [durationMinutes, setDurationMinutes] = useState(120);
   const [mode, setMode] = useState<'SIMPLE' | 'FYUGP_FIRST_IA'>('FYUGP_FIRST_IA');
   const [routinePattern, setRoutinePattern] = useState<'MORNING' | 'DAY' | 'AUTO'>('AUTO');
@@ -333,6 +359,57 @@ export function IaTimetableWorkspace() {
     },
     onError: () =>
       setMessage('Could not generate timetable. Ensure an IA exam exists with scheduled subjects.'),
+  });
+
+  const downloadPdf = useMutation({
+    mutationFn: () =>
+      downloadIaNoticeboardRoutinePdf(activeSession, {
+        routinePattern: resolvedPattern,
+        startDate,
+      }),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FYUGP-First-IA-${resolvedPattern}-Noticeboard.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage('Noticeboard routine PDF downloaded.');
+    },
+    onError: (e) =>
+      setMessage(
+        apiErrorMessage(
+          e,
+          'Could not download noticeboard PDF. Set Start date (e.g. 2026-08-24) and try again.',
+        ),
+      ),
+  });
+
+  const printHtml = useMutation({
+    mutationFn: () =>
+      fetchIaNoticeboardRoutineHtml(activeSession, {
+        routinePattern: resolvedPattern,
+        startDate,
+      }),
+    onSuccess: (html) => {
+      const w = window.open('', '_blank');
+      if (!w) {
+        setMessage('Popup blocked — allow popups to print, or use Download PDF.');
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 400);
+      setMessage('Noticeboard opened for printing.');
+    },
+    onError: (e) =>
+      setMessage(
+        apiErrorMessage(
+          e,
+          'Could not open noticeboard. Set Start date (e.g. 2026-08-24) and try again.',
+        ),
+      ),
   });
 
   return (
@@ -418,11 +495,38 @@ export function IaTimetableWorkspace() {
             )}
             {mode === 'FYUGP_FIRST_IA' ? 'Apply FYUGP First IA Timetable' : 'Generate Timetable'}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => downloadPdf.mutate()}
+            disabled={!activeSession || downloadPdf.isPending || !startDate}
+          >
+            {downloadPdf.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Download noticeboard PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => printHtml.mutate()}
+            disabled={!activeSession || printHtml.isPending || !startDate}
+          >
+            {printHtml.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4" />
+            )}
+            Print noticeboard
+          </Button>
         </div>
         {mode === 'FYUGP_FIRST_IA' ? (
           <p className="mt-3 text-xs text-muted-foreground">
             Day 0 from start date = Monday MAJOR / MAJOR 1. Morning VAC falls on Saturday; Day Shift
-            Sem 1 VAC is Friday afternoon (1:45–2:10).
+            Sem 1 VAC is Friday afternoon (1:45–2:10). After applying, download the noticeboard PDF
+            for the notice board (Morning and Day exams separately).
           </p>
         ) : null}
         {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
@@ -452,11 +556,9 @@ export function IaTimetableWorkspace() {
                   <td className="py-2 pr-3 font-mono text-xs">{p.paperCode}</td>
                   <td className="py-2 pr-3">{p.paperName}</td>
                   <td className="py-2 pr-3">{p.semesterNo ?? '—'}</td>
-                  <td className="py-2 pr-3">
-                    {p.examDate ? String(p.examDate).slice(0, 10) : '—'}
-                  </td>
+                  <td className="py-2 pr-3">{formatPaperDate(p.examDate)}</td>
                   <td className="py-2 pr-3 text-xs text-muted-foreground">
-                    {String(p.startTime).slice(0, 5)}–{String(p.endTime).slice(0, 5)}
+                    {formatPaperClock(p.startTime)}–{formatPaperClock(p.endTime)}
                   </td>
                 </tr>
               ))}

@@ -170,11 +170,40 @@ export type CreateIaExamPayload = {
   startDate?: string;
   endDate?: string;
   remarks?: string;
+  /** Semester → enabled subject categories (MAJOR, MINOR, AEC, …). */
+  enabledCategoriesBySemester?: Record<string, string[]>;
   /** @deprecated legacy single-semester API */
   semesterNo?: number;
   programVersionId?: string;
   departmentId?: string;
 };
+
+export const IA_SUBJECT_CATEGORY_OPTIONS = [
+  'MAJOR',
+  'MINOR',
+  'AEC',
+  'MDC',
+  'SEC',
+  'VAC',
+  'VTC',
+  'INTERNSHIP',
+] as const;
+
+/** Printed FYUGP First IA defaults (VTC & INTERNSHIP off). */
+export function defaultIaCategoriesForSemester(semesterNo: number): string[] {
+  if (semesterNo === 1) return ['MAJOR', 'MINOR', 'AEC', 'MDC', 'SEC', 'VAC'];
+  if (semesterNo === 3) return ['MAJOR', 'AEC', 'MDC', 'SEC'];
+  if (semesterNo === 5) return ['MAJOR', 'MINOR'];
+  return ['MAJOR', 'MINOR', 'AEC', 'MDC', 'SEC', 'VAC'];
+}
+
+export function buildDefaultCategoryPolicy(semesterNos: number[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const sem of semesterNos) {
+    out[String(sem)] = defaultIaCategoriesForSemester(sem);
+  }
+  return out;
+}
 
 export type IaExamPreview = {
   examName: string;
@@ -195,6 +224,7 @@ export type IaExamPreview = {
   programVersions: number;
   ready: boolean;
   warnings: string[];
+  enabledCategoriesBySemester?: Record<string, string[]> | null;
 };
 
 export async function fetchIaExamDepartments(streamId?: string) {
@@ -246,6 +276,37 @@ export async function generateIaTimetable(payload: {
     warnings?: string[];
     mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
   };
+}
+
+export async function downloadIaNoticeboardRoutinePdf(
+  sessionId: string,
+  options?: { routinePattern?: 'MORNING' | 'DAY'; startDate?: string },
+) {
+  const { data } = await api.get(`/v1/examinations/ia/exams/${sessionId}/noticeboard-routine.pdf`, {
+    params: {
+      ...(options?.routinePattern ? { routinePattern: options.routinePattern } : {}),
+      ...(options?.startDate ? { startDate: options.startDate } : {}),
+    },
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export async function fetchIaNoticeboardRoutineHtml(
+  sessionId: string,
+  options?: { routinePattern?: 'MORNING' | 'DAY'; startDate?: string },
+) {
+  const { data } = await api.get<string>(
+    `/v1/examinations/ia/exams/${sessionId}/noticeboard-routine.html`,
+    {
+      params: {
+        ...(options?.routinePattern ? { routinePattern: options.routinePattern } : {}),
+        ...(options?.startDate ? { startDate: options.startDate } : {}),
+      },
+      responseType: 'text',
+    },
+  );
+  return data;
 }
 
 export async function fetchIaRoster(paperId: string, schemeId?: string) {

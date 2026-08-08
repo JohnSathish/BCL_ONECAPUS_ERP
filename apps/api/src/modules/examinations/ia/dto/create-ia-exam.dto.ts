@@ -5,6 +5,7 @@ import {
   IsIn,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -84,6 +85,15 @@ export class CreateIaExamDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  /**
+   * Semester → enabled subject categories (MAJOR, MINOR, AEC, …).
+   * Keys may be numbers or numeric strings. When omitted, all categories are included (legacy).
+   * Wizard should send explicit maps (FYUGP printed defaults leave VTC/INTERNSHIP off).
+   */
+  @IsOptional()
+  @IsObject()
+  enabledCategoriesBySemester?: Record<string, string[]>;
 }
 
 export class PreviewIaExamDto extends CreateIaExamDto {}

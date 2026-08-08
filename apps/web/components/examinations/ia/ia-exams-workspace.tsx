@@ -14,6 +14,8 @@ import {
   fetchIaExamDepartments,
   fetchIaExams,
   previewIaExam,
+  buildDefaultCategoryPolicy,
+  IA_SUBJECT_CATEGORY_OPTIONS,
   type CreateIaExamPayload,
   type IaExamSummary,
 } from '@/services/examinations-ia';
@@ -34,10 +36,18 @@ const EXAM_TYPE_OPTIONS = [
   ['IA_CIE', 'Continuous Internal Evaluation'],
 ] as const;
 
-const WIZARD_STEPS = ['Exam details', 'Semesters', 'Stream', 'Departments', 'Summary'] as const;
+const WIZARD_STEPS = [
+  'Exam details',
+  'Semesters',
+  'Categories',
+  'Stream',
+  'Departments',
+  'Summary',
+] as const;
 
 const ODD_SEMESTERS = [1, 3, 5, 7];
 const EVEN_SEMESTERS = [2, 4, 6, 8];
+const LAST_WIZARD_STEP = WIZARD_STEPS.length - 1;
 
 function Card({
   title,
@@ -112,6 +122,9 @@ export function IaExamsWorkspace() {
   const [remarks, setRemarks] = useState('');
   const [shiftId, setShiftId] = useState('');
   const [semesterNos, setSemesterNos] = useState<number[]>([1, 3, 5]);
+  const [categoryPolicy, setCategoryPolicy] = useState<Record<string, string[]>>(() =>
+    buildDefaultCategoryPolicy([1, 3, 5]),
+  );
   const [streamId, setStreamId] = useState('');
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [allDepartments, setAllDepartments] = useState(true);
@@ -134,6 +147,22 @@ export function IaExamsWorkspace() {
     if (allDepartments) setDepartmentIds([]);
   }, [allDepartments, streamId]);
 
+  useEffect(() => {
+    setCategoryPolicy((prev) => {
+      const next = { ...prev };
+      for (const sem of semesterNos) {
+        const key = String(sem);
+        if (!next[key]?.length) {
+          next[key] = buildDefaultCategoryPolicy([sem])[key];
+        }
+      }
+      for (const key of Object.keys(next)) {
+        if (!semesterNos.includes(Number(key))) delete next[key];
+      }
+      return next;
+    });
+  }, [semesterNos]);
+
   const payload = useMemo<CreateIaExamPayload>(
     () => ({
       name: name.trim(),
@@ -145,6 +174,7 @@ export function IaExamsWorkspace() {
       examType,
       maxMarks,
       remarks: remarks || undefined,
+      enabledCategoriesBySemester: categoryPolicy,
     }),
     [
       name,
@@ -157,13 +187,14 @@ export function IaExamsWorkspace() {
       examType,
       maxMarks,
       remarks,
+      categoryPolicy,
     ],
   );
 
   const preview = useQuery({
     queryKey: ['ia', 'exam-preview', payload],
     queryFn: () => previewIaExam(payload),
-    enabled: step === 4 && semesterNos.length > 0 && Boolean(name.trim()),
+    enabled: step === LAST_WIZARD_STEP && semesterNos.length > 0 && Boolean(name.trim()),
   });
 
   const create = useMutation({
@@ -187,6 +218,16 @@ export function IaExamsWorkspace() {
     });
   };
 
+  const toggleCategory = (sem: number, category: string, on: boolean) => {
+    const key = String(sem);
+    setCategoryPolicy((prev) => {
+      const current = new Set(prev[key] ?? []);
+      if (on) current.add(category);
+      else current.delete(category);
+      return { ...prev, [key]: [...current] };
+    });
+  };
+
   const toggleDepartment = (id: string, on: boolean) => {
     setAllDepartments(false);
     setDepartmentIds((prev) => {
@@ -197,11 +238,16 @@ export function IaExamsWorkspace() {
     });
   };
 
+  const categoriesValid = semesterNos.every(
+    (sem) => (categoryPolicy[String(sem)]?.length ?? 0) > 0,
+  );
+
   const canNext = () => {
     if (step === 0) return Boolean(name.trim()) && maxMarks > 0;
     if (step === 1) return semesterNos.length > 0;
-    if (step === 2) return true;
-    if (step === 3) return allDepartments || departmentIds.length > 0;
+    if (step === 2) return categoriesValid;
+    if (step === 3) return true;
+    if (step === 4) return allDepartments || departmentIds.length > 0;
     return true;
   };
 
@@ -230,7 +276,7 @@ export function IaExamsWorkspace() {
 
       <Card
         title="Create IA Examination"
-        description="Multi-semester wizard — students and subjects load automatically from semester registration and curriculum. No manual registration."
+        description="Multi-semester wizard — include subjects by category (e.g. exclude VTC / Internship). Students load from semester registration."
       >
         <StepPills step={step} />
 
@@ -347,6 +393,80 @@ export function IaExamsWorkspace() {
         ) : null}
 
         {step === 2 ? (
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Enable subject categories for IA marks and papers. All subjects in an enabled category
+              are included automatically. VTC and Internship are off by default for FYUGP First IA.
+            </p>
+            {semesterNos.map((sem) => {
+              const key = String(sem);
+              const enabled = new Set(categoryPolicy[key] ?? []);
+              return (
+                <div key={sem} className="rounded-xl border border-border/70 bg-muted/15 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">Semester {sem}</h3>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setCategoryPolicy((prev) => ({
+                            ...prev,
+                            [key]: buildDefaultCategoryPolicy([sem])[key],
+                          }))
+                        }
+                      >
+                        Reset defaults
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setCategoryPolicy((prev) => ({
+                            ...prev,
+                            [key]: [...IA_SUBJECT_CATEGORY_OPTIONS],
+                          }))
+                        }
+                      >
+                        All categories
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {IA_SUBJECT_CATEGORY_OPTIONS.map((cat) => (
+                      <label
+                        key={cat}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm',
+                          enabled.has(cat)
+                            ? 'border-primary/40 bg-primary/5'
+                            : 'border-border hover:bg-muted/40',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border"
+                          checked={enabled.has(cat)}
+                          onChange={(e) => toggleCategory(sem, cat, e.target.checked)}
+                        />
+                        {cat}
+                      </label>
+                    ))}
+                  </div>
+                  {!enabled.size ? (
+                    <p className="mt-2 text-xs text-destructive">
+                      Select at least one category for Semester {sem}.
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {step === 3 ? (
           <div className="max-w-md space-y-2">
             <Label>Stream</Label>
             <select
@@ -369,7 +489,7 @@ export function IaExamsWorkspace() {
           </div>
         ) : null}
 
-        {step === 3 ? (
+        {step === 4 ? (
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
@@ -402,56 +522,92 @@ export function IaExamsWorkspace() {
           </div>
         ) : null}
 
-        {step === 4 ? (
+        {step === 5 ? (
           <div className="space-y-3">
-            {preview.isLoading ? (
+            {preview.isLoading || preview.isFetching ? (
               <p className="text-sm text-muted-foreground">Calculating preview…</p>
-            ) : preview.data ? (
-              <dl className="grid gap-2 rounded-xl border border-border bg-muted/20 p-4 text-sm md:grid-cols-2">
-                <div>
-                  <dt className="text-muted-foreground">Exam name</dt>
-                  <dd className="font-medium">{preview.data.examName}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Academic year</dt>
-                  <dd className="font-medium">{preview.data.academicYear}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Semesters</dt>
-                  <dd className="font-medium">{preview.data.semesters.join(', ')}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Stream</dt>
-                  <dd className="font-medium">{preview.data.streamName}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Shift</dt>
-                  <dd className="font-medium">{preview.data.shiftName ?? selectedShiftName}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Departments</dt>
-                  <dd className="font-medium">{preview.data.departmentCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Students</dt>
-                  <dd className="font-medium">{preview.data.students.toLocaleString()}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Subjects</dt>
-                  <dd className="font-medium">{preview.data.subjects}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Maximum marks</dt>
-                  <dd className="font-medium">{preview.data.maxMarks}</dd>
-                </div>
-              </dl>
             ) : null}
+            {preview.isError ? (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {apiErrorMessage(
+                  preview.error,
+                  'Preview failed. Go Back and check Shift / Semesters, then return to Summary.',
+                )}
+              </p>
+            ) : null}
+            <dl className="grid gap-2 rounded-xl border border-border bg-muted/20 p-4 text-sm md:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground">Exam name</dt>
+                <dd className="font-medium">{preview.data?.examName ?? name.trim()}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Academic year</dt>
+                <dd className="font-medium">
+                  {preview.data?.academicYear ?? activeYear?.name ?? '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Semesters</dt>
+                <dd className="font-medium">
+                  {(preview.data?.semesters ?? semesterNos).join(', ') || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Stream</dt>
+                <dd className="font-medium">{preview.data?.streamName ?? selectedStreamName}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Shift</dt>
+                <dd className="font-medium">{preview.data?.shiftName ?? selectedShiftName}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Departments</dt>
+                <dd className="font-medium">
+                  {preview.data?.departmentCount ?? (allDepartments ? 'All' : departmentIds.length)}
+                </dd>
+              </div>
+              <div className="md:col-span-2">
+                <dt className="text-muted-foreground">Categories by semester</dt>
+                <dd className="font-medium">
+                  {semesterNos
+                    .map((sem) => {
+                      const cats = (
+                        preview.data?.enabledCategoriesBySemester?.[String(sem)] ??
+                        categoryPolicy[String(sem)] ??
+                        []
+                      ).join(', ');
+                      return `Sem ${sem}: ${cats || '—'}`;
+                    })
+                    .join(' · ')}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Students</dt>
+                <dd className="font-medium">
+                  {preview.data ? preview.data.students.toLocaleString() : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Subjects</dt>
+                <dd className="font-medium">{preview.data?.subjects ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Maximum marks</dt>
+                <dd className="font-medium">{preview.data?.maxMarks ?? maxMarks}</dd>
+              </div>
+            </dl>
             {preview.data?.warnings?.length ? (
               <ul className="text-sm text-amber-700 dark:text-amber-400">
                 {preview.data.warnings.map((w) => (
                   <li key={w}>• {w}</li>
                 ))}
               </ul>
+            ) : null}
+            {!preview.data && !preview.isLoading && !preview.isError ? (
+              <p className="text-sm text-muted-foreground">
+                Preview not loaded yet. Click Create Examination if the details above look correct,
+                or go Back and Next again to refresh the preview.
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -463,7 +619,7 @@ export function IaExamsWorkspace() {
               Back
             </Button>
           ) : null}
-          {step < 4 ? (
+          {step < LAST_WIZARD_STEP ? (
             <Button
               type="button"
               size="sm"
@@ -477,7 +633,11 @@ export function IaExamsWorkspace() {
             <Button
               type="button"
               size="sm"
-              disabled={!preview.data?.ready || create.isPending}
+              disabled={
+                create.isPending ||
+                preview.isLoading ||
+                (preview.data != null && !preview.data.ready)
+              }
               onClick={() => create.mutate()}
             >
               <Plus className="mr-1 h-4 w-4" />

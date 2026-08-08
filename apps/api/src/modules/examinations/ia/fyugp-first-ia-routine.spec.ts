@@ -98,6 +98,55 @@ describe('assignFyugpFirstIaTimetable', () => {
     expect(maj3).toMatchObject({ dayOffset: 3 });
   });
 
+  it('places every department Major 1 / Major 2 on the same days', () => {
+    const multiDept = [
+      {
+        id: 'eco1',
+        paperCode: 'ECO-200',
+        semesterNo: 3,
+        category: 'MAJOR',
+        programmeCode: 'BA-ECO',
+      },
+      {
+        id: 'eco2',
+        paperCode: 'ECO-201',
+        semesterNo: 3,
+        category: 'MAJOR',
+        programmeCode: 'BA-ECO',
+      },
+      {
+        id: 'edn1',
+        paperCode: 'EDN-200',
+        semesterNo: 3,
+        category: 'MAJOR',
+        programmeCode: 'BA-EDU',
+      },
+      {
+        id: 'edn2',
+        paperCode: 'EDN-201',
+        semesterNo: 3,
+        category: 'MAJOR',
+        programmeCode: 'BA-EDU',
+      },
+      {
+        id: 'aec',
+        paperCode: 'AEC-222',
+        semesterNo: 3,
+        category: 'AEC',
+      },
+    ];
+    const { assignments, warnings } = assignFyugpFirstIaTimetable(
+      multiDept,
+      'MORNING',
+    );
+    expect(warnings).toEqual([]);
+    expect(assignments.find((a) => a.paperId === 'eco1')?.dayOffset).toBe(0);
+    expect(assignments.find((a) => a.paperId === 'edn1')?.dayOffset).toBe(0);
+    expect(assignments.find((a) => a.paperId === 'eco2')?.dayOffset).toBe(1);
+    expect(assignments.find((a) => a.paperId === 'edn2')?.dayOffset).toBe(1);
+    expect(assignments.find((a) => a.paperId === 'aec')?.dayOffset).toBe(2);
+  });
+
   it('assigns Day pattern Sem1 VAC to Friday afternoon', () => {
     const { assignments, maxDayOffset } = assignFyugpFirstIaTimetable(
       papers,

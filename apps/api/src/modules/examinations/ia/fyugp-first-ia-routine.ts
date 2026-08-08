@@ -16,7 +16,22 @@ export type FyugpPaperLike = {
   paperCode: string;
   semesterNo: number | null;
   category?: string | null;
+  /** Used to rank majors within a programme (ECO-200/201 share BA-ECO). */
+  programmeCode?: string | null;
 };
+
+/** Group key so each dept's 1st/2nd major share the same IA day. */
+export function majorGroupKey(paper: FyugpPaperLike): string {
+  // Prefer subject stem (EDN-200 / ECO-200) so multi-track programmes (EDN vs EDU) stay separate.
+  const m = paper.paperCode
+    .trim()
+    .toUpperCase()
+    .match(/^([A-Z]+)/);
+  if (m) return `C:${m[1]}`;
+  const prog = paper.programmeCode?.trim();
+  if (prog) return `P:${prog.toUpperCase()}`;
+  return `I:${paper.id}`;
+}
 
 export type FyugpAssignment = {
   paperId: string;
@@ -176,12 +191,23 @@ export function assignFyugpFirstIaTimetable(
       continue;
     }
 
-    const majors = semPapers
-      .filter((p) => normalizeFyugpCategory(p.category) === 'MAJOR')
-      .sort((a, b) => a.paperCode.localeCompare(b.paperCode));
-    const majorIndexById = new Map(
-      majors.map((p, index) => [p.id, index] as const),
+    // Rank majors per programme/dept so every dept's MAJOR 1 shares Mon, etc.
+    const majors = semPapers.filter(
+      (p) => normalizeFyugpCategory(p.category) === 'MAJOR',
     );
+    const majorsByGroup = new Map<string, FyugpPaperLike[]>();
+    for (const p of majors) {
+      const key = majorGroupKey(p);
+      if (!majorsByGroup.has(key)) majorsByGroup.set(key, []);
+      majorsByGroup.get(key)!.push(p);
+    }
+    const majorIndexById = new Map<string, number>();
+    for (const group of majorsByGroup.values()) {
+      group
+        .slice()
+        .sort((a, b) => a.paperCode.localeCompare(b.paperCode))
+        .forEach((p, index) => majorIndexById.set(p.id, index));
+    }
 
     const used = new Set<string>();
 

@@ -19,6 +19,13 @@ import {
   inferFyugpRoutinePattern,
   type FyugpRoutinePattern,
 } from './fyugp-first-ia-routine';
+import {
+  categoryPolicyFromMetadata,
+  categoryPolicyToMetadata,
+  filterOfferingsByCategoryPolicy,
+  resolveCategoryPolicy,
+  type SemesterCategoryMap,
+} from './ia-category-policy';
 
 const ACTIVE_VERSION_STATUSES = [
   'ACTIVE',
@@ -48,6 +55,8 @@ type NormalizedExamInput = {
   startDate?: string;
   endDate?: string;
   remarks?: string;
+  /** null = legacy include-all; otherwise semester → enabled categories */
+  categoryPolicy: SemesterCategoryMap | null;
 };
 
 @Injectable()
@@ -88,6 +97,21 @@ export class IaExamProvisioningService {
       throw new BadRequestException('Select at least one semester');
     }
 
+    const rawPolicy = dto.enabledCategoriesBySemester as
+      | SemesterCategoryMap
+      | undefined;
+    const categoryPolicy = resolveCategoryPolicy(uniqueSemesters, rawPolicy);
+
+    if (categoryPolicy) {
+      for (const sem of uniqueSemesters) {
+        if (!categoryPolicy[sem]?.length) {
+          throw new BadRequestException(
+            `Select at least one subject category for Semester ${sem}`,
+          );
+        }
+      }
+    }
+
     return {
       name: dto.name.trim(),
       semesterNos: uniqueSemesters,
@@ -101,6 +125,7 @@ export class IaExamProvisioningService {
       startDate: dto.startDate,
       endDate: dto.endDate,
       remarks: dto.remarks,
+      categoryPolicy,
     };
   }
 
@@ -149,18 +174,31 @@ export class IaExamProvisioningService {
     streamId?: string,
     shiftId?: string,
   ) {
+    const studentBase = {
+      deletedAt: null as null,
+      ...(departmentIds?.length ? { departmentId: { in: departmentIds } } : {}),
+      ...(streamId ? { academicProfile: { streamId } } : {}),
+    };
+
+    if (!shiftId) {
+      return {
+        status: { in: [...REGISTRATION_STATUSES] },
+        registration: {
+          semesterSequence: semesterNo,
+          student: studentBase,
+        },
+      };
+    }
+
+    // Match shift on semester registration and/or student's primary shift.
     return {
       status: { in: [...REGISTRATION_STATUSES] },
       registration: {
         semesterSequence: semesterNo,
-        student: {
-          deletedAt: null,
-          ...(departmentIds?.length
-            ? { departmentId: { in: departmentIds } }
-            : {}),
-          ...(streamId ? { academicProfile: { streamId } } : {}),
-          ...(shiftId ? { shiftId } : {}),
-        },
+        OR: [
+          { shiftId, student: studentBase },
+          { student: { ...studentBase, primaryShiftId: shiftId } },
+        ],
       },
     };
   }
@@ -246,6 +284,12 @@ export class IaExamProvisioningService {
     });
 
     return [...programOfferings, ...extraOfferings];
+  }
+
+  private applyCategoryPolicy<
+    T extends { semesterSequence?: number | null; category?: string | null },
+  >(offerings: T[], policy: SemesterCategoryMap | null): T[] {
+    return filterOfferingsByCategoryPolicy(offerings, policy);
   }
 
   private async countStudentsForOffering(
@@ -352,11 +396,12 @@ export class IaExamProvisioningService {
       user.tid,
       input,
     );
-    const offerings = await this.loadOfferings(
-      user.tid,
-      input.semesterNos,
-      programVersionIds,
-      { departmentIds: input.departmentIds, streamId: input.streamId },
+    const offerings = this.applyCategoryPolicy(
+      await this.loadOfferings(user.tid, input.semesterNos, programVersionIds, {
+        departmentIds: input.departmentIds,
+        streamId: input.streamId,
+      }),
+      input.categoryPolicy,
     );
 
     let streamName = 'All Streams';
@@ -422,10 +467,15 @@ export class IaExamProvisioningService {
       examType: input.examType,
       programVersions: programVersionIds.length,
       ready: offerings.length > 0 && registeredStudentIds.size > 0,
+      enabledCategoriesBySemester: categoryPolicyToMetadata(
+        input.categoryPolicy,
+      ),
       warnings:
         offerings.length === 0
           ? [
-              'No curriculum subjects found for the selected semesters and stream.',
+              input.categoryPolicy
+                ? 'No subjects match the selected semesters, stream, and subject categories.'
+                : 'No curriculum subjects found for the selected semesters and stream.',
             ]
           : registeredStudentIds.size === 0
             ? [
@@ -447,7 +497,7 @@ export class IaExamProvisioningService {
       throw new BadRequestException('Invalid IA exam type');
     }
 
-    const preview = await this.previewExam(user, input);
+    const preview = await this.previewExam(user, dto);
     if (!preview.ready) {
       throw new BadRequestException(preview.warnings.join(' '));
     }
@@ -460,11 +510,12 @@ export class IaExamProvisioningService {
       user.tid,
       input,
     );
-    const offerings = await this.loadOfferings(
-      user.tid,
-      input.semesterNos,
-      programVersionIds,
-      { departmentIds: input.departmentIds, streamId: input.streamId },
+    const offerings = this.applyCategoryPolicy(
+      await this.loadOfferings(user.tid, input.semesterNos, programVersionIds, {
+        departmentIds: input.departmentIds,
+        streamId: input.streamId,
+      }),
+      input.categoryPolicy,
     );
 
     const examDate = input.startDate ? new Date(input.startDate) : new Date();
@@ -508,6 +559,9 @@ export class IaExamProvisioningService {
           maxMarks: input.maxMarks,
           studentsRegistered: preview.students,
           subjectsLoaded: preview.subjects,
+          enabledCategoriesBySemester: categoryPolicyToMetadata(
+            input.categoryPolicy,
+          ),
         },
       },
     });
@@ -666,6 +720,7 @@ export class IaExamProvisioningService {
       const meta = (session.metadata ?? {}) as {
         semesterNos?: number[];
         streamName?: string;
+        shiftName?: string;
         departmentCount?: number;
         studentsRegistered?: number;
         subjectsLoaded?: number;
@@ -785,16 +840,21 @@ export class IaExamProvisioningService {
             id: string;
             paperCode: string;
             semesterNo: number | null;
-            metadata?: { category?: string };
-          }) => ({
-            id: p.id,
-            paperCode: p.paperCode,
-            semesterNo: p.semesterNo,
-            category:
+            metadata?: { category?: string; programmeCode?: string };
+          }) => {
+            const meta =
               p.metadata && typeof p.metadata === 'object'
-                ? String((p.metadata as Record<string, unknown>).category ?? '')
-                : null,
-          }),
+                ? (p.metadata as Record<string, unknown>)
+                : {};
+            return {
+              id: p.id,
+              paperCode: p.paperCode,
+              semesterNo: p.semesterNo,
+              category: meta.category != null ? String(meta.category) : null,
+              programmeCode:
+                meta.programmeCode != null ? String(meta.programmeCode) : null,
+            };
+          },
         ),
         pattern,
       );
@@ -895,7 +955,7 @@ export class IaExamProvisioningService {
     const session = await (this.prisma as any).examSession.findFirst({
       where: { id: sessionId, tenantId, deletedAt: null },
     });
-    if (!session?.semesterNo) return { added: 0 };
+    if (!session) return { added: 0 };
 
     const meta = (session.metadata ?? {}) as Record<string, unknown>;
     const departmentIds = meta.departmentIds as string[] | undefined;
@@ -905,7 +965,17 @@ export class IaExamProvisioningService {
       (session.shiftId as string | undefined);
     const maxMarks = (meta.maxMarks as number | undefined) ?? 20;
     const passMark = Math.ceil(maxMarks * 0.4);
-    const semesterNo = session.semesterNo as number;
+    const semesterNosFromMeta = Array.isArray(meta.semesterNos)
+      ? (meta.semesterNos as number[]).map(Number).filter(Boolean)
+      : [];
+    const semesterNos = semesterNosFromMeta.length
+      ? semesterNosFromMeta
+      : session.semesterNo
+        ? [session.semesterNo as number]
+        : [];
+    if (!semesterNos.length) return { added: 0 };
+
+    const categoryPolicy = categoryPolicyFromMetadata(meta, semesterNos);
     const examDate = session.startDate
       ? new Date(session.startDate)
       : new Date();
@@ -926,18 +996,14 @@ export class IaExamProvisioningService {
       {
         where: {
           tenantId,
-          status: { in: [...REGISTRATION_STATUSES] },
-          registration: {
-            semesterSequence: semesterNo,
-            student: {
-              deletedAt: null,
-              ...(departmentIds?.length
-                ? { departmentId: { in: departmentIds } }
-                : {}),
-              ...(streamId ? { academicProfile: { streamId } } : {}),
-              ...(shiftId ? { shiftId } : {}),
-            },
-          },
+          OR: semesterNos.map((semesterNo) =>
+            this.studentLineFilter(
+              semesterNo,
+              departmentIds,
+              streamId,
+              shiftId,
+            ),
+          ),
         },
         select: { offeringId: true },
         distinct: ['offeringId'],
@@ -949,7 +1015,7 @@ export class IaExamProvisioningService {
       .filter((id) => !existingOfferingIds.has(id));
     if (!missingIds.length) return { added: 0 };
 
-    const offerings = await this.prisma.courseOffering.findMany({
+    const offeringsRaw = await this.prisma.courseOffering.findMany({
       where: { tenantId, deletedAt: null, id: { in: missingIds } },
       include: {
         course: { select: { id: true, code: true, title: true } },
@@ -960,9 +1026,13 @@ export class IaExamProvisioningService {
         },
       },
     });
+    const offerings = this.applyCategoryPolicy(offeringsRaw, categoryPolicy);
 
     let added = 0;
     for (const offering of offerings) {
+      const semesterNo = offering.semesterSequence ?? semesterNos[0];
+      if (!semesterNo) continue;
+
       const studentCount = await this.countStudentsForOffering(
         tenantId,
         offering.id,
@@ -991,6 +1061,7 @@ export class IaExamProvisioningService {
           totalMaxMarks: maxMarks,
           passMark,
           status: 'ACTIVE',
+          createdById: session.createdById,
           components: {
             create: [
               {

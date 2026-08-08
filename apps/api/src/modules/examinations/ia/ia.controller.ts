@@ -39,6 +39,7 @@ import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { IaMarkEntryService } from './ia-mark-entry.service';
 import { IaNehuExportService } from './ia-nehu-export.service';
+import { IaNoticeboardRoutineService } from './ia-noticeboard-routine.service';
 import { IaPortalService } from './ia-portal.service';
 import { IaSchemeService } from './ia-scheme.service';
 import { IaSessionService } from './ia-session.service';
@@ -62,6 +63,7 @@ export class IaController {
     private readonly defaulters: IaDefaulterService,
     private readonly portal: IaPortalService,
     private readonly admitCards: IaAdmitCardService,
+    private readonly noticeboard: IaNoticeboardRoutineService,
   ) {}
 
   @Get('settings')
@@ -162,6 +164,45 @@ export class IaController {
     @Body() dto: GenerateIaTimetableDto,
   ) {
     return this.exams.generateTimetable(user, dto);
+  }
+
+  @Get('exams/:sessionId/noticeboard-routine.html')
+  @RequireAnyPermission('ia:view', 'ia:manage', 'exam:view', 'exam:admin')
+  async noticeboardHtml(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('routinePattern') routinePattern: 'MORNING' | 'DAY' | undefined,
+    @Query('startDate') startDate: string | undefined,
+    @Res() res: Response,
+  ) {
+    const html = await this.noticeboard.renderHtml(user, sessionId, {
+      routinePattern,
+      startDate,
+    });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
+  @Get('exams/:sessionId/noticeboard-routine.pdf')
+  @RequireAnyPermission('ia:view', 'ia:manage', 'exam:view', 'exam:admin')
+  async noticeboardPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('routinePattern') routinePattern: 'MORNING' | 'DAY' | undefined,
+    @Query('startDate') startDate: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { pdf, filename } = await this.noticeboard.renderPdf(
+      user,
+      sessionId,
+      {
+        routinePattern,
+        startDate,
+      },
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
   }
 
   @Get('papers')
