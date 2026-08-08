@@ -39,7 +39,7 @@ describe('buildNoticeboardRowsFromPlan', () => {
     expect(rows[5]).toMatchObject({
       dateLabel: '28-08-2026',
       dayLabel: 'FRIDAY',
-      timingLabel: '1:45-2:10',
+      timingLabel: 'AFTERNOON 1:45-2:10',
       sem1: 'VAC',
       sem3: '--------',
       sem5: '--------',

@@ -64,7 +64,7 @@ function formatTiming(
     // Official Day Shift notice labels morning papers as "MORNING 9:45-10:40"
     // and Friday VAC as plain "1:45-2:10" (12-hour, not 13:45).
     if (options?.afternoon || (start && start.startsWith('13'))) {
-      return `${startPretty}-${endPretty}`;
+      return `AFTERNOON ${startPretty}-${endPretty}`;
     }
     if (pattern === 'MORNING' || pattern === 'DAY') {
       return `MORNING ${startPretty}-${endPretty}`;
