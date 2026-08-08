@@ -59,6 +59,11 @@ export class CreateIaExamDto {
   @IsUUID()
   academicYearId?: string;
 
+  /** When set, only students registered on this shift are counted into papers. */
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
+
   @IsIn([...IA_EXAM_TYPES])
   examType!: string;
 
@@ -100,4 +105,14 @@ export class GenerateIaTimetableDto {
   @IsOptional()
   @IsString()
   defaultStartTime?: string;
+
+  /** SIMPLE = legacy 3-papers/day packer; FYUGP_FIRST_IA = printed First IA day plan. */
+  @IsOptional()
+  @IsIn(['SIMPLE', 'FYUGP_FIRST_IA'])
+  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+
+  /** Override Morning/Day times; otherwise inferred from session shift name. */
+  @IsOptional()
+  @IsIn(['MORNING', 'DAY'])
+  routinePattern?: 'MORNING' | 'DAY';
 }

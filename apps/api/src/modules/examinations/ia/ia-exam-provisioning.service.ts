@@ -14,6 +14,11 @@ import type {
   GenerateIaTimetableDto,
   PreviewIaExamDto,
 } from './dto/create-ia-exam.dto';
+import {
+  assignFyugpFirstIaTimetable,
+  inferFyugpRoutinePattern,
+  type FyugpRoutinePattern,
+} from './fyugp-first-ia-routine';
 
 const ACTIVE_VERSION_STATUSES = [
   'ACTIVE',
@@ -37,6 +42,7 @@ type NormalizedExamInput = {
   departmentIds?: string[];
   programVersionId?: string;
   academicYearId?: string;
+  shiftId?: string;
   examType: string;
   maxMarks: number;
   startDate?: string;
@@ -89,6 +95,7 @@ export class IaExamProvisioningService {
       departmentIds: uniqueDeptIds.length ? uniqueDeptIds : undefined,
       programVersionId: dto.programVersionId,
       academicYearId: dto.academicYearId,
+      shiftId: dto.shiftId || undefined,
       examType: dto.examType,
       maxMarks: dto.maxMarks,
       startDate: dto.startDate,
@@ -140,6 +147,7 @@ export class IaExamProvisioningService {
     semesterNo: number,
     departmentIds?: string[],
     streamId?: string,
+    shiftId?: string,
   ) {
     return {
       status: { in: [...REGISTRATION_STATUSES] },
@@ -151,6 +159,7 @@ export class IaExamProvisioningService {
             ? { departmentId: { in: departmentIds } }
             : {}),
           ...(streamId ? { academicProfile: { streamId } } : {}),
+          ...(shiftId ? { shiftId } : {}),
         },
       },
     };
@@ -245,12 +254,13 @@ export class IaExamProvisioningService {
     semesterNo: number,
     departmentIds?: string[],
     streamId?: string,
+    shiftId?: string,
   ) {
     return this.prisma.semesterRegistrationLine.count({
       where: {
         tenantId,
         offeringId,
-        ...this.studentLineFilter(semesterNo, departmentIds, streamId),
+        ...this.studentLineFilter(semesterNo, departmentIds, streamId, shiftId),
       },
     });
   }
@@ -261,12 +271,13 @@ export class IaExamProvisioningService {
     semesterNo: number,
     departmentIds?: string[],
     streamId?: string,
+    shiftId?: string,
   ) {
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
         tenantId,
         offeringId,
-        ...this.studentLineFilter(semesterNo, departmentIds, streamId),
+        ...this.studentLineFilter(semesterNo, departmentIds, streamId, shiftId),
       },
       select: { registration: { select: { studentId: true } } },
     });
@@ -357,6 +368,16 @@ export class IaExamProvisioningService {
       streamName = stream?.name ?? 'Selected stream';
     }
 
+    let shiftName: string | null = null;
+    if (input.shiftId) {
+      const shift = await this.prisma.shift.findFirst({
+        where: { id: input.shiftId, tenantId: user.tid, deletedAt: null },
+        select: { name: true },
+      });
+      if (!shift) throw new NotFoundException('Shift not found');
+      shiftName = shift.name;
+    }
+
     const departmentRows = await this.listDepartmentsForStream(
       user.tid,
       input.streamId,
@@ -377,6 +398,7 @@ export class IaExamProvisioningService {
         semesterNo,
         input.departmentIds,
         input.streamId,
+        input.shiftId,
       );
       if (studentIds.length) subjectsWithStudents += 1;
       for (const id of studentIds) registeredStudentIds.add(id);
@@ -389,6 +411,8 @@ export class IaExamProvisioningService {
       semesters: input.semesterNos,
       streamId: input.streamId ?? null,
       streamName,
+      shiftId: input.shiftId ?? null,
+      shiftName,
       departmentCount,
       departmentIds: input.departmentIds ?? [],
       students: registeredStudentIds.size,
@@ -404,7 +428,11 @@ export class IaExamProvisioningService {
               'No curriculum subjects found for the selected semesters and stream.',
             ]
           : registeredStudentIds.size === 0
-            ? ['No registered students match the selected filters.']
+            ? [
+                input.shiftId
+                  ? 'No registered students match the selected shift and filters.'
+                  : 'No registered students match the selected filters.',
+              ]
             : [],
     };
   }
@@ -442,12 +470,23 @@ export class IaExamProvisioningService {
     const examDate = input.startDate ? new Date(input.startDate) : new Date();
     const passMark = Math.ceil(input.maxMarks * 0.4);
 
+    let shiftName: string | null = null;
+    if (input.shiftId) {
+      const shift = await this.prisma.shift.findFirst({
+        where: { id: input.shiftId, tenantId: user.tid, deletedAt: null },
+        select: { name: true },
+      });
+      if (!shift) throw new NotFoundException('Shift not found');
+      shiftName = shift.name;
+    }
+
     const session = await (this.prisma as any).examSession.create({
       data: {
         tenantId: user.tid,
         name: input.name,
         examType: input.examType,
         academicYearId: academicYear.id,
+        shiftId: input.shiftId ?? null,
         semesterNo: input.semesterNos[0] ?? null,
         startDate: input.startDate ? new Date(input.startDate) : null,
         endDate: input.endDate ? new Date(input.endDate) : null,
@@ -461,6 +500,8 @@ export class IaExamProvisioningService {
           semesterNos: input.semesterNos,
           streamId: input.streamId ?? null,
           streamName: preview.streamName,
+          shiftId: input.shiftId ?? null,
+          shiftName,
           departmentIds: input.departmentIds ?? [],
           departmentCount: preview.departmentCount,
           academicYearName: academicYear.name,
@@ -485,6 +526,7 @@ export class IaExamProvisioningService {
         semesterNo,
         input.departmentIds,
         input.streamId,
+        input.shiftId,
       );
       if (studentCount === 0) continue;
 
@@ -554,6 +596,7 @@ export class IaExamProvisioningService {
         semesterNo,
         input.departmentIds,
         input.streamId,
+        input.shiftId,
       );
       for (const id of studentIds) registeredStudentIds.add(id);
     }
@@ -587,6 +630,7 @@ export class IaExamProvisioningService {
       subjectsLoaded: papersCreated,
       semesterNos: input.semesterNos,
       streamId: input.streamId,
+      shiftId: input.shiftId,
     });
 
     void this.examCalendar.syncSession(user, session.id);
@@ -681,6 +725,7 @@ export class IaExamProvisioningService {
             meta.semesterNos ??
             (session.semesterNo ? [session.semesterNo] : []),
           streamName: meta.streamName ?? 'All Streams',
+          shiftName: meta.shiftName ?? null,
           departmentCount: meta.departmentCount ?? 0,
           maxMarks: meta.maxMarks,
         },
@@ -707,31 +752,116 @@ export class IaExamProvisioningService {
       throw new BadRequestException('No subjects scheduled for this exam');
     }
 
-    const duration = dto.durationMinutes ?? 120;
-    const startTime = dto.defaultStartTime ?? '10:00';
-    let dayOffset = 0;
-    let slotIndex = 0;
-    const maxPerDay = 3;
+    const mode = dto.mode ?? 'SIMPLE';
+    let updated = 0;
+    let warnings: string[] = [];
+    let endDate = new Date(dto.startDate);
 
-    for (const paper of papers) {
-      const examDate = new Date(dto.startDate);
-      examDate.setDate(examDate.getDate() + dayOffset);
-      const slotStart = this.addMinutes(startTime, slotIndex * (duration + 30));
+    if (mode === 'FYUGP_FIRST_IA') {
+      const meta = (session.metadata ?? {}) as Record<string, unknown>;
+      let shiftName =
+        typeof meta.shiftName === 'string' ? meta.shiftName : null;
+      if (!shiftName && session.shiftId) {
+        const shift = await this.prisma.shift.findFirst({
+          where: {
+            id: session.shiftId,
+            tenantId: user.tid,
+            deletedAt: null,
+          },
+          select: { name: true },
+        });
+        shiftName = shift?.name ?? null;
+      }
+      const pattern: FyugpRoutinePattern =
+        dto.routinePattern ?? inferFyugpRoutinePattern(shiftName);
 
-      await (this.prisma as any).examPaperSchedule.update({
-        where: { id: paper.id },
+      const {
+        assignments,
+        warnings: assignWarnings,
+        maxDayOffset,
+      } = assignFyugpFirstIaTimetable(
+        papers.map(
+          (p: {
+            id: string;
+            paperCode: string;
+            semesterNo: number | null;
+            metadata?: { category?: string };
+          }) => ({
+            id: p.id,
+            paperCode: p.paperCode,
+            semesterNo: p.semesterNo,
+            category:
+              p.metadata && typeof p.metadata === 'object'
+                ? String((p.metadata as Record<string, unknown>).category ?? '')
+                : null,
+          }),
+        ),
+        pattern,
+      );
+      warnings = assignWarnings;
+
+      for (const a of assignments) {
+        const [y, m, d] = dto.startDate.split('-').map(Number);
+        const examDate = new Date(y, m - 1, d + a.dayOffset);
+        await (this.prisma as any).examPaperSchedule.update({
+          where: { id: a.paperId },
+          data: {
+            examDate,
+            startTime: this.timeDate(a.startTime),
+            endTime: this.timeDate(a.endTime),
+          },
+        });
+        updated += 1;
+      }
+
+      const [ey, em, ed] = dto.startDate.split('-').map(Number);
+      endDate = new Date(ey, em - 1, ed + maxDayOffset);
+
+      await (this.prisma as any).examSession.update({
+        where: { id: dto.sessionId },
         data: {
-          examDate,
-          startTime: this.timeDate(slotStart),
-          endTime: this.timeDate(this.addMinutes(slotStart, duration)),
+          startDate: new Date(ey, em - 1, ed),
+          endDate,
+          metadata: {
+            ...(session.metadata as object),
+            timetableMode: mode,
+            routinePattern: pattern,
+          },
         },
       });
+    } else {
+      const duration = dto.durationMinutes ?? 120;
+      const startTime = dto.defaultStartTime ?? '10:00';
+      let dayOffset = 0;
+      let slotIndex = 0;
+      const maxPerDay = 3;
 
-      slotIndex += 1;
-      if (slotIndex >= maxPerDay) {
-        slotIndex = 0;
-        dayOffset += 1;
+      for (const paper of papers) {
+        const examDate = new Date(dto.startDate);
+        examDate.setDate(examDate.getDate() + dayOffset);
+        const slotStart = this.addMinutes(
+          startTime,
+          slotIndex * (duration + 30),
+        );
+
+        await (this.prisma as any).examPaperSchedule.update({
+          where: { id: paper.id },
+          data: {
+            examDate,
+            startTime: this.timeDate(slotStart),
+            endTime: this.timeDate(this.addMinutes(slotStart, duration)),
+          },
+        });
+
+        slotIndex += 1;
+        if (slotIndex >= maxPerDay) {
+          slotIndex = 0;
+          dayOffset += 1;
+        }
+        updated += 1;
       }
+      endDate = new Date(dto.startDate);
+      endDate.setDate(endDate.getDate() + dayOffset);
     }
 
     await this.audit.log(
@@ -742,13 +872,16 @@ export class IaExamProvisioningService {
       null,
       {
         papers: papers.length,
+        updated,
         startDate: dto.startDate,
+        mode,
+        warnings,
       },
     );
 
     void this.examCalendar.syncSession(user, dto.sessionId);
 
-    return { updated: papers.length };
+    return { updated, warnings, mode };
   }
 
   /**
@@ -767,6 +900,9 @@ export class IaExamProvisioningService {
     const meta = (session.metadata ?? {}) as Record<string, unknown>;
     const departmentIds = meta.departmentIds as string[] | undefined;
     const streamId = meta.streamId as string | undefined;
+    const shiftId =
+      (meta.shiftId as string | undefined) ??
+      (session.shiftId as string | undefined);
     const maxMarks = (meta.maxMarks as number | undefined) ?? 20;
     const passMark = Math.ceil(maxMarks * 0.4);
     const semesterNo = session.semesterNo as number;
@@ -799,6 +935,7 @@ export class IaExamProvisioningService {
                 ? { departmentId: { in: departmentIds } }
                 : {}),
               ...(streamId ? { academicProfile: { streamId } } : {}),
+              ...(shiftId ? { shiftId } : {}),
             },
           },
         },
@@ -832,6 +969,7 @@ export class IaExamProvisioningService {
         semesterNo,
         departmentIds,
         streamId,
+        shiftId,
       );
       if (studentCount === 0) continue;
 

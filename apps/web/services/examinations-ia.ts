@@ -132,12 +132,14 @@ export async function fetchFacultyIaSubjects() {
 }
 
 export type IaExamSummary = IaSession & {
+  shiftId?: string | null;
   metadata?: {
     programmeName?: string;
     programmeCode?: string;
     maxMarks?: number;
     semesterNos?: number[];
     streamName?: string;
+    shiftName?: string;
     departmentCount?: number;
     studentsRegistered?: number;
   };
@@ -150,6 +152,7 @@ export type IaExamSummary = IaSession & {
     completionPercent: number;
     semesterNos: number[];
     streamName: string;
+    shiftName?: string | null;
     departmentCount: number;
     maxMarks?: number;
   };
@@ -161,6 +164,7 @@ export type CreateIaExamPayload = {
   streamId?: string;
   departmentIds?: string[];
   academicYearId?: string;
+  shiftId?: string;
   examType: string;
   maxMarks: number;
   startDate?: string;
@@ -179,6 +183,8 @@ export type IaExamPreview = {
   semesters: number[];
   streamId: string | null;
   streamName: string;
+  shiftId: string | null;
+  shiftName: string | null;
   departmentCount: number;
   departmentIds: string[];
   students: number;
@@ -231,9 +237,15 @@ export async function generateIaTimetable(payload: {
   startDate: string;
   durationMinutes?: number;
   defaultStartTime?: string;
+  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+  routinePattern?: 'MORNING' | 'DAY';
 }) {
   const { data } = await api.post('/v1/examinations/ia/exams/generate-timetable', payload);
-  return data as { updated: number };
+  return data as {
+    updated: number;
+    warnings?: string[];
+    mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+  };
 }
 
 export async function fetchIaRoster(paperId: string, schemeId?: string) {

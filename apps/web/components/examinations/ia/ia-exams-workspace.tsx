@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { fetchAcademicStreams } from '@/services/academic-engine';
+import { fetchAcademicStreams, fetchShifts } from '@/services/academic-engine';
 import {
   createIaExam,
   fetchIaExamDepartments,
@@ -110,6 +110,7 @@ export function IaExamsWorkspace() {
   const [examType, setExamType] = useState('IA_TEST_1');
   const [maxMarks, setMaxMarks] = useState(20);
   const [remarks, setRemarks] = useState('');
+  const [shiftId, setShiftId] = useState('');
   const [semesterNos, setSemesterNos] = useState<number[]>([1, 3, 5]);
   const [streamId, setStreamId] = useState('');
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
@@ -117,6 +118,7 @@ export function IaExamsWorkspace() {
 
   const years = useQuery({ queryKey: ['academic-years'], queryFn: fetchAcademicYears });
   const streams = useQuery({ queryKey: ['academic-streams'], queryFn: fetchAcademicStreams });
+  const shifts = useQuery({ queryKey: ['academic-shifts'], queryFn: fetchShifts });
   const departments = useQuery({
     queryKey: ['ia', 'exam-departments', streamId || 'all'],
     queryFn: () => fetchIaExamDepartments(streamId || undefined),
@@ -139,6 +141,7 @@ export function IaExamsWorkspace() {
       streamId: streamId || undefined,
       departmentIds: allDepartments ? undefined : departmentIds,
       academicYearId: activeYear?.id,
+      shiftId: shiftId || undefined,
       examType,
       maxMarks,
       remarks: remarks || undefined,
@@ -150,6 +153,7 @@ export function IaExamsWorkspace() {
       allDepartments,
       departmentIds,
       activeYear?.id,
+      shiftId,
       examType,
       maxMarks,
       remarks,
@@ -205,6 +209,10 @@ export function IaExamsWorkspace() {
     streamId === ''
       ? 'All Streams'
       : (streams.data?.find((s) => s.id === streamId)?.name ?? 'Selected stream');
+  const selectedShiftName =
+    shiftId === ''
+      ? 'All shifts'
+      : (shifts.data?.find((s) => s.id === shiftId)?.name ?? 'Selected shift');
 
   return (
     <div className="space-y-4">
@@ -263,6 +271,25 @@ export function IaExamsWorkspace() {
                 value={maxMarks}
                 onChange={(e) => setMaxMarks(Number(e.target.value) || 20)}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Shift</Label>
+              <select
+                className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                value={shiftId}
+                onChange={(e) => setShiftId(e.target.value)}
+              >
+                <option value="">All shifts</option>
+                {(shifts.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                For First Internal Assessment, create two exams — one Morning and one Day — so each
+                shift gets its own timetable times.
+              </p>
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label>Remarks (optional)</Label>
@@ -398,6 +425,10 @@ export function IaExamsWorkspace() {
                   <dd className="font-medium">{preview.data.streamName}</dd>
                 </div>
                 <div>
+                  <dt className="text-muted-foreground">Shift</dt>
+                  <dd className="font-medium">{preview.data.shiftName ?? selectedShiftName}</dd>
+                </div>
+                <div>
                   <dt className="text-muted-foreground">Departments</dt>
                   <dd className="font-medium">{preview.data.departmentCount}</dd>
                 </div>
@@ -475,6 +506,9 @@ export function IaExamsWorkspace() {
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {exam.examType.replace(/_/g, ' ')} · {stats?.streamName ?? 'All Streams'}
+                  {stats?.shiftName || exam.metadata?.shiftName
+                    ? ` · ${stats?.shiftName ?? exam.metadata?.shiftName}`
+                    : ''}
                 </p>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                   <dt className="text-muted-foreground">Semesters</dt>

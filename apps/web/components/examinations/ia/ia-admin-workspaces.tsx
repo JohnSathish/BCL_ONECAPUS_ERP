@@ -287,24 +287,49 @@ export function IaTimetableWorkspace() {
   const [sessionId, setSessionId] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [durationMinutes, setDurationMinutes] = useState(120);
+  const [mode, setMode] = useState<'SIMPLE' | 'FYUGP_FIRST_IA'>('FYUGP_FIRST_IA');
+  const [routinePattern, setRoutinePattern] = useState<'MORNING' | 'DAY' | 'AUTO'>('AUTO');
   const [message, setMessage] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const activeSession = sessionId || exams.data?.[0]?.id || '';
+  const selectedExam = (exams.data ?? []).find((s) => s.id === activeSession);
   const sessionPapers = (papers.data ?? []).filter((p) => p.sessionId === activeSession);
+
+  const inferredPattern = useMemo(() => {
+    const name = (
+      selectedExam?.stats?.shiftName ??
+      selectedExam?.metadata?.shiftName ??
+      selectedExam?.name ??
+      ''
+    ).toLowerCase();
+    if (name.includes('morning')) return 'MORNING' as const;
+    if (name.includes('day')) return 'DAY' as const;
+    return 'DAY' as const;
+  }, [selectedExam]);
+
+  const resolvedPattern = routinePattern === 'AUTO' ? inferredPattern : routinePattern;
 
   const generate = useMutation({
     mutationFn: () =>
       generateIaTimetable({
         sessionId: activeSession,
         startDate,
-        durationMinutes,
-        defaultStartTime: '10:00',
+        mode,
+        ...(mode === 'SIMPLE'
+          ? { durationMinutes, defaultStartTime: '10:00' }
+          : { routinePattern: resolvedPattern }),
       }),
     onSuccess: (result) => {
+      const warn = result.warnings ?? [];
+      setWarnings(warn);
       setMessage(
-        `Timetable generated for ${result.updated} subjects. You can edit dates and venues manually below.`,
+        mode === 'FYUGP_FIRST_IA'
+          ? `FYUGP First IA timetable applied to ${result.updated} subjects (${resolvedPattern} pattern).`
+          : `Timetable generated for ${result.updated} subjects.`,
       );
       qc.invalidateQueries({ queryKey: ['ia', 'papers'] });
+      qc.invalidateQueries({ queryKey: ['ia', 'exams'] });
     },
     onError: () =>
       setMessage('Could not generate timetable. Ensure an IA exam exists with scheduled subjects.'),
@@ -314,8 +339,8 @@ export function IaTimetableWorkspace() {
     <div className="space-y-4">
       <Card title="Auto Scheduling Wizard">
         <p className="mb-3 text-xs text-muted-foreground">
-          Select an IA exam, start date, and duration. The system distributes subjects across days
-          automatically. Override individual rows in the table below if needed.
+          Prefer <strong>FYUGP First Internal Assessment routine</strong> for Morning/Day printed IA
+          grids (MAJOR → VAC by day). Use Simple auto-pack only for ad-hoc packing by paper code.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
@@ -328,8 +353,22 @@ export function IaTimetableWorkspace() {
               {(exams.data ?? []).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
+                  {s.stats?.shiftName || s.metadata?.shiftName
+                    ? ` (${s.stats?.shiftName ?? s.metadata?.shiftName})`
+                    : ''}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Mode</p>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as 'SIMPLE' | 'FYUGP_FIRST_IA')}
+              className="h-9 min-w-[240px] rounded-xl border border-border bg-background px-3 text-sm"
+            >
+              <option value="FYUGP_FIRST_IA">FYUGP First Internal Assessment routine</option>
+              <option value="SIMPLE">Simple auto-pack (legacy)</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -341,17 +380,32 @@ export function IaTimetableWorkspace() {
               className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
             />
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Duration (minutes)</p>
-            <input
-              type="number"
-              min={30}
-              max={480}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value) || 120)}
-              className="h-9 w-24 rounded-xl border border-border bg-background px-3 text-sm"
-            />
-          </div>
+          {mode === 'FYUGP_FIRST_IA' ? (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Routine pattern</p>
+              <select
+                value={routinePattern}
+                onChange={(e) => setRoutinePattern(e.target.value as 'MORNING' | 'DAY' | 'AUTO')}
+                className="h-9 min-w-[180px] rounded-xl border border-border bg-background px-3 text-sm"
+              >
+                <option value="AUTO">Auto from shift ({inferredPattern})</option>
+                <option value="MORNING">Morning (7:15–8:00 + Sat VAC)</option>
+                <option value="DAY">Day (9:45–10:40 + Fri VAC afternoon)</option>
+              </select>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Duration (minutes)</p>
+              <input
+                type="number"
+                min={30}
+                max={480}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Number(e.target.value) || 120)}
+                className="h-9 w-24 rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </div>
+          )}
           <Button
             size="sm"
             onClick={() => generate.mutate()}
@@ -362,44 +416,58 @@ export function IaTimetableWorkspace() {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Generate Timetable
+            {mode === 'FYUGP_FIRST_IA' ? 'Apply FYUGP First IA Timetable' : 'Generate Timetable'}
           </Button>
         </div>
+        {mode === 'FYUGP_FIRST_IA' ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Day 0 from start date = Monday MAJOR / MAJOR 1. Morning VAC falls on Saturday; Day Shift
+            Sem 1 VAC is Friday afternoon (1:45–2:10).
+          </p>
+        ) : null}
         {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
+        {warnings.length ? (
+          <ul className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-400">
+            {warnings.map((w) => (
+              <li key={w}>• {w}</li>
+            ))}
+          </ul>
+        ) : null}
       </Card>
       <Card title="IA Timetable — Table View">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs text-muted-foreground">
-              <th className="py-2">Code</th>
-              <th className="py-2">Subject</th>
-              <th className="py-2">Date</th>
-              <th className="py-2">Time</th>
-              <th className="py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessionPapers.map((p) => (
-              <tr key={p.id} className="border-b border-border/40">
-                <td className="py-2">{p.paperCode}</td>
-                <td className="py-2">{p.paperName}</td>
-                <td className="py-2">{String(p.examDate).slice(0, 10)}</td>
-                <td className="py-2">
-                  {p.startTime && p.endTime
-                    ? `${String(p.startTime).slice(11, 16)} – ${String(p.endTime).slice(11, 16)}`
-                    : '—'}
-                </td>
-                <td className="py-2">{p.status}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead>
+              <tr className="border-b text-xs text-muted-foreground">
+                <th className="py-2 pr-3 font-medium">Code</th>
+                <th className="py-2 pr-3 font-medium">Paper</th>
+                <th className="py-2 pr-3 font-medium">Sem</th>
+                <th className="py-2 pr-3 font-medium">Date</th>
+                <th className="py-2 pr-3 font-medium">Time</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!sessionPapers.length && (
-          <p className="py-4 text-sm text-muted-foreground">
-            No subjects for this exam. Create an IA exam first — subjects load from curriculum
-            automatically.
-          </p>
-        )}
+            </thead>
+            <tbody>
+              {sessionPapers.map((p) => (
+                <tr key={p.id} className="border-b border-border/50">
+                  <td className="py-2 pr-3 font-mono text-xs">{p.paperCode}</td>
+                  <td className="py-2 pr-3">{p.paperName}</td>
+                  <td className="py-2 pr-3">{p.semesterNo ?? '—'}</td>
+                  <td className="py-2 pr-3">
+                    {p.examDate ? String(p.examDate).slice(0, 10) : '—'}
+                  </td>
+                  <td className="py-2 pr-3 text-xs text-muted-foreground">
+                    {String(p.startTime).slice(0, 5)}–{String(p.endTime).slice(0, 5)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!sessionPapers.length ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              No papers for this exam yet. Create an IA examination first.
+            </p>
+          ) : null}
+        </div>
       </Card>
     </div>
   );
