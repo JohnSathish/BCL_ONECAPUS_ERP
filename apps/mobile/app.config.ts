@@ -33,13 +33,22 @@ const hasGoogleServices = Boolean(
 );
 
 /**
- * iOS Firebase config. Drop GoogleService-Info.plist at apps/mobile/ (from the
- * Firebase iOS app) to enable it. Wired conditionally so Android-only builds and
- * checkouts without the file never break. NOTE: FCM push tokens on iOS also need
- * the react-native-firebase messaging SDK (or a direct APNs sender on the API).
+ * iOS Firebase config. Prefer checked-in local file when allowed into the EAS
+ * archive, or set EAS file env `GOOGLE_SERVICE_INFO_PLIST` for cloud builds.
  */
+const googleServiceInfoFromEnv = process.env.GOOGLE_SERVICE_INFO_PLIST?.trim();
 const googleServiceInfoLocal = './GoogleService-Info.plist';
-const hasGoogleServiceInfo = fs.existsSync(path.join(__dirname, googleServiceInfoLocal));
+const googleServiceInfoFile = googleServiceInfoFromEnv
+  ? googleServiceInfoFromEnv
+  : fs.existsSync(path.join(__dirname, googleServiceInfoLocal))
+    ? googleServiceInfoLocal
+    : undefined;
+const hasGoogleServiceInfo = Boolean(
+  googleServiceInfoFile &&
+  (path.isAbsolute(googleServiceInfoFile)
+    ? fs.existsSync(googleServiceInfoFile)
+    : fs.existsSync(path.join(__dirname, googleServiceInfoFile))),
+);
 
 if (
   (easBuildProfile === 'production' ||
@@ -61,7 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.19',
+  version: '1.0.20',
   scheme: 'onecampus',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -75,16 +84,26 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    buildNumber: '1',
-    ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
+    // Rejected build was 1.0.19 (2) — bump for App Review resubmit.
+    buildNumber: '3',
+    ...(hasGoogleServiceInfo && googleServiceInfoFile
+      ? { googleServicesFile: googleServiceInfoFile }
+      : {}),
     infoPlist: {
-      // Required so App Store review accepts the biometric (Face ID) unlock flow.
-      NSFaceIDUsageDescription: 'Use Face ID to quickly and securely sign in to the campus app.',
+      // Explicit purpose strings (Guideline 2.5.1 / 5.1.1) — must say why + how data is used.
+      NSFaceIDUsageDescription:
+        'Don Bosco College campus app uses Face ID so enrolled students and staff can unlock the app and sign in without re-entering a password. Face data stays on your device and is never uploaded to college servers.',
+      NSCameraUsageDescription:
+        'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+      NSPhotoLibraryUsageDescription:
+        'Don Bosco College campus app needs access to your photo library so students and staff can choose an existing passport-style photo to upload for profile or admission documentation. Selected photos are uploaded to your college account for verification and are not shared with other users.',
+      // Standard HTTPS / OS crypto only — no custom non-exempt encryption.
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 39,
+    versionCode: 40,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -173,13 +192,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-image-picker',
       {
-        photosPermission: 'Allow the campus app to access photos for passport photo upload.',
+        // Library-only: profile/passport upload uses launchImageLibraryAsync (no in-app camera capture).
+        photosPermission:
+          'Don Bosco College campus app needs access to your photo library so students and staff can choose an existing passport-style photo to upload for profile or admission documentation. Selected photos are uploaded to your college account for verification and are not shared with other users.',
+        cameraPermission: false,
       },
     ],
     [
       'expo-camera',
       {
-        cameraPermission: 'Allow the campus app to scan login QR codes.',
+        cameraPermission:
+          'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+        microphonePermission: false,
         recordAudioAndroid: false,
       },
     ],
