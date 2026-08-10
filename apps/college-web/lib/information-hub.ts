@@ -49,6 +49,7 @@ export type HubNotice = {
   publishedAt: string;
   href?: string;
   attachmentHref?: string;
+  attachments?: Array<{ url: string; name: string }>;
   urgent?: boolean;
 };
 

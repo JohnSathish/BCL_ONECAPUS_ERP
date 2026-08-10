@@ -26,6 +26,11 @@ export type WebsiteDashboard = {
   generatedAt?: string;
 };
 
+export type WebsiteNoticeAttachment = {
+  url: string;
+  name: string;
+};
+
 export type WebsiteNotice = {
   id: string;
   title: string;
@@ -38,6 +43,8 @@ export type WebsiteNotice = {
   expireAt?: string | null;
   attachmentUrl?: string | null;
   attachmentName?: string | null;
+  /** Up to 5 PDF/document attachments. */
+  attachments?: WebsiteNoticeAttachment[];
   showOnHomepage: boolean;
   isVisible: boolean;
   status: string;

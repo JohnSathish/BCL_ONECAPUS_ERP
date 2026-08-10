@@ -309,6 +309,7 @@ export class WebsiteCmsEnterpriseService {
       expireAt?: string | null;
       attachmentUrl?: string | null;
       attachmentName?: string | null;
+      attachments?: Array<{ url: string; name?: string }> | null;
       showOnHomepage?: boolean;
       isVisible?: boolean;
       status?: string;
@@ -334,6 +335,12 @@ export class WebsiteCmsEnterpriseService {
     ) {
       throw new BadRequestException('Invalid notice priority');
     }
+    const attachments = this.normalizeNoticeAttachments(
+      dto.attachments,
+      dto.attachmentUrl,
+      dto.attachmentName,
+    );
+    const primary = attachments[0] ?? null;
     const row = await this.prisma.websiteNotice.create({
       data: {
         tenantId: user.tid,
@@ -346,8 +353,9 @@ export class WebsiteCmsEnterpriseService {
         priority,
         publishAt: dto.publishAt ? new Date(dto.publishAt) : new Date(),
         expireAt: dto.expireAt ? new Date(dto.expireAt) : null,
-        attachmentUrl: dto.attachmentUrl ?? null,
-        attachmentName: dto.attachmentName ?? null,
+        attachmentUrl: primary?.url ?? null,
+        attachmentName: primary?.name ?? null,
+        attachments,
         showOnHomepage: dto.showOnHomepage ?? true,
         isVisible: dto.isVisible ?? true,
         status: dto.status ?? 'DRAFT',
@@ -372,6 +380,7 @@ export class WebsiteCmsEnterpriseService {
       expireAt: string | null;
       attachmentUrl: string | null;
       attachmentName: string | null;
+      attachments: Array<{ url: string; name?: string }> | null;
       showOnHomepage: boolean;
       isVisible: boolean;
       status: string;
@@ -381,6 +390,42 @@ export class WebsiteCmsEnterpriseService {
       where: { id: noticeId, tenantId: user.tid, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Notice not found');
+
+    const attachmentPatch =
+      dto.attachments !== undefined
+        ? (() => {
+            const attachments = this.normalizeNoticeAttachments(
+              dto.attachments,
+              dto.attachmentUrl,
+              dto.attachmentName,
+            );
+            const primary = attachments[0] ?? null;
+            return {
+              attachments,
+              attachmentUrl: primary?.url ?? null,
+              attachmentName: primary?.name ?? null,
+            };
+          })()
+        : dto.attachmentUrl !== undefined || dto.attachmentName !== undefined
+          ? (() => {
+              const attachments = this.normalizeNoticeAttachments(
+                existing.attachments,
+                dto.attachmentUrl !== undefined
+                  ? dto.attachmentUrl
+                  : existing.attachmentUrl,
+                dto.attachmentName !== undefined
+                  ? dto.attachmentName
+                  : existing.attachmentName,
+              );
+              const primary = attachments[0] ?? null;
+              return {
+                attachments,
+                attachmentUrl: primary?.url ?? null,
+                attachmentName: primary?.name ?? null,
+              };
+            })()
+          : null;
+
     const updated = await this.prisma.websiteNotice.update({
       where: { id: existing.id },
       data: {
@@ -406,12 +451,7 @@ export class WebsiteCmsEnterpriseService {
         ...(dto.expireAt !== undefined
           ? { expireAt: dto.expireAt ? new Date(dto.expireAt) : null }
           : {}),
-        ...(dto.attachmentUrl !== undefined
-          ? { attachmentUrl: dto.attachmentUrl }
-          : {}),
-        ...(dto.attachmentName !== undefined
-          ? { attachmentName: dto.attachmentName }
-          : {}),
+        ...(attachmentPatch ?? {}),
         ...(dto.showOnHomepage !== undefined
           ? { showOnHomepage: dto.showOnHomepage }
           : {}),
@@ -1425,6 +1465,7 @@ export class WebsiteCmsEnterpriseService {
     expireAt: Date | null;
     attachmentUrl: string | null;
     attachmentName: string | null;
+    attachments?: unknown;
     showOnHomepage: boolean;
     isVisible: boolean;
     status: string;
@@ -1432,6 +1473,12 @@ export class WebsiteCmsEnterpriseService {
     createdAt: Date;
     updatedAt: Date;
   }) {
+    const attachments = this.normalizeNoticeAttachments(
+      row.attachments,
+      row.attachmentUrl,
+      row.attachmentName,
+    );
+    const primary = attachments[0] ?? null;
     return {
       id: row.id,
       title: row.title,
@@ -1442,8 +1489,9 @@ export class WebsiteCmsEnterpriseService {
       priority: row.priority,
       publishAt: row.publishAt,
       expireAt: row.expireAt,
-      attachmentUrl: row.attachmentUrl,
-      attachmentName: row.attachmentName,
+      attachmentUrl: primary?.url ?? row.attachmentUrl,
+      attachmentName: primary?.name ?? row.attachmentName,
+      attachments,
       showOnHomepage: row.showOnHomepage,
       isVisible: row.isVisible,
       status: row.status,
@@ -1451,6 +1499,38 @@ export class WebsiteCmsEnterpriseService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  private normalizeNoticeAttachments(
+    value: unknown,
+    fallbackUrl?: string | null,
+    fallbackName?: string | null,
+  ): Array<{ url: string; name: string }> {
+    const out: Array<{ url: string; name: string }> = [];
+    const seen = new Set<string>();
+    const push = (urlRaw: unknown, nameRaw?: unknown) => {
+      const url = typeof urlRaw === 'string' ? urlRaw.trim() : '';
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      const name =
+        typeof nameRaw === 'string' && nameRaw.trim() ? nameRaw.trim() : 'PDF';
+      out.push({ url, name });
+    };
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (!item || typeof item !== 'object') continue;
+        const row = item as Record<string, unknown>;
+        push(row.url, row.name);
+        if (out.length >= 5) break;
+      }
+    }
+
+    if (!out.length) {
+      push(fallbackUrl, fallbackName);
+    }
+
+    return out.slice(0, 5);
   }
 
   private mapAnnouncement(row: {

@@ -69,7 +69,10 @@ function noticeBadgeFromRow(row: Record<string, unknown>): HubNotice['badge'] {
   }
   const category = typeof row.category === 'string' ? row.category.toUpperCase() : '';
   if (category.includes('HOLIDAY')) return 'HOLIDAY';
-  if (typeof row.attachmentUrl === 'string' && row.attachmentUrl.trim()) return 'PDF';
+  const hasPdf =
+    (typeof row.attachmentUrl === 'string' && row.attachmentUrl.trim()) ||
+    (Array.isArray(row.attachments) && row.attachments.length > 0);
+  if (hasPdf) return 'PDF';
   if (category === 'URGENT') return 'URGENT';
   return 'NEW';
 }
@@ -82,6 +85,31 @@ function noticesFromPayload(payload: Record<string, unknown>, fallback: HubNotic
     for (const row of notices) {
       if (!isRecord(row) || typeof row.id !== 'string' || typeof row.title !== 'string') continue;
       const badge = noticeBadgeFromRow(row);
+      const attachments: Array<{ url: string; name: string }> = [];
+      if (Array.isArray(row.attachments)) {
+        for (const item of row.attachments) {
+          if (!isRecord(item) || typeof item.url !== 'string' || !item.url.trim()) continue;
+          const absolute = absolutizeMediaUrl(item.url) || item.url;
+          attachments.push({
+            url: absolute,
+            name: typeof item.name === 'string' && item.name.trim() ? item.name : 'PDF',
+          });
+        }
+      }
+      if (
+        !attachments.length &&
+        typeof row.attachmentUrl === 'string' &&
+        row.attachmentUrl.trim()
+      ) {
+        const absolute = absolutizeMediaUrl(row.attachmentUrl) || row.attachmentUrl;
+        attachments.push({
+          url: absolute,
+          name:
+            typeof row.attachmentName === 'string' && row.attachmentName.trim()
+              ? row.attachmentName
+              : 'PDF',
+        });
+      }
       mapped.push({
         id: row.id,
         title: row.title,
@@ -93,7 +121,8 @@ function noticesFromPayload(payload: Record<string, unknown>, fallback: HubNotic
               ? row.createdAt.slice(0, 10)
               : new Date().toISOString().slice(0, 10),
         href: `/notices/${typeof row.slug === 'string' ? row.slug : row.id}`,
-        attachmentHref: typeof row.attachmentUrl === 'string' ? row.attachmentUrl : undefined,
+        attachmentHref: attachments[0]?.url,
+        attachments,
         urgent: row.priority === 'URGENT' || badge === 'URGENT',
       });
     }

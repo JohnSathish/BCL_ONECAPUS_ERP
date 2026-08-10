@@ -93,6 +93,7 @@ import {
   upsertWebsiteAcademicDepartment,
   upsertWebsiteRedirect,
   uploadWebsiteHeroSlideMobile,
+  uploadWebsiteDocument,
   uploadWebsiteMedia,
 } from '@/services/website-cms';
 import type {
@@ -100,6 +101,7 @@ import type {
   WebsiteHomepageSection,
   WebsiteMenuItem,
   WebsiteNotice,
+  WebsiteNoticeAttachment,
   WebsitePage,
   WebsitePageSection,
   WebsiteSettings,
@@ -2934,28 +2936,83 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
   const [category, setCategory] = useState<(typeof NOTICE_CATEGORIES)[number]>('GENERAL');
   const [priority, setPriority] = useState<(typeof NOTICE_PRIORITIES)[number]>('NORMAL');
   const [bodyHtml, setBodyHtml] = useState('');
+  const [attachments, setAttachments] = useState<WebsiteNoticeAttachment[]>([]);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const MAX_NOTICE_PDFS = 5;
+
   const resetForm = () => {
     setEditingId(null);
     setTitle('');
     setCategory('GENERAL');
     setPriority('NORMAL');
     setBodyHtml('');
+    setAttachments([]);
   };
+
   const loadForEdit = (notice: WebsiteNotice) => {
     setEditingId(notice.id);
     setTitle(notice.title ?? '');
     setCategory((notice.category as (typeof NOTICE_CATEGORIES)[number]) ?? 'GENERAL');
     setPriority((notice.priority as (typeof NOTICE_PRIORITIES)[number]) ?? 'NORMAL');
     setBodyHtml(notice.bodyHtml ?? '');
+    const fromList = Array.isArray(notice.attachments)
+      ? notice.attachments
+          .filter((a) => a?.url?.trim())
+          .map((a) => ({ url: a.url, name: a.name || 'PDF' }))
+      : [];
+    if (fromList.length) {
+      setAttachments(fromList.slice(0, MAX_NOTICE_PDFS));
+    } else if (notice.attachmentUrl?.trim()) {
+      setAttachments([
+        { url: notice.attachmentUrl.trim(), name: notice.attachmentName?.trim() || 'PDF' },
+      ]);
+    } else {
+      setAttachments([]);
+    }
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const onUploadPdf = async (file: File | null) => {
+    if (!file) return;
+    if (attachments.length >= MAX_NOTICE_PDFS) {
+      onMessage(`You can attach up to ${MAX_NOTICE_PDFS} PDFs per notice.`);
+      return;
+    }
+    if (file.type && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      onMessage('Please choose a PDF file.');
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const media = await uploadWebsiteDocument(file, file.name);
+      setAttachments((prev) =>
+        [...prev, { url: media.publicUrl, name: media.fileName || file.name }].slice(
+          0,
+          MAX_NOTICE_PDFS,
+        ),
+      );
+      onMessage('PDF uploaded.');
+    } catch (error) {
+      onMessage(apiErrorMessage(error, 'Could not upload PDF'));
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
+  const noticePayload = () => ({
+    title: title.trim(),
+    category,
+    priority,
+    bodyHtml,
+    attachments,
+    attachmentUrl: attachments[0]?.url ?? null,
+    attachmentName: attachments[0]?.name ?? null,
+  });
+
   const create = useMutation({
     mutationFn: () =>
       createWebsiteNotice({
-        title,
-        category,
-        priority,
-        bodyHtml,
+        ...noticePayload(),
         status: 'DRAFT',
         showOnHomepage: true,
         isVisible: true,
@@ -2969,13 +3026,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not create notice')),
   });
   const saveEdit = useMutation({
-    mutationFn: () =>
-      updateWebsiteNotice(editingId as string, {
-        title: title.trim(),
-        category,
-        priority,
-        bodyHtml,
-      }),
+    mutationFn: () => updateWebsiteNotice(editingId as string, noticePayload()),
     onSuccess: () => {
       resetForm();
       onMessage('Notice updated.');
@@ -3053,10 +3104,61 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
               }}
             />
           </div>
+          <div className="space-y-2 rounded-md border border-border p-3 md:col-span-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">PDF attachments</p>
+              <p className="text-xs text-muted-foreground">
+                {attachments.length}/{MAX_NOTICE_PDFS} files
+              </p>
+            </div>
+            <Input
+              type="file"
+              accept="application/pdf,.pdf"
+              disabled={uploadingPdf || attachments.length >= MAX_NOTICE_PDFS}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = '';
+                void onUploadPdf(file);
+              }}
+            />
+            {attachments.length ? (
+              <ul className="space-y-1.5">
+                {attachments.map((file) => (
+                  <li
+                    key={file.url}
+                    className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm"
+                  >
+                    <a
+                      className="min-w-0 truncate underline"
+                      href={file.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {file.name || 'Download PDF'}
+                    </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setAttachments((prev) => prev.filter((row) => row.url !== file.url))
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Optional — upload up to 5 PDFs for this circular.
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button
               className="w-fit"
-              disabled={!title.trim() || create.isPending || saveEdit.isPending}
+              disabled={!title.trim() || create.isPending || saveEdit.isPending || uploadingPdf}
               onClick={() => (editingId ? saveEdit.mutate() : create.mutate())}
             >
               {editingId ? 'Save changes' : 'Create draft'}
@@ -3072,59 +3174,67 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
       <CompactCard>
         <CompactCardHeader title="All notices" />
         <CompactCardBody className="space-y-2">
-          {notices.data.map((notice) => (
-            <div
-              key={notice.id}
-              className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium">{notice.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {notice.priority} · {notice.category} · {notice.status}
-                  {notice.showOnHomepage ? ' · Homepage' : ''}
-                </p>
+          {notices.data.map((notice) => {
+            const pdfCount = Array.isArray(notice.attachments)
+              ? notice.attachments.length
+              : notice.attachmentUrl
+                ? 1
+                : 0;
+            return (
+              <div
+                key={notice.id}
+                className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium">{notice.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {notice.priority} · {notice.category} · {notice.status}
+                    {notice.showOnHomepage ? ' · Homepage' : ''}
+                    {pdfCount ? ` · ${pdfCount} PDF${pdfCount === 1 ? '' : 's'}` : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => loadForEdit(notice)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={update.isPending}
+                    onClick={() =>
+                      update.mutate({
+                        id: notice.id,
+                        payload: { status: notice.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED' },
+                      })
+                    }
+                  >
+                    {notice.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={update.isPending}
+                    onClick={() =>
+                      update.mutate({
+                        id: notice.id,
+                        payload: { showOnHomepage: !notice.showOnHomepage },
+                      })
+                    }
+                  >
+                    {notice.showOnHomepage ? 'Hide from home' : 'Show on home'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate(notice.id)}
+                  >
+                    Trash
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => loadForEdit(notice)}>
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={update.isPending}
-                  onClick={() =>
-                    update.mutate({
-                      id: notice.id,
-                      payload: { status: notice.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED' },
-                    })
-                  }
-                >
-                  {notice.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={update.isPending}
-                  onClick={() =>
-                    update.mutate({
-                      id: notice.id,
-                      payload: { showOnHomepage: !notice.showOnHomepage },
-                    })
-                  }
-                >
-                  {notice.showOnHomepage ? 'Hide from home' : 'Show on home'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(notice.id)}
-                >
-                  Trash
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {!notices.data.length ? (
             <p className="text-sm text-muted-foreground">No notices yet.</p>
           ) : null}
