@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { NavMegaMenu } from '@/components/nav-mega-menu';
 import type { HomepageHeaderCtas } from '@/lib/homepage-cms-content';
 import { seedHomepageCmsContent } from '@/lib/homepage-cms-content';
+import { SHOW_ERP_AND_MOBILE_APP_CTAS } from '@/lib/feature-flags';
 import { navigation as seedNavigation } from '@/lib/navigation';
 
 type NewsItem = {
@@ -130,9 +131,11 @@ export function Header({
             </span>
           </Link>
           <div className="brand-actions">
-            <HeaderCtaLink className="nav-erp desktop-only" href={erpLogin.href}>
-              {erpLogin.label}
-            </HeaderCtaLink>
+            {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
+              <HeaderCtaLink className="nav-erp desktop-only" href={erpLogin.href}>
+                {erpLogin.label}
+              </HeaderCtaLink>
+            ) : null}
             <Button asChild variant="gold" className="compact desktop-only">
               <HeaderCtaLink href={onlineAdmission.href}>{onlineAdmission.label}</HeaderCtaLink>
             </Button>
@@ -175,10 +178,12 @@ export function Header({
             <Link href="/naac">NAAC</Link>
           </nav>
           <div className="nav-actions desktop-nav-actions">
-            <HeaderCtaLink className="nav-app" href={mobileApp.href}>
-              <PlayStoreMark className="nav-app-icon" />
-              <span>{mobileApp.label}</span>
-            </HeaderCtaLink>
+            {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
+              <HeaderCtaLink className="nav-app" href={mobileApp.href}>
+                <PlayStoreMark className="nav-app-icon" />
+                <span>{mobileApp.label}</span>
+              </HeaderCtaLink>
+            ) : null}
             <Link className="icon-button" href="/search" aria-label="Search">
               <Search size={19} />
             </Link>
@@ -248,21 +253,25 @@ export function Header({
               <Link href="/search" onClick={() => setOpen(false)}>
                 Search
               </Link>
-              <HeaderCtaLink
-                className="nav-app"
-                href={mobileApp.href}
-                onClick={() => setOpen(false)}
-              >
-                <PlayStoreMark className="nav-app-icon" />
-                <span>{mobileApp.label}</span>
-              </HeaderCtaLink>
-              <HeaderCtaLink
-                className="nav-erp"
-                href={erpLogin.href}
-                onClick={() => setOpen(false)}
-              >
-                {erpLogin.label}
-              </HeaderCtaLink>
+              {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
+                <>
+                  <HeaderCtaLink
+                    className="nav-app"
+                    href={mobileApp.href}
+                    onClick={() => setOpen(false)}
+                  >
+                    <PlayStoreMark className="nav-app-icon" />
+                    <span>{mobileApp.label}</span>
+                  </HeaderCtaLink>
+                  <HeaderCtaLink
+                    className="nav-erp"
+                    href={erpLogin.href}
+                    onClick={() => setOpen(false)}
+                  >
+                    {erpLogin.label}
+                  </HeaderCtaLink>
+                </>
+              ) : null}
               <Button asChild variant="gold">
                 <HeaderCtaLink href={onlineAdmission.href} onClick={() => setOpen(false)}>
                   {onlineAdmission.label}

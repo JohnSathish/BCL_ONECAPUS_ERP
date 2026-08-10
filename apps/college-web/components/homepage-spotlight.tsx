@@ -24,6 +24,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { NewsItem } from '@/lib/content';
+import { SHOW_ERP_AND_MOBILE_APP_CTAS, isErpOrMobileAppLink } from '@/lib/feature-flags';
 import {
   newsBadgeStyles,
   normalizeNewsCategory,
@@ -386,15 +387,17 @@ export function HomepageSpotlight({ spotlight, news }: Props) {
             <p className="spotlight-kicker">Quick access</p>
             <h3 id="spotlight-quick-heading">At your fingertips</h3>
             <div className="spotlight-quick-grid">
-              {spotlight.quickAccess.map((item) => {
-                const Icon = quickIcons[item.id as keyof typeof quickIcons] ?? Users;
-                return (
-                  <Link key={item.id} href={item.href} className="spotlight-quick-item">
-                    <Icon aria-hidden />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
+              {spotlight.quickAccess
+                .filter((item) => SHOW_ERP_AND_MOBILE_APP_CTAS || !isErpOrMobileAppLink(item))
+                .map((item) => {
+                  const Icon = quickIcons[item.id as keyof typeof quickIcons] ?? Users;
+                  return (
+                    <Link key={item.id} href={item.href} className="spotlight-quick-item">
+                      <Icon aria-hidden />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
             </div>
           </section>
         </div>

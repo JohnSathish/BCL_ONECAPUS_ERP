@@ -23,6 +23,7 @@ import { VoicesOfBosco } from '@/components/voices-of-bosco';
 import { WhyChooseUs } from '@/components/why-choose-us';
 import { ImportantLinksSection } from '@/components/important-links';
 import type { CollegeContent } from '@/lib/content';
+import { SHOW_ERP_AND_MOBILE_APP_CTAS, isErpOrMobileAppLink } from '@/lib/feature-flags';
 import type { HomepageSectionPayload } from '@/lib/homepage';
 import type { DepartmentCard } from '@/lib/academic-types';
 import type { HeroSlide } from '@/lib/hero-slides';
@@ -331,7 +332,10 @@ export function HomepageResearchAndLinks({
       },
     ],
   };
-  const featured = research.links.slice(0, 3);
+  const visibleLinks = research.links.filter(
+    (link) => SHOW_ERP_AND_MOBILE_APP_CTAS || !isErpOrMobileAppLink(link),
+  );
+  const featured = visibleLinks.slice(0, 3);
 
   const renderCard = (link: { label: string; href: string; description?: string }) => {
     const inner = (

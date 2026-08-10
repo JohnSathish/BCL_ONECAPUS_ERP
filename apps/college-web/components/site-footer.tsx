@@ -5,6 +5,7 @@ import { NewsletterForm } from '@/components/newsletter-form';
 import { VisitorsCount } from '@/components/visitors-count';
 import type { HomepageFooterContent, HomepageHeaderCtas } from '@/lib/homepage-cms-content';
 import { seedHomepageCmsContent } from '@/lib/homepage-cms-content';
+import { SHOW_ERP_AND_MOBILE_APP_CTAS } from '@/lib/feature-flags';
 import { getFooterNavigation } from '@/lib/menus';
 import { quickLinks } from '@/lib/quick-links';
 
@@ -245,15 +246,18 @@ export async function SiteFooter({ footer, headerCtas }: Props) {
             <Clock3 aria-hidden /> Office hours: {officeHours}
           </p>
           <NewsletterForm />
-          <div className="footer-cta-row" aria-label="App and portal links">
-            <FooterCtaLink className="footer-cta footer-cta-app" href={ctas.mobileApp.href}>
-              <PlayStoreMark />
-              <span>{ctas.mobileApp.label}</span>
-            </FooterCtaLink>
-            <FooterCtaLink className="footer-cta footer-cta-erp" href={ctas.erpLogin.href}>
-              <span>{ctas.erpLogin.label}</span>
-            </FooterCtaLink>
-          </div>
+          {/* ERP Login + Mobile App — enable via SHOW_ERP_AND_MOBILE_APP_CTAS in feature-flags.ts */}
+          {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
+            <div className="footer-cta-row" aria-label="App and portal links">
+              <FooterCtaLink className="footer-cta footer-cta-app" href={ctas.mobileApp.href}>
+                <PlayStoreMark />
+                <span>{ctas.mobileApp.label}</span>
+              </FooterCtaLink>
+              <FooterCtaLink className="footer-cta footer-cta-erp" href={ctas.erpLogin.href}>
+                <span>{ctas.erpLogin.label}</span>
+              </FooterCtaLink>
+            </div>
+          ) : null}
         </div>
       </div>
 
