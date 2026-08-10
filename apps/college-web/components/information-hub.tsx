@@ -75,12 +75,11 @@ function NoticeRow({ notice, noticesHref }: { notice: HubNotice; noticesHref: st
   const style = noticeBadgeStyles[badge] ?? noticeBadgeStyles.NEW;
   const published = formatNoticeDate(notice.publishedAt);
   const pulseNew = notice.badge === 'NEW' && isRecentNotice(notice.publishedAt);
-
-  return (
-    <Link
-      href={notice.href ?? noticesHref}
-      className={`info-notice-item${notice.urgent ? ' is-urgent' : ''}${pulseNew ? ' is-new' : ''}`}
-    >
+  const primaryHref = notice.attachmentHref || notice.href || noticesHref;
+  const opensExternal = /^https?:\/\//i.test(primaryHref);
+  const className = `info-notice-item${notice.urgent ? ' is-urgent' : ''}${pulseNew ? ' is-new' : ''}`;
+  const body = (
+    <>
       <span
         className={`info-badge${pulseNew ? ' is-pulse' : ''}`}
         style={{ background: style.bg, color: style.color }}
@@ -98,6 +97,20 @@ function NoticeRow({ notice, noticesHref }: { notice: HubNotice; noticesHref: st
       ) : (
         <span className="info-download-spacer" aria-hidden />
       )}
+    </>
+  );
+
+  if (opensExternal) {
+    return (
+      <a href={primaryHref} className={className} target="_blank" rel="noopener noreferrer">
+        {body}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={primaryHref} className={className}>
+      {body}
     </Link>
   );
 }

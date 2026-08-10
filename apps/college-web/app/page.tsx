@@ -50,7 +50,8 @@ export default async function HomePage() {
     });
   }
 
-  // Production: never show demo seed events/notices — only CMS/ERP data.
+  // Production: never resurrect demo seed events — CMS/empty only.
+  // Notices always come from getPublicNotices (already demo-slug filtered).
   const useDemoFallbacks = process.env.NODE_ENV !== 'production';
   const hub = {
     ...content.informationHub,
@@ -59,7 +60,8 @@ export default async function HomePage() {
       : useDemoFallbacks
         ? content.informationHub.upcomingEvents
         : [],
-    notices: useDemoFallbacks ? content.informationHub.notices : [],
+    notices: content.informationHub.notices,
+    noticesHref: '/notices',
   };
 
   const sections = (homepage?.sections ?? [])

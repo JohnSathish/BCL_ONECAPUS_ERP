@@ -3006,10 +3006,19 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     if (!trimmed) return '';
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
     if (typeof window === 'undefined') return trimmed;
+    const publicBase =
+      (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_COLLEGE_SITE_URL?.trim()) ||
+      (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SITE_URL?.trim()) ||
+      'https://donboscocollege.ac.in';
     try {
-      return new URL(trimmed, window.location.origin).toString();
+      // Prefer college public origin so copied PDF links work outside ERP admin.
+      return new URL(trimmed, publicBase.endsWith('/') ? publicBase : `${publicBase}/`).toString();
     } catch {
-      return trimmed;
+      try {
+        return new URL(trimmed, window.location.origin).toString();
+      } catch {
+        return trimmed;
+      }
     }
   };
 

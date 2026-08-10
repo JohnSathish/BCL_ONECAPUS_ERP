@@ -732,27 +732,45 @@ export class WebsiteCmsEnterpriseService {
     return rows.map((row) => this.mapAnnouncement(row));
   }
 
-  async listPublicNotices(tenantId: string, opts?: { homepage?: boolean }) {
+  async listPublicNotices(
+    tenantId: string,
+    opts: { slug: string; homepage?: boolean },
+  ): Promise<ReturnType<WebsiteCmsEnterpriseService['mapNotice']> | null>;
+  async listPublicNotices(
+    tenantId: string,
+    opts?: { homepage?: boolean; slug?: undefined },
+  ): Promise<Array<ReturnType<WebsiteCmsEnterpriseService['mapNotice']>>>;
+  async listPublicNotices(
+    tenantId: string,
+    opts?: { homepage?: boolean; slug?: string },
+  ) {
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },
     });
-    if (!site) return [];
+    if (!site) return opts?.slug ? null : [];
     const now = new Date();
+    const where = {
+      tenantId,
+      siteId: site.id,
+      deletedAt: null,
+      status: 'PUBLISHED',
+      isVisible: true,
+      ...(opts?.homepage ? { showOnHomepage: true } : {}),
+      ...(opts?.slug ? { slug: opts.slug } : {}),
+      OR: [{ publishAt: null }, { publishAt: { lte: now } }],
+      AND: [
+        {
+          OR: [{ expireAt: null }, { expireAt: { gt: now } }],
+        },
+      ],
+    };
+    if (opts?.slug) {
+      const row = await this.prisma.websiteNotice.findFirst({ where });
+      if (!row || isDemoWebsiteContentSlug(row.slug)) return null;
+      return this.mapNotice(row);
+    }
     const rows = await this.prisma.websiteNotice.findMany({
-      where: {
-        tenantId,
-        siteId: site.id,
-        deletedAt: null,
-        status: 'PUBLISHED',
-        isVisible: true,
-        ...(opts?.homepage ? { showOnHomepage: true } : {}),
-        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
-        AND: [
-          {
-            OR: [{ expireAt: null }, { expireAt: { gt: now } }],
-          },
-        ],
-      },
+      where,
       orderBy: [{ priority: 'asc' }, { publishAt: 'desc' }],
       take: opts?.homepage ? 12 : 50,
     });

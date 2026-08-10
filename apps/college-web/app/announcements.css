@@ -115,3 +115,65 @@
 @media (max-width:640px){
   .announcement-grid{grid-template-columns:1fr}
 }
+
+/* Notice Board index/detail */
+.notice-index-list{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.notice-index-card{
+  padding:16px 18px;
+  border:1px solid var(--line, #e5e7eb);
+  border-radius:12px;
+  background:#fff;
+}
+.notice-index-card.is-urgent{
+  box-shadow:inset 3px 0 0 #dc2626;
+  background:rgba(239,68,68,.04);
+}
+.notice-index-meta{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+  margin-bottom:8px;
+}
+.notice-index-meta time{
+  color:var(--muted, #64748b);
+  font-size:13px;
+}
+.notice-index-card h2{
+  margin:0 0 10px;
+  font-size:1.15rem;
+  line-height:1.35;
+}
+.notice-index-card h2 a{
+  color:inherit;
+  text-decoration:none;
+}
+.notice-index-card h2 a:hover{text-decoration:underline}
+.notice-index-files,
+.notice-detail-files{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.notice-index-files a{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:var(--navy, #0b2240);
+  font-weight:600;
+  text-decoration:none;
+}
+.notice-index-files a:hover{text-decoration:underline}
+.notice-detail-files{
+  margin:18px 0;
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:10px;
+}

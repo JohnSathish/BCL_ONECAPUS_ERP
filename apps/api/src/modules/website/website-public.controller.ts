@@ -77,6 +77,21 @@ export class WebsitePublicController {
   }
 
   @Public()
+  @Get('notices/:slug')
+  async noticeBySlug(
+    @Req() req: Request,
+    @Param('slug') slug: string,
+    @Query('tenant') tenantSlug?: string,
+  ) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    const row = await this.enterprise.listPublicNotices(tenant.id, { slug });
+    if (!row) {
+      throw new NotFoundException('Notice not found');
+    }
+    return row;
+  }
+
+  @Public()
   @Get('announcements')
   async announcements(
     @Req() req: Request,

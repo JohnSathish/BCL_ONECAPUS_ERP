@@ -12,7 +12,7 @@ import {
 
 export const quickLinks: ReadonlyArray<{ label: string; href: string; Icon: LucideIcon }> = [
   { label: 'Online Admission', href: '/admission/apply', Icon: GraduationCap },
-  { label: 'Notice Board', href: '/news', Icon: CalendarDays },
+  { label: 'Notice Board', href: '/notices', Icon: CalendarDays },
   { label: 'Academic Calendar', href: '/academics/calendar', Icon: CalendarDays },
   { label: 'Examination', href: '/examination', Icon: Award },
   { label: 'Library', href: '/facilities/library', Icon: Library },

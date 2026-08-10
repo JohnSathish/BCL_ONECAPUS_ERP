@@ -79,7 +79,6 @@ function noticeBadgeFromRow(row: Record<string, unknown>): HubNotice['badge'] {
 
 function noticesFromPayload(payload: Record<string, unknown>, fallback: HubNotice[]): HubNotice[] {
   const notices = payload.notices;
-  // Empty CMS array is intentional — do not resurrect demo seed notices.
   if (Array.isArray(notices)) {
     const mapped: HubNotice[] = [];
     for (const row of notices) {
@@ -126,7 +125,8 @@ function noticesFromPayload(payload: Record<string, unknown>, fallback: HubNotic
         urgent: row.priority === 'URGENT' || badge === 'URGENT',
       });
     }
-    return mapped;
+    // Prefer homepage payload when it has rows; otherwise use CMS notices from hub.
+    return mapped.length ? mapped : fallback;
   }
   return fallback;
 }

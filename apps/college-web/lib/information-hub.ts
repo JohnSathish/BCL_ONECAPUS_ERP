@@ -184,7 +184,7 @@ export const seedInformationHub: InformationHubContent = {
       title: 'Semester Registration Last Date',
       badge: 'IMPORTANT',
       publishedAt: '2026-05-12',
-      href: '/news',
+      href: '/notices',
       urgent: true,
     },
     {
@@ -192,7 +192,7 @@ export const seedInformationHub: InformationHubContent = {
       title: 'Independence Day Holiday',
       badge: 'HOLIDAY',
       publishedAt: '2026-05-10',
-      href: '/news',
+      href: '/notices',
     },
     {
       id: 'iqac',
@@ -203,7 +203,7 @@ export const seedInformationHub: InformationHubContent = {
     },
   ],
   calendarHref: '/academics/calendar',
-  noticesHref: '/news',
+  noticesHref: '/notices',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
