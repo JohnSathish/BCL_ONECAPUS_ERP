@@ -5,7 +5,7 @@ export const COLLEGE_NAME = 'Don Bosco College, Tura';
  * Do not treat this as the platform identity for other tenants.
  */
 export const PRODUCT_NAME = 'Bosco Connect';
-export const APP_VERSION = '1.0.20';
+export const APP_VERSION = '1.0.21';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
 /** Shown under college name on welcome/login (client-facing) */

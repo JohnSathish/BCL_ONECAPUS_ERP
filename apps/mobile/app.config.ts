@@ -62,30 +62,28 @@ if (
   );
 }
 /** Expo Go shows the app icon while bundling — use a solid asset in dev to avoid a second logo splash. */
-const appIcon = isNativeReleaseBuild
-  ? './assets/bcl-onecampus-logo.png'
-  : './assets/splash-solid.png';
+const appIcon = isNativeReleaseBuild ? './assets/icon.png' : './assets/splash-solid.png';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.20',
+  version: '1.0.21',
   scheme: 'onecampus',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   icon: appIcon,
   splash: {
-    image: './assets/bcl-onecampus-logo.png',
+    image: './assets/icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#020f2e',
+    backgroundColor: '#ffffff',
   },
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // Failed ITMS-90683 upload was 1.0.20 (3) — bump for App Store resubmit.
-    buildNumber: '4',
+    // Icon + branding refresh after ITMS-90683 build 4.
+    buildNumber: '5',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -104,7 +102,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 40,
+    versionCode: 41,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -178,15 +176,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/bcl-onecampus-logo.png',
-        backgroundColor: '#020f2e',
-        imageWidth: 200,
+        image: './assets/icon.png',
+        backgroundColor: '#ffffff',
+        imageWidth: 220,
         resizeMode: 'contain',
       },
     ],
     [
       'expo-notifications',
       {
+        // Android status-bar icons must stay simple/monochrome — keep non-seal mark.
         icon: './assets/bcl-onecampus-logo.png',
         color: '#1e3a8a',
         defaultChannel: 'onecampus_default',

@@ -13,7 +13,7 @@ import {
 } from '@/constants/release';
 import { readCachedBootstrap } from '@/services/mobile-remote-config';
 
-const BCL_LOGO = require('../../../assets/bcl-onecampus-logo.png');
+const COLLEGE_APP_ICON = require('../../../assets/icon.png');
 
 const RING_SIZES = [260, 320, 380, 440, 500];
 
@@ -211,7 +211,7 @@ export function PremiumSplashScreen() {
           <Animated.View
             style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
           >
-            <Image source={BCL_LOGO} style={styles.logo} resizeMode="contain" />
+            <Image source={COLLEGE_APP_ICON} style={styles.logo} resizeMode="contain" />
           </Animated.View>
 
           <Animated.View
