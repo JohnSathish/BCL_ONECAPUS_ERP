@@ -20,9 +20,9 @@ const GLOW_SEQUENCE_DEFAULT = [
 ];
 
 const GLOW_SEQUENCE_LOGIN = [
-  '0 0 14px rgba(43,79,163,0.45), 0 0 32px rgba(23,59,115,0.3)',
-  '0 0 28px rgba(43,79,163,0.75), 0 0 52px rgba(23,59,115,0.45)',
-  '0 0 14px rgba(43,79,163,0.45), 0 0 32px rgba(23,59,115,0.3)',
+  '0 0 14px rgba(34,211,238,0.35), 0 0 32px rgba(22,58,122,0.4)',
+  '0 0 28px rgba(34,211,238,0.55), 0 0 52px rgba(22,58,122,0.55)',
+  '0 0 14px rgba(34,211,238,0.35), 0 0 32px rgba(22,58,122,0.4)',
 ];
 
 export function OrbitCenterNode({
@@ -41,7 +41,7 @@ export function OrbitCenterNode({
     <motion.div
       className={`orbit-core landing-core-glow relative flex flex-col items-center justify-center rounded-full border border-white/30 text-center backdrop-blur-md ${
         isLogin
-          ? 'h-36 w-36 bg-gradient-to-br from-[#173B73]/90 via-[#2B4FA3]/85 to-[#0B1F3A]/95 px-3'
+          ? 'h-36 w-36 bg-gradient-to-br from-[#0d2a52]/95 via-[#163a7a]/90 to-[#071628]/98 px-3'
           : 'h-28 w-28 bg-gradient-to-br from-indigo-500/45 via-violet-600/55 to-purple-700/65 sm:h-32 sm:w-32'
       }`}
       animate={
@@ -87,7 +87,7 @@ export function OrbitCenterNode({
       {isLogin ? (
         <>
           <p className="mt-0.5 text-[12px] font-bold leading-tight text-white">{productName}</p>
-          <p className="mt-1 max-w-[7.75rem] text-[8px] font-medium leading-snug text-blue-100/80">
+          <p className="mt-1 max-w-[7.75rem] text-[8px] font-medium leading-snug text-cyan-200/85">
             {productTagline}
           </p>
         </>

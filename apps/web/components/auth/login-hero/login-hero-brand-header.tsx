@@ -42,7 +42,7 @@ export function LoginHeroBrandHeader({ compact = false, context = null }: Props)
 
   return (
     <header className="login-hero-brand w-full min-w-0">
-      <p className="login-hero-eyebrow mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/70">
+      <p className="login-hero-eyebrow mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
         {eyebrow}
       </p>
 
@@ -61,15 +61,15 @@ export function LoginHeroBrandHeader({ compact = false, context = null }: Props)
         </div>
       </div>
 
-      <p className="login-hero-brand-description mt-4 max-w-[520px] border-l-2 border-cyan-400/35 pl-4 text-sm leading-relaxed text-white/70">
+      <p className="login-hero-brand-description mt-4 max-w-[520px] border-l-2 border-cyan-400/50 pl-4 text-sm leading-relaxed text-white/75">
         One unified platform for{' '}
-        <span className="text-white/90">
+        <span className="text-white">
           admissions, academics, attendance, examinations, finance, analytics
         </span>
         , and campus operations.
       </p>
       {context?.showPoweredBy ? (
-        <p className="mt-3 text-[11px] font-medium text-white/45">
+        <p className="mt-3 text-[11px] font-medium text-cyan-300/70">
           {resolvePoweredByText(context.poweredByText ?? context.poweredBy)}
         </p>
       ) : null}

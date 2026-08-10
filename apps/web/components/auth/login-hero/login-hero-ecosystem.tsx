@@ -39,7 +39,7 @@ export function LoginHeroEcosystem({ context = null }: Props) {
         />
 
         <motion.div
-          className="mt-3 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.08] px-3 py-2.5 backdrop-blur-sm"
+          className="mt-3 min-h-[52px] rounded-xl border border-cyan-300/20 bg-white/[0.07] px-3 py-2.5 backdrop-blur-sm"
           initial={false}
           animate={{ opacity: displayModule ? 1 : 0.7 }}
         >
@@ -74,8 +74,8 @@ export function LoginHeroEcosystem({ context = null }: Props) {
       >
         {TRUST_PILLS.map(({ icon: Icon, label }) => (
           <li key={label}>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/85 backdrop-blur-sm">
-              <Icon className="h-3 w-3 text-blue-200/90" aria-hidden />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+              <Icon className="h-3 w-3 text-cyan-300" aria-hidden />
               {label}
             </span>
           </li>

@@ -23,6 +23,7 @@ export function LoginHeroBackground() {
       <div
         className={`login-hero-grid absolute inset-0 ${animate ? 'login-hero-grid-animate' : ''}`}
       />
+      <div className="login-hero-campus-watermark absolute inset-y-0 right-0 w-[55%] opacity-[0.07]" />
       <div
         className={`login-hero-orb login-hero-orb-1 ${animate ? '' : 'login-hero-orb-static'}`}
       />
@@ -30,7 +31,7 @@ export function LoginHeroBackground() {
         className={`login-hero-orb login-hero-orb-2 ${animate ? '' : 'login-hero-orb-static'}`}
       />
       {animate ? (
-        <div className="login-hero-particles login-hero-particles-float absolute inset-0 opacity-40" />
+        <div className="login-hero-particles login-hero-particles-float absolute inset-0 opacity-35" />
       ) : null}
     </div>
   );
