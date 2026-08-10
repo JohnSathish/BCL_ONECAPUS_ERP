@@ -33,3 +33,13 @@
 .website-popup-image-shell{position:relative;display:inline-block;max-width:min(92vw,900px);max-height:calc(100dvh - 32px)}
 .website-popup-image{display:block!important;width:auto!important;height:auto!important;max-width:min(92vw,900px)!important;max-height:calc(100dvh - 32px)!important;object-fit:contain!important;object-position:center!important}
 .website-popup-close-floating{position:absolute;top:10px;right:10px;z-index:2;border:0;border-radius:999px;background:rgba(255,255,255,.95);padding:8px;color:#0b2e59;box-shadow:0 4px 16px rgba(6,31,61,.18);cursor:pointer}
+
+/* Temporary: hide ERP Login + Mobile App CTAs until relaunch (see lib/feature-flags.ts). */
+.nav-erp,
+.nav-app,
+.footer-cta-erp,
+.footer-cta-app,
+.drawer .nav-erp,
+.drawer .nav-app {
+  display: none !important;
+}
