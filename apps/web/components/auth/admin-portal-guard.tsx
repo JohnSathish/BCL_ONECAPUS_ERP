@@ -1,9 +1,7 @@
 'use client';
 
 import { useRequireAdminPortal } from '@/hooks/use-require-admin-portal';
-
 import { useAuth } from '@/hooks/use-auth';
-
 import { canAccessAdminPortal } from '@/lib/permissions/portal-access';
 
 export function AdminPortalGuard({ children }: { children: React.ReactNode }) {
@@ -11,7 +9,7 @@ export function AdminPortalGuard({ children }: { children: React.ReactNode }) {
 
   useRequireAdminPortal();
 
-  if (!isReady || !session) {
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Verifying access…
@@ -19,8 +17,15 @@ export function AdminPortalGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const roles = session.user.roles ?? [];
+  if (!session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Redirecting to login…
+      </div>
+    );
+  }
 
+  const roles = session.user.roles ?? [];
   const permissions = session.user.permissions ?? [];
 
   if (!canAccessAdminPortal(roles, permissions)) {

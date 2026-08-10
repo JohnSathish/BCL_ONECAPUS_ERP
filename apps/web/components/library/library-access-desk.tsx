@@ -27,16 +27,13 @@ import { LibraryScannerStage, type ScannerPhase } from '@/components/library/lib
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useLibraryRealtime } from '@/hooks/use-library-realtime';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import {
   fetchLibraryAccessDeskDashboard,
   registerLibraryVisitor,
   scanLibraryAccess,
 } from '@/services/library';
 import type { ScanResult } from '@/types/library';
-import { useAuthStore } from '@/store/auth-store';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
@@ -439,15 +436,7 @@ export function LibraryAccessDesk() {
     if (document.fullscreenElement) {
       await document.exitFullscreen().catch(() => undefined);
     }
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    window.location.assign('/login');
+    logoutClientSide({ replace: (href) => window.location.assign(href) });
   };
 
   return (

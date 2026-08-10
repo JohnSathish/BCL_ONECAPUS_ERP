@@ -21,10 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
-import { useAuthStore } from '@/store/auth-store';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { cn } from '@/utils/cn';
 
 type Props = {
@@ -38,16 +35,8 @@ type Props = {
 export function StaffUserMenu({ fullName, designation, photoUrl, email, compact = false }: Props) {
   const router = useRouter();
 
-  const handleLogout = async () => {
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    router.replace('/login');
+  const handleLogout = () => {
+    logoutClientSide(router);
   };
 
   return (

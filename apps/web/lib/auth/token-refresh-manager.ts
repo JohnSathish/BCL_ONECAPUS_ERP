@@ -34,14 +34,15 @@ class TokenRefreshManager {
     }, delay);
   }
 
-  async refreshSession(): Promise<AuthSession> {
+  async refreshSession(options?: { maxWaitMs?: number }): Promise<AuthSession> {
     if (this.refreshPromise) return this.refreshPromise;
     if (Date.now() - this.lastRefreshFailureAt < 10_000) {
       throw new Error('Refresh temporarily paused after a recent failure.');
     }
 
-    this.refreshPromise = withApiStartupRetry(() =>
-      refreshClient.post<AuthSession>('/v1/auth/refresh', {}),
+    this.refreshPromise = withApiStartupRetry(
+      () => refreshClient.post<AuthSession>('/v1/auth/refresh', {}),
+      options?.maxWaitMs != null ? { maxWaitMs: options.maxWaitMs } : undefined,
     )
       .then(({ data }) => {
         const session: AuthSession = {

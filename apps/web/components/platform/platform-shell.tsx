@@ -3,9 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Building2, KeyRound, LayoutDashboard, LogOut, Shield } from 'lucide-react';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/cn';
 
@@ -20,16 +18,8 @@ export function PlatformShell({ children, title }: { children: React.ReactNode; 
   const router = useRouter();
   const session = useAuthStore((s) => s.session);
 
-  const handleLogout = async () => {
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    router.replace('/login');
+  const handleLogout = () => {
+    logoutClientSide(router);
   };
 
   return (

@@ -132,12 +132,8 @@ export default function ForceChangePasswordPage() {
     try {
       await changePassword({ currentPassword, newPassword, confirmPassword });
       tokenRefreshManager.clearSchedule();
-      try {
-        await logout();
-      } catch {
-        /* cookie may already be cleared */
-      }
       clear();
+      void logout().catch(() => undefined);
       router.replace('/login?reset=1');
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not update password. Try again.'));

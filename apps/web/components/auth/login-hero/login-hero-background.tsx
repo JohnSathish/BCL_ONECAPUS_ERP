@@ -3,8 +3,6 @@
 import { motion } from 'framer-motion';
 import { useLoginHeroMotion } from './use-login-hero-motion';
 
-const STAR_COUNT = 18;
-
 export function LoginHeroBackground() {
   const animate = useLoginHeroMotion();
 
@@ -32,35 +30,8 @@ export function LoginHeroBackground() {
         className={`login-hero-orb login-hero-orb-2 ${animate ? '' : 'login-hero-orb-static'}`}
       />
       {animate ? (
-        <div className="login-hero-particles login-hero-particles-float absolute inset-0 opacity-60" />
+        <div className="login-hero-particles login-hero-particles-float absolute inset-0 opacity-40" />
       ) : null}
-      {animate
-        ? Array.from({ length: STAR_COUNT }, (_, i) => (
-            <span
-              key={i}
-              className="login-hero-star"
-              style={{
-                left: `${6 + ((i * 19) % 88)}%`,
-                top: `${8 + ((i * 27) % 84)}%`,
-                animationDelay: `${(i % 6) * -1.2}s`,
-                animationDuration: `${2.5 + (i % 4) * 0.8}s`,
-              }}
-            />
-          ))
-        : null}
-      {animate
-        ? Array.from({ length: 6 }, (_, i) => (
-            <span
-              key={`dot-${i}`}
-              className="login-hero-ai-dot"
-              style={{
-                left: `${10 + ((i * 23) % 80)}%`,
-                top: `${12 + ((i * 31) % 76)}%`,
-                animationDelay: `${(i % 4) * -1.5}s`,
-              }}
-            />
-          ))
-        : null}
     </div>
   );
 }

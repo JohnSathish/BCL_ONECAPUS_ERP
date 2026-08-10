@@ -23,10 +23,7 @@ import {
 } from '@/services/student-portal';
 import { useStudentPortalPreferencesStore } from '@/store/student-portal-preferences-store';
 import { useStudentPortalSettingsStore } from '@/store/student-portal-settings-store';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
-import { useAuthStore } from '@/store/auth-store';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { cn } from '@/utils/cn';
 
 type SettingsSection =
@@ -146,23 +143,17 @@ export function StudentSettingsPage() {
 
   const passwordMutation = useMutation({
     mutationFn: () => changePassword({ currentPassword, newPassword, confirmPassword }),
-    onSuccess: async () => {
+    onSuccess: () => {
       setPasswordMsg('Password updated. Signing you out…');
-      broadcastSessionMessage({ type: 'LOGOUT' });
-      tokenRefreshManager.clearSchedule();
-      useAuthStore.getState().clear();
-      await logout().catch(() => undefined);
-      router.replace('/login');
+      logoutClientSide(router);
     },
     onError: () => setPasswordMsg('Could not update password. Check your current password.'),
   });
 
   const revokeMutation = useMutation({
     mutationFn: revokeAllSessions,
-    onSuccess: async () => {
-      useAuthStore.getState().clear();
-      await logout().catch(() => undefined);
-      router.replace('/login');
+    onSuccess: () => {
+      logoutClientSide(router);
     },
   });
 

@@ -2,7 +2,6 @@
 
 import type { LoginContext } from '@/types/login-context';
 import { cn } from '@/utils/cn';
-import { ParticleCanvas } from '@/components/landing/particle-canvas';
 import { LOGIN_HERO_ANIMATIONS_ENABLED } from './login-hero.constants';
 import { LoginHeroBackground } from './login-hero-background';
 import { LoginHeroBrandHeader } from './login-hero-brand-header';
@@ -32,7 +31,6 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
       aria-label={`${productName} overview`}
     >
       <LoginHeroBackground />
-      {LOGIN_HERO_ANIMATIONS_ENABLED ? <ParticleCanvas className="opacity-50" /> : null}
 
       <div
         className={cn(
@@ -48,7 +46,7 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
           <>
             {LOGIN_HERO_ANIMATIONS_ENABLED ? (
               <>
-                <LoginHeroEcosystem />
+                <LoginHeroEcosystem context={context} />
                 <LoginHeroKpiShowcase />
               </>
             ) : (

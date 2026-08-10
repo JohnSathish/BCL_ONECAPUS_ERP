@@ -8,10 +8,18 @@ export function PlatformPortalGuard({ children }: { children: React.ReactNode })
   const { isReady, session } = useAuth();
   useRequirePlatformPortal();
 
-  if (!isReady || !session) {
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Verifying access…
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Redirecting to login…
       </div>
     );
   }

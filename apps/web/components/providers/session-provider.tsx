@@ -13,12 +13,15 @@ import {
 import { broadcastSessionMessage, subscribeSessionBroadcast } from '@/lib/auth/session-broadcast';
 import { confirmGlobalUnsavedDiscard } from '@/lib/auth/unsaved-changes-registry';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { bootstrapSession, logout as logoutApi } from '@/services/auth';
+import { logout as logoutApi, bootstrapSession } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
+import { useWorkspaceStore } from '@/store/workspace-store';
 
 const IDLE_WARNING_MS = 13 * 60 * 1000;
 const IDLE_LOGOUT_MS = 15 * 60 * 1000;
 const TICK_MS = 15_000;
+/** Continue Session should fail fast — do not wait for API cold-start. */
+const CONTINUE_REFRESH_MAX_WAIT_MS = 8_000;
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -36,24 +39,42 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const initialBootstrapDoneRef = useRef(false);
 
   const performLogout = useCallback(
-    async (broadcast = true, skipUnsavedCheck = false) => {
+    (broadcast = true, skipUnsavedCheck = false) => {
       if (forcedLogoutRef.current) return;
       if (!skipUnsavedCheck && !confirmGlobalUnsavedDiscard()) return;
+
       forcedLogoutRef.current = true;
-      initialBootstrapDoneRef.current = false;
+      // Keep bootstrap "done" so clearing the session does not kick off a 30s refresh retry.
+      initialBootstrapDoneRef.current = true;
       tokenRefreshManager.clearSchedule();
       setWarningOpen(false);
-      try {
-        await logoutApi();
-      } catch {
-        /* cookie may already be cleared */
-      }
+      setContinueBusy(false);
       clear();
+      setBootstrapping(false);
+      try {
+        useWorkspaceStore.getState().clearWorkspace();
+      } catch {
+        /* ignore */
+      }
       if (broadcast) broadcastSessionMessage({ type: 'LOGOUT' });
       router.replace('/login');
+      void logoutApi().catch(() => undefined);
     },
-    [clear, router],
+    [clear, router, setBootstrapping],
   );
+
+  useEffect(() => {
+    if (pathname === '/login' || pathname === '/forgot-password') {
+      forcedLogoutRef.current = false;
+      initialBootstrapDoneRef.current = false;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (session?.accessToken) {
+      forcedLogoutRef.current = false;
+    }
+  }, [session?.accessToken]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -76,7 +97,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // /change-password MUST bootstrap so forced-reset after login (full page
     // navigation) and refresh still recover the httpOnly refresh cookie.
     if (pathname === '/login' || pathname === '/forgot-password') {
-      initialBootstrapDoneRef.current = false;
+      setBootstrapping(false);
+      return;
+    }
+
+    if (forcedLogoutRef.current) {
       setBootstrapping(false);
       return;
     }
@@ -132,9 +157,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return subscribeSessionBroadcast((message) => {
       if (message.type === 'LOGOUT') {
         forcedLogoutRef.current = true;
-        initialBootstrapDoneRef.current = false;
+        initialBootstrapDoneRef.current = true;
         clear();
+        setBootstrapping(false);
         tokenRefreshManager.clearSchedule();
+        setWarningOpen(false);
         router.replace('/login');
       } else if (message.type === 'SESSION_UPDATED') {
         setSession(message.session);
@@ -147,7 +174,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         pingActivity();
       }
     });
-  }, [clear, router, setSession]);
+  }, [clear, router, setBootstrapping, setSession]);
 
   useEffect(() => {
     if (!session) {
@@ -159,9 +186,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(() => {
       const idleMs = Date.now() - getLastActivityAt();
 
+      // Hard idle logout always wins — do not keep offering Continue after expiry.
       if (idleMs >= IDLE_LOGOUT_MS) {
-        if (warningOpen || isUserActivelyTyping()) return;
-        void performLogout();
+        if (isUserActivelyTyping()) return;
+        performLogout(true, true);
         return;
       }
 
@@ -172,7 +200,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }, TICK_MS);
 
     return () => clearInterval(interval);
-  }, [session, warningOpen, performLogout]);
+  }, [session, performLogout]);
 
   useEffect(() => {
     return subscribeActivity(() => {
@@ -186,13 +214,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const onContinueSession = async () => {
     setContinueBusy(true);
     try {
-      await tokenRefreshManager.refreshSession();
+      await tokenRefreshManager.refreshSession({ maxWaitMs: CONTINUE_REFRESH_MAX_WAIT_MS });
       warningShownRef.current = false;
       setWarningOpen(false);
       pingActivity();
       broadcastSessionMessage({ type: 'IDLE_EXTENDED' });
     } catch {
-      await performLogout();
+      performLogout(true, true);
     } finally {
       setContinueBusy(false);
     }
@@ -204,7 +232,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       <SessionExpiryDialog
         open={warningOpen && Boolean(session)}
         onContinue={() => void onContinueSession()}
-        onLogout={() => void performLogout(true, true)}
+        onLogout={() => performLogout(true, true)}
         busy={continueBusy}
       />
     </>

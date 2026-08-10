@@ -32,12 +32,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
-import { useWorkspaceStore } from '@/store/workspace-store';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { useNavPreferencesStore } from '@/store/nav-preferences-store';
 import { cn } from '@/utils/cn';
@@ -60,17 +57,8 @@ export function EnterpriseTopbar({
   const showQuickCreate = useNavPreferencesStore((s) => s.sidebarLayout.showQuickCreate);
   const isAdminChrome = portalRole === 'admin';
 
-  const handleLogout = async () => {
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    useWorkspaceStore.getState().clearWorkspace();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    router.replace('/login');
+  const handleLogout = () => {
+    logoutClientSide(router);
   };
 
   const displayName = session?.user.email?.split('@')[0] ?? 'Admin';

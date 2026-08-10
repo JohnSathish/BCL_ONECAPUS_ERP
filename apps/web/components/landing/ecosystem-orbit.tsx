@@ -16,6 +16,8 @@ type Props = {
   motionEnabled?: boolean;
   onModuleHover?: (index: number | null) => void;
   onSpotlightChange?: (index: number) => void;
+  productName?: string;
+  productTagline?: string;
 };
 
 const SIZE_CONFIG = {
@@ -82,6 +84,8 @@ export function EcosystemOrbit({
   motionEnabled,
   onModuleHover,
   onSpotlightChange,
+  productName,
+  productTagline,
 }: Props) {
   const landingMotion = useLandingMotion();
   const animate = motionEnabled ?? landingMotion;
@@ -263,6 +267,8 @@ export function EcosystemOrbit({
             variant={config.centerVariant}
             animate={mounted && animate}
             staticCenter={isSpotlight}
+            productName={productName}
+            productTagline={productTagline}
           />
         </div>
       </div>

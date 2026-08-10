@@ -31,7 +31,8 @@ export function SessionExpiryDialog({
         <DialogHeader>
           <DialogTitle>Session Expiring Soon</DialogTitle>
           <DialogDescription>
-            Your session will expire in 2 minutes due to inactivity.
+            Your session will expire in about 2 minutes due to inactivity. Choose Continue to stay
+            signed in, or Logout now. If you ignore this, you will be signed out automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

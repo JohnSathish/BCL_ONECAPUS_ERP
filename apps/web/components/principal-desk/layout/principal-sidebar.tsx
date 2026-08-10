@@ -13,12 +13,9 @@ import {
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { SIDEBAR_WIDTH } from '@/lib/sidebar-layout';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { fetchPrincipalCommsStats } from '@/services/principal-comms';
 import { fetchPrincipalDashboard } from '@/services/principal-desk';
-import { useAuthStore } from '@/store/auth-store';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
 import { cn } from '@/utils/cn';
 
@@ -95,16 +92,8 @@ export function PrincipalSidebar() {
     setMobileNavOpen(false);
   }, [pathname, setMobileNavOpen]);
 
-  const handleLogout = async () => {
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    router.replace('/principal-desk/login');
+  const handleLogout = () => {
+    logoutClientSide(router, { redirectTo: '/principal-desk/login' });
   };
 
   const visibleGroups = PRINCIPAL_DESK_NAV.map((group) => ({

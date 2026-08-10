@@ -9,38 +9,51 @@ type Props = {
   variant?: 'login' | 'default';
   animate?: boolean;
   staticCenter?: boolean;
+  productName?: string;
+  productTagline?: string;
 };
 
-const GLOW_SEQUENCE = [
+const GLOW_SEQUENCE_DEFAULT = [
   '0 0 12px rgba(99,102,241,0.35), 0 0 28px rgba(129,140,248,0.2)',
   '0 0 28px rgba(99,102,241,0.75), 0 0 48px rgba(168,85,247,0.45)',
   '0 0 12px rgba(99,102,241,0.35), 0 0 28px rgba(129,140,248,0.2)',
+];
+
+const GLOW_SEQUENCE_LOGIN = [
+  '0 0 14px rgba(43,79,163,0.45), 0 0 32px rgba(23,59,115,0.3)',
+  '0 0 28px rgba(43,79,163,0.75), 0 0 52px rgba(23,59,115,0.45)',
+  '0 0 14px rgba(43,79,163,0.45), 0 0 32px rgba(23,59,115,0.3)',
 ];
 
 export function OrbitCenterNode({
   variant = 'default',
   animate: motionEnabled,
   staticCenter = false,
+  productName = 'Bosco Connect',
+  productTagline = 'Smart Education Management Platform',
 }: Props) {
   const landingMotion = useLandingMotion();
   const animate = motionEnabled ?? landingMotion;
   const isLogin = variant === 'login';
+  const glowSequence = isLogin ? GLOW_SEQUENCE_LOGIN : GLOW_SEQUENCE_DEFAULT;
 
   return (
     <motion.div
-      className={`orbit-core landing-core-glow relative flex flex-col items-center justify-center rounded-full border border-white/30 bg-gradient-to-br from-indigo-500/45 via-violet-600/55 to-purple-700/65 text-center backdrop-blur-md ${
-        isLogin ? 'h-36 w-36 px-3' : 'h-28 w-28 sm:h-32 sm:w-32'
+      className={`orbit-core landing-core-glow relative flex flex-col items-center justify-center rounded-full border border-white/30 text-center backdrop-blur-md ${
+        isLogin
+          ? 'h-36 w-36 bg-gradient-to-br from-[#173B73]/90 via-[#2B4FA3]/85 to-[#0B1F3A]/95 px-3'
+          : 'h-28 w-28 bg-gradient-to-br from-indigo-500/45 via-violet-600/55 to-purple-700/65 sm:h-32 sm:w-32'
       }`}
       animate={
         animate
           ? staticCenter
             ? {
-                boxShadow: GLOW_SEQUENCE,
+                boxShadow: glowSequence,
               }
             : {
                 y: [-6, 6, -6],
                 scale: [1, 1.03, 1],
-                boxShadow: GLOW_SEQUENCE,
+                boxShadow: glowSequence,
               }
           : undefined
       }
@@ -73,10 +86,9 @@ export function OrbitCenterNode({
 
       {isLogin ? (
         <>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/90">BCL</p>
-          <p className="mt-0.5 text-[11px] font-bold leading-tight text-white">OneCampus ERP</p>
-          <p className="mt-1 max-w-[7.5rem] text-[8px] font-medium leading-snug text-white/65">
-            AI-Powered Campus Platform
+          <p className="mt-0.5 text-[12px] font-bold leading-tight text-white">{productName}</p>
+          <p className="mt-1 max-w-[7.75rem] text-[8px] font-medium leading-snug text-blue-100/80">
+            {productTagline}
           </p>
         </>
       ) : (

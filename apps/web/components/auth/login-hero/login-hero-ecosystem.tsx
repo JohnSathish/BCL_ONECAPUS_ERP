@@ -1,18 +1,25 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { EcosystemOrbit } from '@/components/landing/ecosystem-orbit';
-import { ORBIT_MODULES } from '@/components/landing/landing.constants';
-import { TRUST_PILLS } from '@/components/landing/landing.constants';
-import { useLoginHeroMotion } from './use-login-hero-motion';
 import { useState } from 'react';
+import { EcosystemOrbit } from '@/components/landing/ecosystem-orbit';
+import { ORBIT_MODULES, TRUST_PILLS } from '@/components/landing/landing.constants';
+import { resolveProductName, resolveProductTagline } from '@/lib/branding-defaults';
+import type { LoginContext } from '@/types/login-context';
+import { useLoginHeroMotion } from './use-login-hero-motion';
 
-export function LoginHeroEcosystem() {
+type Props = {
+  context?: LoginContext | null;
+};
+
+export function LoginHeroEcosystem({ context = null }: Props) {
   const animate = useLoginHeroMotion();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const displayIndex = hoveredIndex ?? spotlightIndex;
   const displayModule = ORBIT_MODULES[displayIndex] ?? null;
+  const productName = resolveProductName(context?.productName);
+  const productTagline = resolveProductTagline(context?.productTagline);
 
   return (
     <div className="login-hero-section flex w-full shrink-0 flex-col items-center">
@@ -27,10 +34,12 @@ export function LoginHeroEcosystem() {
           motionEnabled={animate}
           onModuleHover={setHoveredIndex}
           onSpotlightChange={setSpotlightIndex}
+          productName={productName}
+          productTagline={productTagline}
         />
 
         <motion.div
-          className="mt-3 min-h-[52px] rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 backdrop-blur-sm"
+          className="mt-3 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.08] px-3 py-2.5 backdrop-blur-sm"
           initial={false}
           animate={{ opacity: displayModule ? 1 : 0.7 }}
         >
@@ -45,13 +54,13 @@ export function LoginHeroEcosystem() {
                 <span className="mr-1">{displayModule.emoji}</span>
                 {displayModule.label}
               </p>
-              <p className="mt-0.5 text-[11px] leading-snug text-white/55">
+              <p className="mt-0.5 text-[11px] leading-snug text-white/70">
                 {displayModule.description}
               </p>
             </motion.div>
           ) : (
-            <p className="text-center text-[11px] text-white/45">
-              Explore the OneCampus ERP ecosystem
+            <p className="text-center text-[11px] text-white/60">
+              Explore the {productName} ecosystem
             </p>
           )}
         </motion.div>
@@ -65,8 +74,8 @@ export function LoginHeroEcosystem() {
       >
         {TRUST_PILLS.map(({ icon: Icon, label }) => (
           <li key={label}>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/75 backdrop-blur-sm">
-              <Icon className="h-3 w-3 text-cyan-300/80" aria-hidden />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/85 backdrop-blur-sm">
+              <Icon className="h-3 w-3 text-blue-200/90" aria-hidden />
               {label}
             </span>
           </li>

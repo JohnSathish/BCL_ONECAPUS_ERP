@@ -46,14 +46,11 @@ export function AdmissionsPortalShell({ children, showSchedule = false, title, s
 
   const branding = portalInfo.data?.branding;
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } finally {
-      tokenRefreshManager.clearSchedule();
-      setSession(null);
-      window.location.href = '/admissions-portal/login';
-    }
+  const handleLogout = () => {
+    tokenRefreshManager.clearSchedule();
+    setSession(null);
+    void logout().catch(() => undefined);
+    window.location.href = '/admissions-portal/login';
   };
 
   return (

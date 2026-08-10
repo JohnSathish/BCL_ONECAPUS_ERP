@@ -27,7 +27,7 @@ function KpiValue({ metric, animate }: { metric: (typeof KPI_METRICS)[number]; a
         {formatted}
         {metric.suffix}
       </p>
-      <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-white/55">
+      <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-white/75">
         {metric.label}
       </p>
     </>
@@ -71,7 +71,7 @@ export function LoginHeroKpiShowcase() {
   return (
     <div ref={ref} className="login-hero-section w-full">
       <motion.div
-        className="login-glass-compact rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-md"
+        className="login-glass-compact rounded-xl border border-white/20 bg-white/[0.1] px-4 py-3 backdrop-blur-md"
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.5 }}
@@ -92,7 +92,7 @@ export function LoginHeroKpiShowcase() {
                 <span
                   key={i}
                   className={`h-0.5 w-4 rounded-full transition-colors ${
-                    i === index ? 'bg-cyan-400/70' : 'bg-white/15'
+                    i === index ? 'bg-blue-200/90' : 'bg-white/25'
                   }`}
                 />
               ))}

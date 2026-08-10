@@ -459,9 +459,9 @@ html.theme-glass-disabled .glass-panel {
 
 .login-hero .landing-core-glow {
   box-shadow:
-    0 0 32px rgba(99, 102, 241, 0.4),
-    0 0 64px rgba(168, 85, 247, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    0 0 28px rgba(43, 79, 163, 0.55),
+    0 0 56px rgba(23, 59, 115, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .orbit-stage {
@@ -505,13 +505,12 @@ html.theme-glass-disabled .glass-panel {
 .login-hero-gradient-wave {
   background: linear-gradient(
     125deg,
-    rgba(14, 165, 233, 0.08) 0%,
-    rgba(99, 102, 241, 0.12) 35%,
-    rgba(168, 85, 247, 0.1) 70%,
-    rgba(14, 165, 233, 0.06) 100%
+    rgba(43, 79, 163, 0.18) 0%,
+    rgba(23, 59, 115, 0.12) 45%,
+    rgba(11, 31, 58, 0.08) 100%
   );
   background-size: 200% 200%;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .login-hero-star {
@@ -542,6 +541,22 @@ html.theme-glass-disabled .glass-panel {
     0 0 40px rgba(99, 102, 241, 0.45),
     0 0 80px rgba(168, 85, 247, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.login-hero .orbit-core {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 36px rgba(43, 79, 163, 0.65),
+    0 0 72px rgba(11, 31, 58, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.login-hero .orbit-halo {
+  border: 1px solid rgba(147, 197, 253, 0.16);
+}
+
+.login-hero .orbit-halo-2 {
+  border-color: rgba(96, 165, 250, 0.1);
 }
 
 .orbit-halo {
@@ -588,25 +603,24 @@ html.theme-glass-disabled .glass-panel {
 
 .login-hero {
   background:
-    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(99, 102, 241, 0.35), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 80% 30%, rgba(168, 85, 247, 0.28), transparent 50%),
-    radial-gradient(ellipse 60% 40% at 50% 90%, rgba(14, 165, 233, 0.15), transparent 45%),
-    linear-gradient(165deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+    radial-gradient(ellipse 55% 50% at 50% 42%, rgba(43, 79, 163, 0.45), transparent 68%),
+    linear-gradient(160deg, #0b1f3a 0%, #173b73 48%, #2b4fa3 100%);
 }
 
 .login-hero-mesh {
   background:
-    radial-gradient(ellipse 70% 55% at 15% 0%, rgba(59, 130, 246, 0.28), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 95% 20%, rgba(129, 140, 248, 0.22), transparent 50%),
-    radial-gradient(ellipse 45% 35% at 40% 100%, rgba(34, 211, 238, 0.12), transparent 55%);
+    radial-gradient(ellipse 65% 50% at 18% 8%, rgba(43, 79, 163, 0.35), transparent 58%),
+    radial-gradient(ellipse 50% 40% at 88% 18%, rgba(23, 59, 115, 0.28), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 100%, rgba(11, 31, 58, 0.35), transparent 60%);
 }
 
 .login-hero-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 15%, transparent 78%);
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 10%, transparent 75%);
+  opacity: 0.85;
 }
 
 .login-hero-grid-animate {
@@ -614,9 +628,9 @@ html.theme-glass-disabled .glass-panel {
 }
 
 .login-hero-particles {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-  background-size: 28px 28px;
-  opacity: 0.2;
+  background-image: radial-gradient(rgba(191, 219, 254, 0.14) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.18;
 }
 
 .login-hero-particles-float {
@@ -650,10 +664,10 @@ html.theme-glass-disabled .glass-panel {
 }
 
 .login-glass-compact {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 
 .login-pill {
@@ -678,7 +692,7 @@ html.theme-glass-disabled .glass-panel {
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(165, 243, 252, 0.55);
+  color: rgba(226, 232, 240, 0.78);
 }
 
 .login-hero-divider {
@@ -717,13 +731,15 @@ html.theme-glass-disabled .glass-panel {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .login-hero-kpi-value {
-  background: linear-gradient(180deg, #ffffff 0%, rgba(191, 219, 254, 0.92) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #ffffff;
 }
 
 .login-module-flow {
@@ -916,7 +932,7 @@ html.theme-glass-disabled .glass-panel {
   left: -8%;
   width: min(380px, 50vw);
   height: min(380px, 50vw);
-  background: rgba(37, 99, 235, 0.45);
+  background: rgba(43, 79, 163, 0.4);
 }
 
 .login-hero-orb-2 {
@@ -924,7 +940,7 @@ html.theme-glass-disabled .glass-panel {
   right: -12%;
   width: min(320px, 42vw);
   height: min(320px, 42vw);
-  background: rgba(124, 58, 237, 0.35);
+  background: rgba(23, 59, 115, 0.35);
   animation-delay: -7s;
 }
 
@@ -933,7 +949,7 @@ html.theme-glass-disabled .glass-panel {
   left: 35%;
   width: min(240px, 32vw);
   height: min(240px, 32vw);
-  background: rgba(79, 70, 229, 0.3);
+  background: rgba(11, 31, 58, 0.32);
   animation-delay: -14s;
 }
 

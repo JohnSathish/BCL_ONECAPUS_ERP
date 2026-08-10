@@ -15,9 +15,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState, useLayoutEffect, useRef, useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { logout } from '@/services/auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { useAuthStore } from '@/store/auth-store';
 import {
   ADMIN_NAV,
@@ -340,17 +338,9 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     [navIndex, recents],
   );
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setMobileNavOpen(false);
-    broadcastSessionMessage({ type: 'LOGOUT' });
-    tokenRefreshManager.clearSchedule();
-    useAuthStore.getState().clear();
-    try {
-      await logout();
-    } catch {
-      /* ignore */
-    }
-    router.replace('/login');
+    logoutClientSide(router);
   };
 
   const resolveOpen = (item: NavItem) => {

@@ -5,10 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { KeyRound } from 'lucide-react';
 import { changeApplicantPassword } from '@/services/admissions-portal';
-import { logout } from '@/services/auth';
-import { broadcastSessionMessage } from '@/lib/auth/session-broadcast';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
-import { useAuthStore } from '@/store/auth-store';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -35,14 +32,13 @@ export function AdmissionsChangePasswordDialog({ open, onOpenChange }: Props) {
 
   const mutation = useMutation({
     mutationFn: () => changeApplicantPassword({ currentPassword, newPassword, confirmPassword }),
-    onSuccess: async () => {
+    onSuccess: () => {
       setMessage('Password updated. Signing you out…');
-      broadcastSessionMessage({ type: 'LOGOUT' });
-      tokenRefreshManager.clearSchedule();
-      useAuthStore.getState().setSession(null);
-      await logout().catch(() => undefined);
       onOpenChange(false);
-      router.replace('/admissions-portal/login');
+      logoutClientSide(router, {
+        redirectTo: '/admissions-portal/login',
+        clearWorkspace: false,
+      });
     },
     onError: (err) => {
       setMessage(apiErrorMessage(err, 'Could not update password. Check your current password.'));
