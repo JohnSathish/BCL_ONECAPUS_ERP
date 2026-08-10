@@ -284,6 +284,10 @@ export class MobileAppSettingsService {
           primaryColor:
             overrides.primaryColor ?? branding?.primaryColor ?? null,
           displayName: branding?.displayName ?? null,
+          productName: branding?.productName ?? null,
+          productTagline: branding?.productTagline ?? null,
+          poweredByText: branding?.poweredByText ?? null,
+          showPoweredBy: branding?.showPoweredBy ?? true,
         },
         loginNotices: {
           showBanner: notices.showBanner,

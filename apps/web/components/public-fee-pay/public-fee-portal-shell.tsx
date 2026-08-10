@@ -75,8 +75,7 @@ export function PublicFeePortalShell({
               <BookOpen size={14} aria-hidden /> Academic Session: {ACADEMIC_SESSION}
             </span>
             <span className="pfp-badge pfp-badge-secure">
-              <Lock size={14} aria-hidden /> Secure Payment | SSL Secured | Powered by BCL OneCampus
-              ERP
+              <Lock size={14} aria-hidden /> Secure Payment | SSL Secured | Powered by BaseCode Labs
             </span>
           </div>
 
@@ -198,7 +197,7 @@ export function PublicFeePortalShell({
         </div>
         <div className="pfp-footer-bottom">
           <span>© {new Date().getFullYear()} Don Bosco College, Tura. All rights reserved.</span>
-          <span>Powered by BCL OneCampus ERP | Version 1.0</span>
+          <span>Powered by BaseCode Labs | Version 1.0</span>
         </div>
       </footer>
     </div>

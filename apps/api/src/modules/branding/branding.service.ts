@@ -24,12 +24,21 @@ import {
   sanitizeCustomCss,
   THEME_PRESETS,
 } from './theme-presets';
+import {
+  BRANDING_DEFAULTS,
+  resolvePoweredByText,
+  resolveProductName,
+  resolveProductTagline,
+} from './branding-defaults';
 
 export type BrandingDto = {
   displayName: string;
   shortName?: string;
   campusName?: string;
   portalSubtitle?: string;
+  productName: string;
+  productTagline: string;
+  poweredByText: string;
   address?: string;
   logoUrl?: string;
   faviconUrl?: string;
@@ -79,6 +88,9 @@ export class BrandingService {
     shortName: string | null;
     campusName: string | null;
     portalSubtitle: string | null;
+    productName?: string | null;
+    productTagline?: string | null;
+    poweredByText?: string | null;
     address: string | null;
     logoUrl: string | null;
     faviconUrl: string | null;
@@ -97,6 +109,9 @@ export class BrandingService {
       shortName: row.shortName ?? undefined,
       campusName: row.campusName ?? undefined,
       portalSubtitle: sanitizeDisplayText(row.portalSubtitle),
+      productName: resolveProductName(row.productName),
+      productTagline: resolveProductTagline(row.productTagline),
+      poweredByText: resolvePoweredByText(row.poweredByText),
       address: sanitizeDisplayText(row.address),
       logoUrl: row.logoUrl ?? undefined,
       faviconUrl: row.faviconUrl ?? undefined,
@@ -127,7 +142,10 @@ export class BrandingService {
         data: {
           tenantId,
           displayName: tenant.institutions[0]?.name ?? tenant.name,
-          portalSubtitle: 'Campus ERP Portal',
+          portalSubtitle: BRANDING_DEFAULTS.portalSubtitle,
+          productName: BRANDING_DEFAULTS.productName,
+          productTagline: BRANDING_DEFAULTS.productTagline,
+          poweredByText: BRANDING_DEFAULTS.poweredByText,
           primaryColor: '#2563eb',
           accentColor: '#7c3aed',
         },
@@ -149,6 +167,9 @@ export class BrandingService {
         shortName: dto.shortName ?? null,
         campusName: dto.campusName ?? null,
         portalSubtitle: sanitizeDisplayText(dto.portalSubtitle) ?? null,
+        productName: sanitizeDisplayText(dto.productName) ?? null,
+        productTagline: sanitizeDisplayText(dto.productTagline) ?? null,
+        poweredByText: sanitizeDisplayText(dto.poweredByText) ?? null,
         address: sanitizeDisplayText(dto.address) ?? null,
         primaryColor: dto.primaryColor ?? null,
         accentColor: dto.accentColor ?? null,

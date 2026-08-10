@@ -24,6 +24,10 @@ export type BootstrapConfig = {
     splashImageUrl: string | null;
     primaryColor: string | null;
     displayName: string | null;
+    productName?: string | null;
+    productTagline?: string | null;
+    poweredByText?: string | null;
+    showPoweredBy?: boolean;
   };
   loginNotices?: {
     showBanner?: boolean;

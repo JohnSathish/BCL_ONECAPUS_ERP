@@ -61,6 +61,11 @@ export type InstitutionBranding = {
   shortName?: string;
   campusName?: string;
   portalSubtitle?: string;
+  /** White-label product name (e.g. Bosco Connect). */
+  productName?: string;
+  productTagline?: string;
+  /** Full attribution line (e.g. Powered by BaseCode Labs). */
+  poweredByText?: string;
   address?: string;
   logoUrl?: string;
   faviconUrl?: string;

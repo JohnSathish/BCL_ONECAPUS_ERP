@@ -4,6 +4,7 @@ import { buildInstitutionalExcelReport } from '../../../common/reports';
 import { resolvePdfImageSrcAsync } from '../../../common/uploads/pdf-asset.util';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
+import { resolveProductName } from '../../branding/branding-defaults';
 import { BooksQueryDto } from '../dto/accounting.dto';
 import { renderAccountingReportPdfHtml } from '../templates/accounting-report.template';
 import { FinancialReportsService } from './financial-reports.service';
@@ -165,7 +166,7 @@ export class AccountingReportExportService {
         meta: {
           institutionName: meta.institutionName,
           institutionTagline: meta.institutionTagline,
-          productName: 'BCL OneCampus ERP',
+          productName: meta.productName,
           reportTitle: meta.reportTitle,
           reportIcon: meta.reportIcon,
           academicYear: meta.academicYear,
@@ -186,7 +187,7 @@ export class AccountingReportExportService {
     const html = renderAccountingReportPdfHtml({
       institutionName: meta.institutionName,
       institutionTagline: meta.institutionTagline,
-      productName: 'BCL OneCampus ERP',
+      productName: meta.productName,
       reportTitle: meta.reportTitle,
       reportIcon: meta.reportIcon,
       logoDataUri: meta.logoDataUri,
@@ -218,6 +219,7 @@ export class AccountingReportExportService {
     return {
       institutionName: ctx.institutionName,
       institutionTagline: ctx.institutionTagline,
+      productName: ctx.productName,
       reportTitle,
       reportIcon,
       academicYear,
@@ -244,6 +246,7 @@ export class AccountingReportExportService {
         branding?.portalSubtitle ??
         branding?.campusName ??
         'Affiliated Institution · Meghalaya',
+      productName: resolveProductName(branding?.productName),
       logoDataUri,
       primaryColor: branding?.primaryColor ?? '#1e3a8a',
     };

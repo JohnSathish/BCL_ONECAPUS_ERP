@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  POWERED_BY,
   POWERED_BY_TAGLINE,
   PRODUCT_NAME,
   SPLASH_DURATION_MS,
@@ -10,6 +11,7 @@ import {
   SPLASH_PRODUCT_TAGLINE,
   SPLASH_ROLES,
 } from '@/constants/release';
+import { readCachedBootstrap } from '@/services/mobile-remote-config';
 
 const BCL_LOGO = require('../../../assets/bcl-onecampus-logo.png');
 
@@ -85,6 +87,20 @@ function PageDots() {
 
 export function PremiumSplashScreen() {
   const insets = useSafeAreaInsets();
+  const [productName, setProductName] = useState(PRODUCT_NAME);
+  const [productTagline, setProductTagline] = useState(SPLASH_PRODUCT_TAGLINE);
+  const [poweredByText, setPoweredByText] = useState(POWERED_BY);
+
+  useEffect(() => {
+    void readCachedBootstrap().then((cached) => {
+      const remoteName = cached?.branding?.productName?.trim();
+      const remoteTagline = cached?.branding?.productTagline?.trim();
+      const remotePowered = cached?.branding?.poweredByText?.trim();
+      if (remoteName) setProductName(remoteName);
+      if (remoteTagline) setProductTagline(remoteTagline);
+      if (remotePowered) setPoweredByText(remotePowered);
+    });
+  }, []);
 
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.9)).current;
@@ -206,9 +222,9 @@ export function PremiumSplashScreen() {
               width: '100%',
             }}
           >
-            <Text style={styles.productName}>{PRODUCT_NAME}</Text>
+            <Text style={styles.productName}>{productName}</Text>
             <DiamondSeparator />
-            <Text style={styles.tagline}>{SPLASH_PRODUCT_TAGLINE}</Text>
+            <Text style={styles.tagline}>{productTagline}</Text>
             <RoleRow />
           </Animated.View>
 
@@ -219,8 +235,7 @@ export function PremiumSplashScreen() {
         </View>
 
         <Animated.View style={[styles.footer, { opacity: footerOpacity }]}>
-          <Text style={styles.poweredLabel}>Developed by</Text>
-          <Text style={styles.poweredBrand}>BaseCode Labs Pvt. Ltd.</Text>
+          <Text style={styles.poweredLabel}>{poweredByText}</Text>
           <Text style={styles.poweredTagline}>{POWERED_BY_TAGLINE}</Text>
           <PageDots />
         </Animated.View>

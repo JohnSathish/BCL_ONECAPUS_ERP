@@ -18,9 +18,14 @@ export function InstitutionBrandMark({ branding, active, collapsed, className }:
     ? (resolveBrandingAssetUrl(branding?.logoUrl) ?? DEFAULT_LOGIN_LOGO)
     : undefined;
   const title = active
-    ? (branding?.shortName ?? branding?.displayName ?? 'BCL OneCampus ERP')
-    : 'BCL OneCampus ERP';
-  const subtitle = active ? (branding?.portalSubtitle ?? 'Campus OS') : 'Campus OS';
+    ? branding?.productName?.trim() || branding?.shortName || branding?.displayName || 'Campus ERP'
+    : 'Campus ERP';
+  const subtitle = active
+    ? branding?.productTagline?.trim() ||
+      branding?.portalSubtitle ||
+      branding?.displayName ||
+      'Campus portal'
+    : 'Campus portal';
 
   const iconStyle =
     active && branding?.primaryColor && branding?.accentColor

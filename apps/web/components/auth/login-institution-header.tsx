@@ -77,10 +77,12 @@ export function LoginInstitutionHeader({
     );
   }
 
-  const { institution, poweredBy, showPoweredBy } = context;
+  const { institution, poweredBy, poweredByText, showPoweredBy, productName, productTagline } =
+    context;
   const logoSrc = resolveBrandingAssetUrl(institution.logoUrl) ?? DEFAULT_LOGIN_LOGO;
   const locationLine = formatInstitutionLocation(institution.campusName, institution.address);
-  const subtitle = institution.portalSubtitle ?? 'Campus ERP Portal';
+  const subtitle = institution.portalSubtitle ?? productTagline ?? 'Campus ERP Portal';
+  const attribution = (poweredByText ?? poweredBy)?.trim();
 
   return (
     <header
@@ -102,15 +104,19 @@ export function LoginInstitutionHeader({
             {institution.displayName}
           </h2>
 
+          {productName ? (
+            <p className="mt-0.5 text-xs font-semibold text-primary/90">{productName}</p>
+          ) : null}
+
           {locationLine ? (
             <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{locationLine}</p>
           ) : null}
 
           <p className="mt-1 text-[11px] font-medium text-muted-foreground/90">{subtitle}</p>
 
-          {showPoweredBy ? (
-            <p className="mt-1 hidden text-[10px] font-medium text-primary/85 sm:block">
-              Powered by {poweredBy}
+          {showPoweredBy && attribution ? (
+            <p className="mt-1 hidden text-[10px] font-medium text-muted-foreground/80 sm:block">
+              {attribution}
             </p>
           ) : null}
         </div>

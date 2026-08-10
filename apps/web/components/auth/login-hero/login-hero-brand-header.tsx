@@ -1,25 +1,40 @@
 'use client';
 
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
-import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
+import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import {
+  resolvePoweredByText,
+  resolveProductName,
+  resolveProductTagline,
+} from '@/lib/branding-defaults';
+import type { LoginContext } from '@/types/login-context';
 
 type Props = {
   compact?: boolean;
+  context?: LoginContext | null;
 };
 
-export function LoginHeroBrandHeader({ compact = false }: Props) {
+export function LoginHeroBrandHeader({ compact = false, context = null }: Props) {
+  const productName = resolveProductName(context?.productName);
+  const productTagline = resolveProductTagline(context?.productTagline);
+  const logoSrc = resolveBrandingAssetUrl(context?.institution?.logoUrl) ?? DEFAULT_LOGIN_LOGO;
+  const institutionName = context?.institution?.displayName?.trim();
+  const eyebrow = institutionName
+    ? `${institutionName} · Campus portal`
+    : 'Campus education platform';
+
   if (compact) {
     return (
       <header className="login-hero-brand login-hero-brand-mobile flex w-full min-w-0 flex-col items-center text-center">
         <div className="login-hero-logo-mark h-12 w-12" aria-hidden>
-          <BrandingLogoImage src={DEFAULT_LOGIN_LOGO} className="h-9 w-9" priority />
+          <BrandingLogoImage src={logoSrc} className="h-9 w-9" priority />
         </div>
 
         <h1 className="mt-2 text-xl font-bold tracking-tight text-white sm:text-2xl">
-          BCL OneCampus ERP
+          {productName}
         </h1>
         <p className="login-hero-tagline-mobile mt-0.5 text-xs font-medium text-white/60 sm:text-sm">
-          AI-Powered Campus Management Platform
+          {productTagline}
         </p>
       </header>
     );
@@ -28,24 +43,20 @@ export function LoginHeroBrandHeader({ compact = false }: Props) {
   return (
     <header className="login-hero-brand w-full min-w-0">
       <p className="login-hero-eyebrow mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/70">
-        BaseCode Labs · OneCampus
+        {eyebrow}
       </p>
 
       <div className="login-hero-brand-lockup flex min-w-0 items-center gap-4 sm:gap-5">
         <div className="login-hero-logo-mark h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]" aria-hidden>
-          <BrandingLogoImage
-            src={DEFAULT_LOGIN_LOGO}
-            className="h-12 w-12 sm:h-14 sm:w-14"
-            priority
-          />
+          <BrandingLogoImage src={logoSrc} className="h-12 w-12 sm:h-14 sm:w-14" priority />
         </div>
 
         <div className="login-hero-brand-copy min-w-0">
           <h1 className="whitespace-nowrap text-[2.35rem] font-black leading-[1.05] tracking-tight text-white xl:text-[2.75rem]">
-            BCL OneCampus ERP
+            {productName}
           </h1>
           <p className="login-hero-tagline mt-0.5 text-sm font-medium sm:text-[0.9375rem]">
-            AI-Powered Campus Management Platform
+            {productTagline}
           </p>
         </div>
       </div>
@@ -57,6 +68,11 @@ export function LoginHeroBrandHeader({ compact = false }: Props) {
         </span>
         , and campus operations.
       </p>
+      {context?.showPoweredBy ? (
+        <p className="mt-3 text-[11px] font-medium text-white/45">
+          {resolvePoweredByText(context.poweredByText ?? context.poweredBy)}
+        </p>
+      ) : null}
     </header>
   );
 }

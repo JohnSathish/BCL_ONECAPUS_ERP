@@ -43,16 +43,21 @@ export function SidebarInstitutionCard({
     ? (resolveBrandingAssetUrl(branding?.logoUrl) ?? DEFAULT_LOGIN_LOGO)
     : undefined;
   const name = active
-    ? (branding?.displayName ?? branding?.shortName ?? 'BCL OneCampus ERP')
-    : 'BCL OneCampus ERP';
+    ? (branding?.displayName ?? branding?.shortName ?? 'Institution')
+    : 'Campus portal';
+  const productName = active ? branding?.productName?.trim() : undefined;
   const academicYear = studentMode
     ? studentDashQ.data?.profile.academicYear
     : statsQ.data?.institution.academicYear;
   const subtitle = studentMode
     ? `FYUGP${academicYear ? ` · AY ${academicYear}` : ''}`
     : active
-      ? (branding?.portalSubtitle ?? academicYear ?? 'Campus OS')
-      : 'Campus OS';
+      ? productName ||
+        branding?.productTagline ||
+        branding?.portalSubtitle ||
+        academicYear ||
+        'Campus portal'
+      : 'Campus portal';
   const location = branding?.address?.split(',').pop()?.trim() ?? 'Active Campus';
 
   const students = statsQ.data?.institution.studentCount;

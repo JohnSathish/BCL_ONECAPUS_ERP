@@ -185,7 +185,7 @@ export function AlumniPublicShell({
             <p>
               © {new Date().getFullYear()} {collegeName} {resolvedAssociationName}
             </p>
-            <p>Powered by BCL OneCampus ERP</p>
+            <p>Powered by BaseCode Labs</p>
           </div>
         </div>
       </footer>

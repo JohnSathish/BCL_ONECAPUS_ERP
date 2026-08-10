@@ -18,7 +18,11 @@ export type LoginContext = {
   loginBackgroundStyle: 'gradient' | 'solid' | 'mesh';
   showPoweredBy: boolean;
   brandingEnabled: boolean;
-  poweredBy: 'BCL OneCampus ERP';
+  productName?: string;
+  productTagline?: string;
+  poweredByText?: string;
+  /** @deprecated Prefer poweredByText */
+  poweredBy?: string;
   loginMethods?: {
     allowBiometricLogin: boolean;
     allowQrLogin: boolean;

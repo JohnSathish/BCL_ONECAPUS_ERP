@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePrincipalDrawerOptional } from '@/components/principal-portal/principal-drawer-context';
 import { principalTheme, severityColor } from '@/components/principal-portal/theme';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
-import { COLLEGE_NAME } from '@/constants/release';
+import { COLLEGE_NAME, PRODUCT_NAME } from '@/constants/release';
 import { fetchPrincipalMobileSummary } from '@/services/principal-desk';
 import type { PrincipalMobileSummary } from '@/types/principal-desk';
 import { formatInr } from '@/utils/currency';
@@ -216,7 +216,7 @@ export default function PrincipalHomeScreen() {
             </Pressable>
             <View style={styles.heroTitles}>
               <Text style={styles.heroTitle}>Principal Dashboard</Text>
-              <Text style={styles.heroSubtitle}>BCL OneCampus ERP</Text>
+              <Text style={styles.heroSubtitle}>{PRODUCT_NAME}</Text>
             </View>
             <View style={styles.heroIcons}>
               <Pressable

@@ -1,17 +1,20 @@
 /** White-label campus portal — college-first in-app; product branding on splash/about */
 export const COLLEGE_NAME = 'Don Bosco College, Tura';
-/** Product brand — splash screen + About only */
-export const PRODUCT_NAME = 'BCL OneCampus ERP';
+/**
+ * Compile-time fallback only. Prefer remote branding.productName from bootstrap/login context.
+ * Do not treat this as the platform identity for other tenants.
+ */
+export const PRODUCT_NAME = 'Bosco Connect';
 export const APP_VERSION = '1.0.20';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
 /** Shown under college name on welcome/login (client-facing) */
 export const COLLEGE_PORTAL_SUBTITLE = 'Official ERP Portal';
 /** Splash-only product tagline */
-export const PORTAL_TAGLINE = 'Enterprise Campus Management System';
+export const PORTAL_TAGLINE = 'Smart Education Management Platform';
 export const PORTAL_AUDIENCE = 'Students • Faculty • Staff • Administration';
 export const SPLASH_AUDIENCE_LINE = 'Student • Faculty • Parent';
-export const SPLASH_PRODUCT_TAGLINE = 'Enterprise Campus Management System';
+export const SPLASH_PRODUCT_TAGLINE = 'Smart Education Management Platform';
 export const SPLASH_MOTTO = 'Smart Campus. Better Future.';
 export const SPLASH_ROLES = [
   { icon: '🎓', label: 'Student' },
@@ -200,7 +203,7 @@ export const LOGIN_TRUST_BADGES = [
 
 export const APP_DISPLAY_NAME = process.env.EXPO_PUBLIC_APP_NAME ?? COLLEGE_NAME;
 
-export const POWERED_BY = 'Powered by BaseCode Labs Pvt. Ltd.';
+export const POWERED_BY = 'Powered by BaseCode Labs';
 export const BASECODE_WEBSITE_URL = 'https://www.basecodelabs.com';
 
 /** Cards implemented in mobile v1 — hide backend-enabled stubs until built. */

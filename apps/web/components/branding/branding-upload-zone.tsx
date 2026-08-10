@@ -173,9 +173,7 @@ export function BrandingBrowserTabMock({
         ) : (
           <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
         )}
-        <span className="truncate text-xs text-foreground">
-          {title || 'Institution Portal'} — BCL OneCampus ERP
-        </span>
+        <span className="truncate text-xs text-foreground">{title || 'Institution Portal'}</span>
       </div>
     </div>
   );

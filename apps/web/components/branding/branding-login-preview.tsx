@@ -57,7 +57,13 @@ export function BrandingLoginPreview({ snapshot, compact, className }: Props) {
           {!compact ? (
             <div className="hidden flex-1 flex-col justify-end p-6 lg:flex">
               <div className="login-glass-compact max-w-sm rounded-xl p-4">
-                <p className="text-sm font-semibold text-white/95">{snapshot.displayName}</p>
+                <p className="text-sm font-semibold text-white/95">
+                  {snapshot.productName ?? 'Campus ERP'}
+                </p>
+                <p className="mt-0.5 text-xs text-white/65">
+                  {snapshot.productTagline ?? 'Smart Education Management Platform'}
+                </p>
+                <p className="mt-2 text-xs font-medium text-white/80">{snapshot.displayName}</p>
                 {locationLine ? (
                   <p className="mt-1 flex items-center gap-1 text-xs text-white/60">
                     <MapPin className="h-3 w-3" />
@@ -93,13 +99,18 @@ export function BrandingLoginPreview({ snapshot, compact, className }: Props) {
                   <h3 className="truncate text-sm font-bold text-foreground">
                     {snapshot.displayName}
                   </h3>
+                  {snapshot.productName ? (
+                    <p className="mt-0.5 text-[10px] font-semibold text-primary/90">
+                      {snapshot.productName}
+                    </p>
+                  ) : null}
                   {locationLine ? (
                     <p className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">
                       {locationLine}
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {snapshot.portalSubtitle ?? 'Campus ERP Portal'}
+                    {snapshot.portalSubtitle ?? snapshot.productTagline ?? 'Campus ERP Portal'}
                   </p>
                 </div>
               </div>
@@ -131,7 +142,7 @@ export function BrandingLoginPreview({ snapshot, compact, className }: Props) {
               </div>
               {snapshot.showPoweredBy ? (
                 <p className="mt-4 text-center text-[9px] text-muted-foreground">
-                  Powered by BCL OneCampus ERP
+                  {snapshot.poweredByText ?? 'Powered by BaseCode Labs'}
                 </p>
               ) : null}
             </div>

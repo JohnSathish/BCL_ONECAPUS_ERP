@@ -2,6 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { sanitizeDisplayText } from '../../common/utils/display-text.util';
+import {
+  BRANDING_DEFAULTS,
+  resolvePoweredByText,
+  resolveProductName,
+  resolveProductTagline,
+} from '../branding/branding-defaults';
 
 export type LoginContextDto = {
   tenantSlug: string;
@@ -23,7 +29,13 @@ export type LoginContextDto = {
   loginBackgroundStyle: 'gradient' | 'solid' | 'mesh';
   showPoweredBy: boolean;
   brandingEnabled: boolean;
-  poweredBy: 'BCL OneCampus ERP';
+  /** White-label product name (e.g. Bosco Connect). */
+  productName: string;
+  productTagline: string;
+  /** Full attribution line (e.g. Powered by BaseCode Labs). */
+  poweredByText: string;
+  /** @deprecated Prefer poweredByText; kept for older clients. */
+  poweredBy: string;
   loginMethods: {
     allowBiometricLogin: boolean;
     allowQrLogin: boolean;
@@ -158,7 +170,8 @@ export class TenantResolutionService {
         shortName: branding?.shortName ?? undefined,
         campusName: branding?.campusName ?? campus?.name,
         portalSubtitle:
-          sanitizeDisplayText(branding?.portalSubtitle) ?? 'Campus ERP Portal',
+          sanitizeDisplayText(branding?.portalSubtitle) ??
+          BRANDING_DEFAULTS.portalSubtitle,
         address: sanitizeDisplayText(branding?.address),
         logoUrl: branding?.logoUrl ?? undefined,
         faviconUrl: branding?.faviconUrl ?? undefined,
@@ -172,7 +185,10 @@ export class TenantResolutionService {
       loginBackgroundStyle,
       showPoweredBy: branding?.showPoweredBy ?? true,
       brandingEnabled: branding?.brandingEnabled ?? true,
-      poweredBy: 'BCL OneCampus ERP',
+      productName: resolveProductName(branding?.productName),
+      productTagline: resolveProductTagline(branding?.productTagline),
+      poweredByText: resolvePoweredByText(branding?.poweredByText),
+      poweredBy: resolvePoweredByText(branding?.poweredByText),
       loginMethods: {
         allowBiometricLogin: security?.allowBiometricLogin ?? true,
         allowQrLogin: security?.allowQrLogin ?? false,

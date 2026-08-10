@@ -121,8 +121,8 @@ export function BrandingThemeSection({ register, control, watch, setValue, disab
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ToggleRow
               id="showPoweredBy"
-              label='Show "Powered by BCL OneCampus ERP"'
-              description="Display attribution on login and portal footer."
+              label='Show "Powered by" attribution'
+              description="Display technology-partner attribution on login and portal footer."
               checked={watch('showPoweredBy')}
               disabled={disabled}
               onChange={(v) => setValue('showPoweredBy', v, { shouldDirty: true })}

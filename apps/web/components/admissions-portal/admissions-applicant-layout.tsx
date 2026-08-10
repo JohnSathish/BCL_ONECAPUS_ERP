@@ -215,7 +215,7 @@ export function AdmissionsApplicantLayout({
           <p className="mt-1">
             Admission Help Desk: {cycleSettings.helpDesk.phone}
             {cycleSettings.helpDesk.email ? ` · ${cycleSettings.helpDesk.email}` : ''} · Powered by
-            OneCampus ERP
+            BaseCode Labs
           </p>
         </footer>
       </div>

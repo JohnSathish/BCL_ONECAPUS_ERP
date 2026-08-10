@@ -11,9 +11,12 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: 'BCL OneCampus ERP',
-  description: 'One unified platform for the entire campus ecosystem',
-  applicationName: 'BCL OneCampus ERP',
+  title: {
+    default: 'Campus ERP',
+    template: '%s',
+  },
+  description: 'Smart Education Management Platform',
+  applicationName: 'Campus ERP',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },

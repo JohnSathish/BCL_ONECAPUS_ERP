@@ -35,6 +35,21 @@ export class UpdateBrandingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
+  productName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  productTagline?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  poweredByText?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   address?: string;
 

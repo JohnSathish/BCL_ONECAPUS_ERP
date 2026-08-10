@@ -126,6 +126,9 @@ async function main() {
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      productName: 'Bosco Connect',
+      productTagline: 'Smart Education Management Platform',
+      poweredByText: 'Powered by BaseCode Labs',
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
@@ -147,6 +150,9 @@ async function main() {
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      productName: 'Bosco Connect',
+      productTagline: 'Smart Education Management Platform',
+      poweredByText: 'Powered by BaseCode Labs',
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',

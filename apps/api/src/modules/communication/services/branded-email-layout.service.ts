@@ -2,9 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { escapeHtml, sanitizeEmailHtml } from '../utils/email-template-helpers';
+import {
+  resolvePoweredByText,
+  resolveProductName,
+  resolveProductTagline,
+} from '../../branding/branding-defaults';
 
 export type BrandedEmailContext = {
   institutionName: string;
+  productName: string;
+  productTagline: string;
   tagline: string;
   address: string;
   website: string;
@@ -14,6 +21,7 @@ export type BrandedEmailContext = {
   primaryColor: string;
   accentColor: string;
   showPoweredBy: boolean;
+  poweredByText: string;
   customFooterHtml: string | null;
   senderName: string | null;
   replyEmail: string | null;
@@ -64,10 +72,12 @@ export class BrandedEmailLayoutService {
         branding?.displayName?.trim() ||
         branding?.shortName?.trim() ||
         'Institution',
+      productName: resolveProductName(branding?.productName),
+      productTagline: resolveProductTagline(branding?.productTagline),
       tagline:
         branding?.portalSubtitle?.trim() ||
         branding?.campusName?.trim() ||
-        'Official ERP Communication',
+        resolveProductTagline(branding?.productTagline),
       address: branding?.address?.trim() || '',
       website,
       email: settings?.replyEmail?.trim() || '',
@@ -76,6 +86,7 @@ export class BrandedEmailLayoutService {
       primaryColor: primary,
       accentColor: accent,
       showPoweredBy: branding?.showPoweredBy ?? true,
+      poweredByText: resolvePoweredByText(branding?.poweredByText),
       customFooterHtml: settings?.footerTemplate?.trim() || null,
       senderName: settings?.defaultSenderName?.trim() || null,
       replyEmail: settings?.replyEmail?.trim() || null,
@@ -85,6 +96,9 @@ export class BrandedEmailLayoutService {
   brandingVariables(ctx: BrandedEmailContext): Record<string, string> {
     return {
       institution_name: ctx.institutionName,
+      product_name: ctx.productName,
+      product_tagline: ctx.productTagline,
+      powered_by: ctx.poweredByText,
       institution_address: ctx.address,
       institution_website: ctx.website,
       institution_email: ctx.email,
@@ -130,7 +144,7 @@ export class BrandedEmailLayoutService {
 
     const poweredBy = input.ctx.showPoweredBy
       ? `<p style="margin:16px 0 0;font-size:11px;line-height:1.5;color:#94a3b8;">
-          Powered by <a href="https://basecodelabs.com" style="color:#64748b;text-decoration:none;font-weight:600;">BaseCode Labs Pvt. Ltd.</a><br/>
+          ${escapeHtml(input.ctx.poweredByText)}<br/>
           <a href="https://basecodelabs.com" style="color:#94a3b8;text-decoration:underline;">basecodelabs.com</a>
           · <a href="mailto:contact@basecodelabs.com" style="color:#94a3b8;text-decoration:underline;">contact@basecodelabs.com</a>
         </p>`

@@ -36,6 +36,9 @@ async function main() {
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      productName: 'Bosco Connect',
+      productTagline: 'Smart Education Management Platform',
+      poweredByText: 'Powered by BaseCode Labs',
       address: 'Tura, West Garo Hills, Meghalaya',
       badges: ['Affiliated to NEHU', 'NEP 2020', 'FYUGP'],
       primaryColor: '#1e3a5f',
@@ -44,6 +47,7 @@ async function main() {
       logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
+      showPoweredBy: true,
       portalExtrasJson: {
         careersPortal: {
           principalName: 'Rev. Fr. Principal',
@@ -59,6 +63,9 @@ async function main() {
       shortName: 'DBC Tura',
       campusName: 'Tura, Meghalaya',
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
+      productName: 'Bosco Connect',
+      productTagline: 'Smart Education Management Platform',
+      poweredByText: 'Powered by BaseCode Labs',
       address: 'Tura, West Garo Hills, Meghalaya',
       badges: ['Affiliated to NEHU', 'NEP 2020', 'FYUGP'],
       primaryColor: '#1e3a5f',
@@ -67,6 +74,7 @@ async function main() {
       logoUrl: 'https://donboscocollege.ac.in/favicon.ico',
       loginBackgroundStyle: 'gradient',
       brandingEnabled: true,
+      showPoweredBy: true,
       portalExtrasJson: {
         careersPortal: {
           principalName: 'Rev. Fr. Principal',

@@ -90,6 +90,48 @@ export function BrandingIdentitySection({ register, disabled }: Props) {
         </div>
 
         <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="productName" className="text-sm font-medium">
+            Product name
+          </Label>
+          <Input
+            id="productName"
+            className={brandingInputClass}
+            placeholder="Bosco Connect"
+            disabled={disabled}
+            {...register('productName')}
+          />
+          <p className="text-xs text-muted-foreground">
+            White-label product identity shown on login hero, splash, and documents.
+          </p>
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="productTagline" className="text-sm font-medium">
+            Product tagline
+          </Label>
+          <Input
+            id="productTagline"
+            className={brandingInputClass}
+            placeholder="Smart Education Management Platform"
+            disabled={disabled}
+            {...register('productTagline')}
+          />
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="poweredByText" className="text-sm font-medium">
+            Powered-by attribution
+          </Label>
+          <Input
+            id="poweredByText"
+            className={brandingInputClass}
+            placeholder="Powered by BaseCode Labs"
+            disabled={disabled}
+            {...register('poweredByText')}
+          />
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="address" className="text-sm font-medium">
             Institution address
           </Label>

@@ -84,8 +84,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // Rejected build was 1.0.19 (2) — bump for App Review resubmit.
-    buildNumber: '3',
+    // Failed ITMS-90683 upload was 1.0.20 (3) — bump for App Store resubmit.
+    buildNumber: '4',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -93,6 +93,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       // Explicit purpose strings (Guideline 2.5.1 / 5.1.1) — must say why + how data is used.
       NSFaceIDUsageDescription:
         'Don Bosco College campus app uses Face ID so enrolled students and staff can unlock the app and sign in without re-entering a password. Face data stays on your device and is never uploaded to college servers.',
+      // Required by expo-camera (QR login). Must stay present — see image-picker note below.
       NSCameraUsageDescription:
         'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
       NSPhotoLibraryUsageDescription:
@@ -127,6 +128,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     './plugins/with-android-r8-keep',
+    // Register early so this infoPlist mod runs last and keeps NSCameraUsageDescription.
+    './plugins/with-ios-privacy-plist',
     [
       'expo-build-properties',
       {
@@ -192,10 +195,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-image-picker',
       {
-        // Library-only: profile/passport upload uses launchImageLibraryAsync (no in-app camera capture).
+        // Profile/passport upload uses launchImageLibraryAsync only (no in-app capture).
+        // IMPORTANT: do NOT set cameraPermission: false — that deletes NSCameraUsageDescription
+        // from Info.plist after expo-camera (mod chain), which fails Apple ITMS-90683 even though
+        // QR login still links camera APIs. Keep the same purpose string as expo-camera.
         photosPermission:
           'Don Bosco College campus app needs access to your photo library so students and staff can choose an existing passport-style photo to upload for profile or admission documentation. Selected photos are uploaded to your college account for verification and are not shared with other users.',
-        cameraPermission: false,
+        cameraPermission:
+          'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+        // Explicit false so a later image-picker mod does not re-add a default mic string.
+        microphonePermission: false,
       },
     ],
     [

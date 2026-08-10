@@ -200,6 +200,12 @@ model TenantBranding {
   shortName            String?  @map("short_name")
   campusName           String?  @map("campus_name")
   portalSubtitle       String?  @map("portal_subtitle")
+  /// White-label product name shown to the institution (e.g. Bosco Connect).
+  productName          String?  @map("product_name")
+  /// Product marketing tagline (e.g. Smart Education Management Platform).
+  productTagline       String?  @map("product_tagline")
+  /// Full attribution line (e.g. Powered by BaseCode Labs).
+  poweredByText        String?  @map("powered_by_text")
   address              String?
   logoUrl              String?  @map("logo_url")
   faviconUrl           String?  @map("favicon_url")

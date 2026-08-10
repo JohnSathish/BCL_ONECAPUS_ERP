@@ -7,6 +7,9 @@ export type BrandingPreviewSnapshot = {
   shortName?: string;
   campusName?: string;
   portalSubtitle?: string;
+  productName?: string;
+  productTagline?: string;
+  poweredByText?: string;
   address?: string;
   logoPreview?: string;
   faviconPreview?: string;
@@ -29,6 +32,9 @@ export function toPreviewSnapshot(
     shortName: values.shortName,
     campusName: values.campusName,
     portalSubtitle: values.portalSubtitle,
+    productName: values.productName,
+    productTagline: values.productTagline,
+    poweredByText: values.poweredByText,
     address: values.address,
     logoPreview,
     faviconPreview,

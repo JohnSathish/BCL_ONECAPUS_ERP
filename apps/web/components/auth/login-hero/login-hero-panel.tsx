@@ -17,8 +17,8 @@ type Props = {
 };
 
 export function LoginHeroPanel({ compact = false, context = null, contextLoading = false }: Props) {
-  void context;
   void contextLoading;
+  const productName = context?.productName?.trim() || 'Campus ERP';
 
   return (
     <section
@@ -29,7 +29,7 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
           ? 'login-hero-compact max-h-[220px] shrink-0 lg:hidden'
           : 'hidden lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden',
       )}
-      aria-label="BCL OneCampus ERP overview"
+      aria-label={`${productName} overview`}
     >
       <LoginHeroBackground />
       {LOGIN_HERO_ANIMATIONS_ENABLED ? <ParticleCanvas className="opacity-50" /> : null}
@@ -42,7 +42,7 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
             : 'mx-auto w-full max-w-xl justify-center gap-3 px-6 py-5 xl:max-w-2xl xl:gap-4 xl:px-10 xl:py-6',
         )}
       >
-        <LoginHeroBrandHeader compact={compact} />
+        <LoginHeroBrandHeader compact={compact} context={context} />
 
         {!compact ? (
           <>
