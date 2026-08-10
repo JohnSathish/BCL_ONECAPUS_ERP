@@ -2938,6 +2938,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
   const [bodyHtml, setBodyHtml] = useState('');
   const [attachments, setAttachments] = useState<WebsiteNoticeAttachment[]>([]);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const MAX_NOTICE_PDFS = 5;
 
   const resetForm = () => {
@@ -2947,6 +2948,7 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
     setPriority('NORMAL');
     setBodyHtml('');
     setAttachments([]);
+    setCopiedUrl(null);
   };
 
   const loadForEdit = (notice: WebsiteNotice) => {
@@ -2996,6 +2998,33 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
       onMessage(apiErrorMessage(error, 'Could not upload PDF'));
     } finally {
       setUploadingPdf(false);
+    }
+  };
+
+  const resolveCopyUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (typeof window === 'undefined') return trimmed;
+    try {
+      return new URL(trimmed, window.location.origin).toString();
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const copyAttachmentUrl = async (url: string) => {
+    const absolute = resolveCopyUrl(url);
+    if (!absolute) return;
+    try {
+      await navigator.clipboard.writeText(absolute);
+      setCopiedUrl(url);
+      onMessage('File URL copied.');
+      window.setTimeout(() => {
+        setCopiedUrl((current) => (current === url ? null : current));
+      }, 1600);
+    } catch {
+      onMessage('Could not copy URL. Select the link and copy manually.');
     }
   };
 
@@ -3126,26 +3155,44 @@ function NoticesView({ onMessage }: { onMessage: (message: string) => void }) {
                 {attachments.map((file) => (
                   <li
                     key={file.url}
-                    className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm"
+                    className="flex flex-col gap-1.5 rounded-md bg-muted/40 px-2 py-1.5 text-sm sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <a
-                      className="min-w-0 truncate underline"
-                      href={file.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {file.name || 'Download PDF'}
-                    </a>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        setAttachments((prev) => prev.filter((row) => row.url !== file.url))
-                      }
-                    >
-                      Remove
-                    </Button>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        className="block truncate font-medium underline"
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {file.name || 'Download PDF'}
+                      </a>
+                      <p
+                        className="truncate text-[11px] text-muted-foreground"
+                        title={resolveCopyUrl(file.url)}
+                      >
+                        {resolveCopyUrl(file.url)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copyAttachmentUrl(file.url)}
+                      >
+                        {copiedUrl === file.url ? 'Copied' : 'Copy URL'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          setAttachments((prev) => prev.filter((row) => row.url !== file.url))
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
