@@ -342,7 +342,7 @@ export class StudentProfileService {
       applicationNumber: student.applicationNumber ?? null,
       admissionNumber: student.admissionNumber ?? null,
       universityRollNumber: student.universityRollNumber ?? null,
-      rollNumber: student.rollNumber,
+      rollNumber: student.rollNumber || student.enrollmentNumber,
       rfidNumber: student.rfidNumber ?? null,
       abcId: student.abcAccount?.abcId ?? null,
       fullName: student.masterProfile?.fullName ?? student.user.email,

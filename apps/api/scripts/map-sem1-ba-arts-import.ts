@@ -19,6 +19,7 @@ import {
   FULL_ADMISSION_IMPORT_HEADERS,
   FULL_ADMISSION_IMPORT_HELPERS,
 } from '../src/modules/students/import/student-import-field-registry';
+import { readOfficeIdentity } from './lib/office-identity-fields';
 
 const SOURCE =
   process.argv.find((arg) => arg.endsWith('.xlsx') && !arg.includes('READY')) ??
@@ -855,6 +856,12 @@ async function main() {
     const state =
       titleCaseWords(salvage?.state || src(row, headers, 'State')) ||
       'Meghalaya';
+    const { nehuRoll, nehuReg } = readOfficeIdentity(
+      row,
+      headers,
+      cellText,
+      roll,
+    );
 
     const values: Record<string, string> = {
       'Academic Year': '2026-27',
@@ -865,8 +872,8 @@ async function main() {
       'Form Number': '',
       'Registration Number': registration,
       'Roll Number': roll,
-      'University Roll Number': '',
-      'University Registration Number': '',
+      'University Roll Number': nehuRoll,
+      'University Registration Number': nehuReg,
       'ABC ID': '',
       Shift: ADMISSION_SHIFT,
       Programme: programme,

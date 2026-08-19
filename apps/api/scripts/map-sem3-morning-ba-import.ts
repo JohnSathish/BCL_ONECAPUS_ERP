@@ -20,6 +20,7 @@ import {
   SEM3_ADMISSION_TEMPLATE_HEADERS,
   SEM3_ADMISSION_TEMPLATE_HELPERS,
 } from '../src/modules/students/migration/sem3-admission-template';
+import { readOfficeIdentity } from './lib/office-identity-fields';
 
 const SOURCE =
   process.argv.find((arg) => arg.endsWith('.xlsx') && !arg.includes('READY')) ??
@@ -471,8 +472,18 @@ async function main() {
       });
     }
 
+    const { nehuRoll, nehuReg } = readOfficeIdentity(
+      row,
+      headers,
+      cellText,
+      roll,
+    );
+
     const values: Record<string, string> = {
       'Registration Number': roll,
+      'Roll Number': roll,
+      'University Roll Number': nehuRoll,
+      'University Registration Number': nehuReg,
       'Full Name': name,
       Email: email,
       Mobile: mobile,

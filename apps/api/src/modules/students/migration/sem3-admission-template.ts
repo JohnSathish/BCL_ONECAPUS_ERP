@@ -3,6 +3,12 @@
 export const SEM3_ADMISSION_TEMPLATE_HEADERS = [
   'Registration Number',
 
+  'Roll Number',
+
+  'University Roll Number',
+
+  'University Registration Number',
+
   'Full Name',
 
   'Email',
@@ -45,6 +51,13 @@ export const SEM3_ADMISSION_TEMPLATE_HEADERS = [
 export const SEM3_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
   'Registration Number': 'College registration / roll when assigned',
 
+  'Roll Number': 'College roll number (same as registration when assigned)',
+
+  'University Roll Number': 'NEHU roll number from the office register',
+
+  'University Registration Number':
+    'NEHU registration / Regd. No. from the office register',
+
   'Full Name': 'Required',
 
   Email: 'Required — used for portal login',
@@ -79,6 +92,12 @@ export const SEM3_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
 
 export const SEM3_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   'Registration Number': 'REG2026001',
+
+  'Roll Number': 'REG2026001',
+
+  'University Roll Number': '25156201',
+
+  'University Registration Number': '25011531',
 
   'Full Name': 'Priangshuman Marak',
 

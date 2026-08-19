@@ -1000,7 +1000,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       String(raw.universityRollNumber ?? '').trim() || undefined;
     const universityRegistrationNumber =
       String(raw.universityRegistrationNumber ?? '').trim() || undefined;
-    const rollNumber = String(raw.rollNumber ?? '').trim();
+    const rollNumber = String(raw.rollNumber ?? '').trim() || enrollmentNumber;
     const fullName = String(raw.fullName ?? '').trim();
     const email = String(raw.email ?? '')
       .trim()
@@ -5034,6 +5034,23 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           await tx.semesterRegistrationLine.create({ data });
         }
       }
+    }
+
+    const unassigned = await tx.semesterRegistrationLine.count({
+      where: { registrationId: registration.id, offeringSectionId: null },
+    });
+    const lineCount = await tx.semesterRegistrationLine.count({
+      where: { registrationId: registration.id },
+    });
+    if (lineCount > 0 && unassigned === 0) {
+      await tx.semesterRegistrationLine.updateMany({
+        where: { registrationId: registration.id, status: 'pending' },
+        data: { status: 'confirmed' },
+      });
+      await tx.semesterRegistration.update({
+        where: { id: registration.id },
+        data: { status: 'completed', submittedAt: new Date() },
+      });
     }
   }
 

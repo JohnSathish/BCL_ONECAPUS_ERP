@@ -20,6 +20,7 @@
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --enrollment=BA25-035 --apply
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --apply
  *   npx ts-node -r tsconfig-paths/register scripts/finalize-draft-registrations.ts --apply --batch=100
+ *   npx tsx scripts/finalize-draft-registrations.ts --sem=all --apply
  */
 import { PrismaClient } from '@prisma/client';
 
@@ -32,9 +33,17 @@ function readArg(name: string): string | undefined {
 const apply = process.argv.includes('--apply');
 const dryRun = !apply;
 const tenantSlug = readArg('tenant') ?? 'demo';
-const sem = Number(readArg('sem') ?? '3');
 const onlyEnrollment = readArg('enrollment');
 const prisma = new PrismaClient();
+
+function parseSemesters(): number[] | 'all' {
+  const raw = readArg('sem') ?? '3';
+  if (raw === 'all') return 'all';
+  return raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+}
 
 async function main() {
   const tenant = await prisma.tenant.findFirst({
@@ -43,9 +52,45 @@ async function main() {
   });
   if (!tenant) throw new Error(`Tenant not found: ${tenantSlug}`);
   const tenantId = tenant.id;
+  const semArg = parseSemesters();
+  const sequences =
+    semArg === 'all'
+      ? [
+          ...new Set(
+            (
+              await prisma.semesterRegistration.findMany({
+                where: {
+                  tenantId,
+                  status: { notIn: ['completed', 'rejected'] },
+                  ...(onlyEnrollment
+                    ? { student: { enrollmentNumber: onlyEnrollment } }
+                    : {}),
+                },
+                select: { semesterSequence: true },
+                distinct: ['semesterSequence'],
+              })
+            ).map((row) => row.semesterSequence),
+          ),
+        ].sort((a, b) => a - b)
+      : semArg;
 
+  if (!sequences.length) {
+    console.log('\nNothing to do — no matching draft registrations.\n');
+    return;
+  }
+
+  for (const sem of sequences) {
+    await finalizeSemester(tenantId, tenant.slug, sem);
+  }
+}
+
+async function finalizeSemester(
+  tenantId: string,
+  tenantSlug: string,
+  sem: number,
+) {
   console.log(
-    `\nFinalize draft registrations — tenant=${tenant.slug} sem=${sem}` +
+    `\nFinalize draft registrations — tenant=${tenantSlug} sem=${sem}` +
       `${onlyEnrollment ? ` enrollment=${onlyEnrollment}` : ''}` +
       `${dryRun ? '  (DRY RUN — no writes)' : '  (APPLYING)'}\n`,
   );

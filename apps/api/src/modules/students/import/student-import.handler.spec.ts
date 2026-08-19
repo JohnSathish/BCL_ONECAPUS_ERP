@@ -25,6 +25,7 @@ describe('StudentImportHandler', () => {
     academicSubject: { findMany: jest.fn() },
 
     courseOffering: { findMany: jest.fn() },
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
   const handler = new StudentImportHandler(
@@ -53,7 +54,7 @@ describe('StudentImportHandler', () => {
 
         batchCode: '2026-BCA',
 
-        currentSemester: 5,
+        currentSemester: 4,
 
         entrySessionId: 'session-1',
 
@@ -145,6 +146,31 @@ describe('StudentImportHandler', () => {
     expect(results[0]?.status).toBe('VALID');
 
     expect(results[0]?.normalized?.programVersionId).toBe('pv-1');
+  });
+
+  it('defaults college roll from registration number', async () => {
+    const results = await handler.parseAndValidate('tenant', [
+      {
+        rowNumber: 2,
+        raw: {
+          registrationNumber: 'BA24-458',
+          fullName: 'Ankit Hajong',
+          email: 'ankit@example.com',
+          programmeCode: 'BCA',
+          batchCode: '2026-BCA',
+          streamCode: 'SCIENCE',
+          shiftCode: 'MORNING',
+          currentSemester: '4',
+          fatherName: 'Father',
+          motherName: 'Mother',
+          categoryCode: 'GENERAL',
+        },
+      },
+    ]);
+
+    expect(results[0]?.status).toBe('VALID');
+    expect(results[0]?.normalized?.enrollmentNumber).toBe('BA24-458');
+    expect(results[0]?.normalized?.rollNumber).toBe('BA24-458');
   });
 
   it('rejects duplicate registration in file', async () => {
@@ -261,6 +287,10 @@ describe('StudentImportHandler', () => {
           shiftCode: 'MORNING',
 
           majorDeptCode: 'CS',
+
+          fatherName: 'John Doe',
+
+          motherName: 'Jane Doe',
         },
       },
     ]);
@@ -342,7 +372,11 @@ describe('StudentImportHandler', () => {
 
           shiftCode: 'MORNING',
 
-          currentSemester: 3,
+          currentSemester: 6,
+
+          fatherName: 'John Doe',
+
+          motherName: 'Jane Doe',
         },
       },
     ]);
@@ -351,7 +385,7 @@ describe('StudentImportHandler', () => {
 
     expect(results[0]?.normalized?.semesterOverride).toBe(true);
 
-    expect(results[0]?.normalized?.currentSemester).toBe(3);
+    expect(results[0]?.normalized?.currentSemester).toBe(6);
   });
 
   it('parses CODE - Name dropdown values when resolving subject codes', () => {

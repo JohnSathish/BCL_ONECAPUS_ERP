@@ -28,4 +28,13 @@ describe('import-column-map', () => {
     expect(normalizeHeader('Previous College')).toBe('previousCollegeName');
     expect(normalizeHeader('Admission Type')).toBe('admissionType');
   });
+
+  it('maps college and NEHU roll headers from office registers', () => {
+    expect(normalizeHeader('Roll No.')).toBe('rollNumber');
+    expect(normalizeHeader('College Roll No')).toBe('rollNumber');
+    expect(normalizeHeader('NEHU ROLL NO.')).toBe('universityRollNumber');
+    expect(normalizeHeader('NEHU ROLL')).toBe('universityRollNumber');
+    expect(normalizeHeader('Board Roll Number')).toBe('boardRollNumber');
+    expect(normalizeHeader('Regd. No.')).toBe('universityRegistrationNumber');
+  });
 });
