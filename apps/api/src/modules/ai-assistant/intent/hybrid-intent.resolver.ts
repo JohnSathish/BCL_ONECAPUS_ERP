@@ -65,6 +65,19 @@ export class HybridIntentResolver {
     const columns = this.extractColumns(q);
     const format = this.extractFormat(lower);
 
+    // Live ERP: who opted / enrolled in a paper (must beat roll-id and Knowledge Base)
+    if (this.isPaperEnrolmentQuery(q, lower)) {
+      const searchQuery = this.extractPaperQuery(q);
+      return {
+        action: 'list_paper_students',
+        filters,
+        searchQuery,
+        question: q,
+        confidence: searchQuery ? 0.97 : 0.6,
+        needsClarification: searchQuery ? undefined : ['query'],
+      };
+    }
+
     // ERP-first: roll / admission / enrollment identifiers (e.g. BA25-814)
     const studentIdentifier = this.extractStudentIdentifier(q);
     if (studentIdentifier && !this.isStaffContext(lower)) {
@@ -89,19 +102,6 @@ export class HybridIntentResolver {
         searchQuery: activeStudent.rollNumber,
         lookupFocus: this.studentLookupFocus(lower),
         confidence: 0.96,
-      };
-    }
-
-    // Live ERP: who opted / enrolled in a paper (must beat Knowledge Base course-code routing)
-    if (this.isPaperEnrolmentQuery(q, lower)) {
-      const searchQuery = this.extractPaperQuery(q);
-      return {
-        action: 'list_paper_students',
-        filters,
-        searchQuery,
-        question: q,
-        confidence: searchQuery ? 0.97 : 0.6,
-        needsClarification: searchQuery ? undefined : ['query'],
       };
     }
 
@@ -705,6 +705,8 @@ export class HybridIntentResolver {
       /\bstudents?\b|\bstaff\b|\bfaculty\b|\bfee\b|\bpending\b|\bcollection\b|\battendance\b|\bdefaulter\b|\boutstanding\b|\breport\b|\bexcel\b|\bcsv\b|\bdownload\b|\bpromote\b|\bsms\b|\bemail\b/.test(
         lower,
       );
+    // Live roster questions must not be treated as curriculum KB just because a VTC/MDC code is present.
+    if (operational) return false;
     // Course codes from NEHU framework (MDC-110, VAC-140, AEC-120, …)
     if (/\b(?:MDC|AEC|SEC|VAC|SUB|VTC)[-\s]?\d{2,3}\b/i.test(q)) {
       return true;
@@ -722,7 +724,6 @@ export class HybridIntentResolver {
     ) {
       return true;
     }
-    if (operational) return false;
 
     if (
       /\b(mdc|aec|sec|vac)\b/.test(lower) &&

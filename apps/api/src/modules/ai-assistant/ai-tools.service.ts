@@ -350,8 +350,20 @@ export class AiToolsService {
     user: JwtUser,
     question: string,
   ): Promise<ToolResult> {
+    // Safety net: roster questions about a paper must hit live ERP, not a KB miss.
+    const reroute = this.intents.resolve(question);
+    if (
+      reroute.action === 'list_paper_students' &&
+      (reroute.searchQuery?.trim().length ?? 0) >= 2
+    ) {
+      return this.listPaperStudents(user, reroute.searchQuery!.trim());
+    }
+
     const answer = await this.knowledge.answer(user.tid, question);
     if (!answer) {
+      if (reroute.action === 'list_paper_students') {
+        return this.listPaperStudents(user, reroute.searchQuery ?? question);
+      }
       return {
         answer:
           'I could not find that in the institutional Knowledge Base yet. Upload curriculum or policy documents (e.g. NEHU Curriculum Framework) under Knowledge Base, or ask about live ERP data such as students and fees.',
