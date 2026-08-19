@@ -597,6 +597,24 @@ export class ElectiveStaffAllocationService {
       },
       data: { staffProfileId: dto.staffProfileId },
     });
+    // Programme grids (e.g. Sem 1 Garo) often hold the same MDC/VTC cell on a
+    // different offering section. Stamp the allotted faculty onto those slots too.
+    await this.prisma.timetablePlanEntry.updateMany({
+      where: {
+        tenantId: user.tid,
+        courseId: offering.courseId,
+        shiftId: dto.shiftId,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        ...(offering.semesterSequence != null
+          ? { semesterSequence: offering.semesterSequence }
+          : {}),
+      },
+      data: {
+        staffProfileId: dto.staffProfileId,
+        ...(dto.classroomId ? { classroomId: dto.classroomId } : {}),
+      },
+    });
 
     const conflicts: { type: string; message: string }[] = [];
     const skippedDays: {
