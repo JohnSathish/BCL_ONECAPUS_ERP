@@ -92,6 +92,19 @@ export class HybridIntentResolver {
       };
     }
 
+    // Live ERP: who opted / enrolled in a paper (must beat Knowledge Base course-code routing)
+    if (this.isPaperEnrolmentQuery(q, lower)) {
+      const searchQuery = this.extractPaperQuery(q);
+      return {
+        action: 'list_paper_students',
+        filters,
+        searchQuery,
+        question: q,
+        confidence: searchQuery ? 0.97 : 0.6,
+        needsClarification: searchQuery ? undefined : ['query'],
+      };
+    }
+
     // Hybrid: institutional knowledge + live ERP (e.g. Sem III students with pending fees)
     const hybrid = this.resolveHybridQuery(q, lower, filters);
     if (hybrid) return hybrid;
@@ -647,7 +660,45 @@ export class HybridIntentResolver {
    * Curriculum / policy questions answered from the institutional Knowledge Base.
    * Operational ERP questions (students, fees, attendance) are excluded unless hybrid.
    */
+  private isPaperEnrolmentQuery(q: string, lower: string) {
+    const asksStudents =
+      /\bstudents?\b/.test(lower) ||
+      /\broll\s*(no|number|numbers)?\b/.test(lower);
+    const enrolment =
+      /\b(opted|opt\b|enrolled|enrol|registered|took|taking|chosen|chose|selected|who\s+takes?|who\s+has)\b/.test(
+        lower,
+      );
+    const paper =
+      /\b(vtc|mdc|aec|sec|vac)\b/.test(lower) ||
+      /\b(?:MDC|AEC|SEC|VAC|VTC|SUB)[-:\s.]?\d{2,4}/i.test(q) ||
+      /\b(paper|course|subject)\b/.test(lower);
+    const listAsk = /\b(which|who|list|show|all|names?)\b/.test(lower);
+    return asksStudents && (enrolment || (listAsk && paper));
+  }
+
+  private extractPaperQuery(q: string): string | undefined {
+    const code = q.match(
+      /\b((?:MDC|AEC|SEC|VAC|VTC|SUB)[-:\s.]?\d{2,4}(?:\.\d+)?)\b/i,
+    );
+    if (code?.[1]) {
+      return code[1].replace(/\s+/g, '').replace(/:/g, '-');
+    }
+    const titled = q.match(
+      /\b(?:opted|opt|enrolled|enrol|registered|taking|took|for)\s+(.+?)(?:\s+list|\s+roll|\s*$)/i,
+    );
+    if (titled?.[1]) {
+      const cleaned = titled[1]
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/[–—]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return cleaned.length >= 3 ? cleaned : undefined;
+    }
+    return undefined;
+  }
+
   private isKnowledgeQuery(q: string, lower: string) {
+    if (this.isPaperEnrolmentQuery(q, lower)) return false;
     if (this.isRegulationKnowledgeQuery(lower)) return true;
 
     const operational =

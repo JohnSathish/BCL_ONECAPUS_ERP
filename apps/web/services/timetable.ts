@@ -832,6 +832,8 @@ export type ElectiveAllocationRow = {
   classroom?: string | null;
   capacity?: number;
   teachingDepartmentId?: string | null;
+  enrolledTotal?: number;
+  enrolledDepartments?: Array<{ name: string; students: number }>;
   status?: string | null;
   slots?: Array<{
     id: string;
@@ -915,7 +917,9 @@ export async function assignElectiveStaff(payload: {
   capacity?: number | null;
   workloadHours?: number | null;
   dayOfWeek?: number | null;
+  daysOfWeek?: number[];
   periodNo?: number | null;
+  saturdayPeriodNo?: number | null;
   startTime?: string | null;
   endTime?: string | null;
   planId?: string | null;
@@ -935,6 +939,16 @@ export async function assignElectiveStaff(payload: {
       startTime: string;
       endTime: string;
     } | null;
+    planEntries?: Array<{
+      id: string;
+      planId: string;
+      dayOfWeek: number;
+      dayName: string;
+      periodNo?: number | null;
+      startTime: string;
+      endTime: string;
+    }>;
+    skippedDays?: Array<{ dayOfWeek: number; dayName: string; reason: string }>;
     conflicts: Array<{ type: string; message: string }>;
   };
 }

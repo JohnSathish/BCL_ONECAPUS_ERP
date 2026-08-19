@@ -11,6 +11,7 @@ const TOOL_NAMES = [
   'search_staff',
   'search_applications',
   'search_subjects',
+  'list_paper_students',
   'search_departments',
   'profile_completion_summary',
   'generate_student_report',
@@ -49,6 +50,7 @@ Return ONLY valid JSON matching:
 {"action":"<tool>","confidence":0-1,"searchQuery":"","lookupFocus":"shift|programme|semester|fee|attendance|profile|who","columns":[],"format":"xlsx|csv|pdf","programmeFamily":"BA|BSC|BCOM","semester":null,"gender":"MALE|FEMALE","chartWidgetId":"department-admissions|fee-collection-trend|shift-attendance","feeReportType":"outstanding|daily-collection|monthly-collection","attendanceReportType":"shortage|daily","proposedAction":"sms|email|promote|certificates","actionHref":"","actionLabel":""}
 Tools: ${TOOL_NAMES.join(', ')}.
 When the user mentions a roll/admission number like BA25-814, use action lookup_student with searchQuery set to that code and lookupFocus for the field asked (shift, programme, fee, attendance, profile).
+When the user asks which students opted/enrolled in a paper (VTC/MDC/AEC/SEC/VAC or a course title), use list_paper_students with searchQuery set to the course code or title.
 Never invent SQL. Prefer generate_student_report for student lists/exports.
 For write actions (sms, email, promote, certificates) use propose_action.`;
 

@@ -31,10 +31,20 @@ type AssignForm = {
   classroomId: string;
   capacity: string;
   workloadHours: string;
-  dayOfWeek: string;
+  daysOfWeek: number[];
   periodNo: string;
+  saturdayPeriodNo: string;
   notes: string;
 };
+
+const WEEKDAYS = [
+  { dayOfWeek: 1, label: 'Mon' },
+  { dayOfWeek: 2, label: 'Tue' },
+  { dayOfWeek: 3, label: 'Wed' },
+  { dayOfWeek: 4, label: 'Thu' },
+  { dayOfWeek: 5, label: 'Fri' },
+  { dayOfWeek: 6, label: 'Sat' },
+] as const;
 
 const emptyForm = (): AssignForm => ({
   staffProfileId: '',
@@ -43,8 +53,9 @@ const emptyForm = (): AssignForm => ({
   classroomId: '',
   capacity: '',
   workloadHours: '',
-  dayOfWeek: '',
+  daysOfWeek: [1, 2, 3, 4, 5],
   periodNo: '',
+  saturdayPeriodNo: '',
   notes: '',
 });
 
@@ -150,35 +161,51 @@ export default function ElectiveStaffAllocationPage() {
     });
   }, [slotsQ.data]);
 
-  const dayChoices = useMemo(() => {
-    const map = new Map<number, string>();
+  const saturdayPeriodChoices = useMemo(() => {
+    const map = new Map<
+      number,
+      { periodNo: number; label: string; startTime: string; endTime: string }
+    >();
     for (const slot of slotsQ.data ?? []) {
-      map.set(slot.dayOfWeek, slot.dayName);
+      if (slot.dayOfWeek !== 6 || slot.periodNo <= 0) continue;
+      if (!map.has(slot.periodNo)) {
+        map.set(slot.periodNo, {
+          periodNo: slot.periodNo,
+          label: slot.label,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        });
+      }
     }
-    if (!map.size) {
-      [1, 2, 3, 4, 5, 6].forEach((d, i) =>
-        map.set(d, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i]!),
-      );
-    }
-    return [...map.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([dayOfWeek, dayName]) => ({ dayOfWeek, dayName }));
+    return [...map.values()].sort((a, b) => a.periodNo - b.periodNo);
   }, [slotsQ.data]);
 
   function openAssign(row: ElectiveAllocationRow) {
     setSelected(row);
     setError('');
     setSuccess('');
-    const firstSlot = row.slots?.[0];
+    const existingDays = [...new Set((row.slots ?? []).map((s) => s.dayOfWeek))].sort(
+      (a, b) => a - b,
+    );
+    const isVtc = (row.category ?? '').toUpperCase() === 'VTC';
+    const weekdaySlot = row.slots?.find((s) => s.dayOfWeek !== 6);
+    const saturdaySlot = row.slots?.find((s) => s.dayOfWeek === 6);
+    const defaultDays = existingDays.length
+      ? existingDays
+      : isVtc
+        ? [1, 2, 3, 4, 5, 6]
+        : [1, 2, 3, 4, 5];
     setForm({
       staffProfileId: row.staffProfileId ?? '',
       sectionCode: row.sectionCode ?? 'A',
-      teachingDepartmentId: row.teachingDepartmentId ?? row.homeDepartmentId ?? '',
+      teachingDepartmentId: '',
       classroomId: row.classroomId ?? '',
       capacity: row.capacity != null ? String(row.capacity) : '',
-      workloadHours: row.weeklyHours ? String(row.weeklyHours) : '',
-      dayOfWeek: firstSlot?.dayOfWeek != null ? String(firstSlot.dayOfWeek) : '',
-      periodNo: firstSlot?.periodNo != null ? String(firstSlot.periodNo) : '',
+      workloadHours: row.weeklyHours ? String(row.weeklyHours) : String(defaultDays.length),
+      daysOfWeek: defaultDays,
+      periodNo: weekdaySlot?.periodNo != null ? String(weekdaySlot.periodNo) : isVtc ? '4' : '',
+      saturdayPeriodNo:
+        saturdaySlot?.periodNo != null ? String(saturdaySlot.periodNo) : isVtc ? '2' : '',
       notes: '',
     });
   }
@@ -188,28 +215,46 @@ export default function ElectiveStaffAllocationPage() {
       if (!selected || !effectiveShiftId) throw new Error('Select a subject and shift');
       if (!form.staffProfileId) throw new Error('Select a faculty member');
       const period = periodChoices.find((p) => String(p.periodNo) === form.periodNo);
+      const daysOfWeek = form.daysOfWeek;
+      const includeSaturday = daysOfWeek.includes(6);
       return assignElectiveStaff({
         courseOfferingId: selected.courseOfferingId,
         shiftId: effectiveShiftId,
         staffProfileId: form.staffProfileId,
         sectionCode: form.sectionCode || 'A',
-        teachingDepartmentId: form.teachingDepartmentId || null,
-        classroomId: form.classroomId || null,
-        capacity: form.capacity ? Number(form.capacity) : null,
-        workloadHours: form.workloadHours ? Number(form.workloadHours) : null,
-        dayOfWeek: form.dayOfWeek ? Number(form.dayOfWeek) : null,
-        periodNo: form.periodNo ? Number(form.periodNo) : null,
-        startTime: period?.startTime ?? null,
-        endTime: period?.endTime ?? null,
-        timetablePlanEntryId: selected.slots?.[0]?.id ?? null,
-        notes: form.notes || null,
-        academicYearId: contextQ.data?.academicYears?.[0]?.id ?? null,
+        ...(form.teachingDepartmentId ? { teachingDepartmentId: form.teachingDepartmentId } : {}),
+        ...(form.classroomId ? { classroomId: form.classroomId } : {}),
+        ...(form.capacity ? { capacity: Number(form.capacity) } : {}),
+        workloadHours: form.workloadHours
+          ? Number(form.workloadHours)
+          : daysOfWeek.length || undefined,
+        ...(daysOfWeek.length === 1 ? { dayOfWeek: daysOfWeek[0] } : {}),
+        ...(daysOfWeek.length ? { daysOfWeek } : {}),
+        ...(form.periodNo ? { periodNo: Number(form.periodNo) } : {}),
+        ...(includeSaturday && form.saturdayPeriodNo
+          ? { saturdayPeriodNo: Number(form.saturdayPeriodNo) }
+          : {}),
+        ...(period?.startTime ? { startTime: period.startTime } : {}),
+        ...(period?.endTime ? { endTime: period.endTime } : {}),
+        ...(form.notes ? { notes: form.notes } : {}),
+        ...(contextQ.data?.academicYears?.[0]?.id
+          ? { academicYearId: contextQ.data.academicYears[0].id }
+          : {}),
       });
     },
     onSuccess: async (res) => {
+      const days = (res.planEntries ?? [])
+        .map((e) => {
+          const day = e.dayName?.slice(0, 3) ?? '';
+          return e.startTime && e.endTime ? `${day} ${e.startTime}–${e.endTime}` : day;
+        })
+        .filter(Boolean);
+      const skipped = (res.skippedDays ?? []).map((d) => `${d.dayName}: ${d.reason}`).join(' · ');
       setSuccess(
-        res.planEntry
-          ? `Assigned · slot ${res.planEntry.dayName} P${res.planEntry.periodNo ?? ''}`
+        days.length
+          ? `Assigned ${selected?.subjectCode ?? ''} · ${days.join(', ')}${
+              skipped ? `. Skipped ${skipped}` : ''
+            }`
           : 'Faculty assigned to elective section',
       );
       setError('');
@@ -416,11 +461,24 @@ export default function ElectiveStaffAllocationPage() {
               </Button>
             </div>
             <div className="space-y-3">
+              {error ? (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </p>
+              ) : null}
               <Field label="Faculty (any department)">
                 <select
                   className="h-10 w-full rounded-md border bg-card px-3 text-sm"
                   value={form.staffProfileId}
-                  onChange={(e) => setForm((f) => ({ ...f, staffProfileId: e.target.value }))}
+                  onChange={(e) => {
+                    const staffProfileId = e.target.value;
+                    const faculty = (facultyQ.data ?? []).find((f) => f.id === staffProfileId);
+                    setForm((f) => ({
+                      ...f,
+                      staffProfileId,
+                      teachingDepartmentId: f.teachingDepartmentId || faculty?.departmentId || '',
+                    }));
+                  }}
                 >
                   <option value="">Select faculty</option>
                   {(facultyQ.data ?? []).map((f) => (
@@ -433,6 +491,24 @@ export default function ElectiveStaffAllocationPage() {
                   ))}
                 </select>
               </Field>
+              {(selected.enrolledDepartments?.length ?? 0) > 0 ? (
+                <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs">
+                  <p className="font-semibold text-sky-900 dark:text-sky-100">
+                    Students who opted this paper ({selected.enrolledTotal ?? 0}) — already in this
+                    one section. You do not add their departments here.
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    {selected.enrolledDepartments
+                      ?.map((d) => `${d.name} (${d.students})`)
+                      .join(' · ')}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Every department&apos;s students who chose this VTC sit in this same section. You
+                  do not list student departments in the reporting field below.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Section / batch">
                   <Input
@@ -448,19 +524,23 @@ export default function ElectiveStaffAllocationPage() {
                   />
                 </Field>
               </div>
-              <Field label="Teaching department (reporting)">
+              <Field label="Workload reporting department (faculty HOD)">
                 <select
                   className="h-10 w-full rounded-md border bg-card px-3 text-sm"
                   value={form.teachingDepartmentId}
                   onChange={(e) => setForm((f) => ({ ...f, teachingDepartmentId: e.target.value }))}
                 >
-                  <option value="">Optional</option>
+                  <option value="">College-wide (all student departments)</option>
                   {(departmentsQ.data ?? []).map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Who reports this teaching load — for Kaushik Paul that is Computer Science. Leave
+                  College-wide if no single HOD should own it.
+                </p>
               </Field>
               <Field label="Room / Lab">
                 <select
@@ -477,35 +557,98 @@ export default function ElectiveStaffAllocationPage() {
                   ))}
                 </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Day">
+              <Field label="Weekday period (Mon–Fri)">
+                <select
+                  className="h-10 w-full rounded-md border bg-card px-3 text-sm"
+                  value={form.periodNo}
+                  onChange={(e) => setForm((f) => ({ ...f, periodNo: e.target.value }))}
+                >
+                  <option value="">No slot yet</option>
+                  {periodChoices.map((p) => (
+                    <option key={p.periodNo} value={p.periodNo}>
+                      {p.label} ({p.startTime}-{p.endTime})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {form.daysOfWeek.includes(6) ? (
+                <Field label="Saturday period">
                   <select
                     className="h-10 w-full rounded-md border bg-card px-3 text-sm"
-                    value={form.dayOfWeek}
-                    onChange={(e) => setForm((f) => ({ ...f, dayOfWeek: e.target.value }))}
+                    value={form.saturdayPeriodNo}
+                    onChange={(e) => setForm((f) => ({ ...f, saturdayPeriodNo: e.target.value }))}
                   >
-                    <option value="">No slot yet</option>
-                    {dayChoices.map((d) => (
-                      <option key={d.dayOfWeek} value={d.dayOfWeek}>
-                        {d.dayName}
-                      </option>
-                    ))}
+                    <option value="">Select Saturday period</option>
+                    {(saturdayPeriodChoices.length ? saturdayPeriodChoices : periodChoices)
+                      .filter((p) => p.periodNo > 0 && p.periodNo <= 3)
+                      .map((p) => (
+                        <option key={p.periodNo} value={p.periodNo}>
+                          {p.label} ({p.startTime}-{p.endTime})
+                        </option>
+                      ))}
                   </select>
                 </Field>
-                <Field label="Period">
-                  <select
-                    className="h-10 w-full rounded-md border bg-card px-3 text-sm"
-                    value={form.periodNo}
-                    onChange={(e) => setForm((f) => ({ ...f, periodNo: e.target.value }))}
+              ) : null}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">Repeat on</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((d) => {
+                    const active = form.daysOfWeek.includes(d.dayOfWeek);
+                    return (
+                      <button
+                        key={d.dayOfWeek}
+                        type="button"
+                        className={cn(
+                          'h-8 rounded-md border px-2.5 text-xs font-semibold',
+                          active
+                            ? 'border-sky-600 bg-sky-600 text-white'
+                            : 'border-border bg-card text-muted-foreground',
+                        )}
+                        onClick={() =>
+                          setForm((f) => {
+                            const adding = !f.daysOfWeek.includes(d.dayOfWeek);
+                            const next = adding
+                              ? [...f.daysOfWeek, d.dayOfWeek].sort((a, b) => a - b)
+                              : f.daysOfWeek.filter((n) => n !== d.dayOfWeek);
+                            return {
+                              ...f,
+                              daysOfWeek: next,
+                              saturdayPeriodNo:
+                                adding && d.dayOfWeek === 6 && !f.saturdayPeriodNo
+                                  ? '2'
+                                  : f.saturdayPeriodNo,
+                              workloadHours:
+                                !f.workloadHours || Number(f.workloadHours) === f.daysOfWeek.length
+                                  ? String(next.length || '')
+                                  : f.workloadHours,
+                            };
+                          })
+                        }
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className="h-8 rounded-md border border-border px-2.5 text-xs"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        daysOfWeek: [1, 2, 3, 4, 5, 6],
+                        saturdayPeriodNo: f.saturdayPeriodNo || '2',
+                        workloadHours: f.workloadHours || '6',
+                      }))
+                    }
                   >
-                    <option value="">No slot yet</option>
-                    {periodChoices.map((p) => (
-                      <option key={p.periodNo} value={p.periodNo}>
-                        {p.label} ({p.startTime}-{p.endTime})
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    Mon–Sat
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  College routine: VTC is Period 4 (12:40–13:25) Monday–Friday and Period 2
+                  (10:40–11:25) on Saturday. Tick Sat and set Saturday period — one save creates all
+                  slots.
+                </p>
               </div>
               <Field label="Weekly hours">
                 <Input

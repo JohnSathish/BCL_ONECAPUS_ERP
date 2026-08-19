@@ -107,6 +107,8 @@ export class AiToolsService {
         return this.searchApplications(user, intent.searchQuery ?? '');
       case 'search_subjects':
         return this.searchSubjects(user, intent.searchQuery ?? '');
+      case 'list_paper_students':
+        return this.listPaperStudents(user, intent.searchQuery ?? '');
       case 'search_departments':
         return this.searchDepartments(user, intent.searchQuery ?? '');
       case 'profile_completion_summary':
@@ -140,9 +142,8 @@ export class AiToolsService {
               ]
             : undefined,
           suggestedFollowUps: [
+            'Which students opted VTC-243.1?',
             'What is the credit for MDC-110?',
-            'Show Semester 1 course details',
-            'How many credits are required for FYUP?',
             'How many students have pending fees?',
           ],
         };
@@ -411,6 +412,8 @@ export class AiToolsService {
         search_applications:
           'Reply with an applicant name, application number, or email.',
         search_subjects: 'Reply with a subject or course code/title.',
+        list_paper_students:
+          'Which paper? Reply with a course code (e.g. VTC-243.1) or the paper title.',
         search_departments: 'Reply with a department name or code.',
       };
       return {
@@ -2018,6 +2021,223 @@ export class AiToolsService {
         totalRows: courses.length,
       },
       links: [{ label: 'Programmes', href: '/admin/programs' }],
+    };
+  }
+
+  private async listPaperStudents(user: JwtUser, query: string) {
+    this.assertPerm(user, AI_PERMS.students, 'student search');
+    const needle = query.trim();
+    if (needle.length < 2) {
+      return {
+        answer:
+          'Which paper? Reply with a course code (e.g. VTC-243.1) or the paper title.',
+        source: 'live' as const,
+      };
+    }
+    const codeNeedle = needle.replace(/\s+/g, '').replace(/:/g, '-');
+    const titleNeedle = needle
+      .replace(/\b(?:MDC|AEC|SEC|VAC|VTC|SUB)[-:]?\d{2,4}(?:\.\d+)?\b/gi, ' ')
+      .replace(/[-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const courses = await this.prisma.course.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        OR: [
+          { code: { contains: codeNeedle, mode: 'insensitive' } },
+          {
+            code: {
+              contains: codeNeedle.replace('-', ': '),
+              mode: 'insensitive',
+            },
+          },
+          ...(titleNeedle.length >= 4
+            ? [{ title: { contains: titleNeedle, mode: 'insensitive' } }]
+            : []),
+        ],
+      },
+      select: { id: true, code: true, title: true },
+      take: 12,
+      orderBy: { code: 'asc' },
+    });
+    if (!courses.length) {
+      return {
+        answer: `No paper matched “${needle}”. Check the course code (e.g. VTC-243.1) or title.`,
+        source: 'live' as const,
+        links: [
+          {
+            label: 'Elective staff allocation',
+            href: '/admin/academics/elective-staff-allocation',
+          },
+        ],
+      };
+    }
+
+    const courseIds = courses.map((c) => c.id);
+    const offeringIds = (
+      await this.prisma.courseOffering.findMany({
+        where: {
+          tenantId: user.tid,
+          deletedAt: null,
+          courseId: { in: courseIds },
+        },
+        select: { id: true },
+      })
+    ).map((o) => o.id);
+
+    const lines = offeringIds.length
+      ? await this.prisma.semesterRegistrationLine.findMany({
+          where: {
+            tenantId: user.tid,
+            offeringId: { in: offeringIds },
+            status: { notIn: ['rejected', 'dropped', 'cancelled'] },
+            registration: { student: { deletedAt: null } },
+          },
+          select: {
+            category: true,
+            offering: {
+              select: { course: { select: { code: true, title: true } } },
+            },
+            registration: {
+              select: {
+                semesterSequence: true,
+                status: true,
+                student: {
+                  select: {
+                    enrollmentNumber: true,
+                    rollNumber: true,
+                    masterProfile: { select: { fullName: true } },
+                    primaryShift: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+          take: 800,
+        })
+      : [];
+
+    const tracks = offeringIds.length
+      ? await this.prisma.studentVtcTrack.findMany({
+          where: {
+            tenantId: user.tid,
+            student: { deletedAt: null },
+            OR: [
+              { selectedSem3OfferingId: { in: offeringIds } },
+              { selectedSem4OfferingId: { in: offeringIds } },
+              { selectedSem6OfferingId: { in: offeringIds } },
+            ],
+          },
+          select: {
+            selectedSem3Offering: {
+              select: { course: { select: { code: true, title: true } } },
+            },
+            selectedSem4Offering: {
+              select: { course: { select: { code: true, title: true } } },
+            },
+            selectedSem6Offering: {
+              select: { course: { select: { code: true, title: true } } },
+            },
+            student: {
+              select: {
+                enrollmentNumber: true,
+                rollNumber: true,
+                masterProfile: { select: { fullName: true } },
+                primaryShift: { select: { name: true } },
+                academicStanding: { select: { currentSemesterSequence: true } },
+              },
+            },
+          },
+          take: 800,
+        })
+      : [];
+
+    const byRoll = new Map<
+      string,
+      {
+        roll: string;
+        name: string;
+        paper: string;
+        semester: string;
+        shift: string;
+      }
+    >();
+
+    for (const line of lines) {
+      const student = line.registration.student;
+      const roll = student.rollNumber || student.enrollmentNumber || '';
+      const key = roll || `${student.enrollmentNumber}`;
+      if (!key || byRoll.has(key)) continue;
+      byRoll.set(key, {
+        roll,
+        name: student.masterProfile?.fullName ?? '—',
+        paper: `${line.offering.course.code} · ${line.offering.course.title}`,
+        semester: String(line.registration.semesterSequence ?? '—'),
+        shift: student.primaryShift?.name ?? '—',
+      });
+    }
+    for (const track of tracks) {
+      const student = track.student;
+      const roll = student.rollNumber || student.enrollmentNumber || '';
+      const key = roll || student.enrollmentNumber || '';
+      if (!key || byRoll.has(key)) continue;
+      const paper =
+        track.selectedSem3Offering?.course ??
+        track.selectedSem4Offering?.course ??
+        track.selectedSem6Offering?.course;
+      byRoll.set(key, {
+        roll,
+        name: student.masterProfile?.fullName ?? '—',
+        paper: paper ? `${paper.code} · ${paper.title}` : needle,
+        semester: String(
+          student.academicStanding?.currentSemesterSequence ?? '—',
+        ),
+        shift: student.primaryShift?.name ?? '—',
+      });
+    }
+
+    const rows = [...byRoll.values()].sort((a, b) =>
+      a.roll.localeCompare(b.roll, undefined, { numeric: true }),
+    );
+    const paperLabel = courses
+      .map((c) => `${c.code} · ${c.title}`)
+      .slice(0, 3)
+      .join('; ');
+
+    if (!rows.length) {
+      return {
+        answer: `No students are registered for ${paperLabel} yet.`,
+        source: 'live' as const,
+        links: [
+          {
+            label: 'Elective staff allocation',
+            href: '/admin/academics/elective-staff-allocation',
+          },
+        ],
+      };
+    }
+
+    return {
+      answer: `${rows.length} student(s) opted ${paperLabel}. Roll numbers and names are in the table.`,
+      source: 'live' as const,
+      table: {
+        columns: [
+          { key: 'roll', label: 'Roll No.' },
+          { key: 'name', label: 'Name' },
+          { key: 'paper', label: 'Paper' },
+          { key: 'semester', label: 'Sem' },
+          { key: 'shift', label: 'Shift' },
+        ],
+        rows,
+        totalRows: rows.length,
+      },
+      links: [{ label: 'Student records', href: '/admin/students' }],
+      suggestedFollowUps: [
+        'Which students opted VTC-243.1?',
+        'Search students',
+      ],
     };
   }
 

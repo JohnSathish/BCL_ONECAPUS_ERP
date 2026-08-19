@@ -73,6 +73,7 @@ export type AiActionKind =
   | 'search_staff'
   | 'search_applications'
   | 'search_subjects'
+  | 'list_paper_students'
   | 'search_departments'
   | 'profile_completion_summary'
   | 'generate_chart'

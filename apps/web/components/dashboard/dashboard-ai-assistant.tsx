@@ -63,9 +63,9 @@ const ACTION_CARDS = [
     label: 'Academic',
     icon: GraduationCap,
     prompts: [
+      'Which students opted VTC-243.1?',
       'What is the credit for MDC-110?',
       'Show Semester 1 course details',
-      'Can Semester III students change their Major?',
       'Show all Semester III students with pending fees',
       'What is the attendance requirement?',
     ],

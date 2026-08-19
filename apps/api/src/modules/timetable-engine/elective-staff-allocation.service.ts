@@ -72,7 +72,9 @@ export type AssignElectiveDto = {
   capacity?: number | null;
   workloadHours?: number | string | null;
   dayOfWeek?: number | null;
+  daysOfWeek?: number[] | null;
   periodNo?: number | null;
+  saturdayPeriodNo?: number | null;
   startTime?: string | null;
   endTime?: string | null;
   planId?: string | null;
@@ -164,6 +166,11 @@ export class ElectiveStaffAllocationService {
       take: 500,
     });
 
+    const enrolledByOffering = await this.loadEnrolledDepartments(
+      user.tid,
+      offerings.map((o) => o.id),
+    );
+
     const sectionIds = offerings.flatMap((o) => o.sections.map((s) => s.id));
     const planEntries = sectionIds.length
       ? await this.prisma.timetablePlanEntry.findMany({
@@ -218,6 +225,9 @@ export class ElectiveStaffAllocationService {
           Number(course.theoryHoursPerWeek ?? 0) ||
           Number(course.credits ?? 0) ||
           0,
+        enrolledTotal: enrolledByOffering.get(offering.id)?.total ?? 0,
+        enrolledDepartments:
+          enrolledByOffering.get(offering.id)?.departments ?? [],
       };
 
       if (!offering.sections.length) {
@@ -576,38 +586,29 @@ export class ElectiveStaffAllocationService {
       academicYearId: dto.academicYearId ?? undefined,
     });
 
-    let planEntry: {
+    const conflicts: { type: string; message: string }[] = [];
+    const skippedDays: {
+      dayOfWeek: number;
+      dayName: string;
+      reason: string;
+    }[] = [];
+    const scheduledDays: {
       id: string;
       planId: string;
       dayOfWeek: number;
       periodNo: number | null;
       startTime: Date;
       endTime: Date;
-    } | null = null;
-    const conflicts: { type: string; message: string }[] = [];
+    }[] = [];
 
+    const days = this.normalizeAssignDays(dto);
     const wantsSlot =
-      dto.dayOfWeek != null &&
-      (dto.periodNo != null || (dto.startTime && dto.endTime));
+      days.length > 0 &&
+      (dto.periodNo != null ||
+        dto.saturdayPeriodNo != null ||
+        Boolean(dto.startTime && dto.endTime));
 
     if (wantsSlot) {
-      const dayOfWeek = Number(dto.dayOfWeek);
-      if (dayOfWeek < 1 || dayOfWeek > 7) {
-        throw new BadRequestException('dayOfWeek must be 1–7 (Mon–Sun)');
-      }
-      const period =
-        dto.periodNo != null
-          ? DEFAULT_PERIODS.find((p) => p.periodNo === Number(dto.periodNo))
-          : null;
-      const startTime = this.parseTime(
-        dto.startTime ?? period?.start ?? '09:45',
-      );
-      const endTime = this.parseTime(dto.endTime ?? period?.end ?? '10:40');
-      const periodNo =
-        dto.periodNo != null
-          ? Number(dto.periodNo)
-          : (period?.periodNo ?? null);
-
       const plan = await this.resolvePlan(
         user,
         dto.shiftId,
@@ -616,115 +617,167 @@ export class ElectiveStaffAllocationService {
         offering.semesterSequence,
       );
 
-      await this.ensureConflictFree(
-        user.tid,
-        {
-          excludeEntryId: dto.timetablePlanEntryId ?? undefined,
-          dayOfWeek,
-          periodNo,
-          startTime,
-          endTime,
-          staffProfileId: dto.staffProfileId,
-          classroomId: dto.classroomId ?? section.classroomId,
-        },
-        conflicts,
-      );
-      if (
-        conflicts.some(
-          (c) => c.type === 'FACULTY_CLASH' || c.type === 'ROOM_CLASH',
-        )
-      ) {
-        throw new BadRequestException({
-          message: conflicts.map((c) => c.message).join(' · '),
-          conflicts,
-        });
-      }
-
-      if (dto.timetablePlanEntryId) {
-        const existing = await this.prisma.timetablePlanEntry.findFirst({
-          where: {
-            tenantId: user.tid,
-            id: dto.timetablePlanEntryId,
-            deletedAt: null,
-          },
-        });
-        if (!existing) {
-          throw new NotFoundException('Timetable entry not found');
+      const allSlots = await this.listSlotOptions(user, dto.shiftId);
+      const repeat = days.length > 1;
+      for (const dayOfWeek of days) {
+        if (dayOfWeek < 1 || dayOfWeek > 7) {
+          throw new BadRequestException('dayOfWeek must be 1–7 (Mon–Sun)');
         }
-        planEntry = await this.prisma.timetablePlanEntry.update({
-          where: { id: existing.id },
-          data: {
-            planId: plan.id,
-            shiftId: dto.shiftId,
+        const { periodNo, startTime, endTime } = this.resolveDayPeriod(
+          dto,
+          dayOfWeek,
+        );
+        const dayHasPeriod = allSlots.some(
+          (slot) =>
+            slot.dayOfWeek === dayOfWeek &&
+            (periodNo == null || slot.periodNo === periodNo),
+        );
+        if (!dayHasPeriod) {
+          skippedDays.push({
+            dayOfWeek,
+            dayName: DAY_NAMES[dayOfWeek] ?? `Day ${dayOfWeek}`,
+            reason:
+              dayOfWeek === 6
+                ? `Saturday only has periods 1–3. Set Saturday period to Period 2 (10:40–11:25) for VTC — Period ${periodNo ?? ''} is not on the Saturday grid.`
+                : `Period ${periodNo ?? ''} is not on the ${DAY_NAMES[dayOfWeek]} grid`,
+          });
+          continue;
+        }
+
+        const dayConflicts: { type: string; message: string }[] = [];
+        await this.ensureConflictFree(
+          user.tid,
+          {
+            excludeEntryId: repeat
+              ? undefined
+              : (dto.timetablePlanEntryId ?? undefined),
+            excludeOfferingSectionId: section.id,
             dayOfWeek,
             periodNo,
             startTime,
             endTime,
-            offeringSectionId: section.id,
-            courseOfferingId: offering.id,
-            courseId: offering.courseId,
             staffProfileId: dto.staffProfileId,
             classroomId: dto.classroomId ?? section.classroomId,
-            semesterSequence: offering.semesterSequence,
-            sectionCode: section.sectionCode,
-            fyugpCategory: category,
-            slotType: 'THEORY',
-            status: 'SCHEDULED',
-            source: 'MANUAL',
-            notes: dto.notes ?? existing.notes,
-            metadata: {
-              ...((existing.metadata ?? {}) as object),
-              electiveAllocation: true,
-              teachingDepartmentId: dto.teachingDepartmentId ?? null,
-              assignedById: user.sub,
-              assignedAt: new Date().toISOString(),
-            },
           },
-        });
-      } else {
-        // Soft-replace prior elective slots for this section+day+period
+          dayConflicts,
+        );
+        if (
+          dayConflicts.some(
+            (c) => c.type === 'FACULTY_CLASH' || c.type === 'ROOM_CLASH',
+          )
+        ) {
+          throw new BadRequestException({
+            message: dayConflicts.map((c) => c.message).join(' · '),
+            conflicts: dayConflicts,
+          });
+        }
+        conflicts.push(...dayConflicts);
+
+        const updateExisting =
+          !repeat && dto.timetablePlanEntryId
+            ? await this.prisma.timetablePlanEntry.findFirst({
+                where: {
+                  tenantId: user.tid,
+                  id: dto.timetablePlanEntryId,
+                  deletedAt: null,
+                },
+              })
+            : null;
+
+        if (updateExisting) {
+          scheduledDays.push(
+            await this.prisma.timetablePlanEntry.update({
+              where: { id: updateExisting.id },
+              data: {
+                planId: plan.id,
+                shiftId: dto.shiftId,
+                dayOfWeek,
+                periodNo,
+                startTime,
+                endTime,
+                offeringSectionId: section.id,
+                courseOfferingId: offering.id,
+                courseId: offering.courseId,
+                staffProfileId: dto.staffProfileId,
+                classroomId: dto.classroomId ?? section.classroomId,
+                semesterSequence: offering.semesterSequence,
+                sectionCode: section.sectionCode,
+                fyugpCategory: category,
+                slotType: 'THEORY',
+                status: 'SCHEDULED',
+                source: 'MANUAL',
+                notes: dto.notes ?? updateExisting.notes,
+                metadata: {
+                  ...((updateExisting.metadata ?? {}) as object),
+                  electiveAllocation: true,
+                  teachingDepartmentId: dto.teachingDepartmentId ?? null,
+                  assignedById: user.sub,
+                  assignedAt: new Date().toISOString(),
+                },
+              },
+            }),
+          );
+          continue;
+        }
+
         await this.prisma.timetablePlanEntry.updateMany({
           where: {
             tenantId: user.tid,
             offeringSectionId: section.id,
             dayOfWeek,
-            ...(periodNo != null ? { periodNo } : {}),
             deletedAt: null,
             status: { not: 'CANCELLED' },
           },
           data: { deletedAt: new Date(), status: 'CANCELLED' },
         });
-        planEntry = await this.prisma.timetablePlanEntry.create({
-          data: {
-            tenantId: user.tid,
-            planId: plan.id,
-            shiftId: dto.shiftId,
-            dayOfWeek,
-            periodNo,
-            startTime,
-            endTime,
-            offeringSectionId: section.id,
-            courseOfferingId: offering.id,
-            courseId: offering.courseId,
-            staffProfileId: dto.staffProfileId,
-            classroomId: dto.classroomId ?? section.classroomId,
-            semesterSequence: offering.semesterSequence,
-            sectionCode: section.sectionCode,
-            fyugpCategory: category,
-            slotType: 'THEORY',
-            status: 'SCHEDULED',
-            source: 'MANUAL',
-            notes: dto.notes ?? null,
-            metadata: {
-              electiveAllocation: true,
-              teachingDepartmentId: dto.teachingDepartmentId ?? null,
-              assignedById: user.sub,
-              assignedAt: new Date().toISOString(),
+        scheduledDays.push(
+          await this.prisma.timetablePlanEntry.create({
+            data: {
+              tenantId: user.tid,
+              planId: plan.id,
+              shiftId: dto.shiftId,
+              dayOfWeek,
+              periodNo,
+              startTime,
+              endTime,
+              offeringSectionId: section.id,
+              courseOfferingId: offering.id,
+              courseId: offering.courseId,
+              staffProfileId: dto.staffProfileId,
+              classroomId: dto.classroomId ?? section.classroomId,
+              semesterSequence: offering.semesterSequence,
+              sectionCode: section.sectionCode,
+              fyugpCategory: category,
+              slotType: 'THEORY',
+              status: 'SCHEDULED',
+              source: 'MANUAL',
+              notes: dto.notes ?? null,
+              metadata: {
+                electiveAllocation: true,
+                teachingDepartmentId: dto.teachingDepartmentId ?? null,
+                assignedById: user.sub,
+                assignedAt: new Date().toISOString(),
+              },
             },
+          }),
+        );
+      }
+
+      if (days.length) {
+        await this.prisma.timetablePlanEntry.updateMany({
+          where: {
+            tenantId: user.tid,
+            offeringSectionId: section.id,
+            dayOfWeek: { notIn: days },
+            deletedAt: null,
+            status: { not: 'CANCELLED' },
           },
+          data: { deletedAt: new Date(), status: 'CANCELLED' },
         });
       }
     }
+
+    const planEntry = scheduledDays[0] ?? null;
 
     const rows = await this.listRows(user, {
       shiftId: dto.shiftId,
@@ -748,8 +801,120 @@ export class ElectiveStaffAllocationService {
             endTime: this.formatTime(planEntry.endTime),
           }
         : null,
+      planEntries: scheduledDays.map((entry) => ({
+        id: entry.id,
+        planId: entry.planId,
+        dayOfWeek: entry.dayOfWeek,
+        dayName: DAY_NAMES[entry.dayOfWeek],
+        periodNo: entry.periodNo,
+        startTime: this.formatTime(entry.startTime),
+        endTime: this.formatTime(entry.endTime),
+      })),
+      skippedDays,
       conflicts,
     };
+  }
+
+  private resolveDayPeriod(
+    dto: AssignElectiveDto,
+    dayOfWeek: number,
+  ): { periodNo: number | null; startTime: Date; endTime: Date } {
+    const isSaturday = dayOfWeek === 6;
+    const periodNo =
+      isSaturday && dto.saturdayPeriodNo != null
+        ? Number(dto.saturdayPeriodNo)
+        : dto.periodNo != null
+          ? Number(dto.periodNo)
+          : null;
+    const period =
+      periodNo != null
+        ? DEFAULT_PERIODS.find((p) => p.periodNo === periodNo)
+        : null;
+    const startSrc = isSaturday
+      ? (period?.start ?? '10:40')
+      : (dto.startTime ?? period?.start ?? '09:45');
+    const endSrc = isSaturday
+      ? (period?.end ?? '11:25')
+      : (dto.endTime ?? period?.end ?? '10:40');
+    return {
+      periodNo,
+      startTime: this.parseTime(startSrc),
+      endTime: this.parseTime(endSrc),
+    };
+  }
+
+  private normalizeAssignDays(dto: AssignElectiveDto): number[] {
+    const fromList = (dto.daysOfWeek ?? [])
+      .map((d) => Number(d))
+      .filter((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+    if (fromList.length) {
+      return [...new Set(fromList)].sort((a, b) => a - b);
+    }
+    if (dto.dayOfWeek != null) return [Number(dto.dayOfWeek)];
+    return [];
+  }
+
+  private async loadEnrolledDepartments(
+    tenantId: string,
+    offeringIds: string[],
+  ) {
+    const empty = new Map<
+      string,
+      { total: number; departments: Array<{ name: string; students: number }> }
+    >();
+    if (!offeringIds.length) return empty;
+    const lines = await this.prisma.semesterRegistrationLine.findMany({
+      where: {
+        tenantId,
+        offeringId: { in: offeringIds },
+        status: { notIn: ['rejected'] },
+        registration: { student: { deletedAt: null } },
+      },
+      select: {
+        offeringId: true,
+        registration: {
+          select: {
+            student: {
+              select: {
+                department: { select: { name: true } },
+                programVersion: {
+                  select: {
+                    program: {
+                      select: {
+                        name: true,
+                        department: { select: { name: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const counts = new Map<string, Map<string, number>>();
+    for (const line of lines) {
+      const dept =
+        line.registration.student.department?.name ??
+        line.registration.student.programVersion?.program.department?.name ??
+        line.registration.student.programVersion?.program.name ??
+        'Unassigned';
+      const byDept = counts.get(line.offeringId) ?? new Map<string, number>();
+      byDept.set(dept, (byDept.get(dept) ?? 0) + 1);
+      counts.set(line.offeringId, byDept);
+    }
+    const result = empty;
+    for (const [offeringId, byDept] of counts) {
+      const departments = [...byDept.entries()]
+        .map(([name, students]) => ({ name, students }))
+        .sort((a, b) => b.students - a.students);
+      result.set(offeringId, {
+        total: departments.reduce((sum, row) => sum + row.students, 0),
+        departments,
+      });
+    }
+    return result;
   }
 
   private async resolvePlan(
@@ -803,6 +968,7 @@ export class ElectiveStaffAllocationService {
     tenantId: string,
     input: {
       excludeEntryId?: string;
+      excludeOfferingSectionId?: string;
       dayOfWeek: number;
       periodNo: number | null;
       startTime: Date;
@@ -820,6 +986,9 @@ export class ElectiveStaffAllocationService {
         staffProfileId: input.staffProfileId,
         dayOfWeek: input.dayOfWeek,
         ...(input.excludeEntryId ? { id: { not: input.excludeEntryId } } : {}),
+        ...(input.excludeOfferingSectionId
+          ? { offeringSectionId: { not: input.excludeOfferingSectionId } }
+          : {}),
         ...(input.periodNo != null
           ? { periodNo: input.periodNo }
           : {
@@ -846,6 +1015,9 @@ export class ElectiveStaffAllocationService {
           dayOfWeek: input.dayOfWeek,
           ...(input.excludeEntryId
             ? { id: { not: input.excludeEntryId } }
+            : {}),
+          ...(input.excludeOfferingSectionId
+            ? { offeringSectionId: { not: input.excludeOfferingSectionId } }
             : {}),
           ...(input.periodNo != null
             ? { periodNo: input.periodNo }
