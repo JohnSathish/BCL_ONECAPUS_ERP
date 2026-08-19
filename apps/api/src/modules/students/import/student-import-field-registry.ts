@@ -754,6 +754,7 @@ export const FULL_ADMISSION_HIDDEN_SHEETS = {
   sem1Aec: 'FA Sem1 AEC',
   sem1Sec: 'FA Sem1 SEC',
   sem1AllMinors: 'FA Sem1 Minor Depts',
+  sem1MinorsByMajor: 'FA Sem1 Minors By Major',
   sem3MajorDepartments: 'FA Sem3 Majors',
   sem3Mdc: 'FA Sem3 MDC',
   sem3Aec: 'FA Sem3 AEC',
@@ -774,7 +775,7 @@ export const FULL_ADMISSION_STRUCTURE_NOTES = [
   'Sem 3: Major Department auto-assigns two major papers; no Minor column.',
   'Sem 5: Major Department auto-assigns three major papers + Minor + Internship.',
   'Use department and paper titles from dropdowns — never enter raw course codes.',
-  'Minor Department lists all NEP minors — the import validates the major/minor pairing.',
+  'Minor Department lists allowed NEP minors for the selected Major (official First Semester combination table).',
   "Father's Name and Mother's Name are mandatory for new admissions.",
   'Photo File Name is optional — use the Photo Bulk Upload tool if not embedding photos.',
 ];

@@ -234,4 +234,60 @@ describe('Sem5ImportCurriculumService', () => {
     ]);
     expect(minors.map((row) => row.departmentName)).toEqual(['Garo']);
   });
+
+  it('resolveMinorDepartmentOptionAcrossCatalogs finds a minor on another programme catalog', () => {
+    const chemistryCatalog = {
+      programVersionId: 'pv-che',
+      programCode: 'BSC-CHE',
+      programName: 'B.Sc Chemistry',
+      curriculumLabel: 'FYUGP',
+      semesterSequence: 5 as const,
+      shiftId: 'day',
+      majorDepartments: [],
+      minorDepartments: [
+        {
+          departmentName: 'Mathematics',
+          subjectSlug: 'mathematics',
+          paper: {
+            title: 'Minor',
+            code: 'MTH-302',
+            courseId: 'c-mth',
+            offeringId: 'o-mth',
+          },
+        },
+      ],
+      internshipAreas: [],
+      minorByMajor: { chemistry: ['Mathematics', 'Physics'] },
+    };
+    const zoologyCatalog = {
+      ...chemistryCatalog,
+      programVersionId: 'pv-zoo',
+      programCode: 'BSC-ZOO',
+      programName: 'B.Sc Zoology',
+      minorDepartments: [
+        {
+          departmentName: 'Botany',
+          subjectSlug: 'botany',
+          paper: {
+            title: 'Minor',
+            code: 'BOT-302',
+            courseId: 'c-bot',
+            offeringId: 'o-bot',
+          },
+        },
+      ],
+      minorByMajor: { zoology: ['Botany', 'Chemistry'] },
+    };
+
+    expect(
+      service.resolveMinorDepartmentOption(chemistryCatalog, 'Botany'),
+    ).toBeUndefined();
+    expect(
+      service.resolveMinorDepartmentOptionAcrossCatalogs(
+        [chemistryCatalog, zoologyCatalog],
+        'Botany',
+        'day',
+      )?.paper.code,
+    ).toBe('BOT-302');
+  });
 });

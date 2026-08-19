@@ -36,6 +36,24 @@ describe('MajorMinorEligibilityService', () => {
       name: 'Sociology',
       programmeGroup: 'ARTS',
     },
+    education: {
+      id: 'sub-edn',
+      slug: 'education',
+      name: 'Education',
+      programmeGroup: 'ARTS',
+    },
+    garo: {
+      id: 'sub-gar',
+      slug: 'garo',
+      name: 'Garo',
+      programmeGroup: 'ARTS',
+    },
+    philosophy: {
+      id: 'sub-phi',
+      slug: 'philosophy',
+      name: 'Philosophy',
+      programmeGroup: 'ARTS',
+    },
     physics: {
       id: 'sub-phy',
       slug: 'physics',
@@ -273,6 +291,28 @@ describe('MajorMinorEligibilityService', () => {
     ]);
   });
 
+  it('falls back to seeded rules when the programme minor catalog omits them', async () => {
+    mockCurriculumOfferings(['education'], ['economics']);
+    mockAcademicSubjects(['education', 'garo', 'history', 'philosophy']);
+    prisma.majorMinorRule.findMany.mockResolvedValue([
+      { allowedMinorSubject: subjects.garo },
+      { allowedMinorSubject: subjects.history },
+      { allowedMinorSubject: subjects.philosophy },
+    ]);
+
+    const minors = await service.listEligibleMinors(
+      tenantId,
+      programVersionId,
+      'education',
+      1,
+    );
+    expect(minors.map((m) => m.slug).sort()).toEqual([
+      'garo',
+      'history',
+      'philosophy',
+    ]);
+  });
+
   it('allows Accounting for Business with Economics, Mathematics, Geography and blocks Chemistry', async () => {
     mockAcademicSubjects([
       'accounting-for-business',
@@ -282,11 +322,24 @@ describe('MajorMinorEligibilityService', () => {
       'chemistry',
     ]);
 
-    prisma.majorMinorRule.findMany.mockResolvedValue([
-      { allowedMinorSubject: subjects.economics },
-      { allowedMinorSubject: subjects.mathematics },
-      { allowedMinorSubject: subjects.geography },
-    ]);
+    prisma.majorMinorRule.findMany.mockImplementation(
+      async (args: {
+        where: { majorSubjectId: string; allowedMinorSubjectId?: string };
+      }) => {
+        const allowed = new Set(['sub-eco', 'sub-mth', 'sub-geo']);
+        const minorId = args.where.allowedMinorSubjectId;
+        if (minorId) {
+          return allowed.has(minorId)
+            ? [{ allowedMinorSubject: { id: minorId } }]
+            : [];
+        }
+        return [
+          { allowedMinorSubject: subjects.economics },
+          { allowedMinorSubject: subjects.mathematics },
+          { allowedMinorSubject: subjects.geography },
+        ];
+      },
+    );
 
     prisma.majorMinorRule.findFirst.mockImplementation(
       async (args: {
@@ -321,6 +374,7 @@ describe('MajorMinorEligibilityService', () => {
 
   it('rejects Economics + Physics with INVALID_MAJOR_MINOR_PAIR', async () => {
     mockAcademicSubjects(['economics', 'physics']);
+    prisma.majorMinorRule.findMany.mockResolvedValue([]);
     prisma.majorMinorRule.findFirst.mockResolvedValue(null);
 
     const result = await service.validateMajorMinorPair(

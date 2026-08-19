@@ -740,10 +740,10 @@ export class AuthService {
         WHERE s.tenant_id = ${tenantId}::uuid
           AND s.deleted_at IS NULL
           AND (
-            upper(regexp_replace(coalesce(s.roll_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
-            OR upper(regexp_replace(coalesce(s.enrollment_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
-            OR upper(regexp_replace(coalesce(s.university_roll_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
-            OR upper(regexp_replace(coalesce(s.university_registration_number, ''), '[\s\-_.]', '', 'g')) = ${compact}
+            upper(translate(coalesce(s.roll_number, ''), ' -_.', '')) = ${compact}
+            OR upper(translate(coalesce(s.enrollment_number, ''), ' -_.', '')) = ${compact}
+            OR upper(translate(coalesce(s.university_roll_number, ''), ' -_.', '')) = ${compact}
+            OR upper(translate(coalesce(s.university_registration_number, ''), ' -_.', '')) = ${compact}
           )
         LIMIT 1
       `;

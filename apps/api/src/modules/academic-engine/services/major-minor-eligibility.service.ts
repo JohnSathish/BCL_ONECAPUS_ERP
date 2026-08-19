@@ -376,7 +376,9 @@ export class MajorMinorEligibilityService {
     const eligibleSlugs = [...allowedSlugs].filter((slug) =>
       programmeMinorSlugs.has(slug),
     );
-    if (eligibleSlugs.length === 0) return [];
+    const slugsForLookup =
+      eligibleSlugs.length > 0 ? eligibleSlugs : [...allowedSlugs];
+    if (slugsForLookup.length === 0) return [];
 
     const subjects = await this.prisma.academicSubject.findMany({
       where: {
@@ -384,7 +386,7 @@ export class MajorMinorEligibilityService {
         institutionId,
         isActive: true,
         deletedAt: null,
-        slug: { in: eligibleSlugs },
+        slug: { in: slugsForLookup },
       },
       include: { department: { select: { id: true, name: true, code: true } } },
       orderBy: { name: 'asc' },

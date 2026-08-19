@@ -1979,11 +1979,38 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             'Minor Department is required for Semester 1 import.',
           );
         } else {
-          const minorOption = this.sem1Curriculum.resolveMinorDepartment(
+          const extraDepartments = ctx.sem1Catalogs
+            ? [...ctx.sem1Catalogs.values()].flatMap((entry) => [
+                ...entry.minorDepartments,
+                ...entry.majorDepartments,
+              ])
+            : [];
+          let minorOption = this.sem1Curriculum.resolveMinorDepartment(
             catalog,
             department.departmentName,
             minorDepartment,
+            extraDepartments,
           );
+          if (!minorOption) {
+            const exception = this.firstText(raw, [
+              'principalCombinationException',
+              'majorMinorException',
+            ]);
+            if (exception && /principal/i.test(exception)) {
+              const normalized =
+                this.sem1Curriculum.normalizeLabel(minorDepartment);
+              minorOption = extraDepartments.find(
+                (entry) =>
+                  this.sem1Curriculum.normalizeLabel(entry.departmentName) ===
+                  normalized,
+              );
+              if (minorOption) {
+                ctx.warnings.push(
+                  `Unofficial major-minor pair ${department.departmentName} + ${minorDepartment} imported under Principal exception.`,
+                );
+              }
+            }
+          }
           if (!minorOption) {
             ctx.errors.push(
               `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
@@ -2628,6 +2655,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
             department.departmentName,
             minorDepartment,
           );
+          const exception = this.firstText(raw, [
+            'principalCombinationException',
+            'majorMinorException',
+          ]);
+          const principalException = Boolean(
+            exception && /principal/i.test(exception),
+          );
           const overrideAllowed = !allowedMinor
             ? this.matchesStudentMajorMinorOverride({
                 majorDepartment: department.departmentName,
@@ -2637,8 +2671,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
                 programVersionId: ctx.programVersionId,
                 shiftId: ctx.shiftId,
                 fyugp: ctx.fyugp,
-              })
+              }) || principalException
             : false;
+          if (!allowedMinor && principalException) {
+            ctx.warnings.push(
+              `Unofficial major-minor pair ${department.departmentName} + ${minorDepartment} imported under Principal exception.`,
+            );
+          }
           if (!allowedMinor && !overrideAllowed) {
             ctx.errors.push(
               this.sem5Curriculum.formatInvalidMinorMessage(
@@ -2652,7 +2691,14 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
               this.sem5Curriculum.resolveMinorDepartmentOption(
                 catalog,
                 minorDepartment,
-              );
+              ) ??
+              (principalException
+                ? this.sem5Curriculum.resolveMinorDepartmentOptionAcrossCatalogs(
+                    ctx.sem5Catalogs ? [...ctx.sem5Catalogs.values()] : [],
+                    minorDepartment,
+                    ctx.shiftId,
+                  )
+                : undefined);
             if (!minorOption) {
               ctx.errors.push(
                 `Minor Department "${minorDepartment}" is not configured in Semester 5 curriculum.`,
@@ -3236,9 +3282,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       semesterNeeds.sem7;
 
     return {
-      programVersionIds: hasScopedPairs
-        ? [...programVersionIds]
-        : ctx.allProgramVersionIds,
+      programVersionIds:
+        semesterNeeds.sem1 || !hasScopedPairs
+          ? ctx.allProgramVersionIds
+          : [...programVersionIds],
       shiftIds: hasScopedPairs ? [...shiftIds] : ctx.allShiftIds,
       semesterNeeds: hasSemesterNeeds
         ? semesterNeeds
@@ -4750,7 +4797,10 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
   private normalizeImportBloodGroup(value: string) {
     if (!value) return '';
-    const text = value.trim().replace(/\u2212/g, '-');
+    const text = value
+      .trim()
+      .replace(/\u2212/g, '-')
+      .replace(/\s+/g, '');
     const upper = text.toUpperCase();
     if (['NOT CHECKED', 'NA', 'N/A', 'UNKNOWN', 'NIL'].includes(upper)) {
       return '';
@@ -4760,6 +4810,9 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (/^A\+VE$/i.test(text)) return 'A+';
     if (/^B\+VE$/i.test(text)) return 'B+';
     if (/^AB\+VE$/i.test(text)) return 'AB+';
+    if (/^(A|B|O|AB)\+V$/i.test(text)) {
+      return `${text.replace(/\+V$/i, '').toUpperCase()}+`;
+    }
     if (/^(A|B|O|AB)$/i.test(text)) return `${upper}+`;
     if (/^(A|B|O|AB)[+-]$/i.test(text)) {
       const group = text.slice(0, -1).toUpperCase();
@@ -5186,6 +5239,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       sem3MajorDepartments,
       sem5MajorDepartments,
       sem5TenantMinorByMajor,
+      sem1TenantMinorByMajor,
       batches,
       streams,
       shifts,
@@ -5232,6 +5286,11 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         options.tenantId,
         options.shiftId,
         options.academicYearId,
+      ),
+      this.sem1Curriculum.buildTenantMinorByMajor(
+        options.tenantId,
+        1,
+        options.shiftId,
       ),
       this.prisma.admissionBatch.findMany({
         where: { tenantId: options.tenantId, deletedAt: null },
@@ -5410,9 +5469,16 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
 
     const allSem1Minors = [
       ...new Set(
-        Object.values(sem1Catalog.minorByMajor).flatMap((minors) => minors),
+        Object.values(sem1TenantMinorByMajor).flatMap((minors) => minors),
       ),
     ].sort((a, b) => a.localeCompare(b));
+    const sem1MinorsByMajorRows = sem1MajorDepartments.map((major) => {
+      const minors =
+        sem1TenantMinorByMajor[
+          this.sem1Curriculum.normalizeLabel(major.departmentName)
+        ] ?? [];
+      return [major.departmentName, ...minors];
+    });
     const sem5MinorsByMajorRows = sem5MajorDepartments.map((major) => {
       const minors =
         sem5TenantMinorByMajor[
@@ -5512,6 +5578,19 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         name: FULL_ADMISSION_HIDDEN_SHEETS.sem1AllMinors,
         headers: ['Minor Department'],
         rows: allSem1Minors.map((minor) => [minor]),
+        hidden: true,
+      },
+      {
+        name: FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
+        headers: [
+          'Major Department',
+          'Minor 1',
+          'Minor 2',
+          'Minor 3',
+          'Minor 4',
+          'Minor 5',
+        ],
+        rows: sem1MinorsByMajorRows,
         hidden: true,
       },
       {
@@ -5641,6 +5720,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       sheet,
       headers,
       hiddenSheets,
+      sem1MajorDepartments.length,
       sem5MajorDepartments.length,
     );
 
@@ -5652,6 +5732,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     sheet: ExcelJS.Worksheet,
     headers: string[],
     references: { name: string; rows: (string | number | null)[][] }[],
+    sem1MajorDepartmentCount: number,
     sem5MajorDepartmentCount: number,
   ) {
     const refByName = new Map(references.map((ref) => [ref.name, ref]));
@@ -5715,10 +5796,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1MajorDepartments,
         column: 'A',
       },
-      'Minor Department': {
-        refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1AllMinors,
-        column: 'A',
-      },
       MDC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Mdc, column: 'A' },
       AEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Aec, column: 'A' },
       SEC: { refName: FULL_ADMISSION_HIDDEN_SHEETS.sem1Sec, column: 'A' },
@@ -5762,6 +5839,32 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
           config.column ?? 'A',
         ),
         { allowBlank: !requiredHeaders.has(header) },
+      );
+    }
+
+    const sem1MajorColIndex = headers.indexOf('Major Department') + 1;
+    const sem1MinorColIndex = headers.indexOf('Minor Department') + 1;
+    const sem1MajorColLetter = sem1MajorColIndex
+      ? excelColumnLetter(sem1MajorColIndex)
+      : null;
+    if (
+      sem1MinorColIndex &&
+      sem1MajorColLetter &&
+      sem1MajorDepartmentCount > 0
+    ) {
+      applyDependentIndirectListValidation(
+        sheet,
+        sem1MinorColIndex,
+        excelMinorByMajorOffsetFormula(
+          FULL_ADMISSION_HIDDEN_SHEETS.sem1MinorsByMajor,
+          sem1MajorColLetter,
+        ),
+        {
+          allowBlank: true,
+          errorTitle: 'Invalid minor',
+          error:
+            'Choose a minor department allowed for the selected Semester 1 major department.',
+        },
       );
     }
 
@@ -5838,12 +5941,21 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Students');
     const headers = [...SEM1_SUBJECT_IMPORT_HEADERS];
+    const tenantMinorByMajor =
+      await this.sem1Curriculum.buildTenantMinorByMajor(
+        options.tenantId,
+        semesterSequence,
+        options.shiftId,
+      );
     const sampleMajor =
       catalog.majorDepartments[0]?.departmentName ??
       majorDepartments[0]?.departmentName ??
       'Economics';
     const sampleMajorKey = this.sem1Curriculum.normalizeLabel(sampleMajor);
-    const sampleMinor = catalog.minorByMajor[sampleMajorKey]?.[0] ?? 'History';
+    const sampleMinor =
+      tenantMinorByMajor[sampleMajorKey]?.[0] ??
+      catalog.minorByMajor[sampleMajorKey]?.[0] ??
+      'History';
     const sampleRow = {
       ...SEM1_SUBJECT_IMPORT_SAMPLE_ROW,
       Programme: catalog.programCode,
@@ -5873,11 +5985,15 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 24;
     });
 
-    const minorsByMajorRows = catalog.majorDepartments.map((major) => {
+    const minorsByMajorRows = majorDepartments.map((major) => {
       const minors =
+        tenantMinorByMajor[
+          this.sem1Curriculum.normalizeLabel(major.departmentName)
+        ] ??
         catalog.minorByMajor[
           this.sem1Curriculum.normalizeLabel(major.departmentName)
-        ] ?? [];
+        ] ??
+        [];
       return [major.departmentName, ...minors];
     });
 
@@ -5991,7 +6107,13 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       col.width = 36;
     });
 
-    this.applySem1Dropdowns(sheet, headers, hiddenSheets, programmes, catalog);
+    this.applySem1Dropdowns(
+      sheet,
+      headers,
+      hiddenSheets,
+      programmes,
+      minorsByMajorRows.length,
+    );
     const buf = await workbook.xlsx.writeBuffer();
     return Buffer.from(buf);
   }
@@ -6208,7 +6330,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       rows: (string | number | null)[][];
     }[],
     programmes: { code: string }[],
-    catalog: Sem1ImportCurriculumCatalog,
+    minorsByMajorRowCount: number,
   ) {
     const nameDropdownMap: Record<string, { refName: string; column: string }> =
       {
@@ -6270,7 +6392,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       }
     }
 
-    if (minorColIndex && majorColIndex && catalog.majorDepartments.length) {
+    if (minorColIndex && majorColIndex && minorsByMajorRowCount > 0) {
       applyDependentIndirectListValidation(
         sheet,
         minorColIndex,

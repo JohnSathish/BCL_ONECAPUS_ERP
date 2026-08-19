@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { slugifySubject } from '../../academic-engine/domain/nep-categories';
+import {
+  allowedMinorsForDbcMajor,
+  isAllowedDbcMajorMinorPair,
+} from '../../academic-engine/domain/dbc-major-minor-matrix';
 import { CurriculumResolutionService } from '../../academic-engine/services/curriculum-resolution.service';
 import { MajorMinorEligibilityService } from '../../academic-engine/services/major-minor-eligibility.service';
 import { PrismaService } from '../../../database/prisma.service';
@@ -35,6 +39,7 @@ export type Sem1ImportCurriculumCatalog = {
   aecPapers: Sem1PaperOption[];
   secPapers: Sem1PaperOption[];
   vacPaper: Sem1PaperOption;
+  minorDepartments: Sem1MajorDepartmentOption[];
   minorByMajor: Record<string, string[]>;
 };
 
@@ -225,6 +230,7 @@ export class Sem1ImportCurriculumService {
       );
 
     const majorDepartments = this.buildMajorDepartments(byCategory('MAJOR'));
+    const minorDepartments = this.buildMajorDepartments(byCategory('MINOR'));
     const mdcDepartments = this.buildCategoryPaperOptions(byCategory('MDC'));
     const aecPapers = this.buildCategoryPaperOptions(byCategory('AEC'));
     const secPapers = this.buildCategoryPaperOptions(byCategory('SEC'));
@@ -256,6 +262,7 @@ export class Sem1ImportCurriculumService {
       aecPapers,
       secPapers,
       vacPaper: this.toPaperOption(vacOffering),
+      minorDepartments,
       minorByMajor,
     };
   }
@@ -283,7 +290,8 @@ export class Sem1ImportCurriculumService {
       );
     }
     const minors =
-      catalog.minorByMajor[this.normalizeLabel(major.departmentName)] ?? [];
+      catalog.minorByMajor[this.normalizeLabel(major.departmentName)] ??
+      this.officialMinorsForMajor(major.departmentName);
     return {
       majorDepartment: major.departmentName,
       majorPaper: major.paper,
@@ -322,6 +330,25 @@ export class Sem1ImportCurriculumService {
     );
   }
 
+  /** College-wide official minor lists for Excel dropdowns (not one programme). */
+  async buildTenantMinorByMajor(
+    tenantId: string,
+    semesterSequence = 1,
+    shiftId?: string,
+  ): Promise<Record<string, string[]>> {
+    const majors = await this.buildTenantMajorDepartments(
+      tenantId,
+      semesterSequence,
+      shiftId,
+    );
+    const minorByMajor: Record<string, string[]> = {};
+    for (const major of majors) {
+      minorByMajor[this.normalizeLabel(major.departmentName)] =
+        this.officialMinorsForMajor(major.departmentName, majors);
+    }
+    return minorByMajor;
+  }
+
   resolveMajorDepartment(
     catalog: Sem1ImportCurriculumCatalog,
     input: string,
@@ -337,14 +364,32 @@ export class Sem1ImportCurriculumService {
     catalog: Sem1ImportCurriculumCatalog,
     majorDepartment: string,
     minorInput: string,
+    extraDepartments: Sem1MajorDepartmentOption[] = [],
   ): Sem1MajorDepartmentOption | undefined {
     const majorKey = this.normalizeLabel(majorDepartment);
-    const allowed = catalog.minorByMajor[majorKey] ?? [];
+    const allowed =
+      catalog.minorByMajor[majorKey] ??
+      this.officialMinorsForMajor(majorDepartment);
     const normalized = this.normalizeLabel(minorInput);
-    if (!allowed.some((minor) => this.normalizeLabel(minor) === normalized)) {
+    const allowedByCatalog = allowed.some(
+      (minor) => this.normalizeLabel(minor) === normalized,
+    );
+    const allowedByMatrix = isAllowedDbcMajorMinorPair(
+      majorDepartment,
+      minorInput,
+    );
+    if (!allowedByCatalog && !allowedByMatrix) {
       return undefined;
     }
-    return catalog.majorDepartments.find(
+    // Sem 1 demo/live data often has only MAJOR papers per programme, no MINOR
+    // offerings. Resolve the minor from this catalogue first, then other
+    // programmes' department papers passed in by the import handler.
+    const lookup = [
+      ...catalog.minorDepartments,
+      ...catalog.majorDepartments,
+      ...extraDepartments,
+    ];
+    return lookup.find(
       (department) =>
         this.normalizeLabel(department.departmentName) === normalized,
     );
@@ -387,6 +432,14 @@ export class Sem1ImportCurriculumService {
   ): Promise<Record<string, string[]>> {
     const minorByMajor: Record<string, string[]> = {};
     for (const major of majorDepartments) {
+      const official = this.officialMinorsForMajor(
+        major.departmentName,
+        majorDepartments,
+      );
+      if (official.length) {
+        minorByMajor[this.normalizeLabel(major.departmentName)] = official;
+        continue;
+      }
       const eligibleMinors =
         await this.majorMinorEligibility.listEligibleMinors(
           tenantId,
@@ -403,6 +456,23 @@ export class Sem1ImportCurriculumService {
       minorByMajor[this.normalizeLabel(major.departmentName)] = names;
     }
     return minorByMajor;
+  }
+
+  private officialMinorsForMajor(
+    majorName: string,
+    knownDepartments: Sem1MajorDepartmentOption[] = [],
+  ): string[] {
+    const official = [...allowedMinorsForDbcMajor(majorName)];
+    if (!official.length) return [];
+    const byNormalized = new Map(
+      knownDepartments.map((department) => [
+        this.normalizeLabel(department.departmentName),
+        department.departmentName,
+      ]),
+    );
+    return official.map(
+      (minor) => byNormalized.get(this.normalizeLabel(minor)) ?? minor,
+    );
   }
 
   private buildMajorDepartments(
@@ -479,6 +549,7 @@ export class Sem1ImportCurriculumService {
       BOT: 'Botany',
       CHE: 'Chemistry',
       MAT: 'Mathematics',
+      MTH: 'Mathematics',
       PHY: 'Physics',
       ZOO: 'Zoology',
       COM: 'Commerce',

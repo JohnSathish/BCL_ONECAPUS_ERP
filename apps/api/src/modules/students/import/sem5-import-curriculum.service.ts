@@ -386,6 +386,28 @@ export class Sem5ImportCurriculumService {
     );
   }
 
+  /**
+   * Principal exceptions may use a minor that exists on another programme's
+   * Sem 5 catalog (e.g. Chemistry + Botany uses Zoology's Botany minor paper).
+   */
+  resolveMinorDepartmentOptionAcrossCatalogs(
+    catalogs: Sem5ImportCurriculumCatalog[],
+    input: string,
+    preferredShiftId?: string,
+  ): Sem5MinorDepartmentOption | undefined {
+    const ordered = preferredShiftId
+      ? [
+          ...catalogs.filter((catalog) => catalog.shiftId === preferredShiftId),
+          ...catalogs.filter((catalog) => catalog.shiftId !== preferredShiftId),
+        ]
+      : catalogs;
+    for (const catalog of ordered) {
+      const found = this.resolveMinorDepartmentOption(catalog, input);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
   resolveMinorDepartment(
     catalog: Sem5ImportCurriculumCatalog,
     majorDepartment: string,

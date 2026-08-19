@@ -52,3 +52,49 @@ export const DBC_MAJOR_MINOR_DEPT_CODE: Record<string, string> = {
   Physics: 'PHY',
   Commerce: 'COM',
 };
+
+function normalizeMajorMinorLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const DBC_MAJOR_NAME_ALIASES: Record<string, string> = {
+  'pol science': 'Political Science',
+  'political science': 'Political Science',
+  'pol sci': 'Political Science',
+  bcom: 'Commerce',
+  'b com': 'Commerce',
+  commerce: 'Commerce',
+  'acc for business': 'Commerce',
+  'accounting for business': 'Commerce',
+  maths: 'Mathematics',
+  math: 'Mathematics',
+};
+
+export function canonicalDbcMajorName(name: string): string | undefined {
+  const normalized = normalizeMajorMinorLabel(name);
+  if (!normalized) return undefined;
+  const aliased = DBC_MAJOR_NAME_ALIASES[normalized];
+  if (aliased) return aliased;
+  return Object.keys(DBC_MAJOR_MINOR_MATRIX).find(
+    (major) => normalizeMajorMinorLabel(major) === normalized,
+  );
+}
+
+export function allowedMinorsForDbcMajor(majorName: string): readonly string[] {
+  const canonical = canonicalDbcMajorName(majorName);
+  return canonical ? (DBC_MAJOR_MINOR_MATRIX[canonical] ?? []) : [];
+}
+
+export function isAllowedDbcMajorMinorPair(
+  majorName: string,
+  minorName: string,
+): boolean {
+  const allowed = allowedMinorsForDbcMajor(majorName);
+  const minorKey = normalizeMajorMinorLabel(minorName);
+  return allowed.some((minor) => normalizeMajorMinorLabel(minor) === minorKey);
+}

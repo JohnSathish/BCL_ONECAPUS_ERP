@@ -183,6 +183,8 @@ const HEADER_ALIASES: Record<string, string> = {
   'major paper index': 'majorPaperIndex',
   majorpaperindex: 'majorPaperIndex',
   'section code': 'sectionCode',
+  'principal combination exception': 'principalCombinationException',
+  principalcombinationexception: 'principalCombinationException',
   sectioncode: 'sectionCode',
   grp: 'sectionCode',
   group: 'sectionCode',
