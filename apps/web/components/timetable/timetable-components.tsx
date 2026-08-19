@@ -609,11 +609,11 @@ export function TimetableSlotCell({ entry }: { entry: TimetableEntry }) {
           </p>
           <p className="text-[10px] opacity-75">{overlay.reasonLabel}</p>
         </div>
-      ) : entry.staffProfile || !display.categoryOnly ? (
+      ) : (
         <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug opacity-90">
           {formatTimetableFacultyLabel(entry.staffProfile)}
         </p>
-      ) : null}
+      )}
       <p className="mt-1.5 text-[11px] opacity-80">
         Sem {entry.semesterSequence ?? '-'} · Sec {entry.sectionCode ?? '-'} ·{' '}
         {entry.classroom?.code ?? 'Room TBA'}

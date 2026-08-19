@@ -13,6 +13,8 @@ const dayLabels = [
   'Saturday',
 ];
 
+const POOL_FYUGP_CATEGORIES = ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'] as const;
+
 @Injectable()
 export class TimetablePrintService {
   constructor(
@@ -80,19 +82,30 @@ export class TimetablePrintService {
       },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
+    const hydratedEntries = await this.hydratePoolFaculty(
+      tenantId,
+      plan?.shiftId ?? null,
+      entries,
+    );
 
     const courseIds = Array.from(
-      new Set(entries.map((entry) => entry.courseId).filter(Boolean)),
+      new Set(hydratedEntries.map((entry) => entry.courseId).filter(Boolean)),
     ) as string[];
     const staffIds = Array.from(
-      new Set(entries.map((entry) => entry.staffProfileId).filter(Boolean)),
+      new Set(
+        hydratedEntries.map((entry) => entry.staffProfileId).filter(Boolean),
+      ),
     ) as string[];
     const roomIds = Array.from(
-      new Set(entries.map((entry) => entry.classroomId).filter(Boolean)),
+      new Set(
+        hydratedEntries.map((entry) => entry.classroomId).filter(Boolean),
+      ),
     ) as string[];
     const groupIds = Array.from(
       new Set(
-        entries.map((entry) => entry.teachingSubjectGroupId).filter(Boolean),
+        hydratedEntries
+          .map((entry) => entry.teachingSubjectGroupId)
+          .filter(Boolean),
       ),
     ) as string[];
     const courses = courseIds.length
@@ -131,7 +144,7 @@ export class TimetablePrintService {
       asOf,
     );
 
-    const fallbackSlots = this.uniqueSlotsFromEntries(entries);
+    const fallbackSlots = this.uniqueSlotsFromEntries(hydratedEntries);
     const effectiveSlots = slots.length ? slots : fallbackSlots;
     const slotRows = effectiveSlots.map((slot) => ({
       id: slot.id,
@@ -147,7 +160,7 @@ export class TimetablePrintService {
     }));
 
     const grouped = new Map<string, any[]>();
-    for (const entry of entries) {
+    for (const entry of hydratedEntries) {
       const key = `${entry.dayOfWeek}:${formatShiftTime(entry.startTime)}:${formatShiftTime(entry.endTime)}`;
       grouped.set(key, [
         ...(grouped.get(key) ?? []),
@@ -201,6 +214,137 @@ export class TimetablePrintService {
           [],
       })),
     };
+  }
+
+  private isPoolPlaceholder(entry: {
+    fyugpCategory?: string | null;
+    courseId?: string | null;
+    metadata?: unknown;
+  }) {
+    const category = String(entry.fyugpCategory ?? '').toUpperCase();
+    if (
+      !POOL_FYUGP_CATEGORIES.includes(
+        category as (typeof POOL_FYUGP_CATEGORIES)[number],
+      )
+    ) {
+      return false;
+    }
+    const meta = (entry.metadata ?? {}) as { displayAsCategoryOnly?: boolean };
+    return meta.displayAsCategoryOnly === true || !entry.courseId;
+  }
+
+  /**
+   * Department grids store MDC/SEC/VAC/AEC/VTC as category-only cells with no
+   * staff. Fill names from Elective Staff Allocation (same shift / day / period).
+   */
+  private async hydratePoolFaculty<
+    T extends {
+      fyugpCategory?: string | null;
+      courseId?: string | null;
+      staffProfileId?: string | null;
+      classroomId?: string | null;
+      dayOfWeek: number;
+      periodNo?: number | null;
+      semesterSequence?: number | null;
+      shiftId?: string | null;
+      metadata?: unknown;
+    },
+  >(tenantId: string, shiftId: string | null, entries: T[]): Promise<T[]> {
+    const needs = entries.filter(
+      (entry) => this.isPoolPlaceholder(entry) && !entry.staffProfileId,
+    );
+    if (!needs.length) return entries;
+
+    const assigned = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        staffProfileId: { not: null },
+        fyugpCategory: { in: [...POOL_FYUGP_CATEGORIES] },
+        ...(shiftId ? { OR: [{ shiftId }, { plan: { shiftId } }] } : {}),
+      },
+      select: {
+        fyugpCategory: true,
+        dayOfWeek: true,
+        periodNo: true,
+        semesterSequence: true,
+        staffProfileId: true,
+        classroomId: true,
+      },
+    });
+
+    const sections = await this.prisma.offeringSection.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        staffProfileId: { not: null },
+        ...(shiftId ? { shiftId } : {}),
+        courseOffering: {
+          deletedAt: null,
+          category: { in: [...POOL_FYUGP_CATEGORIES] },
+        },
+      },
+      select: {
+        staffProfileId: true,
+        classroomId: true,
+        courseOffering: {
+          select: { category: true, semesterSequence: true },
+        },
+      },
+    });
+
+    const bySlot = new Map<
+      string,
+      { staffProfileId: string; classroomId: string | null }
+    >();
+    for (const row of assigned) {
+      if (!row.staffProfileId) continue;
+      const cat = String(row.fyugpCategory ?? '').toUpperCase();
+      const payload = {
+        staffProfileId: row.staffProfileId,
+        classroomId: row.classroomId,
+      };
+      const withSem = `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|${row.semesterSequence ?? ''}`;
+      const noSem = `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|`;
+      if (!bySlot.has(withSem)) bySlot.set(withSem, payload);
+      if (!bySlot.has(noSem)) bySlot.set(noSem, payload);
+    }
+
+    const byCategory = new Map<
+      string,
+      { staffProfileId: string; classroomId: string | null }
+    >();
+    for (const section of sections) {
+      if (!section.staffProfileId) continue;
+      const cat = String(section.courseOffering.category ?? '').toUpperCase();
+      const payload = {
+        staffProfileId: section.staffProfileId,
+        classroomId: section.classroomId,
+      };
+      const withSem = `${cat}|${section.courseOffering.semesterSequence ?? ''}`;
+      const noSem = `${cat}|`;
+      if (!byCategory.has(withSem)) byCategory.set(withSem, payload);
+      if (!byCategory.has(noSem)) byCategory.set(noSem, payload);
+    }
+
+    return entries.map((entry) => {
+      if (entry.staffProfileId || !this.isPoolPlaceholder(entry)) return entry;
+      const cat = String(entry.fyugpCategory ?? '').toUpperCase();
+      const hit =
+        bySlot.get(
+          `${cat}|${entry.dayOfWeek}|${entry.periodNo ?? ''}|${entry.semesterSequence ?? ''}`,
+        ) ??
+        bySlot.get(`${cat}|${entry.dayOfWeek}|${entry.periodNo ?? ''}|`) ??
+        byCategory.get(`${cat}|${entry.semesterSequence ?? ''}`) ??
+        byCategory.get(`${cat}|`);
+      if (!hit) return entry;
+      return {
+        ...entry,
+        staffProfileId: hit.staffProfileId,
+        classroomId: entry.classroomId ?? hit.classroomId,
+      };
+    });
   }
 
   private uniqueSlotsFromEntries(entries: any[]) {

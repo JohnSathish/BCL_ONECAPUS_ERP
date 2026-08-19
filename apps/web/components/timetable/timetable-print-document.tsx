@@ -346,11 +346,11 @@ function renderPrintCell(timeRow: ReturnType<typeof groupRowsByTime>[number], da
                 {' · '}
                 {overlay.reasonLabel}
               </p>
-            ) : entry.staffProfile || !display.categoryOnly ? (
+            ) : (
               <p className="timetable-print-slot-faculty">
                 {formatTimetableFacultyShortLabel(entry.staffProfile)}
               </p>
-            ) : null}
+            )}
             <p className="timetable-print-slot-meta">
               Sem {entry.semesterSequence ?? '-'}
               {entry.sectionCode ? ` · Sec ${entry.sectionCode}` : ''}

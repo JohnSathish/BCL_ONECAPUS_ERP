@@ -705,7 +705,7 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'academics',
         permissions: [...P.academics],
         activePattern:
-          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar|academics/shift-faculty|academics/elective-staff-allocation)(?:/.*)?$',
+          '^/admin/(?:programs|academic-engine|academic-lifecycle|shifts|academics/subject-sections|academics/academic-calendar|academics/shift-faculty|academics/elective-staff-allocation|academics/attendance)(?:/.*)?$',
         children: [
           { label: 'Programmes', href: '/admin/programs', permissions: [...P.academics] },
           {
@@ -762,6 +762,11 @@ export const ADMIN_NAV: NavGroup[] = [
               'academic-engine:manage',
               ...P.academics,
             ],
+          },
+          {
+            label: 'Student Attendance',
+            href: '/admin/academics/attendance',
+            permissions: [...P.studentAttendance, ...P.academics],
           },
         ],
       },
