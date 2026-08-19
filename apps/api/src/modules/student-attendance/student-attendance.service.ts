@@ -102,10 +102,18 @@ export class StudentAttendanceService {
     user: JwtUser,
     dto: GenerateAttendanceSessionsDto,
   ) {
+    return this.generateSessionsForTenant(user.tid, dto, user.sub);
+  }
+
+  async generateSessionsForTenant(
+    tenantId: string,
+    dto: GenerateAttendanceSessionsDto,
+    actorId?: string | null,
+  ) {
     const sessionDate = this.startOfDay(dto.date);
-    const policy = await this.attendancePolicy.getOrCreate(user.tid);
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
     const dayResolution = await this.workingDays.resolveDay(
-      user.tid,
+      tenantId,
       sessionDate,
     );
     const skipNonWorking =
@@ -128,7 +136,7 @@ export class StudentAttendanceService {
     // Honor date-scoped timetable cancellations (Phase 2 calendar cancel/relocate).
     const dayCancelled = await this.prisma.timetableSubstitution.findFirst({
       where: {
-        tenantId: user.tid,
+        tenantId,
         sessionDate,
         action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
         status: { not: 'REJECTED' },
@@ -148,7 +156,7 @@ export class StudentAttendanceService {
     const cancelledEntryIds = (
       await this.prisma.timetableSubstitution.findMany({
         where: {
-          tenantId: user.tid,
+          tenantId,
           sessionDate,
           action: 'CANCEL_FOR_DATE',
           status: { not: 'REJECTED' },
@@ -165,11 +173,11 @@ export class StudentAttendanceService {
 
     const planScope = dto.timetablePlanId
       ? { planId: dto.timetablePlanId }
-      : await this.publishedPlanScope(user.tid);
+      : await this.publishedPlanScope(tenantId);
 
     const entries = await this.prisma.timetablePlanEntry.findMany({
       where: {
-        tenantId: user.tid,
+        tenantId,
         deletedAt: null,
         status: { not: 'CANCELLED' },
         dayOfWeek,
@@ -196,7 +204,7 @@ export class StudentAttendanceService {
       orderBy: [{ startTime: 'asc' }],
     });
 
-    const hydratedEntries = await this.hydratePoolSlots(user.tid, entries);
+    const hydratedEntries = await this.hydratePoolSlots(tenantId, entries);
     const realPoolKeys = new Set(
       entries
         .filter(
@@ -249,7 +257,7 @@ export class StudentAttendanceService {
         : [];
       const linkedPapers = entry.teachingSubjectGroupId
         ? await this.subjectGroups.linkedPaperIds(
-            user.tid,
+            tenantId,
             entry.teachingSubjectGroupId,
           )
         : [];
@@ -268,13 +276,13 @@ export class StudentAttendanceService {
       await (this.prisma as any).studentAttendanceSession.upsert({
         where: {
           tenantId_timetablePlanEntryId_sessionDate: {
-            tenantId: user.tid,
+            tenantId,
             timetablePlanEntryId: entry.id,
             sessionDate,
           },
         },
         create: {
-          tenantId: user.tid,
+          tenantId,
           academicYearId: entry.plan?.academicYearId,
           semesterId: entry.plan?.semesterId,
           semesterNo: entry.semesterSequence,
@@ -309,19 +317,32 @@ export class StudentAttendanceService {
     }
 
     const removedDuplicates = await this.cleanupDuplicateSessions(
-      user.tid,
+      tenantId,
       sessionDate,
     );
 
-    await this.audit(user, 'GENERATE_SESSIONS', null, null, {
-      date: dto.date,
-      created,
-      considered: entries.length,
-      deduped: dedupedEntries.length,
-      attendanceMode: policy.attendanceMode,
-      removedDuplicates,
-      publishedPlansOnly: !dto.timetablePlanId,
-    });
+    await this.audit(
+      {
+        sub: actorId || '',
+        tid: tenantId,
+        email: '',
+        roles: [],
+        permissions: [],
+      },
+      'GENERATE_SESSIONS',
+      null,
+      null,
+      {
+        date: dto.date,
+        created,
+        considered: entries.length,
+        deduped: dedupedEntries.length,
+        attendanceMode: policy.attendanceMode,
+        removedDuplicates,
+        publishedPlansOnly: !dto.timetablePlanId,
+        source: actorId ? 'MANUAL' : 'MORNING_CRON',
+      },
+    );
     return {
       considered: entries.length,
       deduped: dedupedEntries.length,
@@ -330,6 +351,8 @@ export class StudentAttendanceService {
       aggregationUnit: policy.aggregationUnit,
       created,
       removedDuplicates,
+      skipped: false as const,
+      reason: undefined as string | undefined,
     };
   }
 
@@ -1847,7 +1870,7 @@ export class StudentAttendanceService {
     await (this.prisma as any).studentAttendanceAuditLog.create({
       data: {
         tenantId: user.tid,
-        actorId: user.sub,
+        actorId: user.sub || null,
         sessionId,
         studentId,
         action,

@@ -44,6 +44,10 @@ _migration-pack/
 apps/api/backups/**
 !apps/api/backups/.gitkeep
 
+# VPS-generated nginx vhosts for extra sites on the ERP IP
+nginx/extra-sites.d/*.conf
+!nginx/extra-sites.d/00-stub.conf
+
 # Local / runtime artifacts (do not commit)
 /_local/
 staffcredentials.txt

@@ -3,6 +3,7 @@ import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.m
 import { LicensingModule } from '../licensing/licensing.module';
 import { TeachingSubjectGroupModule } from '../timetable-engine/teaching-subject-group.module';
 import { AttendancePolicyService } from './attendance-policy.service';
+import { StudentAttendanceSchedulerService } from './student-attendance-scheduler.service';
 import { StudentAttendanceController } from './student-attendance.controller';
 import { StudentAttendanceService } from './student-attendance.service';
 
@@ -13,7 +14,11 @@ import { StudentAttendanceService } from './student-attendance.service';
     AcademicCalendarModule,
   ],
   controllers: [StudentAttendanceController],
-  providers: [StudentAttendanceService, AttendancePolicyService],
+  providers: [
+    StudentAttendanceService,
+    AttendancePolicyService,
+    StudentAttendanceSchedulerService,
+  ],
   exports: [StudentAttendanceService, AttendancePolicyService],
 })
 export class StudentAttendanceModule {}

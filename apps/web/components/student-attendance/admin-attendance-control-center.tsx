@@ -159,8 +159,9 @@ export function AdminAttendanceControlCenter() {
             </p>
             <h1 className="mt-1 text-2xl font-bold">Admin Control Center</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Generate timetable-linked sessions, monitor marking compliance, freeze/lock periods,
-              calculate eligibility, and track defaulters.
+              Today&apos;s timetable-linked sessions are created automatically at 6:00 AM IST (retry
+              at 7:00 AM). Use Generate only for a missed day or another date. Then monitor marking,
+              freeze/lock periods, calculate eligibility, and track defaulters.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -170,7 +171,11 @@ export function AdminAttendanceControlCenter() {
               onChange={(event) => setDate(event.target.value)}
               className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
             />
-            <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
+            <Button
+              onClick={() => generateMut.mutate()}
+              disabled={generateMut.isPending}
+              title="Today is created automatically at 6:00 AM IST. Use this for a missed or other date."
+            >
               {generateMut.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

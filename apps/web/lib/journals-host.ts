@@ -30,7 +30,15 @@ export function extractJournalSlugFromHost(host: string): string | null {
 }
 
 export function isJournalHost(host: string): boolean {
-  return Boolean(extractJournalSlugFromHost(host));
+  const hostname = host.split(':')[0]?.toLowerCase() ?? '';
+  if (hostname.startsWith('transient.') || hostname.startsWith('source.')) {
+    return true;
+  }
+  const extra = (process.env.NEXT_PUBLIC_JOURNAL_CUSTOM_HOSTS ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return extra.includes(hostname);
 }
 
 export function getJournalSlugFromLocation(): string | null {
