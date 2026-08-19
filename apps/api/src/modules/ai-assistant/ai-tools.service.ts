@@ -2066,7 +2066,14 @@ export class AiToolsService {
             },
           },
           ...(titleNeedle.length >= 4
-            ? [{ title: { contains: titleNeedle, mode: 'insensitive' } }]
+            ? [
+                {
+                  title: {
+                    contains: titleNeedle,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ]
             : []),
         ],
       },
