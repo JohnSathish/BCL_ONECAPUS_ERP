@@ -83,6 +83,10 @@ docker cp "$DUMP_FILE" "$("${COMPOSE[@]}" ps -q postgres):/tmp/restore.dump"
 echo "Restore complete."
 
 echo
+echo "=== [3b] Map college admin login onto restored demo admin ==="
+bash scripts/deploy/vps-sync-college-admin.sh || true
+
+echo
 echo "=== [4/7] Pull latest code and rebuild (vps-update.sh) ==="
 bash scripts/deploy/vps-update.sh
 

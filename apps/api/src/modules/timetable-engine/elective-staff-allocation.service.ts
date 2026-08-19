@@ -565,6 +565,7 @@ export class ElectiveStaffAllocationService {
       section = await this.prisma.offeringSection.update({
         where: { id: section.id },
         data: {
+          staffProfileId: dto.staffProfileId,
           capacity:
             dto.capacity == null ? section.capacity : Number(dto.capacity),
           classroomId:
@@ -581,9 +582,20 @@ export class ElectiveStaffAllocationService {
       staffProfileId: dto.staffProfileId,
       preferredRoomId: dto.classroomId ?? section.classroomId,
       workloadHours: dto.workloadHours,
+      role: 'PRIMARY_FACULTY',
       status: 'DRAFT',
       notes: dto.notes,
       academicYearId: dto.academicYearId ?? undefined,
+    });
+
+    await this.prisma.timetablePlanEntry.updateMany({
+      where: {
+        tenantId: user.tid,
+        offeringSectionId: section.id,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+      },
+      data: { staffProfileId: dto.staffProfileId },
     });
 
     const conflicts: { type: string; message: string }[] = [];

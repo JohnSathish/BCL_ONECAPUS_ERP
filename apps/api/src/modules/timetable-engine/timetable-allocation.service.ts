@@ -204,10 +204,44 @@ export class TimetableAllocationService {
       },
       select: { staffProfileId: true },
     });
-    const role = this.normalizeRole(dto.role, !existingPrimary);
+    const replacingPrimary = Boolean(
+      dto.staffProfileId &&
+      existingPrimary?.staffProfileId &&
+      existingPrimary.staffProfileId !== dto.staffProfileId,
+    );
+    // Elective "Assign" and a new lead faculty must replace, not add a co-teacher.
+    const role = this.normalizeRole(
+      dto.role,
+      !existingPrimary || replacingPrimary,
+    );
     const isPrimary = role === 'PRIMARY_FACULTY' || !existingPrimary;
 
     await this.prisma.$transaction(async (tx) => {
+      if (isPrimary && replacingPrimary) {
+        await (tx as any).subjectTeachingAssignment.updateMany({
+          where: {
+            tenantId,
+            offeringSectionId: section.id,
+            deletedAt: null,
+            isPrimary: true,
+            staffProfileId: { not: dto.staffProfileId },
+          },
+          data: {
+            isPrimary: false,
+            role: 'CO_FACULTY',
+            canEnterInternalMarks: false,
+          },
+        });
+        await tx.staffSubjectAssignment.updateMany({
+          where: {
+            tenantId,
+            offeringSectionId: section.id,
+            isPrimaryFaculty: true,
+            staffProfileId: { not: dto.staffProfileId as string },
+          },
+          data: { isPrimaryFaculty: false },
+        });
+      }
       await tx.staffSubjectAssignment.upsert({
         where: {
           staffProfileId_offeringSectionId: {
