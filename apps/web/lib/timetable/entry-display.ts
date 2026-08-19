@@ -120,15 +120,25 @@ export type TimetableStaffDirectoryEntry = {
 
 /** Unique short-code → full-name rows for a matrix (for print staff directory). */
 export function collectTimetableStaffDirectory(
-  entries: Array<{ staffProfile?: TimetableStaffLabel }>,
+  entries: Array<{
+    staffProfile?: TimetableStaffLabel;
+    metadata?: Record<string, unknown> | null;
+  }>,
 ): TimetableStaffDirectoryEntry[] {
   const byCode = new Map<string, TimetableStaffDirectoryEntry>();
-  for (const entry of entries) {
-    const code = String(entry.staffProfile?.shortCode ?? '').trim();
-    const name = String(entry.staffProfile?.fullName ?? '').trim();
-    if (!code || !name) continue;
+  const push = (staff?: TimetableStaffLabel) => {
+    const code = String(staff?.shortCode ?? '').trim();
+    const name = String(staff?.fullName ?? '').trim();
+    if (!code || !name) return;
     const key = code.toUpperCase();
     if (!byCode.has(key)) byCode.set(key, { shortCode: code, fullName: name });
+  };
+  for (const entry of entries) {
+    push(entry.staffProfile);
+    const team = Array.isArray(entry.metadata?.facultyTeam)
+      ? (entry.metadata?.facultyTeam as TimetableStaffLabel[])
+      : [];
+    for (const member of team) push(member);
   }
   return Array.from(byCode.values()).sort((a, b) =>
     a.shortCode.localeCompare(b.shortCode, undefined, { sensitivity: 'base' }),

@@ -8,11 +8,13 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import { getZonedDateKey } from '../../common/utils/time-greeting';
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ACADEMIC_CALENDAR_EVENT_TYPES,
   EXAM_TYPES,
+  WEBSITE_FALLBACK_EXCLUDED_TYPES,
   defaultColorForType,
   defaultCreatesAttendanceSession,
   defaultIsWorkingDayForType,
@@ -1100,26 +1102,59 @@ export class AcademicCalendarService {
   }
 
   async listPublicWebsiteEvents(tenantId: string, limit = 12) {
-    const today = parseDateOnly(toDateOnlyIso(new Date()));
-    const rows = await this.prisma.academicCalendarEvent.findMany({
+    const today = parseDateOnly(getZonedDateKey());
+    const include = {
+      calendar: { select: { id: true, title: true, academicYearId: true } },
+    } as const;
+    const orderBy = [{ startDate: 'asc' as const }, { title: 'asc' as const }];
+    const live = {
+      tenantId,
+      deletedAt: null,
+      active: true,
+      endDate: { gte: today },
+      calendar: { deletedAt: null },
+    };
+
+    let rows = await this.prisma.academicCalendarEvent.findMany({
       where: {
-        tenantId,
-        deletedAt: null,
-        active: true,
+        ...live,
         visibility: 'PUBLIC',
         publishedToWebsite: true,
-        endDate: { gte: today },
-        calendar: {
-          deletedAt: null,
-          status: 'PUBLISHED',
-        },
+        calendar: { deletedAt: null, status: 'PUBLISHED' },
       },
-      orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
+      orderBy,
       take: limit,
-      include: {
-        calendar: { select: { id: true, title: true, academicYearId: true } },
-      },
+      include,
     });
+
+    // Dump/restore and older rows often leave publishedToWebsite=false even when
+    // the calendar is public. Still show student-facing events on the website.
+    if (!rows.length) {
+      rows = await this.prisma.academicCalendarEvent.findMany({
+        where: {
+          ...live,
+          publishedToWebsite: true,
+        },
+        orderBy,
+        take: limit,
+        include,
+      });
+    }
+
+    if (!rows.length) {
+      rows = await this.prisma.academicCalendarEvent.findMany({
+        where: {
+          ...live,
+          visibility: 'PUBLIC',
+          calendar: { deletedAt: null, status: 'PUBLISHED' },
+          type: { notIn: [...WEBSITE_FALLBACK_EXCLUDED_TYPES] },
+        },
+        orderBy,
+        take: limit,
+        include,
+      });
+    }
+
     return rows.map((row) => ({
       id: row.id,
       title: row.title,

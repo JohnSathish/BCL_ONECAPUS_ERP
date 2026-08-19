@@ -10,7 +10,11 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './config/cors.config';
-import { resolveUploadRoot } from './common/uploads/upload-paths';
+import { seedWebsitePublicUploads } from './common/uploads/seed-website-public-uploads';
+import {
+  resolveStorageRoot,
+  resolveUploadRoot,
+} from './common/uploads/upload-paths';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
@@ -24,7 +28,16 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '5mb' });
   app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
 
+  seedWebsitePublicUploads();
+
+  // CMS/hero files may live in UPLOAD_ROOT (/data/uploads) or STORAGE_ROOT
+  // (/data/storage). Serve both so a deploy does not blank the homepage slider.
   app.useStaticAssets(resolveUploadRoot(), {
+    prefix: '/uploads/',
+    maxAge: '7d',
+    immutable: true,
+  });
+  app.useStaticAssets(resolveStorageRoot(), {
     prefix: '/uploads/',
     maxAge: '7d',
     immutable: true,

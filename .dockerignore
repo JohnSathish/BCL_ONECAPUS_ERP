@@ -11,4 +11,5 @@ node_modules
 !.env.example
 terminals
 agent-transcripts
-assets
+# Cursor/chat screenshots at repo root only — do not exclude apps/api/assets
+/assets

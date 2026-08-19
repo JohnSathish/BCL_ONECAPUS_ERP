@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
@@ -29,11 +30,11 @@ import {
 } from '@/services/student-attendance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
-import Link from 'next/link';
+import { institutionDateKey } from '@/lib/institution-date';
 
 export function AdminAttendanceControlCenter() {
   const qc = useQueryClient();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => institutionDateKey());
   const [reportType, setReportType] = useState('unmarked');
   const [message, setMessage] = useState('');
 
@@ -108,6 +109,13 @@ export function AdminAttendanceControlCenter() {
   });
 
   const stats = dashboard.data ?? {};
+  const sessionRows = sessions.data ?? [];
+  const markedCount = sessionRows.filter((row) =>
+    ['MARKED', 'LOCKED', 'FROZEN'].includes(String(row.status ?? '').toUpperCase()),
+  ).length;
+  const unmarkedCount = sessionRows.filter(
+    (row) => String(row.status ?? '').toUpperCase() === 'OPEN',
+  ).length;
   const shortageCount = stats.shortageStudents ?? 0;
   const modeLabel = (() => {
     const mode = policyQ.data?.attendanceMode ?? stats.attendanceMode;
@@ -123,6 +131,8 @@ export function AdminAttendanceControlCenter() {
       : stats.aggregationUnit === 'SESSION'
         ? 'Today Sessions (AM/PM)'
         : 'Today Sessions';
+  const sessionCountLabel =
+    date === institutionDateKey() ? sessionLabel : sessionLabel.replace(/^Today /, '');
   const lowSummaries = useMemo(
     () => (summaries.data ?? []).filter((row: any) => Number(row.percentage ?? 0) < 75).slice(0, 8),
     [summaries.data],
@@ -205,18 +215,14 @@ export function AdminAttendanceControlCenter() {
 
       <div className="grid gap-3 md:grid-cols-4">
         <KpiCard
-          label={sessionLabel}
-          value={stats.today?.sessions ?? 0}
+          label={sessionCountLabel}
+          value={sessionRows.length}
           icon={<CalendarDays className="h-5 w-5" />}
         />
-        <KpiCard
-          label="Marked"
-          value={stats.today?.marked ?? 0}
-          icon={<ShieldCheck className="h-5 w-5" />}
-        />
+        <KpiCard label="Marked" value={markedCount} icon={<ShieldCheck className="h-5 w-5" />} />
         <KpiCard
           label="Unmarked"
-          value={stats.today?.unmarked ?? 0}
+          value={unmarkedCount}
           icon={<FileWarning className="h-5 w-5" />}
         />
         <KpiCard

@@ -23,6 +23,7 @@ import {
 import { WebsiteService } from './website.service';
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
 import { isDemoWebsiteContentSlug } from './website-content-catalog';
+import { AcademicCalendarService } from '../academic-calendar/academic-calendar.service';
 
 export type WebsiteMenuTreeNode = {
   id: string;
@@ -40,6 +41,7 @@ export class WebsiteCmsEnterpriseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly website: WebsiteService,
+    private readonly academicCalendar: AcademicCalendarService,
   ) {}
 
   async enhancedDashboard(tenantId: string) {
@@ -774,9 +776,13 @@ export class WebsiteCmsEnterpriseService {
       orderBy: [{ priority: 'asc' }, { publishAt: 'desc' }],
       take: opts?.homepage ? 12 : 50,
     });
-    return rows
+    const mapped = rows
       .filter((row) => !isDemoWebsiteContentSlug(row.slug))
       .map((row) => this.mapNotice(row));
+    if (opts?.homepage && !mapped.length && !opts.slug) {
+      return this.listPublicNotices(tenantId);
+    }
+    return mapped;
   }
 
   async getPublicHomepage(tenantId: string) {
@@ -945,33 +951,9 @@ export class WebsiteCmsEnterpriseService {
   }
 
   async listUpcomingEvents(tenantId: string) {
-    // Prefer published ERP Academic Calendar public events.
-    const erpEvents = await this.prisma.academicCalendarEvent.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        active: true,
-        visibility: 'PUBLIC',
-        publishedToWebsite: true,
-        endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) },
-        calendar: { deletedAt: null, status: 'PUBLISHED' },
-      },
-      orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
-      take: 12,
-    });
-    if (erpEvents.length) {
-      return erpEvents.map((row) => ({
-        id: row.id,
-        title: row.title,
-        date: row.startDate.toISOString().slice(0, 10),
-        category: row.type,
-        href: '/academics/calendar',
-        registrationUrl: null,
-        featured: false,
-        showCountdown: false,
-        source: 'ERP',
-      }));
-    }
+    const erpEvents =
+      await this.academicCalendar.listPublicWebsiteEvents(tenantId);
+    if (erpEvents.length) return erpEvents;
 
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },

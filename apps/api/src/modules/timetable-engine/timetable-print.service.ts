@@ -92,10 +92,8 @@ export class TimetablePrintService {
       new Set(hydratedEntries.map((entry) => entry.courseId).filter(Boolean)),
     ) as string[];
     const staffIds = Array.from(
-      new Set(
-        hydratedEntries.map((entry) => entry.staffProfileId).filter(Boolean),
-      ),
-    ) as string[];
+      new Set(hydratedEntries.flatMap((entry) => this.entryStaffIds(entry))),
+    );
     const roomIds = Array.from(
       new Set(
         hydratedEntries.map((entry) => entry.classroomId).filter(Boolean),
@@ -183,6 +181,7 @@ export class TimetablePrintService {
           replacementOverlay: entry.staffProfileId
             ? (overlayMap.get(entry.staffProfileId) ?? null)
             : null,
+          metadata: this.withResolvedFacultyTeam(entry.metadata, staffById),
         },
       ]);
     }
@@ -236,6 +235,7 @@ export class TimetablePrintService {
   /**
    * Department grids store MDC/SEC/VAC/AEC/VTC as category-only cells with no
    * staff. Fill names from Elective Staff Allocation (same shift / day / period).
+   * Attach every matching teacher so notice print can show "MDC BC,KA".
    */
   private async hydratePoolFaculty<
     T extends {
@@ -250,10 +250,10 @@ export class TimetablePrintService {
       metadata?: unknown;
     },
   >(tenantId: string, shiftId: string | null, entries: T[]): Promise<T[]> {
-    const needs = entries.filter(
-      (entry) => this.isPoolPlaceholder(entry) && !entry.staffProfileId,
+    const poolEntries = entries.filter((entry) =>
+      this.isPoolPlaceholder(entry),
     );
-    if (!needs.length) return entries;
+    if (!poolEntries.length) return entries;
 
     const assigned = await this.prisma.timetablePlanEntry.findMany({
       where: {
@@ -294,10 +294,21 @@ export class TimetablePrintService {
       },
     });
 
-    const bySlot = new Map<
-      string,
-      { staffProfileId: string; classroomId: string | null }
-    >();
+    type PoolStaffHit = { staffProfileId: string; classroomId: string | null };
+    const bySlot = new Map<string, PoolStaffHit[]>();
+    const byCategory = new Map<string, PoolStaffHit[]>();
+    const pushUnique = (
+      map: Map<string, PoolStaffHit[]>,
+      key: string,
+      payload: PoolStaffHit,
+    ) => {
+      const list = map.get(key) ?? [];
+      if (!list.some((row) => row.staffProfileId === payload.staffProfileId)) {
+        list.push(payload);
+        map.set(key, list);
+      }
+    };
+
     for (const row of assigned) {
       if (!row.staffProfileId) continue;
       const cat = String(row.fyugpCategory ?? '').toUpperCase();
@@ -305,16 +316,18 @@ export class TimetablePrintService {
         staffProfileId: row.staffProfileId,
         classroomId: row.classroomId,
       };
-      const withSem = `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|${row.semesterSequence ?? ''}`;
-      const noSem = `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|`;
-      if (!bySlot.has(withSem)) bySlot.set(withSem, payload);
-      if (!bySlot.has(noSem)) bySlot.set(noSem, payload);
+      pushUnique(
+        bySlot,
+        `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|${row.semesterSequence ?? ''}`,
+        payload,
+      );
+      pushUnique(
+        bySlot,
+        `${cat}|${row.dayOfWeek}|${row.periodNo ?? ''}|`,
+        payload,
+      );
     }
 
-    const byCategory = new Map<
-      string,
-      { staffProfileId: string; classroomId: string | null }
-    >();
     for (const section of sections) {
       if (!section.staffProfileId) continue;
       const cat = String(section.courseOffering.category ?? '').toUpperCase();
@@ -322,29 +335,99 @@ export class TimetablePrintService {
         staffProfileId: section.staffProfileId,
         classroomId: section.classroomId,
       };
-      const withSem = `${cat}|${section.courseOffering.semesterSequence ?? ''}`;
-      const noSem = `${cat}|`;
-      if (!byCategory.has(withSem)) byCategory.set(withSem, payload);
-      if (!byCategory.has(noSem)) byCategory.set(noSem, payload);
+      pushUnique(
+        byCategory,
+        `${cat}|${section.courseOffering.semesterSequence ?? ''}`,
+        payload,
+      );
+      pushUnique(byCategory, `${cat}|`, payload);
     }
 
     return entries.map((entry) => {
-      if (entry.staffProfileId || !this.isPoolPlaceholder(entry)) return entry;
+      if (!this.isPoolPlaceholder(entry)) return entry;
       const cat = String(entry.fyugpCategory ?? '').toUpperCase();
-      const hit =
+      const hits =
         bySlot.get(
           `${cat}|${entry.dayOfWeek}|${entry.periodNo ?? ''}|${entry.semesterSequence ?? ''}`,
         ) ??
         bySlot.get(`${cat}|${entry.dayOfWeek}|${entry.periodNo ?? ''}|`) ??
         byCategory.get(`${cat}|${entry.semesterSequence ?? ''}`) ??
-        byCategory.get(`${cat}|`);
-      if (!hit) return entry;
+        byCategory.get(`${cat}|`) ??
+        [];
+      if (!hits.length && !entry.staffProfileId) return entry;
+      const staffProfileId =
+        entry.staffProfileId ?? hits[0]?.staffProfileId ?? null;
+      const team: Array<{ staffProfileId: string; role: string }> = [];
+      const pushTeam = (id?: string | null) => {
+        if (!id || team.some((row) => row.staffProfileId === id)) return;
+        team.push({ staffProfileId: id, role: 'POOL' });
+      };
+      pushTeam(staffProfileId);
+      for (const hit of hits) pushTeam(hit.staffProfileId);
+      const meta =
+        entry.metadata && typeof entry.metadata === 'object'
+          ? (entry.metadata as Record<string, unknown>)
+          : {};
       return {
         ...entry,
-        staffProfileId: hit.staffProfileId,
-        classroomId: entry.classroomId ?? hit.classroomId,
+        staffProfileId,
+        classroomId: entry.classroomId ?? hits[0]?.classroomId ?? null,
+        metadata: {
+          ...meta,
+          facultyTeam: team.length ? team : meta.facultyTeam,
+        },
       };
     });
+  }
+
+  private entryStaffIds(entry: {
+    staffProfileId?: string | null;
+    metadata?: unknown;
+  }): string[] {
+    const team = Array.isArray(
+      (entry.metadata as { facultyTeam?: { staffProfileId?: string }[] } | null)
+        ?.facultyTeam,
+    )
+      ? ((entry.metadata as { facultyTeam?: { staffProfileId?: string }[] })
+          .facultyTeam ?? [])
+      : [];
+    return [
+      entry.staffProfileId,
+      ...team.map((member) => member.staffProfileId),
+    ].filter((id): id is string => Boolean(id));
+  }
+
+  private withResolvedFacultyTeam(
+    metadata: unknown,
+    staffById: Map<
+      string,
+      { shortCode?: string | null; fullName?: string | null }
+    >,
+  ) {
+    const meta =
+      metadata && typeof metadata === 'object'
+        ? { ...(metadata as Record<string, unknown>) }
+        : {};
+    const team = Array.isArray(meta.facultyTeam) ? meta.facultyTeam : [];
+    if (!team.length)
+      return Object.keys(meta).length ? meta : (metadata ?? null);
+    meta.facultyTeam = team.map((member) => {
+      const row = (member ?? {}) as {
+        staffProfileId?: string;
+        shortCode?: string | null;
+        fullName?: string | null;
+        role?: string;
+      };
+      const staff = row.staffProfileId
+        ? staffById.get(row.staffProfileId)
+        : undefined;
+      return {
+        ...row,
+        shortCode: staff?.shortCode ?? row.shortCode ?? null,
+        fullName: staff?.fullName ?? row.fullName ?? null,
+      };
+    });
+    return meta;
   }
 
   private uniqueSlotsFromEntries(entries: any[]) {

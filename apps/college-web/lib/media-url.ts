@@ -27,13 +27,14 @@ const mediaOrigin = () => {
 
 export function absoluteMediaUrl(src: string): string {
   if (!src) return src;
-  if (/^https?:\/\//i.test(src) || src.startsWith('/images/')) return src;
-  // Rewrite accidental Docker-internal URLs baked into cached HTML
-  if (/^https?:\/\/api(?::\d+)?\//i.test(src)) {
-    const path = src.replace(/^https?:\/\/api(?::\d+)?/i, '');
+  if (src.startsWith('/images/')) return src;
+  // Rewrite accidental Docker-internal / localhost URLs baked into cached HTML
+  if (/^https?:\/\/(api|localhost|127\.0\.0\.1)(?::\d+)?\//i.test(src)) {
+    const path = src.replace(/^https?:\/\/[^/]+/i, '');
     const origin = mediaOrigin();
     return origin ? `${origin}${path}` : path;
   }
+  if (/^https?:\/\//i.test(src)) return src;
   if (src.startsWith('/')) {
     const origin = mediaOrigin();
     return origin ? `${origin}${src}` : src;

@@ -147,6 +147,27 @@ describe('AttendancePolicyService collection modes', () => {
     expect(resolved.map((r) => r.entry.id)).toEqual(['e1', 'e6']);
   });
 
+  it('FIRST_LAST keeps a pool paper on its own first/last, even mid-day', () => {
+    const s = service();
+    const resolved = s.resolveCountableEntries('FIRST_LAST', [
+      ...entries,
+      {
+        id: 'mdc-p3',
+        periodNo: 3,
+        planId: 'plan-mdc',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        offeringSectionId: 'mdc-112',
+        startTime: '10:45',
+      },
+    ]);
+    expect(resolved.map((r) => r.entry.id).sort()).toEqual([
+      'e1',
+      'e6',
+      'mdc-p3',
+    ]);
+  });
+
   it('unit labels adapt by mode', () => {
     const s = service();
     expect(s.unitLabels('ONCE_PER_DAY').working).toBe('Working Days');

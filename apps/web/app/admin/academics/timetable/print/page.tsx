@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Printer, X } from 'lucide-react';
+import { TimetableDepartmentNoticePrint } from '@/components/timetable/timetable-department-notice-print';
 import { TimetablePrintDocument } from '@/components/timetable/timetable-print-document';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled, useRequireAuth } from '@/hooks/use-auth';
@@ -24,10 +25,12 @@ function TimetablePrintPageContent() {
   const printedRef = useRef(false);
 
   const planId = searchParams.get('planId') ?? '';
-  const semester = searchParams.get('semester');
-  const staffProfileId = searchParams.get('staffProfileId') ?? undefined;
-  const classroomId = searchParams.get('classroomId') ?? undefined;
-  const sectionCode = searchParams.get('sectionCode') ?? undefined;
+  const layout = searchParams.get('layout') === 'notice' ? 'notice' : 'grid';
+  const isNotice = layout === 'notice';
+  const semester = isNotice ? null : searchParams.get('semester');
+  const staffProfileId = isNotice ? undefined : (searchParams.get('staffProfileId') ?? undefined);
+  const classroomId = isNotice ? undefined : (searchParams.get('classroomId') ?? undefined);
+  const sectionCode = isNotice ? undefined : (searchParams.get('sectionCode') ?? undefined);
   const autoprint = searchParams.get('autoprint') === '1';
   const effectiveShiftId = useEffectiveShiftId(undefined);
 
@@ -36,8 +39,11 @@ function TimetablePrintPageContent() {
 
   useEffect(() => {
     document.body.classList.add('timetable-print-mode');
-    return () => document.body.classList.remove('timetable-print-mode');
-  }, []);
+    if (isNotice) document.body.classList.add('timetable-print-mode-notice');
+    return () => {
+      document.body.classList.remove('timetable-print-mode', 'timetable-print-mode-notice');
+    };
+  }, [isNotice]);
 
   const contextQ = useQuery({
     queryKey: ['timetable', 'context', 'print'],
@@ -57,6 +63,7 @@ function TimetablePrintPageContent() {
       'matrix',
       'print',
       planId,
+      layout,
       semester,
       staffProfileId,
       classroomId,
@@ -87,10 +94,13 @@ function TimetablePrintPageContent() {
     <div className="timetable-print-shell">
       <div className="timetable-print-toolbar no-print">
         <div>
-          <p className="text-sm font-semibold text-gray-900">Timetable Print Preview</p>
+          <p className="text-sm font-semibold text-gray-900">
+            {isNotice ? 'Department notice preview' : 'Timetable Print Preview'}
+          </p>
           <p className="text-xs text-gray-600">
-            A4 landscape. All semesters print as one page each (Sem 1 / 3 / 5) so all 6 periods fit.
-            Choose a single semester for one page only.
+            {isNotice
+              ? 'A4 portrait. One table per day with Sem 1 / 3 / 5 as rows, matching the printed department notice.'
+              : 'A4 landscape. All semesters print as one page each (Sem 1 / 3 / 5) so all 6 periods fit. Choose a single semester for one page only.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -116,15 +126,30 @@ function TimetablePrintPageContent() {
           Unable to load timetable. Check your session and try again.
         </p>
       ) : (
-        <TimetablePrintDocument
-          matrix={matrixQ.data}
-          plan={plan}
-          context={contextQ.data}
-          branding={brandingDoc}
-          semesterFilter={semester ? Number(semester) : undefined}
-          sectionFilter={sectionCode}
-          generatedAt={generatedAt.current}
-        />
+        <>
+          {isNotice ? (
+            <style>{`@media print { @page { size: A4 portrait; margin: 8mm; } }`}</style>
+          ) : null}
+          {isNotice ? (
+            <TimetableDepartmentNoticePrint
+              matrix={matrixQ.data}
+              plan={plan}
+              context={contextQ.data}
+              branding={brandingDoc}
+              generatedAt={generatedAt.current}
+            />
+          ) : (
+            <TimetablePrintDocument
+              matrix={matrixQ.data}
+              plan={plan}
+              context={contextQ.data}
+              branding={brandingDoc}
+              semesterFilter={semester ? Number(semester) : undefined}
+              sectionFilter={sectionCode}
+              generatedAt={generatedAt.current}
+            />
+          )}
+        </>
       )}
     </div>
   );

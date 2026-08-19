@@ -43,23 +43,19 @@ export default async function HomePage() {
     cmsEvents.push({
       id: row.id,
       title: row.title,
-      date: typeof row.date === 'string' ? row.date : new Date().toISOString().slice(0, 10),
+      date:
+        typeof row.date === 'string'
+          ? row.date.slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
       category: normalizeEventCategory(typeof row.category === 'string' ? row.category : undefined),
       href: typeof row.href === 'string' ? row.href : undefined,
       registrationHref: typeof row.registrationUrl === 'string' ? row.registrationUrl : undefined,
     });
   }
 
-  // Production: never resurrect demo seed events — CMS/empty only.
-  // Notices always come from getPublicNotices (already demo-slug filtered).
-  const useDemoFallbacks = process.env.NODE_ENV !== 'production';
   const hub = {
     ...content.informationHub,
-    upcomingEvents: cmsEvents.length
-      ? cmsEvents
-      : useDemoFallbacks
-        ? content.informationHub.upcomingEvents
-        : [],
+    upcomingEvents: cmsEvents.length ? cmsEvents : content.informationHub.upcomingEvents,
     notices: content.informationHub.notices,
     noticesHref: '/notices',
   };

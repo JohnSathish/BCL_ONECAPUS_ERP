@@ -9,7 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEffectiveShiftId } from '@/hooks/use-bind-workspace-shift';
 import { useShiftScope } from '@/hooks/use-shift-scope';
 import { fetchStreamMasterRoutine, fetchTimetablePlans } from '@/services/timetable';
-import { openTimetablePrint } from '@/lib/timetable/open-timetable-print';
+import {
+  openDepartmentNoticePrint,
+  openTimetablePrint,
+} from '@/lib/timetable/open-timetable-print';
 
 export default function TimetableReportsPage() {
   const { hideShiftSelectors, activeShiftName, activeShiftCode } = useShiftScope();
@@ -70,6 +73,16 @@ export default function TimetableReportsPage() {
               disabled={!planId}
             >
               Print / Save PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!planId) return;
+                openDepartmentNoticePrint(planId);
+              }}
+              disabled={!planId}
+            >
+              Dept. notice
             </Button>
           </CardContent>
         </Card>

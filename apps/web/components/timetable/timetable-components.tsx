@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  ClipboardList,
   FileDown,
   Play,
   Printer,
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
+  openDepartmentNoticePrint,
   openTimetablePrint,
   type TimetablePrintParams,
 } from '@/lib/timetable/open-timetable-print';
@@ -456,6 +458,39 @@ export function TimetableConflictPanel({ validation }: { validation?: TimetableC
   );
 }
 
+function TimetablePrintActions({ printOptions }: { printOptions?: TimetablePrintParams }) {
+  const planId = printOptions?.planId;
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!planId}
+        onClick={() => {
+          if (!printOptions?.planId) return;
+          openTimetablePrint(printOptions);
+        }}
+      >
+        <Printer className="mr-2 h-3.5 w-3.5" />
+        Print
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!planId}
+        title="Print Sem 1, 3 and 5 together like the department notice board"
+        onClick={() => {
+          if (!planId) return;
+          openDepartmentNoticePrint(planId);
+        }}
+      >
+        <ClipboardList className="mr-2 h-3.5 w-3.5" />
+        Dept. notice
+      </Button>
+    </>
+  );
+}
+
 export function TimetableMatrixGrid({
   matrix,
   editable,
@@ -485,18 +520,7 @@ export function TimetableMatrixGrid({
             `${matrix?.summary?.streamName ?? 'FYUGP'} Consolidated Routine`}
         </CardTitle>
         <div className="flex gap-2 print:hidden">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!printOptions?.planId}
-            onClick={() => {
-              if (!printOptions?.planId) return;
-              openTimetablePrint(printOptions);
-            }}
-          >
-            <Printer className="mr-2 h-3.5 w-3.5" />
-            Print
-          </Button>
+          <TimetablePrintActions printOptions={printOptions} />
           <Button size="sm" variant="outline">
             <FileDown className="mr-2 h-3.5 w-3.5" />
             CSV
@@ -642,10 +666,9 @@ export function TimetablePrintLayout({
           <h2 className="mt-1 text-xl font-semibold">{title}</h2>
         </div>
         {printOptions?.planId ? (
-          <Button size="sm" variant="outline" onClick={() => openTimetablePrint(printOptions)}>
-            <Printer className="mr-2 h-3.5 w-3.5" />
-            Print
-          </Button>
+          <div className="flex flex-wrap gap-2 print:hidden">
+            <TimetablePrintActions printOptions={printOptions} />
+          </div>
         ) : null}
       </div>
       <TimetableMatrixGrid matrix={matrix} printOptions={printOptions} />

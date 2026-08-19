@@ -274,10 +274,14 @@ export function readInformationHub(value: unknown): Partial<InformationHubConten
                 : seedInformationHub.leadership.leadershipHref,
           }
         : undefined,
-    upcomingEvents: Array.isArray(source.upcomingEvents)
-      ? (source.upcomingEvents as HubEvent[])
-      : undefined,
-    notices: Array.isArray(source.notices) ? (source.notices as HubNotice[]) : undefined,
+    upcomingEvents:
+      Array.isArray(source.upcomingEvents) && source.upcomingEvents.length
+        ? (source.upcomingEvents as HubEvent[])
+        : undefined,
+    notices:
+      Array.isArray(source.notices) && source.notices.length
+        ? (source.notices as HubNotice[])
+        : undefined,
     calendarHref: typeof source.calendarHref === 'string' ? source.calendarHref : undefined,
     noticesHref: typeof source.noticesHref === 'string' ? source.noticesHref : undefined,
   };

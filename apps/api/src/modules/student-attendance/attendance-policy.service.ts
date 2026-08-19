@@ -284,14 +284,25 @@ export class AttendancePolicyService {
     }
 
     if (canon === 'FIRST_LAST') {
-      const teachingPeriodNos = teaching
-        .map((e) => Number(e.periodNo))
-        .filter((n) => n > 0);
-      return teaching
-        .filter((e) =>
-          this.isPeriodCountable(mode, e.periodNo, teachingPeriodNos),
-        )
-        .map((entry) => ({ entry, collectionUnit: 'PERIOD' as const }));
+      const byCohort = new Map<string, T[]>();
+      for (const entry of teaching) {
+        const key = this.cohortKey(entry);
+        const bucket = byCohort.get(key) ?? [];
+        bucket.push(entry);
+        byCohort.set(key, bucket);
+      }
+      const out: ResolvedCountableEntry<T>[] = [];
+      for (const group of byCohort.values()) {
+        const teachingPeriodNos = group
+          .map((e) => Number(e.periodNo))
+          .filter((n) => n > 0);
+        for (const entry of group) {
+          if (this.isPeriodCountable(mode, entry.periodNo, teachingPeriodNos)) {
+            out.push({ entry, collectionUnit: 'PERIOD' });
+          }
+        }
+      }
+      return out;
     }
 
     if (canon === 'ONCE_PER_DAY') {

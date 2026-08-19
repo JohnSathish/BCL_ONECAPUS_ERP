@@ -314,6 +314,86 @@ body.timetable-print-mode {
   white-space: nowrap;
 }
 
+.timetable-print-notice {
+  max-width: 210mm;
+}
+
+.timetable-print-notice-dept {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 9pt;
+  font-weight: 600;
+}
+
+.timetable-print-notice-day {
+  margin: 0 0 7px;
+}
+
+.timetable-print-notice-table {
+  font-size: 7pt;
+}
+
+.timetable-print-notice-table .notice-day-col,
+.timetable-print-notice-table .notice-day-cell {
+  width: 72px;
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f3f4f6 !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.timetable-print-notice-table .notice-sem-col,
+.timetable-print-notice-table .notice-sem-cell {
+  width: 52px;
+  text-align: center;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.timetable-print-notice-table td {
+  text-align: center;
+  vertical-align: middle;
+  font-size: 7pt;
+  font-weight: 600;
+  padding: 3px 2px;
+}
+
+.timetable-print-notice-table .break-row,
+.timetable-print-notice-table td.break-row {
+  background: #fef3c7 !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.timetable-print-notice-table .notice-pool-cell {
+  background: #f0fdf4 !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.timetable-print-notice-sign {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 14px;
+  padding-top: 18px;
+  font-size: 8pt;
+}
+
+.timetable-print-notice-sign-line {
+  margin: 28px 0 0;
+  border-top: 1px solid #111;
+  padding-top: 3px;
+  min-width: 160px;
+  font-size: 7pt;
+  color: #374151;
+}
+
 .timetable-print-loading {
   max-width: 640px;
   margin: 4rem auto;
@@ -398,6 +478,11 @@ body.timetable-print-mode {
   .timetable-print-legend,
   .timetable-print-staff-directory,
   .timetable-print-footer {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .timetable-print-notice-day {
     page-break-inside: avoid;
     break-inside: avoid;
   }

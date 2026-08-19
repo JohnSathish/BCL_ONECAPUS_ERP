@@ -984,14 +984,38 @@ export class StaffPortalService {
       }
     };
 
+    const taughtSections = await this.prisma.offeringSection.findMany({
+      where: { tenantId, staffProfileId, deletedAt: null },
+      select: { id: true },
+    });
+    const taughtSectionIds = taughtSections.map((row) => row.id);
+
     const planEntries = await this.prisma.timetablePlanEntry.findMany({
       where: {
         tenantId,
-        staffProfileId,
         dayOfWeek,
         deletedAt: null,
         status: { not: 'CANCELLED' },
-        plan: { tenantId, status: 'PUBLISHED', deletedAt: null },
+        plan: { tenantId, deletedAt: null },
+        OR: [
+          { staffProfileId },
+          ...(taughtSectionIds.length
+            ? [{ offeringSectionId: { in: taughtSectionIds } }]
+            : []),
+        ],
+        AND: [
+          {
+            OR: [
+              { plan: { status: 'PUBLISHED' } },
+              {
+                metadata: {
+                  path: ['electiveAllocation'],
+                  equals: true,
+                } as any,
+              },
+            ],
+          },
+        ],
       },
       include: {
         plan: { select: { id: true, shiftId: true, name: true } },

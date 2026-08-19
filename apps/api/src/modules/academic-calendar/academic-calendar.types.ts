@@ -167,6 +167,17 @@ export const MEETING_TYPES = new Set<string>([
   'STAFF_EVENT',
 ]);
 
+/** Routine / staff-only types omitted when falling back to unpublished-website PUBLIC events. */
+export const WEBSITE_FALLBACK_EXCLUDED_TYPES = [
+  'WORKING_DAY',
+  'WEEKEND',
+  'STAFF_MEETING',
+  'DEPARTMENT_MEETING',
+  'STAFF_EVENT',
+  'LEAVE',
+  'MAINTENANCE',
+] as const;
+
 const BREAK_TYPES = new Set<string>([
   'TEACHING_BREAK',
   'SEMESTER_END',
