@@ -7,7 +7,7 @@
 #
 # Run on the VPS:
 #   cd /opt/nep-erp && git pull origin master && bash scripts/deploy/vps-restore-extra-sites-ssl.sh
-# Optional: MERCY_BACKEND_PORT=13000 SACRED_BACKEND_PORT=13001 DIOCESE_BACKEND_PORT=13002
+# Optional: MERCY_BACKEND_PORT=13000 DIOCESE_BACKEND_PORT=13100 DIOCESE_API_PORT=14100
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
@@ -68,28 +68,17 @@ cert_ok_for_site() {
   openssl x509 -in "${cert_dir}/fullchain.pem" -noout -text 2>/dev/null | grep -q "DNS:${site}"
 }
 
-classify_site_from_body() {
-  local body="$1"
-  if echo "$body" | grep -qiE 'Mercy Dosa|Dosa House'; then
-    echo mercydosahouse.com
-    return 0
-  fi
-  if echo "$body" | grep -qiE 'Sacred Heart|Shrine Tura'; then
-    echo sacredheartshrinetura.in
-    return 0
-  fi
-  if echo "$body" | grep -qiE 'Tura Diocese|Diocese of Tura|turadiocese'; then
-    echo turadiocese.in
-    return 0
-  fi
-  return 1
-}
+# docker-website = Mercy Dosa. bcl-diocese-web = Diocese + parish sites
+# (sacredheartshrinetura.in is a host on the Diocese app, not a separate container).
+OVERRIDE_MERCY_WEB="${MERCY_BACKEND_PORT:-}"
+OVERRIDE_MERCY_ADMIN="${MERCY_ADMIN_BACKEND_PORT:-}"
+OVERRIDE_DIOCESE_WEB="${DIOCESE_BACKEND_PORT:-}"
+OVERRIDE_DIOCESE_API="${DIOCESE_API_PORT:-}"
 
-# OpenLiteSpeed is not installed on this VPS. Extra sites are separate Docker
-# apps on 13000-series ports. Never reuse one app for every Host — Mercy Dosa
-# ignores Host and would otherwise appear on sacredheartshrinetura.in too.
-declare -A SITE_PORT=()
-CANDIDATE_PORTS=()
+MERCY_WEB_PORT=""
+MERCY_ADMIN_PORT=""
+DIOCESE_WEB_PORT=""
+DIOCESE_API_PORT=""
 
 while read -r name ports; do
   [[ -n "${name:-}" ]] || continue
@@ -99,47 +88,31 @@ while read -r name ports; do
   case "$hostport" in
     80|443|3000|3001|3002|8080|8443|6379|15432) continue ;;
   esac
-  CANDIDATE_PORTS+=("$hostport")
   case "$lname" in
-    *mercy*|*dosa*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
-    *sacred*|*shrine*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
-    *diocese*|*turadiocese*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
+    docker-website*|mercy-website*|mercy-web*) MERCY_WEB_PORT="$hostport" ;;
+    docker-admin*|mercy-admin*) MERCY_ADMIN_PORT="$hostport" ;;
+    bcl-diocese-web*|diocese-web*) DIOCESE_WEB_PORT="$hostport" ;;
+    bcl-diocese-api*|diocese-api*) DIOCESE_API_PORT="$hostport" ;;
   esac
 done < <(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null || true)
 
-CANDIDATE_PORTS+=(13000 13001 13002 13100 14100 8088 8888 8008 9080)
+[[ -n "$OVERRIDE_MERCY_WEB" ]] && MERCY_WEB_PORT="$OVERRIDE_MERCY_WEB"
+[[ -n "$OVERRIDE_MERCY_ADMIN" ]] && MERCY_ADMIN_PORT="$OVERRIDE_MERCY_ADMIN"
+[[ -n "$OVERRIDE_DIOCESE_WEB" ]] && DIOCESE_WEB_PORT="$OVERRIDE_DIOCESE_WEB"
+[[ -n "$OVERRIDE_DIOCESE_API" ]] && DIOCESE_API_PORT="$OVERRIDE_DIOCESE_API"
+[[ -n "${SACRED_BACKEND_PORT:-}" ]] && DIOCESE_WEB_PORT="$SACRED_BACKEND_PORT"
 
-# Unique ports, preserve order.
-declare -A SEEN_PORT=()
-UNIQUE_PORTS=()
-for port in "${CANDIDATE_PORTS[@]}"; do
-  [[ -n "${SEEN_PORT[$port]:-}" ]] && continue
-  SEEN_PORT[$port]=1
-  UNIQUE_PORTS+=("$port")
-done
+declare -A SITE_PORT=()
+[[ -n "$MERCY_WEB_PORT" ]] && SITE_PORT[mercydosahouse.com]="$MERCY_WEB_PORT"
+[[ -n "$DIOCESE_WEB_PORT" ]] && SITE_PORT[turadiocese.in]="$DIOCESE_WEB_PORT"
+[[ -n "$DIOCESE_WEB_PORT" ]] && SITE_PORT[sacredheartshrinetura.in]="$DIOCESE_WEB_PORT"
 
 echo
-echo "--- Probing backends with Host (content must match the domain) ---"
-for site in "${SITES[@]}"; do
-  for port in "${UNIQUE_PORTS[@]}"; do
-    body="$(curl -4 -sS --max-time 4 -H "Host: ${site}" "http://127.0.0.1:${port}/" 2>/dev/null | tr '\n' ' ' | head -c 5000 || true)"
-    [[ -n "$body" ]] || continue
-    if echo "$body" | grep -qiE 'moodle|journals-portal|Don Bosco College'; then
-      continue
-    fi
-    classified="$(classify_site_from_body "$body" || true)"
-    if [[ "$classified" == "$site" ]]; then
-      SITE_PORT[$site]="$port"
-      echo "  MATCH ${site} on :${port}"
-      break
-    fi
-  done
-done
-
-# Manual overrides if a site is up but the HTML fingerprint missed it.
-[[ -n "${MERCY_BACKEND_PORT:-}" ]] && SITE_PORT[mercydosahouse.com]="$MERCY_BACKEND_PORT"
-[[ -n "${SACRED_BACKEND_PORT:-}" ]] && SITE_PORT[sacredheartshrinetura.in]="$SACRED_BACKEND_PORT"
-[[ -n "${DIOCESE_BACKEND_PORT:-}" ]] && SITE_PORT[turadiocese.in]="$DIOCESE_BACKEND_PORT"
+echo "--- Docker name map ---"
+echo "  Mercy web    : ${MERCY_WEB_PORT:-MISSING}"
+echo "  Mercy admin  : ${MERCY_ADMIN_PORT:-MISSING}"
+echo "  Diocese web  : ${DIOCESE_WEB_PORT:-MISSING} (also sacredheartshrinetura.in)"
+echo "  Diocese API  : ${DIOCESE_API_PORT:-MISSING} (api.turadiocese.in)"
 
 echo
 echo "--- Per-site backends ---"
@@ -225,48 +198,46 @@ echo
 echo "--- Write nginx extra-site vhosts ---"
 gen="${APP_DIR}/nginx/extra-sites.d/hosted-sites.conf"
 
-site_server_names() {
-  local site="$1"
-  case "$site" in
-    mercydosahouse.com) echo "${site} www.${site} admin.mercydosahouse.com" ;;
-    *) echo "${site} www.${site}" ;;
-  esac
-}
-
-{
-  echo "# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) by vps-restore-extra-sites-ssl.sh"
-  echo "# Each server_name has its own backend. Unmapped hosts return 503."
-  echo
-  for site in "${SITES[@]}"; do
-    cert="/etc/letsencrypt/live/${site}"
-    names="$(site_server_names "$site")"
-    port="${SITE_PORT[$site]:-}"
-    if [[ -n "$port" ]]; then
-      location_block=$(cat <<EOF
-  location / {
-    proxy_pass         http://host.docker.internal:${port};
+proxy_headers() {
+  cat <<'EOF'
     proxy_http_version 1.1;
-    proxy_set_header   Host \$host;
-    proxy_set_header   X-Real-IP \$remote_addr;
-    proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header   Host $host;
+    proxy_set_header   X-Real-IP $remote_addr;
+    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto https;
-    proxy_set_header   X-Forwarded-Host \$host;
+    proxy_set_header   X-Forwarded-Host $host;
     proxy_connect_timeout 5s;
     proxy_read_timeout 120s;
     proxy_send_timeout 120s;
-  }
 EOF
-)
-    else
-      location_block=$(cat <<EOF
-  location / {
+}
+
+emit_vhost() {
+  local names="$1"
+  local cert="$2"
+  local port="$3"
+  local api_port="${4:-}"
+  local location_block
+  if [[ -n "$port" ]]; then
+    location_block="  location / {
+    proxy_pass         http://host.docker.internal:${port};
+$(proxy_headers)
+  }"
+    if [[ -n "$api_port" ]]; then
+      location_block="  location /api {
+    proxy_pass         http://host.docker.internal:${api_port};
+$(proxy_headers)
+  }
+
+${location_block}"
+    fi
+  else
+    location_block='  location / {
     default_type text/plain;
     return 503 "This domain is not mapped to a running app on this server.";
-  }
-EOF
-)
-    fi
-    cat <<EOF
+  }'
+  fi
+  cat <<EOF
 server {
   listen 80;
   server_name ${names};
@@ -297,7 +268,22 @@ ${location_block}
 }
 
 EOF
-  done
+}
+
+{
+  echo "# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) by vps-restore-extra-sites-ssl.sh"
+  echo "# Mercy docker-website / docker-admin; Diocese bcl-diocese-web + bcl-diocese-api."
+  echo
+  emit_vhost "mercydosahouse.com www.mercydosahouse.com" \
+    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_WEB_PORT:-}"
+  emit_vhost "admin.mercydosahouse.com" \
+    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_ADMIN_PORT:-}"
+  emit_vhost "turadiocese.in www.turadiocese.in sacredheart.turadiocese.in" \
+    /etc/letsencrypt/live/turadiocese.in "${DIOCESE_WEB_PORT:-}" "${DIOCESE_API_PORT:-}"
+  emit_vhost "api.turadiocese.in" \
+    /etc/letsencrypt/live/turadiocese.in "${DIOCESE_API_PORT:-}"
+  emit_vhost "sacredheartshrinetura.in www.sacredheartshrinetura.in" \
+    /etc/letsencrypt/live/sacredheartshrinetura.in "${DIOCESE_WEB_PORT:-}" "${DIOCESE_API_PORT:-}"
 } > "$gen"
 
 cp nginx/nginx.combined-dbc.ssl.conf nginx/nginx.conf
@@ -327,14 +313,12 @@ fi
 
 echo
 echo "=== Extra-site SSL restored ==="
-echo "Each hostname now has its own backend (or 503 if that app is down)."
 echo "OpenLiteSpeed/lswsctrl is not used on this server."
-for site in "${SITES[@]}"; do
-  if [[ -n "${SITE_PORT[$site]:-}" ]]; then
-    echo "  https://${site}/  -> :${SITE_PORT[$site]}"
-  else
-    echo "  https://${site}/  -> 503 (start that site's container, then re-run)"
-  fi
-done
+echo "  https://mercydosahouse.com/              -> :${MERCY_WEB_PORT:-503}"
+echo "  https://admin.mercydosahouse.com/        -> :${MERCY_ADMIN_PORT:-503}"
+echo "  https://turadiocese.in/                  -> :${DIOCESE_WEB_PORT:-503}"
+echo "  https://sacredheart.turadiocese.in/      -> :${DIOCESE_WEB_PORT:-503}"
+echo "  https://sacredheartshrinetura.in/        -> :${DIOCESE_WEB_PORT:-503} (Diocese parish host)"
+echo "  https://api.turadiocese.in/              -> :${DIOCESE_API_PORT:-503}"
 echo
 echo "College ERP HTTPS was not changed."
