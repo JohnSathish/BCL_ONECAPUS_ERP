@@ -111,17 +111,31 @@ ensure_ols_proxy_listener
 
 detect_backend_port() {
   local domain="$1"
-  local port code
-  for port in ${BACKEND_PORT:-} 8088 8080 8888 8008 9080; do
+  local port code body
+  # 8080 is Moodle on this VPS — never treat it as a CyberPanel site.
+  for port in ${BACKEND_PORT:-} 8088 8888 8008 9080 8090; do
     [[ -n "$port" ]] || continue
+    [[ "$port" == "8080" ]] && continue
     code="$(curl -4 -sS -o /tmp/extra-site-body --max-time 4 -w '%{http_code}' \
       -H "Host: ${domain}" "http://127.0.0.1:${port}/" || true)"
+    body="$(head -c 400 /tmp/extra-site-body 2>/dev/null || true)"
+    if echo "$body" | grep -qiE 'moodle|nextjs|journals-portal|Don Bosco College'; then
+      continue
+    fi
     if [[ "$code" =~ ^(200|301|302|303|307|308)$ ]]; then
       echo "$port"
       return 0
     fi
   done
   return 1
+}
+
+cert_ok_for_site() {
+  local site="$1"
+  local cert_dir="/etc/letsencrypt/live/${site}"
+  [[ -f "${cert_dir}/fullchain.pem" ]] || return 1
+  openssl x509 -in "${cert_dir}/fullchain.pem" -noout -checkend 2592000 >/dev/null 2>&1 || return 1
+  openssl x509 -in "${cert_dir}/fullchain.pem" -noout -text 2>/dev/null | grep -q "DNS:${site}"
 }
 
 BACKEND=""
@@ -143,52 +157,65 @@ if [[ -z "$BACKEND" ]]; then
   ss -lptn 2>/dev/null | head -40 || true
 fi
 
-PROBE="nep-extra-acme-$(date +%s)"
-echo "ok-${PROBE}" > "certbot/www/.well-known/acme-challenge/${PROBE}"
-"${COMPOSE[@]}" up -d nginx
-sleep 3
-
+NEED_ACME=0
 echo
-echo "--- HTTP-01 reachability ---"
-HTTP_FAIL=0
+echo "--- Certificate coverage ---"
 for site in "${SITES[@]}"; do
-  body="$(curl -4 -sS --max-time 15 "http://${site}/.well-known/acme-challenge/${PROBE}" || true)"
-  if [[ "$body" == "ok-${PROBE}" ]]; then
-    echo "OK  ${site}"
+  if cert_ok_for_site "$site"; then
+    echo "KEEP ${site} (existing Let's Encrypt cert is valid)"
   else
-    echo "FAIL ${site} (got: ${body:0:80})"
-    HTTP_FAIL=1
+    echo "NEED ${site}"
+    NEED_ACME=1
   fi
 done
-rm -f "certbot/www/.well-known/acme-challenge/${PROBE}"
 
-if [[ "$HTTP_FAIL" -ne 0 ]]; then
-  echo "ERROR: Let's Encrypt cannot validate extra hosts over HTTP :80."
-  exit 1
-fi
+if [[ "$NEED_ACME" -eq 1 ]]; then
+  echo
+  echo "--- Apply ACME-capable nginx, then HTTP-01 ---"
+  cp nginx/nginx.combined-dbc.ssl.conf nginx/nginx.conf
+  "${COMPOSE[@]}" up -d --force-recreate nginx
+  sleep 4
 
-echo
-echo "--- Issue / reuse Let's Encrypt certificates ---"
-for site in "${SITES[@]}"; do
-  cert_dir="/etc/letsencrypt/live/${site}"
-  if [[ -f "${cert_dir}/fullchain.pem" ]] && openssl x509 -in "${cert_dir}/fullchain.pem" -noout -checkend 2592000 >/dev/null 2>&1; then
-    if openssl x509 -in "${cert_dir}/fullchain.pem" -noout -text | grep -q "DNS:${site}"; then
-      echo "KEEP ${site} (existing cert still valid)"
-      continue
+  PROBE="nep-extra-acme-$(date +%s)"
+  echo "ok-${PROBE}" > "certbot/www/.well-known/acme-challenge/${PROBE}"
+
+  HTTP_FAIL=0
+  for site in "${SITES[@]}"; do
+    cert_ok_for_site "$site" && continue
+    body="$(curl -4 -sS --max-time 15 "http://${site}/.well-known/acme-challenge/${PROBE}" || true)"
+    if [[ "$body" == "ok-${PROBE}" ]]; then
+      echo "OK  ${site}"
+    else
+      echo "FAIL ${site} (got: ${body:0:80})"
+      HTTP_FAIL=1
     fi
+  done
+  rm -f "certbot/www/.well-known/acme-challenge/${PROBE}"
+
+  if [[ "$HTTP_FAIL" -ne 0 ]]; then
+    echo "ERROR: Let's Encrypt cannot validate missing hosts over HTTP :80."
+    exit 1
   fi
-  echo "REQUEST ${site} + www.${site}"
-  certbot certonly \
-    --webroot -w "${APP_DIR}/certbot/www" \
-    --cert-name "$site" \
-    -d "$site" -d "www.${site}" \
-    --email "$EMAIL" \
-    --agree-tos \
-    --no-eff-email \
-    --non-interactive \
-    --expand \
-    --preferred-challenges http
-done
+
+  echo
+  echo "--- Issue missing certificates ---"
+  for site in "${SITES[@]}"; do
+    cert_ok_for_site "$site" && continue
+    echo "REQUEST ${site} + www.${site}"
+    certbot certonly \
+      --webroot -w "${APP_DIR}/certbot/www" \
+      --cert-name "$site" \
+      -d "$site" -d "www.${site}" \
+      --email "$EMAIL" \
+      --agree-tos \
+      --no-eff-email \
+      --non-interactive \
+      --expand \
+      --preferred-challenges http
+  done
+else
+  echo "All extra-site certificates already exist — skipping HTTP-01 / certbot."
+fi
 
 echo
 echo "--- Write nginx extra-site vhosts ---"
