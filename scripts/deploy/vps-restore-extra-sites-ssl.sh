@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Restore SSL + reverse-proxy for extra websites that share the ERP VPS IP.
 #
-# Docker nginx owns :80/:443 and currently serves the ERP certificate for any
-# unmatched hostname (mercydosahouse.com, sacredheartshrinetura.in, turadiocese.in).
-# Chrome then shows NET::ERR_CERT_COMMON_NAME_INVALID.
+# OpenLiteSpeed is not installed on this VPS (no /usr/local/lsws). Extra sites
+# are separate Docker apps. Each hostname must proxy to its own published port;
+# otherwise sacredheartshrinetura.in shows Mercy Dosa House.
 #
 # Run on the VPS:
 #   cd /opt/nep-erp && git pull origin master && bash scripts/deploy/vps-restore-extra-sites-ssl.sh
+# Optional: MERCY_BACKEND_PORT=13000 SACRED_BACKEND_PORT=13001 DIOCESE_BACKEND_PORT=13002
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
 EMAIL="${SSL_EMAIL:-admin@donboscocollege.ac.in}"
-BACKEND_PORT="${EXTRA_SITES_BACKEND_PORT:-}"
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
 
 SITES=(
@@ -56,55 +56,9 @@ echo "--- Who owns :80 / :443 ---"
 ss -lptn 'sport = :80 or sport = :443' 2>/dev/null || netstat -lptn | grep -E ':80|:443' || true
 
 echo
-echo "--- Local HTTP listeners (CyberPanel / OpenLiteSpeed candidates) ---"
-ss -lptn 2>/dev/null | grep -E 'lshttpd|openlitespeed|httpd|apache|lsws' || true
-
-ensure_ols_proxy_listener() {
-  local conf="/usr/local/lsws/conf/httpd_config.conf"
-  local ctrl="/usr/local/lsws/bin/lswsctrl"
-  if [[ ! -f "$conf" ]]; then
-    echo "WARN: OpenLiteSpeed config not found at $conf"
-    return 0
-  fi
-
-  echo "Moving OpenLiteSpeed off :80/:443 (Docker nginx owns those) onto 127.0.0.1:8088"
-  cp "$conf" "${conf}.bak.docker-bind.$(date +%Y%m%d%H%M%S)"
-  sed -i -E 's/^([[:space:]]*address[[:space:]]+)\*:80[[:space:]]*$/\1127.0.0.1:8088/' "$conf"
-  sed -i -E 's/^([[:space:]]*address[[:space:]]+)\*:443[[:space:]]*$/\1127.0.0.1:8444/' "$conf"
-
-  if [[ -x "$ctrl" ]]; then
-    "$ctrl" restart || "$ctrl" start || true
-  fi
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl start lsws 2>/dev/null || true
-    systemctl start lscpd 2>/dev/null || true
-  fi
-  sleep 3
-  ss -lptn 2>/dev/null | grep -E '8088|lshttpd|openlitespeed' || true
-}
-
-ensure_ols_proxy_listener
-
-detect_backend_port() {
-  local domain="$1"
-  local port code body
-  # 8080/8443 are Moodle. 80/443 are Docker nginx.
-  for port in ${BACKEND_PORT:-} 8088 13000 13001 13002 13100 14100 8888 8008 9080 8090 7080; do
-    [[ -n "$port" ]] || continue
-    [[ "$port" == "8080" || "$port" == "8443" ]] && continue
-    code="$(curl -4 -sS -o /tmp/extra-site-body --max-time 4 -w '%{http_code}' \
-      -H "Host: ${domain}" "http://127.0.0.1:${port}/" || true)"
-    body="$(head -c 400 /tmp/extra-site-body 2>/dev/null || true)"
-    if echo "$body" | grep -qiE 'moodle|nextjs|journals-portal|Don Bosco College'; then
-      continue
-    fi
-    if [[ "$code" =~ ^(200|301|302|303|307|308)$ ]]; then
-      echo "$port"
-      return 0
-    fi
-  done
-  return 1
-}
+echo "--- Docker containers (likely extra-site backends) ---"
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' 2>/dev/null || true
+echo "homes: $(ls /home 2>/dev/null | tr '\n' ' ' || echo none)"
 
 cert_ok_for_site() {
   local site="$1"
@@ -114,23 +68,97 @@ cert_ok_for_site() {
   openssl x509 -in "${cert_dir}/fullchain.pem" -noout -text 2>/dev/null | grep -q "DNS:${site}"
 }
 
-BACKEND=""
+classify_site_from_body() {
+  local body="$1"
+  if echo "$body" | grep -qiE 'Mercy Dosa|Dosa House'; then
+    echo mercydosahouse.com
+    return 0
+  fi
+  if echo "$body" | grep -qiE 'Sacred Heart|Shrine Tura'; then
+    echo sacredheartshrinetura.in
+    return 0
+  fi
+  if echo "$body" | grep -qiE 'Tura Diocese|Diocese of Tura|turadiocese'; then
+    echo turadiocese.in
+    return 0
+  fi
+  return 1
+}
+
+# OpenLiteSpeed is not installed on this VPS. Extra sites are separate Docker
+# apps on 13000-series ports. Never reuse one app for every Host — Mercy Dosa
+# ignores Host and would otherwise appear on sacredheartshrinetura.in too.
+declare -A SITE_PORT=()
+CANDIDATE_PORTS=()
+
+while read -r name ports; do
+  [[ -n "${name:-}" ]] || continue
+  lname="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+  hostport="$(echo "$ports" | grep -oE '0\.0\.0\.0:[0-9]+' | head -1 | cut -d: -f2 || true)"
+  [[ -n "$hostport" ]] || continue
+  case "$hostport" in
+    80|443|3000|3001|3002|8080|8443|6379|15432) continue ;;
+  esac
+  CANDIDATE_PORTS+=("$hostport")
+  case "$lname" in
+    *mercy*|*dosa*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
+    *sacred*|*shrine*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
+    *diocese*|*turadiocese*) CANDIDATE_PORTS=("$hostport" "${CANDIDATE_PORTS[@]}") ;;
+  esac
+done < <(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null || true)
+
+CANDIDATE_PORTS+=(13000 13001 13002 13100 14100 8088 8888 8008 9080)
+
+# Unique ports, preserve order.
+declare -A SEEN_PORT=()
+UNIQUE_PORTS=()
+for port in "${CANDIDATE_PORTS[@]}"; do
+  [[ -n "${SEEN_PORT[$port]:-}" ]] && continue
+  SEEN_PORT[$port]=1
+  UNIQUE_PORTS+=("$port")
+done
+
+echo
+echo "--- Probing backends with Host (content must match the domain) ---"
 for site in "${SITES[@]}"; do
-  if port="$(detect_backend_port "$site")"; then
-    BACKEND="$port"
-    echo "Detected extra-site backend http://127.0.0.1:${BACKEND} (Host: ${site})"
-    break
+  for port in "${UNIQUE_PORTS[@]}"; do
+    body="$(curl -4 -sS --max-time 4 -H "Host: ${site}" "http://127.0.0.1:${port}/" 2>/dev/null | tr '\n' ' ' | head -c 5000 || true)"
+    [[ -n "$body" ]] || continue
+    if echo "$body" | grep -qiE 'moodle|journals-portal|Don Bosco College'; then
+      continue
+    fi
+    classified="$(classify_site_from_body "$body" || true)"
+    if [[ "$classified" == "$site" ]]; then
+      SITE_PORT[$site]="$port"
+      echo "  MATCH ${site} on :${port}"
+      break
+    fi
+  done
+done
+
+# Manual overrides if a site is up but the HTML fingerprint missed it.
+[[ -n "${MERCY_BACKEND_PORT:-}" ]] && SITE_PORT[mercydosahouse.com]="$MERCY_BACKEND_PORT"
+[[ -n "${SACRED_BACKEND_PORT:-}" ]] && SITE_PORT[sacredheartshrinetura.in]="$SACRED_BACKEND_PORT"
+[[ -n "${DIOCESE_BACKEND_PORT:-}" ]] && SITE_PORT[turadiocese.in]="$DIOCESE_BACKEND_PORT"
+
+echo
+echo "--- Per-site backends ---"
+MISSING=0
+for site in "${SITES[@]}"; do
+  if [[ -n "${SITE_PORT[$site]:-}" ]]; then
+    echo "  ${site} -> 127.0.0.1:${SITE_PORT[$site]}"
+  else
+    echo "  ${site} -> NOT FOUND (will serve 503, not another site)"
+    MISSING=1
   fi
 done
 
-if [[ -z "$BACKEND" ]]; then
-  BACKEND=8088
+if [[ "$MISSING" -eq 1 ]]; then
   echo
-  echo "WARN: no CyberPanel HTTP backend answered yet. Issuing certificates anyway"
-  echo "and proxying to 127.0.0.1:${BACKEND} (OpenLiteSpeed DockerHTTP listener)."
-  echo "Chrome will stop showing the certificate warning. If a site then shows 502,"
-  echo "start OpenLiteSpeed: /usr/local/lsws/bin/lswsctrl start"
-  ss -lptn 2>/dev/null | head -40 || true
+  echo "WARN: one or more extra sites have no matching app."
+  echo "OpenLiteSpeed (/usr/local/lsws) is not on this server — ignore lswsctrl."
+  echo "Start the missing Docker site, or re-run with e.g. SACRED_BACKEND_PORT=13001"
+  ss -lptn 2>/dev/null | grep -E ':1300|:1310|:1410|:8088' || true
 fi
 
 NEED_ACME=0
@@ -197,16 +225,51 @@ echo
 echo "--- Write nginx extra-site vhosts ---"
 gen="${APP_DIR}/nginx/extra-sites.d/hosted-sites.conf"
 
+site_server_names() {
+  local site="$1"
+  case "$site" in
+    mercydosahouse.com) echo "${site} www.${site} admin.mercydosahouse.com" ;;
+    *) echo "${site} www.${site}" ;;
+  esac
+}
+
 {
   echo "# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) by vps-restore-extra-sites-ssl.sh"
-  echo "# Backend: host.docker.internal:${BACKEND}"
+  echo "# Each server_name has its own backend. Unmapped hosts return 503."
   echo
   for site in "${SITES[@]}"; do
     cert="/etc/letsencrypt/live/${site}"
+    names="$(site_server_names "$site")"
+    port="${SITE_PORT[$site]:-}"
+    if [[ -n "$port" ]]; then
+      location_block=$(cat <<EOF
+  location / {
+    proxy_pass         http://host.docker.internal:${port};
+    proxy_http_version 1.1;
+    proxy_set_header   Host \$host;
+    proxy_set_header   X-Real-IP \$remote_addr;
+    proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto https;
+    proxy_set_header   X-Forwarded-Host \$host;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+  }
+EOF
+)
+    else
+      location_block=$(cat <<EOF
+  location / {
+    default_type text/plain;
+    return 503 "This domain is not mapped to a running app on this server.";
+  }
+EOF
+)
+    fi
     cat <<EOF
 server {
   listen 80;
-  server_name ${site} www.${site};
+  server_name ${names};
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
@@ -220,7 +283,7 @@ server {
 server {
   listen 443 ssl;
   http2 on;
-  server_name ${site} www.${site};
+  server_name ${names};
 
   ssl_certificate     ${cert}/fullchain.pem;
   ssl_certificate_key ${cert}/privkey.pem;
@@ -230,18 +293,7 @@ server {
 
   client_max_body_size 64m;
 
-  location / {
-    proxy_pass         http://host.docker.internal:${BACKEND};
-    proxy_http_version 1.1;
-    proxy_set_header   Host \$host;
-    proxy_set_header   X-Real-IP \$remote_addr;
-    proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header   X-Forwarded-Proto https;
-    proxy_set_header   X-Forwarded-Host \$host;
-    proxy_connect_timeout 5s;
-    proxy_read_timeout 120s;
-    proxy_send_timeout 120s;
-  }
+${location_block}
 }
 
 EOF
@@ -275,9 +327,14 @@ fi
 
 echo
 echo "=== Extra-site SSL restored ==="
-echo "Open these without the Chrome warning:"
+echo "Each hostname now has its own backend (or 503 if that app is down)."
+echo "OpenLiteSpeed/lswsctrl is not used on this server."
 for site in "${SITES[@]}"; do
-  echo "  https://${site}/"
+  if [[ -n "${SITE_PORT[$site]:-}" ]]; then
+    echo "  https://${site}/  -> :${SITE_PORT[$site]}"
+  else
+    echo "  https://${site}/  -> 503 (start that site's container, then re-run)"
+  fi
 done
 echo
 echo "College ERP HTTPS was not changed."
