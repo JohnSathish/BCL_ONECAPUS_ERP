@@ -7,7 +7,7 @@
 #
 # Run on the VPS:
 #   cd /opt/nep-erp && git pull origin master && bash scripts/deploy/vps-restore-extra-sites-ssl.sh
-# Optional: MERCY_BACKEND_PORT=13000 DIOCESE_BACKEND_PORT=13100 DIOCESE_API_PORT=14100
+# Optional: MERCY_BACKEND_PORT=13000 MERCY_API_BACKEND_PORT=13001 DIOCESE_BACKEND_PORT=13100
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
@@ -72,11 +72,13 @@ cert_ok_for_site() {
 # (sacredheartshrinetura.in is a host on the Diocese app, not a separate container).
 OVERRIDE_MERCY_WEB="${MERCY_BACKEND_PORT:-}"
 OVERRIDE_MERCY_ADMIN="${MERCY_ADMIN_BACKEND_PORT:-}"
+OVERRIDE_MERCY_API="${MERCY_API_BACKEND_PORT:-}"
 OVERRIDE_DIOCESE_WEB="${DIOCESE_BACKEND_PORT:-}"
 OVERRIDE_DIOCESE_API="${DIOCESE_API_PORT:-}"
 
 MERCY_WEB_PORT=""
 MERCY_ADMIN_PORT=""
+MERCY_API_PORT=""
 DIOCESE_WEB_PORT=""
 DIOCESE_API_PORT=""
 
@@ -91,6 +93,7 @@ while read -r name ports; do
   case "$lname" in
     docker-website*|mercy-website*|mercy-web*) MERCY_WEB_PORT="$hostport" ;;
     docker-admin*|mercy-admin*) MERCY_ADMIN_PORT="$hostport" ;;
+    docker-api*|mercy-api*) MERCY_API_PORT="$hostport" ;;
     bcl-diocese-web*|diocese-web*) DIOCESE_WEB_PORT="$hostport" ;;
     bcl-diocese-api*|diocese-api*) DIOCESE_API_PORT="$hostport" ;;
   esac
@@ -98,6 +101,7 @@ done < <(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null || true)
 
 [[ -n "$OVERRIDE_MERCY_WEB" ]] && MERCY_WEB_PORT="$OVERRIDE_MERCY_WEB"
 [[ -n "$OVERRIDE_MERCY_ADMIN" ]] && MERCY_ADMIN_PORT="$OVERRIDE_MERCY_ADMIN"
+[[ -n "$OVERRIDE_MERCY_API" ]] && MERCY_API_PORT="$OVERRIDE_MERCY_API"
 [[ -n "$OVERRIDE_DIOCESE_WEB" ]] && DIOCESE_WEB_PORT="$OVERRIDE_DIOCESE_WEB"
 [[ -n "$OVERRIDE_DIOCESE_API" ]] && DIOCESE_API_PORT="$OVERRIDE_DIOCESE_API"
 [[ -n "${SACRED_BACKEND_PORT:-}" ]] && DIOCESE_WEB_PORT="$SACRED_BACKEND_PORT"
@@ -111,6 +115,7 @@ echo
 echo "--- Docker name map ---"
 echo "  Mercy web    : ${MERCY_WEB_PORT:-MISSING}"
 echo "  Mercy admin  : ${MERCY_ADMIN_PORT:-MISSING}"
+echo "  Mercy API    : ${MERCY_API_PORT:-MISSING} (/api on mercydosahouse.com)"
 echo "  Diocese web  : ${DIOCESE_WEB_PORT:-MISSING} (also sacredheartshrinetura.in)"
 echo "  Diocese API  : ${DIOCESE_API_PORT:-MISSING} (api.turadiocese.in)"
 
@@ -275,9 +280,9 @@ EOF
   echo "# Mercy docker-website / docker-admin; Diocese bcl-diocese-web + bcl-diocese-api."
   echo
   emit_vhost "mercydosahouse.com www.mercydosahouse.com" \
-    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_WEB_PORT:-}"
+    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_WEB_PORT:-}" "${MERCY_API_PORT:-}"
   emit_vhost "admin.mercydosahouse.com" \
-    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_ADMIN_PORT:-}"
+    /etc/letsencrypt/live/mercydosahouse.com "${MERCY_ADMIN_PORT:-}" "${MERCY_API_PORT:-}"
   emit_vhost "turadiocese.in www.turadiocese.in sacredheart.turadiocese.in" \
     /etc/letsencrypt/live/turadiocese.in "${DIOCESE_WEB_PORT:-}" "${DIOCESE_API_PORT:-}"
   emit_vhost "api.turadiocese.in" \
@@ -314,7 +319,7 @@ fi
 echo
 echo "=== Extra-site SSL restored ==="
 echo "OpenLiteSpeed/lswsctrl is not used on this server."
-echo "  https://mercydosahouse.com/              -> :${MERCY_WEB_PORT:-503}"
+echo "  https://mercydosahouse.com/              -> :${MERCY_WEB_PORT:-503}  /api -> :${MERCY_API_PORT:-503}"
 echo "  https://admin.mercydosahouse.com/        -> :${MERCY_ADMIN_PORT:-503}"
 echo "  https://turadiocese.in/                  -> :${DIOCESE_WEB_PORT:-503}"
 echo "  https://sacredheart.turadiocese.in/      -> :${DIOCESE_WEB_PORT:-503}"
