@@ -61,50 +61,26 @@ ss -lptn 2>/dev/null | grep -E 'lshttpd|openlitespeed|httpd|apache|lsws' || true
 
 ensure_ols_proxy_listener() {
   local conf="/usr/local/lsws/conf/httpd_config.conf"
-  [[ -f "$conf" ]] || return 0
-  if grep -qE '127\.0\.0\.1:8088|:8088' "$conf"; then
-    echo "OpenLiteSpeed already has an :8088 listener"
+  local ctrl="/usr/local/lsws/bin/lswsctrl"
+  if [[ ! -f "$conf" ]]; then
+    echo "WARN: OpenLiteSpeed config not found at $conf"
     return 0
   fi
 
-  echo "Adding OpenLiteSpeed 127.0.0.1:8088 listener so Docker nginx can proxy extra sites"
-  local maps=""
-  local site vhost
-  for site in "${SITES[@]}"; do
-    vhost=""
-    if [[ -d "/usr/local/lsws/conf/vhosts/${site}" ]]; then
-      vhost="$site"
-    elif [[ -d "/usr/local/lsws/conf/vhosts/www.${site}" ]]; then
-      vhost="www.${site}"
-    elif [[ -d "/home/${site}/public_html" ]]; then
-      vhost="$site"
-    elif [[ -d /usr/local/lsws/conf/vhosts ]]; then
-      vhost="$(grep -l "$site" /usr/local/lsws/conf/vhosts/*/vhconf.conf 2>/dev/null | head -1 | awk -F/ '{print $(NF-1)}' || true)"
-    fi
-    [[ -n "$vhost" ]] || continue
-    maps+="  map                     ${site} ${vhost}"$'\n'
-    maps+="  map                     www.${site} ${vhost}"$'\n'
-  done
-  if [[ -z "$maps" ]]; then
-    echo "WARN: no OpenLiteSpeed vhosts found for extra sites; listener maps skipped"
-    return 0
-  fi
+  echo "Moving OpenLiteSpeed off :80/:443 (Docker nginx owns those) onto 127.0.0.1:8088"
+  cp "$conf" "${conf}.bak.docker-bind.$(date +%Y%m%d%H%M%S)"
+  sed -i -E 's/^([[:space:]]*address[[:space:]]+)\*:80[[:space:]]*$/\1127.0.0.1:8088/' "$conf"
+  sed -i -E 's/^([[:space:]]*address[[:space:]]+)\*:443[[:space:]]*$/\1127.0.0.1:8444/' "$conf"
 
-  cp "$conf" "${conf}.bak.extra-sites.$(date +%Y%m%d%H%M%S)"
-  cat >> "$conf" <<EOF
-
-listener DockerHTTP {
-  address                 127.0.0.1:8088
-  secure                  0
-${maps}
-}
-EOF
-  if [[ -x /usr/local/lsws/bin/lswsctrl ]]; then
-    /usr/local/lsws/bin/lswsctrl restart || true
-  elif command -v systemctl >/dev/null 2>&1; then
-    systemctl restart lsws || true
+  if [[ -x "$ctrl" ]]; then
+    "$ctrl" restart || "$ctrl" start || true
   fi
-  sleep 2
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl start lsws 2>/dev/null || true
+    systemctl start lscpd 2>/dev/null || true
+  fi
+  sleep 3
+  ss -lptn 2>/dev/null | grep -E '8088|lshttpd|openlitespeed' || true
 }
 
 ensure_ols_proxy_listener
@@ -112,10 +88,10 @@ ensure_ols_proxy_listener
 detect_backend_port() {
   local domain="$1"
   local port code body
-  # 8080 is Moodle on this VPS — never treat it as a CyberPanel site.
-  for port in ${BACKEND_PORT:-} 8088 8888 8008 9080 8090; do
+  # 8080/8443 are Moodle. 80/443 are Docker nginx.
+  for port in ${BACKEND_PORT:-} 8088 13000 13001 13002 13100 14100 8888 8008 9080 8090 7080; do
     [[ -n "$port" ]] || continue
-    [[ "$port" == "8080" ]] && continue
+    [[ "$port" == "8080" || "$port" == "8443" ]] && continue
     code="$(curl -4 -sS -o /tmp/extra-site-body --max-time 4 -w '%{http_code}' \
       -H "Host: ${domain}" "http://127.0.0.1:${port}/" || true)"
     body="$(head -c 400 /tmp/extra-site-body 2>/dev/null || true)"
@@ -262,6 +238,7 @@ server {
     proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto https;
     proxy_set_header   X-Forwarded-Host \$host;
+    proxy_connect_timeout 5s;
     proxy_read_timeout 120s;
     proxy_send_timeout 120s;
   }
