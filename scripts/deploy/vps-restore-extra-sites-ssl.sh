@@ -40,6 +40,10 @@ if ! grep -q extra-sites.d docker-compose.prod.yml; then
   exit 1
 fi
 
+echo
+echo "--- Existing Let's Encrypt live dirs ---"
+ls -1 /etc/letsencrypt/live 2>/dev/null || echo "(none)"
+
 mkdir -p nginx/extra-sites.d certbot/www/.well-known/acme-challenge /etc/letsencrypt
 
 if ! command -v certbot >/dev/null 2>&1; then
@@ -74,6 +78,8 @@ ensure_ols_proxy_listener() {
       vhost="www.${site}"
     elif [[ -d "/home/${site}/public_html" ]]; then
       vhost="$site"
+    elif [[ -d /usr/local/lsws/conf/vhosts ]]; then
+      vhost="$(grep -l "$site" /usr/local/lsws/conf/vhosts/*/vhconf.conf 2>/dev/null | head -1 | awk -F/ '{print $(NF-1)}' || true)"
     fi
     [[ -n "$vhost" ]] || continue
     maps+="  map                     ${site} ${vhost}"$'\n'
@@ -128,19 +134,13 @@ for site in "${SITES[@]}"; do
 done
 
 if [[ -z "$BACKEND" ]]; then
+  BACKEND=8088
   echo
-  echo "ERROR: Could not find CyberPanel/OpenLiteSpeed HTTP backend for extra sites."
-  echo "Docker nginx is correctly owning :80/:443, but the original sites must still"
-  echo "answer on a local port (usually 8088) so nginx can reverse-proxy them."
-  echo
-  echo "Fix on this VPS, then re-run:"
-  echo "  1. In CyberPanel, keep the websites; do not delete them."
-  echo "  2. Make OpenLiteSpeed listen on 127.0.0.1:8088 (this script tries to add that)."
-  echo "  3. Or set EXTRA_SITES_BACKEND_PORT=<port> and re-run."
-  echo
-  echo "Listening ports now:"
-  ss -lptn 2>/dev/null | head -80 || true
-  exit 1
+  echo "WARN: no CyberPanel HTTP backend answered yet. Issuing certificates anyway"
+  echo "and proxying to 127.0.0.1:${BACKEND} (OpenLiteSpeed DockerHTTP listener)."
+  echo "Chrome will stop showing the certificate warning. If a site then shows 502,"
+  echo "start OpenLiteSpeed: /usr/local/lsws/bin/lswsctrl start"
+  ss -lptn 2>/dev/null | head -40 || true
 fi
 
 PROBE="nep-extra-acme-$(date +%s)"
