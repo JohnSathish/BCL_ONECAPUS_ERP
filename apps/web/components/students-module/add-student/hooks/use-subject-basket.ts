@@ -8,9 +8,11 @@ import {
   buildSelectableSlotKeys,
   buildSlotKeys,
   isAutoAssignedCategory,
+  poolOfferingsForCategory,
   slugifySubject,
   slotCategory,
 } from '@/components/students-module/add-student/utils/subject-basket';
+import { subjectPathSlugForCategory } from '@/utils/semester-rules';
 import type { SubjectBasketMeta } from '@/components/students-module/add-student/types/draft';
 import type { CatalogSectionRow } from '@/types/academic-engine';
 import type { AdmissionPoolsResponse } from '@/types/students';
@@ -88,10 +90,14 @@ export function useSubjectBasket(params: {
       for (const slotKey of params.autoSlotKeys) {
         if (selections[slotKey]) continue;
         const category = slotCategory(slotKey);
-        const slug = category === 'MAJOR' ? params.majorSubjectSlug : params.minorSubjectSlug;
+        if (category !== 'MAJOR' && category !== 'MINOR') continue;
+        const slug = subjectPathSlugForCategory(
+          category,
+          params.majorSubjectSlug ?? '',
+          params.minorSubjectSlug ?? '',
+        );
         if (!slug) continue;
-        const poolRows =
-          category === 'MAJOR' ? (params.pools?.major ?? []) : (params.pools?.minor ?? []);
+        const poolRows = poolOfferingsForCategory(params.pools, category);
         const target = slugifySubject(slug);
         const offering = poolRows.find((row) => {
           const course = row.course;
@@ -114,7 +120,12 @@ export function useSubjectBasket(params: {
       const uniqueCats = [...new Set(categoriesComplete)];
       for (const slotKey of params.autoSlotKeys) {
         const category = slotCategory(slotKey);
-        const slug = category === 'MAJOR' ? params.majorSubjectSlug : params.minorSubjectSlug;
+        if (category !== 'MAJOR' && category !== 'MINOR') continue;
+        const slug = subjectPathSlugForCategory(
+          category,
+          params.majorSubjectSlug ?? '',
+          params.minorSubjectSlug ?? '',
+        );
         if (slug && !uniqueCats.includes(category)) uniqueCats.push(category);
       }
       const requiredPool = [...new Set(params.selectableSlotKeys.map((k) => slotCategory(k)))];

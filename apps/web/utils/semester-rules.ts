@@ -1,7 +1,11 @@
-import { isAutoAssignedCategory } from '@/constants/nep-curriculum-categories';
+import {
+  isAutoAssignedCategory,
+  isMajorPathAutoCategory,
+  subjectPathSlugForCategory,
+} from '@/constants/nep-curriculum-categories';
 
 export { requiredMajorPaperCount } from '@/utils/major-paper-assignment';
-export { isAutoAssignedCategory };
+export { isAutoAssignedCategory, isMajorPathAutoCategory, subjectPathSlugForCategory };
 
 export type SemesterRuleLike = {
   semesterSequence?: number;

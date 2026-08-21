@@ -3,6 +3,7 @@ import {
   minorRequired,
   formatSemesterSummary,
   buildAutoSlotKeysFromRule,
+  subjectPathSlugForCategory,
 } from '@/utils/semester-rules';
 
 describe('semester-rules utils', () => {
@@ -34,5 +35,11 @@ describe('semester-rules utils', () => {
       categoryCounts: { MAJOR: 3, MINOR: 1, INTERNSHIP: 1 },
     });
     expect(keys).toEqual(['MAJOR-1', 'MAJOR-2', 'MAJOR-3', 'MINOR', 'INTERNSHIP']);
+  });
+
+  it('resolves internship from the major subject path', () => {
+    expect(subjectPathSlugForCategory('INTERNSHIP', 'garo', 'education')).toBe('garo');
+    expect(subjectPathSlugForCategory('MINOR', 'garo', 'education')).toBe('education');
+    expect(subjectPathSlugForCategory('MAJOR', 'garo', 'education')).toBe('garo');
   });
 });

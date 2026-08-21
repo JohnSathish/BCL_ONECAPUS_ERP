@@ -39,6 +39,8 @@ import {
   resolveVtcTrackFields,
 } from '../../../common/services/vtc-track-metadata';
 
+import { ALWAYS_AUTO_ASSIGNED } from '../domain/registration-category-classification';
+
 export type ValidateSubjectBasketDto = {
   programVersionId: string;
 
@@ -533,9 +535,14 @@ export class AdmissionPoolsService {
     for (const [cat, count] of Object.entries(pools.categoryCounts)) {
       if (count <= 0) continue;
 
-      if (cat === 'MAJOR' && dto.majorSubjectSlug) continue;
-
       if (cat === 'MINOR' && dto.minorSubjectSlug) continue;
+
+      if (
+        ALWAYS_AUTO_ASSIGNED.has(cat) &&
+        cat !== 'MINOR' &&
+        dto.majorSubjectSlug
+      )
+        continue;
 
       const selected = Object.keys(dto.selections).filter(
         (k) => k === cat || k.startsWith(`${cat}-`),

@@ -291,7 +291,7 @@ export function StepFyugpBasket({ draft, setDraft, errors, onValidationIssues }:
     selections: draft.subjectSelections,
     catalog: catalogRows,
     resolveSection: resolveSlotSection,
-    pathNames: { MAJOR: majorName, MINOR: minorName },
+    pathNames: { MAJOR: majorName, MINOR: minorName, INTERNSHIP: majorName },
   }).map((row) => ({
     ...row,
     badgeLabel:
@@ -366,7 +366,7 @@ export function StepFyugpBasket({ draft, setDraft, errors, onValidationIssues }:
             {autoSlotKeys.map((slotKey) => {
               const category = slotCategory(slotKey);
               const section = resolveSlotSection(slotKey);
-              const pathName = category === 'MAJOR' ? majorName : minorName;
+              const pathName = category === 'MINOR' ? minorName : majorName;
               const duplicateWarning =
                 Boolean(section) && duplicateCodes.includes(section!.courseOffering.course.code);
               return (

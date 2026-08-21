@@ -238,4 +238,27 @@ describe('AdmissionPoolsService', () => {
 
     expect(eligibility.validateMajorMinorPair).not.toHaveBeenCalled();
   });
+
+  it('does not require INTERNSHIP selection when major path is set', async () => {
+    mockSemesterRule(5, { MAJOR: 3, MINOR: 1, INTERNSHIP: 1 });
+    eligibility.listEligibleMajors.mockResolvedValue([]);
+    eligibility.listEligibleMinors.mockResolvedValue([]);
+    eligibility.validateMajorMinorPair.mockResolvedValue({
+      ok: true,
+      issues: [],
+    });
+    offerings.listOfferings.mockResolvedValue([]);
+
+    const result = await service.validateSubjectBasket('tenant-1', {
+      programVersionId: 'pv-1',
+      semesterSequence: 5,
+      majorSubjectSlug: 'garo',
+      minorSubjectSlug: 'education',
+      selections: {},
+    });
+
+    expect(result.issues.some((i) => i.message.includes('INTERNSHIP'))).toBe(
+      false,
+    );
+  });
 });

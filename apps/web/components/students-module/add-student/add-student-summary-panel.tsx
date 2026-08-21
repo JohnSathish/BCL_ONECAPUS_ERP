@@ -13,7 +13,12 @@ import { normalizeCatalogResponse } from '@/utils/catalog-eligibility';
 import { buildAssignedSubjectRows } from '@/utils/assigned-subject-display';
 import { cn } from '@/utils/cn';
 import { StudentName } from '@/components/students/student-name';
-import { categoryLabel, requiredCategories } from '@/utils/semester-rules';
+import {
+  categoryLabel,
+  isAutoAssignedCategory,
+  requiredCategories,
+  slotCategory,
+} from '@/utils/semester-rules';
 
 type Props = {
   draft: AddStudentDraft;
@@ -88,10 +93,7 @@ export function AddStudentSummaryPanel({
   const previewRows = useMemo(() => {
     const slotKeys = Object.keys(draft.subjectSelections);
     if (!catalogRows.length || !draft.majorSubjectSlug || slotKeys.length === 0) return [];
-    const autoSlotKeys = slotKeys.filter((key) => {
-      const base = key.split('-')[0];
-      return base === 'MAJOR' || base === 'MINOR';
-    });
+    const autoSlotKeys = slotKeys.filter((key) => isAutoAssignedCategory(slotCategory(key)));
     return buildAssignedSubjectRows({
       slotKeys,
       autoSlotKeys,

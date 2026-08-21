@@ -1314,6 +1314,46 @@ export class AdminRegistrationService {
           if (minorPool.length > 0) pool = minorPool;
         }
 
+        if (
+          (category === 'INTERNSHIP' ||
+            category === 'DISSERTATION' ||
+            category === 'PROJECT' ||
+            category === 'RESEARCH') &&
+          majorChoice
+        ) {
+          const pathPool = pool.filter((s) =>
+            courseMatchesSubjectPath(
+              s.courseOffering.course,
+              majorChoice.subjectSlug,
+            ),
+          );
+          if (pathPool.length > 0) {
+            pool = pathPool;
+          } else {
+            const majorPrefixes = new Set(
+              eligibleSections
+                .filter(
+                  (s) =>
+                    s.courseOffering.category === 'MAJOR' &&
+                    courseMatchesSubjectPath(
+                      s.courseOffering.course,
+                      majorChoice.subjectSlug,
+                    ),
+                )
+                .map((s) =>
+                  s.courseOffering.course.code.split('-')[0]?.toUpperCase(),
+                )
+                .filter((code): code is string => Boolean(code)),
+            );
+            const prefixPool = pool.filter((s) =>
+              majorPrefixes.has(
+                s.courseOffering.course.code.split('-')[0]?.toUpperCase() ?? '',
+              ),
+            );
+            if (prefixPool.length > 0) pool = prefixPool;
+          }
+        }
+
         if (category === 'MDC') {
           pool = pool.filter((s) => {
             const slug =

@@ -1,5 +1,6 @@
 import type { CatalogSectionRow } from '@/types/academic-engine';
 import type { AdmissionPoolOffering, AdmissionPoolsResponse } from '@/types/students';
+import { isMajorPathAutoCategory } from '@/constants/nep-curriculum-categories';
 import {
   assignMajorPaperSlots,
   requiredMajorPaperCount,
@@ -12,6 +13,7 @@ import {
   categorySlotKeys,
   isAutoAssignedCategory,
   slotCategory,
+  subjectPathSlugForCategory,
 } from '@/utils/semester-rules';
 
 export { categorySlotKeys as categoryKeys, slotCategory, isAutoAssignedCategory };
@@ -63,33 +65,67 @@ export function buildSelectableSlotKeys(pools?: AdmissionPoolsResponse, semester
   return buildSelectableSlotKeysFromRule({ categoryCounts: pools.categoryCounts });
 }
 
-function courseSubjectSlug(course: {
-  subjectSlug?: string | null;
-  department?: { name?: string | null } | null;
-  title?: string | null;
-  code?: string | null;
-}): string {
-  if (course.subjectSlug?.trim()) return slugifySubject(course.subjectSlug);
-  if (course.department?.name?.trim()) return slugifySubject(course.department.name);
-  if (course.title?.trim()) return slugifySubject(course.title);
-  if (course.code?.trim()) return slugifySubject(course.code);
-  return '';
-}
-
 function catalogCourseId(row: CatalogSectionRow): string {
   const course = row.courseOffering.course as { id?: string; code: string };
   return course.id ?? course.code;
 }
 
-function catalogRowsForMajorPath(
+const GENERIC_PATH_TITLES = new Set(['internship', 'dissertation', 'project', 'research']);
+
+function coursePathCandidates(course: {
+  subjectSlug?: string | null;
+  department?: { name?: string | null; code?: string | null } | null;
+  title?: string | null;
+  code?: string | null;
+}): string[] {
+  const slugs = new Set<string>();
+  if (course.subjectSlug?.trim()) slugs.add(slugifySubject(course.subjectSlug));
+  if (course.department?.name?.trim()) slugs.add(slugifySubject(course.department.name));
+  if (course.title?.trim()) {
+    const titleSlug = slugifySubject(course.title);
+    if (titleSlug && !GENERIC_PATH_TITLES.has(titleSlug)) slugs.add(titleSlug);
+  }
+  return [...slugs];
+}
+
+function courseMatchesPath(
+  course: {
+    subjectSlug?: string | null;
+    department?: { name?: string | null; code?: string | null } | null;
+    title?: string | null;
+    code?: string | null;
+  },
+  subjectSlug: string,
+): boolean {
+  const target = slugifySubject(subjectSlug);
+  if (!target) return false;
+  return coursePathCandidates(course).includes(target);
+}
+
+function courseCodePrefix(code?: string | null): string {
+  return (code?.split('-')[0] ?? '').trim().toUpperCase();
+}
+
+export function poolOfferingsForCategory(
+  pools: AdmissionPoolsResponse | undefined,
+  category: string,
+): AdmissionPoolOffering[] {
+  if (!pools) return [];
+  if (category === 'MAJOR') return pools.major ?? [];
+  if (category === 'MINOR') return pools.minor ?? [];
+  return pools.pools?.[category] ?? [];
+}
+
+function catalogRowsForCategoryPath(
   catalog: CatalogSectionRow[],
   pools: AdmissionPoolsResponse | undefined,
+  category: string,
   subjectSlug: string,
 ): CatalogSectionRow[] {
-  const target = subjectSlug ? slugifySubject(subjectSlug) : '';
-
   const poolOfferings = subjectSlug
-    ? (pools?.major ?? []).filter((o) => courseSubjectSlug(o.course ?? {}) === target)
+    ? poolOfferingsForCategory(pools, category).filter((o) =>
+        courseMatchesPath(o.course ?? {}, subjectSlug),
+      )
     : [];
 
   const poolOfferingIds = new Set(
@@ -99,13 +135,25 @@ function catalogRowsForMajorPath(
     poolOfferings.map((o) => o.course?.code).filter(Boolean) as string[],
   );
 
-  const slugMatches = catalog.filter((row) => {
-    if (row.courseOffering.category !== 'MAJOR') return false;
+  let slugMatches = catalog.filter((row) => {
+    if (row.courseOffering.category !== category) return false;
     if (!subjectSlug) return true;
-    const rowSlug = courseSubjectSlug(row.courseOffering.course);
-    if (rowSlug === target) return true;
+    if (courseMatchesPath(row.courseOffering.course, subjectSlug)) return true;
     return poolCourseCodes.has(row.courseOffering.course.code);
   });
+
+  if (slugMatches.length === 0 && isMajorPathAutoCategory(category) && category !== 'MAJOR') {
+    const majorPrefixes = new Set(
+      catalogRowsForMajorPath(catalog, pools, subjectSlug).map((row) =>
+        courseCodePrefix(row.courseOffering.course.code),
+      ),
+    );
+    slugMatches = catalog.filter((row) => {
+      if (row.courseOffering.category !== category) return false;
+      const prefix = courseCodePrefix(row.courseOffering.course.code);
+      return Boolean(prefix) && majorPrefixes.has(prefix);
+    });
+  }
 
   let matches = slugMatches;
   if (poolOfferingIds.size > 0) {
@@ -119,6 +167,14 @@ function catalogRowsForMajorPath(
     if (!byCourseId.has(courseId)) byCourseId.set(courseId, row);
   }
   return [...byCourseId.values()];
+}
+
+function catalogRowsForMajorPath(
+  catalog: CatalogSectionRow[],
+  pools: AdmissionPoolsResponse | undefined,
+  subjectSlug: string,
+): CatalogSectionRow[] {
+  return catalogRowsForCategoryPath(catalog, pools, 'MAJOR', subjectSlug);
 }
 
 /** Resolve a catalog section from saved slot selections first, then path rules. */
@@ -172,15 +228,14 @@ function findPoolOffering(
   offerings: AdmissionPoolOffering[],
   subjectSlug: string,
 ): AdmissionPoolOffering | undefined {
-  const target = slugifySubject(subjectSlug);
-  return offerings.find((o) => courseSubjectSlug(o.course ?? {}) === target);
+  return offerings.find((o) => courseMatchesPath(o.course ?? {}, subjectSlug));
 }
 
-/** Resolve a catalog section for a major/minor path chosen in Academic Details. */
+/** Resolve a catalog section for a major/minor/internship path chosen in Academic Details. */
 export function resolveSectionForPath(
   catalog: CatalogSectionRow[],
   pools: AdmissionPoolsResponse | undefined,
-  category: 'MAJOR' | 'MINOR',
+  category: string,
   subjectSlug: string,
   paperIndex?: number,
   requiredMajorCount?: number,
@@ -202,7 +257,7 @@ export function resolveSectionForPath(
     return sections[paperIndex - 1];
   }
 
-  const poolRows = category === 'MAJOR' ? (pools?.major ?? []) : (pools?.minor ?? []);
+  const poolRows = poolOfferingsForCategory(pools, category);
   const offering = findPoolOffering(poolRows, subjectSlug);
   if (offering?.id) {
     const byOffering = catalog.find(
@@ -214,13 +269,9 @@ export function resolveSectionForPath(
     if (byOffering) return byOffering;
   }
 
-  const target = slugifySubject(subjectSlug);
-  const matches = catalog.filter((row) => {
-    if (row.courseOffering.category !== category) return false;
-    if (courseSubjectSlug(row.courseOffering.course) !== target) return false;
-    if (paperIndex == null) return true;
-    return row.courseOffering.majorPaperIndex === paperIndex;
-  });
+  const matches = catalogRowsForCategoryPath(catalog, pools, category, subjectSlug).filter(
+    (row) => paperIndex == null || row.courseOffering.majorPaperIndex === paperIndex,
+  );
   return matches[0];
 }
 
@@ -233,8 +284,8 @@ export function resolveSectionForSlot(
   semesterSequence = 1,
 ): CatalogSectionRow | undefined {
   const category = slotCategory(slotKey);
-  if (category !== 'MAJOR' && category !== 'MINOR') return undefined;
-  const slug = category === 'MAJOR' ? majorSubjectSlug : minorSubjectSlug;
+  const slug = subjectPathSlugForCategory(category, majorSubjectSlug, minorSubjectSlug);
+  if (!slug) return undefined;
   const paperIndex = slotKey.includes('-') ? Number(slotKey.split('-')[1]) : undefined;
   const requiredMajorCount =
     category === 'MAJOR'

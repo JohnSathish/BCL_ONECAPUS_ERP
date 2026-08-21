@@ -56,4 +56,194 @@ describe('bindAutoAssignedSelections', () => {
     expect(selections['MAJOR-2']).toBe('sec-eco-201');
     expect(new Set([selections['MAJOR-1'], selections['MAJOR-2']]).size).toBe(2);
   });
+
+  it('assigns INTERNSHIP from the major subject path for Sem 5', () => {
+    const sem5Catalog: CatalogSectionRow[] = [
+      {
+        id: 'sec-gar-300',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-300',
+          category: 'MAJOR',
+          semesterSequence: 5,
+          majorPaperIndex: 1,
+          course: {
+            code: 'GAR-300',
+            title: 'Prabandher Rupriti',
+            credits: 4,
+            subjectSlug: 'garo',
+          },
+        },
+      },
+      {
+        id: 'sec-gar-301',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-301',
+          category: 'MAJOR',
+          semesterSequence: 5,
+          majorPaperIndex: 2,
+          course: {
+            code: 'GAR-301',
+            title: 'Kothasahityer Rupriti',
+            credits: 4,
+            subjectSlug: 'garo',
+          },
+        },
+      },
+      {
+        id: 'sec-gar-302',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-302',
+          category: 'MAJOR',
+          semesterSequence: 5,
+          majorPaperIndex: 3,
+          course: {
+            code: 'GAR-302',
+            title: 'Rabindra Sahitya',
+            credits: 4,
+            subjectSlug: 'garo',
+          },
+        },
+      },
+      {
+        id: 'sec-edn-302',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-edn-302',
+          category: 'MINOR',
+          semesterSequence: 5,
+          course: {
+            code: 'EDN-302',
+            title: 'Education for Sustainable Development',
+            credits: 4,
+            subjectSlug: 'education',
+          },
+        },
+      },
+      {
+        id: 'sec-gar-303',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-303',
+          category: 'INTERNSHIP',
+          semesterSequence: 5,
+          course: {
+            code: 'GAR-303',
+            title: 'Internship',
+            credits: 4,
+            subjectSlug: 'garo',
+          },
+        },
+      },
+      {
+        id: 'sec-edn-303',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-edn-303',
+          category: 'INTERNSHIP',
+          semesterSequence: 5,
+          course: {
+            code: 'EDN-303',
+            title: 'Internship',
+            credits: 4,
+            subjectSlug: 'education',
+          },
+        },
+      },
+    ];
+
+    const selections = bindAutoAssignedSelections(
+      {},
+      ['MAJOR-1', 'MAJOR-2', 'MAJOR-3', 'MINOR', 'INTERNSHIP'],
+      sem5Catalog,
+      {
+        categoryCounts: { MAJOR: 3, MINOR: 1, INTERNSHIP: 1 },
+        major: [],
+        minor: [],
+        pools: { INTERNSHIP: [] },
+        structureRules: [],
+        semesterRule: {
+          categoryCounts: { MAJOR: 3, MINOR: 1, INTERNSHIP: 1 },
+        },
+      } as never,
+      'garo',
+      'education',
+      5,
+    );
+
+    expect(selections['MAJOR-1']).toBe('sec-gar-300');
+    expect(selections.MINOR).toBe('sec-edn-302');
+    expect(selections.INTERNSHIP).toBe('sec-gar-303');
+  });
+
+  it('assigns INTERNSHIP by major course-code prefix when slug metadata is missing', () => {
+    const catalog: CatalogSectionRow[] = [
+      {
+        id: 'sec-gar-300',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-300',
+          category: 'MAJOR',
+          semesterSequence: 5,
+          majorPaperIndex: 1,
+          course: { code: 'GAR-300', title: 'Prabandher Rupriti', credits: 4, subjectSlug: 'garo' },
+        },
+      },
+      {
+        id: 'sec-gar-303',
+        sectionCode: 'A',
+        capacity: 80,
+        waitlistCapacity: 0,
+        shift: { id: 'shift-1', code: 'DAY', name: 'Day' },
+        courseOffering: {
+          id: 'off-gar-303',
+          category: 'INTERNSHIP',
+          semesterSequence: 5,
+          course: { code: 'GAR-303', title: 'Internship', credits: 4 },
+        },
+      },
+    ];
+
+    const selections = bindAutoAssignedSelections(
+      {},
+      ['MAJOR-1', 'INTERNSHIP'],
+      catalog,
+      {
+        categoryCounts: { MAJOR: 1, INTERNSHIP: 1 },
+        major: [],
+        minor: [],
+        pools: {},
+        structureRules: [],
+        semesterRule: { categoryCounts: { MAJOR: 1, INTERNSHIP: 1 } },
+      } as never,
+      'garo',
+      '',
+      5,
+    );
+
+    expect(selections.INTERNSHIP).toBe('sec-gar-303');
+  });
 });

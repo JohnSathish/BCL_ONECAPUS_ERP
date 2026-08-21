@@ -294,4 +294,108 @@ describe('AdminRegistrationService buildAutoAssignLines', () => {
     expect(lines.filter((l) => l.category === 'MAJOR')).toHaveLength(3);
     expect(lines.filter((l) => l.category === 'MINOR')).toHaveLength(1);
   });
+
+  it('picks the internship that matches the major subject path', async () => {
+    prisma.student.findFirstOrThrow.mockResolvedValue({
+      programVersionId: 'pv-gar',
+      primaryShiftId: 'shift-day',
+      academicProfile: {
+        streamId: null,
+        preferredShiftId: 'shift-day',
+        class12Subjects: [],
+      },
+      programChoices: [
+        { choiceType: 'MAJOR', subjectSlug: 'garo' },
+        { choiceType: 'MINOR', subjectSlug: 'education' },
+      ],
+    });
+    prisma.semesterStructureRule.findFirst.mockResolvedValue({
+      categoryCounts: { MAJOR: 1, MINOR: 1, INTERNSHIP: 1 },
+      continuityRules: {},
+      lines: [],
+    });
+    prisma.semesterRegistration.findFirst.mockResolvedValue(null);
+    prisma.offeringSection.findMany.mockResolvedValue([
+      {
+        id: 'sec-gar-300',
+        courseOfferingId: 'off-gar-300',
+        capacity: 80,
+        seatLedger: { confirmedCount: 0 },
+        courseOffering: {
+          category: 'MAJOR',
+          majorPaperIndex: null,
+          displayOrder: null,
+          courseId: 'course-gar-300',
+          course: {
+            code: 'GAR-300',
+            title: 'Prabandher Rupriti',
+            subjectSlug: 'garo',
+          },
+        },
+      },
+      {
+        id: 'sec-edn-302',
+        courseOfferingId: 'off-edn-302',
+        capacity: 80,
+        seatLedger: { confirmedCount: 0 },
+        courseOffering: {
+          category: 'MINOR',
+          majorPaperIndex: null,
+          displayOrder: null,
+          courseId: 'course-edn-302',
+          course: {
+            code: 'EDN-302',
+            title: 'Education for Sustainable Development',
+            subjectSlug: 'education',
+          },
+        },
+      },
+      {
+        id: 'sec-edn-303',
+        courseOfferingId: 'off-edn-303',
+        capacity: 80,
+        seatLedger: { confirmedCount: 0 },
+        courseOffering: {
+          category: 'INTERNSHIP',
+          majorPaperIndex: null,
+          displayOrder: null,
+          courseId: 'course-edn-303',
+          course: {
+            code: 'EDN-303',
+            title: 'Internship',
+            subjectSlug: 'education',
+          },
+        },
+      },
+      {
+        id: 'sec-gar-303',
+        courseOfferingId: 'off-gar-303',
+        capacity: 80,
+        seatLedger: { confirmedCount: 0 },
+        courseOffering: {
+          category: 'INTERNSHIP',
+          majorPaperIndex: null,
+          displayOrder: null,
+          courseId: 'course-gar-303',
+          course: {
+            code: 'GAR-303',
+            title: 'Internship',
+            subjectSlug: 'garo',
+          },
+        },
+      },
+    ]);
+
+    const lines = await service.buildAutoAssignLinesForStudent(
+      'tenant-1',
+      'stu-1',
+      'pv-gar',
+      5,
+      { shiftId: 'shift-day' },
+    );
+
+    expect(lines.find((l) => l.category === 'INTERNSHIP')?.offeringId).toBe(
+      'off-gar-303',
+    );
+  });
 });
