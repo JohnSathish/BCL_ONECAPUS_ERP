@@ -193,9 +193,18 @@ export class FeeLedgerService {
   }
 
   private async nextEntryNo(tenantId: string) {
-    const count = await this.db().studentFeeLedgerEntry.count({
-      where: { tenantId },
+    const year = new Date().getFullYear();
+    const prefix = `LED-${year}-`;
+    const latest = await this.db().studentFeeLedgerEntry.findFirst({
+      where: { tenantId, entryNo: { startsWith: prefix } },
+      orderBy: { entryNo: 'desc' },
+      select: { entryNo: true },
     });
-    return `LED-${new Date().getFullYear()}-${String(count + 1).padStart(6, '0')}`;
+    const parsed = Number.parseInt(
+      String(latest?.entryNo ?? '').slice(prefix.length),
+      10,
+    );
+    const next = Number.isFinite(parsed) && parsed >= 0 ? parsed + 1 : 1;
+    return `${prefix}${String(next).padStart(6, '0')}`;
   }
 }

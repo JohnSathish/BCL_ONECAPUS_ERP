@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import {
-  FEE_CYCLE_TRIGGER_SEMESTERS,
   fyugpYearForSemester,
   isFeeCycleTriggerSemester,
   semesterPairLabel,
@@ -59,8 +59,12 @@ function asCycleDemandPreview(preview: unknown): CycleDemandPreview | null {
   return row?.cycle && row?.lines && row.totalAmount != null ? row : null;
 }
 
+const STUDENT_LOAD_BATCH = 200;
+
 @Injectable()
 export class FeeCycleEngineService {
+  private readonly logger = new Logger(FeeCycleEngineService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cycles: FeeCycleConfigService,
@@ -118,16 +122,14 @@ export class FeeCycleEngineService {
     }
 
     const students = dto.studentIds?.length
-      ? await Promise.all(
-          dto.studentIds.map((id) => this.loadStudent(user.tid, id)),
-        )
+      ? await this.loadStudents(user.tid, dto.studentIds)
       : await this.resolveStudentsForSemester(user.tid, dto);
 
     const results: Array<Record<string, unknown>> = [];
     let createdCount = 0;
     let skippedCount = 0;
 
-    for (const student of students.filter(Boolean) as StudentScope[]) {
+    for (const student of students) {
       const preview = await this.evaluate(
         user.tid,
         student,
@@ -143,21 +145,87 @@ export class FeeCycleEngineService {
         });
         continue;
       }
-      const demand = await this.createDemand(
-        user,
-        student,
-        ready,
-        dto.publish ?? true,
-      );
-      createdCount += 1;
-      results.push({
-        studentId: student.id,
-        created: true,
-        demandId: demand.id,
-      });
+      try {
+        const demand = await this.createDemand(
+          user,
+          student,
+          ready,
+          dto.publish ?? true,
+        );
+        createdCount += 1;
+        results.push({
+          studentId: student.id,
+          created: true,
+          demandId: demand.id,
+        });
+      } catch (error) {
+        skippedCount += 1;
+        const reason =
+          error instanceof Error ? error.message : 'Failed to create demand';
+        this.logger.warn(
+          `Cycle demand failed for student ${student.id} (sem ${dto.semesterNumber}): ${reason}`,
+        );
+        results.push({
+          studentId: student.id,
+          skipped: true,
+          reason,
+        });
+      }
     }
 
     return { createdCount, skippedCount, results };
+  }
+
+  /**
+   * Generate session/admission cycle demands for students currently in the
+   * FYUP entry semesters (default I, III, V). Existing demands are skipped.
+   */
+  async generateForEntrySemesters(
+    user: JwtUser,
+    dto: { semesterNumbers?: number[]; publish?: boolean },
+  ) {
+    const requested = dto.semesterNumbers?.length
+      ? dto.semesterNumbers
+      : ([1, 3, 5] as const);
+    const semesters = [...new Set(requested)].filter((sem) =>
+      isFeeCycleTriggerSemester(sem),
+    );
+    if (!semesters.length) {
+      return {
+        createdCount: 0,
+        skippedCount: 0,
+        message: 'No valid fee-trigger semesters selected.',
+        bySemester: [] as Array<{
+          semesterNumber: number;
+          createdCount: number;
+          skippedCount: number;
+        }>,
+      };
+    }
+
+    const bySemester: Array<{
+      semesterNumber: number;
+      createdCount: number;
+      skippedCount: number;
+    }> = [];
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (const semesterNumber of semesters) {
+      const result = await this.generateBulk(user, {
+        semesterNumber,
+        publish: dto.publish ?? true,
+      });
+      createdCount += result.createdCount;
+      skippedCount += result.skippedCount;
+      bySemester.push({
+        semesterNumber,
+        createdCount: result.createdCount,
+        skippedCount: result.skippedCount,
+      });
+    }
+
+    return { createdCount, skippedCount, bySemester };
   }
 
   /** Called automatically on enrollment (Sem I) or promotion (Sem III / V). */
@@ -423,49 +491,68 @@ export class FeeCycleEngineService {
     preview: CycleDemandPreview,
     publish: boolean,
   ) {
-    const demandNo = await this.nextDemandNo(user.tid);
-    const demand = await this.db().studentFeeDemand.create({
-      data: {
-        tenantId: user.tid,
-        studentId: student.id,
-        feeCycleId: preview.cycle.id,
-        academicYearId: student.academicProfile?.admissionYearId,
-        semesterNumber: preview.semesterNumber ?? preview.cycle.startSemester,
-        academicYearNo: preview.academicYearNo,
-        demandNo,
-        demandType: 'ADMISSION_SESSION',
-        billingLayer: 'BIENNIAL',
-        billingPeriod: preview.billingPeriod,
-        status: publish ? 'PUBLISHED' : 'DRAFT',
-        totalAmount: preview.totalAmount,
-        balanceAmount: preview.totalAmount,
-        publishedAt: publish ? new Date() : undefined,
-        generatedById: user.sub,
-        metadata: {
-          feeCycleCode: preview.cycle.code,
-          feeCycleName: preview.cycle.name,
-          coversSemesters: [
-            preview.cycle.startSemester,
-            preview.cycle.endSemester,
-          ],
-          arrearsCarriedForward: preview.arrearsAmount ?? 0,
-        },
-        lines: {
-          create: preview.lines.map((line) => ({
+    let demand: Record<string, any> | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const demandNo = await this.nextDemandNo(user.tid);
+      try {
+        demand = await this.db().studentFeeDemand.create({
+          data: {
             tenantId: user.tid,
-            code: line.code,
-            name: line.name,
-            category: line.category,
-            quantity: line.quantity,
-            unitAmount: line.unitAmount,
-            amount: line.amount,
-            sourceType: line.sourceType,
-            sourceRefId: line.sourceRefId,
-          })),
-        },
-      },
-      include: { lines: true },
-    });
+            studentId: student.id,
+            feeCycleId: preview.cycle.id,
+            academicYearId: student.academicProfile?.admissionYearId,
+            semesterNumber:
+              preview.semesterNumber ?? preview.cycle.startSemester,
+            academicYearNo: preview.academicYearNo,
+            demandNo,
+            demandType: 'ADMISSION_SESSION',
+            billingLayer: 'BIENNIAL',
+            billingPeriod: preview.billingPeriod,
+            status: publish ? 'PUBLISHED' : 'DRAFT',
+            totalAmount: preview.totalAmount,
+            balanceAmount: preview.totalAmount,
+            publishedAt: publish ? new Date() : undefined,
+            generatedById: user.sub,
+            metadata: {
+              feeCycleCode: preview.cycle.code,
+              feeCycleName: preview.cycle.name,
+              coversSemesters: [
+                preview.cycle.startSemester,
+                preview.cycle.endSemester,
+              ],
+              arrearsCarriedForward: preview.arrearsAmount ?? 0,
+            },
+            lines: {
+              create: preview.lines.map((line) => ({
+                tenantId: user.tid,
+                code: line.code,
+                name: line.name,
+                category: line.category,
+                quantity: line.quantity,
+                unitAmount: line.unitAmount,
+                amount: line.amount,
+                sourceType: line.sourceType,
+                sourceRefId: line.sourceRefId,
+              })),
+            },
+          },
+          include: { lines: true },
+        });
+        break;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          attempt < 2
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!demand) {
+      throw new Error('Could not allocate a unique fee demand number');
+    }
 
     await this.ledger.post({
       tenantId: user.tid,
@@ -485,13 +572,25 @@ export class FeeCycleEngineService {
         demandId: demand.id,
         actorId: user.sub,
         action: 'fee_cycle_demand.generated',
-        after: demand,
+        after: {
+          demandId: demand.id,
+          demandNo: demand.demandNo,
+          totalAmount: Number(demand.totalAmount),
+        },
         metadata: { feeCycleId: preview.cycle.id },
       },
     });
 
     if (publish) {
-      await this.feeSummary.touchAfterPayment(user.tid, student.id);
+      try {
+        await this.feeSummary.touchAfterPayment(user.tid, student.id);
+      } catch (error) {
+        this.logger.warn(
+          `Fee summary refresh failed for ${student.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
 
     return demand;
@@ -499,10 +598,26 @@ export class FeeCycleEngineService {
 
   private async nextDemandNo(tenantId: string) {
     const year = new Date().getFullYear();
-    const count = await this.db().studentFeeDemand.count({
-      where: { tenantId },
+    const prefix = `FD-${year}-`;
+    const latest = await this.db().studentFeeDemand.findFirst({
+      where: { tenantId, demandNo: { startsWith: prefix } },
+      orderBy: { demandNo: 'desc' },
+      select: { demandNo: true },
     });
-    return `FD-${year}-${String(count + 1).padStart(6, '0')}`;
+    const parsed = Number.parseInt(
+      String(latest?.demandNo ?? '').slice(prefix.length),
+      10,
+    );
+    const next = Number.isFinite(parsed) && parsed >= 0 ? parsed + 1 : 1;
+    return `${prefix}${String(next).padStart(6, '0')}`;
+  }
+
+  private studentInclude() {
+    return {
+      academicProfile: true,
+      academicStanding: true,
+      programVersion: { select: { programId: true } },
+    };
   }
 
   private async loadStudent(
@@ -511,12 +626,25 @@ export class FeeCycleEngineService {
   ): Promise<StudentScope | null> {
     return this.db().student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
-      include: {
-        academicProfile: true,
-        academicStanding: true,
-        programVersion: { select: { programId: true } },
-      },
+      include: this.studentInclude(),
     });
+  }
+
+  private async loadStudents(
+    tenantId: string,
+    studentIds: string[],
+  ): Promise<StudentScope[]> {
+    if (!studentIds.length) return [];
+    const loaded: StudentScope[] = [];
+    for (let i = 0; i < studentIds.length; i += STUDENT_LOAD_BATCH) {
+      const chunk = studentIds.slice(i, i + STUDENT_LOAD_BATCH);
+      const rows = await this.db().student.findMany({
+        where: { id: { in: chunk }, tenantId, deletedAt: null },
+        include: this.studentInclude(),
+      });
+      loaded.push(...(rows as StudentScope[]));
+    }
+    return loaded;
   }
 
   private async resolveStudentsForSemester(
@@ -532,11 +660,8 @@ export class FeeCycleEngineService {
       select: { studentId: true },
     });
     const ids = standings.map((s: { studentId: string }) => s.studentId);
-    const students = await Promise.all(
-      ids.map((id: string) => this.loadStudent(tenantId, id)),
-    );
+    const students = await this.loadStudents(tenantId, ids);
     return students.filter((student) => {
-      if (!student) return false;
       if (dto.programId && student.programVersion?.programId !== dto.programId)
         return false;
       if (dto.shiftId && student.primaryShiftId !== dto.shiftId) return false;

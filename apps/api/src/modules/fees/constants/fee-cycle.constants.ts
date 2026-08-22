@@ -91,7 +91,11 @@ export function cycleLineAmounts(cycleCode: string): Record<string, number> {
   return CYCLE_LATER_LINE_AMOUNTS;
 }
 
-/** Default FYUP admission cycles for Don Bosco College, Tura. */
+/** Default FYUP admission/session cycles for Don Bosco College, Tura.
+ * Cycle 1 includes the first-year admission fee. Later cycles are session
+ * fees for the current year (Sem 3/5/7 entry) and must not block student
+ * creation — generate them as pending after the student record exists.
+ */
 export const DON_BOSCO_DEFAULT_FEE_CYCLES = [
   {
     code: 'CYCLE_1',

@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -14,6 +14,7 @@ import {
 
 export class FeeHeadQueryDto {
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   activeOnly?: boolean;
 }
@@ -257,6 +258,19 @@ export class BulkGenerateCycleDemandDto {
   shiftId?: string;
 
   @IsOptional()
+  @IsBoolean()
+  publish?: boolean;
+}
+
+export class BulkGenerateEntrySemestersDto {
+  @IsOptional()
+  @IsArray()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  semesterNumbers?: number[];
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   publish?: boolean;
 }

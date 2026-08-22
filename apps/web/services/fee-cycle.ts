@@ -97,8 +97,30 @@ export async function bulkGenerateCycleDemands(payload: {
   studentIds?: string[];
   publish?: boolean;
 }) {
-  const { data } = await api.post('/v1/fees/cycle-demands/bulk', payload);
-  return data;
+  const { data } = await api.post('/v1/fees/cycle-demands/bulk', payload, {
+    timeout: 180_000,
+  });
+  return data as { createdCount?: number; skippedCount?: number };
+}
+
+export async function bulkGenerateEntrySemesterDemands(payload?: {
+  semesterNumbers?: number[];
+  publish?: boolean;
+}) {
+  const { data } = await api.post(
+    '/v1/fees/cycle-demands/bulk-entry',
+    { semesterNumbers: [1, 3, 5], publish: true, ...payload },
+    { timeout: 180_000 },
+  );
+  return data as {
+    createdCount: number;
+    skippedCount: number;
+    bySemester: Array<{
+      semesterNumber: number;
+      createdCount: number;
+      skippedCount: number;
+    }>;
+  };
 }
 
 export async function fetchStudentFeeAccount(studentId: string) {

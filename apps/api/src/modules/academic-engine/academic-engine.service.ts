@@ -807,7 +807,11 @@ export class AcademicEngineService {
     tenantId: string,
     studentId: string,
     dto: CreateRegistrationDto,
-    opts?: { bypassRegistrationWindow?: boolean; promotionBypass?: boolean },
+    opts?: {
+      bypassRegistrationWindow?: boolean;
+      promotionBypass?: boolean;
+      skipFeeEnforcement?: boolean;
+    },
   ) {
     const student = await this.assertStudent(tenantId, studentId);
 
@@ -822,15 +826,19 @@ export class AcademicEngineService {
     if (standing.registrationLocked) {
       throw new BadRequestException('Registration is locked for this student');
     }
-    const feeCheck = await this.feeEnforcement.checkFeesClear(
-      tenantId,
-      studentId,
-      'REGISTRATION',
-    );
-    if (!opts?.promotionBypass && feeCheck.blocked) {
-      throw new BadRequestException(
-        `Fee dues outstanding (₹${feeCheck.outstandingAmount}). ${feeCheck.reasons.join('; ')}`,
+    const skipFeeEnforcement =
+      Boolean(opts?.promotionBypass) || Boolean(opts?.skipFeeEnforcement);
+    if (!skipFeeEnforcement) {
+      const feeCheck = await this.feeEnforcement.checkFeesClear(
+        tenantId,
+        studentId,
+        'REGISTRATION',
       );
+      if (feeCheck.blocked) {
+        throw new BadRequestException(
+          `Fee dues outstanding (₹${feeCheck.outstandingAmount}). ${feeCheck.reasons.join('; ')}`,
+        );
+      }
     }
     if (standing.currentSemesterSequence !== dto.semesterSequence) {
       throw new BadRequestException(

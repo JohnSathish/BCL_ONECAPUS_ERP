@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarRange, CheckCircle2, Layers, Plus } from 'lucide-rea
 import {
   activateFeeCycle,
   bulkGenerateCycleDemands,
+  bulkGenerateEntrySemesterDemands,
   createFeeCycle,
   deactivateFeeCycle,
   fetchFeeCycles,
@@ -45,7 +46,7 @@ export function FeeCycleConfigPanel() {
 
   const headsQ = useQuery({
     queryKey: ['fee-heads'],
-    queryFn: () => fetchFeeHeads(true),
+    queryFn: () => fetchFeeHeads(),
   });
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['fee-cycles'] });
@@ -62,6 +63,11 @@ export function FeeCycleConfigPanel() {
 
   const bulkMut = useMutation({
     mutationFn: bulkGenerateCycleDemands,
+  });
+
+  const entryBulkMut = useMutation({
+    mutationFn: () =>
+      bulkGenerateEntrySemesterDemands({ semesterNumbers: [1, 3, 5], publish: true }),
   });
 
   const cycles = cyclesQ.data ?? [];
@@ -85,8 +91,49 @@ export function FeeCycleConfigPanel() {
           </CardTitle>
           <CardDescription>
             Don Bosco FYUP model: one demand per academic year covering two semesters. Demands are
-            auto-generated when a student enters Semester I, III, V, or VII.
+            auto-generated when a student enters Semester I, III, V, or VII. Use the button below to
+            publish pending Admission & Session fees for every student currently in Semesters I,
+            III, and V.
           </CardDescription>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button
+              size="sm"
+              disabled={entryBulkMut.isPending}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    'Generate Admission & Session Fee for all students currently in Semester I, III, and V?\n\nStudents who already have a demand for this cycle will be skipped. New demands will appear as Pending in Fee Collection.',
+                  )
+                ) {
+                  return;
+                }
+                entryBulkMut.mutate();
+              }}
+            >
+              {entryBulkMut.isPending
+                ? 'Generating Sem I, III, V…'
+                : 'Generate Admission & Session Fee (Sem I, III, V)'}
+            </Button>
+            {entryBulkMut.data ? (
+              <p className="text-sm text-muted-foreground">
+                {entryBulkMut.data.createdCount} created, {entryBulkMut.data.skippedCount} skipped
+                {entryBulkMut.data.bySemester?.length
+                  ? ` — ${entryBulkMut.data.bySemester
+                      .map(
+                        (row) =>
+                          `Sem ${ROMAN[row.semesterNumber - 1] ?? row.semesterNumber}: ${row.createdCount} new`,
+                      )
+                      .join(' · ')}`
+                  : ''}
+                .
+              </p>
+            ) : null}
+            {entryBulkMut.isError ? (
+              <p className="text-sm text-destructive">
+                {apiErrorMessage(entryBulkMut.error, 'Could not generate fee demands.')}
+              </p>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-2">
@@ -110,6 +157,12 @@ export function FeeCycleConfigPanel() {
                 <StatusPill status={cycle.status} />
               </button>
             ))}
+            <Link
+              href="/admin/fees/admission-structure"
+              className="block rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground"
+            >
+              Edit heads &amp; amounts (add ID Card to Cycle 4) →
+            </Link>
             <CreateCycleForm heads={headsQ.data?.heads ?? []} onCreated={invalidate} />
           </div>
 

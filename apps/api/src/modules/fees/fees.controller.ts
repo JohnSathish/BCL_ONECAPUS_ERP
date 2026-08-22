@@ -53,6 +53,7 @@ import {
 } from './dto/fees.dto';
 import {
   BulkGenerateCycleDemandDto,
+  BulkGenerateEntrySemestersDto,
   CreateFeeCycleDto,
   CreateFeeHeadDto,
   FeeCycleQueryDto,
@@ -920,6 +921,15 @@ export class FeesController {
     @Body() dto: BulkGenerateCycleDemandDto,
   ) {
     return this.cycleEngine.generateBulk(user, dto);
+  }
+
+  @Post('cycle-demands/bulk-entry')
+  @RequirePermissions('fees:manage')
+  bulkGenerateEntrySemesterDemands(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: BulkGenerateEntrySemestersDto,
+  ) {
+    return this.cycleEngine.generateForEntrySemesters(user, dto);
   }
 
   @Get('students/:studentId/fee-summary')

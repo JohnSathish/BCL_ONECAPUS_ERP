@@ -34,6 +34,8 @@ describe('StudentImportHandler', () => {
     {} as never,
     {} as never,
     {} as never,
+    { onStudentSemesterEntry: jest.fn() } as never,
+    { buildCatalog: jest.fn() } as never,
     { buildCatalog: jest.fn() } as never,
     { buildCatalog: jest.fn() } as never,
     { buildCatalog: jest.fn() } as never,

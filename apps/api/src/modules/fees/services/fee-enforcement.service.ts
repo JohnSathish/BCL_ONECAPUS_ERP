@@ -71,7 +71,10 @@ export class FeeEnforcementService {
           reasons.push(
             `Admission & Session fee (${cycle.name}): ₹${amt} outstanding`,
           );
-        } else if (!admissionDemand) {
+        } else if (!admissionDemand && context !== 'REGISTRATION') {
+          // Do not block student creation / subject registration when the
+          // cycle demand has not been generated yet. Generate fees after
+          // the student record exists; hall ticket / exam still require it.
           reasons.push(
             `Admission & Session fee (${cycle.name}) not yet generated/paid`,
           );

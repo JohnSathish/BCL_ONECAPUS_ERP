@@ -28,6 +28,7 @@ import { normalizeNehuCourseCode } from '../../academic-engine/domain/course-cod
 import type { StudentImportMode } from '../dto/students.dto';
 import { StudentSemesterResolverService } from '../services/student-semester-resolver.service';
 import { StudentAbcService } from '../services/student-abc.service';
+import { FeeCycleEngineService } from '../../fees/services/fee-cycle-engine.service';
 import {
   SEM1_ADMISSION_SAMPLE_ROW,
   SEM1_ADMISSION_TEMPLATE_HEADERS,
@@ -473,6 +474,7 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     private readonly majorMinorTrack: StudentMajorMinorTrackService,
     private readonly semesterResolver: StudentSemesterResolverService,
     private readonly abcService: StudentAbcService,
+    private readonly feeCycleEngine: FeeCycleEngineService,
     private readonly sem1Curriculum: Sem1ImportCurriculumService,
     private readonly sem2Curriculum: Sem2ImportCurriculumService,
     private readonly sem3Curriculum: Sem3ImportCurriculumService,
@@ -4488,6 +4490,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (n.abcId) {
       await this.abcService.upsertForStudent(tenantId, studentId, n.abcId);
     }
+    void this.feeCycleEngine.onStudentSemesterEntry(
+      tenantId,
+      studentId,
+      targetSemester,
+      userId,
+    );
     return studentId;
   }
 
@@ -4699,6 +4707,12 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
     if (n.abcId) {
       await this.abcService.upsertForStudent(tenantId, studentId, n.abcId);
     }
+    void this.feeCycleEngine.onStudentSemesterEntry(
+      tenantId,
+      studentId,
+      targetSemester,
+      userId,
+    );
     return studentId;
   }
 

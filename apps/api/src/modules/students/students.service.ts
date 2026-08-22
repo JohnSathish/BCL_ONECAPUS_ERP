@@ -908,7 +908,11 @@ export class StudentsService {
     return student;
   }
 
-  async admit(tenantId: string, dto: AdmitStudentDto) {
+  async admit(
+    tenantId: string,
+    dto: AdmitStudentDto,
+    opts?: { skipFeeGeneration?: boolean },
+  ) {
     await this.licenseEnforcement.assertWriteAllowed(
       tenantId,
       'student.create',
@@ -1143,7 +1147,22 @@ export class StudentsService {
       });
     }
 
-    return this.profileService.getFullProfile(tenantId, student.id);
+    const profile = await this.profileService.getFullProfile(
+      tenantId,
+      student.id,
+    );
+    if (!opts?.skipFeeGeneration) {
+      const standing = await this.prisma.studentAcademicStanding.findUnique({
+        where: { studentId: student.id },
+        select: { currentSemesterSequence: true },
+      });
+      await this.generateSemesterEntryFees(
+        tenantId,
+        student.id,
+        standing?.currentSemesterSequence ?? dto.currentSemester ?? 1,
+      );
+    }
+    return profile;
   }
 
   async admitFull(tenantId: string, actorId: string, dto: AdmitFullStudentDto) {
@@ -1230,7 +1249,9 @@ export class StudentsService {
       }
     }
 
-    const profile = await this.admit(tenantId, admitDto);
+    const profile = await this.admit(tenantId, admitDto, {
+      skipFeeGeneration: true,
+    });
     const studentId = profile.id;
 
     if (
@@ -1289,6 +1310,7 @@ export class StudentsService {
               semesterId,
               semesterSequence,
             },
+            { skipFeeEnforcement: true },
           );
         }
 
@@ -1350,10 +1372,39 @@ export class StudentsService {
 
       await this.academicEngine.syncStudentTracks(tenantId, studentId);
 
+      await this.generateSemesterEntryFees(
+        tenantId,
+        studentId,
+        semesterSequence,
+        actorId,
+      );
+
       return this.profileService.getFullProfile(tenantId, studentId);
     } catch (error) {
       await this.purgeAdmissionAttempt(tenantId, studentId);
       throw error;
+    }
+  }
+
+  private async generateSemesterEntryFees(
+    tenantId: string,
+    studentId: string,
+    semesterSequence: number,
+    actorId?: string,
+  ) {
+    try {
+      await this.feeCycleEngine.onStudentSemesterEntry(
+        tenantId,
+        studentId,
+        semesterSequence,
+        actorId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Fee cycle generation skipped for student ${studentId} (sem ${semesterSequence}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 
