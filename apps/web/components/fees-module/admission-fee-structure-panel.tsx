@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Layers, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, Layers, Plus, Save, Trash2 } from 'lucide-react';
 import { fetchFeeCycles, fetchFeeHeads, updateFeeCycle } from '@/services/fee-cycle';
-import type { FeeHeadMaster } from '@/types/fee-cycle';
+import type { AcademicFeeCycle, FeeHeadMaster } from '@/types/fee-cycle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,18 +20,27 @@ function formatInr(amount: number) {
   }).format(amount);
 }
 
-type DraftHead = {
+type DraftRow = {
+  key: string;
   feeHeadId: string;
+  name: string;
   amount: string;
-  feeHead: FeeHeadMaster;
+  isNew?: boolean;
 };
+
+function rowsFromCycle(cycle: AcademicFeeCycle | null): DraftRow[] {
+  return (cycle?.lines ?? []).map((line) => ({
+    key: line.id,
+    feeHeadId: line.feeHeadId,
+    name: line.feeHead?.name ?? line.feeHeadId,
+    amount: String(line.amount),
+  }));
+}
 
 export function AdmissionFeeStructurePanel() {
   const qc = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lineAmounts, setLineAmounts] = useState<Record<string, string>>({});
-  const [addedHeads, setAddedHeads] = useState<DraftHead[]>([]);
-  const [removedLineIds, setRemovedLineIds] = useState<string[]>([]);
+  const [draftRows, setDraftRows] = useState<DraftRow[] | null>(null);
   const [headToAdd, setHeadToAdd] = useState('');
   const [message, setMessage] = useState('');
 
@@ -41,62 +50,49 @@ export function AdmissionFeeStructurePanel() {
   const cycles = cyclesQ.data ?? [];
   const selected = cycles.find((c) => c.id === selectedId) ?? cycles[0] ?? null;
   const masterHeads = headsQ.data?.heads ?? [];
+  const rows = draftRows ?? rowsFromCycle(selected);
 
-  const visibleLines = useMemo(
-    () => (selected?.lines ?? []).filter((line) => !removedLineIds.includes(line.id)),
-    [selected, removedLineIds],
-  );
-
-  const usedHeadIds = useMemo(() => {
-    const ids = new Set(visibleLines.map((line) => line.feeHeadId));
-    for (const row of addedHeads) ids.add(row.feeHeadId);
-    return ids;
-  }, [visibleLines, addedHeads]);
-
+  const usedHeadIds = useMemo(() => new Set(rows.map((row) => row.feeHeadId)), [rows]);
   const availableHeads = masterHeads.filter(
     (head) => head.isActive !== false && !usedHeadIds.has(head.id),
   );
-
-  const computedTotal = useMemo(() => {
-    const existing = visibleLines.reduce((sum, line) => {
-      const val = lineAmounts[line.id] ?? String(line.amount);
-      return sum + Number(val || 0);
-    }, 0);
-    const extra = addedHeads.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    return existing + extra;
-  }, [visibleLines, lineAmounts, addedHeads]);
+  const computedTotal = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
   const resetDraft = () => {
-    setLineAmounts({});
-    setAddedHeads([]);
-    setRemovedLineIds([]);
+    setDraftRows(null);
     setHeadToAdd('');
     setMessage('');
+  };
+
+  const updateRows = (next: DraftRow[]) => setDraftRows(next);
+
+  const moveRow = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    const current = next[index];
+    const swap = next[target];
+    if (!current || !swap) return;
+    next[index] = swap;
+    next[target] = current;
+    updateRows(next);
   };
 
   const saveMut = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error('No cycle selected');
-      const existing = visibleLines.map((line, index) => ({
-        feeHeadId: line.feeHeadId,
-        amount: Number(lineAmounts[line.id] ?? line.amount),
-        sortOrder: line.sortOrder ?? (index + 1) * 10,
-      }));
-      const extra = addedHeads.map((row, index) => ({
-        feeHeadId: row.feeHeadId,
-        amount: Number(row.amount || 0),
-        sortOrder: (existing.length + index + 1) * 10,
-      }));
       return updateFeeCycle(selected.id, {
-        lines: [...existing, ...extra],
+        lines: rows.map((row, index) => ({
+          feeHeadId: row.feeHeadId,
+          amount: Number(row.amount || 0),
+          sortOrder: (index + 1) * 10,
+        })),
         totalAmount: computedTotal,
       });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['fee-cycles'] });
-      setAddedHeads([]);
-      setRemovedLineIds([]);
-      setLineAmounts({});
+      setDraftRows(null);
       setMessage(
         selected
           ? `${selected.name} saved — total ${formatInr(computedTotal)}. Other cycles were not changed.`
@@ -109,9 +105,15 @@ export function AdmissionFeeStructurePanel() {
   const addSelectedHead = () => {
     const head = availableHeads.find((row) => row.id === headToAdd);
     if (!head) return;
-    setAddedHeads((prev) => [
-      ...prev,
-      { feeHeadId: head.id, amount: String(head.amount), feeHead: head },
+    updateRows([
+      ...rows,
+      {
+        key: `new-${head.id}`,
+        feeHeadId: head.id,
+        name: head.name,
+        amount: String(head.amount),
+        isNew: true,
+      },
     ]);
     setHeadToAdd('');
     setMessage('');
@@ -125,8 +127,8 @@ export function AdmissionFeeStructurePanel() {
           Admission & Session Fee Structure
         </CardTitle>
         <CardDescription>
-          Heads and amounts are saved only for the selected cycle (I–II, III–IV, V–VI, or VII–VIII).
-          Adding ID Card to Cycle 4 does not add it to Cycle 2 or Cycle 3.
+          Heads, amounts, and order are saved only for the selected cycle. Use the arrows to move a
+          head up or down, then Save structure.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -160,50 +162,48 @@ export function AdmissionFeeStructurePanel() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-2">Order</th>
                     <th className="px-3 py-2">Fee head</th>
                     <th className="px-3 py-2 text-right">Amount (₹)</th>
                     <th className="px-3 py-2 text-right">This cycle</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleLines.map((line) => (
-                    <tr key={line.id} className="border-t">
-                      <td className="px-3 py-2">{line.feeHead?.name ?? line.feeHeadId}</td>
-                      <td className="px-3 py-2 text-right">
-                        <Input
-                          className="ml-auto h-8 w-28 text-right"
-                          type="number"
-                          defaultValue={String(line.amount)}
-                          onChange={(e) =>
-                            setLineAmounts((prev) => ({ ...prev, [line.id]: e.target.value }))
-                          }
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive"
-                          title="Remove from this cycle only"
-                          onClick={() =>
-                            setRemovedLineIds((prev) =>
-                              prev.includes(line.id) ? prev : [...prev, line.id],
-                            )
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {addedHeads.map((row) => (
-                    <tr key={`new-${row.feeHeadId}`} className="border-t bg-primary/5">
+                  {rows.map((row, index) => (
+                    <tr key={row.key} className={`border-t ${row.isNew ? 'bg-primary/5' : ''}`}>
                       <td className="px-3 py-2">
-                        {row.feeHead.name}
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          New on this cycle
-                        </span>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={index === 0}
+                            title="Move up"
+                            onClick={() => moveRow(index, -1)}
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={index === rows.length - 1}
+                            title="Move down"
+                            onClick={() => moveRow(index, 1)}
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.name}
+                        {row.isNew ? (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            New on this cycle
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Input
@@ -211,11 +211,9 @@ export function AdmissionFeeStructurePanel() {
                           type="number"
                           value={row.amount}
                           onChange={(e) =>
-                            setAddedHeads((prev) =>
-                              prev.map((item) =>
-                                item.feeHeadId === row.feeHeadId
-                                  ? { ...item, amount: e.target.value }
-                                  : item,
+                            updateRows(
+                              rows.map((item) =>
+                                item.key === row.key ? { ...item, amount: e.target.value } : item,
                               ),
                             )
                           }
@@ -227,11 +225,8 @@ export function AdmissionFeeStructurePanel() {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-destructive"
-                          onClick={() =>
-                            setAddedHeads((prev) =>
-                              prev.filter((item) => item.feeHeadId !== row.feeHeadId),
-                            )
-                          }
+                          title="Remove from this cycle only"
+                          onClick={() => updateRows(rows.filter((item) => item.key !== row.key))}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -239,7 +234,9 @@ export function AdmissionFeeStructurePanel() {
                     </tr>
                   ))}
                   <tr className="border-t font-semibold">
-                    <td className="px-3 py-2">Total</td>
+                    <td className="px-3 py-2" colSpan={2}>
+                      Total
+                    </td>
                     <td className="px-3 py-2 text-right">{formatInr(computedTotal)}</td>
                     <td />
                   </tr>
@@ -250,8 +247,8 @@ export function AdmissionFeeStructurePanel() {
             <div className="mt-4 space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4">
               <p className="text-sm font-semibold">Add a fee head to {selected.name} only</p>
               <p className="text-xs text-muted-foreground">
-                Choose ID Card here to charge it on Semester VII &amp; VIII. This does not add it to
-                Cycle 2 or Cycle 3.
+                Added heads apply only to this cycle. After adding, use the arrows to place ID Card
+                where you want it, then Save structure.
               </p>
               <div className="flex flex-wrap items-end gap-2">
                 <select
