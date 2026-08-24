@@ -16,6 +16,7 @@ import {
 import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
+import { isExcelImportedStudent } from '../domain/class12-subjects.util';
 
 function serializeValue(value: unknown): string | null {
   if (value == null || value === '') return null;
@@ -492,6 +493,12 @@ export class StudentProfileChangeRequestService {
   ) {
     await this.assertStudentCanEditProfile(user.tid, studentId);
 
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: user.tid, deletedAt: null },
+      select: { importSource: true, admissionSource: true },
+    });
+    const excelImported = isExcelImportedStudent(student ?? {});
+
     const percentage =
       input.totalMarks != null &&
       input.maximumMarks != null &&
@@ -505,7 +512,10 @@ export class StudentProfileChangeRequestService {
         input.boardName,
         input.stream,
         input.subjects,
-        { requireMinFive: true },
+        {
+          requireMinFive: !excelImported,
+          strictMaster: !excelImported,
+        },
       );
     }
 

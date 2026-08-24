@@ -105,16 +105,18 @@ export class Class12SubjectsService {
 
   /**
    * Validate subject marks against the Class XII Subject Master for board+stream.
-   * Requires min 5 named subjects, no duplicates, all names in master.
+   * Software admissions require min 5 named subjects, no duplicates, all names in master.
+   * Excel-imported students skip the master (marks are not captured in import).
    */
   async assertSubjectMarksValid(
     tenantId: string,
     board: string | null | undefined,
     stream: string | null | undefined,
     subjects: Array<{ subjectName?: string | null }>,
-    options?: { requireMinFive?: boolean },
+    options?: { requireMinFive?: boolean; strictMaster?: boolean },
   ) {
     const requireMinFive = options?.requireMinFive !== false;
+    const strictMaster = options?.strictMaster !== false;
     const named = subjects
       .map((s) => String(s.subjectName ?? '').trim())
       .filter(Boolean);
@@ -138,6 +140,8 @@ export class Class12SubjectsService {
         `Duplicate Class XII subject(s): ${[...new Set(duplicates)].join(', ')}`,
       );
     }
+
+    if (!strictMaster) return;
 
     const boardRaw = normalizeClass12Board(board);
     const streamCode = normalizeClass12Stream(stream);

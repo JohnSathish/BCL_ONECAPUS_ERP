@@ -35,6 +35,7 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { fetchStudentRollShiftHistory } from '@/services/roll-number';
 import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
+import { isExcelImportedStudent } from '@/lib/student-admission-source';
 import { formatCourseDisplayTitle } from '@/utils/format-course-title';
 
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
@@ -959,6 +960,7 @@ export function BoardExamSection({
   canEdit: boolean;
 }) {
   const exam = profile.boardExam;
+  const class12Optional = isExcelImportedStudent(profile);
   const [form, setForm] = useState({
     boardName: exam?.boardName ?? '',
     schoolName: exam?.schoolName ?? '',
@@ -973,7 +975,7 @@ export function BoardExamSection({
         marksObtained: m.marksObtained ?? undefined,
         maxMarks: m.maxMarks ?? undefined,
         grade: (m as { grade?: string }).grade ?? '',
-      })) ?? emptyBoardExamSubjectRows(),
+      })) ?? (class12Optional ? [] : emptyBoardExamSubjectRows()),
   });
   const { message, saving } = useDebouncedSave(
     profile.id,
@@ -1037,6 +1039,8 @@ export function BoardExamSection({
           }
           showBoardSelect
           disabled={!canEdit}
+          minSubjects={class12Optional ? 0 : 5}
+          requireCatalog={!class12Optional}
           inputClassName={inputClass}
           onBoardChange={(boardName) => setForm((f) => ({ ...f, boardName }))}
           onStreamChange={(stream) => setForm((f) => ({ ...f, stream }))}

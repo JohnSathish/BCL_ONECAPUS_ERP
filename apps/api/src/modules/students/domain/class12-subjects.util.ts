@@ -29,6 +29,21 @@ export function normalizeClass12Board(board?: string | null): string {
     .replace(/\s+/g, ' ');
 }
 
+/**
+ * Excel import does not capture Class XII subject marks. Keep the board-subject
+ * master (MBOSE / stream catalogs) required only for software admissions.
+ */
+export function isExcelImportedStudent(input?: {
+  importSource?: string | null;
+  admissionSource?: string | null;
+}): boolean {
+  const tokens = `${input?.importSource ?? ''} ${input?.admissionSource ?? ''}`
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
+  return tokens.includes('IMPORT') || tokens.includes('EXCEL');
+}
+
 /** Expand "MBOSE (MBOSE)" into lookup keys that match Support Data board types. */
 export function class12BoardLookupAliases(board?: string | null): string[] {
   const raw = normalizeClass12Board(board);

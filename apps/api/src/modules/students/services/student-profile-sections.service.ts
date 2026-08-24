@@ -31,6 +31,10 @@ import { AcademicChangeHistoryService } from '../academic-change-history/academi
 import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
 import { Class12SubjectsService } from './class12-subjects.service';
 import {
+  class12BoardLookupAliases,
+  isExcelImportedStudent,
+} from '../domain/class12-subjects.util';
+import {
   isTemporaryStudentLoginEmail,
   resolveStudentContactEmail,
 } from '../student-credentials.util';
@@ -112,7 +116,8 @@ export class StudentProfileSectionsService {
     if (!isProfileSectionKey(sectionKey)) {
       throw new BadRequestException(`Unknown profile section: ${sectionKey}`);
     }
-    await this.loadStudent(tenantId, studentId);
+    const student = await this.loadStudent(tenantId, studentId);
+    const excelImported = isExcelImportedStudent(student);
 
     let auditRecorded = 0;
 
@@ -156,6 +161,7 @@ export class StudentProfileSectionsService {
           studentId,
           dto as UpdateBoardExamSectionDto,
           actorId,
+          excelImported,
         );
         break;
       case 'cuet':
@@ -172,6 +178,7 @@ export class StudentProfileSectionsService {
           studentId,
           dto as UpdateAcademicSectionDto,
           actorId,
+          excelImported,
         );
         break;
       case 'fyugp_registration':
@@ -469,9 +476,11 @@ export class StudentProfileSectionsService {
         break;
       case 'board_exam':
         checks.push(
-          student.boardExams.some(
-            (b) => b.subjectMarks.length >= 5 || Boolean(b.boardRollNumber),
-          ),
+          isExcelImportedStudent(student)
+            ? true
+            : student.boardExams.some(
+                (b) => b.subjectMarks.length >= 5 || Boolean(b.boardRollNumber),
+              ),
         );
         break;
       case 'cuet':
@@ -988,6 +997,7 @@ export class StudentProfileSectionsService {
     studentId: string,
     dto: UpdateBoardExamSectionDto,
     actorId?: string,
+    excelImported = false,
   ) {
     let exam = await this.prisma.studentBoardExam.findFirst({
       where: { tenantId, studentId },
@@ -998,19 +1008,25 @@ export class StudentProfileSectionsService {
       });
     }
     if (dto.boardName) {
-      await this.assertBoardNameExists(tenantId, dto.boardName);
+      await this.assertBoardNameExists(tenantId, dto.boardName, {
+        required: !excelImported,
+      });
     }
     if (dto.subjectMarks?.length) {
       const namedMarks = dto.subjectMarks.filter((m) =>
         String(m.subjectName ?? '').trim(),
       );
       // Autosave may send partial rows; only fully validate when 5+ subjects present.
+      // Excel import never captured per-subject marks — skip the board master.
       await this.class12Subjects.assertSubjectMarksValid(
         tenantId,
         dto.boardName ?? exam.boardName,
         dto.stream ?? exam.stream,
         namedMarks,
-        { requireMinFive: namedMarks.length >= 5 },
+        {
+          requireMinFive: !excelImported && namedMarks.length >= 5,
+          strictMaster: !excelImported,
+        },
       );
     }
 
@@ -1107,8 +1123,9 @@ export class StudentProfileSectionsService {
     studentId: string,
     dto: UpdateAcademicSectionDto,
     actorId?: string,
+    excelImported = false,
   ) {
-    if (dto.class12Subjects !== undefined) {
+    if (dto.class12Subjects !== undefined && !excelImported) {
       await this.assertClass12SubjectsExist(tenantId, dto.class12Subjects);
     }
     if (dto.majorSubjectSlug && dto.minorSubjectSlug) {
@@ -1258,22 +1275,36 @@ export class StudentProfileSectionsService {
     await this.touchModified(tenantId, studentId, actorId);
   }
 
-  private async assertBoardNameExists(tenantId: string, boardName: string) {
-    const normalized = this.normalizeBoardValue(boardName);
-    if (!normalized) return;
+  private async assertBoardNameExists(
+    tenantId: string,
+    boardName: string,
+    options?: { required?: boolean },
+  ) {
+    const aliases = [
+      ...new Set(
+        [
+          boardName.trim(),
+          ...class12BoardLookupAliases(boardName),
+          this.normalizeBoardValue(boardName),
+        ]
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (!aliases.length) return;
     const board = await this.prisma.masterLookup.findFirst({
       where: {
         tenantId,
         lookupType: 'BOARD_NAME',
         isActive: true,
         archivedAt: null,
-        OR: [
-          { label: { equals: boardName.trim(), mode: 'insensitive' } },
-          { code: { equals: normalized, mode: 'insensitive' } },
-        ],
+        OR: aliases.flatMap((alias) => [
+          { label: { equals: alias, mode: 'insensitive' as const } },
+          { code: { equals: alias, mode: 'insensitive' as const } },
+        ]),
       },
     });
-    if (!board) {
+    if (!board && options?.required !== false) {
       throw new BadRequestException(
         `Unknown board "${boardName}". Add it in Support Data -> Students -> Board Names first.`,
       );

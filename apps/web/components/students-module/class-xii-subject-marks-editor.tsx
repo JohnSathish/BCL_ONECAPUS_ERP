@@ -31,6 +31,11 @@ type Props = {
   /** When false, board is controlled externally (no board select rendered). */
   showBoardSelect?: boolean;
   minSubjects?: number;
+  /**
+   * Software admissions must pick from the board+stream master.
+   * Excel-imported students did not enter Class XII marks — allow empty / free text.
+   */
+  requireCatalog?: boolean;
   className?: string;
   inputClassName?: string;
 };
@@ -50,6 +55,7 @@ function SubjectSearchSelect({
   disabledOptions,
   disabled,
   loading,
+  allowFreeText,
   onChange,
   inputClassName,
 }: {
@@ -58,6 +64,7 @@ function SubjectSearchSelect({
   disabledOptions: Set<string>;
   disabled?: boolean;
   loading?: boolean;
+  allowFreeText?: boolean;
   onChange: (name: string) => void;
   inputClassName?: string;
 }) {
@@ -72,6 +79,18 @@ function SubjectSearchSelect({
       return true;
     });
   }, [options, q, disabledOptions, value]);
+
+  if (allowFreeText && options.length === 0) {
+    return (
+      <input
+        className={inputClassName}
+        disabled={disabled}
+        placeholder={loading ? 'Loading subjects…' : 'Subject name (optional)'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
 
   return (
     <div className="relative">
@@ -139,11 +158,13 @@ export function ClassXiiSubjectMarksEditor({
   disabled,
   showBoardSelect = true,
   minSubjects = 5,
+  requireCatalog = true,
   className,
   inputClassName = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm',
 }: Props) {
   const streamCode = normalizeClass12Stream(stream);
   const canFetch = Boolean(boardName?.trim() && streamCode);
+  const allowFreeText = !requireCatalog;
 
   const subjectsQuery = useQuery({
     queryKey: ['class12-subjects', boardName, streamCode],
@@ -153,16 +174,16 @@ export function ClassXiiSubjectMarksEditor({
 
   const options = subjectsQuery.data ?? [];
 
-  // Ensure at least minSubjects rows are visible
+  // Ensure at least minSubjects rows are visible (skip padding when optional/empty).
   useEffect(() => {
-    if (subjectMarks.length < minSubjects) {
-      onSubjectMarksChange([...subjectMarks, ...emptyRows(minSubjects - subjectMarks.length)]);
-    }
+    if (minSubjects <= 0 || subjectMarks.length >= minSubjects) return;
+    onSubjectMarksChange([...subjectMarks, ...emptyRows(minSubjects - subjectMarks.length)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pad once when short
   }, [minSubjects, subjectMarks.length]);
 
-  // Clear invalid subjects only after a non-empty catalog loads.
+  // Clear invalid subjects only after a non-empty catalog loads for software admissions.
   useEffect(() => {
+    if (!requireCatalog) return;
     if (!canFetch || subjectsQuery.isLoading || !subjectsQuery.data?.length) return;
     const allowed = new Set(subjectsQuery.data.map((s) => s.subjectName));
     let changed = false;
@@ -246,7 +267,9 @@ export function ClassXiiSubjectMarksEditor({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">Subject marks (min {minSubjects})</p>
+          <p className="text-sm font-medium">
+            {requireCatalog ? `Subject marks (min ${minSubjects})` : 'Subject marks (optional)'}
+          </p>
           {subjectsQuery.isFetching ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading subjects…
@@ -254,7 +277,12 @@ export function ClassXiiSubjectMarksEditor({
           ) : null}
         </div>
 
-        {!canFetch ? (
+        {!requireCatalog ? (
+          <p className="text-sm text-muted-foreground">
+            Class XII subject marks were not part of Excel import and are optional. Board values
+            such as MBOSE (MBOSE) do not need a matching subject master.
+          </p>
+        ) : !canFetch ? (
           <p className="text-sm text-muted-foreground">
             Select Board and Stream to load Class XII subjects.
           </p>
@@ -276,8 +304,9 @@ export function ClassXiiSubjectMarksEditor({
               value={row.subjectName}
               options={options}
               disabledOptions={selectedNames}
-              disabled={disabled || !canFetch || options.length === 0}
+              disabled={disabled || (requireCatalog && (!canFetch || options.length === 0))}
               loading={subjectsQuery.isFetching}
+              allowFreeText={allowFreeText}
               onChange={(name) => updateRow(idx, { subjectName: name })}
               inputClassName={inputClassName}
             />
@@ -319,7 +348,7 @@ export function ClassXiiSubjectMarksEditor({
 
         <button
           type="button"
-          disabled={disabled || !canFetch}
+          disabled={disabled || (requireCatalog && !canFetch)}
           onClick={addRow}
           className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
         >
