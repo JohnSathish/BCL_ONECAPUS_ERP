@@ -24,7 +24,6 @@ import {
   verifyStudentDocument,
 } from '@/services/students';
 import { fetchAcademicDepartments } from '@/services/organization';
-import { fetchAcademicSubjects } from '@/services/academic-engine';
 import { fetchBoardNames } from '@/services/support-data';
 import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
 import { normalizeClass12Stream } from '@/services/class12-subjects';
@@ -857,6 +856,9 @@ function departmentFromCourseCode(code?: string | null) {
     PHI: 'Philosophy',
     POL: 'Political Science',
     SOC: 'Sociology',
+    COM: 'Commerce',
+    BCOM: 'Commerce',
+    ACC: 'Commerce',
   };
   return prefix ? map[prefix] : undefined;
 }
@@ -868,9 +870,9 @@ function CurrentSemesterRegistrationCard({
   profile: StudentProfile;
   major?: string;
 }) {
-  const currentSemester = profile.semester ?? 1;
+  const currentSemester = Number(profile.semester ?? 1);
   const enrollments = (profile.sectionEnrollments ?? []).filter(
-    (row) => row.semesterSequence === currentSemester,
+    (row) => Number(row.semesterSequence) === currentSemester,
   );
 
   const majorPapers = enrollments.filter(

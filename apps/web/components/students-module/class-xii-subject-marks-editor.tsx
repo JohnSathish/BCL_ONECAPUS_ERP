@@ -161,9 +161,9 @@ export function ClassXiiSubjectMarksEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pad once when short
   }, [minSubjects, subjectMarks.length]);
 
-  // Clear invalid subjects when board/stream catalog changes
+  // Clear invalid subjects only after a non-empty catalog loads.
   useEffect(() => {
-    if (!canFetch || subjectsQuery.isLoading || !subjectsQuery.data) return;
+    if (!canFetch || subjectsQuery.isLoading || !subjectsQuery.data?.length) return;
     const allowed = new Set(subjectsQuery.data.map((s) => s.subjectName));
     let changed = false;
     const next = subjectMarks.map((row) => {

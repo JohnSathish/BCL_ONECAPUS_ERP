@@ -1156,7 +1156,8 @@ export class AdminRegistrationService {
         )
       ) {
         let majorSections = eligibleSections.filter(
-          (s) => s.courseOffering.category === 'MAJOR',
+          (s) =>
+            String(s.courseOffering.category ?? '').toUpperCase() === 'MAJOR',
         );
         if (majorChoice) {
           majorSections = majorSections.filter((s) =>
@@ -1265,7 +1266,9 @@ export class AdminRegistrationService {
           category === 'MAJOR' && count > 1 ? paperIndex + 1 : undefined;
 
         let pool = eligibleSections.filter(
-          (s) => s.courseOffering.category === category,
+          (s) =>
+            String(s.courseOffering.category ?? '').toUpperCase() ===
+            String(category ?? '').toUpperCase(),
         );
 
         if (majorPaperIndex != null) {
@@ -1376,9 +1379,15 @@ export class AdminRegistrationService {
 
         const picked = pickBestSection(pool);
         if (!picked) {
-          throw new BadRequestException(
-            `No eligible section for ${category}${majorPaperIndex ? ` paper ${majorPaperIndex}` : ''}`,
+          if (category === 'MAJOR') {
+            throw new BadRequestException(
+              `No eligible section for ${category}${majorPaperIndex ? ` paper ${majorPaperIndex}` : ''}`,
+            );
+          }
+          this.logger.warn(
+            `No eligible section for ${category} (student ${reg.studentId}, sem ${reg.semesterSequence}); assigning remaining compulsory papers`,
           );
+          continue;
         }
 
         lines.push({

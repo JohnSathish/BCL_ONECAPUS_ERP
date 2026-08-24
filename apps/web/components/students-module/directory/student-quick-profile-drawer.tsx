@@ -69,7 +69,7 @@ export function StudentQuickProfileDrawer({ row, open, onOpenChange }: Props) {
             <Link href={base}>Open full profile</Link>
           </Button>
           <Button asChild className="flex-1">
-            <Link href={`${base}?tab=edit`}>
+            <Link href={`${base}?tab=academic`}>
               Edit
               <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
             </Link>

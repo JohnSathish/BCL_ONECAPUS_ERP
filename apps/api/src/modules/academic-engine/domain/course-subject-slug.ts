@@ -10,6 +10,8 @@ export function resolveCourseSubjectSlugCandidates(course: {
   if (course.title?.trim()) slugs.add(slugifySubject(course.title));
   if (course.department?.name?.trim())
     slugs.add(slugifySubject(course.department.name));
+  if (course.department?.code?.trim())
+    slugs.add(slugifySubject(course.department.code));
   return [...slugs];
 }
 

@@ -302,6 +302,9 @@ function departmentFromCourseCode(code?: string | null) {
     PHI: 'Philosophy',
     POL: 'Political Science',
     SOC: 'Sociology',
+    COM: 'Commerce',
+    BCOM: 'Commerce',
+    ACC: 'Commerce',
   };
   return prefix ? map[prefix] : undefined;
 }

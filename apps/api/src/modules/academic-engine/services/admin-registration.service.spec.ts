@@ -398,4 +398,62 @@ describe('AdminRegistrationService buildAutoAssignLines', () => {
       'off-gar-303',
     );
   });
+
+  it('still assigns Commerce MAJOR when Economics MINOR has no section', async () => {
+    prisma.student.findFirstOrThrow.mockResolvedValue({
+      programVersionId: 'pv-bcom',
+      primaryShiftId: 'shift-day',
+      academicProfile: {
+        streamId: null,
+        preferredShiftId: 'shift-day',
+        class12Subjects: [],
+      },
+      programChoices: [
+        { choiceType: 'MAJOR', subjectSlug: 'commerce' },
+        { choiceType: 'MINOR', subjectSlug: 'economics' },
+      ],
+    });
+    prisma.semesterStructureRule.findFirst.mockResolvedValue({
+      categoryCounts: { MAJOR: 1, MINOR: 1, MDC: 1, AEC: 1, SEC: 1, VAC: 1 },
+      continuityRules: {},
+      lines: [],
+    });
+    prisma.semesterRegistration.findFirst.mockResolvedValue(null);
+    prisma.semester.findFirst.mockResolvedValue({ id: 'sem-1' });
+    prisma.offeringSection.findMany.mockResolvedValue([
+      {
+        id: 'sec-com-100',
+        courseOfferingId: 'off-com-100',
+        capacity: 80,
+        seatLedger: { confirmedCount: 0 },
+        courseOffering: {
+          category: 'MAJOR',
+          majorPaperIndex: 1,
+          displayOrder: 1,
+          courseId: 'course-com-100',
+          course: {
+            code: 'COM-100',
+            title: 'Accounting for Business',
+            subjectSlug: 'commerce',
+          },
+        },
+      },
+    ]);
+
+    const lines = await service.buildAutoAssignLinesForStudent(
+      'tenant-1',
+      'stu-com',
+      'pv-bcom',
+      1,
+      { shiftId: 'shift-day' },
+    );
+
+    expect(lines).toEqual([
+      {
+        category: 'MAJOR',
+        offeringId: 'off-com-100',
+        offeringSectionId: 'sec-com-100',
+      },
+    ]);
+  });
 });

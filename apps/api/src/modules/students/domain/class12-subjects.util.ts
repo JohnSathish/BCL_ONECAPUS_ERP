@@ -29,6 +29,34 @@ export function normalizeClass12Board(board?: string | null): string {
     .replace(/\s+/g, ' ');
 }
 
+/** Expand "MBOSE (MBOSE)" into lookup keys that match Support Data board types. */
+export function class12BoardLookupAliases(board?: string | null): string[] {
+  const raw = normalizeClass12Board(board);
+  if (!raw) return [];
+  const aliases = new Set<string>([raw]);
+  const stripped = raw.replace(/\s*\(([^)]*)\)\s*$/, '').trim();
+  if (stripped) aliases.add(stripped);
+  const inner = raw.match(/\(([^)]+)\)\s*$/);
+  if (inner?.[1]) aliases.add(normalizeClass12Board(inner[1]));
+  return [...aliases].filter(Boolean);
+}
+
+export function class12StreamLookupAliases(stream?: string | null): string[] {
+  const code = normalizeClass12Stream(stream);
+  if (!code) return [];
+  const aliases = new Set<string>([code]);
+  if (code === 'COMMERCE') {
+    aliases.add('COM');
+    aliases.add('BUSINESS');
+  }
+  if (code === 'ARTS') {
+    aliases.add('ART');
+    aliases.add('HUMANITIES');
+  }
+  if (code === 'SCIENCE') aliases.add('SCI');
+  return [...aliases];
+}
+
 export function normalizeClass12Stream(stream?: string | null): string {
   const raw = String(stream ?? '')
     .trim()

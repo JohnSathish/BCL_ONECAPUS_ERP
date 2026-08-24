@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import {
+  class12BoardLookupAliases,
+  class12StreamLookupAliases,
   normalizeClass12Board,
   normalizeClass12Stream,
   normalizeClass12SubjectKey,
@@ -26,12 +28,11 @@ export class Class12SubjectsService {
     const boardRaw = normalizeClass12Board(board);
     const streamCode = normalizeClass12Stream(stream);
     if (!boardRaw || !streamCode) {
-      throw new BadRequestException(
-        'board and stream query params are required',
-      );
+      return [];
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
+    const streamAliases = class12StreamLookupAliases(streamCode);
     // Subjects seeded as boardType GENERAL are shared across all boards.
     const uniqueAliases = [
       ...new Set(
@@ -46,10 +47,14 @@ export class Class12SubjectsService {
         tenantId,
         isActive: true,
         deletedAt: null,
-        category: { equals: streamCode, mode: 'insensitive' },
-        OR: uniqueAliases.map((alias) => ({
-          boardType: { equals: alias, mode: 'insensitive' as const },
+        OR: streamAliases.map((alias) => ({
+          category: { equals: alias, mode: 'insensitive' as const },
         })),
+        AND: {
+          OR: uniqueAliases.map((alias) => ({
+            boardType: { equals: alias, mode: 'insensitive' as const },
+          })),
+        },
       },
       orderBy: [{ sortOrder: 'asc' }, { subjectName: 'asc' }],
       select: {
@@ -74,7 +79,12 @@ export class Class12SubjectsService {
     tenantId: string,
     boardRaw: string,
   ): Promise<string[]> {
-    const aliases = new Set<string>([boardRaw, 'GENERAL', 'ALL', 'COMMON']);
+    const aliases = new Set<string>([
+      ...class12BoardLookupAliases(boardRaw),
+      'GENERAL',
+      'ALL',
+      'COMMON',
+    ]);
     const lookup = await this.prisma.masterLookup.findFirst({
       where: {
         tenantId,
@@ -138,15 +148,20 @@ export class Class12SubjectsService {
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
+    const streamAliases = class12StreamLookupAliases(streamCode);
     const rows = await this.prisma.supportBoardSubject.findMany({
       where: {
         tenantId,
         isActive: true,
         deletedAt: null,
-        category: { equals: streamCode, mode: 'insensitive' },
-        OR: boardAliases.map((alias) => ({
-          boardType: { equals: alias, mode: 'insensitive' as const },
+        OR: streamAliases.map((alias) => ({
+          category: { equals: alias, mode: 'insensitive' as const },
         })),
+        AND: {
+          OR: boardAliases.map((alias) => ({
+            boardType: { equals: alias, mode: 'insensitive' as const },
+          })),
+        },
       },
       select: { subjectName: true, subjectCode: true },
     });

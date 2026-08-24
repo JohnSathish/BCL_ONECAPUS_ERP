@@ -37,6 +37,7 @@ import { LEGACY_SECTION_TO_TAB, PROFILE_TABS, type ProfileTabKey } from '@/types
 import { cn } from '@/utils/cn';
 
 function parseTab(tabParam: string | null, sectionParam: string | null): ProfileTabKey {
+  if (tabParam === 'edit') return 'academic';
   if (tabParam && PROFILE_TABS.some((t) => t.key === tabParam)) {
     return tabParam as ProfileTabKey;
   }
@@ -241,7 +242,7 @@ function ProfileSummarySidebar({
 }) {
   const completionPercent = profile.completion?.completionPercent ?? 0;
   const enrollments = profile.sectionEnrollments?.filter(
-    (e) => e.semesterSequence === profile.semester,
+    (e) => Number(e.semesterSequence) === Number(profile.semester),
   );
   const photoMut = useMutation({
     mutationFn: (file: File) => uploadStudentPhoto(profile.id, file),

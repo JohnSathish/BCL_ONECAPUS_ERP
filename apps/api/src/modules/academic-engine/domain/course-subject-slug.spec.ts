@@ -16,4 +16,14 @@ describe('course-subject-slug', () => {
     ]);
     expect(courseMatchesSubjectPath(course, 'mathematics')).toBe(true);
   });
+
+  it('matches commerce path via department code COM', () => {
+    const course = {
+      subjectSlug: null,
+      title: 'Accounting for Business',
+      department: { name: 'Commerce', code: 'COM' },
+    };
+    expect(courseMatchesSubjectPath(course, 'commerce')).toBe(true);
+    expect(courseMatchesSubjectPath(course, 'com')).toBe(true);
+  });
 });

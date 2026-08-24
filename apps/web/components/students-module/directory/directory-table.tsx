@@ -68,7 +68,7 @@ function InlineActions({
   const base = studentBase(row.id);
   const quick = [
     { label: 'View', action: () => onOpenProfile?.(row), icon: Eye, href: undefined },
-    { label: 'Edit', href: `${base}?tab=edit`, icon: Edit },
+    { label: 'Edit', href: `${base}?tab=academic`, icon: Edit },
     {
       label: 'Academics',
       href: `/admin/students/subject-registration?student=${row.id}`,

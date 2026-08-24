@@ -114,28 +114,36 @@ export class StudentProfileService {
     });
 
     const sectionEnrollments = registrations.flatMap((reg) =>
-      reg.lines.map((l) => ({
-        registrationId: reg.id,
-        semesterSequence: reg.semesterSequence,
-        semesterId: reg.semesterId,
-        registrationStatus: reg.status,
-        sectionCode: l.offeringSection?.sectionCode ?? null,
-        courseCode: l.offering.course.code,
-        courseTitle: l.offering.course.title,
-        category: l.category,
-        status: l.status,
-        credits: Number(l.credits ?? l.offering.course.credits ?? 0),
-        assignedById: l.assignedById,
-        assignmentSource: l.assignmentSource,
-        registrationSource: l.registrationSource,
-        generatedBy: l.generatedBy,
-        generatedAt: l.createdAt,
-        curriculumMappingId: l.offeringId,
-        mappingSource: l.offering.mappingSource,
-        curriculumVersion: l.offering.programVersion?.version ?? null,
-        facultyName: l.offeringSection?.staffProfile?.fullName ?? null,
-        facultyId: l.offeringSection?.staffProfile?.id ?? null,
-      })),
+      reg.lines.flatMap((l) => {
+        const course = l.offering?.course;
+        if (!course) return [];
+        return [
+          {
+            registrationId: reg.id,
+            semesterSequence: reg.semesterSequence,
+            semesterId: reg.semesterId,
+            registrationStatus: reg.status,
+            sectionCode: l.offeringSection?.sectionCode ?? null,
+            courseCode: course.code,
+            courseTitle: course.title,
+            category: String(
+              l.category || l.offering?.category || '',
+            ).toUpperCase(),
+            status: l.status,
+            credits: Number(l.credits ?? course.credits ?? 0),
+            assignedById: l.assignedById,
+            assignmentSource: l.assignmentSource,
+            registrationSource: l.registrationSource,
+            generatedBy: l.generatedBy,
+            generatedAt: l.createdAt,
+            curriculumMappingId: l.offeringId,
+            mappingSource: l.offering.mappingSource,
+            curriculumVersion: l.offering.programVersion?.version ?? null,
+            facultyName: l.offeringSection?.staffProfile?.fullName ?? null,
+            facultyId: l.offeringSection?.staffProfile?.id ?? null,
+          },
+        ];
+      }),
     );
 
     const completion = await this.sections.getCompletion(tenantId, studentId);
@@ -705,42 +713,50 @@ export class StudentProfileService {
     });
 
     return registrations.flatMap((reg) =>
-      reg.lines.map((line) => ({
-        registrationId: reg.id,
-        lineId: line.id,
-        semesterSequence: reg.semesterSequence,
-        semesterId: reg.semesterId,
-        registrationStatus: reg.status,
-        category: line.category,
-        lineStatus: line.status,
-        course: {
-          id: line.offering.courseId,
-          code: line.offering.course.code,
-          title: line.offering.course.title,
-          credits: Number(line.credits ?? line.offering.course.credits ?? 0),
-        },
-        section: line.offeringSection
-          ? {
-              id: line.offeringSection.id,
-              sectionCode: line.offeringSection.sectionCode,
-            }
-          : null,
-        faculty: line.offeringSection?.staffProfile
-          ? {
-              id: line.offeringSection.staffProfile.id,
-              name: line.offeringSection.staffProfile.fullName,
-              employeeCode: line.offeringSection.staffProfile.employeeCode,
-            }
-          : null,
-        generatedBy: line.generatedBy,
-        generatedAt: line.createdAt,
-        registrationSource: line.registrationSource,
-        assignmentSource: line.assignmentSource,
-        curriculumMappingId: line.offeringId,
-        mappingSource: line.offering.mappingSource,
-        curriculumVersion: line.offering.programVersion?.version ?? null,
-        poolName: line.offering.categoryPool?.poolName ?? null,
-      })),
+      reg.lines.flatMap((line) => {
+        const course = line.offering?.course;
+        if (!course) return [];
+        return [
+          {
+            registrationId: reg.id,
+            lineId: line.id,
+            semesterSequence: reg.semesterSequence,
+            semesterId: reg.semesterId,
+            registrationStatus: reg.status,
+            category: String(
+              line.category || line.offering?.category || '',
+            ).toUpperCase(),
+            lineStatus: line.status,
+            course: {
+              id: line.offering.courseId,
+              code: course.code,
+              title: course.title,
+              credits: Number(line.credits ?? course.credits ?? 0),
+            },
+            section: line.offeringSection
+              ? {
+                  id: line.offeringSection.id,
+                  sectionCode: line.offeringSection.sectionCode,
+                }
+              : null,
+            faculty: line.offeringSection?.staffProfile
+              ? {
+                  id: line.offeringSection.staffProfile.id,
+                  name: line.offeringSection.staffProfile.fullName,
+                  employeeCode: line.offeringSection.staffProfile.employeeCode,
+                }
+              : null,
+            generatedBy: line.generatedBy,
+            generatedAt: line.createdAt,
+            registrationSource: line.registrationSource,
+            assignmentSource: line.assignmentSource,
+            curriculumMappingId: line.offeringId,
+            mappingSource: line.offering.mappingSource,
+            curriculumVersion: line.offering.programVersion?.version ?? null,
+            poolName: line.offering.categoryPool?.poolName ?? null,
+          },
+        ];
+      }),
     );
   }
 }

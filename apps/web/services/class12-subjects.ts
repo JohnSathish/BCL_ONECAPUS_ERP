@@ -27,8 +27,14 @@ export function normalizeClass12Stream(stream?: string | null): string {
 }
 
 export async function fetchClass12Subjects(board: string, stream: string) {
+  const boardCode = String(board ?? '')
+    .trim()
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim();
+  const streamCode = normalizeClass12Stream(stream);
+  if (!boardCode || !streamCode) return [];
   const { data } = await api.get<Class12SubjectOption[]>('/v1/class12/subjects', {
-    params: { board, stream: normalizeClass12Stream(stream) },
+    params: { board: boardCode, stream: streamCode },
   });
   return data;
 }
