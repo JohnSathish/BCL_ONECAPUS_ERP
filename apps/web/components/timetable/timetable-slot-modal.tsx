@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
 import { fetchStaff } from '@/services/staff';
@@ -108,8 +107,6 @@ export function TimetableSlotModal({
     >
   >({});
   const authReady = useAuthQueryEnabled();
-  const debouncedFacultySearch = useDebouncedValue(facultySearch, 250);
-  const debouncedCoFacultySearch = useDebouncedValue(coFacultySearch, 250);
 
   const coursesQ = useQuery({
     queryKey: ['timetable', 'courses'],
@@ -117,36 +114,16 @@ export function TimetableSlotModal({
     enabled: authReady && open,
   });
   const staffQ = useQuery({
-    queryKey: ['timetable', 'staff', context?.shiftId, debouncedFacultySearch],
+    queryKey: ['timetable', 'staff', context?.shiftId],
     queryFn: async () => {
       if (context?.shiftId) {
         return fetchFacultyShiftAssignments(context.shiftId, {
           limit: 200,
-          search: debouncedFacultySearch.trim() || undefined,
         });
       }
       const result = await fetchStaff({
         activeTeachingOnly: true,
         limit: 100,
-        search: debouncedFacultySearch.trim() || undefined,
-      });
-      return result.data;
-    },
-    enabled: authReady && open,
-  });
-  const coStaffQ = useQuery({
-    queryKey: ['timetable', 'staff', 'co', context?.shiftId, debouncedCoFacultySearch],
-    queryFn: async () => {
-      if (context?.shiftId) {
-        return fetchFacultyShiftAssignments(context.shiftId, {
-          limit: 200,
-          search: debouncedCoFacultySearch.trim() || undefined,
-        });
-      }
-      const result = await fetchStaff({
-        activeTeachingOnly: true,
-        limit: 100,
-        search: debouncedCoFacultySearch.trim() || undefined,
       });
       return result.data;
     },
@@ -241,13 +218,10 @@ export function TimetableSlotModal({
         };
       });
   const staff = mapStaffRows(staffQ.data as unknown[] | undefined);
-  const coStaff = mapStaffRows(coStaffQ.data as unknown[] | undefined);
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
   const selectedFromLists =
-    staff.find((m) => m.id === staffProfileId) ??
-    coStaff.find((m) => m.id === staffProfileId) ??
-    pickedStaffCache[staffProfileId];
+    staff.find((m) => m.id === staffProfileId) ?? pickedStaffCache[staffProfileId];
   const selectedStaff =
     selectedFromLists ??
     (staffProfileId && entry?.staffProfile
@@ -264,7 +238,7 @@ export function TimetableSlotModal({
   const primaryOptions = selectedStaff
     ? [selectedStaff, ...staff.filter((m) => m.id !== selectedStaff.id)]
     : staff;
-  const coOptions = coStaff;
+  const coOptions = staff;
 
   const rememberStaff = (id: string, list: typeof staff) => {
     const member = list.find((m) => m.id === id);
@@ -539,13 +513,13 @@ export function TimetableSlotModal({
                 value={coFacultyPick}
                 options={coOptions}
                 onChange={(id) => {
-                  rememberStaff(id, coStaff);
+                  rememberStaff(id, staff);
                   setCoFacultyPick(id);
                 }}
                 searchQuery={coFacultySearch}
                 onSearchChange={setCoFacultySearch}
-                loading={coStaffQ.isLoading}
-                error={coStaffQ.isError}
+                loading={staffQ.isLoading}
+                error={staffQ.isError}
                 excludeIds={[staffProfileId, ...coFacultyIds].filter(Boolean)}
                 emptyHint="No matching co-faculty"
                 placeholder="Search co-faculty…"
@@ -568,10 +542,7 @@ export function TimetableSlotModal({
             {coFacultyIds.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {coFacultyIds.map((id) => {
-                  const member =
-                    staff.find((row) => row.id === id) ??
-                    coStaff.find((row) => row.id === id) ??
-                    pickedStaffCache[id];
+                  const member = staff.find((row) => row.id === id) ?? pickedStaffCache[id];
                   return (
                     <button
                       key={id}

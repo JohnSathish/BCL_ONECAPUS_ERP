@@ -4,6 +4,10 @@ import { Search, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import {
+  compareTimetableFacultyMatches,
+  matchesTimetableFaculty,
+} from '@/components/timetable/timetable-faculty-search-utils';
 import { cn } from '@/utils/cn';
 
 export type TimetableFacultyOption = {
@@ -88,25 +92,25 @@ export function TimetableFacultySearchSelect({
   const selected = options.find((m) => m.id === value);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return options.filter((member) => {
-      if (excludeIds.includes(member.id)) return false;
-      if (!q) return true;
-      const haystack = [
-        member.fullName,
-        member.shortCode ?? '',
-        member.employeeCode ?? '',
-        ...(member.assignedShifts?.map((s) => s.code) ?? []),
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+    return options
+      .filter((member) => {
+        if (excludeIds.includes(member.id)) return false;
+        return matchesTimetableFaculty(member, query);
+      })
+      .sort(compareTimetableFacultyMatches(query));
   }, [options, query, excludeIds]);
 
   useLayoutEffect(() => {
     if (!open || !containerRef.current) return;
-    const update = () => {
+    const update = (event?: Event) => {
+      const target = event?.target;
+      if (
+        target &&
+        menuRef.current &&
+        (target === menuRef.current || menuRef.current.contains(target as Node))
+      ) {
+        return;
+      }
       if (!containerRef.current) return;
       setMenuPosition(computeMenuPosition(containerRef.current.getBoundingClientRect()));
     };
@@ -146,7 +150,7 @@ export function TimetableFacultySearchSelect({
       ? createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[10000] overflow-hidden rounded-md border border-border bg-background text-foreground shadow-xl"
+            className="fixed z-[10000] overflow-y-auto overscroll-contain rounded-md border border-border bg-background text-foreground shadow-xl"
             style={{
               top: menuPosition.top,
               left: menuPosition.left,
@@ -154,39 +158,39 @@ export function TimetableFacultySearchSelect({
               maxHeight: menuPosition.maxHeight,
             }}
             role="listbox"
+            onWheel={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
           >
-            <div className="max-h-full overflow-auto bg-background">
-              {loading ? (
-                <p className="bg-background p-3 text-xs text-muted-foreground">Searching…</p>
-              ) : filtered.length ? (
-                filtered.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    className={cn(
-                      'flex w-full flex-col border-b border-border/50 bg-background px-3 py-2 text-left text-sm last:border-0 hover:bg-muted',
-                      value === member.id && 'bg-primary/10',
-                    )}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      onChange(member.id);
-                      setQuery('');
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="font-medium text-foreground">{member.fullName}</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {member.shortCode ?? member.employeeCode ?? 'No code'}
-                      {member.assignedShifts?.length
-                        ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
-                        : ''}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p className="bg-background p-3 text-xs text-muted-foreground">{emptyHint}</p>
-              )}
-            </div>
+            {loading ? (
+              <p className="bg-background p-3 text-xs text-muted-foreground">Searching…</p>
+            ) : filtered.length ? (
+              filtered.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className={cn(
+                    'flex w-full flex-col border-b border-border/50 bg-background px-3 py-2 text-left text-sm last:border-0 hover:bg-muted',
+                    value === member.id && 'bg-primary/10',
+                  )}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onChange(member.id);
+                    setQuery('');
+                    setOpen(false);
+                  }}
+                >
+                  <span className="font-medium text-foreground">{member.fullName}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {member.shortCode ?? member.employeeCode ?? 'No code'}
+                    {member.assignedShifts?.length
+                      ? ` · ${member.assignedShifts.map((s) => s.code).join('/')}`
+                      : ''}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="bg-background p-3 text-xs text-muted-foreground">{emptyHint}</p>
+            )}
           </div>,
           document.body,
         )
