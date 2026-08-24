@@ -1,4 +1,6 @@
-FROM node:22-alpine AS deps
+# Docker Hub anonymous pulls often 500/429; GCR mirrors library/node.
+ARG NODE_IMAGE=mirror.gcr.io/library/node:22-alpine
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY .npmrc package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
@@ -8,7 +10,7 @@ RUN for attempt in 1 2 3 4 5; do \
       sleep $((attempt * 10)); \
     done
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
@@ -22,7 +24,7 @@ ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN rm -f prisma.config.ts && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 RUN npm run build:docker
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # System Chromium for Puppeteer PDFs (npm ci uses --ignore-scripts, so no bundled Chrome).

@@ -72,7 +72,19 @@ echo "Validating nginx config…"
 echo "Rebuilding ERP, API, worker, and college website…"
 # Use Docker layer cache when possible; npm ci retries are in each Dockerfile .npmrc.
 # For a full clean rebuild: COMPOSE build --no-cache web api worker college-web
-"${COMPOSE[@]}" build web api worker college-web
+build_ok=0
+for attempt in 1 2 3; do
+  if "${COMPOSE[@]}" build web api worker college-web; then
+    build_ok=1
+    break
+  fi
+  echo "docker compose build failed (attempt ${attempt}/3); retrying in $((attempt * 20))s…"
+  sleep $((attempt * 20))
+done
+if [[ "$build_ok" -ne 1 ]]; then
+  echo "docker compose build failed after 3 attempts" >&2
+  exit 1
+fi
 
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis

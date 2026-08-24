@@ -1,4 +1,6 @@
-FROM node:22-alpine AS deps
+# Docker Hub anonymous pulls often 500/429; GCR mirrors library/node.
+ARG NODE_IMAGE=mirror.gcr.io/library/node:22-alpine
+FROM ${NODE_IMAGE} AS deps
 
 WORKDIR /app
 
@@ -18,7 +20,7 @@ RUN for attempt in 1 2 3 4 5; do \
 
 
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -46,7 +48,7 @@ RUN npm run build
 
 
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 
 WORKDIR /app
 

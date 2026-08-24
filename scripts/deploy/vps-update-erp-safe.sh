@@ -82,7 +82,19 @@ echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
 echo "Rebuilding web + api + worker…"
-"${COMPOSE[@]}" build web api worker
+build_ok=0
+for attempt in 1 2 3; do
+  if "${COMPOSE[@]}" build web api worker; then
+    build_ok=1
+    break
+  fi
+  echo "docker compose build failed (attempt ${attempt}/3); retrying in $((attempt * 20))s…"
+  sleep $((attempt * 20))
+done
+if [[ "$build_ok" -ne 1 ]]; then
+  echo "docker compose build failed after 3 attempts" >&2
+  exit 1
+fi
 
 echo "Starting data services…"
 "${COMPOSE[@]}" up -d postgres redis

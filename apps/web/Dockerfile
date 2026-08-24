@@ -1,4 +1,6 @@
-FROM node:22-alpine AS deps
+# Docker Hub anonymous pulls often 500/429; GCR mirrors library/node.
+ARG NODE_IMAGE=mirror.gcr.io/library/node:22-alpine
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV HUSKY=0
@@ -13,7 +15,7 @@ RUN for attempt in 1 2 3 4 5; do \
 RUN npm install @tailwindcss/oxide-linux-x64-musl@4.3.0 --workspace=web --no-save \
   && npm rebuild @tailwindcss/oxide lightningcss --workspace=web
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
@@ -36,7 +38,7 @@ ENV NEXT_PUBLIC_SHOW_DEMO_LOGIN=$NEXT_PUBLIC_SHOW_DEMO_LOGIN
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

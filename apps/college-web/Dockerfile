@@ -1,4 +1,6 @@
-FROM node:22-alpine AS deps
+# Docker Hub anonymous pulls often 500/429; GCR mirrors library/node.
+ARG NODE_IMAGE=mirror.gcr.io/library/node:22-alpine
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV HUSKY=0
@@ -6,7 +8,7 @@ COPY .npmrc package.json package-lock.json ./
 COPY apps/college-web/package.json ./apps/college-web/
 RUN npm ci -w @onecampus/college-web --include=dev --ignore-scripts
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
@@ -26,7 +28,7 @@ ENV NEXT_PUBLIC_TENANT_SLUG=$NEXT_PUBLIC_TENANT_SLUG
 ENV NEXT_PUBLIC_ERP_LOGIN_URL=$NEXT_PUBLIC_ERP_LOGIN_URL
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
