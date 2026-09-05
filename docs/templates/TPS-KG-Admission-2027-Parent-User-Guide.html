@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tura Public School — K.G. Admission 2027 Parent User Guide</title>
+  <style>
+    :root {
+      --tps-green: #1a5336;
+      --tps-green-deep: #0f3d28;
+      --tps-mint: #eaf5ee;
+      --tps-border: #c6e2d1;
+      --tps-ink: #0f172a;
+      --tps-muted: #475569;
+      --tps-warn: #92400e;
+      --tps-warn-bg: #fff4d6;
+    }
+
+    * { box-sizing: border-box; }
+    html { font-size: 15px; }
+    body {
+      margin: 0;
+      color: var(--tps-ink);
+      background: #f3f5f4;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 0 0 1px #e2e8f0;
+    }
+
+    /* —— Institutional header —— */
+    .masthead {
+      text-align: center;
+      padding: 28px 28px 20px;
+      border-bottom: 3px solid var(--tps-green);
+      background: linear-gradient(180deg, #f7fbf8 0%, #ffffff 100%);
+    }
+    .masthead img.logo {
+      display: block;
+      width: 72px;
+      height: auto;
+      margin: 0 auto 12px;
+    }
+    .masthead h1 {
+      margin: 0;
+      font-size: 1.55rem;
+      letter-spacing: 0.04em;
+      color: var(--tps-green);
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+    .masthead .session {
+      margin: 8px 0 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--tps-green-deep);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .masthead .motto {
+      margin: 8px 0 0;
+      font-style: italic;
+      color: var(--tps-muted);
+    }
+    .masthead .affiliation {
+      margin: 6px 0 0;
+      font-size: 0.88rem;
+      color: #64748b;
+    }
+    .doc-title {
+      margin: 14px auto 0;
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 999px;
+      background: var(--tps-green);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      justify-content: space-between;
+      padding: 12px 28px;
+      background: var(--tps-mint);
+      border-bottom: 1px solid var(--tps-border);
+      font-size: 0.9rem;
+    }
+    .meta-bar strong { color: var(--tps-green); }
+
+    .content { padding: 8px 28px 36px; }
+
+    h2 {
+      margin: 28px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--tps-border);
+      color: var(--tps-green);
+      font-size: 1.2rem;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      color: var(--tps-green-deep);
+      font-size: 1.02rem;
+    }
+    p { margin: 0 0 10px; }
+    ul, ol { margin: 0 0 12px; padding-left: 1.25rem; }
+    li { margin: 4px 0; }
+
+    .callout {
+      margin: 14px 0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--tps-border);
+      background: var(--tps-mint);
+    }
+    .callout.warn {
+      background: var(--tps-warn-bg);
+      border-color: #f0d48a;
+      color: var(--tps-warn);
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 0 0 16px;
+    }
+    .steps > li {
+      position: relative;
+      margin: 0 0 14px;
+      padding: 12px 14px 12px 54px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #fafcfa;
+    }
+    .steps > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--tps-green);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 28px;
+      text-align: center;
+    }
+    .steps > li h3 { margin-top: 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid #dbe4de;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--tps-mint);
+      color: var(--tps-green-deep);
+      font-weight: 700;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #f8fafc;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.88em;
+    }
+
+    .checklist label {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin: 6px 0;
+    }
+    .checklist input { margin-top: 4px; }
+
+    .footer-note {
+      margin-top: 28px;
+      padding-top: 14px;
+      border-top: 2px solid var(--tps-green);
+      font-size: 0.85rem;
+      color: var(--tps-muted);
+    }
+    .signature {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 28px;
+    }
+    .signature .line {
+      margin-top: 48px;
+      border-top: 1px solid #94a3b8;
+      padding-top: 6px;
+      font-size: 0.85rem;
+      color: var(--tps-muted);
+    }
+
+    .print-bar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.95);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .print-bar button {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      background: var(--tps-green);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .print-bar button.secondary {
+      background: #fff;
+      color: var(--tps-green);
+      border: 1px solid var(--tps-border);
+    }
+
+    @media print {
+      body { background: #fff; }
+      .print-bar { display: none !important; }
+      .page { box-shadow: none; max-width: none; }
+      h2 { break-after: avoid; }
+      .steps > li, table, .callout { break-inside: avoid; }
+      a[href]::after { content: ""; }
+    }
+
+    @page {
+      margin: 14mm 12mm;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <button type="button" class="secondary" onclick="window.location.href='https://admission.turapublicschool.com/'">Open Admission Portal</button>
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="page">
+    <header class="masthead">
+      <img class="logo" src="tps-logo.png" alt="Tura Public School logo"
+           onerror="this.onerror=null;this.src='https://admission.turapublicschool.com/school-admissions/tps-logo.png';" />
+      <h1>Tura Public School, Tura</h1>
+      <p class="session">K.G. Admission — Academic Session 2027</p>
+      <p class="motto">“Glow in Integrity”</p>
+      <p class="affiliation">Affiliated to CISCE, New Delhi</p>
+      <div class="doc-title">Parent / Guardian User Guide</div>
+    </header>
+
+    <div class="meta-bar">
+      <div><strong>Portal:</strong> https://admission.turapublicschool.com/</div>
+      <div><strong>Help email:</strong> info@turapublicschool.com</div>
+      <div><strong>Last date to apply:</strong> 26/09/2026 (or as updated by school)</div>
+      <div><strong>Application fee:</strong> ₹100 (bank transfer)</div>
+    </div>
+
+    <div class="content">
+      <div class="callout warn">
+        <strong>Please read before you begin</strong>
+        Online registration does <u>not</u> guarantee admission. Seats are limited. Names must match original birth and caste certificates. Keep your Application Number and password safe.
+      </div>
+
+      <h2>1. Who can apply?</h2>
+      <ul>
+        <li>Admission class: <strong>K.G.</strong> for Academic Session <strong>2027</strong>.</li>
+        <li>Age as on <strong>1st January 2027</strong>: at least <strong>5 years</strong> and less than <strong>6 years</strong>.</li>
+        <li>Eligible date of birth: <strong>02 January 2021</strong> to <strong>01 January 2022</strong>.</li>
+        <li>The child must have attended <strong>Nursery</strong>.</li>
+        <li>Parent / guardian must have a working mobile number and email address (OTP is sent to email).</li>
+      </ul>
+
+      <h2>2. What you need ready</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Child’s full name</td>
+            <td>Enter in BLOCK LETTERS, exactly as on birth certificate</td>
+          </tr>
+          <tr>
+            <td>Date of birth</td>
+            <td>Must fall inside the eligible window above</td>
+          </tr>
+          <tr>
+            <td>Parent email &amp; mobile</td>
+            <td>Email receives OTP and application messages</td>
+          </tr>
+          <tr>
+            <td>Passport photograph</td>
+            <td>School uniform preferred · JPG / JPEG / PNG only</td>
+          </tr>
+          <tr>
+            <td>Certificates</td>
+            <td>Birth, school, income, and category certificates as applicable · JPG / JPEG / PNG only (PDF not accepted)</td>
+          </tr>
+          <tr>
+            <td>₹100 fee payment</td>
+            <td>Bank transfer + Transaction / UTR number + receipt image</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>3. How to register (create your login)</h2>
+      <ol class="steps">
+        <li>
+          <h3>Open the portal</h3>
+          <p>Go to <span class="kbd">https://admission.turapublicschool.com/</span> on a computer or mobile browser. Prefer Chrome / Edge / Firefox.</p>
+        </li>
+        <li>
+          <h3>Start registration</h3>
+          <p>Choose <strong>Register</strong>. Fill:</p>
+          <ul>
+            <li>Child’s full name (BLOCK LETTERS)</li>
+            <li>Date of birth</li>
+            <li>Gender</li>
+            <li>Parent / guardian mobile</li>
+            <li>Parent / guardian email</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Verify email with OTP</h3>
+          <p>Click <strong>Send OTP</strong>. Open the parent email inbox (and Spam/Junk). Enter the <strong>6-digit OTP</strong>. Tick the confirmation that the child attended Nursery and meets the age rule.</p>
+        </li>
+        <li>
+          <h3>Get login details</h3>
+          <p>After successful registration you receive an <strong>Application Number</strong> (example format: <span class="kbd">TPS27-0001</span>) and a password. <strong>Save both immediately</strong>. You will use them to log in.</p>
+        </li>
+      </ol>
+      <div class="callout">
+        <strong>Already registered?</strong>
+        Do not register again with the same email or mobile. Use <strong>Login</strong> or <strong>Forgot password</strong> on the portal.
+      </div>
+
+      <h2>4. How to log in</h2>
+      <ol>
+        <li>Open https://admission.turapublicschool.com/</li>
+        <li>Go to <strong>Login</strong></li>
+        <li>Enter Application Number / registered email and password</li>
+        <li>You will see the Dashboard with steps: Application Form → Documents → Fee &amp; Receipt → Review &amp; Submit</li>
+      </ol>
+
+      <h2>5. Fill the Application Form</h2>
+      <p>Open <strong>Application Form</strong> from the top menu. Complete every section carefully. You can save progress and return later until final submission.</p>
+
+      <h3>5.1 Child details</h3>
+      <ul>
+        <li>Full name, date of birth, gender, blood group</li>
+        <li>Caste / Category and Community / Tribe (this decides which certificates are required)</li>
+        <li>Nationality, last school attended, Nursery attendance</li>
+      </ul>
+
+      <h3>5.2 Address</h3>
+      <ul>
+        <li>Enter <strong>Permanent address</strong> fully, including PIN code</li>
+        <li>If Present address is the same, use <strong>Same as permanent</strong> (if shown)</li>
+        <li>Otherwise fill Present address completely</li>
+      </ul>
+
+      <h3>5.3 Father &amp; Mother details</h3>
+      <ul>
+        <li>Name, occupation, education, mobile, and other fields as asked</li>
+        <li>Income details must match the income certificates you will upload</li>
+      </ul>
+
+      <h3>5.4 Sibling (if any)</h3>
+      <p>If a brother/sister already studies in Tura Public School, fill sibling details as requested. Otherwise mark No / leave as guided on screen.</p>
+
+      <div class="callout warn">
+        <strong>Tip</strong>
+        Spell names exactly as on certificates. Wrong spelling can delay verification or cause rejection of documents.
+      </div>
+
+      <h2>6. Upload documents</h2>
+      <p>Open <strong>Documents</strong>. Upload clear colour photos/scans. Allowed types: <strong>JPG, JPEG, PNG only</strong>. PDF files are not accepted.</p>
+
+      <h3>Documents required for all applicants</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Document</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Passport photograph (school uniform preferred)</td></tr>
+          <tr><td>2</td><td>Birth certificate</td></tr>
+          <tr><td>3</td><td>Last school report card</td></tr>
+          <tr><td>4</td><td>Last school certificate</td></tr>
+          <tr><td>5</td><td>Father’s income certificate</td></tr>
+          <tr><td>6</td><td>Mother’s income certificate</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Additional certificates (by category)</h3>
+      <table>
+        <thead>
+          <tr><th>Child’s category / community</th><th>Upload</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>General / UR</td><td>Caste Certificate</td></tr>
+          <tr><td>ST — Garo / Khasi / Jaintia</td><td>Mother’s ST Certificate</td></tr>
+          <tr><td>SC</td><td>Father’s SC Certificate</td></tr>
+          <tr><td>OBC</td><td>Father’s OBC Certificate</td></tr>
+        </tbody>
+      </table>
+      <p>If a certificate has more than one page, upload each page as a separate image where the portal allows extra pages.</p>
+      <p>You may <strong>replace</strong> a file before final submission if you uploaded the wrong image.</p>
+
+      <h2>7. Pay the application fee &amp; upload receipt</h2>
+      <ol class="steps">
+        <li>
+          <h3>Transfer ₹100 to the school account</h3>
+          <table>
+            <tbody>
+              <tr><th>Account name</th><td>Tura Public School</td></tr>
+              <tr><th>Account number</th><td>10949575002</td></tr>
+              <tr><th>IFSC</th><td>SBIN0000198</td></tr>
+              <tr><th>Bank</th><td>State Bank of India</td></tr>
+              <tr><th>Branch</th><td>SBI Main Branch Tura</td></tr>
+              <tr><th>Amount</th><td>₹100</td></tr>
+            </tbody>
+          </table>
+          <p>While transferring, mention your <strong>Application Number</strong> in the payment remark/reference if your bank allows it.</p>
+        </li>
+        <li>
+          <h3>Enter Transaction / UTR number</h3>
+          <p>On <strong>Fee &amp; Receipt</strong>, enter the bank <strong>Transaction ID / UTR</strong> exactly as shown in your bank SMS/app. This is <u>not</u> the same as your Application Number.</p>
+        </li>
+        <li>
+          <h3>Upload payment receipt image</h3>
+          <p>Upload a clear JPG/JPEG/PNG of the transfer receipt or screenshot. You can replace or remove the receipt before final submission if needed.</p>
+        </li>
+      </ol>
+
+      <h2>8. Review &amp; final submit</h2>
+      <ol class="steps">
+        <li>
+          <h3>Open Review &amp; Submit</h3>
+          <p>Check every section: child details, address, parents, documents, and payment.</p>
+        </li>
+        <li>
+          <h3>Confirm and submit</h3>
+          <p>Only when all required items are complete, click final submit. After submission the application is <strong>locked</strong> for editing.</p>
+        </li>
+        <li>
+          <h3>Download PDF</h3>
+          <p>Download the final Application PDF and keep a copy. It includes your form details and uploaded document images.</p>
+        </li>
+      </ol>
+      <div class="callout">
+        <strong>After submission</strong>
+        The school office will verify payment and documents. Watch your registered email / portal status for updates. For help, write to <strong>info@turapublicschool.com</strong>.
+      </div>
+
+      <h2>9. Parent checklist (tick before you submit)</h2>
+      <div class="checklist">
+        <label><input type="checkbox" /> Child DOB is between 02/01/2021 and 01/01/2022</label>
+        <label><input type="checkbox" /> Names match birth / caste certificates</label>
+        <label><input type="checkbox" /> Application Form all sections completed</label>
+        <label><input type="checkbox" /> Photograph + all required certificates uploaded (JPG/PNG)</label>
+        <label><input type="checkbox" /> ₹100 transferred to school SBI account</label>
+        <label><input type="checkbox" /> Correct UTR / Transaction ID entered</label>
+        <label><input type="checkbox" /> Payment receipt image uploaded</label>
+        <label><input type="checkbox" /> Application Number and password saved safely</label>
+        <label><input type="checkbox" /> Final PDF downloaded after submit</label>
+      </div>
+
+      <h2>10. Common problems &amp; solutions</h2>
+      <table>
+        <thead>
+          <tr><th>Problem</th><th>What to do</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OTP not received</td>
+            <td>Check Spam/Junk; wait 1–2 minutes; request OTP again; confirm email spelling</td>
+          </tr>
+          <tr>
+            <td>Date of birth not accepted</td>
+            <td>Only 02/01/2021–01/01/2022 is eligible. Adult/wrong year DOB will be rejected on submit</td>
+          </tr>
+          <tr>
+            <td>“Already registered”</td>
+            <td>Use Login with the same email/mobile. Do not create a second account</td>
+          </tr>
+          <tr>
+            <td>Upload rejected / PDF not allowed</td>
+            <td>Convert the page to JPG/JPEG/PNG and upload again</td>
+          </tr>
+          <tr>
+            <td>Cannot submit</td>
+            <td>Complete form + required docs + UTR + receipt. Check Review page for missing items</td>
+          </tr>
+          <tr>
+            <td>Forgot password</td>
+            <td>Use Forgot password on the portal; OTP goes to registered parent email</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>11. Office hours &amp; contact</h2>
+      <ul>
+        <li><strong>Email:</strong> info@turapublicschool.com</li>
+        <li><strong>Website:</strong> https://turapublicschool.com/</li>
+        <li><strong>Admission portal:</strong> https://admission.turapublicschool.com/</li>
+        <li><strong>Help desk timing (typical):</strong> Weekdays 10:30 AM – 2:00 PM</li>
+      </ul>
+
+      <div class="signature">
+        <div>
+          <div class="line">Parent / Guardian signature</div>
+        </div>
+        <div>
+          <div class="line">Date</div>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        <p><strong>Tura Public School, Tura</strong> · Affiliated to CISCE, New Delhi · “Glow in Integrity”</p>
+        <p>This guide is for K.G. Online Admission — Academic Session 2027. Admission rules, last date, and fee details may be updated by the school on the portal without reprinting this sheet. Always follow the live portal instructions.</p>
+        <p>Document version: Parent User Guide · Session 2027 · For distribution to parents / guardians</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
