@@ -172,13 +172,13 @@ export function SchoolAdmissionsShell({
   }
 
   return (
-    <div className="tps-portal min-h-screen bg-[#f4f6f5] text-slate-900">
+    <div className="tps-portal flex min-h-screen flex-col bg-[#f4f6f5] text-slate-900">
       <SchoolBrandBar
         schoolName={branding.schoolName}
         shortName={branding.shortName}
         subtitle={branding.subtitle}
       />
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">{children}</main>
       <SchoolPortalFooter />
     </div>
   );

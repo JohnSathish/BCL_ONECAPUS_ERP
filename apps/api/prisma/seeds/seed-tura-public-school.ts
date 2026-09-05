@@ -150,7 +150,7 @@ export async function seedTuraPublicSchool(
         email: 'admin@turapublicschool.com',
       },
     },
-    update: { passwordHash: hash, isActive: true, displayName: 'TPS Admin' },
+    update: { isActive: true, displayName: 'TPS Admin' },
     create: {
       tenantId: tenant.id,
       email: 'admin@turapublicschool.com',
