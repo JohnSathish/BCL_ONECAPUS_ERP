@@ -1,0 +1,18 @@
+---
+description: Keep Tura Public School admissions isolated from college ERP
+alwaysApply: true
+---
+
+# School admissions ≠ college ERP
+
+Tura Public School (TPS) online admission is a **separate product** that happens to live in this monorepo. Do **not** treat it as an extension of the college ERP (Don Bosco / FYUP / Bosco Connect).
+
+When the task is school admission, communication, branding, SMTP, hosts, or office UI:
+
+- **Do not edit** college FYUP admissions (`/admissions-portal`, `admissions.*` plural APIs, merit, Razorpay, college document slots, college form wizard).
+- **Do not change** college tenant branding, college nav, college login splash, college SMTP (`SMTP_*`), or college website CMS unless the user explicitly asks for a college change.
+- Implement school work only in the school pack: `apps/api/src/modules/school-admissions/`, `apps/web/app/school-admissions-portal/`, `apps/web/app/admin/school-admissions/`, `apps/web/components/school-admissions-portal/`, TPS seed/scripts, `SCHOOL_SMTP_*`.
+- Keep hosts and schema separate: school `admission.*` (singular) vs college `admissions.*` (plural). Tenant slug `tura-public-school` must not inherit college FYUP behaviour.
+- Shared platform code (auth, tenants, mail transport) may be **read**. Only touch it if there is no school-only alternative, and then add a school-specific branch (e.g. `institutionType === 'SCHOOL'`) without changing college defaults.
+
+If a request could be done by copying or patching college admissions, **do not**. Build or extend the school pack instead.

@@ -174,7 +174,7 @@ export function canAccessPath(roles: string[], path: string, permissions: string
   if (path.startsWith('/principal-desk')) {
     return canAccessPrincipalDesk(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
-  if (path.startsWith('/admissions-portal')) {
+  if (path.startsWith('/admissions-portal') || path.startsWith('/school-admissions-portal')) {
     return canAccessApplicantPortal(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
   // Auth / public app paths only — deny unknown relative links (notification sanitization).

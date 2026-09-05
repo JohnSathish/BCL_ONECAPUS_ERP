@@ -892,22 +892,25 @@ export class AdmissionsCycleService {
 
   async nextApplicationNumber(cycleId: string): Promise<string> {
     return this.prisma.$transaction(async (tx) => {
-      const cycle = await tx.admissionCycle.findUniqueOrThrow({
+      const cycle = await tx.admissionCycle.findUnique({
         where: { id: cycleId },
       });
+      if (!cycle) {
+        throw new BadRequestException('Admission cycle not found');
+      }
       if (cycle.status === 'ARCHIVED') {
         throw new BadRequestException(
           'Cannot issue application numbers for an archived cycle',
         );
       }
-      const settings = (cycle.settings as CycleSettings) ?? {};
-      const prefix = settings.applicationNumberPrefix ?? 'DBCT26';
-      const seq = cycle.applicationSeq + 1;
-      await tx.admissionCycle.update({
+      // Atomic increment avoids duplicate application numbers under concurrent register.
+      const updated = await tx.admissionCycle.update({
         where: { id: cycleId },
-        data: { applicationSeq: seq },
+        data: { applicationSeq: { increment: 1 } },
       });
-      return `${prefix}-${String(seq).padStart(4, '0')}`;
+      const settings = (updated.settings as CycleSettings) ?? {};
+      const prefix = settings.applicationNumberPrefix ?? 'DBCT26';
+      return `${prefix}-${String(updated.applicationSeq).padStart(4, '0')}`;
     });
   }
 

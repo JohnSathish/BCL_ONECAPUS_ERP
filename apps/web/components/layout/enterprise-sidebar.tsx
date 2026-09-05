@@ -19,6 +19,7 @@ import { logoutClientSide } from '@/lib/auth/client-logout';
 import { useAuthStore } from '@/store/auth-store';
 import {
   ADMIN_NAV,
+  SCHOOL_ADMIN_NAV,
   ROLE_NAV,
   STAFF_NAV,
   STUDENT_NAV,
@@ -186,8 +187,12 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
       // null while loading / on error → RBAC-only (backward compatible)
       const enabledModules = enabledModulesQ.isSuccess ? enabledModulesQ.data : null;
       const filtered = filterAdminNav(
-        ADMIN_NAV,
-        buildAdminNavContext(session ?? undefined, enabledModules),
+        branding?.portalExtras?.institutionType === 'SCHOOL' ? SCHOOL_ADMIN_NAV : ADMIN_NAV,
+        buildAdminNavContext(
+          session ?? undefined,
+          enabledModules,
+          branding?.portalExtras?.institutionType,
+        ),
       );
       return applyWorkspaceNavLabels(filtered, workspaceKind);
     }
@@ -229,6 +234,7 @@ export function EnterpriseSidebar({ role }: { role: keyof typeof ROLE_NAV | 'adm
     workspaceKind,
     enabledModulesQ.isSuccess,
     enabledModulesQ.data,
+    branding?.portalExtras?.institutionType,
   ]);
 
   const navIndex = useMemo(() => buildNavIndex(groups), [groups]);

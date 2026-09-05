@@ -2,7 +2,8 @@
 
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { Sparkles } from 'lucide-react';
-import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
+import { resolveSchoolAwareLogoUrl } from '@/lib/school-admissions-branding';
 import type { InstitutionBranding } from '@/types/branding';
 import { cn } from '@/utils/cn';
 
@@ -15,7 +16,10 @@ type Props = {
 
 export function InstitutionBrandMark({ branding, active, collapsed, className }: Props) {
   const logoSrc = active
-    ? (resolveBrandingAssetUrl(branding?.logoUrl) ?? DEFAULT_LOGIN_LOGO)
+    ? resolveSchoolAwareLogoUrl({
+        logoUrl: branding?.logoUrl,
+        institutionType: branding?.portalExtras?.institutionType,
+      })
     : undefined;
   const title = active
     ? branding?.productName?.trim() || branding?.shortName || branding?.displayName || 'Campus ERP'

@@ -220,7 +220,10 @@ export function canAccessPath(
       canAccessAdminPortal(roles, permissions)
     );
   }
-  if (path.startsWith('/admissions-portal')) {
+  if (
+    path.startsWith('/admissions-portal') ||
+    path.startsWith('/school-admissions-portal')
+  ) {
     return (
       canAccessApplicantPortal(roles, permissions) ||
       canAccessAdminPortal(roles, permissions)

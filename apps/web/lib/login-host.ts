@@ -4,6 +4,9 @@ export function getLoginHostHeader(): string {
   }
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if (window.location.pathname.startsWith('/school-admissions-portal')) {
+      return 'admission.tps.localhost';
+    }
     return process.env.NEXT_PUBLIC_LOGIN_HOST ?? 'demo.localhost';
   }
   return window.location.host.includes(':')

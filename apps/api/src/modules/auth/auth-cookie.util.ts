@@ -8,12 +8,13 @@ export const REFRESH_COOKIE_PATH = '/api/v1/auth';
 export function refreshCookieOptions(
   maxAgeSeconds: number,
   secure: boolean,
+  path: string = REFRESH_COOKIE_PATH,
 ): CookieOptions {
   return {
     httpOnly: true,
     secure,
     sameSite: 'lax',
-    path: REFRESH_COOKIE_PATH,
+    path,
     maxAge: maxAgeSeconds * 1000,
   };
 }
@@ -23,21 +24,23 @@ export function setRefreshCookie(
   refreshToken: string,
   maxAgeSeconds: number,
   secure: boolean,
+  path: string = REFRESH_COOKIE_PATH,
 ): void {
   res.cookie(
     REFRESH_COOKIE_NAME,
     refreshToken,
-    refreshCookieOptions(maxAgeSeconds, secure),
+    refreshCookieOptions(maxAgeSeconds, secure, path),
   );
 }
 
 export function clearRefreshCookie(res: Response, secure: boolean): void {
-  res.clearCookie(REFRESH_COOKIE_NAME, {
+  const base = {
     httpOnly: true,
     secure,
-    sameSite: 'lax',
-    path: REFRESH_COOKIE_PATH,
-  });
+    sameSite: 'lax' as const,
+  };
+  res.clearCookie(REFRESH_COOKIE_NAME, { ...base, path: REFRESH_COOKIE_PATH });
+  res.clearCookie(REFRESH_COOKIE_NAME, { ...base, path: '/' });
 }
 
 export function readRefreshTokenFromRequest(

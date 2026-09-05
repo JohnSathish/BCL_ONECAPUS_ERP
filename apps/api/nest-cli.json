@@ -8,6 +8,10 @@
       {
         "include": "modules/proposals/assets/**/*",
         "watchAssets": true
+      },
+      {
+        "include": "modules/school-admissions/assets/**/*",
+        "watchAssets": true
       }
     ]
   }

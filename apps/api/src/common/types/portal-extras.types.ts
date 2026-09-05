@@ -10,6 +10,7 @@ export type CareersPortalExtras = {
 
 export type PortalExtrasJson = {
   careersPortal?: CareersPortalExtras;
+  institutionType?: 'COLLEGE' | 'SCHOOL';
 };
 
 export function parsePortalExtras(value: unknown): PortalExtrasJson {
@@ -25,6 +26,7 @@ export function mergePortalExtras(
   const base = parsePortalExtras(existing);
   return {
     ...base,
+    ...patch,
     careersPortal: {
       ...base.careersPortal,
       ...patch.careersPortal,

@@ -1,7 +1,8 @@
 'use client';
 
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
-import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { BASECODE_LABS_WEBSITE } from '@/components/branding/powered-by-basecode-labs';
+import { resolveSchoolAwareLogoUrl } from '@/lib/school-admissions-branding';
 import {
   resolvePoweredByText,
   resolveProductName,
@@ -17,7 +18,10 @@ type Props = {
 export function LoginHeroBrandHeader({ compact = false, context = null }: Props) {
   const productName = resolveProductName(context?.productName);
   const productTagline = resolveProductTagline(context?.productTagline);
-  const logoSrc = resolveBrandingAssetUrl(context?.institution?.logoUrl) ?? DEFAULT_LOGIN_LOGO;
+  const logoSrc = resolveSchoolAwareLogoUrl({
+    logoUrl: context?.institution?.logoUrl,
+    institutionType: context?.institutionType,
+  });
   const institutionName = context?.institution?.displayName?.trim();
   const eyebrow = institutionName
     ? `${institutionName} · Campus portal`
@@ -69,9 +73,14 @@ export function LoginHeroBrandHeader({ compact = false, context = null }: Props)
         , and campus operations.
       </p>
       {context?.showPoweredBy ? (
-        <p className="mt-3 text-[11px] font-medium text-cyan-300/70">
+        <a
+          href={BASECODE_LABS_WEBSITE}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 text-[11px] font-medium text-cyan-300/70 underline-offset-2 hover:underline"
+        >
           {resolvePoweredByText(context.poweredByText ?? context.poweredBy)}
-        </p>
+        </a>
       ) : null}
     </header>
   );

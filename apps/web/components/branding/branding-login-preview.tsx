@@ -142,7 +142,7 @@ export function BrandingLoginPreview({ snapshot, compact, className }: Props) {
               </div>
               {snapshot.showPoweredBy ? (
                 <p className="mt-4 text-center text-[9px] text-muted-foreground">
-                  {snapshot.poweredByText ?? 'Powered by BaseCode Labs'}
+                  {snapshot.poweredByText ?? 'Powered by BaseCode Labs Pvt. Ltd.'}
                 </p>
               ) : null}
             </div>

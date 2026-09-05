@@ -253,7 +253,7 @@ export function LoginAuthCard({
                 priority
               />
               <p className="text-[10px] text-muted-foreground">
-                A Product of{' '}
+                Powered by{' '}
                 <span className="font-medium text-foreground/80 group-hover:text-primary">
                   BaseCode Labs Pvt. Ltd.
                 </span>

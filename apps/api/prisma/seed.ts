@@ -21,6 +21,7 @@ import { seedDonBoscoMonthlyPlans } from './seeds/monthly-fee.seed';
 import { seedDbcCommittees } from './seeds/seed-dbc-committees';
 import { seedNaacIqac } from './seeds/seed-naac-iqac';
 import { seedWebsiteCms } from './seeds/website.seed';
+import { seedTuraPublicSchool } from './seeds/seed-tura-public-school';
 import { SEED_PERMISSIONS as PERMISSIONS } from './seed-permissions';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
 
@@ -128,7 +129,7 @@ async function main() {
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
       productName: 'Bosco Connect',
       productTagline: 'Smart Education Management Platform',
-      poweredByText: 'Powered by BaseCode Labs',
+      poweredByText: 'Powered by BaseCode Labs Pvt. Ltd.',
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
@@ -152,7 +153,7 @@ async function main() {
       portalSubtitle: 'FYUGP - AY 2026-27 - ODD Semester',
       productName: 'Bosco Connect',
       productTagline: 'Smart Education Management Platform',
-      poweredByText: 'Powered by BaseCode Labs',
+      poweredByText: 'Powered by BaseCode Labs Pvt. Ltd.',
       address: 'Tura, West Garo Hills, Meghalaya - 794002',
       badges: [
         'Affiliated to NEHU, Shillong',
@@ -3500,6 +3501,13 @@ async function main() {
   );
 
   await seedTenantLicensing(tenant.id, adminUser.id, passwordHash);
+
+  const tps = await seedTuraPublicSchool(prisma, passwordHash);
+  console.log(
+    'Tura Public School seeded:',
+    tps.adminEmail,
+    '/ Admin@123 — http://admission.tps.localhost:3000',
+  );
 
   console.log(
     'Seed completed. Tenant:',

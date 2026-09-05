@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Menu, X } from 'lucide-react';
 import { fetchAlumniPortalInfo } from '@/services/alumni-portal';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { cn } from '@/utils/cn';
 
 const DEFAULT_LOGO_URL = '/branding/basecode-labs-logo.png';
@@ -185,7 +186,7 @@ export function AlumniPublicShell({
             <p>
               © {new Date().getFullYear()} {collegeName} {resolvedAssociationName}
             </p>
-            <p>Powered by BaseCode Labs</p>
+            <PoweredByBaseCodeLabs className="text-white/70 underline-offset-2 hover:underline" />
           </div>
         </div>
       </footer>

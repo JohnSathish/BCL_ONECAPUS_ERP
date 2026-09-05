@@ -22,6 +22,7 @@ import { PermissionsModule } from './common/permissions/permissions.module';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { AdmissionsModule } from './modules/admissions/admissions.module';
+import { SchoolAdmissionsModule } from './modules/school-admissions/school-admissions.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
 import { SupportDataModule } from './modules/support-data/support-data.module';
 import { StudentsModule } from './modules/students/students.module';
@@ -147,6 +148,7 @@ import { MoodleModule } from './modules/moodle/moodle.module';
     MobileAppModule,
     ProgramsCoursesModule,
     AdmissionsModule,
+    SchoolAdmissionsModule,
     MasterDataModule,
     SupportDataModule,
     StudentsModule,

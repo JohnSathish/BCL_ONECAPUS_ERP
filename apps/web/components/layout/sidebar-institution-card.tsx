@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { MapPin } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
-import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { resolveSchoolAwareLogoUrl } from '@/lib/school-admissions-branding';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
 import { fetchStudentDashboard } from '@/services/student-portal';
 import type { InstitutionBranding } from '@/types/branding';
@@ -40,7 +40,10 @@ export function SidebarInstitutionCard({
   });
 
   const logoSrc = active
-    ? (resolveBrandingAssetUrl(branding?.logoUrl) ?? DEFAULT_LOGIN_LOGO)
+    ? resolveSchoolAwareLogoUrl({
+        logoUrl: branding?.logoUrl,
+        institutionType: branding?.portalExtras?.institutionType,
+      })
     : undefined;
   const name = active
     ? (branding?.displayName ?? branding?.shortName ?? 'Institution')

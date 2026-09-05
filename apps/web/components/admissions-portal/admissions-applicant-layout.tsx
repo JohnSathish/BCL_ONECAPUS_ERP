@@ -14,6 +14,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { logout } from '@/services/auth';
 import { fetchApplicantMe, fetchPortalInfo } from '@/services/admissions-portal';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -211,8 +212,8 @@ export function AdmissionsApplicantLayout({
           <p>© {new Date().getFullYear()} Don Bosco College Tura. All rights reserved.</p>
           <p className="mt-1">
             Admission Help Desk: {cycleSettings.helpDesk.phone}
-            {cycleSettings.helpDesk.email ? ` · ${cycleSettings.helpDesk.email}` : ''} · Powered by
-            BaseCode Labs
+            {cycleSettings.helpDesk.email ? ` · ${cycleSettings.helpDesk.email}` : ''} ·{' '}
+            <PoweredByBaseCodeLabs className="text-[#1a5336] underline" />
           </p>
         </footer>
       </div>

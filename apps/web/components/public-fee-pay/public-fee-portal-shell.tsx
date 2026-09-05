@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import './public-fee-pay.css';
 
 const ACADEMIC_SESSION = '2026 – 2027';
@@ -76,6 +77,7 @@ export function PublicFeePortalShell({
             </span>
             <span className="pfp-badge pfp-badge-secure">
               <Lock size={14} aria-hidden /> Secure Payment | SSL Secured | Powered by BaseCode Labs
+              Pvt. Ltd.
             </span>
           </div>
 
@@ -197,7 +199,7 @@ export function PublicFeePortalShell({
         </div>
         <div className="pfp-footer-bottom">
           <span>© {new Date().getFullYear()} Don Bosco College, Tura. All rights reserved.</span>
-          <span>Powered by BaseCode Labs | Version 1.0</span>
+          <PoweredByBaseCodeLabs />
         </div>
       </footer>
     </div>

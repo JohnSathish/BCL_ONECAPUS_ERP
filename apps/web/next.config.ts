@@ -2,6 +2,12 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    'admission.tps.localhost',
+    'tps.localhost',
+    'admissions.demo.localhost',
+    'demo.localhost',
+  ],
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: ['geist'],
@@ -81,7 +87,7 @@ const nextConfig: NextConfig = {
       `img-src 'self' data: blob: https:${devImgSrc}`,
       "font-src 'self' data:",
       `connect-src 'self' https://api.razorpay.com https://api.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in wss: ws:${devApiConnect}`,
-      "frame-src 'self' https://api.razorpay.com https://sdk.cashfree.com https://payments.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in",
+      "frame-src 'self' blob: https://api.razorpay.com https://sdk.cashfree.com https://payments.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

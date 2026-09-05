@@ -28,6 +28,7 @@ export type LoginContext = {
     allowQrLogin: boolean;
     allowRfidLogin: boolean;
   };
+  institutionType?: 'COLLEGE' | 'SCHOOL';
 };
 
 export type LoginChallenge = {

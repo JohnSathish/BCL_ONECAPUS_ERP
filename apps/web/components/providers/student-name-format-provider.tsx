@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { fetchStudentDisplaySettings } from '@/services/student-display-settings';
 import { useAuth } from '@/hooks/use-auth';
+import { shouldSkipCollegeWorkspaceApis } from '@/lib/school-admissions-branding';
+import { usePathname } from 'next/navigation';
 import {
   DEFAULT_STUDENT_NAME_DISPLAY_FORMAT,
   formatStudentDisplayName,
@@ -29,10 +31,14 @@ const StudentNameFormatContext = createContext<StudentNameFormatContextValue>({
 
 export function StudentNameFormatProvider({ children }: { children: React.ReactNode }) {
   const { session, isReady } = useAuth();
+  const pathname = usePathname();
   const settings = useQuery({
     queryKey: ['settings', 'student-display'],
     queryFn: fetchStudentDisplaySettings,
-    enabled: isReady && Boolean(session?.accessToken),
+    enabled:
+      isReady &&
+      Boolean(session?.accessToken) &&
+      !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });
 

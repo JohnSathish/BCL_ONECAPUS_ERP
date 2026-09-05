@@ -15,6 +15,7 @@ export type AdminNavContext = {
    * `null` / `undefined` = skip entitlement gating (RBAC-only / loading / backward compat).
    */
   enabledModules?: string[] | null;
+  institutionType?: 'COLLEGE' | 'SCHOOL' | string | null;
 };
 
 export function buildAdminNavContext(
@@ -22,11 +23,13 @@ export function buildAdminNavContext(
     user?: { permissions?: string[]; roles?: string[] };
   },
   enabledModules?: string[] | null,
+  institutionType?: string | null,
 ): AdminNavContext {
   return {
     permissions: session?.user?.permissions ?? [],
     roles: session?.user?.roles ?? [],
     enabledModules,
+    institutionType,
   };
 }
 

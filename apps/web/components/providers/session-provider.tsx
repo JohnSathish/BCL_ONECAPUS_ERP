@@ -57,14 +57,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         /* ignore */
       }
       if (broadcast) broadcastSessionMessage({ type: 'LOGOUT' });
-      router.replace('/login');
+      const schoolPortal = pathname.startsWith('/school-admissions-portal');
+      router.replace(schoolPortal ? '/school-admissions-portal/login' : '/login');
       void logoutApi().catch(() => undefined);
     },
-    [clear, router, setBootstrapping],
+    [clear, pathname, router, setBootstrapping],
   );
 
   useEffect(() => {
     if (pathname === '/login' || pathname === '/forgot-password') {
+      forcedLogoutRef.current = false;
+      initialBootstrapDoneRef.current = false;
+    }
+    if (
+      pathname === '/school-admissions-portal/login' ||
+      pathname === '/school-admissions-portal/register'
+    ) {
       forcedLogoutRef.current = false;
       initialBootstrapDoneRef.current = false;
     }
@@ -83,7 +91,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       pathname === '/change-password' ||
       pathname === '/login' ||
       pathname === '/forgot-password' ||
-      pathname.startsWith('/admissions-portal')
+      pathname.startsWith('/admissions-portal') ||
+      pathname.startsWith('/school-admissions-portal')
     ) {
       return;
     }
@@ -96,7 +105,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Login/forgot stay cold — no session restore.
     // /change-password MUST bootstrap so forced-reset after login (full page
     // navigation) and refresh still recover the httpOnly refresh cookie.
-    if (pathname === '/login' || pathname === '/forgot-password') {
+    if (
+      pathname === '/login' ||
+      pathname === '/forgot-password' ||
+      pathname === '/school-admissions-portal/login' ||
+      pathname === '/school-admissions-portal/register'
+    ) {
       setBootstrapping(false);
       return;
     }
@@ -162,7 +176,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setBootstrapping(false);
         tokenRefreshManager.clearSchedule();
         setWarningOpen(false);
-        router.replace('/login');
+        const schoolPortal =
+          typeof window !== 'undefined' &&
+          window.location.pathname.startsWith('/school-admissions-portal');
+        router.replace(schoolPortal ? '/school-admissions-portal/login' : '/login');
       } else if (message.type === 'SESSION_UPDATED') {
         setSession(message.session);
         tokenRefreshManager.scheduleProactiveRefresh(message.session);

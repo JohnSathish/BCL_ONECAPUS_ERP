@@ -1,3 +1,5 @@
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
+
 export function LandingFooter() {
   return (
     <footer className="border-t border-white/10 py-10">
@@ -5,7 +7,7 @@ export function LandingFooter() {
         <p className="text-sm text-white/45">
           © {new Date().getFullYear()} BaseCode Labs Pvt. Ltd. · BCL OneCampus ERP
         </p>
-        <p className="text-xs text-white/35">A Product of BaseCode Labs · NEP 2020 · FYUGP Ready</p>
+        <PoweredByBaseCodeLabs className="text-xs text-white/35 underline-offset-2 hover:underline" />
       </div>
     </footer>
   );

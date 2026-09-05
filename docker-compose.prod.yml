@@ -67,6 +67,24 @@ services:
       # College CMS publish → college-web ISR (internal Docker network, not public nginx /api)
       WEBSITE_REVALIDATE_WEBHOOK_URL: ${WEBSITE_REVALIDATE_WEBHOOK_URL:-http://donboscocollege-web:3000/api/revalidate}
       WEBSITE_REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+      # College SMTP (Don Bosco) — do not reuse for school admissions
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+      ADMISSIONS_PORTAL_ORIGIN: ${ADMISSIONS_PORTAL_ORIGIN:-}
+      # Tura Public School admissions mailbox (Hostinger) — isolated from college SMTP
+      SCHOOL_SMTP_HOST: ${SCHOOL_SMTP_HOST:-}
+      SCHOOL_SMTP_PORT: ${SCHOOL_SMTP_PORT:-}
+      SCHOOL_SMTP_SECURE: ${SCHOOL_SMTP_SECURE:-}
+      SCHOOL_SMTP_USER: ${SCHOOL_SMTP_USER:-}
+      SCHOOL_SMTP_PASS: ${SCHOOL_SMTP_PASS:-}
+      SCHOOL_SMTP_FROM: ${SCHOOL_SMTP_FROM:-}
+      SCHOOL_SMTP_FROM_NAME: ${SCHOOL_SMTP_FROM_NAME:-}
+      SCHOOL_ADMISSIONS_LOGIN_URL: ${SCHOOL_ADMISSIONS_LOGIN_URL:-}
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage

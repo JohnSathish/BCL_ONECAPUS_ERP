@@ -7,6 +7,7 @@ import {
 } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './config/cors.config';
@@ -29,6 +30,21 @@ async function bootstrap() {
   app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
 
   seedWebsitePublicUploads();
+
+  // School admission documents must not be world-readable via /uploads (IDOR).
+  // Applicant/office UIs use authenticated download endpoints instead.
+  app.use('/uploads', (req: Request, res: Response, next: NextFunction) => {
+    const path = typeof req.path === 'string' ? req.path : '';
+    const url = typeof req.url === 'string' ? req.url : '';
+    if (
+      path.includes('/school-admissions/') ||
+      url.includes('/school-admissions/')
+    ) {
+      res.status(401).type('text/plain').send('Authentication required');
+      return;
+    }
+    next();
+  });
 
   // CMS/hero files may live in UPLOAD_ROOT (/data/uploads) or STORAGE_ROOT
   // (/data/storage). Serve both so a deploy does not blank the homepage slider.

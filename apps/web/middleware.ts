@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isAdmissionsLoginPath, isAdmissionsPublicPath } from '@/lib/admissions-portal-routes';
+import {
+  isSchoolAdmissionHostName,
+  isSchoolAdmissionsLoginPath,
+  isSchoolAdmissionsPublicPath,
+} from '@/lib/school-admissions-portal-routes';
 import { isProductionCollegeHost } from '@/lib/demo-login';
 import { extractJournalSlugFromHost, isJournalHost } from '@/lib/journals-host';
 
@@ -14,6 +19,10 @@ function isLibraryHost(host: string) {
 
 function isAdmissionsHost(host: string) {
   return hostname(host).startsWith('admissions.');
+}
+
+function isSchoolAdmissionHost(host: string) {
+  return isSchoolAdmissionHostName(host);
 }
 
 function isCareerHost(host: string) {
@@ -144,6 +153,57 @@ async function resolveJournalRedirect(request: NextRequest, pathname: string, sl
   }
 }
 
+function handleSchoolAdmissionHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const loginPath = '/school-admissions-portal/login';
+  const portalPath = '/school-admissions-portal';
+
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/uploads') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  const refreshCookie = request.cookies.get('nep_refresh')?.value;
+  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
+
+  if (pathname === '/' || pathname === '/school-admissions-portal') {
+    const url = request.nextUrl.clone();
+    url.pathname = hasRefreshCookie
+      ? '/school-admissions-portal/dashboard'
+      : '/school-admissions-portal/register';
+    return NextResponse.redirect(url);
+  }
+
+  const isPublic = isSchoolAdmissionsPublicPath(pathname);
+  const isLogin = isSchoolAdmissionsLoginPath(pathname) || pathname === '/login';
+
+  if (!hasRefreshCookie && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = loginPath;
+    return NextResponse.redirect(url);
+  }
+
+  if (hasRefreshCookie && isLogin) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/school-admissions-portal/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  return handleSubdomainRewrite(request, portalPath, loginPath, [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+    '/journals-portal',
+    '/admissions-portal',
+  ]);
+}
+
 function handleAdmissionsHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginPath = '/admissions-portal/login';
@@ -183,6 +243,7 @@ function handleAdmissionsHost(request: NextRequest) {
     '/shift',
     '/library-desk',
     '/journals-portal',
+    '/school-admissions-portal',
   ]);
 }
 
@@ -349,6 +410,10 @@ function handleSubdomainRewrite(
 
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
+
+  if (isSchoolAdmissionHost(host)) {
+    return handleSchoolAdmissionHost(request);
+  }
 
   if (isAdmissionsHost(host)) {
     return handleAdmissionsHost(request);

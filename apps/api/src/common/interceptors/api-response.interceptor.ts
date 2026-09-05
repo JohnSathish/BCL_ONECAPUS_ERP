@@ -34,6 +34,15 @@ export class ApiResponseInterceptor implements NestInterceptor {
   private shouldBypass(payload: unknown, response: Response) {
     if (payload instanceof StreamableFile || Buffer.isBuffer(payload))
       return true;
+    // Monorepo / duplicate @nestjs/common copies can break `instanceof`.
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      (payload as { constructor?: { name?: string } }).constructor?.name ===
+        'StreamableFile'
+    ) {
+      return true;
+    }
     if (typeof payload === 'string') return true;
     if (response.headersSent) return true;
     const contentType = String(

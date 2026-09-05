@@ -2,7 +2,7 @@
 export const BRANDING_DEFAULTS = {
   productName: 'Campus ERP',
   productTagline: 'Smart Education Management Platform',
-  poweredByText: 'Powered by BaseCode Labs',
+  poweredByText: 'Powered by BaseCode Labs Pvt. Ltd.',
   portalSubtitle: 'Campus ERP Portal',
 } as const;
 

@@ -677,6 +677,10 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: [...MODULE_PERMISSIONS.admissions],
   },
   {
+    prefix: '/admin/school-admissions',
+    permissions: [...MODULE_PERMISSIONS.admissions],
+  },
+  {
     prefix: '/admin/students',
     permissions: [...MODULE_PERMISSIONS.students, 'communication:read'],
   },

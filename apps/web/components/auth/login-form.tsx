@@ -5,7 +5,11 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { resolveHomePath } from '@/lib/permissions/portal-access';
+import {
+  canAccessAdminPortal,
+  canAccessApplicantPortal,
+  resolveHomePath,
+} from '@/lib/permissions/portal-access';
 import { getWebDeviceFingerprint } from '@/lib/device-fingerprint';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import type { ApiStartupRetryOptions } from '@/lib/http/wait-for-api';
@@ -13,6 +17,7 @@ import { fetchLoginChallenge, fetchLoginContext, login } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
 import { LoginDynamicFavicon } from '@/components/branding/login-dynamic-favicon';
+import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
 import { LoginAuthCard } from './login-auth-card';
 import { LoginAuthPanel } from './login-auth-panel';
 import { LoginHeroPanel } from './login-hero-panel';
@@ -190,10 +195,18 @@ export function LoginForm({
           router.replace('/change-password');
           return;
         }
+        const roles = session.user.roles ?? [];
+        const permissions = session.user.permissions ?? [];
+        const schoolHome =
+          context?.institutionType === 'SCHOOL'
+            ? canAccessAdminPortal(roles, permissions)
+              ? '/admin'
+              : canAccessApplicantPortal(roles, permissions)
+                ? '/school-admissions-portal/dashboard'
+                : null
+            : null;
         const destination =
-          postLoginPath ??
-          queryNextPath ??
-          resolveHomePath(session.user.roles, session.user.permissions ?? []);
+          postLoginPath ?? queryNextPath ?? schoolHome ?? resolveHomePath(roles, permissions);
         // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
         window.location.assign(destination);
       } catch (err) {
@@ -256,6 +269,7 @@ export function LoginForm({
     },
     [
       challenge,
+      context,
       hardRedirect,
       loadChallenge,
       postLoginPath,
@@ -300,10 +314,18 @@ export function LoginForm({
     />
   );
 
+  const schoolLogin = context?.institutionType === 'SCHOOL';
+  const favicon = (
+    <LoginDynamicFavicon
+      faviconUrl={schoolLogin ? SCHOOL_PORTAL_LOGO_SRC : context?.institution.faviconUrl}
+      forceProductBrand={!schoolLogin}
+    />
+  );
+
   if (compact) {
     return (
       <>
-        <LoginDynamicFavicon faviconUrl={context?.institution.faviconUrl} />
+        {favicon}
         <div className="mx-auto w-full max-w-md px-1 py-2">{authCard}</div>
       </>
     );
@@ -311,7 +333,7 @@ export function LoginForm({
 
   return (
     <>
-      <LoginDynamicFavicon faviconUrl={context?.institution.faviconUrl} />
+      {favicon}
       <LoginPageShell
         hero={
           <div className="relative flex h-full min-h-0 flex-col lg:min-h-screen">

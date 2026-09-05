@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCareersPortalInfo } from '@/services/careers-portal';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { ExternalLink, Mail, MapPin, Phone } from 'lucide-react';
 
 export function CareersFooter() {
@@ -136,6 +137,9 @@ export function CareersFooter() {
       <div className="border-t border-white/10 py-5 text-center text-xs text-slate-500">
         © {new Date().getFullYear()} {info?.collegeName ?? 'Don Bosco College, Tura'} · Official
         Recruitment Portal · All rights reserved
+        <span className="mt-2 block">
+          <PoweredByBaseCodeLabs className="text-slate-400 underline-offset-2 hover:underline" />
+        </span>
       </div>
     </footer>
   );

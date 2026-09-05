@@ -185,6 +185,7 @@ export class UserProvisioningService {
       plainPassword = result.plainPassword;
     } else {
       if (options.passwordHash || options.password) {
+        plainPassword = options.password;
         const hash =
           options.passwordHash ?? (await bcrypt.hash(options.password!, 12));
         user = await this.prisma.user.update({
@@ -199,6 +200,7 @@ export class UserProvisioningService {
             username: options.username ?? user.username,
             mustResetPassword:
               options.mustResetPassword ?? user.mustResetPassword,
+            passwordChangedAt: new Date(),
           },
         });
       }

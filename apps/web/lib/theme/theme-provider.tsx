@@ -19,6 +19,7 @@ import { getPreset, resolvePresetId } from './default-themes';
 import { ThemeContext, type ThemeContextValue } from './theme-context';
 import { useThemeStore } from './theme-store';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
+import { shouldSkipCollegeWorkspaceApis } from '@/lib/school-admissions-branding';
 import {
   applyThemePreset,
   exportThemeSettings,
@@ -143,14 +144,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const themeQuery = useQuery({
     queryKey: ['theme-settings', tenantId],
     queryFn: fetchThemeSettings,
-    enabled: Boolean(session?.accessToken),
+    enabled:
+      Boolean(session?.accessToken) && !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });
 
   const userPrefsQuery = useQuery({
     queryKey: ['user-preferences', session?.user.id],
     queryFn: fetchUserPreferences,
-    enabled: Boolean(session?.accessToken),
+    enabled:
+      Boolean(session?.accessToken) && !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });
 

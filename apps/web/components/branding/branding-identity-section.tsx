@@ -125,7 +125,7 @@ export function BrandingIdentitySection({ register, disabled }: Props) {
           <Input
             id="poweredByText"
             className={brandingInputClass}
-            placeholder="Powered by BaseCode Labs"
+            placeholder="Powered by BaseCode Labs Pvt. Ltd."
             disabled={disabled}
             {...register('poweredByText')}
           />

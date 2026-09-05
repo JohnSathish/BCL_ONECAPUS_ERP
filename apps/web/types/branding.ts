@@ -77,6 +77,7 @@ export type InstitutionBranding = {
   brandingEnabled: boolean;
   badges: string[];
   portalExtras?: {
+    institutionType?: 'COLLEGE' | 'SCHOOL';
     careersPortal?: {
       principalName?: string;
       principalTitle?: string;

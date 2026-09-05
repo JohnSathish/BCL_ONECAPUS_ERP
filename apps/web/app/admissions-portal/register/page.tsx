@@ -17,6 +17,7 @@ import {
 } from '@/services/admissions-portal';
 import { useAuthStore } from '@/store/auth-store';
 import { PhotoUploadDropzone } from '@/components/admissions-portal/photo-upload-dropzone';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { GENDER_OPTIONS } from '@/components/admissions-portal/constants';
 import {
   formatInr,
@@ -319,6 +320,9 @@ function PublicPageShell({
         <p>ADMISSIONS OFFICE · Meghalaya — 794002</p>
         <p>Mob. +91 9402152496</p>
         <p className="mt-1 text-[#2563eb]">principaldbct@gmail.com · www.donboscocollege.ac.in</p>
+        <p className="mt-2">
+          <PoweredByBaseCodeLabs className="text-[#1a5336] underline" />
+        </p>
       </footer>
     </div>
   );

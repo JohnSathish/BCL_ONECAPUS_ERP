@@ -3,6 +3,7 @@
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { MapPin } from 'lucide-react';
 import { resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { resolveSchoolAwareLogoUrl } from '@/lib/school-admissions-branding';
 import type { LoginContext } from '@/types/login-context';
 
 type Props = {
@@ -18,7 +19,13 @@ export function LoginHeroInstitutionShowcase({ context, loading }: Props) {
   if (!context) return null;
 
   const { institution } = context;
-  const logoSrc = resolveBrandingAssetUrl(institution.logoUrl);
+  const logoSrc =
+    context.institutionType === 'SCHOOL'
+      ? resolveSchoolAwareLogoUrl({
+          logoUrl: institution.logoUrl,
+          institutionType: 'SCHOOL',
+        })
+      : resolveBrandingAssetUrl(institution.logoUrl);
   const location = [institution.campusName, institution.address].filter(Boolean).join(' · ');
   const badges = institution.badges ?? [];
   const hasContent = institution.displayName || location || badges.length > 0 || logoSrc;

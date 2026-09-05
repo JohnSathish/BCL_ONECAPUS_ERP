@@ -245,6 +245,39 @@ const OFFICIAL_DOCUMENTS_CHILDREN: NavChild[] = [
   },
 ];
 
+export const SCHOOL_ADMIN_NAV: NavGroup[] = [
+  {
+    label: 'School admissions',
+    zone: 'pin-top',
+    items: [
+      {
+        label: 'KG applications',
+        href: '/admin/school-admissions',
+        icon: GraduationCap,
+        module: 'admissions',
+        permissions: [...P.admissions],
+        activePattern: '^/admin/school-admissions',
+        children: [
+          { label: 'Applications', href: '/admin/school-admissions' },
+          {
+            label: 'Admission Settings',
+            href: '/admin/school-admissions/admission-settings',
+          },
+          { label: 'Certificate settings', href: '/admin/school-admissions/settings' },
+        ],
+      },
+      {
+        label: 'Communication',
+        href: '/admin/communication',
+        icon: Mail,
+        module: 'communication',
+        permissions: [...P.communication],
+        activePattern: '^/admin/communication',
+      },
+    ],
+  },
+];
+
 export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Dashboard',

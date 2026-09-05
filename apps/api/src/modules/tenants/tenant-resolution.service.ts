@@ -41,6 +41,7 @@ export type LoginContextDto = {
     allowQrLogin: boolean;
     allowRfidLogin: boolean;
   };
+  institutionType?: 'COLLEGE' | 'SCHOOL';
 };
 
 @Injectable()
@@ -163,6 +164,17 @@ export class TenantResolutionService {
 
     const security = tenant.securitySettings;
 
+    const extras =
+      branding?.portalExtrasJson &&
+      typeof branding.portalExtrasJson === 'object'
+        ? (branding.portalExtrasJson as { institutionType?: unknown })
+        : undefined;
+    const institutionType =
+      extras?.institutionType === 'SCHOOL' ||
+      extras?.institutionType === 'COLLEGE'
+        ? extras.institutionType
+        : undefined;
+
     return {
       tenantSlug: tenant.slug,
       institution: {
@@ -194,6 +206,7 @@ export class TenantResolutionService {
         allowQrLogin: security?.allowQrLogin ?? false,
         allowRfidLogin: security?.allowRfidLogin ?? false,
       },
+      institutionType,
     };
   }
 }

@@ -23,6 +23,7 @@ import { fetchJournalPortalInfo, fetchJournalPortalMe } from '@/services/journal
 import { bootstrapSession, logout as apiLogout } from '@/services/auth';
 import { updateUserAppearanceMode } from '@/services/user-preferences';
 import { HOME_FOOTER_INDEXING } from '@/components/journals-portal/home/transient-home-static';
+import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/cn';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -594,7 +595,7 @@ export function JournalPublicShell({ children }: Props) {
             © {new Date().getFullYear()} {journal?.institution || 'Don Bosco College, Tura'}. All
             rights reserved.
           </p>
-          <p>Designed for research & scholarly excellence</p>
+          <PoweredByBaseCodeLabs className="text-white/55 underline-offset-2 hover:underline" />
         </div>
       </footer>
     </div>

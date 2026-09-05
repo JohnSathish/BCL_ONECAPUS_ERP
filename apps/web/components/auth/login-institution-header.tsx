@@ -2,7 +2,9 @@
 
 import { Loader2 } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
-import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { BASECODE_LABS_WEBSITE } from '@/components/branding/powered-by-basecode-labs';
+import { DEFAULT_LOGIN_LOGO } from '@/lib/branding-asset';
+import { resolveSchoolAwareLogoUrl } from '@/lib/school-admissions-branding';
 import type { LoginContext } from '@/types/login-context';
 import { cn } from '@/utils/cn';
 
@@ -79,7 +81,10 @@ export function LoginInstitutionHeader({
 
   const { institution, poweredBy, poweredByText, showPoweredBy, productName, productTagline } =
     context;
-  const logoSrc = resolveBrandingAssetUrl(institution.logoUrl) ?? DEFAULT_LOGIN_LOGO;
+  const logoSrc = resolveSchoolAwareLogoUrl({
+    logoUrl: institution.logoUrl,
+    institutionType: context.institutionType,
+  });
   const locationLine = formatInstitutionLocation(institution.campusName, institution.address);
   const subtitle = institution.portalSubtitle ?? productTagline ?? 'Campus ERP Portal';
   const attribution = (poweredByText ?? poweredBy)?.trim();
@@ -115,9 +120,14 @@ export function LoginInstitutionHeader({
           <p className="mt-1 text-[11px] font-medium text-muted-foreground/90">{subtitle}</p>
 
           {showPoweredBy && attribution ? (
-            <p className="mt-1 hidden text-[10px] font-medium text-muted-foreground/80 sm:block">
+            <a
+              href={BASECODE_LABS_WEBSITE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 hidden text-[10px] font-medium text-muted-foreground/80 underline-offset-2 hover:underline sm:block"
+            >
               {attribution}
-            </p>
+            </a>
           ) : null}
         </div>
       </div>
