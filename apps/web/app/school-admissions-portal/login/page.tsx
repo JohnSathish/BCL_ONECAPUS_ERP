@@ -180,8 +180,8 @@ export default function SchoolAdmissionsLoginPage() {
             <p className="text-xs text-destructive">{errors.password.message}</p>
           ) : (
             <p className="text-xs text-slate-500">
-              Enter the 6-digit PIN from registration. Older complex passwords no longer work — use
-              Forgot PIN to set a new one.
+              Enter the 6-digit PIN from the registration email. Use Forgot PIN if you did not
+              receive it or need a new one.
             </p>
           )}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

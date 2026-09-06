@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GENDER_OPTIONS, schoolRegisterSchema } from '@/lib/school-admissions-schema';
 import { eligibleDobIsoRange } from '@/lib/school-age-eligibility';
-import { normalizeSchoolLoginPin } from '@/lib/school-login-pin';
 import {
   isSchoolExistingApplicationError,
   isSchoolExistingEmailApplicationError,
@@ -69,11 +68,10 @@ export default function SchoolAdmissionsRegisterPage() {
     getValues,
     trigger,
     watch,
-    setValue,
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: (values, context, options) => zodResolver(schema)(values, context, options),
-    defaultValues: { acceptedPolicies: false, loginPin: '', confirmLoginPin: '' },
+    defaultValues: { acceptedPolicies: false },
   });
 
   const emailValue = watch('email');
@@ -144,7 +142,6 @@ export default function SchoolAdmissionsRegisterPage() {
         phone: values.phone,
         acceptedPolicies: values.acceptedPolicies,
         otp: values.otp,
-        password: values.loginPin,
       });
       const password = data.password ?? data.generatedPassword;
       const payload = {
@@ -245,7 +242,8 @@ export default function SchoolAdmissionsRegisterPage() {
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Names must match the original birth and caste certificates. A 6-digit OTP is sent to
-                the parent email.
+                the parent email to verify the address. After you create the application, the
+                6-digit login PIN is sent in a second email.
                 {info.data?.lastDateLabel
                   ? ` Last date to apply: ${info.data.lastDateLabel}.`
                   : info.data?.registrationClosesAt
@@ -372,54 +370,6 @@ export default function SchoolAdmissionsRegisterPage() {
               </div>
               {otpMessage ? <p className="text-xs text-emerald-700">{otpMessage}</p> : null}
               {errors.otp ? <p className="text-xs text-destructive">{errors.otp.message}</p> : null}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="loginPin">Create a 6-digit login PIN</Label>
-                <Input
-                  id="loginPin"
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="new-password"
-                  maxLength={6}
-                  pattern="[0-9]*"
-                  className="tps-public-input tps-pin-input mt-1 h-12"
-                  placeholder="••••••"
-                  {...register('loginPin')}
-                  onChange={(event) =>
-                    setValue('loginPin', normalizeSchoolLoginPin(event.target.value), {
-                      shouldValidate: true,
-                    })
-                  }
-                />
-                {errors.loginPin ? (
-                  <p className="text-xs text-destructive">{errors.loginPin.message}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-slate-500">Numbers only, for example 365452.</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="confirmLoginPin">Confirm 6-digit PIN</Label>
-                <Input
-                  id="confirmLoginPin"
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="new-password"
-                  maxLength={6}
-                  pattern="[0-9]*"
-                  className="tps-public-input tps-pin-input mt-1 h-12"
-                  placeholder="••••••"
-                  {...register('confirmLoginPin')}
-                  onChange={(event) =>
-                    setValue('confirmLoginPin', normalizeSchoolLoginPin(event.target.value), {
-                      shouldValidate: true,
-                    })
-                  }
-                />
-                {errors.confirmLoginPin ? (
-                  <p className="text-xs text-destructive">{errors.confirmLoginPin.message}</p>
-                ) : null}
-              </div>
             </div>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-1" {...register('acceptedPolicies')} />

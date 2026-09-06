@@ -23,7 +23,11 @@ import {
   type SchoolCycleSettings,
 } from './school-admission.constants';
 import { normalizeSchoolDocumentRequirements } from './school-document-requirements';
-import { isSchoolLoginPin, SCHOOL_LOGIN_PIN_MESSAGE } from './school-login-pin';
+import {
+  generateSchoolLoginPin,
+  isSchoolLoginPin,
+  SCHOOL_LOGIN_PIN_MESSAGE,
+} from './school-login-pin';
 import { SchoolAdmissionsMailService } from './school-admissions-mail.service';
 
 const OTP_TTL_SECONDS = 10 * 60;
@@ -248,10 +252,7 @@ export class SchoolAdmissionsPortalService {
     const applicationNumber = await this.cycles.nextApplicationNumber(
       portal.cycle.id,
     );
-    const plainPassword = dto.password.trim();
-    if (!isSchoolLoginPin(plainPassword)) {
-      throw new BadRequestException(SCHOOL_LOGIN_PIN_MESSAGE);
-    }
+    const plainPassword = generateSchoolLoginPin();
 
     const { user } = await this.provisioning.ensureUserWithRoles(
       tenantId,

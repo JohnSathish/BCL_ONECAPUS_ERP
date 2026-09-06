@@ -177,7 +177,6 @@ export async function registerSchoolApplicant(payload: {
   phone: string;
   acceptedPolicies: boolean;
   otp: string;
-  password: string;
 }) {
   const { data } = await publicClient.post('/v1/school-admissions/portal/register', payload, {
     headers: getLoginRequestHeaders(),

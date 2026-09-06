@@ -51,10 +51,6 @@ export class SchoolApplicantRegisterDto {
   acceptedPolicies!: boolean;
 
   @IsString()
-  @Matches(SCHOOL_LOGIN_PIN_PATTERN, { message: SCHOOL_LOGIN_PIN_MESSAGE })
-  password!: string;
-
-  @IsString()
   @Matches(/^\d{6}$/)
   otp!: string;
 }
