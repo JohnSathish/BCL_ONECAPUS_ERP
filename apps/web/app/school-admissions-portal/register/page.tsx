@@ -240,20 +240,6 @@ export default function SchoolAdmissionsRegisterPage() {
               <h2 className="tps-serif mt-2 text-2xl text-slate-900">
                 Register for K.G. Admission 2027
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Names must match the original birth and caste certificates. A 6-digit OTP is sent to
-                the parent email to verify the address. After you create the application, the
-                6-digit login PIN is sent in a second email.
-                {info.data?.lastDateLabel
-                  ? ` Last date to apply: ${info.data.lastDateLabel}.`
-                  : info.data?.registrationClosesAt
-                    ? ` Registration closes ${new Date(info.data.registrationClosesAt).toLocaleDateString('en-IN')}.`
-                    : ''}
-                {typeof info.data?.seatsRemaining === 'number' &&
-                typeof info.data?.maxOnlineApplications === 'number'
-                  ? ` ${info.data.seatsRemaining} of ${info.data.maxOnlineApplications} seats remaining.`
-                  : ''}
-              </p>
             </div>
             <ol className="grid grid-cols-3 gap-2 rounded-2xl bg-[#f4f7f5] p-3 text-center text-[11px] font-medium">
               {['Basic Details', 'Verify Email', 'Get Login Details'].map((label, index) => {

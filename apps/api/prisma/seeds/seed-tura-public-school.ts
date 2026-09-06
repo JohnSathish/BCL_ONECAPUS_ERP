@@ -1,6 +1,9 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { defaultTpsKg2027Settings } from '../../src/modules/school-admissions/school-admission.constants';
+import {
+  defaultTpsKg2027Settings,
+  TPS_KG_2027_REGISTRATION_CLOSES_AT,
+} from '../../src/modules/school-admissions/school-admission.constants';
 
 const TPS_HOSTS = [
   'admission.turapublicschool.com',
@@ -287,9 +290,9 @@ export async function seedTuraPublicSchool(
         status: 'OPEN',
         fyupSemester: 1,
         registrationOpensAt: new Date('2026-01-01'),
-        registrationClosesAt: new Date('2026-09-25T23:59:59.000Z'),
-        applicationDeadline: new Date('2026-09-25T23:59:59.000Z'),
-        paymentDeadline: new Date('2026-09-25T23:59:59.000Z'),
+        registrationClosesAt: TPS_KG_2027_REGISTRATION_CLOSES_AT,
+        applicationDeadline: TPS_KG_2027_REGISTRATION_CLOSES_AT,
+        paymentDeadline: TPS_KG_2027_REGISTRATION_CLOSES_AT,
         settings: settings as unknown as Prisma.InputJsonValue,
       },
     });
@@ -299,6 +302,9 @@ export async function seedTuraPublicSchool(
       data: {
         status: 'OPEN',
         title: 'K.G. Admission Form for Academic Session 2027',
+        registrationClosesAt: TPS_KG_2027_REGISTRATION_CLOSES_AT,
+        applicationDeadline: TPS_KG_2027_REGISTRATION_CLOSES_AT,
+        paymentDeadline: TPS_KG_2027_REGISTRATION_CLOSES_AT,
         settings: settings as unknown as Prisma.InputJsonValue,
       },
     });

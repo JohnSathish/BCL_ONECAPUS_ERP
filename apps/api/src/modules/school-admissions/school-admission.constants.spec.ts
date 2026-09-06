@@ -218,3 +218,41 @@ describe('school online application capacity', () => {
     expect(result.maxOnlineApplications).toBe(100);
   });
 });
+
+describe('school admission last date label', () => {
+  it('prints 25 September 2026 IST as 25th September, 2026 (Friday)', () => {
+    const result = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      registrationClosesAt: new Date('2026-09-25T18:29:59.000Z'),
+      now: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    expect(result.lastDateLabel).toBe('25th September, 2026 (Friday)');
+    expect(result.message).toBe(
+      'Online admissions are open until 25th September, 2026 (Friday).',
+    );
+  });
+
+  it('does not treat 25 Sep 23:59 UTC as 26 September in India', () => {
+    const labelled = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      registrationClosesAt: new Date('2026-09-25T23:59:59.000Z'),
+      now: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    expect(labelled.lastDateLabel).toBe('25th September, 2026 (Friday)');
+
+    const stillOpen = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      registrationClosesAt: new Date('2026-09-25T23:59:59.000Z'),
+      now: new Date('2026-09-25T18:00:00.000Z'),
+    });
+    expect(stillOpen.isOpen).toBe(true);
+
+    const closed = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      registrationClosesAt: new Date('2026-09-25T23:59:59.000Z'),
+      now: new Date('2026-09-25T18:30:00.000Z'),
+    });
+    expect(closed.isOpen).toBe(false);
+    expect(closed.closedReason).toBe('ended');
+  });
+});

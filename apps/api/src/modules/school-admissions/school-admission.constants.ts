@@ -154,14 +154,66 @@ function windowCounts(
   };
 }
 
+/** End of 25 September 2026 in India. `2026-09-25T23:59:59Z` is already 26 Sep IST. */
+export const TPS_KG_2027_REGISTRATION_CLOSES_AT = new Date(
+  '2026-09-25T18:29:59.000Z',
+);
+
+/**
+ * `YYYY-MM-DDT23:59:59.000Z` was stored as “that calendar date”. In IST it is
+ * already the next morning, so treat it as 23:59:59 on that date in India.
+ */
+function schoolCloseInstant(d: Date): Date {
+  if (
+    d.getUTCHours() === 23 &&
+    d.getUTCMinutes() === 59 &&
+    d.getUTCSeconds() === 59
+  ) {
+    return new Date(
+      Date.UTC(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        18,
+        29,
+        59,
+        d.getUTCMilliseconds(),
+      ),
+    );
+  }
+  return d;
+}
+
+function istDayOrdinal(day: number): string {
+  const teens = day % 100;
+  if (teens >= 11 && teens <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+/** Parent-facing last date, e.g. "25th September, 2026 (Friday)" in IST. */
 function formatAdmissionDateIn(d: Date | null | undefined): string | null {
   if (!d || Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
-  });
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).formatToParts(d);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  const day = Number(value('day'));
+  if (!Number.isFinite(day) || day < 1) return null;
+  return `${istDayOrdinal(day)} ${value('month')}, ${value('year')} (${value('weekday')})`;
 }
 
 /**
@@ -180,13 +232,15 @@ export function evaluateSchoolAdmissionWindow(input: {
   const opensAt = input.registrationOpensAt
     ? new Date(input.registrationOpensAt)
     : null;
-  const closesAt = input.registrationClosesAt
+  const closesAtRaw = input.registrationClosesAt
     ? new Date(input.registrationClosesAt)
     : null;
   const opensValid =
     opensAt && !Number.isNaN(opensAt.getTime()) ? opensAt : null;
   const closesValid =
-    closesAt && !Number.isNaN(closesAt.getTime()) ? closesAt : null;
+    closesAtRaw && !Number.isNaN(closesAtRaw.getTime())
+      ? schoolCloseInstant(closesAtRaw)
+      : null;
   const lastDateLabel = formatAdmissionDateIn(closesValid);
   const enabled = input.settings?.newAdmissionsEnabled !== false;
   const counts = windowCounts(input.settings, input.currentApplicationCount);
@@ -261,8 +315,8 @@ export function evaluateSchoolAdmissionWindow(input: {
     newAdmissionsEnabled: true,
     closedReason: null,
     message: closesValid
-      ? `Online admissions are open until ${lastDateLabel}. ${counts.seatsRemaining} of ${counts.maxOnlineApplications} seats remaining.`
-      : `Online admissions are open. ${counts.seatsRemaining} of ${counts.maxOnlineApplications} seats remaining.`,
+      ? `Online admissions are open until ${lastDateLabel}.`
+      : 'Online admissions are open.',
   };
 }
 
