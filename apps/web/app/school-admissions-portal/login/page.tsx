@@ -15,11 +15,16 @@ import { Label } from '@/components/ui/label';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { useAuthStore } from '@/store/auth-store';
 import { apiErrorMessage } from '@/utils/api-error';
+import {
+  SCHOOL_LOGIN_PIN_MESSAGE,
+  SCHOOL_LOGIN_PIN_PATTERN,
+  normalizeSchoolLoginPin,
+} from '@/lib/school-login-pin';
 import { fetchSchoolPortalInfo, loginSchoolApplicant } from '@/services/school-admissions';
 
 const schema = z.object({
   applicationNumber: z.string().min(4),
-  password: z.string().min(4),
+  password: z.string().regex(SCHOOL_LOGIN_PIN_PATTERN, SCHOOL_LOGIN_PIN_MESSAGE),
   rememberMe: z.boolean().optional(),
 });
 
@@ -103,7 +108,7 @@ export default function SchoolAdmissionsLoginPage() {
             </p>
             {saved.password ? (
               <p>
-                Password: <strong className="font-mono">{saved.password}</strong>
+                6-digit PIN: <strong className="font-mono tracking-widest">{saved.password}</strong>
               </p>
             ) : null}
             <p className="mt-1 text-xs text-slate-500">
@@ -130,15 +135,24 @@ export default function SchoolAdmissionsLoginPage() {
             ) : null}
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">6-digit PIN</Label>
             <div className="relative mt-1">
               <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1a5336]" />
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
+                inputMode="numeric"
                 autoComplete="current-password"
-                className="tps-public-input h-12 px-10"
+                maxLength={6}
+                pattern="[0-9]*"
+                className="tps-public-input tps-pin-input h-12 px-10"
+                placeholder="••••••"
                 {...register('password')}
+                onChange={(event) =>
+                  setValue('password', normalizeSchoolLoginPin(event.target.value), {
+                    shouldValidate: true,
+                  })
+                }
               />
               <button
                 type="button"
@@ -159,9 +173,17 @@ export default function SchoolAdmissionsLoginPage() {
               className="font-medium text-[#1a5336] underline"
               href="/school-admissions-portal/forgot-password"
             >
-              Forgot password?
+              Forgot PIN?
             </Link>
           </div>
+          {errors.password ? (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          ) : (
+            <p className="text-xs text-slate-500">
+              Enter the 6-digit PIN from registration. Older complex passwords no longer work — use
+              Forgot PIN to set a new one.
+            </p>
+          )}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button
             type="submit"

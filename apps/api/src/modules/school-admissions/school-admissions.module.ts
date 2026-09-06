@@ -11,6 +11,7 @@ import { SchoolAdmissionsOfficeService } from './school-admissions-office.servic
 import { SchoolAdmissionsPdfService } from './school-admissions-pdf.service';
 import { SchoolAdmissionsPortalController } from './school-admissions-portal.controller';
 import { SchoolAdmissionsPortalService } from './school-admissions-portal.service';
+import { SchoolPortalPresenceService } from './school-portal-presence.service';
 
 @Module({
   imports: [AuthModule, AdministrationModule, TenantsModule, AdmissionsModule],
@@ -20,6 +21,7 @@ import { SchoolAdmissionsPortalService } from './school-admissions-portal.servic
   ],
   providers: [
     SchoolAdmissionsPortalService,
+    SchoolPortalPresenceService,
     SchoolAdmissionsFormService,
     SchoolAdmissionsDocumentService,
     SchoolAdmissionsOfficeService,

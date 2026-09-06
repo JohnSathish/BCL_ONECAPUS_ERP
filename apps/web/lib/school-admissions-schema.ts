@@ -5,6 +5,7 @@ import {
   TPS_KG_2027_MAX_AGE_YEARS_EXCLUSIVE,
   TPS_KG_2027_MIN_AGE_YEARS,
 } from './school-age-eligibility';
+import { SCHOOL_LOGIN_PIN_MESSAGE, SCHOOL_LOGIN_PIN_PATTERN } from './school-login-pin';
 
 export const SCHOOL_DOCUMENT_SLOTS = [
   { code: 'PHOTO', label: 'Passport photograph (school uniform)', required: true },
@@ -93,9 +94,11 @@ export function schoolRegisterSchema(options?: {
       email: z.string().email(),
       phone: z.string().min(10, 'Enter a reachable 10-digit mobile number'),
       otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit email OTP'),
+      loginPin: z.string().regex(SCHOOL_LOGIN_PIN_PATTERN, SCHOOL_LOGIN_PIN_MESSAGE),
+      confirmLoginPin: z.string().regex(SCHOOL_LOGIN_PIN_PATTERN, SCHOOL_LOGIN_PIN_MESSAGE),
       acceptedPolicies: z.boolean().refine((v) => v === true, {
         message:
-          'You must confirm the child attended Nursery and meets the age rule as on 01 January 2027',
+          'You must confirm the child attended Nursery and that age as on 1st January 2027 is at least 5 years and not more than 6 years',
       }),
     })
     .superRefine((values, ctx) => {
@@ -110,6 +113,13 @@ export function schoolRegisterSchema(options?: {
           code: 'custom',
           path: ['dateOfBirth'],
           message: age.message,
+        });
+      }
+      if (values.loginPin !== values.confirmLoginPin) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['confirmLoginPin'],
+          message: 'Both PIN fields must match',
         });
       }
     });

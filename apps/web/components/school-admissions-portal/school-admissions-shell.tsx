@@ -148,8 +148,9 @@ export function SchoolEligibilityCard() {
     <aside className="rounded-2xl border border-amber-200 bg-[#fff4d6] p-4 text-sm text-amber-950">
       <p className="font-semibold">Important information</p>
       <ul className="mt-2 list-disc space-y-1 pl-4">
-        <li>The child must be at least 5 years old but less than 6 as on 01 January 2027.</li>
-        <li>Eligible date of birth: 02 January 2021 to 01 January 2022.</li>
+        <li>
+          Age as on 1st January 2027: <strong>At least 5 years and not more than 6 years.</strong>
+        </li>
         <li>The child must have attended Nursery.</li>
         <li>Names must match the original birth and caste certificates.</li>
       </ul>

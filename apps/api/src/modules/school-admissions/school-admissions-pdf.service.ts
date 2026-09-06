@@ -778,6 +778,7 @@ export class SchoolAdmissionsPdfService {
 
   <section class="age-card">
     <p class="age-title">Age as on 1st January, 2027</p>
+    <p class="note" style="margin:0 0 8px;">At least 5 years and not more than 6 years.</p>
     <div class="age-boxes">
       <div class="age-unit"><span class="val">${esc(String(ageYears))}</span><span class="lbl">Years</span></div>
       <div class="age-unit"><span class="val">${esc(String(ageMonths))}</span><span class="lbl">Months</span></div>

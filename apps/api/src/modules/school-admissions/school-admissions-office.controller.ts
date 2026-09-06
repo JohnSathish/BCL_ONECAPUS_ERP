@@ -155,6 +155,12 @@ export class SchoolAdmissionsOfficeController {
     return file.stream;
   }
 
+  @Post('applications/:id/reset-login-pin')
+  @RequireAnyPermission('admissions:manage', 'admissions:configure')
+  resetLoginPin(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.office.resetApplicantLoginPin(user.tid, id, user.sub);
+  }
+
   @Post('applications/:id/resend-pdf-email')
   @RequireAnyPermission('admissions:manage', 'admissions:configure')
   resendPdfEmail(@CurrentUser() user: JwtUser, @Param('id') id: string) {

@@ -283,13 +283,50 @@
   font-size: 0.72rem;
 }
 
+.tps-public-footer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+@media (min-width: 640px) {
+  .tps-public-footer-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.tps-public-traffic {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.tps-public-traffic strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tps-public-traffic-sep {
+  opacity: 0.45;
+}
+
 .tps-public-footer a {
   color: rgba(255, 255, 255, 0.95);
   text-decoration: none;
 }
 
-.tps-public-footer a:hover {
-  text-decoration: underline;
+.tps-pin-input {
+  letter-spacing: 0.35em;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .tps-fade-up {

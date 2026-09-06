@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GENDER_OPTIONS, schoolRegisterSchema } from '@/lib/school-admissions-schema';
 import { eligibleDobIsoRange } from '@/lib/school-age-eligibility';
+import { normalizeSchoolLoginPin } from '@/lib/school-login-pin';
 import {
   isSchoolExistingApplicationError,
   isSchoolExistingEmailApplicationError,
@@ -68,10 +69,11 @@ export default function SchoolAdmissionsRegisterPage() {
     getValues,
     trigger,
     watch,
+    setValue,
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: (values, context, options) => zodResolver(schema)(values, context, options),
-    defaultValues: { acceptedPolicies: false },
+    defaultValues: { acceptedPolicies: false, loginPin: '', confirmLoginPin: '' },
   });
 
   const emailValue = watch('email');
@@ -134,7 +136,16 @@ export default function SchoolAdmissionsRegisterPage() {
     setError(null);
     setExistingApplication(null);
     try {
-      const data = await registerSchoolApplicant(values);
+      const data = await registerSchoolApplicant({
+        childFullName: values.childFullName,
+        dateOfBirth: values.dateOfBirth,
+        gender: values.gender,
+        email: values.email,
+        phone: values.phone,
+        acceptedPolicies: values.acceptedPolicies,
+        otp: values.otp,
+        password: values.loginPin,
+      });
       const password = data.password ?? data.generatedPassword;
       const payload = {
         username: data.username ?? data.applicationNumber,
@@ -178,7 +189,8 @@ export default function SchoolAdmissionsRegisterPage() {
               </p>
               {result.password ? (
                 <p className="mt-1">
-                  Password: <strong className="font-mono">{result.password}</strong>
+                  6-digit PIN:{' '}
+                  <strong className="font-mono tracking-widest">{result.password}</strong>
                 </p>
               ) : null}
               <p className="mt-1">Email: {result.email}</p>
@@ -189,7 +201,8 @@ export default function SchoolAdmissionsRegisterPage() {
               </p>
             ) : (
               <p className="text-sm text-amber-700">
-                We could not send the email just now. Please copy the username and password above.
+                We could not send the email just now. Please copy the username and 6-digit PIN
+                above.
               </p>
             )}
             {result.ageWarning ? (
@@ -205,7 +218,9 @@ export default function SchoolAdmissionsRegisterPage() {
               Admissions closed
             </p>
             <h2 className="tps-serif text-2xl text-slate-900">
-              Online admissions are currently closed
+              {info.data.closedReason === 'capacity'
+                ? 'Application limit reached'
+                : 'Online admissions are currently closed'}
             </h2>
             <p className="text-sm text-slate-600">
               {info.data.message || 'Online admissions are currently closed.'}
@@ -236,6 +251,10 @@ export default function SchoolAdmissionsRegisterPage() {
                   : info.data?.registrationClosesAt
                     ? ` Registration closes ${new Date(info.data.registrationClosesAt).toLocaleDateString('en-IN')}.`
                     : ''}
+                {typeof info.data?.seatsRemaining === 'number' &&
+                typeof info.data?.maxOnlineApplications === 'number'
+                  ? ` ${info.data.seatsRemaining} of ${info.data.maxOnlineApplications} seats remaining.`
+                  : ''}
               </p>
             </div>
             <ol className="grid grid-cols-3 gap-2 rounded-2xl bg-[#f4f7f5] p-3 text-center text-[11px] font-medium">
@@ -287,7 +306,8 @@ export default function SchoolAdmissionsRegisterPage() {
                   <p className="text-xs text-destructive">{errors.dateOfBirth.message}</p>
                 ) : (
                   <p className="mt-1 text-xs text-slate-500">
-                    Eligible: 02 January 2021 to 01 January 2022.
+                    Age as on 1st January 2027:{' '}
+                    <strong>At least 5 years and not more than 6 years.</strong>
                   </p>
                 )}
               </div>
@@ -353,11 +373,59 @@ export default function SchoolAdmissionsRegisterPage() {
               {otpMessage ? <p className="text-xs text-emerald-700">{otpMessage}</p> : null}
               {errors.otp ? <p className="text-xs text-destructive">{errors.otp.message}</p> : null}
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="loginPin">Create a 6-digit login PIN</Label>
+                <Input
+                  id="loginPin"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  maxLength={6}
+                  pattern="[0-9]*"
+                  className="tps-public-input tps-pin-input mt-1 h-12"
+                  placeholder="••••••"
+                  {...register('loginPin')}
+                  onChange={(event) =>
+                    setValue('loginPin', normalizeSchoolLoginPin(event.target.value), {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+                {errors.loginPin ? (
+                  <p className="text-xs text-destructive">{errors.loginPin.message}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">Numbers only, for example 365452.</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="confirmLoginPin">Confirm 6-digit PIN</Label>
+                <Input
+                  id="confirmLoginPin"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  maxLength={6}
+                  pattern="[0-9]*"
+                  className="tps-public-input tps-pin-input mt-1 h-12"
+                  placeholder="••••••"
+                  {...register('confirmLoginPin')}
+                  onChange={(event) =>
+                    setValue('confirmLoginPin', normalizeSchoolLoginPin(event.target.value), {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+                {errors.confirmLoginPin ? (
+                  <p className="text-xs text-destructive">{errors.confirmLoginPin.message}</p>
+                ) : null}
+              </div>
+            </div>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-1" {...register('acceptedPolicies')} />
               <span>
-                I confirm the child has attended Nursery and that age is not less than 5 years and
-                not 6 years or above as of 1 January 2027.
+                I confirm the child has attended Nursery and that age as on 1st January 2027 is at
+                least 5 years and not more than 6 years.
               </span>
             </label>
             {errors.acceptedPolicies ? (

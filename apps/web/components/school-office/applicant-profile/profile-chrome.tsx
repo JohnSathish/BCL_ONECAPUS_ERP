@@ -12,7 +12,9 @@ export function ApplicantProfileHeader({
   badges,
   indexNumber,
   onDownloadPdf,
+  onResetPin,
   onResendEmail,
+  issuedPin,
   busy,
 }: {
   applicationNumber: string;
@@ -21,7 +23,9 @@ export function ApplicantProfileHeader({
   badges: SchoolOfficeStatusBadge[];
   indexNumber?: string | null;
   onDownloadPdf: () => void;
+  onResetPin: () => void;
   onResendEmail: () => void;
+  issuedPin?: string | null;
   busy?: boolean;
 }) {
   return (
@@ -40,11 +44,22 @@ export function ApplicantProfileHeader({
           <Button type="button" variant="outline" onClick={() => window.print()}>
             Print
           </Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={onResetPin}>
+            Issue new 6-digit PIN
+          </Button>
           <Button type="button" variant="outline" disabled={busy} onClick={onResendEmail}>
             Resend PDF by Email
           </Button>
         </div>
       </div>
+
+      {issuedPin ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 print:hidden">
+          New PIN for this applicant:{' '}
+          <strong className="font-mono tracking-widest">{issuedPin}</strong>. Share it once. It is
+          not stored in plain text.
+        </p>
+      ) : null}
 
       <div>
         <p className="font-mono text-sm font-semibold text-[var(--school-erp-primary)]">

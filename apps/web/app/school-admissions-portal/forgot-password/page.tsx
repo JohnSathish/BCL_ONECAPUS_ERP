@@ -13,6 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
+  SCHOOL_LOGIN_PIN_MESSAGE,
+  SCHOOL_LOGIN_PIN_PATTERN,
+  normalizeSchoolLoginPin,
+} from '@/lib/school-login-pin';
+import {
   confirmSchoolPasswordReset,
   requestSchoolPasswordReset,
 } from '@/services/school-admissions';
@@ -25,11 +30,11 @@ const confirmSchema = z
   .object({
     emailOrApplicationNumber: z.string().min(4),
     otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit OTP'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
-    confirmPassword: z.string().min(8),
+    newPassword: z.string().regex(SCHOOL_LOGIN_PIN_PATTERN, SCHOOL_LOGIN_PIN_MESSAGE),
+    confirmPassword: z.string().regex(SCHOOL_LOGIN_PIN_PATTERN, SCHOOL_LOGIN_PIN_MESSAGE),
   })
   .refine((v) => v.newPassword === v.confirmPassword, {
-    message: 'Passwords do not match',
+    message: 'Both PIN fields must match',
     path: ['confirmPassword'],
   });
 
@@ -89,10 +94,10 @@ export default function SchoolForgotPasswordPage() {
           <p className="inline-flex rounded-full bg-[#eaf5ee] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a5336]">
             Account recovery
           </p>
-          <h2 className="tps-serif mt-2 text-2xl text-slate-900">Reset password</h2>
+          <h2 className="tps-serif mt-2 text-2xl text-slate-900">Reset 6-digit PIN</h2>
           <p className="mt-1 text-sm text-slate-500">
             Enter your application number or registered parent email. We will send a one-time code
-            to the parent email on file.
+            to the parent email so you can set a new 6-digit PIN.
           </p>
         </div>
 
@@ -147,29 +152,57 @@ export default function SchoolForgotPasswordPage() {
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New password</Label>
+              <Label htmlFor="newPassword">New 6-digit PIN</Label>
               <div className="relative">
                 <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   id="newPassword"
                   type="password"
-                  className="tps-public-input h-12 px-10"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  maxLength={6}
+                  pattern="[0-9]*"
+                  className="tps-public-input tps-pin-input h-12 px-10"
+                  placeholder="••••••"
                   {...confirmForm.register('newPassword')}
+                  onChange={(event) =>
+                    confirmForm.setValue(
+                      'newPassword',
+                      normalizeSchoolLoginPin(event.target.value),
+                      {
+                        shouldValidate: true,
+                      },
+                    )
+                  }
                 />
               </div>
               {confirmForm.formState.errors.newPassword ? (
                 <p className="text-sm text-destructive">
                   {confirmForm.formState.errors.newPassword.message}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-slate-500">Numbers only, for example 365452.</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm password</Label>
+              <Label htmlFor="confirmPassword">Confirm 6-digit PIN</Label>
               <Input
                 id="confirmPassword"
                 type="password"
-                className="tps-public-input h-12"
+                inputMode="numeric"
+                autoComplete="new-password"
+                maxLength={6}
+                pattern="[0-9]*"
+                className="tps-public-input tps-pin-input h-12"
+                placeholder="••••••"
                 {...confirmForm.register('confirmPassword')}
+                onChange={(event) =>
+                  confirmForm.setValue(
+                    'confirmPassword',
+                    normalizeSchoolLoginPin(event.target.value),
+                    { shouldValidate: true },
+                  )
+                }
               />
               {confirmForm.formState.errors.confirmPassword ? (
                 <p className="text-sm text-destructive">
@@ -184,7 +217,7 @@ export default function SchoolForgotPasswordPage() {
               className="h-12 w-full bg-[#1a5336] text-white hover:bg-[#15462d]"
               disabled={confirmForm.formState.isSubmitting}
             >
-              {confirmForm.formState.isSubmitting ? 'Updating…' : 'Update password'}
+              {confirmForm.formState.isSubmitting ? 'Updating…' : 'Update PIN'}
             </Button>
             <button
               type="button"

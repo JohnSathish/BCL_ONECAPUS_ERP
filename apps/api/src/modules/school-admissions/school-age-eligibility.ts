@@ -4,8 +4,11 @@ export const TPS_KG_2027_CENSUS_DATE = '2027-01-01';
 export const TPS_KG_2027_MIN_AGE_YEARS = 5;
 export const TPS_KG_2027_MAX_AGE_YEARS_EXCLUSIVE = 6;
 
-export const SCHOOL_AGE_INELIGIBLE_MESSAGE =
-  'The child must be at least 5 years old but less than 6 years old as on 01 January 2027. Eligible date of birth: 02 January 2021 to 01 January 2022.';
+/** Parent-facing age rule. Do not publish the eligible date-of-birth window. */
+export const SCHOOL_AGE_RULE_LINE =
+  'Age as on 1st January 2027: At least 5 years and not more than 6 years.';
+
+export const SCHOOL_AGE_INELIGIBLE_MESSAGE = SCHOOL_AGE_RULE_LINE;
 
 const UTC_MONTH_NAMES = [
   'January',
@@ -50,6 +53,25 @@ export function formatUtcDateIso(date: Date): string {
 export function formatUtcDateLong(date: Date): string {
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${day} ${UTC_MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+function utcDayOrdinal(day: number): string {
+  const teens = day % 100;
+  if (teens >= 11 && teens <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+export function formatUtcDateLongOrdinal(date: Date): string {
+  return `${utcDayOrdinal(date.getUTCDate())} ${UTC_MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
 export function compareUtcDateOnly(a: Date, b: Date): number {
@@ -139,12 +161,7 @@ export function schoolAgeIneligibleMessage(
 ): string {
   const census = parseDateOnly(censusDate);
   if (!census) return SCHOOL_AGE_INELIGIBLE_MESSAGE;
-  const { minDob, maxDob } = eligibleDobRangeUtc(
-    census,
-    minAgeYears,
-    maxAgeYearsExclusive,
-  );
-  return `The child must be at least ${minAgeYears} years old but less than ${maxAgeYearsExclusive} years old as on ${formatUtcDateLong(census)}. Eligible date of birth: ${formatUtcDateLong(minDob)} to ${formatUtcDateLong(maxDob)}.`;
+  return `Age as on ${formatUtcDateLongOrdinal(census)}: At least ${minAgeYears} years and not more than ${maxAgeYearsExclusive} years.`;
 }
 
 export function evaluateSchoolAgeEligibility(

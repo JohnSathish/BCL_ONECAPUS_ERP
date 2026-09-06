@@ -43,6 +43,7 @@ export default function SchoolAdmissionWindowSettingsPage() {
   const [enabledToggle, setEnabledToggle] = useState(true);
   const [opensAt, setOpensAt] = useState('');
   const [closesAt, setClosesAt] = useState('');
+  const [maxApplications, setMaxApplications] = useState('50');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export default function SchoolAdmissionWindowSettingsPage() {
     setEnabledToggle(windowQ.data.newAdmissionsEnabled);
     setOpensAt(toDatetimeLocalValue(windowQ.data.registrationOpensAt));
     setClosesAt(toDatetimeLocalValue(windowQ.data.registrationClosesAt));
+    setMaxApplications(String(windowQ.data.maxOnlineApplications ?? 50));
   }, [windowQ.data]);
 
   const save = useMutation({
@@ -59,6 +61,7 @@ export default function SchoolAdmissionWindowSettingsPage() {
         newAdmissionsEnabled: enabledToggle,
         registrationOpensAt: fromDatetimeLocalValue(opensAt),
         registrationClosesAt: fromDatetimeLocalValue(closesAt),
+        maxOnlineApplications: Number(maxApplications),
       }),
     onSuccess: async (data) => {
       setError(null);
@@ -121,6 +124,14 @@ export default function SchoolAdmissionWindowSettingsPage() {
         {status?.lastDateLabel ? (
           <p className="mt-1">Closing Date: {status.lastDateLabel}</p>
         ) : null}
+        {typeof status?.maxOnlineApplications === 'number' ? (
+          <p className="mt-1">
+            Applications: {status.applicationCount ?? 0} of {status.maxOnlineApplications}
+            {typeof status.seatsRemaining === 'number'
+              ? ` (${status.seatsRemaining} remaining)`
+              : ''}
+          </p>
+        ) : null}
       </div>
 
       <form
@@ -182,6 +193,25 @@ export default function SchoolAdmissionWindowSettingsPage() {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="maxApplications">Maximum online applications</Label>
+          <Input
+            id="maxApplications"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={10000}
+            step={1}
+            value={maxApplications}
+            onChange={(e) => setMaxApplications(e.target.value.replace(/\D/g, ''))}
+          />
+          <p className="text-xs text-muted-foreground">
+            Default is 50. Raise this to 100, 150, or any number when the Principal allows more
+            applications. New registrations stop automatically when this count is reached. Existing
+            applicants can still log in and complete their form.
+          </p>
+        </div>
+
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-800">{message}</p> : null}
 
@@ -201,6 +231,7 @@ export default function SchoolAdmissionWindowSettingsPage() {
               setEnabledToggle(windowQ.data.newAdmissionsEnabled);
               setOpensAt(toDatetimeLocalValue(windowQ.data.registrationOpensAt));
               setClosesAt(toDatetimeLocalValue(windowQ.data.registrationClosesAt));
+              setMaxApplications(String(windowQ.data.maxOnlineApplications ?? 50));
               setMessage(null);
               setError(null);
             }}

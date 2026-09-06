@@ -31,11 +31,13 @@ import { SchoolAdmissionsDocumentService } from './school-admissions-document.se
 import { SchoolAdmissionsFormService } from './school-admissions-form.service';
 import { SchoolAdmissionsPdfService } from './school-admissions-pdf.service';
 import { SchoolAdmissionsPortalService } from './school-admissions-portal.service';
+import { SchoolPortalPresenceService } from './school-portal-presence.service';
 import {
   SchoolApplicantLoginDto,
   SchoolApplicantRegisterDto,
   SchoolPasswordResetConfirmDto,
   SchoolPasswordResetRequestDto,
+  SchoolPortalHeartbeatDto,
   SchoolRequestOtpDto,
   SchoolSaveFormDraftDto,
   SchoolSavePaymentTransactionDto,
@@ -48,6 +50,7 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export class SchoolAdmissionsPortalController {
   constructor(
     private readonly portal: SchoolAdmissionsPortalService,
+    private readonly presence: SchoolPortalPresenceService,
     private readonly form: SchoolAdmissionsFormService,
     private readonly documents: SchoolAdmissionsDocumentService,
     private readonly pdf: SchoolAdmissionsPdfService,
@@ -71,6 +74,28 @@ export class SchoolAdmissionsPortalController {
   ) {
     const tenantId = await this.resolveTenantId(loginHost || host);
     return this.portal.getPortalInfo(tenantId);
+  }
+
+  @Public()
+  @Get('traffic')
+  async traffic(
+    @Headers('host') host: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.resolveTenantId(loginHost || host);
+    return this.presence.stats(tenantId);
+  }
+
+  @Public()
+  @Post('traffic/heartbeat')
+  async trafficHeartbeat(
+    @Headers('host') host: string,
+    @Headers('x-login-host') loginHost: string | undefined,
+    @Body() dto: SchoolPortalHeartbeatDto,
+    @Req() req: Request,
+  ) {
+    const tenantId = await this.resolveTenantId(loginHost || host);
+    return this.presence.heartbeat(tenantId, dto.sessionId, req);
   }
 
   @Public()

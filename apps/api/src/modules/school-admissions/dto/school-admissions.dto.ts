@@ -9,11 +9,15 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
+import {
+  SCHOOL_LOGIN_PIN_MESSAGE,
+  SCHOOL_LOGIN_PIN_PATTERN,
+} from './school-login-pin';
 
 export class SchoolApplicantRegisterDto {
   @IsString()
@@ -45,10 +49,9 @@ export class SchoolApplicantRegisterDto {
   })
   acceptedPolicies!: boolean;
 
-  @IsOptional()
   @IsString()
-  @MinLength(6)
-  password?: string;
+  @Matches(SCHOOL_LOGIN_PIN_PATTERN, { message: SCHOOL_LOGIN_PIN_MESSAGE })
+  password!: string;
 
   @IsString()
   @Matches(/^\d{6}$/)
@@ -71,6 +74,7 @@ export class SchoolApplicantLoginDto {
 
   @IsString()
   @MinLength(4)
+  @MaxLength(72)
   password!: string;
 
   @IsOptional()
@@ -94,7 +98,7 @@ export class SchoolPasswordResetConfirmDto {
   otp!: string;
 
   @IsString()
-  @MinLength(8)
+  @Matches(SCHOOL_LOGIN_PIN_PATTERN, { message: SCHOOL_LOGIN_PIN_MESSAGE })
   newPassword!: string;
 }
 
@@ -125,6 +129,15 @@ export class SchoolSavePaymentTransactionDto {
       'Enter a valid bank transaction / UTR / reference number (letters, numbers, hyphens, or slashes)',
   })
   paymentTransactionReference!: string;
+}
+
+export class SchoolPortalHeartbeatDto {
+  @IsString()
+  @Matches(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    { message: 'Invalid session' },
+  )
+  sessionId!: string;
 }
 
 export class SchoolOfficeListQueryDto extends PaginationQueryDto {
@@ -218,4 +231,10 @@ export class SchoolAdmissionWindowUpdateDto {
   @IsOptional()
   @IsString()
   registrationClosesAt?: string | null;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  maxOnlineApplications!: number;
 }

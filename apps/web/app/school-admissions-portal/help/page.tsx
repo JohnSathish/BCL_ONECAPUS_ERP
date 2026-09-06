@@ -30,6 +30,17 @@ export default function SchoolAdmissionsHelpPage() {
         <li>Use the parent email for OTP and login details. SMS OTP is not used.</li>
         <li>Keep the application number as the bank transfer reference.</li>
         <li>Upload a passport photograph of the child in school uniform.</li>
+        <li>
+          Full parent instructions (print or save as PDF):{' '}
+          <a
+            className="font-medium text-[#1a5336] underline"
+            href="/school-admissions/kg-admission-2027-instructions.html"
+            target="_blank"
+            rel="noreferrer"
+          >
+            K.G. Admission 2027 instruction sheet
+          </a>
+        </li>
       </ul>
     </SchoolApplicantNav>
   );

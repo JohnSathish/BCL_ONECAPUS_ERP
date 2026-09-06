@@ -88,6 +88,11 @@ export type SchoolCycleSettings = {
    */
   newAdmissionsEnabled?: boolean;
   /**
+   * Maximum number of online applications for this cycle.
+   * Defaults to 50 when omitted. Staff can raise or lower it from Admission Settings.
+   */
+  maxOnlineApplications?: number;
+  /**
    * Conditional certificates (Mother’s ST / Father’s SC or OBC, etc.).
    * Editable from the school admissions admin settings panel.
    */
@@ -108,10 +113,46 @@ export type SchoolAdmissionWindowEvaluation = {
     | 'not_started'
     | 'ended'
     | 'cycle_unavailable'
+    | 'capacity'
     | null;
   message: string;
   lastDateLabel: string | null;
+  maxOnlineApplications: number;
+  applicationCount: number;
+  seatsRemaining: number;
 };
+
+export const SCHOOL_DEFAULT_MAX_ONLINE_APPLICATIONS = 50;
+export const SCHOOL_MAX_ONLINE_APPLICATIONS_CEILING = 10_000;
+
+export function schoolMaxOnlineApplications(
+  settings?: Pick<SchoolCycleSettings, 'maxOnlineApplications'> | null,
+): number {
+  const raw = settings?.maxOnlineApplications;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return Math.min(
+      SCHOOL_MAX_ONLINE_APPLICATIONS_CEILING,
+      Math.max(1, Math.floor(raw)),
+    );
+  }
+  return SCHOOL_DEFAULT_MAX_ONLINE_APPLICATIONS;
+}
+
+function windowCounts(
+  settings?: SchoolCycleSettings | null,
+  currentApplicationCount?: number,
+) {
+  const maxOnlineApplications = schoolMaxOnlineApplications(settings);
+  const applicationCount = Math.max(
+    0,
+    Math.floor(currentApplicationCount ?? 0),
+  );
+  return {
+    maxOnlineApplications,
+    applicationCount,
+    seatsRemaining: Math.max(0, maxOnlineApplications - applicationCount),
+  };
+}
 
 function formatAdmissionDateIn(d: Date | null | undefined): string | null {
   if (!d || Number.isNaN(d.getTime())) return null;
@@ -132,6 +173,7 @@ export function evaluateSchoolAdmissionWindow(input: {
   settings?: SchoolCycleSettings | null;
   registrationOpensAt?: Date | string | null;
   registrationClosesAt?: Date | string | null;
+  currentApplicationCount?: number;
   now?: Date;
 }): SchoolAdmissionWindowEvaluation {
   const now = input.now ?? new Date();
@@ -147,72 +189,80 @@ export function evaluateSchoolAdmissionWindow(input: {
     closesAt && !Number.isNaN(closesAt.getTime()) ? closesAt : null;
   const lastDateLabel = formatAdmissionDateIn(closesValid);
   const enabled = input.settings?.newAdmissionsEnabled !== false;
+  const counts = windowCounts(input.settings, input.currentApplicationCount);
+  const base = {
+    registrationOpensAt: opensValid,
+    registrationClosesAt: closesValid,
+    lastDateLabel,
+    ...counts,
+  };
 
   if (!input.cycleStatus || input.cycleStatus === 'ARCHIVED') {
     return {
+      ...base,
       isOpen: false,
       status: 'CLOSED',
       newAdmissionsEnabled: enabled,
-      registrationOpensAt: opensValid,
-      registrationClosesAt: closesValid,
       closedReason: 'cycle_unavailable',
       message: 'Online admissions are currently closed.',
-      lastDateLabel,
     };
   }
 
   if (!enabled) {
     return {
+      ...base,
       isOpen: false,
       status: 'CLOSED',
       newAdmissionsEnabled: false,
-      registrationOpensAt: opensValid,
-      registrationClosesAt: closesValid,
       closedReason: 'disabled',
       message: 'Online admissions are currently closed.',
-      lastDateLabel,
     };
   }
 
   if (opensValid && opensValid > now) {
     return {
+      ...base,
       isOpen: false,
       status: 'CLOSED',
       newAdmissionsEnabled: true,
-      registrationOpensAt: opensValid,
-      registrationClosesAt: closesValid,
       closedReason: 'not_started',
       message: `Online admissions open on ${formatAdmissionDateIn(opensValid)}.`,
-      lastDateLabel,
     };
   }
 
   if (closesValid && closesValid < now) {
     return {
+      ...base,
       isOpen: false,
       status: 'CLOSED',
       newAdmissionsEnabled: true,
-      registrationOpensAt: opensValid,
-      registrationClosesAt: closesValid,
       closedReason: 'ended',
       message: lastDateLabel
         ? `Online admissions are currently closed. The last date to apply was ${lastDateLabel}.`
         : 'Online admissions are currently closed.',
-      lastDateLabel,
+    };
+  }
+
+  if (counts.seatsRemaining <= 0) {
+    return {
+      ...base,
+      isOpen: false,
+      status: 'CLOSED',
+      newAdmissionsEnabled: true,
+      closedReason: 'capacity',
+      message: `Online applications are closed. The school has reached the limit of ${counts.maxOnlineApplications} applications.`,
     };
   }
 
   return {
+    ...base,
     isOpen: true,
     status: 'OPEN',
     newAdmissionsEnabled: true,
-    registrationOpensAt: opensValid,
-    registrationClosesAt: closesValid,
     closedReason: null,
     message: closesValid
-      ? `Online admissions are open until ${lastDateLabel}.`
-      : 'Online admissions are open.',
-    lastDateLabel,
+      ? `Online admissions are open until ${lastDateLabel}. ${counts.seatsRemaining} of ${counts.maxOnlineApplications} seats remaining.`
+      : `Online admissions are open. ${counts.seatsRemaining} of ${counts.maxOnlineApplications} seats remaining.`,
   };
 }
 
@@ -221,6 +271,7 @@ export {
   TPS_KG_2027_CENSUS_DATE,
   TPS_KG_2027_MIN_AGE_YEARS,
   TPS_KG_2027_MAX_AGE_YEARS_EXCLUSIVE,
+  SCHOOL_AGE_RULE_LINE,
   SCHOOL_AGE_INELIGIBLE_MESSAGE,
   parseDateOnly,
   formatUtcDateIso,
@@ -406,6 +457,8 @@ export function defaultTpsKg2027Settings(): SchoolCycleSettings {
       phone: '',
       email: 'info@turapublicschool.com',
     },
+    newAdmissionsEnabled: true,
+    maxOnlineApplications: 50,
     documentRequirements: structuredClone(DEFAULT_SCHOOL_DOCUMENT_REQUIREMENTS),
   };
 }

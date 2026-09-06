@@ -49,7 +49,7 @@ export function schoolCredentialsEmailHtml(input: {
       </p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;border-collapse:separate;border-spacing:0 8px;">
         ${credentialRow('Username / Application no.', input.username)}
-        ${credentialRow('Password', input.password)}
+        ${credentialRow('6-digit PIN', input.password)}
       </table>
       <p style="margin:0 0 24px;text-align:center;">
         <a href="${escapeHtml(input.loginUrl)}" style="display:inline-block;background:#1b4d3e;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;font-size:14px;">

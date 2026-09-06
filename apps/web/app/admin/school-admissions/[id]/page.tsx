@@ -16,6 +16,7 @@ import {
   rejectSchoolDocument,
   rejectSchoolPayment,
   resendSchoolApplicationPdfEmail,
+  resetSchoolApplicantLoginPin,
   verifySchoolDocument,
   verifySchoolPayment,
 } from '@/services/school-admissions';
@@ -112,6 +113,7 @@ function ApplicantProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [issuedPin, setIssuedPin] = useState<string | null>(null);
 
   useEffect(() => {
     const existing = text(office.indexNumber);
@@ -198,6 +200,26 @@ function ApplicantProfilePage() {
     }
   };
 
+  const resetPin = async () => {
+    if (
+      !window.confirm(
+        'Issue a new 6-digit PIN? The previous password or PIN will stop working immediately.',
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await resetSchoolApplicantLoginPin(params.id);
+      setIssuedPin(result.pin);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (detail.isLoading) {
     return <p className="text-sm text-[var(--school-erp-muted)]">Loading applicant…</p>;
   }
@@ -227,7 +249,9 @@ function ApplicantProfilePage() {
         badges={badges}
         indexNumber={text(office.indexNumber) || null}
         onDownloadPdf={() => void downloadPdf()}
+        onResetPin={() => void resetPin()}
         onResendEmail={() => void run(() => resendSchoolApplicationPdfEmail(params.id))}
+        issuedPin={issuedPin}
         busy={busy}
       />
 

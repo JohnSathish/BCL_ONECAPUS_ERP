@@ -240,8 +240,8 @@ export default function SchoolApplicationFormPage() {
           min={dobWindow?.minDob}
           max={dobWindow?.maxDob}
           error={
-            hasGap('Date of birth', 'Eligible date of birth')
-              ? gaps.find((g) => g === 'Date of birth' || g.includes('Eligible date of birth'))
+            hasGap('Date of birth', 'Age as on')
+              ? gaps.find((g) => g === 'Date of birth' || g.includes('Age as on'))
               : undefined
           }
           onChange={(v) => patch('child', 'dateOfBirth', v)}
@@ -252,8 +252,7 @@ export default function SchoolApplicationFormPage() {
           </p>
         ) : (
           <p className="col-span-full rounded-xl bg-[#fff4d6] p-3 text-sm text-amber-950">
-            The child must be at least 5 years old but less than 6 as on 01 January 2027. Eligible
-            date of birth: 02 January 2021 to 01 January 2022.
+            Age as on 1st January 2027: <strong>At least 5 years and not more than 6 years.</strong>
           </p>
         )}
         <SelectField

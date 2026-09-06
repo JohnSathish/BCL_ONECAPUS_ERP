@@ -19,9 +19,11 @@ import {
   evaluateSchoolAgeEligibility,
   evaluateSchoolAdmissionWindow,
   isSchoolCycleSettings,
+  schoolMaxOnlineApplications,
   type SchoolCycleSettings,
 } from './school-admission.constants';
 import { normalizeSchoolDocumentRequirements } from './school-document-requirements';
+import { isSchoolLoginPin, SCHOOL_LOGIN_PIN_MESSAGE } from './school-login-pin';
 import { SchoolAdmissionsMailService } from './school-admissions-mail.service';
 
 const OTP_TTL_SECONDS = 10 * 60;
@@ -68,15 +70,23 @@ export class SchoolAdmissionsPortalService {
         message: 'Online admissions are currently closed.',
         closedReason: 'cycle_unavailable' as const,
         lastDateLabel: null,
+        maxOnlineApplications: null,
+        applicationCount: 0,
+        seatsRemaining: null,
         branding: this.brandingPayload(branding),
       };
     }
 
+    const applicationCount = await this.countCycleApplications(
+      tenantId,
+      cycle.id,
+    );
     const window = evaluateSchoolAdmissionWindow({
       cycleStatus: cycle.status,
       settings: settings ?? undefined,
       registrationOpensAt: cycle.registrationOpensAt,
       registrationClosesAt: cycle.registrationClosesAt,
+      currentApplicationCount: applicationCount,
     });
 
     return {
@@ -85,6 +95,9 @@ export class SchoolAdmissionsPortalService {
       newAdmissionsEnabled: window.newAdmissionsEnabled,
       closedReason: window.closedReason,
       lastDateLabel: window.lastDateLabel,
+      maxOnlineApplications: window.maxOnlineApplications,
+      applicationCount: window.applicationCount,
+      seatsRemaining: window.seatsRemaining,
       cycle,
       settings,
       registrationOpensAt: cycle.registrationOpensAt,
@@ -171,7 +184,7 @@ export class SchoolAdmissionsPortalService {
       dateOfBirth: string;
       gender: string;
       acceptedPolicies?: boolean;
-      password?: string;
+      password: string;
       otp: string;
     },
   ) {
@@ -224,10 +237,21 @@ export class SchoolAdmissionsPortalService {
       });
     }
 
+    const taken = await this.countCycleApplications(tenantId, portal.cycle.id);
+    const max = schoolMaxOnlineApplications(settings);
+    if (taken >= max) {
+      throw new BadRequestException(
+        `Online applications are closed. The school has reached the limit of ${max} applications.`,
+      );
+    }
+
     const applicationNumber = await this.cycles.nextApplicationNumber(
       portal.cycle.id,
     );
-    const plainPassword = dto.password ?? this.generateTempPassword();
+    const plainPassword = dto.password.trim();
+    if (!isSchoolLoginPin(plainPassword)) {
+      throw new BadRequestException(SCHOOL_LOGIN_PIN_MESSAGE);
+    }
 
     const { user } = await this.provisioning.ensureUserWithRoles(
       tenantId,
@@ -345,7 +369,7 @@ export class SchoolAdmissionsPortalService {
     const generic = {
       ok: true,
       message:
-        'If an account matches, a password-reset OTP has been sent to the registered parent email.',
+        'If an account matches, a PIN-reset OTP has been sent to the registered parent email.',
       expiresInSeconds: OTP_TTL_SECONDS,
     };
 
@@ -390,7 +414,7 @@ export class SchoolAdmissionsPortalService {
     if (!sent.ok) {
       throw new BadRequestException(
         sent.error ||
-          'Could not send the password-reset email. Please try again or contact the school office.',
+          'Could not send the PIN-reset email. Please try again or contact the school office.',
       );
     }
 
@@ -432,23 +456,24 @@ export class SchoolAdmissionsPortalService {
     await this.assertValidOtp(tenantId, email, dto.otp, 'password-reset');
 
     const newPassword = dto.newPassword.trim();
-    if (newPassword.length < 8) {
-      throw new BadRequestException('Password must be at least 8 characters');
+    if (!isSchoolLoginPin(newPassword)) {
+      throw new BadRequestException(SCHOOL_LOGIN_PIN_MESSAGE);
     }
 
-    await this.provisioning.resetPassword(
-      tenantId,
-      application.applicantUserId!,
-      {
-        newPassword,
-        forceReset: false,
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: application.applicantUserId! },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        mustResetPassword: false,
       },
-    );
+    });
     await this.clearOtp(this.passwordResetOtpKey(tenantId, email));
 
     return {
       ok: true,
-      message: 'Password updated. You can sign in with your new password.',
+      message: 'PIN updated. You can sign in with your new 6-digit PIN.',
       applicationNumber: application.applicationNumber,
     };
   }
@@ -594,6 +619,12 @@ export class SchoolAdmissionsPortalService {
     return null;
   }
 
+  private countCycleApplications(tenantId: string, cycleId: string) {
+    return this.prisma.admissionApplication.count({
+      where: { tenantId, cycleId, deletedAt: null },
+    });
+  }
+
   private brandingPayload(
     branding: {
       displayName?: string | null;
@@ -614,10 +645,6 @@ export class SchoolAdmissionsPortalService {
       accentColor: branding?.accentColor ?? '#c5a572',
       logoUrl: branding?.logoUrl ?? null,
     };
-  }
-
-  private generateTempPassword() {
-    return `Tps${Math.random().toString(36).slice(2, 8)}!`;
   }
 
   private loginUrl() {

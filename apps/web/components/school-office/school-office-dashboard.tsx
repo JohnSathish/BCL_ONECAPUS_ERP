@@ -41,6 +41,15 @@ export function SchoolOfficeDashboard() {
             {data?.admissionWindow?.lastDateLabel ? (
               <p className="mt-1 text-sm">Closing Date: {data.admissionWindow.lastDateLabel}</p>
             ) : null}
+            {typeof data?.admissionWindow?.maxOnlineApplications === 'number' ? (
+              <p className="mt-1 text-sm">
+                Applications: {data.admissionWindow.applicationCount ?? 0} /{' '}
+                {data.admissionWindow.maxOnlineApplications}
+                {typeof data.admissionWindow.seatsRemaining === 'number'
+                  ? ` · ${data.admissionWindow.seatsRemaining} remaining`
+                  : ''}
+              </p>
+            ) : null}
           </div>
           <Link
             href="/admin/school-admissions/admission-settings"

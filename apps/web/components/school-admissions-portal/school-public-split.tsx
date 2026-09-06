@@ -14,6 +14,7 @@ import {
   SchoolQuoteCard,
   useSchoolPortalBranding,
 } from './school-admissions-shell';
+import { SchoolPortalTrafficStats } from './school-portal-traffic-stats';
 
 const PILLARS = [
   { icon: GraduationCap, label: 'Quality Education' },
@@ -94,8 +95,9 @@ export function SchoolPublicSplit({ children }: { children: React.ReactNode }) {
         </div>
 
         <footer className="tps-public-footer">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="tps-public-footer-row">
             <p>Affiliated to CISCE, New Delhi</p>
+            <SchoolPortalTrafficStats />
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <a href="/privacy-policy.html" target="_blank" rel="noreferrer">
                 Privacy Policy
@@ -106,6 +108,14 @@ export function SchoolPublicSplit({ children }: { children: React.ReactNode }) {
               </a>
               <span className="opacity-40">|</span>
               <a href="#tps-help">Help</a>
+              <span className="opacity-40">|</span>
+              <a
+                href="/school-admissions/kg-admission-2027-instructions.html"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Instructions
+              </a>
               <span className="hidden opacity-40 sm:inline">|</span>
               <PoweredByBaseCodeLabs className="hidden text-white underline sm:inline" />
             </div>

@@ -1,11 +1,13 @@
 import {
   ageAsOf,
   eligibleDobIsoRange,
+  evaluateSchoolAdmissionWindow,
   evaluateSchoolAgeEligibility,
   getSchoolFormGaps,
   parseDateOnly,
   SCHOOL_AGE_INELIGIBLE_MESSAGE,
   schoolAgeIneligibleMessage,
+  schoolMaxOnlineApplications,
 } from './school-admission.constants';
 
 describe('school admission age rules', () => {
@@ -184,5 +186,35 @@ describe('school admission age rules', () => {
     });
     expect(gapsOk).not.toContain('Permanent PIN Code');
     expect(gapsOk).not.toContain('Present PIN Code');
+  });
+});
+
+describe('school online application capacity', () => {
+  it('defaults the cap to 50', () => {
+    expect(schoolMaxOnlineApplications(null)).toBe(50);
+    expect(schoolMaxOnlineApplications({})).toBe(50);
+  });
+
+  it('closes new registration when the cap is reached', () => {
+    const result = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      settings: { maxOnlineApplications: 50 } as never,
+      currentApplicationCount: 50,
+    });
+    expect(result.isOpen).toBe(false);
+    expect(result.closedReason).toBe('capacity');
+    expect(result.seatsRemaining).toBe(0);
+    expect(result.maxOnlineApplications).toBe(50);
+  });
+
+  it('reopens when the admin raises the cap', () => {
+    const result = evaluateSchoolAdmissionWindow({
+      cycleStatus: 'OPEN',
+      settings: { maxOnlineApplications: 100 } as never,
+      currentApplicationCount: 50,
+    });
+    expect(result.isOpen).toBe(true);
+    expect(result.seatsRemaining).toBe(50);
+    expect(result.maxOnlineApplications).toBe(100);
   });
 });

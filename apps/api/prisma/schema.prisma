@@ -16553,3 +16553,30 @@ model PrincipalMailAuditLog {
   @@map("principal_mail_audit_logs")
   @@schema("platform")
 }
+
+/// Unique hashed browsers on the Tura Public School admission portal (not college ERP).
+model SchoolPortalVisitor {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  visitorKey  String   @map("visitor_key")
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @map("last_seen_at")
+
+  @@unique([tenantId, visitorKey])
+  @@index([tenantId])
+  @@map("school_portal_visitors")
+  @@schema("platform")
+}
+
+/// Live tabs/sessions with a recent heartbeat on the school admission portal.
+model SchoolPortalPresence {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  sessionKey String   @map("session_key")
+  lastSeenAt DateTime @map("last_seen_at")
+
+  @@unique([tenantId, sessionKey])
+  @@index([tenantId, lastSeenAt])
+  @@map("school_portal_presence")
+  @@schema("platform")
+}

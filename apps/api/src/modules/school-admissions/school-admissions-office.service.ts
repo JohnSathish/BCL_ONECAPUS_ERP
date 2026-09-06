@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { AdmissionsCycleService } from '../admissions/admissions-cycle.service';
@@ -12,6 +13,7 @@ import {
   evaluateSchoolAdmissionWindow,
   isSchoolCycleSettings,
   requiredSchoolDocumentCodes,
+  schoolMaxOnlineApplications,
   type SchoolCycleSettings,
 } from './school-admission.constants';
 import {
@@ -27,6 +29,7 @@ import {
 } from './school-document-requirements';
 import { SchoolOfficeListQueryDto } from './dto/school-admissions.dto';
 import { buildSchoolKgAdmissionExcelReport } from './reports/school-kg-admission-excel.report';
+import { generateSchoolLoginPin } from './school-login-pin';
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -491,11 +494,17 @@ export class SchoolAdmissionsOfficeService {
 
     const cycle = await this.loadCycleForSummary(tenantId);
     const fee = cycle?.settings?.applicationFee ?? 100;
+    const applicationCount = cycle
+      ? await this.prisma.admissionApplication.count({
+          where: { tenantId, cycleId: cycle.id, deletedAt: null },
+        })
+      : total;
     const admissionWindow = evaluateSchoolAdmissionWindow({
       cycleStatus: cycle?.status,
       settings: cycle?.settings ?? null,
       registrationOpensAt: cycle?.registrationOpensAt,
       registrationClosesAt: cycle?.registrationClosesAt,
+      currentApplicationCount: applicationCount,
     });
 
     return {
@@ -528,6 +537,9 @@ export class SchoolAdmissionsOfficeService {
         registrationClosesAt:
           admissionWindow.registrationClosesAt?.toISOString() ?? null,
         closedReason: admissionWindow.closedReason,
+        maxOnlineApplications: admissionWindow.maxOnlineApplications,
+        applicationCount: admissionWindow.applicationCount,
+        seatsRemaining: admissionWindow.seatsRemaining,
       },
     };
   }
@@ -579,13 +591,61 @@ export class SchoolAdmissionsOfficeService {
     };
   }
 
+  async resetApplicantLoginPin(
+    tenantId: string,
+    applicationId: string,
+    actorUserId: string,
+  ) {
+    const application = await this.prisma.admissionApplication.findFirst({
+      where: { id: applicationId, tenantId, deletedAt: null },
+      include: { applicantUser: true, cycle: true },
+    });
+    if (
+      !application?.applicantUserId ||
+      !application.applicantUser ||
+      !isSchoolCycleSettings(application.cycle?.settings)
+    ) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const pin = generateSchoolLoginPin();
+    const passwordHash = await bcrypt.hash(pin, 12);
+    await this.prisma.user.update({
+      where: { id: application.applicantUserId },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        mustResetPassword: false,
+      },
+    });
+    await this.cycles.audit(
+      tenantId,
+      application.cycleId,
+      'application',
+      application.id,
+      'school.application.login_pin_reset',
+      actorUserId,
+    );
+
+    return {
+      applicationNumber: application.applicationNumber,
+      pin,
+      message:
+        'Share this 6-digit PIN with the parent once. It is stored only as a hash.',
+    };
+  }
+
   async getCycleSettings(tenantId: string) {
     const cycle = await this.requireSchoolCycle(tenantId);
+    const applicationCount = await this.prisma.admissionApplication.count({
+      where: { tenantId, cycleId: cycle.id, deletedAt: null },
+    });
     const window = evaluateSchoolAdmissionWindow({
       cycleStatus: cycle.status,
       settings: cycle.settings,
       registrationOpensAt: cycle.registrationOpensAt,
       registrationClosesAt: cycle.registrationClosesAt,
+      currentApplicationCount: applicationCount,
     });
     return {
       cycleId: cycle.id,
@@ -606,6 +666,9 @@ export class SchoolAdmissionsOfficeService {
           window.registrationClosesAt?.toISOString() ?? null,
         closedReason: window.closedReason,
         applicationDeadline: cycle.applicationDeadline?.toISOString() ?? null,
+        maxOnlineApplications: window.maxOnlineApplications,
+        applicationCount: window.applicationCount,
+        seatsRemaining: window.seatsRemaining,
       },
     };
   }
@@ -626,14 +689,19 @@ export class SchoolAdmissionsOfficeService {
       newAdmissionsEnabled: boolean;
       registrationOpensAt?: string | null;
       registrationClosesAt?: string | null;
+      maxOnlineApplications: number;
     },
   ) {
     const cycle = await this.requireSchoolCycle(tenantId);
+    const maxOnlineApplications = schoolMaxOnlineApplications({
+      maxOnlineApplications: dto.maxOnlineApplications,
+    });
     const previous = {
       newAdmissionsEnabled: cycle.settings.newAdmissionsEnabled !== false,
       registrationOpensAt: cycle.registrationOpensAt?.toISOString() ?? null,
       registrationClosesAt: cycle.registrationClosesAt?.toISOString() ?? null,
       applicationDeadline: cycle.applicationDeadline?.toISOString() ?? null,
+      maxOnlineApplications: schoolMaxOnlineApplications(cycle.settings),
     };
 
     const opensAt =
@@ -653,6 +721,7 @@ export class SchoolAdmissionsOfficeService {
     const nextSettings: SchoolCycleSettings = {
       ...cycle.settings,
       newAdmissionsEnabled: dto.newAdmissionsEnabled,
+      maxOnlineApplications,
     };
 
     await this.prisma.admissionCycle.update({
@@ -672,6 +741,7 @@ export class SchoolAdmissionsOfficeService {
       registrationOpensAt: opensAt?.toISOString() ?? null,
       registrationClosesAt: closesAt?.toISOString() ?? null,
       applicationDeadline: closesAt?.toISOString() ?? null,
+      maxOnlineApplications,
     };
 
     await this.cycles.audit(

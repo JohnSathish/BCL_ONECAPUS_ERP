@@ -8,9 +8,12 @@ export type SchoolPortalInfo = {
   isOpen: boolean;
   status?: 'OPEN' | 'CLOSED';
   newAdmissionsEnabled?: boolean;
-  closedReason?: 'disabled' | 'not_started' | 'ended' | 'cycle_unavailable' | null;
+  closedReason?: 'disabled' | 'not_started' | 'ended' | 'cycle_unavailable' | 'capacity' | null;
   lastDateLabel?: string | null;
   message?: string;
+  maxOnlineApplications?: number | null;
+  applicationCount?: number;
+  seatsRemaining?: number | null;
   registrationOpensAt?: string | null;
   registrationClosesAt?: string | null;
   applicationDeadline?: string | null;
@@ -74,8 +77,11 @@ export type SchoolAdmissionWindow = {
   lastDateLabel: string | null;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
-  closedReason: 'disabled' | 'not_started' | 'ended' | 'cycle_unavailable' | null;
+  closedReason: 'disabled' | 'not_started' | 'ended' | 'cycle_unavailable' | 'capacity' | null;
   applicationDeadline?: string | null;
+  maxOnlineApplications?: number;
+  applicationCount?: number;
+  seatsRemaining?: number;
 };
 
 export type SchoolApplicantMe = {
@@ -140,6 +146,22 @@ export async function fetchSchoolPortalInfo(): Promise<SchoolPortalInfo> {
   return data;
 }
 
+export type SchoolPortalTraffic = {
+  totalVisitors: number;
+  liveOnline: number;
+};
+
+export async function heartbeatSchoolPortalTraffic(
+  sessionId: string,
+): Promise<SchoolPortalTraffic> {
+  const { data } = await publicClient.post<SchoolPortalTraffic>(
+    '/v1/school-admissions/portal/traffic/heartbeat',
+    { sessionId },
+    { headers: getLoginRequestHeaders() },
+  );
+  return data;
+}
+
 export async function requestSchoolEmailOtp(payload: { email: string; childFullName?: string }) {
   const { data } = await publicClient.post('/v1/school-admissions/portal/otp', payload, {
     headers: getLoginRequestHeaders(),
@@ -155,7 +177,7 @@ export async function registerSchoolApplicant(payload: {
   phone: string;
   acceptedPolicies: boolean;
   otp: string;
-  password?: string;
+  password: string;
 }) {
   const { data } = await publicClient.post('/v1/school-admissions/portal/register', payload, {
     headers: getLoginRequestHeaders(),
@@ -255,6 +277,13 @@ export async function resendSchoolApplicationPdfEmail(id: string) {
       : never;
     error?: string | null;
   };
+}
+
+export async function resetSchoolApplicantLoginPin(id: string) {
+  const { data } = await api.post(
+    `/v1/school-admissions/office/applications/${id}/reset-login-pin`,
+  );
+  return data as { applicationNumber: string; pin: string; message: string };
 }
 
 export async function uploadSchoolDocument(slotCode: string, file: File) {
@@ -473,6 +502,7 @@ export async function updateSchoolAdmissionWindow(payload: {
   newAdmissionsEnabled: boolean;
   registrationOpensAt?: string | null;
   registrationClosesAt?: string | null;
+  maxOnlineApplications: number;
 }) {
   const { data } = await api.patch(
     '/v1/school-admissions/office/settings/admission-window',

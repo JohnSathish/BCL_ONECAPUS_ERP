@@ -191,6 +191,17 @@ export function SchoolAdmissionOverviewDashboard() {
             href="/admin/school-admissions"
           />
           <SchoolErpKpiCard
+            label="Seats Remaining"
+            value={window?.seatsRemaining}
+            hint={
+              typeof window?.maxOnlineApplications === 'number'
+                ? `Limit ${window.maxOnlineApplications} · change in Admission Settings`
+                : 'Set the limit in Admission Settings'
+            }
+            tone="blue"
+            href="/admin/school-admissions/admission-settings"
+          />
+          <SchoolErpKpiCard
             label="In Progress"
             value={data?.draft}
             hint="Draft / incomplete"
