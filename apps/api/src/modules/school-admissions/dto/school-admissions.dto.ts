@@ -14,10 +14,11 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
 import {
   SCHOOL_LOGIN_PIN_MESSAGE,
   SCHOOL_LOGIN_PIN_PATTERN,
-} from './school-login-pin';
+} from '../school-login-pin';
 
 export class SchoolApplicantRegisterDto {
   @IsString()

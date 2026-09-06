@@ -21,20 +21,23 @@ export function isSchoolPortalSessionId(value: string | undefined): boolean {
   return Boolean(value && SESSION_ID_RE.test(value.trim()));
 }
 
+function firstHeaderValue(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === 'string' && item.trim());
+    return typeof first === 'string' ? first : undefined;
+  }
+  return typeof value === 'string' ? value : undefined;
+}
+
 export function schoolPortalClientIp(
-  headers: {
-    'x-forwarded-for'?: string | string[];
-    'x-real-ip'?: string | string[];
-  },
+  headers: Record<string, unknown>,
   fallbackIp?: string | null,
 ): string {
-  const forwarded = headers['x-forwarded-for'];
-  const firstForwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const firstForwarded = firstHeaderValue(headers['x-forwarded-for']);
   if (firstForwarded?.trim()) {
     return firstForwarded.split(',')[0]?.trim() || 'unknown';
   }
-  const real = headers['x-real-ip'];
-  const firstReal = Array.isArray(real) ? real[0] : real;
+  const firstReal = firstHeaderValue(headers['x-real-ip']);
   if (firstReal?.trim()) return firstReal.trim();
   return fallbackIp?.trim() || 'unknown';
 }

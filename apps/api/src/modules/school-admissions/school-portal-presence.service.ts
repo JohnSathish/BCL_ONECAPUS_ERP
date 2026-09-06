@@ -57,7 +57,10 @@ export class SchoolPortalPresenceService {
 
     const now = new Date();
     const salt = this.salt();
-    const ip = schoolPortalClientIp(req.headers, req.ip);
+    const ip = schoolPortalClientIp(
+      req.headers as Record<string, unknown>,
+      req.ip,
+    );
     const visitorKey = schoolPortalVisitorKey(salt, ip, ua);
     const sessionKey = schoolPortalSessionKey(salt, sessionId);
 
