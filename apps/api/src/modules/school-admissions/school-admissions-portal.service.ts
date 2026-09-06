@@ -188,7 +188,6 @@ export class SchoolAdmissionsPortalService {
       dateOfBirth: string;
       gender: string;
       acceptedPolicies?: boolean;
-      password: string;
       otp: string;
     },
   ) {
