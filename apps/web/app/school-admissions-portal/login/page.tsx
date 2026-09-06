@@ -69,8 +69,8 @@ export default function SchoolAdmissionsLoginPage() {
     setError(null);
     try {
       const session = await loginSchoolApplicant({
-        applicationNumber: values.applicationNumber,
-        password: values.password,
+        applicationNumber: values.applicationNumber.trim(),
+        password: normalizeSchoolLoginPin(values.password),
         rememberMe: values.rememberMe,
       });
       sessionStorage.removeItem(CREDENTIALS_KEY);
@@ -147,12 +147,14 @@ export default function SchoolAdmissionsLoginPage() {
                 pattern="[0-9]*"
                 className="tps-public-input tps-pin-input h-12 px-10"
                 placeholder="••••••"
-                {...register('password')}
-                onChange={(event) =>
-                  setValue('password', normalizeSchoolLoginPin(event.target.value), {
-                    shouldValidate: true,
-                  })
-                }
+                {...register('password', {
+                  onChange: (event) => {
+                    setValue('password', normalizeSchoolLoginPin(event.target.value), {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    });
+                  },
+                })}
               />
               <button
                 type="button"

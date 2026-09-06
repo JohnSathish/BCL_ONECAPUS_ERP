@@ -16,3 +16,11 @@ export function normalizeSchoolLoginPin(value: string): string {
 export function generateSchoolLoginPin(): string {
   return String(randomInt(100000, 999999));
 }
+
+export function normalizeSchoolApplicationNumber(value: string): string {
+  return value
+    .trim()
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}

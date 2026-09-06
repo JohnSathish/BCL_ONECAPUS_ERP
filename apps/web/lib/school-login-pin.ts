@@ -9,3 +9,11 @@ export function isSchoolLoginPin(value: string | undefined): boolean {
 export function normalizeSchoolLoginPin(value: string): string {
   return value.replace(/\D/g, '').slice(0, SCHOOL_LOGIN_PIN_LENGTH);
 }
+
+export function normalizeSchoolApplicationNumber(value: string): string {
+  return value
+    .trim()
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}

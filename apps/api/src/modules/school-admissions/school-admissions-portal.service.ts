@@ -26,6 +26,8 @@ import { normalizeSchoolDocumentRequirements } from './school-document-requireme
 import {
   generateSchoolLoginPin,
   isSchoolLoginPin,
+  normalizeSchoolApplicationNumber,
+  normalizeSchoolLoginPin,
   SCHOOL_LOGIN_PIN_MESSAGE,
 } from './school-login-pin';
 import { SchoolAdmissionsMailService } from './school-admissions-mail.service';
@@ -252,6 +254,7 @@ export class SchoolAdmissionsPortalService {
       portal.cycle.id,
     );
     const plainPassword = generateSchoolLoginPin();
+    const passwordHash = await bcrypt.hash(plainPassword, 12);
 
     const { user } = await this.provisioning.ensureUserWithRoles(
       tenantId,
@@ -259,6 +262,7 @@ export class SchoolAdmissionsPortalService {
       ['applicant'],
       {
         password: plainPassword,
+        passwordHash,
         username: applicationNumber,
         displayName: childFullName,
         phone,
@@ -266,6 +270,18 @@ export class SchoolAdmissionsPortalService {
         userTypeForUsername: 'APPLICANT',
       },
     );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        mustResetPassword: false,
+        isActive: true,
+        accountStatus: 'active',
+        deletedAt: null,
+        username: applicationNumber,
+      },
+    });
 
     const application = await this.prisma.admissionApplication.create({
       data: {
@@ -305,7 +321,6 @@ export class SchoolAdmissionsPortalService {
     );
 
     await this.clearOtp(this.otpKey(tenantId, email));
-    // Always email/show the same plaintext that was hashed — never a divergent value.
     const passwordToSend = plainPassword;
     const schoolName =
       portal.branding?.displayName ?? 'Tura Public School, Tura';
@@ -318,27 +333,18 @@ export class SchoolAdmissionsPortalService {
       loginUrl: this.loginUrl(),
     });
 
-    // Never return the plaintext password when it was emailed successfully.
-    // Only surface it if the credentials email failed so the parent can still log in.
     return {
       applicationNumber,
       username: applicationNumber,
       email,
-      ...(credentialsEmail.ok
-        ? {}
-        : {
-            password: passwordToSend,
-            generatedPassword: passwordToSend,
-            credentialsEmailError:
-              credentialsEmail.error ||
-              'Login details email could not be delivered. Save this password now.',
-          }),
+      password: passwordToSend,
+      generatedPassword: passwordToSend,
       applicationId: application.id,
       ageWarning: undefined,
       emailSent: credentialsEmail.ok,
       message: credentialsEmail.ok
         ? 'Registration successful. Login details have been sent to your email.'
-        : 'Registration successful, but the login email could not be sent. Use the password shown below.',
+        : 'Registration successful, but the login email could not be sent. Use the PIN shown below.',
     };
   }
 
@@ -485,9 +491,12 @@ export class SchoolAdmissionsPortalService {
     meta?: { userAgent?: string; ipAddress?: string },
     rememberMe?: boolean,
   ) {
-    const identifier = applicationNumber.trim();
-    const plainPassword = password.trim();
-    const isEmail = identifier.includes('@');
+    const identifierRaw = String(applicationNumber ?? '').trim();
+    const pin = normalizeSchoolLoginPin(String(password ?? ''));
+    const isEmail = identifierRaw.includes('@');
+    const identifier = isEmail
+      ? identifierRaw.toLowerCase()
+      : normalizeSchoolApplicationNumber(identifierRaw);
 
     const application = await this.prisma.admissionApplication.findFirst({
       where: {
@@ -496,23 +505,37 @@ export class SchoolAdmissionsPortalService {
         applicantUserId: { not: null },
         ...(isEmail
           ? { email: { equals: identifier, mode: 'insensitive' } }
-          : { applicationNumber: identifier.toUpperCase() }),
+          : {
+              OR: [
+                {
+                  applicationNumber: {
+                    equals: identifier,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  applicantUser: {
+                    username: { equals: identifier, mode: 'insensitive' },
+                  },
+                },
+              ],
+            }),
       },
       include: { applicantUser: true, cycle: true },
     });
 
-    if (!application?.applicantUser) {
+    if (!application?.applicantUser?.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    if (!isSchoolCycleSettings(application.cycle?.settings)) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    if (!application.applicantUser.isActive) {
+    if (
+      !application.applicantUser.isActive ||
+      application.applicantUser.deletedAt
+    ) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(
-      plainPassword,
+      pin,
       application.applicantUser.passwordHash,
     );
     if (!valid) throw new UnauthorizedException('Invalid credentials');
