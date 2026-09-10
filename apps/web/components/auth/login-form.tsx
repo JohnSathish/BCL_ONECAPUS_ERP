@@ -18,6 +18,7 @@ import { useAuthStore } from '@/store/auth-store';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
 import { LoginDynamicFavicon } from '@/components/branding/login-dynamic-favicon';
 import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
+import { getSecondarySisLoginHeroFallback, SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
 import { LoginAuthCard } from './login-auth-card';
 import { LoginAuthPanel } from './login-auth-panel';
 import { LoginHeroPanel } from './login-hero-panel';
@@ -36,6 +37,8 @@ type LoginFormProps = {
    * such as pay / library where the full ERP splash looks wrong.
    */
   compact?: boolean;
+  /** From the request Host header (SSR). Never read `window` during render. */
+  schoolSis?: boolean;
 };
 
 function resolveSafeNextPath(raw: string | null | undefined): string | undefined {
@@ -52,6 +55,7 @@ export function LoginForm({
   postLoginPath,
   hardRedirect = false,
   compact = false,
+  schoolSis = false,
 }: LoginFormProps) {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
@@ -59,7 +63,9 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [context, setContext] = useState<LoginContext | null>(null);
+  const [context, setContext] = useState<LoginContext | null>(() =>
+    schoolSis ? getSecondarySisLoginHeroFallback() : null,
+  );
   const [contextError, setContextError] = useState<string | null>(null);
   const [contextLoading, setContextLoading] = useState(true);
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
@@ -143,7 +149,7 @@ export function LoginForm({
         }
       } catch (error) {
         if (!cancelled) {
-          setContext(null);
+          setContext(schoolSis ? getSecondarySisLoginHeroFallback() : null);
           setContextError(
             apiErrorMessage(
               error,
@@ -291,10 +297,17 @@ export function LoginForm({
     [setValue],
   );
 
+  const sisHost = schoolSis || context?.schoolProduct === 'SECONDARY_SIS';
+  const schoolLogin = context?.institutionType === 'SCHOOL' || sisHost;
+  const sisContext =
+    sisHost && context?.schoolProduct !== 'SECONDARY_SIS'
+      ? getSecondarySisLoginHeroFallback()
+      : context;
+
   const authCard = (
     <LoginAuthCard
-      context={context}
-      contextLoading={contextLoading}
+      context={sisContext}
+      contextLoading={contextLoading && !sisHost}
       contextError={contextError}
       waitingForApi={apiWaiting}
       challenge={challenge}
@@ -311,13 +324,18 @@ export function LoginForm({
       passwordValue={passwordValue}
       challengeAnswer={challengeAnswer}
       onFillDemoCredentials={fillDemoCredentials}
+      schoolPortal={schoolLogin}
     />
   );
-
-  const schoolLogin = context?.institutionType === 'SCHOOL';
   const favicon = (
     <LoginDynamicFavicon
-      faviconUrl={schoolLogin ? SCHOOL_PORTAL_LOGO_SRC : context?.institution.faviconUrl}
+      faviconUrl={
+        context?.schoolProduct === 'SECONDARY_SIS' || sisHost
+          ? sisContext?.institution.faviconUrl || SCHOOL_SIS_LOGO_SRC
+          : schoolLogin && context?.schoolProduct !== 'SECONDARY_SIS'
+            ? SCHOOL_PORTAL_LOGO_SRC
+            : context?.institution.faviconUrl
+      }
       forceProductBrand={!schoolLogin}
     />
   );
@@ -331,20 +349,31 @@ export function LoginForm({
     );
   }
 
+  const heroContext = sisContext;
+
   return (
     <>
       {favicon}
       <LoginPageShell
         hero={
           <div className="relative flex h-full min-h-0 flex-col lg:min-h-screen">
-            <LoginHeroPanel compact context={context} contextLoading={contextLoading} />
-            <LoginHeroPanel context={context} contextLoading={contextLoading} />
+            <LoginHeroPanel
+              compact
+              schoolSis={sisHost || context?.schoolProduct === 'SECONDARY_SIS'}
+              context={heroContext}
+              contextLoading={contextLoading}
+            />
+            <LoginHeroPanel
+              schoolSis={sisHost || context?.schoolProduct === 'SECONDARY_SIS'}
+              context={heroContext}
+              contextLoading={contextLoading}
+            />
           </div>
         }
         auth={
           <LoginAuthPanel
-            theme={context?.theme}
-            loginBackgroundStyle={context?.loginBackgroundStyle}
+            theme={sisContext?.theme}
+            loginBackgroundStyle={sisContext?.loginBackgroundStyle}
           >
             {authCard}
           </LoginAuthPanel>

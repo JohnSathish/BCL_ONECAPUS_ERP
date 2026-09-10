@@ -1,0 +1,19 @@
+---
+description: Keep St. Luke's school SIS isolated from college FYUP and TPS KG admissions
+alwaysApply: true
+---
+
+# St. Luke's school SIS ≠ college ERP ≠ TPS KG admissions
+
+St. Luke's Secondary School (`st-lukes-tura`) is a **separate school ERP product** in this monorepo. Do **not** treat it as college FYUP or as Tura Public School KG admissions.
+
+When the task is St. Luke's / secondary school SIS:
+
+- **Do not edit** college FYUP admissions, students, examinations, NEP/semester flows, college nav, college SMTP, or college website CMS unless the user explicitly asks for a college change.
+- **Do not edit** TPS KG admissions (`school-admissions-*`, `/school-admissions-portal`, `tura-public-school`) unless the user explicitly asks for a TPS change.
+- Implement St. Luke's work in the school SIS pack: `apps/api/src/modules/school-sis/`, `apps/api/src/modules/school-web/`, `apps/web/app/admin/school-sis/`, `apps/web/components/school-sis/`, `apps/web/lib/school-sis/`, `apps/web/services/school-sis.ts`, `prisma/seeds/seed-st-lukes-tura.ts`, `prisma/seeds/seed-st-lukes-website.ts`. Public site (later) is `apps/school-web`, not `apps/college-web` or `academic.website_*`.
+- Shared school ERP shell may be **read**. Only add a `schoolProduct === 'SECONDARY_SIS'` branch; keep TPS (`KG_ADMISSIONS` default) unchanged.
+- Hosts: `erp.stlukestura.in` / `sls.localhost`. Do **not** register `admission.stlukestura.in` (that prefix is the TPS KG portal). Apex `stlukestura.in` stays the public website.
+- School SIS tables live in Postgres schema `school` and must not reference college `Student` / semester tables.
+
+If a request could be done by copying college FYUP or TPS KG admissions, **do not**. Extend the school SIS pack instead.

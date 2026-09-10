@@ -472,3 +472,492 @@
     background: rgba(15, 36, 28, 0.45);
   }
 }
+
+/* St. Luke's Secondary SIS — light ERP chrome (does not affect TPS KG). */
+.school-erp-shell.is-sls {
+  --school-erp-primary: #1a365d;
+  --school-erp-primary-deep: #12263f;
+  --school-erp-primary-hover: #163056;
+  --school-erp-accent: #0ea5e9;
+  --school-erp-page: #f4f7fb;
+  --school-erp-card: #ffffff;
+  --school-erp-border: rgba(26, 54, 93, 0.1);
+  --school-erp-text: #0f172a;
+  --school-erp-muted: #64748b;
+  --school-erp-sidebar-width: 15.5rem;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar {
+  background: #fff;
+  color: #0f172a;
+  border-right: 1px solid #e8eef5;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-brand {
+  border-color: #e8eef5;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-group-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #94a3b8;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link {
+  color: #334155;
+  font-size: 0.8125rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.65rem;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link:hover {
+  background: #f1f7fc;
+  color: #1a365d;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link.is-active {
+  background: #e8f4fd;
+  color: #1a365d;
+  box-shadow: none;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link.is-active svg {
+  color: #0284c7;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link.is-disabled {
+  opacity: 0.85;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-child {
+  color: #64748b;
+  border-radius: 0.5rem;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-child:hover {
+  background: #f1f7fc;
+  color: #1a365d;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-child.is-active {
+  background: #e8f4fd;
+  color: #1a365d;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-nav::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.school-erp-shell.is-sls .school-erp-icon-btn:hover,
+.school-erp-shell.is-sls .school-erp-profile-btn:hover,
+.school-erp-shell.is-sls .school-erp-profile-btn.is-active {
+  background: #f1f7fc;
+}
+
+.school-erp-shell.is-sls .school-erp-logout-btn:hover {
+  background: #e8f4fd;
+  border-color: rgba(26, 54, 93, 0.2);
+}
+
+.school-erp-shell.is-sls .school-erp-topbar {
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-inner {
+  min-height: 4.15rem;
+  gap: 0.85rem 1.15rem;
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-brand {
+  display: flex;
+  width: auto;
+  max-width: min(22rem, 34vw);
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-crest {
+  height: 2.65rem;
+  width: 2.65rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.school-erp-topbar-school-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.school-erp-topbar-school-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.12rem;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.school-erp-topbar-motto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #94a3b8;
+}
+
+.school-erp-year-chip {
+  display: inline-flex;
+  height: 2.45rem;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 0.8rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0 0.7rem 0 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.school-erp-year-chip:hover,
+.school-erp-year-chip.is-active {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-search {
+  max-width: 40rem;
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-search-input {
+  height: 2.55rem;
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-search-input:hover,
+.school-erp-shell.is-sls .school-erp-topbar-search-input:focus {
+  background: #fff;
+  border-color: #7dd3fc;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+}
+
+.school-erp-shell.is-sls .school-erp-icon-btn {
+  height: 2.45rem;
+  width: 2.45rem;
+  border-radius: 0.8rem;
+  color: #334155;
+}
+
+.school-erp-shell.is-sls .school-erp-icon-btn:hover,
+.school-erp-shell.is-sls .school-erp-icon-btn.is-active {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.school-erp-shell.is-sls .school-erp-logout-btn {
+  border-color: #e2e8f0;
+  color: #1e293b;
+  border-radius: 0.8rem;
+}
+
+.school-erp-shell.is-sls .school-erp-profile-btn {
+  padding-right: 0.55rem;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-slot {
+  transition: width 0.2s ease, flex-basis 0.2s ease;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-slot.is-collapsed {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+}
+
+@media (max-width: 1023px) {
+  .school-erp-shell.is-sls .school-erp-topbar-brand {
+    max-width: min(16rem, 42vw);
+  }
+
+  .school-erp-shell.is-sls .school-erp-topbar-motto {
+    display: none;
+  }
+}
+
+.sls-profile-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid #e8eef5;
+  background: #fff;
+  padding: 1.35rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.sls-profile-name {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.sls-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .sls-kpi-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .sls-kpi-row {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+.sls-kpi-card {
+  border-radius: 1rem;
+  border: 1px solid #e8eef5;
+  background: #fff;
+  padding: 0.85rem 0.9rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.sls-kpi-card p.value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a365d;
+}
+
+.sls-kpi-card p.label {
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sls-kpi-card p.hint {
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.sls-kpi-card.is-soon p.value {
+  color: #cbd5e1;
+}
+
+.sls-id-card {
+  display: none;
+  width: 86mm;
+  margin: 1.5rem auto 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 2px solid #1a365d;
+  background: #fff;
+  padding: 1rem;
+}
+
+.sls-profile-card {
+  overflow: hidden;
+  border-radius: 1.1rem;
+  border: 1px solid #e8eef5;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.035);
+}
+
+.sls-staff-card {
+  overflow: hidden;
+  border-radius: 1.1rem;
+  border: 1px solid #e8eef5;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.035);
+}
+
+.sls-staff-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e8eef5;
+  background: #eef5fb;
+  padding: 0.7rem 1rem;
+}
+
+.sls-staff-card-head h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a365d;
+}
+
+.sls-profile-tabs {
+  display: flex;
+  gap: 0.15rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+  scrollbar-width: thin;
+}
+
+.sls-profile-tab {
+  flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.sls-profile-tab.is-active {
+  border-bottom-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.sls-more-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  color: #334155;
+}
+
+.sls-more-item:hover {
+  background: #f8fafc;
+}
+
+.sls-more-item-muted {
+  justify-content: space-between;
+  color: #94a3b8;
+  cursor: default;
+}
+
+.sls-contact-btn {
+  display: inline-flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #fff;
+  color: #2563eb;
+  box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+@media print {
+  .school-erp-topbar,
+  .school-erp-sidebar-slot,
+  .school-erp-page-footer,
+  .sls-profile-actions,
+  .sls-profile-tabs,
+  .sls-kpi-row,
+  .sls-profile-print-hide {
+    display: none !important;
+  }
+  .sls-profile-hero,
+  .sls-profile-card {
+    box-shadow: none;
+  }
+  body.is-printing-id .sls-student-profile > *:not(.sls-id-card) {
+    display: none !important;
+  }
+  body.is-printing-id .sls-id-card {
+    display: flex !important;
+    page-break-inside: avoid;
+  }
+}
+
+.sls-tt-table {
+  background: #fff;
+  border: 1px solid #dbeafe;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.sls-tt-axis,
+.sls-tt-day {
+  background: #1a365d;
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 10px 8px;
+  text-align: center;
+  width: 64px;
+}
+.sls-tt-head {
+  background: #f0f9ff;
+  border-left: 1px solid #e2e8f0;
+  min-width: 110px;
+  padding: 8px;
+  text-align: center;
+  color: #1e3a5f;
+}
+.sls-tt-head.is-break {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.sls-tt-cell {
+  border: 1px solid #e2e8f0;
+  height: 88px;
+  max-width: 140px;
+  padding: 6px;
+  vertical-align: top;
+  cursor: pointer;
+  background: #fff;
+}
+.sls-tt-cell:hover {
+  background: #f8fafc;
+}
+.sls-tt-break {
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+@media print {
+  .sls-tt-print-header {
+    display: block !important;
+    margin-bottom: 12px;
+  }
+  .sls-tt-cell {
+    height: auto;
+  }
+}

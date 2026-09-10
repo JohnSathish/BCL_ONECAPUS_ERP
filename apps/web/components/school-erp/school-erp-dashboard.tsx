@@ -14,6 +14,8 @@ import {
   isSchoolErpMultiModuleDashboard,
 } from '@/lib/school-erp/modules';
 import { SchoolAdmissionOverviewDashboard } from './modules/admission-overview-dashboard';
+import { SchoolSisDashboard } from '@/components/school-sis/school-sis-dashboard';
+import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
 
 /**
  * School ERP home dashboard composer.
@@ -24,6 +26,14 @@ import { SchoolAdmissionOverviewDashboard } from './modules/admission-overview-d
  */
 export function SchoolErpDashboard() {
   const user = useAuthStore((s) => s.session?.user);
+  if (
+    isSecondarySchoolSisSession({
+      tenantSlug: user?.tenantSlug,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+    })
+  ) {
+    return <SchoolSisDashboard />;
+  }
   const welcomeName = user?.displayName?.trim() || user?.email?.split('@')[0] || 'Admin';
   const multiModule = isSchoolErpMultiModuleDashboard();
   const widgets = getActiveDashboardWidgetIds();

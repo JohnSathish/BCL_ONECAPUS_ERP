@@ -34,6 +34,7 @@ type Props = {
   passwordValue: string;
   challengeAnswer: string;
   onFillDemoCredentials?: (email: string, password: string) => void;
+  schoolPortal?: boolean;
 };
 
 const SECURITY_LINES = [
@@ -72,8 +73,10 @@ export function LoginAuthCard({
   passwordValue,
   challengeAnswer,
   onFillDemoCredentials,
+  schoolPortal: schoolPortalProp,
 }: Props) {
   const animate = useLoginHeroMotion();
+  const schoolPortal = schoolPortalProp ?? context?.institutionType === 'SCHOOL';
   const showSignInIntro = Boolean(context) && !contextLoading;
   const themeStyle = context?.theme
     ? ({
@@ -87,7 +90,7 @@ export function LoginAuthCard({
 
   return (
     <motion.article
-      className="login-glass-card login-institution-themed login-auth-card-shell flex w-full min-h-0 max-h-[min(calc(100dvh-4rem),880px)] min-w-0 max-w-[440px] flex-col overflow-hidden rounded-2xl"
+      className="login-glass-card login-institution-themed login-auth-card-shell flex w-full min-h-0 min-w-0 max-w-[440px] flex-col overflow-visible rounded-2xl max-lg:max-h-none lg:max-h-[min(calc(100dvh-4rem),880px)] lg:overflow-hidden"
       style={themeStyle}
       initial={animate ? { opacity: 0, y: 18, scale: 0.98 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -111,18 +114,20 @@ export function LoginAuthCard({
             Sign in to your portal
           </p>
           <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-            Students: use your college roll number. Staff: use your work email.
+            {schoolPortal
+              ? 'Use your school office email to open the School ERP.'
+              : 'Students: use your college roll number. Staff: use your work email.'}
           </p>
         </motion.div>
       ) : null}
 
-      <div className="login-auth-card-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+      <div className="login-auth-card-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-visible max-lg:overflow-y-visible lg:overflow-y-auto overscroll-contain">
         <div className="space-y-3 px-5 py-4 sm:px-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
             <motion.div className="space-y-3" {...fadeUp(0.22, animate)}>
               <LoginField
                 id="identifier"
-                label="College roll number or email"
+                label={schoolPortal ? 'Email' : 'College roll number or email'}
                 icon={UserRound}
                 type="text"
                 autoComplete="username"
@@ -193,11 +198,11 @@ export function LoginAuthCard({
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="login-cta group relative flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-sm font-semibold text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="login-cta group relative flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-sm font-semibold text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-100"
               >
                 <span className="login-cta-gradient absolute inset-0" />
                 <span className="login-cta-shine absolute inset-0" />
-                <span className="relative flex items-center gap-2">
+                <span className="relative z-10 flex items-center gap-2 mix-blend-normal">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

@@ -3,10 +3,12 @@
 import {
   Activity,
   Bell,
+  CalendarDays,
   ChevronDown,
   KeyRound,
   LogOut,
   Mail,
+  Maximize2,
   Menu,
   Search,
   Settings,
@@ -14,11 +16,16 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { logoutClientSide } from '@/lib/auth/client-logout';
 import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
+import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useBranding } from '@/hooks/use-branding';
+import { isSecondarySchoolSisSession, SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
 import { SCHOOL_ERP_SESSION_LABEL } from '@/lib/school-erp/nav';
 import { changePassword } from '@/services/student-portal';
+import { fetchSchoolSisMasters } from '@/services/school-sis';
 import { useAuthStore } from '@/store/auth-store';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -62,7 +69,7 @@ const MESSAGE_PREVIEW = [
   },
 ];
 
-type PanelId = 'notifications' | 'messages' | 'profile' | 'mobileSearch' | null;
+type PanelId = 'notifications' | 'messages' | 'profile' | 'mobileSearch' | 'year' | null;
 
 export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
   const router = useRouter();
@@ -77,10 +84,54 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordBusy, setPasswordBusy] = useState(false);
   const user = useAuthStore((s) => s.session?.user);
-  const display = user?.displayName?.trim() || user?.email?.split('@')[0] || 'TPS Admin';
+  const { branding, displayName: brandName, productTagline } = useBranding();
+  const authEnabled = useAuthQueryEnabled();
+  const sis = isSecondarySchoolSisSession({
+    tenantSlug: user?.tenantSlug,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+    extras: branding?.portalExtras,
+  });
+  const masters = useQuery({
+    queryKey: ['school-sis', 'masters', 'topbar'],
+    queryFn: fetchSchoolSisMasters,
+    enabled: authEnabled && sis,
+    staleTime: 60_000,
+  });
+  const display = user?.displayName?.trim() || user?.email?.split('@')[0] || 'Admin';
+  const schoolTitle =
+    branding?.displayName ||
+    brandName ||
+    (sis ? "St. Luke's Secondary School, Tura" : 'Tura Public School, Tura');
+  const sisSchoolName =
+    schoolTitle.replace(/,\s*Tura.*$/i, '').trim() || "St. Luke's Secondary School";
+  const sisMotto = (productTagline || 'Knowledge · Service · Light')
+    .split(/[·•|]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(' | ');
+  const yearName = masters.data?.academicYear?.name;
+  const yearChipLabel = yearName
+    ? /^academic year/i.test(yearName)
+      ? yearName
+      : `Academic Year ${yearName}`
+    : 'Academic Year';
+  const logoSrc = branding?.logoUrl || (sis ? SCHOOL_SIS_LOGO_SRC : SCHOOL_PORTAL_LOGO_SRC);
+  const roleLine = (() => {
+    const roles = user?.roles ?? [];
+    if (roles.some((r) => /principal/i.test(r))) return 'Principal';
+    if (roles.some((r) => /admin/i.test(r))) return 'Administrator';
+    if (roles[0]) return roles[0].replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return 'Staff';
+  })();
 
-  const unreadNotifications = 5;
-  const unreadMessages = 2;
+  const unreadNotifications = sis ? 0 : 5;
+  const unreadMessages = sis ? 0 : 2;
+
+  const toggleFullscreen = () => {
+    if (typeof document === 'undefined') return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -111,7 +162,13 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
     const q = raw.trim();
     setOpenPanel(null);
     router.push(
-      q ? `/admin/school-admissions?search=${encodeURIComponent(q)}` : '/admin/school-admissions',
+      sis
+        ? q
+          ? `/admin/school-sis/students?q=${encodeURIComponent(q)}`
+          : '/admin/school-sis/students'
+        : q
+          ? `/admin/school-admissions?search=${encodeURIComponent(q)}`
+          : '/admin/school-admissions',
     );
   };
 
@@ -159,29 +216,39 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
           <div className="school-erp-topbar-left">
             <button
               type="button"
-              className="school-erp-icon-btn lg:hidden"
+              className={cn('school-erp-icon-btn', !sis && 'lg:hidden')}
               onClick={onMenu}
-              aria-label="Open navigation"
+              aria-label={sis ? 'Toggle navigation' : 'Open navigation'}
             >
               <Menu className="h-5 w-5" />
             </button>
 
             <div className="school-erp-topbar-brand">
               <img
-                src={SCHOOL_PORTAL_LOGO_SRC}
-                alt="Tura Public School"
-                width={40}
-                height={48}
-                className="h-10 w-auto shrink-0"
+                src={logoSrc}
+                alt={schoolTitle}
+                width={44}
+                height={44}
+                className={sis ? 'school-erp-topbar-crest' : 'h-10 w-auto shrink-0'}
               />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold leading-tight text-[var(--school-erp-primary)]">
-                  Tura Public School, Tura
-                </p>
-                <p className="mt-0.5 truncate text-[10px] leading-snug text-[var(--school-erp-muted)]">
-                  Discipline · Knowledge · Service · {SCHOOL_ERP_SESSION_LABEL}
-                </p>
-              </div>
+              {sis ? (
+                <div className="school-erp-topbar-brand-copy min-w-0">
+                  <p className="school-erp-topbar-school-name">{sisSchoolName}</p>
+                  <p className="school-erp-topbar-school-meta">
+                    <span className="shrink-0">Tura, Meghalaya</span>
+                    <span className="school-erp-topbar-motto">{sisMotto}</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold leading-tight text-[var(--school-erp-primary)]">
+                    {schoolTitle}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] leading-snug text-[var(--school-erp-muted)]">
+                    Discipline · Knowledge · Service · {SCHOOL_ERP_SESSION_LABEL}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -193,7 +260,11 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 ref={inputRef}
                 type="search"
                 className="school-erp-topbar-search-input"
-                placeholder="Search students, applications, staff…"
+                placeholder={
+                  sis
+                    ? 'Search students, staff, notices, events, applications...'
+                    : 'Search students, applications, staff…'
+                }
                 aria-label="Global search"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') runSearch((e.target as HTMLInputElement).value);
@@ -216,6 +287,64 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
               }}
             >
               <Search className="h-4 w-4" />
+            </button>
+
+            {sis ? (
+              <div className="relative hidden xl:block">
+                <button
+                  type="button"
+                  className={cn('school-erp-year-chip', openPanel === 'year' && 'is-active')}
+                  aria-label="Academic year"
+                  aria-expanded={openPanel === 'year'}
+                  onClick={() => toggle('year')}
+                >
+                  <CalendarDays className="h-4 w-4 text-sky-600" />
+                  <span>{yearChipLabel}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                </button>
+                {openPanel === 'year' ? (
+                  <div
+                    className="school-erp-topbar-panel school-erp-topbar-panel-narrow"
+                    role="dialog"
+                    aria-label="Academic year"
+                  >
+                    <div className="school-erp-topbar-panel-head">
+                      <p className="text-sm font-semibold text-[var(--school-erp-primary)]">
+                        Session
+                      </p>
+                    </div>
+                    <p className="px-3 py-3 text-sm font-medium text-slate-800">{yearChipLabel}</p>
+                    {(masters.data?.academicYears ?? []).length > 1 ? (
+                      <ul className="divide-y divide-slate-100 border-t">
+                        {(masters.data?.academicYears ?? []).map((year) => (
+                          <li key={year.id} className="px-3 py-2 text-sm text-slate-600">
+                            {year.name}
+                            {year.status === 'CURRENT' ? (
+                              <span className="ml-2 text-[10px] font-semibold uppercase text-sky-600">
+                                Current
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="border-t px-3 py-2 text-[11px] text-slate-400">
+                        Additional sessions will appear here when opened.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className="school-erp-icon-btn hidden sm:inline-flex"
+              aria-label="Fullscreen"
+              title="Fullscreen"
+              onClick={toggleFullscreen}
+            >
+              <Maximize2 className="h-4 w-4" />
             </button>
 
             <div className="relative">
@@ -243,15 +372,21 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                       {unreadNotifications} unread
                     </span>
                   </div>
-                  <ul className="divide-y divide-slate-100">
-                    {NOTIFICATION_PREVIEW.map((item) => (
-                      <li key={item.id} className="px-3 py-2.5 hover:bg-[#f7faf8]">
-                        <p className="text-sm font-medium text-slate-800">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-[var(--school-erp-muted)]">{item.body}</p>
-                        <p className="mt-1 text-[10px] text-slate-400">{item.time}</p>
-                      </li>
-                    ))}
-                  </ul>
+                  {sis ? (
+                    <p className="px-3 py-4 text-sm text-slate-500">No new notifications.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {NOTIFICATION_PREVIEW.map((item) => (
+                        <li key={item.id} className="px-3 py-2.5 hover:bg-[#f7faf8]">
+                          <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                          <p className="mt-0.5 text-xs text-[var(--school-erp-muted)]">
+                            {item.body}
+                          </p>
+                          <p className="mt-1 text-[10px] text-slate-400">{item.time}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <p className="border-t px-3 py-2 text-center text-[11px] text-[var(--school-erp-muted)]">
                     Full notifications centre — Coming Soon
                   </p>
@@ -284,15 +419,21 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                       {unreadMessages} unread
                     </span>
                   </div>
-                  <ul className="divide-y divide-slate-100">
-                    {MESSAGE_PREVIEW.map((item) => (
-                      <li key={item.id} className="px-3 py-2.5 hover:bg-[#f7faf8]">
-                        <p className="text-sm font-medium text-slate-800">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-[var(--school-erp-muted)]">{item.body}</p>
-                        <p className="mt-1 text-[10px] text-slate-400">{item.time}</p>
-                      </li>
-                    ))}
-                  </ul>
+                  {sis ? (
+                    <p className="px-3 py-4 text-sm text-slate-500">No messages yet.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {MESSAGE_PREVIEW.map((item) => (
+                        <li key={item.id} className="px-3 py-2.5 hover:bg-[#f7faf8]">
+                          <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                          <p className="mt-0.5 text-xs text-[var(--school-erp-muted)]">
+                            {item.body}
+                          </p>
+                          <p className="mt-1 text-[10px] text-slate-400">{item.time}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <p className="border-t px-3 py-2 text-center text-[11px] text-[var(--school-erp-muted)]">
                     Communications module — Coming Soon
                   </p>
@@ -310,14 +451,21 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 aria-expanded={openPanel === 'profile'}
                 onClick={() => toggle('profile')}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eaf5ee] text-[var(--school-erp-primary)]">
+                <span
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                    sis
+                      ? 'bg-[#2563eb] text-white'
+                      : 'bg-[#eaf5ee] text-[var(--school-erp-primary)]',
+                  )}
+                >
                   <UserRound className="h-4 w-4" />
                 </span>
                 <span className="hidden min-w-0 text-left md:block">
                   <span className="block max-w-[8.5rem] truncate text-xs font-semibold text-slate-800">
                     {display}
                   </span>
-                  <span className="block text-[10px] text-slate-500">Administrator</span>
+                  <span className="block text-[10px] text-slate-500">{roleLine}</span>
                 </span>
                 <ChevronDown className="hidden h-3.5 w-3.5 shrink-0 text-slate-400 md:block" />
               </button>
@@ -325,7 +473,7 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 <div className="school-erp-topbar-panel school-erp-topbar-panel-narrow" role="menu">
                   <div className="border-b px-3 py-2.5 md:hidden">
                     <p className="text-sm font-semibold text-slate-800">{display}</p>
-                    <p className="text-[11px] text-slate-500">Administrator</p>
+                    <p className="text-[11px] text-slate-500">{roleLine}</p>
                   </div>
                   <button type="button" className="school-erp-menu-item" role="menuitem" disabled>
                     <UserRound className="h-4 w-4" />
@@ -383,7 +531,11 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 ref={mobileInputRef}
                 type="search"
                 className="school-erp-topbar-search-input pl-9"
-                placeholder="Search applications…"
+                placeholder={
+                  sis
+                    ? 'Search students, staff, notices, events, applications...'
+                    : 'Search applications…'
+                }
                 aria-label="Mobile search"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') runSearch((e.target as HTMLInputElement).value);

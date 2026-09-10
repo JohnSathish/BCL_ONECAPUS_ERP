@@ -10,7 +10,7 @@ const API_ORIGIN =
  * Nest (`api:dev`) often finishes TypeScript compile after Next is already serving.
  * Retry connection refused / fetch failures long enough to cover a cold watch boot.
  */
-const PROXY_STARTUP_MAX_ATTEMPTS = 40;
+const PROXY_STARTUP_MAX_ATTEMPTS = 6;
 const PROXY_STARTUP_INITIAL_DELAY_MS = 500;
 const PROXY_STARTUP_MAX_DELAY_MS = 3_000;
 

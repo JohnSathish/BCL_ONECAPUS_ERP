@@ -54,6 +54,14 @@ export function resolveUploadAssetUrl(path?: string | null): string | undefined 
   if (!uploads) {
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     const normalized = path.startsWith('/') ? path : `/${path}`;
+    // App-public files must stay relative so SSR and the client hydrate the same `src`.
+    if (
+      normalized.startsWith('/school-sis/') ||
+      normalized.startsWith('/school-admissions/') ||
+      normalized.startsWith('/branding/')
+    ) {
+      return normalized;
+    }
     const origin = displayUploadOrigin();
     return origin ? `${origin}${normalized}` : normalized;
   }

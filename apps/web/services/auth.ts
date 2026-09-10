@@ -18,7 +18,9 @@ export async function fetchLoginChallenge(
   options?: ApiStartupRetryOptions,
 ): Promise<LoginChallenge> {
   return withApiStartupRetry(async () => {
-    const { data } = await publicClient.get<LoginChallenge>(`/v1/auth/challenge`);
+    const { data } = await publicClient.get<LoginChallenge>(`/v1/auth/challenge`, {
+      headers: getLoginRequestHeaders(),
+    });
     return data;
   }, options);
 }

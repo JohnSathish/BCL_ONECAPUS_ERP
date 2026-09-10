@@ -43,6 +43,7 @@ export function SidebarInstitutionCard({
     ? resolveSchoolAwareLogoUrl({
         logoUrl: branding?.logoUrl,
         institutionType: branding?.portalExtras?.institutionType,
+        schoolProduct: branding?.portalExtras?.schoolProduct,
       })
     : undefined;
   const name = active

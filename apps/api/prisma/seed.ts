@@ -22,6 +22,7 @@ import { seedDbcCommittees } from './seeds/seed-dbc-committees';
 import { seedNaacIqac } from './seeds/seed-naac-iqac';
 import { seedWebsiteCms } from './seeds/website.seed';
 import { seedTuraPublicSchool } from './seeds/seed-tura-public-school';
+import { seedStLukesSecondarySchool } from './seeds/seed-st-lukes-tura';
 import { SEED_PERMISSIONS as PERMISSIONS } from './seed-permissions';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
 
@@ -3507,6 +3508,13 @@ async function main() {
     'Tura Public School seeded:',
     tps.adminEmail,
     '/ Admin@123 — http://admission.tps.localhost:3000',
+  );
+
+  const sls = await seedStLukesSecondarySchool(prisma, passwordHash);
+  console.log(
+    "St. Luke's Secondary School seeded:",
+    sls.adminEmail,
+    '/ Admin@123 — http://sls.localhost:3000/login',
   );
 
   console.log(

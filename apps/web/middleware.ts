@@ -6,6 +6,7 @@ import {
   isSchoolAdmissionsLoginPath,
   isSchoolAdmissionsPublicPath,
 } from '@/lib/school-admissions-portal-routes';
+import { isSchoolWebPublicHost } from '@/lib/school-web/hosts';
 import { isProductionCollegeHost } from '@/lib/demo-login';
 import { extractJournalSlugFromHost, isJournalHost } from '@/lib/journals-host';
 
@@ -408,8 +409,66 @@ function handleSubdomainRewrite(
   return NextResponse.rewrite(url);
 }
 
+function handleSchoolWebHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/uploads') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/school-sis') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+  const aliases: Record<string, string> = {
+    '/about/history': '/history',
+    '/about/vision-mission': '/vision-mission',
+    '/about/principal': '/principal',
+    '/about/faculty': '/faculty',
+    '/admissions/fees': '/fees',
+    '/admissions/process': '/admissions',
+    '/admissions/requirements': '/admissions',
+    '/academics/classes': '/academics',
+    '/academics/subjects': '/curriculum',
+    '/academics/examinations': '/examinations',
+    '/faculty/principal': '/principal',
+    '/contact/location': '/contact',
+    '/activities': '/student-life',
+  };
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    const next = request.nextUrl.clone();
+    next.pathname = pathname.replace(/\/+$/, '') || '/';
+    return NextResponse.redirect(next, 308);
+  }
+  if (aliases[pathname]) {
+    const next = request.nextUrl.clone();
+    next.pathname = aliases[pathname]!;
+    return NextResponse.redirect(next, 308);
+  }
+  if (pathname === '/school-site' || pathname.startsWith('/school-site/')) {
+    const next = request.nextUrl.clone();
+    next.pathname =
+      pathname === '/school-site' || pathname === '/school-site/'
+        ? '/'
+        : pathname.slice('/school-site'.length);
+    return NextResponse.redirect(next, 308);
+  }
+  if (pathname.startsWith('/admin') || pathname.startsWith('/login')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
+  const url = request.nextUrl.clone();
+  url.pathname = pathname === '/' ? '/school-site' : `/school-site${pathname}`;
+  return NextResponse.rewrite(url);
+}
+
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
+
+  if (isSchoolWebPublicHost(host)) {
+    return handleSchoolWebHost(request);
+  }
 
   if (isSchoolAdmissionHost(host)) {
     return handleSchoolAdmissionHost(request);

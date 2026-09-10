@@ -42,6 +42,7 @@ export type LoginContextDto = {
     allowRfidLogin: boolean;
   };
   institutionType?: 'COLLEGE' | 'SCHOOL';
+  schoolProduct?: 'KG_ADMISSIONS' | 'SECONDARY_SIS';
 };
 
 @Injectable()
@@ -167,12 +168,20 @@ export class TenantResolutionService {
     const extras =
       branding?.portalExtrasJson &&
       typeof branding.portalExtrasJson === 'object'
-        ? (branding.portalExtrasJson as { institutionType?: unknown })
+        ? (branding.portalExtrasJson as {
+            institutionType?: unknown;
+            schoolProduct?: unknown;
+          })
         : undefined;
     const institutionType =
       extras?.institutionType === 'SCHOOL' ||
       extras?.institutionType === 'COLLEGE'
         ? extras.institutionType
+        : undefined;
+    const schoolProduct =
+      extras?.schoolProduct === 'SECONDARY_SIS' ||
+      extras?.schoolProduct === 'KG_ADMISSIONS'
+        ? extras.schoolProduct
         : undefined;
 
     return {
@@ -207,6 +216,7 @@ export class TenantResolutionService {
         allowRfidLogin: security?.allowRfidLogin ?? false,
       },
       institutionType,
+      schoolProduct,
     };
   }
 }

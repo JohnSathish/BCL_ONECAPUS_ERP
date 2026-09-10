@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "core", "academic", "finance", "compliance", "library", "naac", "access"]
+  schemas  = ["platform", "core", "academic", "finance", "compliance", "library", "naac", "access", "school"]
 }
 
 // --- platform ---
@@ -16566,6 +16566,1080 @@ model SchoolPortalVisitor {
   @@index([tenantId])
   @@map("school_portal_visitors")
   @@schema("platform")
+}
+
+/// Isolated secondary-school SIS (St. Luke’s and future school ERP tenants).
+/// No FKs into college FYUP Student / Semester tables.
+model SchoolAcademicYear {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  /// Calendar year used in admission numbers (e.g. 2026 for 2026-27).
+  code      String
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime  @map("end_date") @db.Date
+  status    String    @default("UPCOMING")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  sections          SchoolSection[]
+  enrollments       SchoolEnrollment[]
+  gradeSubjects     SchoolGradeSubject[]
+  classTeachers     SchoolClassTeacherAssignment[]
+  subjectTeachers   SchoolSubjectTeacherAssignment[]
+  sequences         SchoolIdSequence[]
+  admissionCycles   SchoolAdmissionCycle[]
+  timetableBells    SchoolTimetableBell[]
+  timetablePlans    SchoolTimetablePlan[]
+  feeStructures     SchoolFeeStructure[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@map("school_academic_years")
+  @@schema("school")
+}
+
+model SchoolIdSequence {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+  kind           String
+  lastValue      Int    @default(0) @map("last_value")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId, kind])
+  @@map("school_id_sequences")
+  @@schema("school")
+}
+
+model SchoolGrade {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  sections       SchoolSection[]
+  gradeSubjects  SchoolGradeSubject[]
+  feeStructures  SchoolFeeStructure[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("school_grades")
+  @@schema("school")
+}
+
+model SchoolSection {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  gradeId        String    @map("grade_id") @db.Uuid
+  name           String
+  capacity       Int?
+  roomLabel      String?   @map("room_label")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear       SchoolAcademicYear                @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grade              SchoolGrade                       @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  enrollments        SchoolEnrollment[]
+  classTeachers      SchoolClassTeacherAssignment[]
+  subjectTeachers    SchoolSubjectTeacherAssignment[]
+  timetableSlots     SchoolTimetableSlot[]
+
+  @@unique([tenantId, academicYearId, gradeId, name])
+  @@index([tenantId, academicYearId])
+  @@map("school_sections")
+  @@schema("school")
+}
+
+model SchoolSubject {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  gradeSubjects     SchoolGradeSubject[]
+  subjectTeachers   SchoolSubjectTeacherAssignment[]
+  timetableSlots    SchoolTimetableSlot[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("school_subjects")
+  @@schema("school")
+}
+
+model SchoolGradeSubject {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  gradeId        String   @map("grade_id") @db.Uuid
+  subjectId      String   @map("subject_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grade          SchoolGrade      @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject        SchoolSubject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId, gradeId, subjectId])
+  @@map("school_grade_subjects")
+  @@schema("school")
+}
+
+model SchoolStudent {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  admissionNumber  String    @map("admission_number")
+  fullName         String    @map("full_name")
+  gender           String?
+  dateOfBirth      DateTime? @map("date_of_birth") @db.Date
+  status           String    @default("ACTIVE")
+  phone            String?
+  email            String?
+  address          String?
+  bloodGroup       String?   @map("blood_group")
+  house            String?
+  nationality      String?
+  religion         String?
+  casteCategory    String?   @map("caste_category")
+  motherTongue     String?   @map("mother_tongue")
+  languagesKnown   Json      @default("[]") @map("languages_known")
+  aadhaarNumber    String?   @map("aadhaar_number")
+  photoUrl         String?   @map("photo_url")
+  currentAddress   Json      @default("{}") @map("current_address")
+  permanentAddress Json      @default("{}") @map("permanent_address")
+  usesTransport    Boolean   @default(false) @map("uses_transport")
+  transportJson    Json      @default("{}") @map("transport_json")
+  usesHostel       Boolean   @default(false) @map("uses_hostel")
+  hostelJson       Json      @default("{}") @map("hostel_json")
+  medicalHealth    String?   @map("medical_health")
+  allergies        Json      @default("[]")
+  medicalConditions String?  @map("medical_conditions") @db.Text
+  medications      String?   @db.Text
+  emergencyNotes   String?   @map("emergency_notes") @db.Text
+  bankName         String?   @map("bank_name")
+  bankBranch       String?   @map("bank_branch")
+  bankIfsc         String?   @map("bank_ifsc")
+  remarks          String?   @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  guardians        SchoolStudentGuardian[]
+  enrollments      SchoolEnrollment[]
+  documents        SchoolStudentDocument[]
+  previousSchools  SchoolStudentPreviousSchool[]
+  enrollmentEvents SchoolEnrollmentEvent[]
+  applications     SchoolApplication[]
+  personAccounts   SchoolPersonAccount[]
+  siblingLinks     SchoolStudentSibling[] @relation("StudentSiblings")
+  siblingOf        SchoolStudentSibling[] @relation("SiblingOf")
+  auditLogs        SchoolStudentAuditLog[]
+
+  @@unique([tenantId, admissionNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, fullName])
+  @@map("school_students")
+  @@schema("school")
+}
+
+model SchoolGuardian {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  fullName   String    @map("full_name")
+  relation   String
+  phone      String?
+  email      String?
+  occupation String?
+  photoUrl   String?   @map("photo_url")
+  address    Json      @default("{}")
+  isPrimary  Boolean   @default(true) @map("is_primary")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  students       SchoolStudentGuardian[]
+  personAccounts SchoolPersonAccount[]
+
+  @@index([tenantId])
+  @@map("school_guardians")
+  @@schema("school")
+}
+
+model SchoolStudentGuardian {
+  studentId    String @map("student_id") @db.Uuid
+  guardianId   String @map("guardian_id") @db.Uuid
+  relationship String @default("GUARDIAN")
+
+  student  SchoolStudent  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian SchoolGuardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, guardianId])
+  @@map("school_student_guardians")
+  @@schema("school")
+}
+
+model SchoolStudentSibling {
+  id               String @id @default(uuid()) @db.Uuid
+  tenantId         String @map("tenant_id") @db.Uuid
+  studentId        String @map("student_id") @db.Uuid
+  siblingStudentId String @map("sibling_student_id") @db.Uuid
+  relationship     String @default("SIBLING")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  student SchoolStudent @relation("StudentSiblings", fields: [studentId], references: [id], onDelete: Cascade)
+  sibling SchoolStudent @relation("SiblingOf", fields: [siblingStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, siblingStudentId])
+  @@index([tenantId, studentId])
+  @@map("school_student_siblings")
+  @@schema("school")
+}
+
+model SchoolStudentAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  action     String
+  entity     String
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  student SchoolStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, createdAt])
+  @@map("school_student_audit_logs")
+  @@schema("school")
+}
+
+model SchoolEnrollment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  rollNumber     String?   @map("roll_number")
+  admissionDate  DateTime? @map("admission_date") @db.Date
+  status         String    @default("ACTIVE")
+  source         String    @default("OFFICE")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  student      SchoolStudent       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear SchoolAcademicYear  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  section      SchoolSection       @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  events       SchoolEnrollmentEvent[]
+
+  @@unique([tenantId, studentId, academicYearId])
+  @@index([tenantId, academicYearId, sectionId])
+  @@map("school_enrollments")
+  @@schema("school")
+}
+
+model SchoolEnrollmentEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  enrollmentId   String?  @map("enrollment_id") @db.Uuid
+  type           String
+  fromSectionId  String?  @map("from_section_id") @db.Uuid
+  toSectionId    String?  @map("to_section_id") @db.Uuid
+  note           String?
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student    SchoolStudent     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrollment SchoolEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, studentId, createdAt])
+  @@map("school_enrollment_events")
+  @@schema("school")
+}
+
+model SchoolStudentPreviousSchool {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  schoolName     String    @map("school_name")
+  address        String?
+  lastClass      String?   @map("last_class")
+  board          String?
+  yearOfLeaving  String?   @map("year_of_leaving")
+  tcNumber       String?   @map("tc_number")
+  tcDate         DateTime? @map("tc_date") @db.Date
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  student SchoolStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@map("school_student_previous_schools")
+  @@schema("school")
+}
+
+model SchoolStudentDocument {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  studentId          String    @map("student_id") @db.Uuid
+  slot               String
+  fileName           String    @map("file_name")
+  storageKey         String?   @map("storage_key")
+  mimeType           String?   @map("mime_type")
+  uploadedById       String?   @map("uploaded_by_id") @db.Uuid
+  verificationStatus String    @default("PENDING") @map("verification_status")
+  verifiedById       String?   @map("verified_by_id") @db.Uuid
+  verifiedAt         DateTime? @map("verified_at")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  student SchoolStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@map("school_student_documents")
+  @@schema("school")
+}
+
+model SchoolAdmissionCycle {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  gradeId        String?   @map("grade_id") @db.Uuid
+  name           String
+  opensAt        DateTime  @map("opens_at")
+  closesAt       DateTime  @map("closes_at")
+  status         String    @default("OPEN")
+  seatCap        Int?      @map("seat_cap")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  applications SchoolApplication[]
+
+  @@index([tenantId, status])
+  @@map("school_admission_cycles")
+  @@schema("school")
+}
+
+model SchoolApplication {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  cycleId             String    @map("cycle_id") @db.Uuid
+  applicationNumber   String    @map("application_number")
+  status              String    @default("SUBMITTED")
+  fullName            String    @map("full_name")
+  gender              String?
+  dateOfBirth         DateTime? @map("date_of_birth") @db.Date
+  phone               String?
+  email               String?
+  address             String?
+  previousSchoolName  String?   @map("previous_school_name")
+  previousClass       String?   @map("previous_class")
+  guardianName        String    @map("guardian_name")
+  guardianRelation    String    @default("Parent") @map("guardian_relation")
+  guardianPhone       String?   @map("guardian_phone")
+  guardianEmail       String?   @map("guardian_email")
+  studentId           String?   @map("student_id") @db.Uuid
+  submittedAt         DateTime  @default(now()) @map("submitted_at")
+  convertedAt         DateTime? @map("converted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  cycle   SchoolAdmissionCycle @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  student SchoolStudent?       @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, applicationNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, cycleId])
+  @@map("school_applications")
+  @@schema("school")
+}
+
+model SchoolPersonAccount {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  personType String    @map("person_type")
+  studentId  String?   @map("student_id") @db.Uuid
+  guardianId String?   @map("guardian_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  student  SchoolStudent?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian SchoolGuardian? @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, personType])
+  @@index([tenantId, studentId])
+  @@index([tenantId, guardianId])
+  @@map("school_person_accounts")
+  @@schema("school")
+}
+
+model SchoolStaff {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  employeeCode   String    @map("employee_code")
+  fullName       String    @map("full_name")
+  staffType      String    @default("TEACHING") @map("staff_type")
+  designation    String?
+  department     String?
+  phone          String?
+  email          String?
+  joiningDate    DateTime? @map("joining_date") @db.Date
+  status         String    @default("ACTIVE")
+  photoUrl       String?   @map("photo_url")
+  gender         String?
+  bloodGroup     String?   @map("blood_group")
+  dateOfBirth    DateTime? @map("date_of_birth") @db.Date
+  fatherSpouseName String? @map("father_spouse_name")
+  academicQualification String? @map("academic_qualification")
+  professionalQualification String? @map("professional_qualification")
+  teachingExperience String? @map("teaching_experience")
+  classAssigned  String?   @map("class_assigned")
+  trainingStatus String?   @map("training_status")
+  address        String?
+  remarks        String?   @db.Text
+  extrasJson     Json      @default("{}") @map("extras_json")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  classTeacherAssignments   SchoolClassTeacherAssignment[]
+  subjectTeacherAssignments SchoolSubjectTeacherAssignment[]
+  timetableSlots            SchoolTimetableSlot[]
+  webProfiles               SchoolWebStaffProfile[]
+
+  @@unique([tenantId, employeeCode])
+  @@index([tenantId, staffType, status])
+  @@map("school_staff")
+  @@schema("school")
+}
+
+model SchoolClassTeacherAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  staffId        String    @map("staff_id") @db.Uuid
+  role           String    @default("PRIMARY")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  section      SchoolSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  staff        SchoolStaff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, sectionId, role])
+  @@index([tenantId, staffId])
+  @@map("school_class_teacher_assignments")
+  @@schema("school")
+}
+
+model SchoolSubjectTeacherAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  subjectId      String    @map("subject_id") @db.Uuid
+  staffId        String    @map("staff_id") @db.Uuid
+  periodsPerWeek Int       @default(0) @map("periods_per_week")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  section      SchoolSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      SchoolSubject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff        SchoolStaff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, sectionId, subjectId])
+  @@index([tenantId, staffId])
+  @@map("school_subject_teacher_assignments")
+  @@schema("school")
+}
+
+model SchoolRoom {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("school_rooms")
+  @@schema("school")
+}
+
+/// Bell schedule for a school year: teaching periods and recesses.
+model SchoolTimetableBell {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  kind           String
+  code           String
+  label          String
+  startTime      String    @map("start_time")
+  endTime        String    @map("end_time")
+  sortOrder      Int       @default(0) @map("sort_order")
+  periodNumber   Int?      @map("period_number")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  slots        SchoolTimetableSlot[]
+
+  @@unique([tenantId, academicYearId, code])
+  @@index([tenantId, academicYearId, sortOrder])
+  @@map("school_timetable_bells")
+  @@schema("school")
+}
+
+model SchoolTimetablePlan {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  name           String
+  status         String    @default("DRAFT")
+  daysJson       Json      @default("[1,2,3,4,5,6]") @map("days_json")
+  effectiveFrom  DateTime? @map("effective_from") @db.Date
+  effectiveUntil DateTime? @map("effective_until") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  slots        SchoolTimetableSlot[]
+
+  @@index([tenantId, academicYearId, status])
+  @@map("school_timetable_plans")
+  @@schema("school")
+}
+
+model SchoolTimetableSlot {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  planId    String    @map("plan_id") @db.Uuid
+  sectionId String    @map("section_id") @db.Uuid
+  bellId    String    @map("bell_id") @db.Uuid
+  dayOfWeek Int       @map("day_of_week")
+  subjectId String?   @map("subject_id") @db.Uuid
+  staffId   String?   @map("staff_id") @db.Uuid
+  roomLabel String?   @map("room_label")
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  plan    SchoolTimetablePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  section SchoolSection       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  bell    SchoolTimetableBell @relation(fields: [bellId], references: [id], onDelete: Restrict)
+  subject SchoolSubject?      @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  staff   SchoolStaff?        @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, sectionId, bellId, dayOfWeek])
+  @@index([tenantId, planId, staffId, dayOfWeek, bellId])
+  @@index([tenantId, planId, roomLabel, dayOfWeek, bellId])
+  @@map("school_timetable_slots")
+  @@schema("school")
+}
+
+/// Official school fee structure for a class in an academic year. Not college finance.FeeStructure.
+model SchoolFeeStructure {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  gradeId        String    @map("grade_id") @db.Uuid
+  code           String
+  name           String
+  status         String    @default("PUBLISHED")
+  sourceLabel    String?   @map("source_label")
+  notesJson      Json      @default("[]") @map("notes_json")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grade          SchoolGrade      @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+  lines          SchoolFeeLine[]
+  installments   SchoolFeeInstallment[]
+
+  @@unique([tenantId, academicYearId, gradeId, code])
+  @@index([tenantId, academicYearId, status])
+  @@map("school_fee_structures")
+  @@schema("school")
+}
+
+model SchoolFeeLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  structureId    String  @map("structure_id") @db.Uuid
+  kind           String
+  code           String
+  label          String
+  amount         Int?
+  unspecified    Boolean @default(false)
+  remarks        String?
+  sortOrder      Int     @default(0) @map("sort_order")
+
+  structure SchoolFeeStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([structureId, code])
+  @@index([structureId, sortOrder])
+  @@map("school_fee_lines")
+  @@schema("school")
+}
+
+model SchoolFeeInstallment {
+  id          String @id @default(uuid()) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  structureId String @map("structure_id") @db.Uuid
+  sequence    Int
+  label       String
+  amount      Int
+
+  structure SchoolFeeStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([structureId, sequence])
+  @@map("school_fee_installments")
+  @@schema("school")
+}
+
+/// Public website + office CMS for secondary SIS tenants (St. Luke's). Not college website_*.
+model SchoolWebSite {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @unique @map("tenant_id") @db.Uuid
+  displayName      String    @map("display_name")
+  shortName        String    @map("short_name")
+  motto            String
+  addressLine      String    @map("address_line")
+  city             String
+  district         String
+  state            String
+  pin              String
+  email            String?
+  phone            String?
+  primaryColor     String    @default("#1a365d") @map("primary_color")
+  accentColor      String    @default("#c5a572") @map("accent_color")
+  seoTitle         String?   @map("seo_title")
+  seoDescription   String?   @map("seo_description") @db.Text
+  applyCtaUrl      String?   @map("apply_cta_url")
+  studentPortalUrl String?   @map("student_portal_url")
+  extrasJson       Json      @default("{}") @map("extras_json")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("school_web_sites")
+  @@schema("school")
+}
+
+model SchoolWebMenu {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  location  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items SchoolWebMenuItem[]
+
+  @@unique([tenantId, location])
+  @@map("school_web_menus")
+  @@schema("school")
+}
+
+model SchoolWebMenuItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  menuId    String  @map("menu_id") @db.Uuid
+  parentId  String? @map("parent_id") @db.Uuid
+  label     String
+  href      String
+  sortOrder Int     @default(0) @map("sort_order")
+  visible   Boolean @default(true)
+
+  menu     SchoolWebMenu      @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parent   SchoolWebMenuItem? @relation("MenuItemChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children SchoolWebMenuItem[] @relation("MenuItemChildren")
+
+  @@index([menuId, sortOrder])
+  @@map("school_web_menu_items")
+  @@schema("school")
+}
+
+model SchoolWebPage {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  slug           String
+  title          String
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime? @map("scheduled_at")
+  publishedAt    DateTime? @map("published_at")
+  seoTitle       String?   @map("seo_title")
+  seoDescription String?   @map("seo_description") @db.Text
+  seoJson        Json      @default("{}") @map("seo_json")
+  blockDocument  Json      @default("{}") @map("block_document")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  revisions SchoolWebPageRevision[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("school_web_pages")
+  @@schema("school")
+}
+
+model SchoolWebPageRevision {
+  id         String   @id @default(uuid()) @db.Uuid
+  pageId     String   @map("page_id") @db.Uuid
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  snapshot   Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  page SchoolWebPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, createdAt])
+  @@map("school_web_page_revisions")
+  @@schema("school")
+}
+
+model SchoolWebHomepageSection {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  key       String
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, key])
+  @@index([tenantId, sortOrder])
+  @@map("school_web_homepage_sections")
+  @@schema("school")
+}
+
+model SchoolWebMediaFolder {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  parentId  String?   @map("parent_id") @db.Uuid
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  parent   SchoolWebMediaFolder?  @relation("MediaFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children SchoolWebMediaFolder[] @relation("MediaFolderTree")
+  assets   SchoolWebMediaAsset[]
+
+  @@index([tenantId, parentId])
+  @@map("school_web_media_folders")
+  @@schema("school")
+}
+
+model SchoolWebMediaAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  folderId   String?  @map("folder_id") @db.Uuid
+  fileName   String   @map("file_name")
+  storageKey String   @map("storage_key")
+  mimeType   String   @map("mime_type")
+  bytes      Int      @default(0)
+  alt        String?
+  variants   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  folder          SchoolWebMediaFolder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  noticePdfs      SchoolWebNotice[]
+  eventImages     SchoolWebEvent[]
+  galleryItems    SchoolWebGalleryItem[]
+  galleryCovers   SchoolWebGalleryAlbum[]
+  downloads       SchoolWebDownload[]
+  staffPhotos     SchoolWebStaffProfile[]
+
+  @@index([tenantId, createdAt])
+  @@map("school_web_media_assets")
+  @@schema("school")
+}
+
+model SchoolWebNotice {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  slug         String
+  title        String
+  category     String    @default("GENERAL")
+  body         String    @db.Text
+  featured     Boolean   @default(false)
+  status       String    @default("DRAFT")
+  publishedAt  DateTime? @map("published_at")
+  expiresAt    DateTime? @map("expires_at")
+  pdfAssetId   String?   @map("pdf_asset_id") @db.Uuid
+  seoJson      Json      @default("{}") @map("seo_json")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  pdfAsset SchoolWebMediaAsset? @relation(fields: [pdfAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, publishedAt])
+  @@map("school_web_notices")
+  @@schema("school")
+}
+
+model SchoolWebEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  slug         String
+  title        String
+  summary      String?   @db.Text
+  venue        String?
+  startsAt     DateTime  @map("starts_at")
+  endsAt       DateTime? @map("ends_at")
+  status       String    @default("DRAFT")
+  imageAssetId String?   @map("image_asset_id") @db.Uuid
+  seoJson      Json      @default("{}") @map("seo_json")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  image SchoolWebMediaAsset? @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, startsAt])
+  @@map("school_web_events")
+  @@schema("school")
+}
+
+model SchoolWebGalleryCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  slug      String
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  albums SchoolWebGalleryAlbum[]
+
+  @@unique([tenantId, slug])
+  @@map("school_web_gallery_categories")
+  @@schema("school")
+}
+
+model SchoolWebGalleryTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  slug      String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  albums SchoolWebGalleryAlbumTag[]
+
+  @@unique([tenantId, slug])
+  @@map("school_web_gallery_tags")
+  @@schema("school")
+}
+
+model SchoolWebGalleryAlbumTag {
+  albumId String @map("album_id") @db.Uuid
+  tagId   String @map("tag_id") @db.Uuid
+
+  album SchoolWebGalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  tag   SchoolWebGalleryTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, tagId])
+  @@map("school_web_gallery_album_tags")
+  @@schema("school")
+}
+
+model SchoolWebGalleryAlbum {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  slug          String
+  title         String
+  description   String?   @db.Text
+  categoryId    String?   @map("category_id") @db.Uuid
+  eventName     String?   @map("event_name")
+  eventDate     DateTime? @map("event_date")
+  location      String?
+  coverAssetId  String?   @map("cover_asset_id") @db.Uuid
+  status        String    @default("DRAFT")
+  visibility    String    @default("PUBLIC")
+  published     Boolean   @default(false)
+  publishedAt   DateTime? @map("published_at")
+  scheduledAt   DateTime? @map("scheduled_at")
+  allowDownload Boolean   @default(false) @map("allow_download")
+  seoJson       Json      @default("{}") @map("seo_json")
+  viewCount     Int       @default(0) @map("view_count")
+  academicYear  String?   @map("academic_year")
+  sortOrder     Int       @default(0) @map("sort_order")
+  createdById   String?   @map("created_by") @db.Uuid
+  updatedById   String?   @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  category   SchoolWebGalleryCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  coverAsset SchoolWebMediaAsset?      @relation(fields: [coverAssetId], references: [id], onDelete: SetNull)
+  items      SchoolWebGalleryItem[]
+  tags       SchoolWebGalleryAlbumTag[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, visibility])
+  @@index([tenantId, eventDate])
+  @@map("school_web_gallery_albums")
+  @@schema("school")
+}
+
+model SchoolWebGalleryItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  albumId      String   @map("album_id") @db.Uuid
+  assetId      String   @map("asset_id") @db.Uuid
+  title        String?
+  caption      String?
+  description  String?  @db.Text
+  altText      String?  @map("alt_text")
+  credit       String?
+  sortOrder    Int      @default(0) @map("sort_order")
+  uploadedById String?  @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  album SchoolWebGalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  asset SchoolWebMediaAsset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([albumId, sortOrder])
+  @@map("school_web_gallery_items")
+  @@schema("school")
+}
+
+model SchoolWebDownload {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  title         String
+  category      String    @default("GENERAL")
+  status        String    @default("DRAFT")
+  assetId       String?   @map("asset_id") @db.Uuid
+  publishedAt   DateTime? @map("published_at")
+  downloadCount Int       @default(0) @map("download_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  asset SchoolWebMediaAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@map("school_web_downloads")
+  @@schema("school")
+}
+
+model SchoolWebEnquiry {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  email     String?
+  phone     String?
+  subject   String?
+  message   String   @db.Text
+  status    String   @default("NEW")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, status, createdAt])
+  @@map("school_web_enquiries")
+  @@schema("school")
+}
+
+model SchoolWebStaffProfile {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  schoolStaffId String? @map("school_staff_id") @db.Uuid
+  fullName      String  @map("full_name")
+  designation   String?
+  bio           String? @db.Text
+  photoAssetId  String? @map("photo_asset_id") @db.Uuid
+  sortOrder     Int     @default(0) @map("sort_order")
+  published     Boolean @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  staff      SchoolStaff?         @relation(fields: [schoolStaffId], references: [id], onDelete: SetNull)
+  photoAsset SchoolWebMediaAsset? @relation(fields: [photoAssetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, published, sortOrder])
+  @@map("school_web_staff_profiles")
+  @@schema("school")
+}
+
+model SchoolWebAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  beforeJson  Json?    @map("before_json")
+  afterJson   Json?    @map("after_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_web_audit_logs")
+  @@schema("school")
+}
+
+/// One hashed browser visitor for the St. Luke's public website (online count + unique totals).
+model SchoolWebVisitorPresence {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  visitorHash String   @map("visitor_hash")
+  firstSeenAt DateTime @map("first_seen_at")
+  lastSeenAt  DateTime @map("last_seen_at")
+  lastPath    String?  @map("last_path")
+  visitCount  Int      @default(1) @map("visit_count")
+  pageViews   Int      @default(1) @map("page_views")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, visitorHash])
+  @@index([tenantId, lastSeenAt])
+  @@index([visitorHash])
+  @@map("school_web_visitor_presence")
+  @@schema("school")
+}
+
+model SchoolWebVisitorDaily {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  day            DateTime @db.Date
+  visits         Int      @default(0)
+  uniqueVisitors Int      @default(0) @map("unique_visitors")
+  pageViews      Int      @default(0) @map("page_views")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, day])
+  @@index([tenantId, day])
+  @@map("school_web_visitor_daily")
+  @@schema("school")
+}
+
+model SchoolWebVisitorPageStat {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  day       DateTime @db.Date
+  path      String
+  views     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, day, path])
+  @@index([tenantId, day])
+  @@map("school_web_visitor_page_stats")
+  @@schema("school")
 }
 
 /// Live tabs/sessions with a recent heartbeat on the school admission portal.

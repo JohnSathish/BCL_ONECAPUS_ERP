@@ -439,6 +439,18 @@ html.theme-glass-disabled .glass-panel {
   box-shadow: 0 4px 14px hsl(var(--primary) / 0.35);
 }
 
+.login-cta:disabled {
+  box-shadow: none;
+}
+
+.login-cta:disabled .login-cta-gradient {
+  background: #cbd5e1;
+}
+
+.login-cta:disabled .relative {
+  color: #0f172a;
+}
+
 .login-cta:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 8px 24px hsl(var(--primary) / 0.4);
@@ -1106,6 +1118,14 @@ html.theme-glass-disabled .glass-panel {
   background: transparent !important;
 }
 
+.login-hero-logo-mark--crest {
+  background: transparent;
+  border-radius: 9999px;
+  padding: 0.15rem;
+  border: 0;
+  box-shadow: none;
+}
+
 .login-stat-glass {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1208,6 +1228,11 @@ html.theme-glass-disabled .glass-panel {
     color-mix(in srgb, var(--login-institution-primary) 55%, var(--login-institution-accent)) 50%,
     var(--login-institution-accent) 100%
   );
+}
+
+.login-cta:disabled .login-cta-gradient,
+.login-institution-themed .login-cta:disabled .login-cta-gradient {
+  background: #cbd5e1;
 }
 
 .login-institution-themed .text-primary {

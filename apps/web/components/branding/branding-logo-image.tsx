@@ -31,7 +31,10 @@ export function BrandingLogoImage({
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const effectiveSrc = failedSrc === src && src !== DEFAULT_LOGIN_LOGO ? DEFAULT_LOGIN_LOGO : src;
   const shouldUnoptimize =
-    unoptimized ?? (effectiveSrc.startsWith('http') || effectiveSrc.startsWith('/uploads'));
+    unoptimized ??
+    (effectiveSrc.startsWith('http') ||
+      effectiveSrc.startsWith('/uploads') ||
+      effectiveSrc.startsWith('/school-sis/'));
   const shouldPriority = priority ?? effectiveSrc === DEFAULT_LOGIN_LOGO;
 
   return (

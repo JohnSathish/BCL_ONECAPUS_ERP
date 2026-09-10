@@ -34,7 +34,7 @@ export function LoginHumanVerification({
       </label>
       <div className="flex items-stretch gap-2">
         <div
-          className="login-verification-equation flex min-w-[7.5rem] items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/30 px-3 py-2.5 font-mono text-sm font-semibold text-foreground"
+          className="login-verification-equation flex min-w-[9.5rem] shrink-0 items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/30 px-3 py-2.5 font-mono text-sm font-semibold text-foreground"
           aria-hidden={!challenge}
         >
           <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />

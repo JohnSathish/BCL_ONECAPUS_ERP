@@ -24,6 +24,7 @@ export function LoginHeroInstitutionShowcase({ context, loading }: Props) {
       ? resolveSchoolAwareLogoUrl({
           logoUrl: institution.logoUrl,
           institutionType: 'SCHOOL',
+          schoolProduct: context.schoolProduct,
         })
       : resolveBrandingAssetUrl(institution.logoUrl);
   const location = [institution.campusName, institution.address].filter(Boolean).join(' · ');

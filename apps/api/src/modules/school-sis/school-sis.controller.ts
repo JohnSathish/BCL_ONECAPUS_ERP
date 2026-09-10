@@ -1,0 +1,591 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
+import {
+  CurrentUser,
+  type JwtUser,
+} from '../../common/decorators/current-user.decorator';
+import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import {
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  SCHOOL_SIS_PERMISSION_READ,
+} from './school-sis.constants';
+import {
+  AddPreviousSchoolDto,
+  AddStudentDocumentDto,
+  AssignClassTeacherDto,
+  AssignSubjectTeacherDto,
+  ConvertApplicationDto,
+  CreateAdmissionCycleDto,
+  CreateSchoolSectionDto,
+  CreateSchoolStaffDto,
+  CreateSchoolStudentDto,
+  EnrollStudentDto,
+  PatchApplicationStatusDto,
+  PromoteStudentDto,
+  SaveSchoolStaffDto,
+  SaveSchoolStudentMasterDto,
+  SaveSchoolTimetableBellsDto,
+  SaveSchoolTimetableSlotDto,
+  MoveSchoolTimetableSlotDto,
+  CopySchoolTimetableDto,
+  CreateSchoolRoomDto,
+} from './dto/school-sis.dto';
+import { SchoolSisAdmissionService } from './school-sis-admission.service';
+import { SchoolSisService } from './school-sis.service';
+import { SchoolSisStudentMasterService } from './school-sis-student-master.service';
+import { SchoolSisFeesService } from './school-sis-fees.service';
+import { SchoolSisTimetableService } from './school-sis-timetable.service';
+
+@ApiBearerAuth()
+@ApiTags('school-sis')
+@Controller({ path: 'school-sis', version: '1' })
+export class SchoolSisController {
+  constructor(
+    private readonly sis: SchoolSisService,
+    private readonly admission: SchoolSisAdmissionService,
+    private readonly master: SchoolSisStudentMasterService,
+    private readonly timetable: SchoolSisTimetableService,
+    private readonly fees: SchoolSisFeesService,
+  ) {}
+
+  private canManageMedical(user: JwtUser) {
+    return user.permissions?.includes(SCHOOL_SIS_PERMISSION_MANAGE) ?? false;
+  }
+
+  @Get('overview')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  overview(@CurrentUser() user: JwtUser) {
+    return this.sis.overview(user.tid);
+  }
+
+  @Get('masters')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  masters(@CurrentUser() user: JwtUser) {
+    return this.sis.listMasters(user.tid);
+  }
+
+  @Post('sections')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createSection(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateSchoolSectionDto,
+  ) {
+    return this.sis.createSection(user.tid, dto);
+  }
+
+  @Get('students')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  students(
+    @CurrentUser() user: JwtUser,
+    @Query('q') q?: string,
+    @Query('gradeId') gradeId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.sis.listStudents(user.tid, q, gradeId, sectionId, status);
+  }
+
+  @Post('students/master')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createMaster(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolStudentMasterDto,
+  ) {
+    return this.master.saveMaster(
+      user.tid,
+      user.sub,
+      dto,
+      undefined,
+      this.canManageMedical(user),
+    );
+  }
+
+  @Get('students/:id')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  student(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.master.getMaster(user.tid, id, this.canManageMedical(user));
+  }
+
+  @Post('students')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createStudent(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateSchoolStudentDto,
+  ) {
+    return this.sis.createStudent(user.tid, dto, user.sub);
+  }
+
+  @Patch('students/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  patchStudent(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolStudentMasterDto,
+  ) {
+    return this.master.saveMaster(
+      user.tid,
+      user.sub,
+      dto,
+      id,
+      this.canManageMedical(user),
+    );
+  }
+
+  @Post('students/:id/photo')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  uploadPhoto(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('kind') kind?: string,
+  ) {
+    const k = (kind ?? 'STUDENT').toUpperCase();
+    const allowed = ['STUDENT', 'FATHER', 'MOTHER', 'GUARDIAN'] as const;
+    if (!allowed.includes(k as (typeof allowed)[number])) {
+      return this.master.savePhoto(user.tid, id, user.sub, 'STUDENT', file);
+    }
+    return this.master.savePhoto(
+      user.tid,
+      id,
+      user.sub,
+      k as (typeof allowed)[number],
+      file,
+    );
+  }
+
+  @Delete('students/:id/photo')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  removePhoto(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.master.removePhoto(user.tid, id, user.sub, 'STUDENT');
+  }
+
+  @Post('students/:id/documents/upload')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  uploadDocument(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('slot') slot?: string,
+  ) {
+    return this.master.uploadDocument(
+      user.tid,
+      id,
+      user.sub,
+      slot || 'OTHER',
+      file,
+    );
+  }
+
+  @Get('students/:id/documents/:documentId/file')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  documentFile(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.master.streamDocument(user.tid, id, documentId);
+  }
+
+  @Delete('students/:id/documents/:documentId')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  deleteDocument(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.master.deleteDocument(user.tid, id, documentId, user.sub);
+  }
+
+  @Post('students/:id/previous-schools')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  previousSchool(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddPreviousSchoolDto,
+  ) {
+    return this.sis.addPreviousSchool(user.tid, id, dto);
+  }
+
+  @Post('students/:id/documents')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  document(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddStudentDocumentDto,
+  ) {
+    return this.sis.addDocument(user.tid, id, dto);
+  }
+
+  @Get('staff')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  staff(@CurrentUser() user: JwtUser) {
+    return this.sis.listStaff(user.tid);
+  }
+
+  @Post('staff')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createStaff(@CurrentUser() user: JwtUser, @Body() dto: CreateSchoolStaffDto) {
+    return this.sis.createStaff(user.tid, dto);
+  }
+
+  @Get('staff/:id')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  staffOne(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.sis.getStaff(user.tid, id);
+  }
+
+  @Patch('staff/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  patchStaff(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolStaffDto,
+  ) {
+    return this.sis.updateStaff(user.tid, id, dto);
+  }
+
+  @Post('staff/:id/photo')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  uploadStaffPhoto(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.sis.saveStaffPhoto(user.tid, id, file);
+  }
+
+  @Delete('staff/:id/photo')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  removeStaffPhoto(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.sis.removeStaffPhoto(user.tid, id);
+  }
+
+  @Post('staff/:id/documents/upload')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  uploadStaffDocument(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('slot') slot?: string,
+  ) {
+    return this.sis.saveStaffDocument(user.tid, id, slot || 'RESUME', file);
+  }
+
+  @Post('enrollments')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  enroll(@CurrentUser() user: JwtUser, @Body() dto: EnrollStudentDto) {
+    return this.sis.enroll(user.tid, dto);
+  }
+
+  @Post('enrollments/promote')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  promote(@CurrentUser() user: JwtUser, @Body() dto: PromoteStudentDto) {
+    return this.sis.promote(user.tid, dto, user.sub);
+  }
+
+  @Get('allocations')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  allocations(@CurrentUser() user: JwtUser) {
+    return this.sis.listAllocations(user.tid);
+  }
+
+  @Post('allocations/class-teacher')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  classTeacher(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: AssignClassTeacherDto,
+  ) {
+    return this.sis.assignClassTeacher(user.tid, dto);
+  }
+
+  @Post('allocations/subject-teacher')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  subjectTeacher(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: AssignSubjectTeacherDto,
+  ) {
+    return this.sis.assignSubjectTeacher(user.tid, dto);
+  }
+
+  @Get('admission/cycles')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  cycles(@CurrentUser() user: JwtUser) {
+    return this.admission.listCycles(user.tid);
+  }
+
+  @Post('admission/cycles')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createCycle(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateAdmissionCycleDto,
+  ) {
+    return this.admission.createCycle(user.tid, dto);
+  }
+
+  @Get('admission/applications')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  applications(@CurrentUser() user: JwtUser, @Query('status') status?: string) {
+    return this.admission.listApplications(user.tid, status);
+  }
+
+  @Patch('admission/applications/:id/status')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  patchApplication(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: PatchApplicationStatusDto,
+  ) {
+    return this.admission.patchStatus(user.tid, id, dto);
+  }
+
+  @Post('admission/applications/:id/convert')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  convert(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: ConvertApplicationDto,
+  ) {
+    return this.admission.convert(user.tid, id, dto, user.sub);
+  }
+
+  @Get('timetable/setup')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  timetableSetup(
+    @CurrentUser() user: JwtUser,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.timetable.ensureSetup(user.tid, academicYearId);
+  }
+
+  @Post('timetable/bells')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  saveBells(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolTimetableBellsDto,
+  ) {
+    return this.timetable.saveBells(user.tid, dto);
+  }
+
+  @Get('timetable/rooms')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  rooms(@CurrentUser() user: JwtUser) {
+    return this.timetable.listRooms(user.tid);
+  }
+
+  @Post('timetable/rooms')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createRoom(@CurrentUser() user: JwtUser, @Body() dto: CreateSchoolRoomDto) {
+    return this.timetable.createRoom(user.tid, dto.name);
+  }
+
+  @Delete('timetable/rooms/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  deleteRoom(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.timetable.deleteRoom(user.tid, id);
+  }
+
+  @Get('timetable/class/:sectionId')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  classTimetable(
+    @CurrentUser() user: JwtUser,
+    @Param('sectionId') sectionId: string,
+  ) {
+    const publishedOnly = !user.permissions?.includes(
+      SCHOOL_SIS_PERMISSION_MANAGE,
+    );
+    return this.timetable.classGrid(user.tid, sectionId, publishedOnly);
+  }
+
+  @Get('timetable/teacher/:staffId')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  teacherTimetable(
+    @CurrentUser() user: JwtUser,
+    @Param('staffId') staffId: string,
+  ) {
+    return this.timetable.teacherGrid(user.tid, staffId, false);
+  }
+
+  @Get('timetable/student/:studentId')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  studentTimetable(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.timetable.studentGrid(user.tid, studentId);
+  }
+
+  @Get('timetable/master')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  masterTimetable(
+    @CurrentUser() user: JwtUser,
+    @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('staffId') staffId?: string,
+    @Query('room') room?: string,
+  ) {
+    return this.timetable.master(user.tid, {
+      dayOfWeek: dayOfWeek ? Number(dayOfWeek) : undefined,
+      sectionId,
+      staffId,
+      room,
+    });
+  }
+
+  @Get('timetable/validate')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  validateTimetable(@CurrentUser() user: JwtUser) {
+    return this.timetable.validate(user.tid);
+  }
+
+  @Post('timetable/publish')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  publishTimetable(@CurrentUser() user: JwtUser) {
+    return this.timetable.publish(user.tid);
+  }
+
+  @Post('timetable/slots')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  saveSlot(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolTimetableSlotDto,
+  ) {
+    return this.timetable.upsertSlot(user.tid, dto);
+  }
+
+  @Post('timetable/slots/move')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  moveSlot(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: MoveSchoolTimetableSlotDto,
+  ) {
+    return this.timetable.moveSlot(user.tid, dto);
+  }
+
+  @Post('timetable/copy')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  copyTimetable(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CopySchoolTimetableDto,
+  ) {
+    return this.timetable.copySection(user.tid, dto);
+  }
+
+  @Get('fees/structures')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  feeStructures(@CurrentUser() user: JwtUser) {
+    return this.fees.list(user.tid);
+  }
+
+  @Get('fees/structures/:id')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  feeStructureOne(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.fees.one(user.tid, id);
+  }
+
+  @Get('fees/student/:studentId')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  studentFees(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.fees.forStudent(user.tid, studentId);
+  }
+}

@@ -2,9 +2,34 @@
 
 import { useState } from 'react';
 import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
+import { useBranding } from '@/hooks/use-branding';
+import { useAuthStore } from '@/store/auth-store';
+import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
+import { cn } from '@/utils/cn';
 import { SchoolErpSidebar } from './school-erp-sidebar';
 import { SchoolErpTopbar } from './school-erp-topbar';
 import './school-erp.css';
+
+function SchoolErpFooterLine() {
+  const { branding, displayName } = useBranding();
+  const name = branding?.displayName || displayName;
+  const tenantSlug = useAuthStore((s) => s.session?.user.tenantSlug);
+  const sis = isSecondarySchoolSisSession({
+    tenantSlug,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+    extras: branding?.portalExtras,
+  });
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+      <span>
+        © {new Date().getFullYear()} {name}
+        {sis ? ' · Knowledge · Service · Light' : ' · School ERP v1.0'}
+      </span>
+      <span className="hidden text-slate-300 sm:inline">|</span>
+      <PoweredByBaseCodeLabs className="text-[var(--school-erp-primary)] underline" />
+    </div>
+  );
+}
 
 /**
  * School ERP application shell:
@@ -17,13 +42,34 @@ import './school-erp.css';
  */
 export function SchoolErpShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
+  const { branding } = useBranding();
+  const tenantSlug = useAuthStore((s) => s.session?.user.tenantSlug);
+  const sis = isSecondarySchoolSisSession({
+    tenantSlug,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+    extras: branding?.portalExtras,
+  });
+
+  const onMenu = () => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches && sis) {
+      setDesktopNavCollapsed((open) => !open);
+      return;
+    }
+    setMobileOpen(true);
+  };
 
   return (
-    <div className="school-erp-shell">
-      <SchoolErpTopbar onMenu={() => setMobileOpen(true)} />
+    <div className={cn('school-erp-shell', sis && 'is-sls')}>
+      <SchoolErpTopbar onMenu={onMenu} />
 
       <div className="school-erp-body">
-        <div className="school-erp-sidebar-slot hidden lg:flex">
+        <div
+          className={cn(
+            'school-erp-sidebar-slot hidden lg:flex',
+            sis && desktopNavCollapsed && 'is-collapsed',
+          )}
+        >
           <SchoolErpSidebar />
         </div>
 
@@ -45,11 +91,7 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
           <main className="school-erp-main-scroll">
             <div className="school-erp-main-inner">{children}</div>
             <footer className="school-erp-page-footer">
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-                <span>© {new Date().getFullYear()} Tura Public School, Tura · School ERP v1.0</span>
-                <span className="hidden text-slate-300 sm:inline">|</span>
-                <PoweredByBaseCodeLabs className="text-[var(--school-erp-primary)] underline" />
-              </div>
+              <SchoolErpFooterLine />
             </footer>
           </main>
         </div>

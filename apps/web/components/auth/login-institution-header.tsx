@@ -84,6 +84,7 @@ export function LoginInstitutionHeader({
   const logoSrc = resolveSchoolAwareLogoUrl({
     logoUrl: institution.logoUrl,
     institutionType: context.institutionType,
+    schoolProduct: context.schoolProduct,
   });
   const locationLine = formatInstitutionLocation(institution.campusName, institution.address);
   const subtitle = institution.portalSubtitle ?? productTagline ?? 'Campus ERP Portal';

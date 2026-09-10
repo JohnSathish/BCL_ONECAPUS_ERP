@@ -248,6 +248,12 @@ export function isSchoolErpNavActive(pathname: string | null | undefined, href?:
   if (href === '/admin/school-admissions/payments') {
     return pathname === '/admin/school-admissions/payments';
   }
+  if (href === '/admin/school-sis/students') {
+    return (
+      pathname === href ||
+      Boolean(pathname.match(/^\/admin\/school-sis\/students\/(?!new(?:\/|$))/))
+    );
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

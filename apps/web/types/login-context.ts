@@ -29,6 +29,7 @@ export type LoginContext = {
     allowRfidLogin: boolean;
   };
   institutionType?: 'COLLEGE' | 'SCHOOL';
+  schoolProduct?: 'KG_ADMISSIONS' | 'SECONDARY_SIS';
 };
 
 export type LoginChallenge = {

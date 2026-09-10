@@ -1,0 +1,697 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+  Award,
+  BookMarked,
+  BookOpen,
+  Building2,
+  Bus,
+  CalendarDays,
+  ClipboardList,
+  FileBarChart2,
+  GraduationCap,
+  HelpCircle,
+  Home,
+  LayoutDashboard,
+  Library,
+  Megaphone,
+  Settings,
+  Shield,
+  Smartphone,
+  Sparkles,
+  Stethoscope,
+  UserCog,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import type { SchoolErpNavLink, SchoolErpNavModule } from '@/lib/school-erp/nav';
+
+export type SchoolSisNavGroup = {
+  id: string;
+  label: string;
+  items: SchoolErpNavModule[];
+};
+
+const soon = (id: string, label: string, extra?: Partial<SchoolErpNavLink>): SchoolErpNavLink => ({
+  id,
+  label,
+  status: 'coming_soon',
+  ...extra,
+});
+
+const live = (id: string, label: string, href: string): SchoolErpNavLink => ({
+  id,
+  label,
+  href,
+  status: 'active',
+});
+
+/** St. Luke's secondary SIS navigation — grouped ERP modules, not TPS KG. */
+export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
+  {
+    id: 'main',
+    label: 'MAIN',
+    items: [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        href: '/admin',
+        icon: LayoutDashboard as LucideIcon,
+        status: 'active',
+      },
+      {
+        id: 'application',
+        label: 'Application',
+        icon: ClipboardList as LucideIcon,
+        status: 'active',
+        children: [
+          live('online-admission', 'Online admission', '/admin/school-sis/admissions'),
+          live('public-apply', 'Public apply form', '/school-sis-portal/apply'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'people',
+    label: 'PEOPLE & ADMISSION',
+    items: [
+      {
+        id: 'students',
+        label: 'Students',
+        icon: GraduationCap as LucideIcon,
+        status: 'active',
+        children: [
+          live('student-list', 'Student List', '/admin/school-sis/students'),
+          live('student-add', 'Add Student', '/admin/school-sis/students/new'),
+          live('student-enrollment', 'Student Enrollment', '/admin/school-sis/students'),
+          soon('student-documents', 'Student Documents'),
+          soon('student-history', 'Student History'),
+        ],
+      },
+      {
+        id: 'teachers',
+        label: 'Teachers',
+        icon: Users as LucideIcon,
+        status: 'active',
+        children: [
+          live('teacher-list', 'Teacher List', '/admin/school-sis/staff'),
+          live('teacher-profiles', 'Teacher Profiles', '/admin/school-sis/staff'),
+          live('teacher-assignments', 'Teacher Assignments', '/admin/school-sis/allocation'),
+        ],
+      },
+      {
+        id: 'parents',
+        label: 'Parents',
+        icon: Users as LucideIcon,
+        status: 'coming_soon',
+        children: [soon('parent-list', 'Parent List'), soon('parent-accounts', 'Parent Accounts')],
+      },
+      {
+        id: 'guardians',
+        label: 'Guardians',
+        icon: Users as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('guardian-list', 'Guardian List'),
+          soon('guardian-relationships', 'Guardian Relationships'),
+        ],
+      },
+      {
+        id: 'staff',
+        label: 'Staff',
+        icon: UserCog as LucideIcon,
+        status: 'active',
+        children: [
+          live('staff-list', 'Staff List', '/admin/school-sis/staff'),
+          live('staff-profiles', 'Staff Profiles', '/admin/school-sis/staff'),
+        ],
+      },
+      {
+        id: 'users',
+        label: 'Users',
+        icon: Shield as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('user-accounts', 'User Accounts'),
+          soon('user-roles', 'Roles'),
+          soon('user-permissions', 'Permissions'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'academic',
+    label: 'ACADEMIC',
+    items: [
+      {
+        id: 'classes-sections',
+        label: 'Classes & Sections',
+        icon: BookOpen as LucideIcon,
+        status: 'active',
+        children: [
+          live('academic-years', 'Academic Years', '/admin/school-sis/classes'),
+          live('classes', 'Classes', '/admin/school-sis/classes'),
+          live('sections', 'Sections', '/admin/school-sis/classes'),
+          live('class-teachers', 'Class Teachers', '/admin/school-sis/allocation'),
+          live('student-allocation', 'Student Allocation', '/admin/school-sis/allocation'),
+        ],
+      },
+      {
+        id: 'subjects-curriculum',
+        label: 'Subjects & Curriculum',
+        icon: BookMarked as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('subjects', 'Subjects'),
+          soon('subject-groups', 'Subject Groups'),
+          soon('curriculum', 'Curriculum'),
+          soon('subject-class-mapping', 'Subject-Class Mapping'),
+        ],
+      },
+      {
+        id: 'timetable',
+        label: 'Timetable',
+        icon: CalendarDays as LucideIcon,
+        status: 'active',
+        children: [
+          live('class-timetable', 'Class Timetable', '/admin/school-sis/timetable'),
+          live('teacher-timetable', 'Teacher Timetable', '/admin/school-sis/timetable/teacher'),
+          live('master-timetable', 'Master Timetable', '/admin/school-sis/timetable/master'),
+          live('timetable-config', 'Timetable Settings', '/admin/school-sis/timetable/settings'),
+        ],
+      },
+      {
+        id: 'learning',
+        label: 'Learning',
+        icon: Sparkles as LucideIcon,
+        status: 'coming_soon',
+      },
+      {
+        id: 'examination',
+        label: 'Examination',
+        icon: ClipboardList as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('exams', 'Exams'),
+          soon('exam-schedule', 'Exam Schedule'),
+          soon('marks-entry', 'Marks Entry'),
+          soon('grades', 'Grades'),
+          soon('results', 'Results'),
+          soon('report-cards', 'Report Cards'),
+        ],
+      },
+      {
+        id: 'holidays',
+        label: 'Holidays',
+        icon: CalendarDays as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('holiday-calendar', 'Holiday Calendar'),
+          soon('academic-calendar', 'Academic Calendar'),
+        ],
+      },
+      {
+        id: 'attendance',
+        label: 'Attendance',
+        icon: ClipboardList as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('student-attendance', 'Student Attendance'),
+          soon('staff-attendance', 'Staff Attendance'),
+          soon('attendance-reports', 'Attendance Reports'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'hr',
+    label: 'HR & PAYROLL',
+    items: [
+      {
+        id: 'hr-payroll',
+        label: 'HR & Payroll',
+        icon: Building2 as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('employees', 'Employee Management'),
+          soon('departments', 'Departments'),
+          soon('designations', 'Designations'),
+          soon('leave', 'Leave'),
+          soon('payroll', 'Payroll'),
+          soon('salary', 'Salary'),
+          soon('payslips', 'Payslips'),
+          soon('hr-reports', 'HR Reports'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'FINANCE & ACCOUNTS',
+    items: [
+      {
+        id: 'fees',
+        label: 'Fees',
+        icon: Wallet as LucideIcon,
+        status: 'active',
+        children: [
+          live('fee-structure', 'Fee Structure', '/admin/school-sis/fees'),
+          soon('student-fees', 'Student Fees'),
+          soon('fee-collection', 'Fee Collection'),
+          soon('pending-fees', 'Pending Fees'),
+          soon('fee-receipts', 'Receipts'),
+          soon('concessions', 'Concessions'),
+          soon('fee-reports', 'Fee Reports'),
+        ],
+      },
+      {
+        id: 'billing',
+        label: 'Billing',
+        icon: Wallet as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('stationery-billing', 'Stationery Billing'),
+          soon('other-billing', 'Other Billing'),
+          soon('invoices', 'Invoices'),
+          soon('billing-receipts', 'Receipts'),
+        ],
+      },
+      {
+        id: 'accounts',
+        label: 'Accounts',
+        icon: FileBarChart2 as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('income', 'Income'),
+          soon('expenses', 'Expenses'),
+          soon('ledger', 'Ledger'),
+          soon('financial-reports', 'Financial Reports'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'campus',
+    label: 'CAMPUS OPERATIONS',
+    items: [
+      {
+        id: 'library',
+        label: 'Library',
+        icon: Library as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('books', 'Books'),
+          soon('library-members', 'Members'),
+          soon('issue-return', 'Issue/Return'),
+          soon('fines', 'Fines'),
+        ],
+      },
+      {
+        id: 'transport',
+        label: 'Transport',
+        icon: Bus as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('vehicles', 'Vehicles'),
+          soon('routes', 'Routes'),
+          soon('stops', 'Stops'),
+          soon('drivers', 'Drivers'),
+          soon('transport-allocation', 'Student Allocation'),
+        ],
+      },
+      {
+        id: 'sports',
+        label: 'Sports',
+        icon: Award as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('sports-list', 'Sports'),
+          soon('teams', 'Teams'),
+          soon('activities', 'Activities'),
+          soon('sports-achievements', 'Achievements'),
+        ],
+      },
+      {
+        id: 'hostel',
+        label: 'Hostel',
+        icon: Home as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('hostels', 'Hostels'),
+          soon('rooms', 'Rooms'),
+          soon('hostel-allocation', 'Student Allocation'),
+        ],
+      },
+      {
+        id: 'cafeteria',
+        label: 'Cafeteria',
+        icon: Building2 as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('menu', 'Menu'),
+          soon('cafeteria-billing', 'Billing'),
+          soon('cafeteria-tx', 'Transactions'),
+        ],
+      },
+      {
+        id: 'assets',
+        label: 'Assets',
+        icon: Building2 as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('asset-list', 'Assets'),
+          soon('inventory', 'Inventory'),
+          soon('maintenance', 'Maintenance'),
+        ],
+      },
+      {
+        id: 'security',
+        label: 'Security',
+        icon: Shield as LucideIcon,
+        status: 'coming_soon',
+        children: [soon('visitors', 'Visitors'), soon('security-logs', 'Security Logs')],
+      },
+      {
+        id: 'medical',
+        label: 'Medical',
+        icon: Stethoscope as LucideIcon,
+        status: 'coming_soon',
+        children: [soon('student-medical', 'Student Medical Records')],
+      },
+    ],
+  },
+  {
+    id: 'communication',
+    label: 'COMMUNICATION',
+    items: [
+      {
+        id: 'broadcast',
+        label: 'Broadcast',
+        icon: Megaphone as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('announcements', 'Announcements'),
+          soon('notices', 'Notices'),
+          soon('circulars', 'Circulars'),
+        ],
+      },
+      {
+        id: 'sms',
+        label: 'SMS',
+        icon: Megaphone as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('sms-templates', 'SMS Templates'),
+          soon('sms-campaigns', 'SMS Campaigns'),
+          soon('sms-reports', 'Delivery Reports'),
+        ],
+      },
+      {
+        id: 'whatsapp',
+        label: 'WhatsApp',
+        icon: Megaphone as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('wa-templates', 'WhatsApp Templates'),
+          soon('wa-messaging', 'Messaging'),
+          soon('wa-status', 'Delivery Status'),
+        ],
+      },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        icon: Megaphone as LucideIcon,
+        status: 'coming_soon',
+        children: [soon('push', 'Push Notifications'), soon('in-app', 'In-app Notifications')],
+      },
+      {
+        id: 'automation',
+        label: 'Automation',
+        icon: Sparkles as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('scheduled-notifications', 'Scheduled notifications'),
+          soon('reminders', 'Automated reminders'),
+          soon('workflows', 'Workflow automation'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'REPORTS',
+    items: [
+      {
+        id: 'reports-analytics',
+        label: 'Reports & Analytics',
+        icon: FileBarChart2 as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('student-reports', 'Student Reports'),
+          soon('attendance-reports-hub', 'Attendance Reports'),
+          soon('fee-reports-hub', 'Fee Reports'),
+          soon('exam-reports', 'Exam Reports'),
+          soon('staff-reports', 'Staff Reports'),
+          soon('admission-reports', 'Admission Reports'),
+          soon('transport-reports', 'Transport Reports'),
+          soon('library-reports', 'Library Reports'),
+        ],
+      },
+      {
+        id: 'ai-insights',
+        label: 'AI Insights',
+        icon: Sparkles as LucideIcon,
+        status: 'coming_soon',
+      },
+      {
+        id: 'achievements',
+        label: 'Achievements',
+        icon: Award as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('student-achievements', 'Student Achievements'),
+          soon('staff-achievements', 'Staff Achievements'),
+          soon('school-achievements', 'School Achievements'),
+        ],
+      },
+      {
+        id: 'certificates',
+        label: 'Certificates',
+        icon: Award as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('certificate-templates', 'Certificate Templates'),
+          soon('generate-certificate', 'Generate Certificate'),
+          soon('certificate-history', 'Certificate History'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'administration',
+    label: 'ADMINISTRATION',
+    items: [
+      {
+        id: 'events',
+        label: 'Events',
+        icon: CalendarDays as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('school-events', 'School Events'),
+          soon('event-calendar', 'Calendar'),
+          soon('event-management', 'Event Management'),
+        ],
+      },
+      {
+        id: 'multi-school',
+        label: 'Multi School',
+        icon: Building2 as LucideIcon,
+        status: 'coming_soon',
+      },
+      {
+        id: 'mobile-app',
+        label: 'Mobile App',
+        icon: Smartphone as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('android', 'Android'),
+          soon('ios', 'iOS'),
+          soon('app-settings', 'App settings'),
+          soon('app-push', 'Push notifications'),
+          soon('app-version', 'App version'),
+          soon('app-features', 'Feature availability'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'settings',
+    label: 'SETTINGS',
+    items: [
+      {
+        id: 'settings-general',
+        label: 'General',
+        icon: Settings as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('school-information', 'School Information'),
+          soon('logo', 'Logo'),
+          soon('address', 'Address'),
+          soon('phone', 'Phone'),
+          soon('email', 'Email'),
+          soon('website', 'Website'),
+          soon('social-links', 'Social Links'),
+        ],
+      },
+      {
+        id: 'account-security',
+        label: 'Account & Security',
+        icon: Shield as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('sec-roles', 'Roles'),
+          soon('sec-permissions', 'Permissions'),
+          soon('password-policies', 'Password policies'),
+          soon('login-security', 'Login security'),
+          soon('sessions', 'Sessions'),
+          soon('audit-logs', 'Audit logs'),
+        ],
+      },
+      {
+        id: 'settings-academic',
+        label: 'Academic',
+        icon: BookOpen as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('settings-year', 'Academic Year'),
+          soon('settings-classes', 'Classes'),
+          soon('settings-sections', 'Sections'),
+          soon('grading', 'Grading'),
+          soon('attendance-settings', 'Attendance settings'),
+        ],
+      },
+      {
+        id: 'financial-settings',
+        label: 'Financial Settings',
+        icon: Wallet as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('fee-settings', 'Fee settings'),
+          soon('payment-config', 'Payment configuration'),
+          soon('receipt-settings', 'Receipt settings'),
+        ],
+      },
+      {
+        id: 'settings-communication',
+        label: 'Communication',
+        icon: Megaphone as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('email-settings', 'Email'),
+          soon('sms-settings', 'SMS'),
+          soon('wa-settings', 'WhatsApp'),
+          soon('push-settings', 'Push notifications'),
+        ],
+      },
+      {
+        id: 'localization',
+        label: 'Localization',
+        icon: Settings as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('timezone', 'Timezone'),
+          soon('currency', 'Currency'),
+          soon('date-format', 'Date format'),
+          soon('language', 'Language'),
+        ],
+      },
+      {
+        id: 'integrations',
+        label: 'Integrations',
+        icon: Settings as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('payment-gateway', 'Payment Gateway'),
+          soon('email-api', 'Email'),
+          soon('sms-api', 'SMS'),
+          soon('wa-api', 'WhatsApp'),
+          soon('maps', 'Maps'),
+          soon('storage', 'Storage'),
+        ],
+      },
+      {
+        id: 'appearance',
+        label: 'Appearance',
+        icon: Sparkles as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('appearance-logo', 'Logo'),
+          soon('theme', 'Theme'),
+          soon('brand-colours', 'Brand colours'),
+          soon('login-screen', 'Login screen'),
+          soon('sidebar-config', 'Sidebar configuration'),
+        ],
+      },
+      {
+        id: 'system',
+        label: 'System',
+        icon: Settings as LucideIcon,
+        status: 'coming_soon',
+        children: [
+          soon('system-status', 'System status'),
+          soon('cache', 'Cache'),
+          soon('backup', 'Backup'),
+          soon('logs', 'Logs'),
+          soon('maintenance', 'Maintenance mode'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'cms',
+    label: 'CMS & WEBSITE',
+    items: [
+      {
+        id: 'cms-website',
+        label: 'Website CMS',
+        icon: Home as LucideIcon,
+        status: 'active',
+        children: [
+          live('cms-pages', 'Pages & homepage', '/admin/school-sis/website'),
+          live('cms-notices', 'Notices', '/admin/school-sis/website'),
+          live('cms-events', 'Events', '/admin/school-sis/website'),
+          live('cms-enquiries', 'Contact / Enquiries', '/admin/school-sis/website'),
+          live('cms-seo', 'SEO & identity', '/admin/school-sis/website'),
+          live('cms-gallery', 'Albums / Gallery', '/admin/school-sis/website/albums'),
+          soon('cms-downloads', 'Downloads'),
+          soon('cms-media', 'Media Library'),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'help',
+    label: 'HELP',
+    items: [
+      {
+        id: 'documentation',
+        label: 'Documentation',
+        icon: HelpCircle as LucideIcon,
+        status: 'coming_soon',
+      },
+      {
+        id: 'changelog',
+        label: 'Changelog',
+        icon: HelpCircle as LucideIcon,
+        status: 'coming_soon',
+      },
+      {
+        id: 'support',
+        label: 'Support',
+        icon: HelpCircle as LucideIcon,
+        status: 'coming_soon',
+      },
+    ],
+  },
+];
+
+export const SCHOOL_SIS_NAV: SchoolErpNavModule[] = SCHOOL_SIS_NAV_GROUPS.flatMap((g) => g.items);

@@ -1,4 +1,5 @@
 import { DEFAULT_LOGIN_LOGO, resolveBrandingAssetUrl } from '@/lib/branding-asset';
+import { SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
 
 /** Official Tura Public School emblem (public Next.js asset). */
 export const SCHOOL_PORTAL_LOGO_SRC = '/school-admissions/tps-logo.png';
@@ -7,9 +8,11 @@ export const SCHOOL_PORTAL_BUILDING_SRC = '/school-admissions/tps-building-offic
 export function resolveSchoolAwareLogoUrl(input?: {
   logoUrl?: string | null;
   institutionType?: string | null;
+  schoolProduct?: string | null;
 }): string {
   const uploaded = resolveBrandingAssetUrl(input?.logoUrl);
   if (uploaded) return uploaded;
+  if (input?.schoolProduct === 'SECONDARY_SIS') return SCHOOL_SIS_LOGO_SRC;
   if (input?.institutionType === 'SCHOOL') return SCHOOL_PORTAL_LOGO_SRC;
   return DEFAULT_LOGIN_LOGO;
 }
@@ -21,7 +24,9 @@ export function isSchoolErpHost(hostname?: string | null): boolean {
   return (
     host === 'tps.localhost' ||
     host === 'turapublicschool.com' ||
-    host.endsWith('.turapublicschool.com')
+    host.endsWith('.turapublicschool.com') ||
+    host === 'sls.localhost' ||
+    host === 'erp.stlukestura.in'
   );
 }
 
@@ -32,6 +37,7 @@ export function isSchoolErpSession(input?: {
 }): boolean {
   if (input?.institutionType === 'SCHOOL') return true;
   if (input?.tenantSlug === 'tura-public-school') return true;
+  if (input?.tenantSlug === 'st-lukes-tura') return true;
   return isSchoolErpHost(input?.hostname);
 }
 

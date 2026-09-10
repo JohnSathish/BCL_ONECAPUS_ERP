@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     'admission.tps.localhost',
     'tps.localhost',
+    'school.localhost',
+    'sls.localhost',
     'admissions.demo.localhost',
     'demo.localhost',
   ],
@@ -37,8 +39,26 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: '/faculty', destination: '/staff/dashboard', permanent: false },
-      { source: '/faculty/:path*', destination: '/staff/:path*', permanent: false },
+      {
+        source: '/faculty',
+        missing: [
+          { type: 'host', value: 'school.localhost' },
+          { type: 'host', value: 'stlukestura.in' },
+          { type: 'host', value: 'www.stlukestura.in' },
+        ],
+        destination: '/staff/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/faculty/:path*',
+        missing: [
+          { type: 'host', value: 'school.localhost' },
+          { type: 'host', value: 'stlukestura.in' },
+          { type: 'host', value: 'www.stlukestura.in' },
+        ],
+        destination: '/staff/:path*',
+        permanent: false,
+      },
       {
         source: '/admin/students/certificates',
         destination: '/admin/certificates',
@@ -87,7 +107,7 @@ const nextConfig: NextConfig = {
       `img-src 'self' data: blob: https:${devImgSrc}`,
       "font-src 'self' data:",
       `connect-src 'self' https://api.razorpay.com https://api.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in wss: ws:${devApiConnect}`,
-      "frame-src 'self' blob: https://api.razorpay.com https://sdk.cashfree.com https://payments.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in",
+      "frame-src 'self' blob: https://www.google.com https://maps.google.com https://www.google.co.in https://api.razorpay.com https://sdk.cashfree.com https://payments.cashfree.com https://sandbox.cashfree.com https://payment1.atomtech.in https://paynetzuat.atomtech.in https://pgtest.atomtech.in https://psa.atomtech.in",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

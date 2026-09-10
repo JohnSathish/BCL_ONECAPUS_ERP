@@ -7,6 +7,9 @@ export function getLoginHostHeader(): string {
     if (window.location.pathname.startsWith('/school-admissions-portal')) {
       return 'admission.tps.localhost';
     }
+    if (window.location.pathname.startsWith('/school-site')) {
+      return 'school.localhost';
+    }
     return process.env.NEXT_PUBLIC_LOGIN_HOST ?? 'demo.localhost';
   }
   return window.location.host.includes(':')

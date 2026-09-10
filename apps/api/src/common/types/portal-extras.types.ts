@@ -11,6 +11,8 @@ export type CareersPortalExtras = {
 export type PortalExtrasJson = {
   careersPortal?: CareersPortalExtras;
   institutionType?: 'COLLEGE' | 'SCHOOL';
+  /** SCHOOL only: TPS KG admissions vs secondary SIS (St. Luke's). */
+  schoolProduct?: 'KG_ADMISSIONS' | 'SECONDARY_SIS';
 };
 
 export function parsePortalExtras(value: unknown): PortalExtrasJson {

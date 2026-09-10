@@ -84,14 +84,22 @@ export function SchoolErpPanel({
   );
 }
 
-export function SchoolErpComingSoonBadge({ compact }: { compact?: boolean }) {
+export function SchoolErpComingSoonBadge({
+  compact,
+  tone = 'dark',
+}: {
+  compact?: boolean;
+  tone?: 'dark' | 'light';
+}) {
   return (
     <span
       className={cn(
         'shrink-0 rounded-full font-medium',
-        compact
-          ? 'bg-white/15 px-1.5 py-0.5 text-[9px] text-emerald-50/90'
-          : 'bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500',
+        compact && tone === 'light'
+          ? 'bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-700'
+          : compact
+            ? 'bg-white/15 px-1.5 py-0.5 text-[9px] text-emerald-50/90'
+            : 'bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500',
       )}
     >
       Coming Soon

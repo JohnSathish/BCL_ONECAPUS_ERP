@@ -19,6 +19,7 @@ export function InstitutionBrandMark({ branding, active, collapsed, className }:
     ? resolveSchoolAwareLogoUrl({
         logoUrl: branding?.logoUrl,
         institutionType: branding?.portalExtras?.institutionType,
+        schoolProduct: branding?.portalExtras?.schoolProduct,
       })
     : undefined;
   const title = active

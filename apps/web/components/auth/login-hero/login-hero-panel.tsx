@@ -13,11 +13,24 @@ type Props = {
   compact?: boolean;
   context?: LoginContext | null;
   contextLoading?: boolean;
+  schoolSis?: boolean;
 };
 
-export function LoginHeroPanel({ compact = false, context = null, contextLoading = false }: Props) {
+export function LoginHeroPanel({
+  compact = false,
+  context = null,
+  contextLoading = false,
+  schoolSis = false,
+}: Props) {
   void contextLoading;
-  const productName = context?.productName?.trim() || 'Campus ERP';
+  const schoolHero = schoolSis || context?.institutionType === 'SCHOOL';
+  const productName =
+    context?.productName?.trim() ||
+    (schoolSis || context?.schoolProduct === 'SECONDARY_SIS'
+      ? "St. Luke's School ERP"
+      : schoolHero
+        ? 'School ERP'
+        : 'Campus ERP');
 
   return (
     <section
@@ -40,22 +53,27 @@ export function LoginHeroPanel({ compact = false, context = null, contextLoading
             : 'mx-auto w-full max-w-xl justify-center gap-3 px-6 py-5 xl:max-w-2xl xl:gap-4 xl:px-10 xl:py-6',
         )}
       >
-        <LoginHeroBrandHeader compact={compact} context={context} />
+        <LoginHeroBrandHeader compact={compact} context={context} schoolSis={schoolSis} />
 
         {!compact ? (
-          <>
-            {LOGIN_HERO_ANIMATIONS_ENABLED ? (
-              <>
-                <LoginHeroEcosystem context={context} />
-                <LoginHeroKpiShowcase />
-              </>
-            ) : (
-              <>
-                <div className="login-hero-divider" aria-hidden />
-                <LoginHeroKpiShowcase />
-              </>
-            )}
-          </>
+          schoolHero ? (
+            <p className="max-w-[520px] border-l-2 border-cyan-400/50 pl-4 text-sm leading-relaxed text-white/75">
+              School office tools for classes, students, staff, and the academic year — separate
+              from the college Campus ERP.
+            </p>
+          ) : LOGIN_HERO_ANIMATIONS_ENABLED ? (
+            <>
+              <LoginHeroEcosystem context={context} />
+              <LoginHeroKpiShowcase />
+            </>
+          ) : (
+            <>
+              <div className="login-hero-divider" aria-hidden />
+              <LoginHeroKpiShowcase />
+            </>
+          )
+        ) : schoolHero ? (
+          <p className="text-center text-xs font-medium text-white/70">School office sign-in</p>
         ) : (
           <LoginHeroMobileBranding />
         )}
