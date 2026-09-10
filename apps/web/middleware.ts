@@ -6,7 +6,7 @@ import {
   isSchoolAdmissionsLoginPath,
   isSchoolAdmissionsPublicPath,
 } from '@/lib/school-admissions-portal-routes';
-import { isSchoolWebPublicHost } from '@/lib/school-web/hosts';
+import { isSchoolWebPublicHost, schoolHostFromRequestHeaders } from '@/lib/school-web/hosts';
 import { isProductionCollegeHost } from '@/lib/demo-login';
 import { extractJournalSlugFromHost, isJournalHost } from '@/lib/journals-host';
 
@@ -464,7 +464,7 @@ function handleSchoolWebHost(request: NextRequest) {
 }
 
 export async function middleware(request: NextRequest) {
-  const host = request.headers.get('host') ?? '';
+  const host = schoolHostFromRequestHeaders(request.headers);
 
   if (isSchoolWebPublicHost(host)) {
     return handleSchoolWebHost(request);
