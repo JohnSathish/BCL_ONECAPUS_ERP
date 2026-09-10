@@ -290,7 +290,7 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
             </button>
 
             {sis ? (
-              <div className="relative hidden xl:block">
+              <div className="relative hidden md:block">
                 <button
                   type="button"
                   className={cn('school-erp-year-chip', openPanel === 'year' && 'is-active')}
@@ -299,7 +299,7 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                   onClick={() => toggle('year')}
                 >
                   <CalendarDays className="h-4 w-4 text-sky-600" />
-                  <span>{yearChipLabel}</span>
+                  <span className="school-erp-year-chip-text">{yearChipLabel}</span>
                   <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                 </button>
                 {openPanel === 'year' ? (
@@ -461,7 +461,7 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 >
                   <UserRound className="h-4 w-4" />
                 </span>
-                <span className="hidden min-w-0 text-left md:block">
+                <span className="school-erp-profile-copy hidden min-w-0 text-left md:block">
                   <span className="block max-w-[8.5rem] truncate text-xs font-semibold text-slate-800">
                     {display}
                   </span>
@@ -501,7 +501,7 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                   </button>
                   <button
                     type="button"
-                    className="school-erp-menu-item school-erp-menu-item-danger sm:hidden"
+                    className="school-erp-menu-item school-erp-menu-item-danger"
                     role="menuitem"
                     onClick={logout}
                   >

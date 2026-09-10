@@ -193,14 +193,14 @@ export function SchoolSisDashboard() {
 
   return (
     <div className="sls-dashboard space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="sls-page-head">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#1a365d]">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-500">
             Welcome back, {welcomeName}! Here&apos;s what&apos;s happening at {schoolName}.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="sls-page-actions">
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
             <span className="text-[11px] uppercase tracking-wide text-slate-400">Year</span>
             <select
@@ -231,7 +231,7 @@ export function SchoolSisDashboard() {
         <p className="text-sm text-red-600">{apiErrorMessage(overview.error)}</p>
       ) : null}
 
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3 xl:grid-cols-6">
+      <div className="sls-stat-grid">
         {stats.map((card) => {
           const Icon = card.icon;
           const inner = (
@@ -253,7 +253,7 @@ export function SchoolSisDashboard() {
             </>
           );
           const className =
-            'min-w-[11.5rem] flex-1 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:min-w-0';
+            'min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]';
           if (card.href) {
             return (
               <Link

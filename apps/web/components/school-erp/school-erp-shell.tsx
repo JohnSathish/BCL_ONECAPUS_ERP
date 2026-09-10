@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { useBranding } from '@/hooks/use-branding';
 import { useAuthStore } from '@/store/auth-store';
@@ -50,6 +50,15 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
     hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
     extras: branding?.portalExtras,
   });
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => {
+      if (desktop.matches) setMobileOpen(false);
+    };
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
+  }, []);
 
   const onMenu = () => {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches && sis) {

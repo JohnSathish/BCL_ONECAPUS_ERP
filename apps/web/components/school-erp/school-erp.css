@@ -8,7 +8,7 @@
   --school-erp-border: rgba(27, 77, 62, 0.12);
   --school-erp-text: #0f1f1a;
   --school-erp-muted: #5b6b64;
-  --school-erp-sidebar-width: 17.5rem;
+  --school-erp-sidebar-width: clamp(15.25rem, 16.5vw, 18.5rem);
 
   position: fixed;
   inset: 0;
@@ -367,7 +367,12 @@
 .school-erp-main-inner {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 1.25rem 1rem 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  container-type: inline-size;
+  container-name: erp-main;
+  padding: 1.1rem max(0.85rem, env(safe-area-inset-right)) 1.5rem
+    max(0.85rem, env(safe-area-inset-left));
 }
 
 @media (min-width: 640px) {
@@ -379,8 +384,15 @@
 
 @media (min-width: 1024px) {
   .school-erp-main-inner {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: clamp(1.25rem, 2vw, 2.5rem);
+    padding-right: clamp(1.25rem, 2vw, 2.5rem);
+  }
+}
+
+@media (min-width: 1600px) {
+  .school-erp-main-inner {
+    padding-left: clamp(1.75rem, 2.4vw, 3.25rem);
+    padding-right: clamp(1.75rem, 2.4vw, 3.25rem);
   }
 }
 
@@ -484,7 +496,7 @@
   --school-erp-border: rgba(26, 54, 93, 0.1);
   --school-erp-text: #0f172a;
   --school-erp-muted: #64748b;
-  --school-erp-sidebar-width: 15.5rem;
+  --school-erp-sidebar-width: clamp(13.5rem, 15.5vw, 17.5rem);
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar {
@@ -961,3 +973,169 @@
     height: auto;
   }
 }
+
+/* Fluid St. Luke's ERP chrome — viewport + remaining main-column width. */
+.school-erp-shell.is-sls .school-erp-topbar-inner {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+.school-erp-shell.is-sls .school-erp-topbar-brand {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .school-erp-shell.is-sls .school-erp-topbar-brand {
+    display: flex;
+    width: auto;
+    max-width: min(18rem, 28vw);
+  }
+}
+
+@media (min-width: 1280px) {
+  .school-erp-shell.is-sls .school-erp-topbar-brand {
+    max-width: min(24rem, 32vw);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .school-erp-shell.is-sls {
+    --school-erp-sidebar-width: 13.25rem;
+  }
+
+  .school-erp-shell.is-sls .school-erp-tenant-switch {
+    display: none;
+  }
+
+  .school-erp-shell.is-sls .school-erp-nav-link {
+    padding: 0.38rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .school-erp-shell.is-sls .school-erp-profile-copy {
+    display: none;
+  }
+}
+
+@media (max-width: 1399px) {
+  .school-erp-year-chip-text {
+    display: none;
+  }
+
+  .school-erp-year-chip {
+    padding-left: 0.55rem;
+    padding-right: 0.45rem;
+  }
+}
+
+@media (max-width: 1535px) {
+  .school-erp-shell.is-sls .school-erp-logout-btn {
+    display: none;
+  }
+}
+
+@media (max-height: 760px) {
+  .school-erp-shell.is-sls .school-erp-tenant-switch {
+    display: none;
+  }
+}
+
+.sls-page,
+.sls-dashboard {
+  min-width: 0;
+  width: 100%;
+}
+
+.sls-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem 1rem;
+}
+
+.sls-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sls-stat-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@container erp-main (min-width: 420px) {
+  .sls-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container erp-main (min-width: 720px) {
+  .sls-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container erp-main (min-width: 1100px) {
+  .sls-stat-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.sls-chip-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sls-chip-row > * {
+  flex: 0 0 auto;
+}
+
+.sls-filter-bar > * {
+  min-width: 0;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner .overflow-x-auto,
+.school-erp-shell.is-sls .sls-chip-row {
+  max-width: 100%;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table {
+  width: 100%;
+}
+
+@media (max-width: 639px) {
+  .school-erp-shell.is-sls .school-erp-icon-btn,
+  .school-erp-shell.is-sls .school-erp-nav-link {
+    min-height: 2.5rem;
+  }
+
+  .sls-page-actions {
+    width: 100%;
+  }
+
+  .sls-page-actions > a,
+  .sls-page-actions > button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .school-erp-topbar-kbd {
+    display: none;
+  }
+
+  .school-erp-shell.is-sls .school-erp-topbar-search-input {
+    padding-right: 1rem;
+  }
+}
+

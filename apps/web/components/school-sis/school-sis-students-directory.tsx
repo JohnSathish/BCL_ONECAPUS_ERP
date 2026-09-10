@@ -248,8 +248,8 @@ export function SchoolSisStudentsDirectory() {
   });
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="sls-page space-y-5">
+      <div className="sls-page-head">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
             <GraduationCap className="h-5 w-5" />
@@ -263,7 +263,7 @@ export function SchoolSisStudentsDirectory() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="sls-page-actions">
           <button
             type="button"
             disabled
@@ -295,7 +295,7 @@ export function SchoolSisStudentsDirectory() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="sls-stat-grid">
         {[
           {
             label: 'Total Students',
@@ -385,7 +385,7 @@ export function SchoolSisStudentsDirectory() {
         })}
       </div>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div className="sls-chip-row">
         <button
           type="button"
           className={cn(
@@ -431,7 +431,7 @@ export function SchoolSisStudentsDirectory() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center">
+      <div className="sls-filter-bar flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-4 lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -458,7 +458,7 @@ export function SchoolSisStudentsDirectory() {
           Advanced Filters
         </button>
         <select
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
+          className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:w-auto"
           value={sectionId}
           onChange={(e) => {
             setSectionId(e.target.value);
@@ -501,7 +501,7 @@ export function SchoolSisStudentsDirectory() {
       ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2.5">
+        <div className="sls-chip-row border-b border-slate-100 px-3 py-2.5">
           <label className="flex items-center gap-2 px-1 text-xs text-slate-500">
             <input
               type="checkbox"

@@ -16,6 +16,17 @@ import {
   SCHOOL_LAUNCH_FREQUENCIES,
   type SchoolLaunchPopupConfig,
 } from '@/lib/school-web/launch-popup';
+import {
+  CmsCard,
+  CmsField,
+  CmsInput,
+  CmsMedia,
+  CmsPageHeader,
+  CmsSaveBar,
+  CmsSelect,
+  CmsTextarea,
+  CmsToggle,
+} from './school-web-cms-ui';
 
 function toLocalInput(iso: string | null) {
   if (!iso) return '';
@@ -25,10 +36,18 @@ function toLocalInput(iso: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function snapshot(form: SchoolLaunchPopupConfig) {
+  return JSON.stringify(form);
+}
+
 export function SchoolWebLaunchPopupCms() {
   const qc = useQueryClient();
   const home = useQuery({ queryKey: ['school-web-home'], queryFn: fetchSchoolWebHomepage });
   const [error, setError] = useState<string | null>(null);
+  const [device, setDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [advanced, setAdvanced] = useState(false);
+  const [savedAt, setSavedAt] = useState(false);
+  const [baseline, setBaseline] = useState('');
   const [form, setForm] = useState<SchoolLaunchPopupConfig>(() => ({
     enabled: true,
     ...defaultLaunchPopupPayload(),
@@ -36,7 +55,9 @@ export function SchoolWebLaunchPopupCms() {
 
   useEffect(() => {
     const section = home.data?.find((s) => s.key === 'launchPopup');
-    setForm(parseLaunchPopup(section));
+    const next = parseLaunchPopup(section);
+    setForm(next);
+    setBaseline(snapshot(next));
   }, [home.data]);
 
   const save = useMutation({
@@ -69,6 +90,8 @@ export function SchoolWebLaunchPopupCms() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['school-web-home'] });
       setError(null);
+      setSavedAt(true);
+      setBaseline(snapshot(form));
     },
     onError: (err) => setError(apiErrorMessage(err)),
   });
@@ -76,260 +99,320 @@ export function SchoolWebLaunchPopupCms() {
   const set = <K extends keyof SchoolLaunchPopupConfig>(
     key: K,
     value: SchoolLaunchPopupConfig[K],
-  ) => setForm((current) => ({ ...current, [key]: value }));
+  ) => {
+    setSavedAt(false);
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const dirty = snapshot(form) !== baseline;
+  const ctaClass =
+    form.ctaStyle === 'navy'
+      ? 'cta is-navy'
+      : form.ctaStyle === 'outline'
+        ? 'cta is-outline'
+        : 'cta';
 
   return (
-    <form
-      className="rounded-2xl border bg-white p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (form.enabled && form.title.trim().length < 2) {
-          setError('Add a title before turning the popup on.');
-          return;
+    <>
+      <CmsPageHeader
+        title="Launch popup"
+        description="Configure the announcement shown to visitors before the official website launch. The site remains available behind it."
+        actions={
+          <span className={`sls-cms-dot${form.enabled ? '' : ' is-off'}`}>
+            <i />
+            {form.enabled ? 'Active' : 'Hidden'}
+          </span>
         }
-        save.mutate();
-      }}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      />
+      <div className="sls-cms-status">
         <div>
-          <h2 className="text-sm font-semibold text-[#1a365d]">Website launch popup</h2>
-          <p className="mt-1 max-w-xl text-xs text-slate-500">
-            Pre-launch announcement over the public site. The pages stay available behind it. After
-            a launch date passes, the popup hides unless you choose to keep it on.
+          <strong>Website launch popup</strong>
+          <p className="sls-cms-help" style={{ margin: '0.35rem 0 0' }}>
+            {form.enabled
+              ? 'Visitors will see this popup when they open the public website.'
+              : 'The popup is off. Visitors go straight to the website.'}
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-          <input
-            type="checkbox"
-            checked={form.enabled}
-            onChange={(e) => set('enabled', e.target.checked)}
-          />
-          Enable coming soon popup
-        </label>
-      </div>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">
-          Eyebrow
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.kicker}
-            onChange={(e) => set('kicker', e.target.value)}
-          />
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          Launching label
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.launchingLabel}
-            onChange={(e) => set('launchingLabel', e.target.value)}
-          />
-        </label>
-      </div>
-      <label className="mt-3 block text-xs font-semibold text-slate-500">
-        Title
-        <input
-          className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-          value={form.title}
-          onChange={(e) => set('title', e.target.value)}
+        <CmsToggle
+          checked={form.enabled}
+          onChange={(value) => set('enabled', value)}
+          label="Show coming soon popup"
         />
-      </label>
-      <label className="mt-3 block text-xs font-semibold text-slate-500">
-        Subtitle (optional)
-        <input
-          className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-          value={form.subtitle}
-          onChange={(e) => set('subtitle', e.target.value)}
-        />
-      </label>
-      <label className="mt-3 block text-xs font-semibold text-slate-500">
-        Description
-        <textarea
-          className="mt-1 h-28 w-full rounded-lg border px-3 py-2 text-sm"
-          value={form.description}
-          onChange={(e) => set('description', e.target.value)}
-        />
-      </label>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">
-          School name line
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.footerLine}
-            onChange={(e) => set('footerLine', e.target.value)}
-          />
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          Location line
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.locationLine}
-            onChange={(e) => set('locationLine', e.target.value)}
-          />
-        </label>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">
-          Logo URL
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.logoUrl}
-            onChange={(e) => set('logoUrl', e.target.value)}
-          />
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          Campus image URL
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.imageUrl}
-            onChange={(e) => set('imageUrl', e.target.value)}
-          />
-        </label>
-      </div>
-      <label className="mt-3 block text-xs font-semibold text-slate-500">
-        Replace campus image
-        <input
-          className="mt-1 block w-full text-sm"
-          type="file"
-          accept="image/*"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.currentTarget.value = '';
-            if (!file) return;
-            try {
-              const uploaded = await uploadSchoolWebHeroImages([file]);
-              if (uploaded.urls[0]) set('imageUrl', uploaded.urls[0]);
-            } catch (err) {
-              setError(apiErrorMessage(err));
-            }
-          }}
-        />
-      </label>
-      <label className="mt-3 block text-xs font-semibold text-slate-500">
-        Image alt text
-        <input
-          className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-          value={form.imageAlt}
-          onChange={(e) => set('imageAlt', e.target.value)}
-        />
-      </label>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">
-          Launch date (optional)
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            type="datetime-local"
-            value={toLocalInput(form.launchAt)}
-            onChange={(e) =>
-              set('launchAt', e.target.value ? new Date(e.target.value).toISOString() : null)
-            }
-          />
-        </label>
-        <label className="flex items-end gap-2 pb-2 text-xs font-semibold text-slate-600">
-          <input
-            type="checkbox"
-            checked={form.showAfterLaunch}
-            onChange={(e) => set('showAfterLaunch', e.target.checked)}
-          />
-          Keep showing after the launch date
-        </label>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">
-          Button text
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.ctaLabel}
-            onChange={(e) => set('ctaLabel', e.target.value)}
-          />
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          Button URL
-          <input
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.ctaHref}
-            onChange={(e) => set('ctaHref', e.target.value)}
-          />
-        </label>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs font-semibold text-slate-500">
-          Button style
-          <select
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.ctaStyle}
-            onChange={(e) => set('ctaStyle', e.target.value as SchoolLaunchPopupConfig['ctaStyle'])}
+      <div className="sls-cms-grid has-preview">
+        <div className="sls-cms-stack">
+          <CmsCard title="Popup content" description="The message visitors will see first.">
+            <div className="sls-cms-fields cols-2">
+              <CmsField label="Eyebrow">
+                <CmsInput value={form.kicker} onChange={(e) => set('kicker', e.target.value)} />
+              </CmsField>
+              <CmsField label="Launching label">
+                <CmsInput
+                  value={form.launchingLabel}
+                  onChange={(e) => set('launchingLabel', e.target.value)}
+                />
+              </CmsField>
+              <CmsField label="Main title" span2>
+                <CmsInput value={form.title} onChange={(e) => set('title', e.target.value)} />
+              </CmsField>
+              <CmsField label="Subtitle" span2>
+                <CmsInput
+                  value={form.subtitle}
+                  onChange={(e) => set('subtitle', e.target.value)}
+                  placeholder="Optional"
+                />
+              </CmsField>
+              <CmsField label="Description" span2>
+                <CmsTextarea
+                  value={form.description}
+                  onChange={(e) => set('description', e.target.value)}
+                />
+              </CmsField>
+              <CmsField label="School name">
+                <CmsInput
+                  value={form.footerLine}
+                  onChange={(e) => set('footerLine', e.target.value)}
+                />
+              </CmsField>
+              <CmsField label="Location">
+                <CmsInput
+                  value={form.locationLine}
+                  onChange={(e) => set('locationLine', e.target.value)}
+                />
+              </CmsField>
+            </div>
+          </CmsCard>
+          <CmsCard
+            title="Branding & images"
+            description="Logo and campus photograph shown on the popup."
           >
-            {SCHOOL_LAUNCH_CTA_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {style}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          How often
-          <select
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.frequency}
-            onChange={(e) =>
-              set('frequency', e.target.value as SchoolLaunchPopupConfig['frequency'])
-            }
+            <div className="sls-cms-fields cols-2">
+              <CmsField label="Campus image">
+                <CmsMedia
+                  src={form.imageUrl}
+                  alt={form.imageAlt}
+                  onFile={async (file) => {
+                    try {
+                      const uploaded = await uploadSchoolWebHeroImages([file]);
+                      if (uploaded.urls[0]) set('imageUrl', uploaded.urls[0]);
+                    } catch (err) {
+                      setError(apiErrorMessage(err));
+                    }
+                  }}
+                />
+              </CmsField>
+              <CmsField label="School crest">
+                <CmsMedia
+                  src={form.logoUrl}
+                  alt=""
+                  hint="Replace crest"
+                  onFile={async (file) => {
+                    try {
+                      const uploaded = await uploadSchoolWebHeroImages([file]);
+                      if (uploaded.urls[0]) set('logoUrl', uploaded.urls[0]);
+                    } catch (err) {
+                      setError(apiErrorMessage(err));
+                    }
+                  }}
+                />
+              </CmsField>
+              <CmsField
+                label="Image description"
+                span2
+                hint="Read aloud for visitors who cannot see the photo."
+              >
+                <CmsInput value={form.imageAlt} onChange={(e) => set('imageAlt', e.target.value)} />
+              </CmsField>
+            </div>
+          </CmsCard>
+          <CmsCard title="Call to action" description="The button on the popup.">
+            <div className="sls-cms-fields cols-2">
+              <CmsField label="Button text">
+                <CmsInput value={form.ctaLabel} onChange={(e) => set('ctaLabel', e.target.value)} />
+              </CmsField>
+              <CmsField
+                label="Button destination"
+                hint="Use / for the homepage, or a page such as /about."
+              >
+                <CmsInput value={form.ctaHref} onChange={(e) => set('ctaHref', e.target.value)} />
+              </CmsField>
+              <CmsField label="Button style">
+                <CmsSelect
+                  value={form.ctaStyle}
+                  onChange={(e) =>
+                    set('ctaStyle', e.target.value as SchoolLaunchPopupConfig['ctaStyle'])
+                  }
+                >
+                  {SCHOOL_LAUNCH_CTA_STYLES.map((style) => (
+                    <option key={style} value={style}>
+                      {style === 'gold'
+                        ? 'Gold (recommended)'
+                        : style === 'navy'
+                          ? 'Navy'
+                          : 'Outline'}
+                    </option>
+                  ))}
+                </CmsSelect>
+              </CmsField>
+              <CmsField label="Open in a new tab">
+                <CmsToggle
+                  checked={form.ctaNewTab}
+                  onChange={(value) => set('ctaNewTab', value)}
+                  label={form.ctaNewTab ? 'Yes' : 'No'}
+                />
+              </CmsField>
+            </div>
+          </CmsCard>
+          <CmsCard
+            title="Launch schedule"
+            description="The popup can hide itself after a date you set."
           >
-            {SCHOOL_LAUNCH_FREQUENCIES.map((item) => (
-              <option key={item} value={item}>
-                {item === 'session'
-                  ? 'Once per session'
-                  : item === 'visit'
-                    ? 'Every visit'
-                    : item === 'day'
-                      ? 'Once per day'
-                      : 'Only once'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-slate-500">
-          Animation
-          <select
-            className="mt-1 h-10 w-full rounded-lg border px-3 text-sm"
-            value={form.animation}
-            onChange={(e) =>
-              set('animation', e.target.value as SchoolLaunchPopupConfig['animation'])
-            }
+            <div className="sls-cms-fields cols-2">
+              <CmsField
+                label="Launch date"
+                hint="Leave blank to keep showing until you turn the popup off."
+              >
+                <CmsInput
+                  type="datetime-local"
+                  value={toLocalInput(form.launchAt)}
+                  onChange={(e) =>
+                    set('launchAt', e.target.value ? new Date(e.target.value).toISOString() : null)
+                  }
+                />
+              </CmsField>
+              <CmsField label="After that date">
+                <CmsToggle
+                  checked={form.showAfterLaunch}
+                  onChange={(value) => set('showAfterLaunch', value)}
+                  label={form.showAfterLaunch ? 'Keep showing' : 'Stop automatically'}
+                />
+              </CmsField>
+            </div>
+          </CmsCard>
+          <CmsCard
+            title="When should it appear?"
+            description="How often returning visitors see the popup."
           >
-            {SCHOOL_LAUNCH_ANIMATIONS.map((item) => (
-              <option key={item} value={item}>
-                {item === 'fade-scale' ? 'Fade and scale' : 'Fade and slide up'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex flex-col justify-end gap-2 pb-1 text-xs font-semibold text-slate-600">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.ctaNewTab}
-              onChange={(e) => set('ctaNewTab', e.target.checked)}
-            />
-            Open button in a new tab
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.closeButton}
-              onChange={(e) => set('closeButton', e.target.checked)}
-            />
-            Show close button
-          </label>
+            <div className="sls-cms-fields cols-2">
+              <CmsField label="How often">
+                <CmsSelect
+                  value={form.frequency}
+                  onChange={(e) =>
+                    set('frequency', e.target.value as SchoolLaunchPopupConfig['frequency'])
+                  }
+                >
+                  {SCHOOL_LAUNCH_FREQUENCIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item === 'session'
+                        ? 'Once per browser session'
+                        : item === 'visit'
+                          ? 'Every visit'
+                          : item === 'day'
+                            ? 'Once per day'
+                            : 'Only once'}
+                    </option>
+                  ))}
+                </CmsSelect>
+              </CmsField>
+              <CmsField label="Animation">
+                <CmsSelect
+                  value={form.animation}
+                  onChange={(e) =>
+                    set('animation', e.target.value as SchoolLaunchPopupConfig['animation'])
+                  }
+                >
+                  {SCHOOL_LAUNCH_ANIMATIONS.map((item) => (
+                    <option key={item} value={item}>
+                      {item === 'fade-scale' ? 'Fade and scale' : 'Fade and slide up'}
+                    </option>
+                  ))}
+                </CmsSelect>
+              </CmsField>
+              <CmsField label="Close button">
+                <CmsToggle
+                  checked={form.closeButton}
+                  onChange={(value) => set('closeButton', value)}
+                  label={form.closeButton ? 'Show close' : 'No close button'}
+                />
+              </CmsField>
+              <CmsField
+                label="Where it appears"
+                hint="This popup is shown on the public website homepage and inner pages."
+              >
+                <CmsInput value="Whole public website" readOnly />
+              </CmsField>
+            </div>
+          </CmsCard>
+          <details
+            className="sls-cms-card sls-cms-advanced"
+            open={advanced}
+            onToggle={(e) => setAdvanced((e.target as HTMLDetailsElement).open)}
+          >
+            <summary>Advanced settings</summary>
+            <p className="sls-cms-help">Only needed if you must paste an image address by hand.</p>
+            <div className="sls-cms-fields">
+              <CmsField label="Campus image address">
+                <CmsInput value={form.imageUrl} onChange={(e) => set('imageUrl', e.target.value)} />
+              </CmsField>
+              <CmsField label="Crest address">
+                <CmsInput value={form.logoUrl} onChange={(e) => set('logoUrl', e.target.value)} />
+              </CmsField>
+            </div>
+          </details>
         </div>
+        <aside className="sls-cms-preview">
+          <header>
+            <strong>Live preview</strong>
+            <div className="sls-cms-devices">
+              {(['desktop', 'tablet', 'mobile'] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={device === item ? 'is-on' : ''}
+                  onClick={() => setDevice(item)}
+                >
+                  {item[0]!.toUpperCase() + item.slice(1)}
+                </button>
+              ))}
+            </div>
+          </header>
+          <div className={`sls-cms-device is-${device}`}>
+            <div className="sls-cms-popup">
+              {form.imageUrl ? <img className="hero" src={form.imageUrl} alt="" /> : null}
+              <div className="copy">
+                {form.logoUrl ? <img className="crest" src={form.logoUrl} alt="" /> : null}
+                <p className="kicker">{form.kicker}</p>
+                <h4>{form.title || 'Title'}</h4>
+                {form.subtitle ? <p className="body">{form.subtitle}</p> : null}
+                <p className="body">{form.description}</p>
+                <p className="meta">{form.launchingLabel}</p>
+                {form.ctaLabel ? <span className={ctaClass}>{form.ctaLabel} →</span> : null}
+                <p className="meta">{form.footerLine}</p>
+                <p className="meta">{form.locationLine}</p>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
-      <button
-        type="submit"
-        className="mt-4 h-10 rounded-xl bg-[#2563eb] px-4 text-sm font-semibold text-white"
-      >
-        {save.isPending ? 'Saving…' : 'Save launch popup'}
-      </button>
-    </form>
+      <CmsSaveBar
+        dirty={dirty}
+        saving={save.isPending}
+        saved={savedAt}
+        error={error}
+        onCancel={() => {
+          const section = home.data?.find((s) => s.key === 'launchPopup');
+          const next = parseLaunchPopup(section);
+          setForm(next);
+          setError(null);
+        }}
+        onSave={() => {
+          if (form.enabled && form.title.trim().length < 2) {
+            setError('Add a title before turning the popup on.');
+            return;
+          }
+          save.mutate();
+        }}
+      />
+    </>
   );
 }
