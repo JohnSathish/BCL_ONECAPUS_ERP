@@ -3,7 +3,17 @@ import { unwrapApiPayload } from '@/lib/http/api-envelope';
 
 export { schoolWebPath } from './paths';
 
-const API_BASE = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001/api';
+function schoolWebApiBase() {
+  const explicit = process.env.API_INTERNAL_URL?.replace(/\/+$/, '');
+  if (explicit) return explicit.endsWith('/api') ? explicit : `${explicit}/api`;
+  const origin = (
+    process.env.API_INTERNAL_ORIGIN ??
+    process.env.API_DEV_ORIGIN ??
+    process.env.NEXT_PRIVATE_API_ORIGIN ??
+    'http://127.0.0.1:3001'
+  ).replace(/\/+$/, '');
+  return origin.endsWith('/api') ? origin : `${origin}/api`;
+}
 
 export type SchoolWebMenuItem = {
   id: string;
@@ -104,8 +114,11 @@ export async function schoolWebRequestHost() {
 async function schoolWebGet<T>(path: string): Promise<T | null> {
   const host = await schoolWebRequestHost();
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'X-Login-Host': 'school.localhost' },
+    const res = await fetch(`${schoolWebApiBase()}${path}`, {
+      headers: {
+        'X-Login-Host': host,
+        'X-Forwarded-Host': host,
+      },
       cache: 'no-store',
     });
     if (!res.ok) {

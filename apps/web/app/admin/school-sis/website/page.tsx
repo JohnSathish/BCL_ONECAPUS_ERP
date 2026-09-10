@@ -17,6 +17,8 @@ import {
   upsertSchoolWebPage,
 } from '@/services/school-web';
 import { SchoolWebLaunchPopupCms } from '@/components/school-sis/school-web-launch-popup-cms';
+import { SchoolWebHeroCms } from '@/components/school-sis/school-web-hero-cms';
+import { SchoolWebFlashNewsCms } from '@/components/school-sis/school-web-flash-news-cms';
 import { SchoolWebAboutPrincipalCms } from '@/components/school-sis/school-web-about-cms';
 import { SchoolWebExploreCms } from '@/components/school-sis/school-web-explore-cms';
 import { SchoolWebNewsEventsCms } from '@/components/school-sis/school-web-news-events-cms';
@@ -24,12 +26,32 @@ import { SchoolWebContactCms } from '@/components/school-sis/school-web-contact-
 import { SchoolWebSeoCms } from '@/components/school-sis/school-web-seo-cms';
 import { SchoolWebFooterCms } from '@/components/school-sis/school-web-footer-cms';
 import {
+  SchoolWebCmsErrorBoundary,
+  schoolWebPublicSiteUrl,
+} from '@/components/school-sis/school-web-cms-error-boundary';
+import {
   EMPTY_SEO_FORM,
   SchoolSeoFields,
   seoFormFromJson,
   seoJsonFromForm,
 } from '@/components/school-sis/school-web-seo-fields';
 import { apiErrorMessage } from '@/utils/api-error';
+
+const HOME_MANAGED_KEYS = [
+  'hero',
+  'flashNews',
+  'launchPopup',
+  'about',
+  'explore',
+  'notices',
+  'contact',
+];
+
+const HOME_SECTION_LABELS: Record<string, string> = {
+  campus: 'Campus band',
+  pillars: 'Stats strip',
+  gallery: 'Gallery teaser',
+};
 
 export default function SchoolWebCmsPage() {
   const enabled = useAuthQueryEnabled();
@@ -164,13 +186,23 @@ export default function SchoolWebCmsPage() {
     ['footer', 'Footer'],
   ] as const;
 
+  const publicSiteUrl = schoolWebPublicSiteUrl();
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-[#1a365d]">Website CMS</h1>
         <p className="text-sm text-slate-500">
-          Public site: <code>http://school.localhost:3000</code> or <code>/school-site</code> on the
-          office host. Content is stored in the school website CMS, not the college website module.
+          Public site:{' '}
+          <a
+            className="font-medium text-[#163a6b] underline-offset-2 hover:underline"
+            href={publicSiteUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {publicSiteUrl}
+          </a>
+          . Content is stored in the school website CMS, not the college website module.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -271,25 +303,36 @@ export default function SchoolWebCmsPage() {
 
       {tab === 'home' ? (
         <div className="space-y-3">
-          <SchoolWebHeroCms />
-          <SchoolWebFlashNewsCms />
-          <SchoolWebAboutPrincipalCms />
-          <SchoolWebExploreCms />
-          <SchoolWebNewsEventsCms />
-          <SchoolWebContactCms />
+          {home.isLoading ? (
+            <p className="rounded-2xl border bg-white px-4 py-8 text-center text-sm text-slate-500">
+              Loading homepage sections…
+            </p>
+          ) : null}
+          {home.isError ? (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Could not load homepage content. {apiErrorMessage(home.error)}
+            </p>
+          ) : null}
+          <SchoolWebCmsErrorBoundary label="Homepage slider">
+            <SchoolWebHeroCms />
+          </SchoolWebCmsErrorBoundary>
+          <SchoolWebCmsErrorBoundary label="Flash news">
+            <SchoolWebFlashNewsCms />
+          </SchoolWebCmsErrorBoundary>
+          <SchoolWebCmsErrorBoundary label="About & Principal">
+            <SchoolWebAboutPrincipalCms />
+          </SchoolWebCmsErrorBoundary>
+          <SchoolWebCmsErrorBoundary label="Explore cards">
+            <SchoolWebExploreCms />
+          </SchoolWebCmsErrorBoundary>
+          <SchoolWebCmsErrorBoundary label="News & events">
+            <SchoolWebNewsEventsCms />
+          </SchoolWebCmsErrorBoundary>
+          <SchoolWebCmsErrorBoundary label="Contact">
+            <SchoolWebContactCms />
+          </SchoolWebCmsErrorBoundary>
           {(home.data ?? [])
-            .filter(
-              (section) =>
-                ![
-                  'hero',
-                  'flashNews',
-                  'launchPopup',
-                  'about',
-                  'explore',
-                  'notices',
-                  'contact',
-                ].includes(section.key),
-            )
+            .filter((section) => !HOME_MANAGED_KEYS.includes(section.key))
             .map((section) => (
               <form
                 key={section.key}
@@ -297,17 +340,30 @@ export default function SchoolWebCmsPage() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   const fd = new FormData(e.currentTarget);
-                  const payload = JSON.parse(String(fd.get('payload') || '{}'));
-                  patchSchoolWebHomepage(section.key, { payload, enabled: true }).then(() =>
-                    qc.invalidateQueries({ queryKey: ['school-web-home'] }),
-                  );
+                  let payload: Record<string, unknown> = {};
+                  try {
+                    const parsed = JSON.parse(String(fd.get('payload') || '{}'));
+                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                      throw new Error('Section JSON must be an object');
+                    }
+                    payload = parsed as Record<string, unknown>;
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Invalid JSON');
+                    return;
+                  }
+                  setError(null);
+                  patchSchoolWebHomepage(section.key, { payload, enabled: true })
+                    .then(() => qc.invalidateQueries({ queryKey: ['school-web-home'] }))
+                    .catch((err) => setError(apiErrorMessage(err)));
                 }}
               >
-                <p className="text-sm font-semibold text-[#1a365d]">{section.key}</p>
+                <p className="text-sm font-semibold text-[#1a365d]">
+                  {HOME_SECTION_LABELS[section.key] || section.key}
+                </p>
                 <textarea
                   name="payload"
                   className="mt-2 h-40 w-full rounded-lg border p-2 font-mono text-xs"
-                  defaultValue={JSON.stringify(section.payload, null, 2)}
+                  defaultValue={JSON.stringify(section.payload ?? {}, null, 2)}
                 />
                 <button type="submit" className="mt-2 rounded-xl border px-3 py-1.5 text-sm">
                   Save section
@@ -317,7 +373,11 @@ export default function SchoolWebCmsPage() {
         </div>
       ) : null}
 
-      {tab === 'launch' ? <SchoolWebLaunchPopupCms /> : null}
+      {tab === 'launch' ? (
+        <SchoolWebCmsErrorBoundary label="Launch popup">
+          <SchoolWebLaunchPopupCms />
+        </SchoolWebCmsErrorBoundary>
+      ) : null}
 
       {tab === 'pages' ? (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -336,7 +396,9 @@ export default function SchoolWebCmsPage() {
                   version: 1,
                   blocks: pageForm.body.split('\n\n').map((text) => ({ type: 'paragraph', text })),
                 },
-              }).then(() => qc.invalidateQueries({ queryKey: ['school-web-pages'] }));
+              })
+                .then(() => qc.invalidateQueries({ queryKey: ['school-web-pages'] }))
+                .catch((err) => setError(apiErrorMessage(err)));
             }}
           >
             <h2 className="text-sm font-semibold">Edit page</h2>
@@ -411,7 +473,9 @@ export default function SchoolWebCmsPage() {
               status: noticeForm.status,
               featured: noticeForm.featured,
               seoJson: seoJsonFromForm(noticeForm.seo),
-            }).then(() => qc.invalidateQueries({ queryKey: ['school-web-notices'] }));
+            })
+              .then(() => qc.invalidateQueries({ queryKey: ['school-web-notices'] }))
+              .catch((err) => setError(apiErrorMessage(err)));
           }}
         >
           <input
@@ -477,7 +541,9 @@ export default function SchoolWebCmsPage() {
               venue: eventForm.venue,
               status: eventForm.status,
               seoJson: seoJsonFromForm(eventForm.seo),
-            }).then(() => qc.invalidateQueries({ queryKey: ['school-web-events'] }));
+            })
+              .then(() => qc.invalidateQueries({ queryKey: ['school-web-events'] }))
+              .catch((err) => setError(apiErrorMessage(err)));
           }}
         >
           <input
@@ -533,8 +599,16 @@ export default function SchoolWebCmsPage() {
         </form>
       ) : null}
 
-      {tab === 'seo' ? <SchoolWebSeoCms /> : null}
-      {tab === 'footer' ? <SchoolWebFooterCms /> : null}
+      {tab === 'seo' ? (
+        <SchoolWebCmsErrorBoundary label="SEO audit">
+          <SchoolWebSeoCms />
+        </SchoolWebCmsErrorBoundary>
+      ) : null}
+      {tab === 'footer' ? (
+        <SchoolWebCmsErrorBoundary label="Footer">
+          <SchoolWebFooterCms />
+        </SchoolWebCmsErrorBoundary>
+      ) : null}
 
       {tab === 'inbox' ? (
         <ul className="rounded-2xl border bg-white p-4 text-sm">

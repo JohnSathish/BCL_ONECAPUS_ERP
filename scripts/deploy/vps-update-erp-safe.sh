@@ -15,8 +15,24 @@ if [[ ! -f .env ]]; then
 fi
 
 set -a
-# shellcheck disable=SC1091
-source .env
+# Quote-safe load: unquoted apostrophes in values (e.g. St. Luke's) break `source .env`.
+eval "$(python3 - <<'PY'
+from pathlib import Path
+import shlex
+for line in Path(".env").read_text(encoding="utf-8").splitlines():
+    if not line.strip() or line.lstrip().startswith("#") or "=" not in line:
+        continue
+    k, _, v = line.partition("=")
+    k = k.strip()
+    if not k:
+        continue
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+        print(f"{k}={v}")
+    else:
+        print(f"{k}={shlex.quote(v)}")
+PY
+)"
 set +a
 
 resolve_erp_net() {

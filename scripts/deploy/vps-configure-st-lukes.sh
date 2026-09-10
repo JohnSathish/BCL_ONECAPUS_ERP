@@ -185,6 +185,20 @@ pw = os.environ.get("SCHOOL_WEB_SMTP_PASS", "").replace(" ", "").strip()
 if pw:
     keys["SCHOOL_WEB_SMTP_PASS"] = pw
 
+def dump_kv(k, v):
+    s = str(v)
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
+        return f"{k}={s}"
+    if any(ch in s for ch in " \t'\"$`#"):
+        escaped = (
+            s.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("$", "\\$")
+            .replace("`", "\\`")
+        )
+        return f'{k}="{escaped}"'
+    return f"{k}={s}"
+
 seen = set()
 out = []
 for kind, val in order:
@@ -195,10 +209,10 @@ for kind, val in order:
     if k in seen:
         continue
     seen.add(k)
-    out.append(f"{k}={keys[k]}")
+    out.append(dump_kv(k, keys[k]))
 for k, v in keys.items():
     if k not in seen:
-        out.append(f"{k}={v}")
+        out.append(dump_kv(k, v))
 env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
 print("Patched .env CORS and St. Luke's SMTP mailbox (password only if SCHOOL_WEB_SMTP_PASS was set)")
 PY

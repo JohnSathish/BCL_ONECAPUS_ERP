@@ -13,8 +13,12 @@ import { SCHOOL_ADMISSION_NUMBER_PREFIX } from '../src/modules/school-sis/school
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
 
-const XI_PATH = String.raw`C:\Users\johnm\OneDrive\Desktop\ST.LUCK SCHOOL TURA\Students data\Class XI Students Details.xlsx`;
-const NURSERY_PATH = String.raw`C:\Users\johnm\OneDrive\Desktop\ST.LUCK SCHOOL TURA\Students data\NURSERY to Class X Stundets details.xlsx`;
+const XI_PATH =
+  process.env.SLS_STUDENTS_XI_XLSX ||
+  String.raw`C:\Users\johnm\OneDrive\Desktop\ST.LUCK SCHOOL TURA\Students data\Class XI Students Details.xlsx`;
+const NURSERY_PATH =
+  process.env.SLS_STUDENTS_NURSERY_XLSX ||
+  String.raw`C:\Users\johnm\OneDrive\Desktop\ST.LUCK SCHOOL TURA\Students data\NURSERY to Class X Stundets details.xlsx`;
 
 const GRADE_DEFS: { code: string; name: string; sortOrder: number }[] = [
   { code: 'NURSERY', name: 'Nursery', sortOrder: 0 },

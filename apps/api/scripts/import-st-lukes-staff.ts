@@ -11,7 +11,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
-const XLSX = String.raw`C:\Users\johnm\Downloads\St_Lukes_Teaching_Staff_Cleaned.xlsx`;
+const XLSX =
+  process.env.SLS_STAFF_XLSX ||
+  String.raw`C:\Users\johnm\Downloads\St_Lukes_Teaching_Staff_Cleaned.xlsx`;
 
 function cell(v: unknown) {
   if (v == null) return '';
