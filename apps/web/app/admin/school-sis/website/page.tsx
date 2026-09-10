@@ -16,7 +16,7 @@ import {
   upsertSchoolWebNotice,
   upsertSchoolWebPage,
 } from '@/services/school-web';
-import { SchoolWebFlashNewsCms } from '@/components/school-sis/school-web-flash-news-cms';
+import { SchoolWebLaunchPopupCms } from '@/components/school-sis/school-web-launch-popup-cms';
 import { SchoolWebAboutPrincipalCms } from '@/components/school-sis/school-web-about-cms';
 import { SchoolWebExploreCms } from '@/components/school-sis/school-web-explore-cms';
 import { SchoolWebNewsEventsCms } from '@/components/school-sis/school-web-news-events-cms';
@@ -35,7 +35,7 @@ export default function SchoolWebCmsPage() {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [tab, setTab] = useState<
-    'site' | 'home' | 'pages' | 'notices' | 'events' | 'inbox' | 'seo' | 'footer'
+    'site' | 'home' | 'launch' | 'pages' | 'notices' | 'events' | 'inbox' | 'seo' | 'footer'
   >('site');
   const [error, setError] = useState<string | null>(null);
   const site = useQuery({ queryKey: ['school-web-site'], queryFn: fetchSchoolWebSite, enabled });
@@ -155,6 +155,7 @@ export default function SchoolWebCmsPage() {
   const tabs = [
     ['site', 'Site & SEO'],
     ['home', 'Homepage'],
+    ['launch', 'Launch popup'],
     ['pages', 'Pages'],
     ['notices', 'News / Notices'],
     ['events', 'Events'],
@@ -279,9 +280,15 @@ export default function SchoolWebCmsPage() {
           {(home.data ?? [])
             .filter(
               (section) =>
-                !['hero', 'flashNews', 'about', 'explore', 'notices', 'contact'].includes(
-                  section.key,
-                ),
+                ![
+                  'hero',
+                  'flashNews',
+                  'launchPopup',
+                  'about',
+                  'explore',
+                  'notices',
+                  'contact',
+                ].includes(section.key),
             )
             .map((section) => (
               <form
@@ -309,6 +316,8 @@ export default function SchoolWebCmsPage() {
             ))}
         </div>
       ) : null}
+
+      {tab === 'launch' ? <SchoolWebLaunchPopupCms /> : null}
 
       {tab === 'pages' ? (
         <div className="grid gap-4 lg:grid-cols-2">

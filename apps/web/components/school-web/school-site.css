@@ -1,75 +1,3 @@
-@font-face {
-  font-family: 'Oswald';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/school-sis/fonts/oswald-cyrillic-ext.woff2') format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-
-@font-face {
-  font-family: 'Oswald';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/school-sis/fonts/oswald-cyrillic.woff2') format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-
-@font-face {
-  font-family: 'Oswald';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/school-sis/fonts/oswald-vietnamese.woff2') format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-
-@font-face {
-  font-family: 'Oswald';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/school-sis/fonts/oswald-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-
-@font-face {
-  font-family: 'Oswald';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/school-sis/fonts/oswald-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'Oswald Fallback';
-  src: local('Arial Narrow'), local('Liberation Sans Narrow'), local('Arial');
-  size-adjust: 92%;
-  ascent-override: 148%;
-  descent-override: 32%;
-  line-gap-override: 0%;
-}
-
-@font-face {
-  font-family: 'Outfit';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url('/school-sis/fonts/outfit-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-
-@font-face {
-  font-family: 'Outfit';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url('/school-sis/fonts/outfit-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 .sls-site {
   --navy: #1a237e;
   --navy-dark: #12185c;
@@ -81,8 +9,12 @@
   --paper: #ffffff;
   --ink: #1c2430;
   --muted: #5b6573;
-  --sls-nav-font: 'Oswald', 'Oswald Fallback', sans-serif;
-  --sls-display-font: 'Outfit', system-ui, sans-serif;
+  --sls-ui-font: var(--font-sls-sans), 'Plus Jakarta Sans', system-ui, sans-serif;
+  --sls-nav-font: var(--sls-ui-font);
+  --sls-display-font: var(--font-sls-serif), Lora, Georgia, 'Times New Roman', serif;
+  font-family: var(--sls-ui-font);
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--ink);
   background:
     radial-gradient(720px 380px at 88% 8%, rgba(255, 225, 74, 0.38), transparent 62%),
@@ -95,11 +27,35 @@
   text-decoration: none;
 }
 
+.sls-site h1,
+.sls-site h2,
+.sls-site h3 {
+  font-family: var(--sls-display-font);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.sls-site p {
+  font-weight: 400;
+}
+
+.sls-site p.sls-kicker,
+.sls-site .sls-kicker {
+  font-weight: 700;
+}
+
+.sls-site button,
+.sls-site input,
+.sls-site textarea,
+.sls-site select {
+  font-family: var(--sls-ui-font);
+}
+
 .sls-top {
   background: var(--navy);
   color: #fff;
   font-size: 12px;
-  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
 .sls-top-inner,
@@ -182,13 +138,17 @@
 .sls-brand strong {
   display: block;
   color: var(--navy);
+  font-family: var(--sls-ui-font);
   font-size: 0.95rem;
+  font-weight: 700;
   line-height: 1.2;
+  letter-spacing: 0;
 }
 
 .sls-brand span span {
   color: var(--muted);
   font-size: 0.72rem;
+  font-weight: 500;
 }
 
 .sls-menu {
@@ -212,10 +172,10 @@
   padding: 0.55rem 0.72rem;
   color: var(--navy);
   font-family: var(--sls-nav-font);
-  font-size: 0.92rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .sls-drop > a::after {
@@ -256,8 +216,9 @@
   padding: 0.5rem 0.95rem;
   font-family: var(--sls-nav-font);
   font-size: 0.84rem;
-  font-weight: 400;
-  letter-spacing: 0.03em;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--ink);
 }
 
@@ -293,8 +254,11 @@
   border: 1px solid #e6e0d2;
   background: #fff;
   padding: 0.4rem 0.65rem;
+  font-family: var(--sls-ui-font);
   font-size: 0.8rem;
+  font-weight: 600;
   color: var(--navy);
+  text-transform: none;
 }
 
 .sls-mobile {
@@ -309,10 +273,10 @@
   padding: 0.45rem 0;
   color: var(--navy);
   font-family: var(--sls-nav-font);
-  font-size: 0.92rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .sls-search {
@@ -404,9 +368,9 @@
   margin: 0.85rem 0 0.7rem;
   font-family: var(--sls-display-font);
   font-size: clamp(38px, 4vw, 55px);
-  line-height: 1.04;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .sls-hero-photo {
@@ -454,9 +418,9 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   color: var(--navy);
-  font-family: var(--sls-display-font);
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-family: var(--sls-ui-font);
+  font-size: 0.88rem;
+  font-weight: 600;
   line-height: 1.25;
   box-shadow: 0 10px 24px rgba(15, 39, 72, 0.16);
 }
@@ -501,8 +465,10 @@
 
 .sls-hero-motto {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-family: var(--sls-display-font);
+  font-size: 1.08rem;
+  font-weight: 500;
+  font-style: italic;
   color: #fff;
 }
 
@@ -511,7 +477,8 @@
   max-width: 34rem;
   color: #e8eef7;
   font-size: 1.02rem;
-  line-height: 1.55;
+  font-weight: 500;
+  line-height: 1.6;
 }
 
 .sls-hero-arrow {
@@ -550,8 +517,11 @@
   gap: 0.4rem;
   border-radius: 999px;
   padding: 0.75rem 1.2rem;
-  font-weight: 800;
+  font-family: var(--sls-ui-font);
+  font-weight: 700;
   font-size: 0.88rem;
+  letter-spacing: 0;
+  text-transform: none;
   transition: transform 0.18s ease, background 0.18s ease;
 }
 
@@ -688,7 +658,7 @@
   display: block;
   font-family: var(--sls-display-font);
   font-size: 0.92rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -696,18 +666,20 @@
   display: block;
   margin-top: 0.2rem;
   color: var(--gold-bright);
+  font-family: var(--sls-ui-font);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .sls-about-pri-copy h2 {
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: clamp(38px, 4vw, 55px);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
   margin: 0.35rem 0 0.85rem;
   max-width: 14ch;
 }
@@ -733,9 +705,11 @@
 .sls-about-pri-stat span {
   display: block;
   color: var(--gold);
+  font-family: var(--sls-ui-font);
   font-size: 0.62rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .sls-about-pri-stat strong {
@@ -794,9 +768,11 @@
 
 .sls-about-pri-num {
   color: var(--gold);
+  font-family: var(--sls-ui-font);
   font-size: 0.62rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .sls-about-pri-highlights strong {
@@ -953,7 +929,7 @@
 .sls-about-pri-quote p {
   margin: 0;
   color: var(--navy);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-style: italic;
 }
 
@@ -961,10 +937,12 @@
   display: block;
   margin-top: 0.35rem;
   color: var(--gold);
+  font-family: var(--sls-ui-font);
   font-style: normal;
   font-size: 0.68rem;
   letter-spacing: 0.12em;
-  font-weight: 800;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .sls-about-pri-id {
@@ -1006,7 +984,8 @@
   margin-top: 0.55rem;
   padding: 0.88rem 1.45rem;
   font-size: 0.95rem;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--navy);
   background: var(--gold-bright);
   box-shadow: 0 8px 22px rgba(196, 149, 24, 0.38);
@@ -1081,9 +1060,9 @@
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: clamp(1.55rem, 2.4vw, 2.05rem);
-  font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
   max-width: 13ch;
 }
 
@@ -1117,8 +1096,10 @@
   padding: 0.45rem 0.72rem;
   background: #fff7d6;
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.76rem;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1141,7 +1122,7 @@
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: 1.28rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -1168,7 +1149,7 @@
 .sls-prayer-close {
   margin-top: 0.75rem !important;
   color: var(--navy) !important;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .sls-prayer-quote {
@@ -1187,15 +1168,19 @@
 .sls-prayer-quote p {
   margin: 0;
   color: var(--navy);
+  font-family: var(--sls-display-font);
   font-style: italic;
   font-size: 0.9rem;
 }
 
 .sls-prayer-quote cite {
   color: #c9a227;
+  font-family: var(--sls-ui-font);
   font-style: normal;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1382,8 +1367,9 @@
   text-align: center;
   font-family: var(--sls-nav-font);
   font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   line-height: 1.2;
   text-decoration: none;
   padding: 0.55rem 0.7rem 0.6rem;
@@ -1493,7 +1479,7 @@
   right: 7%;
   top: 8%;
   color: rgba(22, 58, 107, 0.05);
-  font-family: Palatino, Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.05rem;
   letter-spacing: 0.08em;
   white-space: nowrap;
@@ -1521,9 +1507,9 @@
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: clamp(38px, 4vw, 55px);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
   margin: 0.45rem 0 0.55rem;
 }
 
@@ -1587,7 +1573,7 @@
   background: var(--gold);
   color: #163a6b;
   font-size: 0.58rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border-radius: 999px;
@@ -1651,15 +1637,18 @@
 
 .sls-explore-cat {
   color: var(--gold);
+  font-family: var(--sls-ui-font);
   font-size: 0.64rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .sls-explore-card h3 {
   color: var(--navy);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.12rem;
+  font-weight: 600;
   margin: 0.22rem 0 0.4rem;
 }
 
@@ -1674,8 +1663,9 @@
 .sls-explore-cta {
   margin-top: auto;
   color: var(--navy);
+  font-family: var(--sls-ui-font);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .sls-explore-cta span {
@@ -1825,8 +1815,9 @@
 
 .sls-news-head h2 {
   color: var(--navy);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: clamp(1.45rem, 2.3vw, 1.9rem);
+  font-weight: 600;
   margin: 0.3rem 0 0.45rem;
 }
 
@@ -1836,7 +1827,7 @@
 
 .sls-news-all {
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.86rem;
   border-bottom: 2px solid var(--gold);
   padding-bottom: 0.1rem;
@@ -1938,9 +1929,11 @@
 
 .sls-news-cat {
   color: var(--gold);
+  font-family: var(--sls-ui-font);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .sls-news-copy strong,
@@ -2059,10 +2052,11 @@
 
 .sls-kicker {
   color: var(--navy);
-  font-family: var(--sls-nav-font);
+  font-family: var(--sls-ui-font);
   font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .sls-section {
@@ -2073,9 +2067,9 @@
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: clamp(38px, 4vw, 55px);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
   margin: 0.35rem 0 1rem;
 }
 
@@ -2190,7 +2184,7 @@ a.sls-card:hover {
 
 .sls-footer h3 {
   color: #fff;
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.15rem;
   font-weight: 700;
   margin: 0 0 0.85rem;
@@ -2274,7 +2268,7 @@ a.sls-card:hover {
 
 .sls-footer-values blockquote p {
   margin: 0;
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.25rem;
   font-style: italic;
   color: #fff;
@@ -2326,7 +2320,7 @@ a.sls-card:hover {
 .sls-footer-logo strong {
   display: block;
   color: #fff;
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.05rem;
   line-height: 1.25;
 }
@@ -2368,7 +2362,7 @@ a.sls-card:hover {
 
 .sls-footer-sign {
   color: var(--gold) !important;
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-style: italic;
   font-size: 1.05rem !important;
 }
@@ -2700,9 +2694,11 @@ a.sls-card:hover {
   color: #fff;
   max-width: 22ch;
   margin: 0.28rem 0 0.22rem;
+  font-family: var(--sls-display-font);
+  font-weight: 600;
   font-size: clamp(1.5rem, 2.6vw, 2.2rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
   text-shadow: 0 1px 12px rgba(15, 39, 72, 0.28);
 }
 
@@ -2722,7 +2718,7 @@ a.sls-card:hover {
   margin: 0;
   max-width: 8.5rem;
   color: rgba(255, 255, 255, 0.78);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-style: italic;
   font-size: 0.98rem;
   line-height: 1.3;
@@ -2771,7 +2767,8 @@ a.sls-card:hover {
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: 0.98rem;
-  font-weight: 800;
+  font-weight: 600;
+  font-style: italic;
 }
 
 .sls-pride-inner ul {
@@ -2851,11 +2848,12 @@ a.sls-card:hover {
 }
 
 .sls-flash-label strong {
-  font-family: var(--sls-display-font);
-  font-size: 0.92rem;
+  font-family: var(--sls-ui-font);
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  font-style: italic;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-style: normal;
   white-space: nowrap;
 }
 
@@ -2927,8 +2925,9 @@ a.sls-card:hover {
   background: #e11d48;
   color: #fff;
   font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .sls-flash-controls {
@@ -3009,8 +3008,8 @@ a.sls-card:hover {
   color: var(--navy);
   font-family: var(--sls-nav-font);
   font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .sls-rule-cards p {
@@ -3028,9 +3027,9 @@ a.sls-card:hover {
   color: var(--navy);
   font-family: var(--sls-display-font);
   font-size: clamp(1.7rem, 3vw, 2.35rem);
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.12;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.015em;
 }
 
 .sls-facilities-academies,
@@ -3346,7 +3345,7 @@ a.sls-card:hover {
 .sls-about-explore-card strong {
   display: block;
   color: var(--navy);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.05rem;
   margin-bottom: 0.3rem;
 }
@@ -3364,8 +3363,8 @@ a.sls-card:hover {
   color: var(--navy);
   font-family: var(--sls-nav-font);
   font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .sls-about-campus {
@@ -3433,7 +3432,7 @@ a.sls-card:hover {
 
 .sls-about-panel-pride blockquote p {
   margin: 0;
-  font-family: Palatino, Georgia, serif;
+  font-family: var(--sls-display-font);
   font-style: italic;
   font-size: 1.02rem;
   color: #fff;
@@ -3557,7 +3556,7 @@ a.sls-card:hover {
 
 .sls-visit-copy h2 {
   color: var(--navy);
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: clamp(1.8rem, 3vw, 2.6rem);
   margin: 0.25rem 0 0.7rem;
 }
@@ -3612,8 +3611,9 @@ a.sls-card:hover {
 .sls-visit-motto {
   margin: 0.9rem 0 1.1rem;
   color: var(--navy);
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-family: var(--sls-ui-font);
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: 0.78rem;
 }
@@ -3628,7 +3628,7 @@ a.sls-card:hover {
 .sls-visit-quote p {
   margin: 0;
   font-style: italic;
-  font-family: Palatino, 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.15rem;
 }
 
@@ -3639,7 +3639,7 @@ a.sls-card:hover {
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .sls-visit-card {
@@ -3675,7 +3675,7 @@ a.sls-card:hover {
   border-radius: 0.7rem;
   padding: 0.65rem 0.7rem;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.82rem;
   color: var(--navy);
   background: transparent;
@@ -3822,7 +3822,7 @@ a.sls-card:hover {
 
 .sls-visit-ribbon blockquote p {
   margin: 0;
-  font-family: 'Segoe Script', 'Brush Script MT', Palatino, serif;
+  font-family: var(--sls-display-font);
   font-size: 1.35rem;
   font-style: italic;
 }
@@ -3960,4 +3960,288 @@ a.sls-card:hover {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
   text-decoration: none;
+}
+
+.sls-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.sls-launch-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 20, 50, 0.45);
+  cursor: pointer;
+}
+
+.sls-launch-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  max-height: min(92vh, 740px);
+  overflow: auto;
+  display: grid;
+  background: #fffdf8;
+  border-radius: 1.35rem;
+  box-shadow: 0 28px 64px rgba(10, 22, 48, 0.28);
+  border: 1px solid rgba(197, 165, 114, 0.28);
+}
+
+@media (min-width: 780px) {
+  .sls-launch-dialog {
+    grid-template-columns: 0.92fr 1.08fr;
+    max-height: min(86vh, 560px);
+    overflow: hidden;
+  }
+}
+
+.sls-launch-fade-scale {
+  animation: sls-launch-scale 0.32s ease both;
+}
+
+.sls-launch-fade-slide {
+  animation: sls-launch-slide 0.34s ease both;
+}
+
+@keyframes sls-launch-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sls-launch-slide {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sls-launch-fade-scale,
+  .sls-launch-fade-slide {
+    animation: none;
+  }
+}
+
+.sls-launch-media {
+  min-height: 180px;
+  background: var(--navy);
+}
+
+.sls-launch-media img {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+}
+
+@media (min-width: 780px) {
+  .sls-launch-media img {
+    max-height: none;
+    min-height: 100%;
+  }
+}
+
+.sls-launch-copy {
+  padding: 1.25rem 1.3rem 1.4rem;
+  text-align: center;
+}
+
+.sls-launch-crest {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  margin: 0 auto 0.55rem;
+  display: block;
+}
+
+.sls-launch-kicker {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--sls-ui-font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sls-launch-kicker::after {
+  content: '';
+  display: block;
+  width: 2.6rem;
+  height: 2px;
+  margin: 0.45rem auto 0;
+  background: var(--gold);
+}
+
+.sls-launch-title {
+  margin: 0.7rem 0 0.35rem;
+  color: var(--navy);
+  font-family: var(--sls-display-font);
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.sls-launch-sub,
+.sls-launch-body {
+  margin: 0 auto;
+  max-width: 36rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  font-weight: 400;
+}
+
+.sls-launch-sub {
+  margin-bottom: 0.45rem;
+  color: var(--navy);
+  font-weight: 500;
+}
+
+.sls-launch-body {
+  margin-top: 0.55rem;
+}
+
+.sls-launch-soon {
+  margin: 0.9rem 0 0;
+  color: var(--navy);
+  font-family: var(--sls-ui-font);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sls-launch-count {
+  margin: 0.95rem 0 0;
+}
+
+.sls-launch-count > p {
+  margin: 0 0 0.45rem;
+  color: var(--navy);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sls-launch-count ol {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sls-launch-count li {
+  min-width: 3.4rem;
+  background: #fff;
+  border: 1px solid #e6e0d2;
+  border-radius: 0.7rem;
+  padding: 0.4rem 0.35rem 0.45rem;
+}
+
+.sls-launch-count strong {
+  display: block;
+  color: var(--navy);
+  font-family: var(--sls-display-font);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.sls-launch-count span {
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sls-launch-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.05rem;
+  padding: 0.72rem 1.2rem;
+  border-radius: 999px;
+  background: var(--gold-bright);
+  color: var(--navy);
+  font-family: var(--sls-ui-font);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sls-launch-cta:hover {
+  background: #ffd54a;
+}
+
+.sls-launch-cta.is-navy {
+  background: var(--navy);
+  color: #fff;
+}
+
+.sls-launch-cta.is-navy:hover {
+  background: var(--navy-dark);
+}
+
+.sls-launch-cta.is-outline {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid rgba(26, 35, 126, 0.2);
+}
+
+.sls-launch-school {
+  margin: 1rem 0 0;
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.sls-launch-place {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sls-launch-close {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--navy);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 39, 72, 0.16);
+}
+
+.sls-launch-close:focus-visible,
+.sls-launch-cta:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }

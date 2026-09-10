@@ -5,6 +5,7 @@ export const SCHOOL_WEB_PERMISSION_MEDIA = 'website:media';
 export const SCHOOL_WEB_PERMISSION_ENQUIRIES = 'website:enquiries';
 export const SCHOOL_WEB_HERO_SLIDE_MAX = 15;
 export const SCHOOL_WEB_FLASH_NEWS_MAX = 24;
+export const SCHOOL_WEB_LAUNCH_POPUP_KEY = 'launchPopup';
 
 /** Apex/public hosts that must not be ERP login domains. */
 export const SCHOOL_WEB_PUBLIC_HOST_SLUGS: Record<string, string> = {

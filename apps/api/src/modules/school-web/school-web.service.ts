@@ -385,8 +385,16 @@ export class SchoolWebService {
     const row = await this.prisma.schoolWebHomepageSection.findUnique({
       where: { tenantId_key: { tenantId, key } },
     });
-    if (!row && key !== 'flashNews')
+    if (!row && key !== 'flashNews' && key !== 'launchPopup')
       throw new NotFoundException('Homepage section not found');
+    if (key === 'launchPopup' && dto.enabled === true && dto.payload) {
+      const title = String(
+        (dto.payload as Record<string, unknown>).title || '',
+      ).trim();
+      if (title.length < 2) {
+        throw new BadRequestException('The launch popup needs a title');
+      }
+    }
     if (
       key === 'flashNews' &&
       dto.payload &&
@@ -457,7 +465,7 @@ export class SchoolWebService {
             tenantId,
             key,
             enabled: dto.enabled ?? true,
-            sortOrder: dto.sortOrder ?? 15,
+            sortOrder: dto.sortOrder ?? (key === 'launchPopup' ? 5 : 15),
             payload,
           },
         });
