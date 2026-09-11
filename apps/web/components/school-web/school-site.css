@@ -2491,11 +2491,21 @@ a.sls-card:hover {
 .sls-footer-online {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.4rem;
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
+}
+
+.sls-footer-online strong {
+  font-weight: 700;
+  color: #fff;
+}
+
+.sls-footer-online-sep {
+  opacity: 0.45;
 }
 
 .sls-footer-bar-end {

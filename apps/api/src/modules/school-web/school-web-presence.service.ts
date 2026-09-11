@@ -23,8 +23,9 @@ type FooterVisitorSettings = {
   visitorRetentionDays: number;
 };
 
-type OnlineCache = { at: number; count: number };
-const onlineCache = new Map<string, OnlineCache>();
+type PresenceCounts = { online: number; totalVisitors: number };
+type PresenceCache = { at: number; counts: PresenceCounts };
+const presenceCache = new Map<string, PresenceCache>();
 const newHashesByIp = new Map<string, { at: number; hashes: Set<string> }>();
 
 @Injectable()
@@ -63,20 +64,34 @@ export class SchoolWebPresenceService {
     };
   }
 
-  async onlineCount(tenantId: string, timeoutMinutes: number): Promise<number> {
+  async presenceCounts(
+    tenantId: string,
+    timeoutMinutes: number,
+  ): Promise<PresenceCounts> {
     const key = `${tenantId}:${timeoutMinutes}`;
-    const hit = onlineCache.get(key);
+    const hit = presenceCache.get(key);
     if (hit && Date.now() - hit.at < SCHOOL_WEB_PRESENCE_CACHE_MS)
-      return hit.count;
+      return hit.counts;
     const since = new Date(Date.now() - timeoutMinutes * 60_000);
-    const rows = await this.prisma.$queryRaw<Array<{ n: number }>>(Prisma.sql`
-      SELECT COUNT(*)::int AS n
+    const rows = await this.prisma.$queryRaw<
+      Array<{ online: number; total_visitors: number }>
+    >(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE last_seen_at >= ${since})::int AS online,
+        COALESCE(SUM(visit_count), 0)::int AS total_visitors
       FROM school.school_web_visitor_presence
-      WHERE tenant_id = ${tenantId}::uuid AND last_seen_at >= ${since}
+      WHERE tenant_id = ${tenantId}::uuid
     `);
-    const count = rows[0]?.n ?? 0;
-    onlineCache.set(key, { at: Date.now(), count });
-    return count;
+    const counts: PresenceCounts = {
+      online: rows[0]?.online ?? 0,
+      totalVisitors: rows[0]?.total_visitors ?? 0,
+    };
+    presenceCache.set(key, { at: Date.now(), counts });
+    return counts;
+  }
+
+  async onlineCount(tenantId: string, timeoutMinutes: number): Promise<number> {
+    return (await this.presenceCounts(tenantId, timeoutMinutes)).online;
   }
 
   async heartbeat(
@@ -85,21 +100,16 @@ export class SchoolWebPresenceService {
     sessionId: string | undefined,
     path: string | undefined,
     req: Request,
-  ): Promise<{ online: number }> {
+  ): Promise<PresenceCounts> {
     const settings = this.footerSettings(extrasJson);
-    if (!settings.visitorCounterEnabled) return { online: 0 };
+    if (!settings.visitorCounterEnabled) return { online: 0, totalVisitors: 0 };
 
     const ua =
       typeof req.headers['user-agent'] === 'string'
         ? req.headers['user-agent']
         : '';
     if (isSchoolWebBotUserAgent(ua) || !isSchoolWebSessionId(sessionId)) {
-      return {
-        online: await this.onlineCount(
-          tenantId,
-          settings.visitorTimeoutMinutes,
-        ),
-      };
+      return this.presenceCounts(tenantId, settings.visitorTimeoutMinutes);
     }
 
     const now = new Date();
@@ -122,12 +132,7 @@ export class SchoolWebPresenceService {
     const row = existing[0];
 
     if (!row && !this.allowNewVisitor(ipHash, visitorHash)) {
-      return {
-        online: await this.onlineCount(
-          tenantId,
-          settings.visitorTimeoutMinutes,
-        ),
-      };
+      return this.presenceCounts(tenantId, settings.visitorTimeoutMinutes);
     }
 
     const expired = Boolean(
@@ -167,14 +172,12 @@ export class SchoolWebPresenceService {
       });
     }
 
-    onlineCache.delete(`${tenantId}:${settings.visitorTimeoutMinutes}`);
+    presenceCache.delete(`${tenantId}:${settings.visitorTimeoutMinutes}`);
     if (Math.random() < 0.03) {
       void this.cleanup(tenantId, settings.visitorRetentionDays);
     }
 
-    return {
-      online: await this.onlineCount(tenantId, settings.visitorTimeoutMinutes),
-    };
+    return this.presenceCounts(tenantId, settings.visitorTimeoutMinutes);
   }
 
   async stats(tenantId: string, extrasJson: unknown) {
@@ -185,11 +188,8 @@ export class SchoolWebPresenceService {
     const monthStart = new Date(today);
     monthStart.setUTCDate(monthStart.getUTCDate() - 29);
 
-    const [online, totalRows, rangeRows, pages] = await Promise.all([
-      this.onlineCount(tenantId, settings.visitorTimeoutMinutes),
-      this.prisma.$queryRaw<Array<{ n: number }>>(Prisma.sql`
-        SELECT COUNT(*)::int AS n FROM school.school_web_visitor_presence WHERE tenant_id = ${tenantId}::uuid
-      `),
+    const [counts, rangeRows, pages] = await Promise.all([
+      this.presenceCounts(tenantId, settings.visitorTimeoutMinutes),
       this.prisma.$queryRaw<
         Array<{
           day: Date;
@@ -231,7 +231,7 @@ export class SchoolWebPresenceService {
     ) => rows.reduce((n, row) => n + Number(row[key] || 0), 0);
 
     return {
-      currentlyOnline: online,
+      currentlyOnline: counts.online,
       visitorsToday: todayRow?.visits ?? 0,
       uniqueVisitorsToday: todayRow?.unique_visitors ?? 0,
       pageViewsToday: todayRow?.page_views ?? 0,
@@ -241,7 +241,7 @@ export class SchoolWebPresenceService {
       visitorsThisMonth: sum(rangeRows, 'visits'),
       uniqueVisitorsThisMonth: sum(rangeRows, 'unique_visitors'),
       pageViewsThisMonth: sum(rangeRows, 'page_views'),
-      totalVisitors: totalRows[0]?.n ?? 0,
+      totalVisitors: counts.totalVisitors,
       mostVisitedPages: pages.map((row) => ({
         path: row.path,
         views: row.views,
@@ -257,6 +257,8 @@ export class SchoolWebPresenceService {
           'Distinct browser sessions with a heartbeat inside the active timeout.',
         visits:
           'Sessions. A returning visitor after the timeout starts a new visit. Refreshes do not.',
+        totalVisitors:
+          'All recorded visits (sessions). Shown in the public footer as Total Visitors.',
         uniqueVisitors:
           'Distinct hashed visitor IDs in the period. One browser stays one visitor.',
         pageViews:

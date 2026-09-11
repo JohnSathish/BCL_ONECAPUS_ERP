@@ -46,8 +46,20 @@ function publicPath() {
   return path.startsWith('/school-site') ? path.slice('/school-site'.length) || '/' : path;
 }
 
+type PresencePayload = {
+  data?: { online?: number; totalVisitors?: number };
+  online?: number;
+  totalVisitors?: number;
+};
+
+function formatCount(value: number | null): string {
+  if (value == null) return '—';
+  return value.toLocaleString('en-IN');
+}
+
 export function SchoolFooterPresence({ label }: { label: string }) {
   const [online, setOnline] = useState<number | null>(null);
+  const [totalVisitors, setTotalVisitors] = useState<number | null>(null);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -66,9 +78,12 @@ export function SchoolFooterPresence({ label }: { label: string }) {
           },
           body: JSON.stringify({ sessionId, path: publicPath() }),
         });
-        const payload = (await res.json()) as { data?: { online?: number }; online?: number };
-        const count = payload.data?.online ?? payload.online;
-        if (!stopped && typeof count === 'number') setOnline(count);
+        const payload = (await res.json()) as PresencePayload;
+        const live = payload.data?.online ?? payload.online;
+        const total = payload.data?.totalVisitors ?? payload.totalVisitors;
+        if (stopped) return;
+        if (typeof live === 'number') setOnline(live);
+        if (typeof total === 'number') setTotalVisitors(total);
       } catch {
         /* keep last known count; never show an error in the footer */
       }
@@ -90,7 +105,13 @@ export function SchoolFooterPresence({ label }: { label: string }) {
     <p className="sls-footer-online" aria-live="polite">
       <span aria-hidden>👁</span>
       <span>
-        {label}: {online == null ? '—' : online}
+        Total Visitors: <strong>{formatCount(totalVisitors)}</strong>
+      </span>
+      <span className="sls-footer-online-sep" aria-hidden>
+        ·
+      </span>
+      <span>
+        {label}: <strong>{formatCount(online)}</strong>
       </span>
     </p>
   );
