@@ -19,5 +19,12 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisTimetableService,
     SchoolSisFeesService,
   ],
+  exports: [
+    SchoolSisService,
+    SchoolSisAdmissionService,
+    SchoolSisStudentMasterService,
+    SchoolSisTimetableService,
+    SchoolSisFeesService,
+  ],
 })
 export class SchoolSisModule {}

@@ -1,0 +1,11 @@
+.expo/
+expo-env.d.ts
+google-services.json
+GoogleService-Info.plist
+.env
+.env.local
+*.apk
+*.aab
+android/
+ios/
+node_modules/

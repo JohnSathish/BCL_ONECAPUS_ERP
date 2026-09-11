@@ -103,6 +103,7 @@ export class FcmPushService {
       body: string;
       data?: Record<string, string>;
       imageUrl?: string;
+      androidChannelId?: string;
     },
   ): Promise<FcmSendResult> {
     const unique = [...new Set(tokens.map((t) => t.trim()).filter(Boolean))];
@@ -178,7 +179,7 @@ export class FcmPushService {
         android: {
           priority: 'HIGH',
           notification: {
-            channelId: ANDROID_CHANNEL_ID,
+            channelId: payload.androidChannelId || ANDROID_CHANNEL_ID,
             sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,

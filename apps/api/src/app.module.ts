@@ -25,6 +25,7 @@ import { AdmissionsModule } from './modules/admissions/admissions.module';
 import { SchoolAdmissionsModule } from './modules/school-admissions/school-admissions.module';
 import { SchoolSisModule } from './modules/school-sis/school-sis.module';
 import { SchoolWebModule } from './modules/school-web/school-web.module';
+import { SchoolMobileModule } from './modules/school-mobile/school-mobile.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
 import { SupportDataModule } from './modules/support-data/support-data.module';
 import { StudentsModule } from './modules/students/students.module';
@@ -153,6 +154,7 @@ import { MoodleModule } from './modules/moodle/moodle.module';
     SchoolAdmissionsModule,
     SchoolSisModule,
     SchoolWebModule,
+    SchoolMobileModule,
     MasterDataModule,
     SupportDataModule,
     StudentsModule,

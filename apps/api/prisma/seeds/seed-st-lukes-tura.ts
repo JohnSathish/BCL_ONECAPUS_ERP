@@ -1,10 +1,17 @@
 import type { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import {
   SCHOOL_SIS_PERMISSION_MANAGE,
   SCHOOL_SIS_PERMISSION_READ,
   SCHOOL_SIS_PRODUCT,
 } from '../../src/modules/school-sis/school-sis.constants';
+import {
+  SCHOOL_MOBILE_PERMISSION_MANAGE,
+  SCHOOL_MOBILE_PERMISSION_PARENT,
+  SCHOOL_MOBILE_PERMISSION_STAFF,
+  SCHOOL_MOBILE_PERMISSION_STUDENT,
+} from '../../src/modules/school-mobile/school-mobile.constants';
 import {
   SCHOOL_WEB_PERMISSION_ENQUIRIES,
   SCHOOL_WEB_PERMISSION_MANAGE,
@@ -28,6 +35,8 @@ const SLS_HOSTS = [
 const ADMIN_PERMISSIONS = [
   SCHOOL_SIS_PERMISSION_READ,
   SCHOOL_SIS_PERMISSION_MANAGE,
+  SCHOOL_MOBILE_PERMISSION_MANAGE,
+  SCHOOL_MOBILE_PERMISSION_STAFF,
   SCHOOL_WEB_PERMISSION_READ,
   SCHOOL_WEB_PERMISSION_MANAGE,
   SCHOOL_WEB_PERMISSION_PUBLISH,
@@ -88,6 +97,30 @@ export async function seedStLukesSecondarySchool(
       resource: 'school-sis',
       action: 'manage',
       description: 'Manage St. Luke’s / secondary school SIS',
+    },
+    {
+      slug: SCHOOL_MOBILE_PERMISSION_STUDENT,
+      resource: 'school-mobile',
+      action: 'student',
+      description: 'St. Luke’s School student mobile app',
+    },
+    {
+      slug: SCHOOL_MOBILE_PERMISSION_PARENT,
+      resource: 'school-mobile',
+      action: 'parent',
+      description: 'St. Luke’s School parent mobile app',
+    },
+    {
+      slug: SCHOOL_MOBILE_PERMISSION_STAFF,
+      resource: 'school-mobile',
+      action: 'staff',
+      description: 'St. Luke’s School staff mobile app',
+    },
+    {
+      slug: SCHOOL_MOBILE_PERMISSION_MANAGE,
+      resource: 'school-mobile',
+      action: 'manage',
+      description: 'Manage St. Luke’s School mobile app',
     },
     ...SCHOOL_WEB_PERMISSIONS,
   ]) {
@@ -199,7 +232,16 @@ export async function seedStLukesSecondarySchool(
     ADMIN_PERMISSIONS,
   );
   await upsertRole('principal', 'Principal', ADMIN_PERMISSIONS);
-  await upsertRole('teacher', 'Teacher', [SCHOOL_SIS_PERMISSION_READ]);
+  const teacherRole = await upsertRole('teacher', 'Teacher', [
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+  ]);
+  const studentAppRole = await upsertRole('school-student', 'School Student', [
+    SCHOOL_MOBILE_PERMISSION_STUDENT,
+  ]);
+  const parentAppRole = await upsertRole('school-parent', 'School Parent', [
+    SCHOOL_MOBILE_PERMISSION_PARENT,
+  ]);
 
   const adminUser = await prisma.user.upsert({
     where: {
@@ -415,6 +457,239 @@ export async function seedStLukesSecondarySchool(
   }
 
   await seedStLukesWebsite(prisma, tenant.id);
+
+  const classXi = await prisma.schoolGrade.findFirst({
+    where: { tenantId: tenant.id, code: 'XI', deletedAt: null },
+  });
+  const sectionA = classXi
+    ? await prisma.schoolSection.findFirst({
+        where: {
+          tenantId: tenant.id,
+          academicYearId: academicYear.id,
+          gradeId: classXi.id,
+          name: 'A',
+          deletedAt: null,
+        },
+      })
+    : null;
+
+  const student = await prisma.schoolStudent.upsert({
+    where: {
+      tenantId_admissionNumber: {
+        tenantId: tenant.id,
+        admissionNumber: 'SLS26-0001',
+      },
+    },
+    update: { fullName: 'John Marak', status: 'ACTIVE', deletedAt: null },
+    create: {
+      tenantId: tenant.id,
+      admissionNumber: 'SLS26-0001',
+      fullName: 'John Marak',
+      gender: 'MALE',
+      status: 'ACTIVE',
+    },
+  });
+  if (sectionA) {
+    await prisma.schoolEnrollment.upsert({
+      where: {
+        tenantId_studentId_academicYearId: {
+          tenantId: tenant.id,
+          studentId: student.id,
+          academicYearId: academicYear.id,
+        },
+      },
+      update: { sectionId: sectionA.id, status: 'ACTIVE', deletedAt: null },
+      create: {
+        tenantId: tenant.id,
+        studentId: student.id,
+        academicYearId: academicYear.id,
+        sectionId: sectionA.id,
+        rollNumber: '1',
+        status: 'ACTIVE',
+      },
+    });
+  }
+  let guardian = await prisma.schoolGuardian.findFirst({
+    where: { tenantId: tenant.id, email: 'parent@stlukestura.in' },
+  });
+  if (!guardian) {
+    guardian = await prisma.schoolGuardian.create({
+      data: {
+        tenantId: tenant.id,
+        fullName: 'Mary Marak',
+        relation: 'MOTHER',
+        phone: '9862000001',
+        email: 'parent@stlukestura.in',
+        isPrimary: true,
+      },
+    });
+  }
+  await prisma.schoolStudentGuardian.upsert({
+    where: {
+      studentId_guardianId: { studentId: student.id, guardianId: guardian.id },
+    },
+    update: { relationship: 'MOTHER' },
+    create: {
+      studentId: student.id,
+      guardianId: guardian.id,
+      relationship: 'MOTHER',
+    },
+  });
+
+  const ensureUser = async (
+    email: string,
+    displayName: string,
+    roleId: string,
+  ) => {
+    const user = await prisma.user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email } },
+      update: { isActive: true, displayName, emailVerifiedAt: new Date() },
+      create: {
+        tenantId: tenant.id,
+        email,
+        passwordHash: hash,
+        displayName,
+        emailVerifiedAt: new Date(),
+        isActive: true,
+      },
+    });
+    const linked = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId, deletedAt: null },
+    });
+    if (!linked) {
+      await prisma.userRole.create({ data: { userId: user.id, roleId } });
+    }
+    return user;
+  };
+
+  const studentUser = await ensureUser(
+    'student@stlukestura.in',
+    'John Marak',
+    studentAppRole.id,
+  );
+  const parentUser = await ensureUser(
+    'parent@stlukestura.in',
+    'Mary Marak',
+    parentAppRole.id,
+  );
+  const teacherUser = await ensureUser(
+    'teacher@stlukestura.in',
+    'Rita Sangma',
+    teacherRole.id,
+  );
+
+  await prisma.schoolPersonAccount.upsert({
+    where: {
+      tenantId_userId_personType: {
+        tenantId: tenant.id,
+        userId: studentUser.id,
+        personType: 'STUDENT',
+      },
+    },
+    update: { studentId: student.id },
+    create: {
+      tenantId: tenant.id,
+      userId: studentUser.id,
+      personType: 'STUDENT',
+      studentId: student.id,
+    },
+  });
+  await prisma.schoolPersonAccount.upsert({
+    where: {
+      tenantId_userId_personType: {
+        tenantId: tenant.id,
+        userId: parentUser.id,
+        personType: 'GUARDIAN',
+      },
+    },
+    update: { guardianId: guardian.id },
+    create: {
+      tenantId: tenant.id,
+      userId: parentUser.id,
+      personType: 'GUARDIAN',
+      guardianId: guardian.id,
+    },
+  });
+
+  await prisma.schoolStaff.upsert({
+    where: {
+      tenantId_employeeCode: { tenantId: tenant.id, employeeCode: 'SLS-T-001' },
+    },
+    update: {
+      email: teacherUser.email,
+      fullName: 'Rita Sangma',
+      deletedAt: null,
+    },
+    create: {
+      tenantId: tenant.id,
+      employeeCode: 'SLS-T-001',
+      fullName: 'Rita Sangma',
+      staffType: 'TEACHING',
+      designation: 'Teacher',
+      email: teacherUser.email,
+    },
+  });
+
+  const prayerDays: Array<[number, string, string]> = [
+    [
+      1,
+      'Monday morning prayer',
+      'Lord, as we begin this week, fill our school with Your light. Amen.',
+    ],
+    [
+      2,
+      'Tuesday morning prayer',
+      'God of wisdom, bless our classrooms today. Amen.',
+    ],
+    [
+      3,
+      'Wednesday morning prayer',
+      'Heavenly Father, keep St. Luke’s in Your care. Amen.',
+    ],
+    [
+      4,
+      'Thursday morning prayer',
+      'Lord Jesus, walk with us through this day. Amen.',
+    ],
+    [
+      5,
+      'Friday morning prayer',
+      'God of peace, thank You for this week of learning. Amen.',
+    ],
+    [
+      6,
+      'Saturday prayer',
+      'Creator God, we thank You for rest and family. Amen.',
+    ],
+    [7, 'Sunday prayer', 'Lord, we praise You on this holy day. Amen.'],
+  ];
+  for (const [weekday, title, body] of prayerDays) {
+    await prisma.schoolMobilePrayer.upsert({
+      where: { tenantId_weekday: { tenantId: tenant.id, weekday } },
+      update: { title, body, enabled: true },
+      create: {
+        id: randomUUID(),
+        tenantId: tenant.id,
+        weekday,
+        title,
+        body,
+        enabled: true,
+      },
+    });
+  }
+
+  await prisma.schoolMobileSettings.upsert({
+    where: { tenantId: tenant.id },
+    update: {},
+    create: {
+      id: randomUUID(),
+      tenantId: tenant.id,
+      androidLatestVersion: '1.0.0',
+      iosLatestVersion: '1.0.0',
+      minVersion: '1.0.0',
+      extrasJson: {},
+    },
+  });
 
   return {
     tenantId: tenant.id,

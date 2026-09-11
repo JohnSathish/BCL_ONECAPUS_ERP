@@ -17642,6 +17642,105 @@ model SchoolWebVisitorPageStat {
   @@schema("school")
 }
 
+model SchoolMobileSettings {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  androidLatestVersion String   @default("1.0.0") @map("android_latest_version")
+  iosLatestVersion     String   @default("1.0.0") @map("ios_latest_version")
+  minVersion           String   @default("1.0.0") @map("min_version")
+  forceUpdate          Boolean  @default(false) @map("force_update")
+  androidStoreUrl      String?  @map("android_store_url")
+  iosStoreUrl          String?  @map("ios_store_url")
+  releaseNotes         String?  @map("release_notes") @db.Text
+  maintenanceMode      Boolean  @default(false) @map("maintenance_mode")
+  maintenanceMessage   String?  @map("maintenance_message") @db.Text
+  extrasJson           Json     @default("{}") @map("extras_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("school_mobile_settings")
+  @@schema("school")
+}
+
+model SchoolMobileDevice {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  deviceId    String    @map("device_id")
+  platform    String
+  persona     String
+  appVersion  String?   @map("app_version")
+  pushToken   String?   @map("push_token")
+  deviceLabel String?   @map("device_label")
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId, userId])
+  @@index([tenantId, persona, revokedAt])
+  @@map("school_mobile_devices")
+  @@schema("school")
+}
+
+model SchoolMobileInbox {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  title      String
+  body       String    @db.Text
+  imageUrl   String?   @map("image_url")
+  type       String
+  deepLink   String?   @map("deep_link")
+  relatedId  String?   @map("related_id")
+  audience   String    @default("user")
+  readAt     DateTime? @map("read_at")
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, userId, readAt])
+  @@map("school_mobile_inbox")
+  @@schema("school")
+}
+
+model SchoolMobilePrayer {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  weekday   Int
+  title     String
+  body      String   @db.Text
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, weekday])
+  @@map("school_mobile_prayers")
+  @@schema("school")
+}
+
+model SchoolMobileBroadcast {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  createdByUserId String  @map("created_by_user_id") @db.Uuid
+  title          String
+  body           String   @db.Text
+  imageUrl       String?  @map("image_url")
+  type           String
+  deepLink       String?  @map("deep_link")
+  audience       String
+  audienceFilter Json     @default("{}") @map("audience_filter")
+  successCount   Int      @default(0) @map("success_count")
+  failureCount   Int      @default(0) @map("failure_count")
+  status         String   @default("SENT")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_mobile_broadcasts")
+  @@schema("school")
+}
+
 /// Live tabs/sessions with a recent heartbeat on the school admission portal.
 model SchoolPortalPresence {
   id         String   @id @default(uuid()) @db.Uuid
