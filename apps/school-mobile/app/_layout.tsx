@@ -35,6 +35,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="password" />
         <Stack.Screen name="update" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="notice/[slug]" />
@@ -46,6 +47,13 @@ export default function RootLayout() {
         <Stack.Screen name="timetable" />
         <Stack.Screen name="fees" />
         <Stack.Screen name="attendance" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="academics" />
+        <Stack.Screen name="homework" />
+        <Stack.Screen name="calendar" />
+        <Stack.Screen name="school" />
+        <Stack.Screen name="feedback" />
+        <Stack.Screen name="app-info" />
       </Stack>
     </SafeAreaProvider>
   );

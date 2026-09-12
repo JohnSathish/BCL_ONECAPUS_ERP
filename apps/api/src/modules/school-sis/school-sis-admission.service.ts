@@ -189,7 +189,6 @@ export class SchoolSisAdmissionService {
     await this.sis.enroll(tenantId, {
       studentId: student.id,
       sectionId: dto.sectionId,
-      rollNumber: dto.rollNumber,
     });
     await this.prisma.schoolEnrollment.updateMany({
       where: { tenantId, studentId: student.id, sectionId: dto.sectionId },

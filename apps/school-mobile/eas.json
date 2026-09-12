@@ -8,7 +8,11 @@
         "EXPO_PUBLIC_API_URL": "https://erp.stlukestura.in/api",
         "EXPO_PUBLIC_TENANT_SLUG": "st-lukes-tura",
         "EXPO_PUBLIC_APP_NAME": "St. Luke's School",
-        "EXPO_PUBLIC_LOGIN_HOST": "erp.stlukestura.in"
+        "EXPO_PUBLIC_LOGIN_HOST": "erp.stlukestura.in",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://basecodelabs.com/privacy-policy.html",
+        "EXPO_PUBLIC_TERMS_URL": "https://basecodelabs.com/terms-and-conditions.html",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "admin@stlukestura.in",
+        "EAS_PROJECT_ID": "82f45116-2b82-4b43-93d3-7d7d2027b2da"
       },
       "android": { "buildType": "apk" }
     },
@@ -18,9 +22,20 @@
         "EXPO_PUBLIC_API_URL": "https://erp.stlukestura.in/api",
         "EXPO_PUBLIC_TENANT_SLUG": "st-lukes-tura",
         "EXPO_PUBLIC_APP_NAME": "St. Luke's School",
-        "EXPO_PUBLIC_LOGIN_HOST": "erp.stlukestura.in"
+        "EXPO_PUBLIC_LOGIN_HOST": "erp.stlukestura.in",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://basecodelabs.com/privacy-policy.html",
+        "EXPO_PUBLIC_TERMS_URL": "https://basecodelabs.com/terms-and-conditions.html",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "admin@stlukestura.in",
+        "EAS_PROJECT_ID": "82f45116-2b82-4b43-93d3-7d7d2027b2da"
       },
       "android": { "buildType": "app-bundle" }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal"
+      }
     }
   }
 }

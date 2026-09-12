@@ -30,8 +30,8 @@ export default function SchoolSisFeesPage() {
           <h1 className="text-xl font-semibold text-[#1a365d]">Fee structure</h1>
           <p className="text-sm text-slate-500">
             Nursery–X from <span className="font-medium">St_Lukes_Fee_Structure_2026.xlsx</span>{' '}
-            (new and re-admission). Class XI from the 2026–27 workbook. Collection and receipts are
-            not opened yet.
+            (new and re-admission). Class XI from the 2026–27 workbook. Monthly collection for
+            Nursery–IV is under Fees → Monthly Fees.
           </p>
         </div>
         <button

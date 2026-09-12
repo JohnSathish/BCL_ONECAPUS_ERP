@@ -9,6 +9,7 @@
 import ExcelJS from 'exceljs';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { SCHOOL_ADMISSION_NUMBER_PREFIX } from '../src/modules/school-sis/school-sis.constants';
+import { nextSchoolRollNumber } from '../src/modules/school-sis/school-sis-roll-number';
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
@@ -356,46 +357,20 @@ async function main() {
     }),
   );
 
-  const existingRolls = new Map<string, Set<string>>();
-  for (const s of existing) {
-    for (const enr of s.enrollments) {
-      if (!enr.rollNumber) continue;
-      const set = existingRolls.get(enr.sectionId) ?? new Set<string>();
-      set.add(enr.rollNumber);
-      existingRolls.set(enr.sectionId, set);
-    }
-  }
-
   type Planned = ParsedRow & {
-    rollNumber: string;
     sectionId: string;
     skip?: boolean;
   };
   const planned: Planned[] = [];
   for (const [key, list] of grouped) {
     const sectionId = sectionByKey.get(key)!;
-    const used = existingRolls.get(sectionId) ?? new Set<string>();
-    let seq = 1;
-    const nextRoll = () => {
-      let roll = String(seq).padStart(2, '0');
-      while (used.has(roll)) {
-        seq += 1;
-        roll = String(seq).padStart(2, '0');
-      }
-      used.add(roll);
-      seq += 1;
-      return roll;
-    };
     for (const row of list) {
-      const skip = existingFp.has(fingerprint(row));
       planned.push({
         ...row,
         sectionId,
-        rollNumber: skip ? '' : nextRoll(),
-        skip,
+        skip: existingFp.has(fingerprint(row)),
       });
     }
-    existingRolls.set(sectionId, used);
   }
 
   const toCreate = planned.filter((p) => !p.skip);
@@ -490,13 +465,19 @@ async function main() {
           },
         });
       }
+      const rollNumber = await nextSchoolRollNumber(
+        tx,
+        tenant.id,
+        year.id,
+        year.code,
+      );
       const enrollment = await tx.schoolEnrollment.create({
         data: {
           tenantId: tenant.id,
           studentId: student.id,
           academicYearId: year.id,
           sectionId: row.sectionId,
-          rollNumber: row.rollNumber,
+          rollNumber,
           status: 'ACTIVE',
           source: 'IMPORT',
         },
@@ -508,7 +489,7 @@ async function main() {
           enrollmentId: enrollment.id,
           type: 'CREATED',
           toSectionId: row.sectionId,
-          note: `Register import · roll ${row.rollNumber}`,
+          note: `Register import · roll ${rollNumber}`,
         },
       });
     });
@@ -518,7 +499,7 @@ async function main() {
   }
 
   const verify = await prisma.schoolEnrollment.groupBy({
-    by: ['sectionId', 'rollNumber'],
+    by: ['rollNumber'],
     where: {
       tenantId: tenant.id,
       academicYearId: year.id,
@@ -531,9 +512,9 @@ async function main() {
   console.log(`Created ${created} students.`);
   if (clashes.length) {
     console.error('Roll clashes detected:', clashes);
-    throw new Error('Duplicate roll numbers within a section');
+    throw new Error('Duplicate roll numbers within the admission year');
   }
-  console.log('Roll uniqueness within section: OK');
+  console.log('Roll uniqueness within admission year: OK');
 }
 
 main()

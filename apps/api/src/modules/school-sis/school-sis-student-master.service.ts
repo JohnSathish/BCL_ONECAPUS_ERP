@@ -13,6 +13,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { SCHOOL_ADMISSION_NUMBER_PREFIX } from './school-sis.constants';
+import { resolveSchoolEnrollmentRollNumber } from './school-sis-roll-number';
 import type { SaveSchoolStudentMasterDto } from './dto/school-sis.dto';
 import { SchoolSisService } from './school-sis.service';
 
@@ -608,13 +609,23 @@ export class SchoolSisStudentMasterService {
       },
     });
     if (!current) {
+      const year = await tx.schoolAcademicYear.findFirst({
+        where: { id: args.academicYearId, tenantId: args.tenantId },
+      });
+      const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
+        tenantId: args.tenantId,
+        studentId: args.studentId,
+        academicYearId: args.academicYearId,
+        yearCode: year?.code ?? String(new Date().getFullYear()),
+        requested: args.rollNumber,
+      });
       const created = await tx.schoolEnrollment.create({
         data: {
           tenantId: args.tenantId,
           studentId: args.studentId,
           academicYearId: args.academicYearId,
           sectionId: args.section.id,
-          rollNumber: emptyToNull(args.rollNumber),
+          rollNumber,
           admissionDate: args.admissionDate
             ? new Date(args.admissionDate)
             : new Date(),
@@ -645,16 +656,23 @@ export class SchoolSisStudentMasterService {
       return;
     }
 
+    const year = await tx.schoolAcademicYear.findFirst({
+      where: { id: args.academicYearId, tenantId: args.tenantId },
+    });
+    const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
+      tenantId: args.tenantId,
+      studentId: args.studentId,
+      academicYearId: args.academicYearId,
+      yearCode: year?.code ?? String(new Date().getFullYear()),
+      requested: args.rollNumber || current.rollNumber,
+    });
     const nextSectionId = args.allowSectionChange
       ? args.section.id
       : current.sectionId;
     const updated = await tx.schoolEnrollment.update({
       where: { id: current.id },
       data: {
-        rollNumber:
-          args.rollNumber !== undefined
-            ? emptyToNull(args.rollNumber)
-            : current.rollNumber,
+        rollNumber,
         admissionDate: args.admissionDate
           ? new Date(args.admissionDate)
           : current.admissionDate,

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -26,6 +27,7 @@ import {
   AddPreviousSchoolDto,
   AddStudentDocumentDto,
   AssignClassTeacherDto,
+  AssignSchoolRollNumbersDto,
   AssignSubjectTeacherDto,
   ConvertApplicationDto,
   CreateAdmissionCycleDto,
@@ -35,8 +37,11 @@ import {
   EnrollStudentDto,
   PatchApplicationStatusDto,
   PromoteStudentDto,
+  SaveSchoolClassSubjectsDto,
   SaveSchoolStaffDto,
   SaveSchoolStudentMasterDto,
+  SaveSchoolSubjectDto,
+  SaveSchoolSubjectTypeDto,
   SaveSchoolTimetableBellsDto,
   SaveSchoolTimetableSlotDto,
   MoveSchoolTimetableSlotDto,
@@ -44,6 +49,7 @@ import {
   CreateSchoolRoomDto,
 } from './dto/school-sis.dto';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
+import { SchoolSisCurriculumService } from './school-sis-curriculum.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisStudentMasterService } from './school-sis-student-master.service';
 import { SchoolSisFeesService } from './school-sis-fees.service';
@@ -56,6 +62,7 @@ export class SchoolSisController {
   constructor(
     private readonly sis: SchoolSisService,
     private readonly admission: SchoolSisAdmissionService,
+    private readonly curriculum: SchoolSisCurriculumService,
     private readonly master: SchoolSisStudentMasterService,
     private readonly timetable: SchoolSisTimetableService,
     private readonly fees: SchoolSisFeesService,
@@ -92,6 +99,74 @@ export class SchoolSisController {
     return this.sis.createSection(user.tid, dto);
   }
 
+  @Get('curriculum')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  curriculumBundle(@CurrentUser() user: JwtUser) {
+    return this.curriculum.listBundle(user.tid);
+  }
+
+  @Post('subject-types')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createSubjectType(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolSubjectTypeDto,
+  ) {
+    return this.curriculum.createType(user.tid, dto);
+  }
+
+  @Patch('subject-types/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  patchSubjectType(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolSubjectTypeDto,
+  ) {
+    return this.curriculum.updateType(user.tid, id, dto);
+  }
+
+  @Delete('subject-types/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  deleteSubjectType(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.curriculum.deleteType(user.tid, id);
+  }
+
+  @Post('subjects')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  createSubject(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolSubjectDto,
+  ) {
+    return this.curriculum.createSubject(user.tid, dto);
+  }
+
+  @Patch('subjects/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  patchSubject(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolSubjectDto,
+  ) {
+    return this.curriculum.updateSubject(user.tid, id, dto);
+  }
+
+  @Delete('subjects/:id')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  deleteSubject(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.curriculum.deleteSubject(user.tid, id);
+  }
+
+  @Put('class-subjects')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  saveClassSubjects(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolClassSubjectsDto,
+  ) {
+    return this.curriculum.saveClassSubjects(user.tid, dto);
+  }
+
   @Get('students')
   @RequireAnyPermission(
     SCHOOL_SIS_PERMISSION_READ,
@@ -120,6 +195,15 @@ export class SchoolSisController {
       undefined,
       this.canManageMedical(user),
     );
+  }
+
+  @Post('students/assign-roll-numbers')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  assignRollNumbers(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: AssignSchoolRollNumbersDto,
+  ) {
+    return this.sis.assignRollNumbers(user.tid, dto.studentIds);
   }
 
   @Get('students/:id')

@@ -77,7 +77,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: { typedRoutes: true },
   extra: {
     appDisplayName: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
-    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '' },
+    privacyPolicyUrl:
+      process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html',
+    termsUrl:
+      process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://basecodelabs.com/terms-and-conditions.html',
+    supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'admin@stlukestura.in',
+    eas: {
+      projectId:
+        process.env.EAS_PROJECT_ID ||
+        process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
+        '82f45116-2b82-4b43-93d3-7d7d2027b2da',
+    },
   },
   ...(isNativeRelease ? {} : {}),
 });

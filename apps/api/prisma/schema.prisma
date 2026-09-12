@@ -16593,6 +16593,12 @@ model SchoolAcademicYear {
   timetableBells    SchoolTimetableBell[]
   timetablePlans    SchoolTimetablePlan[]
   feeStructures     SchoolFeeStructure[]
+  houseMemberships  SchoolHouseMembership[]
+  clubs             SchoolClub[]
+  optionalSubjects  SchoolStudentOptionalSubject[]
+  feeSettings       SchoolFeeSettings[]
+  monthlyFeePlans   SchoolMonthlyFeePlan[]
+  feePayments       SchoolFeePayment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16619,6 +16625,7 @@ model SchoolGrade {
   tenantId  String    @map("tenant_id") @db.Uuid
   code      String
   name      String
+  capacity  Int?
   sortOrder Int       @default(0) @map("sort_order")
   active    Boolean   @default(true)
   createdAt DateTime  @default(now()) @map("created_at")
@@ -16628,6 +16635,7 @@ model SchoolGrade {
   sections       SchoolSection[]
   gradeSubjects  SchoolGradeSubject[]
   feeStructures  SchoolFeeStructure[]
+  monthlyFeePlans SchoolMonthlyFeePlan[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16643,6 +16651,7 @@ model SchoolSection {
   name           String
   capacity       Int?
   roomLabel      String?   @map("room_label")
+  active         Boolean   @default(true)
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -16660,7 +16669,7 @@ model SchoolSection {
   @@schema("school")
 }
 
-model SchoolSubject {
+model SchoolSubjectType {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id") @db.Uuid
   code      String
@@ -16671,12 +16680,40 @@ model SchoolSubject {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  gradeSubjects     SchoolGradeSubject[]
-  subjectTeachers   SchoolSubjectTeacherAssignment[]
-  timetableSlots    SchoolTimetableSlot[]
+  subjects SchoolSubject[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
+  @@map("school_subject_types")
+  @@schema("school")
+}
+
+model SchoolSubject {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  subjectTypeId String?   @map("subject_type_id") @db.Uuid
+  code          String
+  name          String
+  sortOrder     Int       @default(0) @map("sort_order")
+  active        Boolean   @default(true)
+  isOptional    Boolean   @default(false) @map("is_optional")
+  maxMarks      Int?      @map("max_marks")
+  passMarks     Int?      @map("pass_marks")
+  hasTheory     Boolean   @default(true) @map("has_theory")
+  hasPractical  Boolean   @default(false) @map("has_practical")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  subjectType       SchoolSubjectType?               @relation(fields: [subjectTypeId], references: [id], onDelete: SetNull)
+  gradeSubjects     SchoolGradeSubject[]
+  subjectTeachers   SchoolSubjectTeacherAssignment[]
+  timetableSlots    SchoolTimetableSlot[]
+  optionalEnrolments SchoolStudentOptionalSubject[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@index([tenantId, subjectTypeId])
   @@map("school_subjects")
   @@schema("school")
 }
@@ -16695,6 +16732,136 @@ model SchoolGradeSubject {
 
   @@unique([tenantId, academicYearId, gradeId, subjectId])
   @@map("school_grade_subjects")
+  @@schema("school")
+}
+
+model SchoolHouse {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String
+  color          String    @default("#0ea5e9")
+  captainName    String?   @map("captain_name")
+  teacherStaffId String?   @map("teacher_staff_id") @db.Uuid
+  sortOrder      Int       @default(0) @map("sort_order")
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  teacher      SchoolStaff?            @relation(fields: [teacherStaffId], references: [id], onDelete: SetNull)
+  memberships  SchoolHouseMembership[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+  @@map("school_houses")
+  @@schema("school")
+}
+
+model SchoolHouseMembership {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  houseId        String   @map("house_id") @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  house        SchoolHouse        @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  student      SchoolStudent      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId, studentId])
+  @@index([tenantId, houseId])
+  @@map("school_house_memberships")
+  @@schema("school")
+}
+
+model SchoolClub {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  academicYearId     String    @map("academic_year_id") @db.Uuid
+  name               String
+  description        String?
+  coordinatorStaffId String?   @map("coordinator_staff_id") @db.Uuid
+  active             Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  coordinator  SchoolStaff?           @relation(fields: [coordinatorStaffId], references: [id], onDelete: SetNull)
+  members      SchoolClubMembership[]
+  activities   SchoolClubActivity[]
+
+  @@unique([tenantId, academicYearId, name])
+  @@index([tenantId, academicYearId])
+  @@map("school_clubs")
+  @@schema("school")
+}
+
+model SchoolClubMembership {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  clubId    String   @map("club_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  club    SchoolClub    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  student SchoolStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, studentId])
+  @@index([tenantId, studentId])
+  @@map("school_club_memberships")
+  @@schema("school")
+}
+
+model SchoolClubActivity {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  clubId       String    @map("club_id") @db.Uuid
+  title        String
+  activityDate DateTime? @map("activity_date") @db.Date
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  club SchoolClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clubId])
+  @@map("school_club_activities")
+  @@schema("school")
+}
+
+model SchoolStudentOptionalSubject {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  subjectId      String   @map("subject_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      SchoolStudent      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      SchoolSubject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, studentId, subjectId])
+  @@index([tenantId, academicYearId, subjectId])
+  @@map("school_student_optional_subjects")
+  @@schema("school")
+}
+
+model SchoolIdCardTemplate {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String
+  status     String    @default("DRAFT")
+  isDefault  Boolean   @default(false) @map("is_default")
+  layoutJson Json      @default("{}") @map("layout_json")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@map("school_id_card_templates")
   @@schema("school")
 }
 
@@ -16747,6 +16914,10 @@ model SchoolStudent {
   siblingLinks     SchoolStudentSibling[] @relation("StudentSiblings")
   siblingOf        SchoolStudentSibling[] @relation("SiblingOf")
   auditLogs        SchoolStudentAuditLog[]
+  houseMemberships SchoolHouseMembership[]
+  clubMemberships  SchoolClubMembership[]
+  optionalSubjects SchoolStudentOptionalSubject[]
+  feePayments      SchoolFeePayment[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -16847,6 +17018,7 @@ model SchoolEnrollment {
   events       SchoolEnrollmentEvent[]
 
   @@unique([tenantId, studentId, academicYearId])
+  @@unique([tenantId, academicYearId, rollNumber])
   @@index([tenantId, academicYearId, sectionId])
   @@map("school_enrollments")
   @@schema("school")
@@ -17023,6 +17195,8 @@ model SchoolStaff {
   subjectTeacherAssignments SchoolSubjectTeacherAssignment[]
   timetableSlots            SchoolTimetableSlot[]
   webProfiles               SchoolWebStaffProfile[]
+  housesLed                 SchoolHouse[]
+  clubsCoordinated          SchoolClub[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -17213,6 +17387,110 @@ model SchoolFeeInstallment {
 
   @@unique([structureId, sequence])
   @@map("school_fee_installments")
+  @@schema("school")
+}
+
+model SchoolFeeSettings {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  academicYearId   String    @map("academic_year_id") @db.Uuid
+  dueDay           Int       @default(15) @map("due_day")
+  lateFeeAmount    Int       @default(20) @map("late_fee_amount")
+  lateFeeEnabled   Boolean   @default(true) @map("late_fee_enabled")
+  paymentMethods   Json      @default("[\"CASH\",\"UPI\",\"BANK\",\"CHEQUE\",\"OTHER\"]") @map("payment_methods")
+  receiptPrefix    String    @default("FB") @map("receipt_prefix")
+  signatoryName    String?   @map("signatory_name")
+  schoolName       String    @default("St. Luke's Secondary School") @map("school_name")
+  schoolAddress    String    @default("Walbakgre, New Tura") @map("school_address")
+  logoUrl          String?   @map("logo_url")
+  instructionsJson Json      @default("[]") @map("instructions_json")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId])
+  @@map("school_fee_settings")
+  @@schema("school")
+}
+
+model SchoolMonthlyFeePlan {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  gradeId        String    @map("grade_id") @db.Uuid
+  tuitionAmount  Int       @map("tuition_amount")
+  lateFeeAmount  Int?      @map("late_fee_amount")
+  otherAmount    Int       @default(0) @map("other_amount")
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grade        SchoolGrade        @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, gradeId])
+  @@index([tenantId, academicYearId])
+  @@map("school_monthly_fee_plans")
+  @@schema("school")
+}
+
+model SchoolFeePayment {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  academicYearId   String    @map("academic_year_id") @db.Uuid
+  studentId        String    @map("student_id") @db.Uuid
+  enrollmentId     String?   @map("enrollment_id") @db.Uuid
+  gradeId          String    @map("grade_id") @db.Uuid
+  sectionId        String    @map("section_id") @db.Uuid
+  feeMonth         String    @map("fee_month")
+  receiptNumber    String    @map("receipt_number")
+  tuitionAmount    Int       @map("tuition_amount")
+  lateFeeAmount    Int       @default(0) @map("late_fee_amount")
+  otherAmount      Int       @default(0) @map("other_amount")
+  discountAmount   Int       @default(0) @map("discount_amount")
+  previousBalance  Int       @default(0) @map("previous_balance")
+  totalAmount      Int       @map("total_amount")
+  paymentMode      String    @map("payment_mode")
+  reference        String?
+  notes            String?
+  status           String    @default("PAID")
+  paidAt           DateTime  @default(now()) @map("paid_at")
+  collectedById    String?   @map("collected_by_id") @db.Uuid
+  snapshotJson     Json      @default("{}") @map("snapshot_json")
+  voidedAt         DateTime? @map("voided_at")
+  voidedById       String?   @map("voided_by_id") @db.Uuid
+  voidReason       String?   @map("void_reason")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      SchoolStudent      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  events       SchoolFeePaymentEvent[]
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, academicYearId, feeMonth, status])
+  @@index([tenantId, studentId, feeMonth])
+  @@index([tenantId, paidAt])
+  @@map("school_fee_payments")
+  @@schema("school")
+}
+
+model SchoolFeePaymentEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  paymentId  String   @map("payment_id") @db.Uuid
+  type       String
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  note       String?
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  payment SchoolFeePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, paymentId, createdAt])
+  @@map("school_fee_payment_events")
   @@schema("school")
 }
 

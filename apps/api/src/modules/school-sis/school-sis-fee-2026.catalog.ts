@@ -57,11 +57,11 @@ export const FEE_2026_GROUPS: Array<{
   {
     code: '2026-NEW',
     name: 'New Admission 2026',
-    gradeCodes: ['UKG', 'I', 'II', 'III', 'IV'],
+    gradeCodes: ['LKG', 'UKG', 'I', 'II', 'III', 'IV'],
     printedTotal: 6750,
     notes: [
       'Source: St_Lukes_Fee_Structure_2026.xlsx · New Admission · KG–IV.',
-      'Applied independently to UKG and Classes I–IV.',
+      'Applied independently to LKG, UKG and Classes I–IV.',
     ],
     lines: heads([
       ['ADM', 'Admission', 1700],

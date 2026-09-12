@@ -1,119 +1,114 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { fetchChallenge, login, type Challenge } from '@/auth/login';
-import { GoldButton } from '@/ui/kit';
+import { login } from '@/auth/login';
+import { NavyButton, Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    void fetchChallenge()
-      .then(setChallenge)
-      .catch((err: Error) => setError(err.message));
-  }, []);
-
   const submit = async () => {
-    if (!challenge) return;
     setBusy(true);
     setError(null);
     try {
-      await login(identifier, password, challenge, Number(answer));
-      router.replace('/(tabs)');
+      const session = await login(identifier, password);
+      router.replace(session.user.mustResetPassword ? '/password' : '/(tabs)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in');
-      void fetchChallenge()
-        .then(setChallenge)
-        .catch(() => undefined);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <LinearGradient colors={[colors.navyDeep, colors.navy]} style={styles.fill}>
+    <Screen light>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.inner}
       >
         <Image source={require('../assets/icon.png')} style={styles.crest} />
-        <Text style={styles.kicker}>St. Luke's Secondary School, Tura</Text>
-        <Text style={styles.hello}>Welcome back</Text>
-        <View style={styles.card}>
+        <Text style={styles.school}>St. Luke's Secondary School</Text>
+        <Text style={styles.place}>Tura, Meghalaya</Text>
+        <Text style={styles.hello}>Welcome</Text>
+        <Text style={styles.sub}>Sign in to continue</Text>
+        <View style={styles.field}>
+          <Text style={styles.label}>Admission / Roll number</Text>
           <TextInput
-            placeholder="Email or username"
-            autoCapitalize="none"
+            placeholder="e.g. SLS26-0001 or 1"
+            autoCapitalize="characters"
+            autoCorrect={false}
             value={identifier}
             onChangeText={setIdentifier}
             style={styles.input}
             placeholderTextColor={colors.muted}
           />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Password</Text>
           <TextInput
-            placeholder="Password"
+            placeholder="First login: StLuke@123"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
             style={styles.input}
             placeholderTextColor={colors.muted}
           />
-          <Text style={styles.hint}>
-            {challenge?.expression ?? challenge?.question ?? 'Loading verification…'}
-          </Text>
-          <TextInput
-            placeholder="Answer"
-            keyboardType="number-pad"
-            value={answer}
-            onChangeText={setAnswer}
-            style={styles.input}
-            placeholderTextColor={colors.muted}
-          />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <GoldButton label={busy ? 'Signing in…' : 'Enter school'} onPress={() => void submit()} />
         </View>
-        <Text style={styles.foot}>Stay signed in until you log out.</Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <NavyButton
+          label={busy ? 'Signing in…' : 'Next'}
+          onPress={() => void submit()}
+          disabled={busy}
+        />
+        <Text style={styles.hint}>
+          Students use admission number or class roll number. First login password is StLuke@123;
+          you will set your own password after that. You stay signed in until you log out.
+        </Text>
+        <Pressable onPress={() => void Linking.openURL('https://stlukestura.in')}>
+          <Text style={styles.contact}>
+            New here? <Text style={styles.link}>Contact School</Text>
+          </Text>
+        </Pressable>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  inner: { flex: 1, justifyContent: 'center', padding: space.lg, gap: 12 },
-  crest: { width: 88, height: 88, alignSelf: 'center', borderRadius: 20 },
-  kicker: { color: colors.gold, textAlign: 'center', fontWeight: '700' },
-  hello: { color: '#fff', fontSize: 28, fontWeight: '800', textAlign: 'center' },
-  card: {
-    backgroundColor: colors.cream,
-    borderRadius: radii.lg,
-    padding: space.md,
-    gap: 10,
-  },
+  inner: { flex: 1, padding: space.lg, gap: 10, justifyContent: 'center' },
+  crest: { width: 88, height: 88, alignSelf: 'center', borderRadius: 44 },
+  school: { textAlign: 'center', fontWeight: '800', color: colors.navy, fontSize: 18 },
+  place: { textAlign: 'center', color: colors.muted, marginBottom: 8 },
+  hello: { textAlign: 'center', fontSize: 28, fontWeight: '800', color: colors.ink },
+  sub: { textAlign: 'center', color: colors.muted, marginBottom: 8 },
+  field: { gap: 6 },
+  label: { fontWeight: '700', color: colors.navy, fontSize: 13 },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f3f5fb',
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.line,
     paddingHorizontal: 14,
-    height: 48,
+    height: 50,
     color: colors.ink,
   },
-  hint: { color: colors.navy, fontWeight: '600' },
   error: { color: colors.danger },
-  foot: { color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  hint: { color: colors.muted, textAlign: 'center', fontSize: 12, lineHeight: 18 },
+  contact: { textAlign: 'center', color: colors.muted, marginTop: 8 },
+  link: { color: colors.navy, fontWeight: '800' },
 });

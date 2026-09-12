@@ -22,20 +22,20 @@ export default function EventDetail() {
 
   if (!row && !error) {
     return (
-      <Screen title="Event">
+      <Screen title="Event" onBack>
         <Loader />
       </Screen>
     );
   }
   if (error || !row) {
     return (
-      <Screen title="Event">
+      <Screen title="Event" onBack>
         <EmptyState title="Event unavailable" body={error ?? ''} />
       </Screen>
     );
   }
   return (
-    <Screen title="Event">
+    <Screen title="Event" onBack>
       <Feed>
         <Card>
           <Text style={{ fontSize: 22, fontWeight: '800' }}>{row.title}</Text>

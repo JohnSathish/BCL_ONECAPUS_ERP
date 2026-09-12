@@ -42,7 +42,11 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     try {
       await refreshAccessToken();
       return apiFetch<T>(path, { ...options, _retried: true });
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('offline') || msg.includes('Could not refresh')) {
+        throw err instanceof Error ? err : new Error(msg);
+      }
       onAuthFailure?.();
       throw new Error('Please sign in again.');
     }

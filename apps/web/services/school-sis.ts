@@ -62,11 +62,114 @@ export type SchoolSisGrade = {
   sortOrder: number;
 };
 
+export type SchoolSisSubjectType = {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+};
+
 export type SchoolSisSubject = {
   id: string;
   code: string;
   name: string;
+  sortOrder?: number;
+  active?: boolean;
+  subjectTypeId?: string | null;
+  subjectType?: SchoolSisSubjectType | null;
+  maxMarks?: number | null;
+  passMarks?: number | null;
+  hasTheory?: boolean;
+  hasPractical?: boolean;
+  isOptional?: boolean;
 };
+
+export type SchoolSisCurriculum = {
+  academicYear: { id: string; name: string; code?: string };
+  types: SchoolSisSubjectType[];
+  subjects: SchoolSisSubject[];
+  grades: SchoolSisGrade[];
+  mappings: Array<{
+    id: string;
+    gradeId: string;
+    subjectId: string;
+    gradeName: string;
+    subjectName: string;
+  }>;
+};
+
+export async function fetchSchoolSisCurriculum() {
+  const { data } = await api.get<SchoolSisCurriculum>('/v1/school-sis/curriculum');
+  return data;
+}
+
+export async function createSchoolSisSubjectType(payload: {
+  name: string;
+  code?: string;
+  sortOrder?: number;
+}) {
+  const { data } = await api.post('/v1/school-sis/subject-types', payload);
+  return data as SchoolSisSubjectType;
+}
+
+export async function updateSchoolSisSubjectType(
+  id: string,
+  payload: { name: string; code?: string; sortOrder?: number; active?: boolean },
+) {
+  const { data } = await api.patch(`/v1/school-sis/subject-types/${id}`, payload);
+  return data as SchoolSisSubjectType;
+}
+
+export async function deleteSchoolSisSubjectType(id: string) {
+  await api.delete(`/v1/school-sis/subject-types/${id}`);
+}
+
+export async function createSchoolSisSubject(payload: {
+  name: string;
+  code?: string;
+  subjectTypeId?: string;
+  sortOrder?: number;
+  maxMarks?: number;
+  passMarks?: number;
+  hasTheory?: boolean;
+  hasPractical?: boolean;
+  isOptional?: boolean;
+}) {
+  const { data } = await api.post('/v1/school-sis/subjects', payload);
+  return data as SchoolSisSubject;
+}
+
+export async function updateSchoolSisSubject(
+  id: string,
+  payload: {
+    name: string;
+    code?: string;
+    subjectTypeId?: string;
+    sortOrder?: number;
+    active?: boolean;
+    maxMarks?: number;
+    passMarks?: number;
+    hasTheory?: boolean;
+    hasPractical?: boolean;
+    isOptional?: boolean;
+  },
+) {
+  const { data } = await api.patch(`/v1/school-sis/subjects/${id}`, payload);
+  return data as SchoolSisSubject;
+}
+
+export async function deleteSchoolSisSubject(id: string) {
+  await api.delete(`/v1/school-sis/subjects/${id}`);
+}
+
+export async function saveSchoolSisClassSubjects(payload: {
+  gradeId: string;
+  subjectIds: string[];
+}) {
+  const { data } = await api.put('/v1/school-sis/class-subjects', payload);
+  return data as SchoolSisCurriculum;
+}
 
 export type SchoolSisSection = {
   id: string;
@@ -238,6 +341,13 @@ export async function uploadSchoolSisStaffDocument(
     params: { slot },
   });
   return data as { fileName?: string; url?: string };
+}
+
+export async function assignSchoolSisRollNumbers(studentIds?: string[]) {
+  const { data } = await api.post('/v1/school-sis/students/assign-roll-numbers', {
+    studentIds,
+  });
+  return data as { assigned: number; total: number; yearCode: string };
 }
 
 export async function enrollSchoolSisStudent(payload: {
@@ -725,4 +835,540 @@ export async function fetchSchoolSisStudentFees(studentId: string) {
     structures?: SchoolSisFeeStructure[];
   }>(`/v1/school-sis/fees/student/${studentId}`);
   return data;
+}
+
+export async function fetchSchoolAcademicYears() {
+  const { data } = await api.get('/v1/school-sis/academic/years');
+  return data as Array<{
+    id: string;
+    name: string;
+    code: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    _count?: { enrollments: number; sections: number };
+  }>;
+}
+
+export async function saveSchoolAcademicYear(
+  payload: {
+    name: string;
+    code?: string;
+    startDate: string;
+    endDate: string;
+    status?: string;
+  },
+  id?: string,
+) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/academic/years/${id}`, payload)
+    : await api.post('/v1/school-sis/academic/years', payload);
+  return data;
+}
+
+export async function activateSchoolAcademicYear(id: string) {
+  const { data } = await api.post(`/v1/school-sis/academic/years/${id}/activate`);
+  return data;
+}
+
+export async function archiveSchoolAcademicYear(id: string) {
+  const { data } = await api.post(`/v1/school-sis/academic/years/${id}/archive`);
+  return data;
+}
+
+export async function fetchSchoolAcademicClasses() {
+  const { data } = await api.get('/v1/school-sis/academic/classes');
+  return data as {
+    academicYear: { id: string; name: string };
+    grades: Array<{
+      id: string;
+      name: string;
+      code: string;
+      active: boolean;
+      capacity: number | null;
+      sortOrder: number;
+    }>;
+    sections: Array<{
+      id: string;
+      name: string;
+      capacity: number | null;
+      active: boolean;
+      gradeId: string;
+      grade: { id: string; name: string };
+      _count?: { enrollments: number };
+      classTeachers?: Array<{ staff: { id: string; fullName: string } }>;
+    }>;
+  };
+}
+
+export async function saveSchoolGrade(
+  payload: { name: string; code?: string; capacity?: number; active?: boolean },
+  id?: string,
+) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/academic/grades/${id}`, payload)
+    : await api.post('/v1/school-sis/academic/grades', payload);
+  return data;
+}
+
+export async function patchSchoolSection(
+  id: string,
+  payload: { name?: string; capacity?: number; active?: boolean },
+) {
+  const { data } = await api.patch(`/v1/school-sis/academic/sections/${id}`, payload);
+  return data;
+}
+
+export async function archiveSchoolSection(id: string) {
+  await api.delete(`/v1/school-sis/academic/sections/${id}`);
+}
+
+export async function fetchSchoolClassSubjectMatrix() {
+  const { data } = await api.get('/v1/school-sis/academic/class-subjects');
+  return data as {
+    academicYear: { id: string; name: string };
+    grades: Array<{ id: string; name: string }>;
+    subjects: SchoolSisSubject[];
+    rows: Array<{
+      sectionId: string;
+      gradeId: string;
+      className: string;
+      sectionName: string;
+      subjectId: string | null;
+      subjectName: string | null;
+      subjectCode: string | null;
+      subjectType: string | null;
+      teacher: { id: string; fullName: string } | null;
+    }>;
+  };
+}
+
+export async function bulkMapSchoolClassSubjects(payload: {
+  gradeIds: string[];
+  subjectIds: string[];
+}) {
+  const { data } = await api.put('/v1/school-sis/academic/class-subjects/bulk', payload);
+  return data;
+}
+
+export async function fetchSchoolStaffMap() {
+  const { data } = await api.get('/v1/school-sis/academic/staff-map');
+  return data as {
+    academicYear: { id: string; name: string };
+    staff: Array<{ id: string; fullName: string; employeeCode: string }>;
+    classTeachers: Array<{
+      id: string;
+      staff: { id: string; fullName: string };
+      section: { name: string; grade: { name: string } };
+    }>;
+    subjectTeachers: Array<{
+      id: string;
+      staff: { id: string; fullName: string };
+      subject: { name: string };
+      section: { name: string; grade: { name: string } };
+      periodsPerWeek: number;
+    }>;
+    workload: Array<{
+      id: string;
+      fullName: string;
+      employeeCode: string;
+      classTeacherSections: number;
+      subjects: number;
+      periods: number;
+    }>;
+  };
+}
+
+export async function fetchSchoolOptionals(sectionId?: string) {
+  const { data } = await api.get('/v1/school-sis/academic/optionals', {
+    params: sectionId ? { sectionId } : undefined,
+  });
+  return data as {
+    academicYear: { id: string; name: string };
+    subjects: SchoolSisSubject[];
+    students: Array<{
+      id: string;
+      fullName: string;
+      admissionNumber: string;
+      className: string;
+      sectionId: string;
+      subjectIds: string[];
+    }>;
+  };
+}
+
+export async function saveSchoolOptionalMapping(payload: {
+  studentId: string;
+  subjectIds: string[];
+}) {
+  const { data } = await api.put('/v1/school-sis/academic/optionals', payload);
+  return data;
+}
+
+export async function fetchSchoolHouses() {
+  const { data } = await api.get('/v1/school-sis/academic/houses');
+  return data as {
+    academicYear: { id: string; name: string };
+    houses: Array<{
+      id: string;
+      name: string;
+      color: string;
+      captainName: string | null;
+      teacherStaffId: string | null;
+      teacher: { id: string; fullName: string } | null;
+      memberships: Array<{
+        student: { id: string; fullName: string; admissionNumber: string };
+      }>;
+    }>;
+  };
+}
+
+export async function saveSchoolHouse(
+  payload: {
+    name: string;
+    color?: string;
+    captainName?: string;
+    teacherStaffId?: string;
+  },
+  id?: string,
+) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/academic/houses/${id}`, payload)
+    : await api.post('/v1/school-sis/academic/houses', payload);
+  return data;
+}
+
+export async function assignSchoolHouseMembers(payload: { houseId: string; studentIds: string[] }) {
+  const { data } = await api.put('/v1/school-sis/academic/houses/members', payload);
+  return data;
+}
+
+export async function fetchSchoolClubs() {
+  const { data } = await api.get('/v1/school-sis/academic/clubs');
+  return data as {
+    academicYear: { id: string; name: string };
+    clubs: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      coordinator: { id: string; fullName: string } | null;
+      members: Array<{
+        student: { id: string; fullName: string; admissionNumber: string };
+      }>;
+      activities: Array<{
+        id: string;
+        title: string;
+        activityDate: string | null;
+        notes: string | null;
+      }>;
+    }>;
+  };
+}
+
+export async function saveSchoolClub(
+  payload: { name: string; description?: string; coordinatorStaffId?: string },
+  id?: string,
+) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/academic/clubs/${id}`, payload)
+    : await api.post('/v1/school-sis/academic/clubs', payload);
+  return data;
+}
+
+export async function assignSchoolClubMembers(clubId: string, studentIds: string[]) {
+  const { data } = await api.put(`/v1/school-sis/academic/clubs/${clubId}/members`, { studentIds });
+  return data;
+}
+
+export async function addSchoolClubActivity(
+  clubId: string,
+  payload: { title: string; activityDate?: string; notes?: string },
+) {
+  const { data } = await api.post(`/v1/school-sis/academic/clubs/${clubId}/activities`, payload);
+  return data;
+}
+
+export async function fetchSchoolPromotion(sectionId?: string) {
+  const { data } = await api.get('/v1/school-sis/academic/promotion', {
+    params: sectionId ? { sectionId } : undefined,
+  });
+  return data as {
+    academicYear: { id: string; name: string };
+    years: Array<{ id: string; name: string; status: string }>;
+    sections: Array<{
+      id: string;
+      name: string;
+      academicYearId: string;
+      grade: { name: string };
+      academicYear: { name: string };
+    }>;
+    students: Array<{
+      enrollmentId: string;
+      studentId: string;
+      fullName: string;
+      admissionNumber: string;
+      status: string;
+      className: string;
+      sectionId: string;
+      rollNumber: string | null;
+    }>;
+    history: Array<{
+      id: string;
+      type: string;
+      createdAt: string;
+      note: string | null;
+      student: { fullName: string; admissionNumber: string };
+    }>;
+  };
+}
+
+export async function applySchoolPromotion(payload: {
+  studentIds: string[];
+  action: 'PROMOTE' | 'HOLD' | 'WITHDRAW';
+  toSectionId?: string;
+  note?: string;
+}) {
+  const { data } = await api.post('/v1/school-sis/academic/promotion', payload);
+  return data as { ok: boolean; count: number };
+}
+
+export async function fetchSchoolIdCards() {
+  const { data } = await api.get('/v1/school-sis/academic/id-cards');
+  return data as Array<{
+    id: string;
+    name: string;
+    status: string;
+    isDefault: boolean;
+    layoutJson: Record<string, unknown>;
+  }>;
+}
+
+export async function saveSchoolIdCard(
+  payload: {
+    name: string;
+    status?: string;
+    isDefault?: boolean;
+    layoutJson?: Record<string, unknown>;
+  },
+  id?: string,
+) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/academic/id-cards/${id}`, payload)
+    : await api.post('/v1/school-sis/academic/id-cards', payload);
+  return data;
+}
+
+export async function previewSchoolIdCard(id: string, studentId?: string) {
+  const { data } = await api.get(`/v1/school-sis/academic/id-cards/${id}/preview`, {
+    params: studentId ? { studentId } : undefined,
+  });
+  return data as {
+    template: { layoutJson: Record<string, boolean | string> };
+    school: { name: string; logoUrl: string | null; address: string | null };
+    academicYear: { name: string };
+    student: {
+      fullName: string;
+      admissionNumber: string;
+      photoUrl: string | null;
+      bloodGroup: string | null;
+      className: string;
+    };
+  };
+}
+
+export async function fetchMonthlyFeeConfig() {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/config');
+  return data as {
+    academicYear: { id: string; name: string; code: string };
+    settings: {
+      dueDay: number;
+      lateFeeAmount: number;
+      lateFeeEnabled: boolean;
+      paymentMethods: string[];
+      receiptPrefix: string;
+      signatoryName: string | null;
+      schoolName: string;
+      schoolAddress: string;
+      logoUrl: string | null;
+      instructionsJson: string[];
+    };
+    plans: Array<{
+      id: string;
+      gradeId: string;
+      tuitionAmount: number;
+      lateFeeAmount: number | null;
+      otherAmount: number;
+      grade: { id: string; name: string; code: string };
+    }>;
+  };
+}
+
+export async function saveMonthlyFeeSettings(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/school-sis/fees/monthly/config', payload);
+  return data;
+}
+
+export async function saveMonthlyFeePlan(payload: {
+  gradeId: string;
+  tuitionAmount: number;
+  lateFeeAmount?: number;
+  otherAmount?: number;
+}) {
+  const { data } = await api.put('/v1/school-sis/fees/monthly/plans', payload);
+  return data;
+}
+
+export async function quoteMonthlyFee(studentId: string, month: string) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/quote', {
+    params: { studentId, month },
+  });
+  return data as {
+    paid: boolean;
+    payment?: { id: string; receiptNumber: string } | null;
+    student: { id: string; fullName: string; admissionNumber: string };
+    className: string;
+    sectionName: string;
+    feeMonth: string;
+    monthLabel: string;
+    tuitionAmount: number;
+    otherAmount: number;
+    lateFeeAmount: number;
+    lateApplies: boolean;
+    previousBalance: number;
+    totalAmount: number;
+    academicYear: { name: string };
+    settings: {
+      paymentMethods: string[];
+      dueDay: number;
+      schoolName: string;
+      schoolAddress: string;
+      signatoryName: string | null;
+      instructionsJson: string[];
+    };
+  };
+}
+
+export async function collectMonthlyFee(payload: {
+  studentId: string;
+  feeMonth: string;
+  paymentMode: string;
+  reference?: string;
+  discountAmount?: number;
+  otherAmount?: number;
+  waiveLateFee?: boolean;
+  notes?: string;
+}) {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/collect', payload);
+  return data as { receiptNumber: string; payment: { id: string } };
+}
+
+export async function fetchMonthlyFeeDashboard() {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/dashboard');
+  return data as {
+    academicYear: { name: string };
+    todayCollection: number;
+    todayCount: number;
+    monthCollection: number;
+    monthPaid: number;
+    monthPending: number;
+    enrolled: number;
+    latePayments: number;
+    pendingFees: number;
+    byClass: Array<{ name: string; amount: number; paid: number }>;
+    byMonth: Array<{ month: string; label: string; amount: number; count: number }>;
+  };
+}
+
+export async function fetchMonthlyFeeRegister(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/register', { params });
+  return data as {
+    academicYear: { name: string };
+    rows: Array<{
+      id: string;
+      receiptNumber: string;
+      feeMonth: string;
+      monthLabel: string;
+      tuitionAmount: number;
+      lateFeeAmount: number;
+      totalAmount: number;
+      paymentMode: string;
+      status: string;
+      paidAt: string;
+      className: string;
+      sectionName: string;
+      student: { fullName: string; admissionNumber: string };
+    }>;
+  };
+}
+
+export async function fetchMonthlyFeePending(month?: string) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/pending', {
+    params: month ? { month } : undefined,
+  });
+  return data as {
+    feeMonth: string;
+    monthLabel: string;
+    rows: Array<{
+      studentId: string;
+      fullName: string;
+      admissionNumber: string;
+      className: string;
+      sectionName: string;
+      tuitionAmount: number;
+      lateFeeAmount: number;
+      previousBalance?: number;
+      totalDue: number;
+    }>;
+  };
+}
+
+export async function voidMonthlyFee(id: string, reason: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/monthly/payments/${id}/void`, { reason });
+  return data;
+}
+
+export async function fetchMonthlyFeePayment(id: string) {
+  const { data } = await api.get(`/v1/school-sis/fees/monthly/payments/${id}`);
+  return data as {
+    id: string;
+    receiptNumber: string;
+    feeMonth: string;
+    tuitionAmount: number;
+    lateFeeAmount: number;
+    otherAmount: number;
+    discountAmount: number;
+    previousBalance: number;
+    totalAmount: number;
+    paymentMode: string;
+    reference: string | null;
+    status: string;
+    paidAt: string;
+    snapshotJson: Record<string, unknown>;
+    student: { fullName: string; admissionNumber: string };
+    events: Array<{ type: string; createdAt: string; note: string | null }>;
+  };
+}
+
+function triggerBlobDownload(data: Blob, fileName: string) {
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+export async function downloadMonthlyFeeRegisterXlsx(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/register-export', {
+    params,
+    responseType: 'blob',
+  });
+  triggerBlobDownload(data as Blob, 'monthly-fee-register.xlsx');
+}
+
+export async function downloadMonthlyFeeReceiptPdf(id: string, receiptNumber: string) {
+  const { data } = await api.get(`/v1/school-sis/fees/monthly/payments/${id}/pdf`, {
+    responseType: 'blob',
+  });
+  triggerBlobDownload(data as Blob, `${receiptNumber.replaceAll('/', '-')}.pdf`);
 }

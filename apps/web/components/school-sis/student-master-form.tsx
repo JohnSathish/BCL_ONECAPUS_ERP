@@ -783,11 +783,12 @@ export function StudentMasterForm({ studentId }: { studentId?: string }) {
               onChange={(e) => patch({ admissionDate: e.target.value })}
             />
           </Field>
-          <Field label="Roll Number">
+          <Field label="Roll Number" hint="Auto-generated SLS26-0001 (year + sequence)">
             <Input
               className={inputClass}
               value={form.rollNumber}
-              onChange={(e) => patch({ rollNumber: e.target.value })}
+              readOnly
+              placeholder="Assigned on save"
             />
           </Field>
           <Field label="Student Status" required>

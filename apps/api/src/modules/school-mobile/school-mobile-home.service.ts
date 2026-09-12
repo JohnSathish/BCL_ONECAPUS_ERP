@@ -39,14 +39,57 @@ export class SchoolMobileHomeService {
     );
     const account = await this.prisma.user.findFirst({
       where: { id: user.sub, tenantId: user.tid },
-      select: { displayName: true, email: true },
+      select: {
+        displayName: true,
+        email: true,
+        username: true,
+        mustResetPassword: true,
+      },
     });
+    const activeChild =
+      children.find((child) => child.studentId === activeStudentId) ??
+      children[0] ??
+      null;
+    let student: Record<string, unknown> | null = null;
+    if (activeChild) {
+      const row = await this.prisma.schoolStudent.findFirst({
+        where: { id: activeChild.studentId, tenantId: user.tid },
+        include: {
+          guardians: { include: { guardian: true } },
+        },
+      });
+      student = row
+        ? {
+            id: row.id,
+            fullName: row.fullName,
+            admissionNumber: row.admissionNumber,
+            photoUrl: row.photoUrl,
+            gender: row.gender,
+            dateOfBirth: row.dateOfBirth,
+            phone: row.phone,
+            email: row.email,
+            address: row.address,
+            classLabel: activeChild.classLabel,
+            guardians: row.guardians.map((link) => ({
+              fullName: link.guardian.fullName,
+              relation: link.relationship || link.guardian.relation,
+              phone: link.guardian.phone,
+            })),
+          }
+        : null;
+    }
     return {
       persona,
-      displayName: account?.displayName || 'St. Luke’s family',
+      displayName:
+        (student?.fullName as string | undefined) ||
+        account?.displayName ||
+        'St. Luke’s family',
       email: account?.email || user.email,
+      username: account?.username,
+      mustResetPassword: Boolean(account?.mustResetPassword),
       children,
       activeStudentId,
+      student,
     };
   }
 

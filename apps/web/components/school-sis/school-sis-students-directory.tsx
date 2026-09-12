@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +22,7 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import {
+  assignSchoolSisRollNumbers,
   fetchSchoolSisMasters,
   fetchSchoolSisStudents,
   type SchoolSisStudent,
@@ -94,6 +95,7 @@ function csvEscape(value: string) {
 export function SchoolSisStudentsDirectory() {
   const params = useSearchParams();
   const enabled = useAuthQueryEnabled();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.session?.user);
   const canManage = canManageSchoolSis(user?.permissions);
   const [q, setQ] = useState(params.get('q') ?? '');
@@ -108,6 +110,8 @@ export function SchoolSisStudentsDirectory() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selected, setSelected] = useState<string[]>([]);
+  const [rollBusy, setRollBusy] = useState(false);
+  const [rollMessage, setRollMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(q), 250);
@@ -496,6 +500,8 @@ export function SchoolSisStudentsDirectory() {
         </label>
       ) : null}
 
+      {rollMessage ? <p className="text-sm text-slate-600">{rollMessage}</p> : null}
+
       {students.isError ? (
         <p className="text-sm text-red-600">{apiErrorMessage(students.error)}</p>
       ) : null}
@@ -514,7 +520,6 @@ export function SchoolSisStudentsDirectory() {
             'Bulk Actions',
             'Assign Class',
             'Assign Section',
-            'Assign Roll No.',
             'Change Status',
             'Print ID Cards',
           ].map((label) => (
@@ -528,6 +533,47 @@ export function SchoolSisStudentsDirectory() {
               {label}
             </button>
           ))}
+          {canManage ? (
+            <button
+              type="button"
+              disabled={rollBusy}
+              title={
+                selected.length
+                  ? 'Assign unique SLS year roll numbers to selected students who do not have one yet'
+                  : 'Assign unique SLS year roll numbers to students missing them'
+              }
+              onClick={() => {
+                setRollBusy(true);
+                setRollMessage(null);
+                void assignSchoolSisRollNumbers(selected.length ? selected : undefined)
+                  .then(async (result) => {
+                    setRollMessage(
+                      result.assigned
+                        ? `Assigned ${result.assigned} roll number${result.assigned === 1 ? '' : 's'} for ${result.yearCode}.`
+                        : 'Every selected student already has a unique year roll number.',
+                    );
+                    await queryClient.invalidateQueries({
+                      queryKey: ['school-sis-students-register'],
+                    });
+                  })
+                  .catch((err: unknown) => {
+                    setRollMessage(apiErrorMessage(err));
+                  })
+                  .finally(() => setRollBusy(false));
+              }}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+            >
+              {rollBusy ? 'Assigning…' : 'Assign Roll No.'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-400"
+            >
+              Assign Roll No.
+            </button>
+          )}
           <div className="relative ml-auto">
             <button
               type="button"

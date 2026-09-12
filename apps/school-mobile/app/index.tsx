@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
-import { getAccessToken } from '@/auth/session';
+import { getAccessToken, getUser } from '@/auth/session';
 import { colors } from '@/theme/tokens';
 
 export default function GateScreen() {
@@ -18,7 +18,6 @@ export default function GateScreen() {
         const boot = await apiFetch<{
           forceUpdate?: boolean;
           maintenanceMode?: boolean;
-          updateAvailable?: boolean;
           androidStoreUrl?: string | null;
           iosStoreUrl?: string | null;
           releaseNotes?: string | null;
@@ -36,10 +35,20 @@ export default function GateScreen() {
           return;
         }
         const token = await getAccessToken();
-        router.replace(token ? '/(tabs)' : '/login');
+        const user = await getUser();
+        if (token && user?.mustResetPassword) {
+          router.replace('/password');
+        } else {
+          router.replace(token ? '/(tabs)' : '/login');
+        }
       } catch {
         const token = await getAccessToken();
-        router.replace(token ? '/(tabs)' : '/login');
+        const user = await getUser();
+        if (token && user?.mustResetPassword) {
+          router.replace('/password');
+        } else {
+          router.replace(token ? '/(tabs)' : '/login');
+        }
       } finally {
         await SplashScreen.hideAsync().catch(() => undefined);
       }
@@ -50,19 +59,32 @@ export default function GateScreen() {
   }, [router]);
 
   return (
-    <LinearGradient colors={[colors.navyDeep, colors.navy]} style={styles.fill}>
+    <LinearGradient colors={['#0b1048', '#1a237e', '#24308f']} style={styles.fill}>
       <Image source={require('../assets/icon.png')} style={styles.crest} />
-      <Text style={styles.name}>St. Luke's School</Text>
-      <Text style={styles.motto}>Knowledge · Service · Light</Text>
+      <Text style={styles.name}>St. Luke's Secondary School</Text>
+      <Text style={styles.place}>Tura, Meghalaya</Text>
+      <View style={styles.ribbon}>
+        <Text style={styles.ribbonText}>ENLIGHTEN · EMPOWER · SERVE</Text>
+      </View>
+      <Text style={styles.motto}>Shaping Brighter Futures</Text>
       <View style={styles.bar} />
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  crest: { width: 120, height: 120, borderRadius: 28 },
-  name: { color: '#fff', fontSize: 26, fontWeight: '800' },
-  motto: { color: colors.gold, letterSpacing: 1.2, fontWeight: '600' },
-  bar: { width: 64, height: 4, backgroundColor: colors.gold, borderRadius: 2, marginTop: 8 },
+  fill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+  crest: { width: 128, height: 128, borderRadius: 64, marginBottom: 8 },
+  name: { color: '#fff', fontSize: 24, fontWeight: '800', textAlign: 'center' },
+  place: { color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  ribbon: {
+    marginTop: 8,
+    backgroundColor: colors.gold,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  ribbonText: { color: colors.navyDeep, fontWeight: '800', fontSize: 11, letterSpacing: 0.6 },
+  motto: { color: 'rgba(255,255,255,0.85)', fontStyle: 'italic', marginTop: 12 },
+  bar: { width: 72, height: 4, backgroundColor: colors.gold, borderRadius: 2, marginTop: 16 },
 });

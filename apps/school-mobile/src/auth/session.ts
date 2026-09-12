@@ -9,6 +9,7 @@ export type StoredUser = {
   permissions?: string[];
   roles?: string[];
   displayName?: string;
+  mustResetPassword?: boolean;
 };
 
 export async function saveSession(accessToken: string, refreshToken: string) {

@@ -154,6 +154,52 @@ export class SchoolMobileBroadcastDto {
   audienceFilter?: Record<string, string>;
 }
 
+export class SchoolMobileLoginDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  identifier!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  password!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  deviceId?: string;
+}
+
+export class SchoolMobileChangePasswordDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  newPassword!: string;
+}
+
+export class SchoolMobileFeedbackDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(4000)
+  message!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+}
+
 export class PatchSchoolMobileInboxDto {
   @IsOptional()
   @IsBoolean()

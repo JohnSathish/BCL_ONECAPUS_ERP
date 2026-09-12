@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { colors } from '@/theme/tokens';
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.55 }}>{emoji}</Text>;
+  return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>;
 }
 
 export default function TabsLayout() {
@@ -13,7 +13,14 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.navy,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: colors.line },
+        tabBarLabelStyle: { fontWeight: '700', fontSize: 11 },
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: colors.line,
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
       }}
     >
       <Tabs.Screen
@@ -27,7 +34,7 @@ export default function TabsLayout() {
         name="notices"
         options={{
           title: 'Notices',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📢" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📄" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -41,7 +48,7 @@ export default function TabsLayout() {
         name="gallery"
         options={{
           title: 'Gallery',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🖼" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🖼️" focused={focused} />,
         }}
       />
       <Tabs.Screen

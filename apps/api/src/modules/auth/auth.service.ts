@@ -1438,6 +1438,47 @@ export class AuthService {
     };
   }
 
+  /**
+   * Long-lived mobile session for the St. Luke's School app.
+   * Skips MFA and password-expiry logout used by college web login.
+   */
+  async issueRememberedSessionForUser(
+    userId: string,
+    tenantId: string,
+    meta?: LoginDeviceMeta,
+    flags?: { mustResetPassword?: boolean },
+  ): Promise<AuthSessionResponse> {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null, status: 'active' },
+    });
+    if (!tenant) throw new UnauthorizedException('Invalid credentials');
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId, deletedAt: null, isActive: true },
+      include: {
+        roles: { where: { deletedAt: null }, include: { role: true } },
+      },
+    });
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+    const roles = user.roles.map((r) => r.role.slug);
+    const resolved = await this.resolveUserPermissions(user.id, roles);
+    const shiftScope = await this.resolveShiftScope(user.id, roles);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+    const mustResetPassword =
+      flags?.mustResetPassword ?? user.mustResetPassword ?? false;
+    return this.issueTokens(
+      { ...user, mustResetPassword },
+      tenant.slug,
+      roles,
+      resolved.permissions,
+      shiftScope,
+      resolved.dataScope,
+      { rememberMe: true, meta },
+    );
+  }
+
   /** Public JSON body — refresh token travels via HttpOnly cookie on web; included in body for mobile */
   toPublicSession(
     session: AuthSessionResponse,

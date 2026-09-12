@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Image, Text } from 'react-native';
+import { Image, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { mediaUrl } from '@/api/config';
-import { Card, EmptyState, Feed, Loader, Screen } from '@/ui/kit';
+import { Card, Chips, EmptyState, Feed, Loader, Screen } from '@/ui/kit';
+import { colors } from '@/theme/tokens';
 
 type Album = {
   slug: string;
@@ -17,6 +18,7 @@ export default function GalleryScreen() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('Albums');
 
   useEffect(() => {
     apiFetch<{ albums: Album[] }>('/v1/school-mobile/gallery')
@@ -26,7 +28,8 @@ export default function GalleryScreen() {
   }, []);
 
   return (
-    <Screen title="Gallery">
+    <Screen title="Photo Gallery">
+      <Chips options={['Albums', 'Photos']} value={tab} onChange={setTab} />
       {loading ? <Loader /> : null}
       {!loading && error ? <EmptyState title="Could not load gallery" body={error} /> : null}
       {!loading && !albums.length && !error ? (
@@ -39,12 +42,18 @@ export default function GalleryScreen() {
         {albums.map((album) => {
           const cover = mediaUrl(album.cover as never);
           return (
-            <Card key={album.slug} onPress={() => router.push(`/gallery/${album.slug}`)}>
+            <Card
+              key={album.slug}
+              padded={false}
+              onPress={() => router.push(`/gallery/${album.slug}`)}
+            >
               {cover ? (
-                <Image source={{ uri: cover }} style={{ height: 160, borderRadius: 12 }} />
-              ) : null}
-              <Text style={{ fontWeight: '800' }}>{album.title}</Text>
-              <Text style={{ color: '#5b6573' }}>{album.photoCount ?? 0} photos</Text>
+                <Image source={{ uri: cover }} style={styles.cover} />
+              ) : (
+                <Text style={styles.ph}>📷</Text>
+              )}
+              <Text style={styles.title}>{album.title}</Text>
+              <Text style={styles.count}>{album.photoCount ?? 0} Photos</Text>
             </Card>
           );
         })}
@@ -52,3 +61,10 @@ export default function GalleryScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  cover: { height: 160, width: '100%' },
+  ph: { textAlign: 'center', padding: 40, fontSize: 32 },
+  title: { fontWeight: '800', paddingHorizontal: 14, paddingTop: 10, color: colors.ink },
+  count: { color: colors.muted, paddingHorizontal: 14, paddingBottom: 12 },
+});

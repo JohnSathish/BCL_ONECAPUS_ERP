@@ -15,6 +15,10 @@ import {
   SCHOOL_ADMISSION_NUMBER_PREFIX,
   SCHOOL_SIS_PRODUCT,
 } from './school-sis.constants';
+import {
+  isSchoolRollNumber,
+  resolveSchoolEnrollmentRollNumber,
+} from './school-sis-roll-number';
 import type {
   AddPreviousSchoolDto,
   AddStudentDocumentDto,
@@ -76,7 +80,7 @@ export class SchoolSisService {
   async nextFormattedNumber(
     tenantId: string,
     academicYearId: string,
-    kind: 'ADMISSION' | 'APPLICATION',
+    kind: 'ADMISSION' | 'APPLICATION' | 'ROLL' | 'FEE',
     prefix: string,
     yearCode: string,
   ) {
@@ -306,6 +310,7 @@ export class SchoolSisService {
         stationery: false,
         transport: false,
         website: true,
+        academicConfig: true,
       },
     };
   }
@@ -320,6 +325,7 @@ export class SchoolSisService {
       }),
       this.prisma.schoolSubject.findMany({
         where: { tenantId, deletedAt: null },
+        include: { subjectType: true },
         orderBy: { sortOrder: 'asc' },
       }),
       this.prisma.schoolSection.findMany({
@@ -434,10 +440,7 @@ export class SchoolSisService {
       take: 2500,
     });
 
-    const rollKey = (value?: string | null) => {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : 9999;
-    };
+    const rollKey = (value?: string | null) => (value ?? '').toUpperCase();
     rows.sort((a, b) => {
       const ea = a.enrollments[0];
       const eb = b.enrollments[0];
@@ -449,7 +452,7 @@ export class SchoolSisService {
       if (sa !== sb) return sa.localeCompare(sb);
       const ra = rollKey(ea?.rollNumber);
       const rb = rollKey(eb?.rollNumber);
-      if (ra !== rb) return ra - rb;
+      if (ra !== rb) return ra.localeCompare(rb, 'en');
       return a.fullName.localeCompare(b.fullName, 'en', {
         sensitivity: 'base',
       });
@@ -613,13 +616,24 @@ export class SchoolSisService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    const toYear = await this.prisma.schoolAcademicYear.findFirst({
+      where: { id: toSection.academicYearId, tenantId, deletedAt: null },
+    });
+    if (!toYear) throw new NotFoundException('Target academic year not found');
     return this.prisma.$transaction(async (tx) => {
       if (current && current.academicYearId === toSection.academicYearId) {
+        const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
+          tenantId,
+          studentId: student.id,
+          academicYearId: toSection.academicYearId,
+          yearCode: toYear.code,
+          requested: dto.rollNumber?.trim() || current.rollNumber,
+        });
         const updated = await tx.schoolEnrollment.update({
           where: { id: current.id },
           data: {
             sectionId: toSection.id,
-            rollNumber: dto.rollNumber?.trim() || current.rollNumber,
+            rollNumber,
           },
         });
         await tx.schoolEnrollmentEvent.create({
@@ -642,13 +656,20 @@ export class SchoolSisService {
           data: { status: 'PROMOTED' },
         });
       }
+      const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
+        tenantId,
+        studentId: student.id,
+        academicYearId: toSection.academicYearId,
+        yearCode: toYear.code,
+        requested: dto.rollNumber?.trim() || current?.rollNumber,
+      });
       const created = await tx.schoolEnrollment.create({
         data: {
           tenantId,
           studentId: student.id,
           academicYearId: toSection.academicYearId,
           sectionId: toSection.id,
-          rollNumber: dto.rollNumber?.trim() || null,
+          rollNumber,
           status: 'ACTIVE',
           source: 'PROMOTE',
         },
@@ -808,29 +829,71 @@ export class SchoolSisService {
     ]);
     if (!student) throw new NotFoundException('Student not found');
     if (!section) throw new NotFoundException('Section not found');
-    return this.prisma.schoolEnrollment.upsert({
-      where: {
-        tenantId_studentId_academicYearId: {
-          tenantId,
-          studentId: student.id,
-          academicYearId: year.id,
-        },
-      },
-      update: {
-        sectionId: section.id,
-        rollNumber: dto.rollNumber?.trim() || null,
-        status: 'ACTIVE',
-        deletedAt: null,
-      },
-      create: {
+    return this.prisma.$transaction(async (tx) => {
+      const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
         tenantId,
         studentId: student.id,
         academicYearId: year.id,
-        sectionId: section.id,
-        rollNumber: dto.rollNumber?.trim() || null,
-        source: 'OFFICE',
-      },
+        yearCode: year.code,
+        requested: dto.rollNumber,
+      });
+      return tx.schoolEnrollment.upsert({
+        where: {
+          tenantId_studentId_academicYearId: {
+            tenantId,
+            studentId: student.id,
+            academicYearId: year.id,
+          },
+        },
+        update: {
+          sectionId: section.id,
+          rollNumber,
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        create: {
+          tenantId,
+          studentId: student.id,
+          academicYearId: year.id,
+          sectionId: section.id,
+          rollNumber,
+          source: 'OFFICE',
+        },
+      });
     });
+  }
+
+  async assignRollNumbers(tenantId: string, studentIds?: string[]) {
+    await this.assertSecondarySisTenant(tenantId);
+    const year = await this.currentYear(tenantId);
+    const enrollments = await this.prisma.schoolEnrollment.findMany({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        deletedAt: null,
+        ...(studentIds?.length ? { studentId: { in: studentIds } } : {}),
+      },
+      select: { id: true, studentId: true, rollNumber: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    let assigned = 0;
+    for (const enrollment of enrollments) {
+      if (isSchoolRollNumber(enrollment.rollNumber)) continue;
+      await this.prisma.$transaction(async (tx) => {
+        const rollNumber = await resolveSchoolEnrollmentRollNumber(tx, {
+          tenantId,
+          studentId: enrollment.studentId,
+          academicYearId: year.id,
+          yearCode: year.code,
+        });
+        await tx.schoolEnrollment.update({
+          where: { id: enrollment.id },
+          data: { rollNumber },
+        });
+      });
+      assigned += 1;
+    }
+    return { assigned, total: enrollments.length, yearCode: year.code };
   }
 
   async listAllocations(tenantId: string) {
@@ -871,6 +934,22 @@ export class SchoolSisService {
     ]);
     if (!section) throw new NotFoundException('Section not found');
     if (!staff) throw new NotFoundException('Staff not found');
+    const clash = await this.prisma.schoolClassTeacherAssignment.findFirst({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        staffId: staff.id,
+        role: 'PRIMARY',
+        deletedAt: null,
+        NOT: { sectionId: section.id },
+      },
+      include: { section: { include: { grade: true } } },
+    });
+    if (clash) {
+      throw new BadRequestException(
+        `${staff.fullName} is already class teacher of ${clash.section.grade.name} ${clash.section.name}`,
+      );
+    }
     return this.prisma.schoolClassTeacherAssignment.upsert({
       where: {
         tenantId_academicYearId_sectionId_role: {

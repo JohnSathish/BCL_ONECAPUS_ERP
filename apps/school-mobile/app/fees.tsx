@@ -18,7 +18,7 @@ export default function FeesScreen() {
   }, []);
 
   return (
-    <Screen title="Fees">
+    <Screen title="Fees" onBack>
       {loading ? <Loader /> : null}
       {error ? <EmptyState title="Fee details unavailable" body={error} /> : null}
       {!loading && !error && !lines.length ? (

@@ -1,47 +1,36 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { clearSession } from '@/auth/session';
-import { Card, Feed, GoldButton, Screen } from '@/ui/kit';
-import { colors, space } from '@/theme/tokens';
-
-const LINKS = [
-  ['Morning prayer', '/prayer'],
-  ['Timetable', '/timetable'],
-  ['Attendance', '/attendance'],
-  ['Fees', '/fees'],
-  ['About the school', '/page/about'],
-  ['Principal’s message', '/page/principal'],
-  ['Admissions', '/page/admissions'],
-  ['Contact', '/page/contact'],
-  ['Notifications', '/inbox'],
-] as const;
+import { Card, Row, Screen } from '@/ui/kit';
+import { colors } from '@/theme/tokens';
 
 export default function MoreScreen() {
   const router = useRouter();
   return (
     <Screen title="More">
-      <Feed>
-        {LINKS.map(([label, href]) => (
-          <Card key={href} onPress={() => router.push(href as never)}>
-            <Text style={styles.link}>{label}</Text>
-          </Card>
-        ))}
-        <View style={{ height: space.sm }} />
-        <GoldButton
-          label="Log out"
+      <View style={{ padding: 16, gap: 12 }}>
+        <Card>
+          <Row icon="🙏" label="Daily Morning Prayer" onPress={() => router.push('/prayer')} />
+          <Row icon="🏫" label="School Information" onPress={() => router.push('/school')} />
+          <Row icon="📘" label="Academics" onPress={() => router.push('/academics')} />
+          <Row icon="📝" label="Admissions" onPress={() => router.push('/page/admissions')} />
+          <Row icon="🔗" label="Important Links" onPress={() => router.push('/page/about')} />
+          <Row icon="☎️" label="Contact Us" onPress={() => router.push('/page/contact')} />
+          <Row icon="💬" label="Feedback / Enquiry" onPress={() => router.push('/feedback')} />
+          <Row icon="ℹ️" label="App Information" onPress={() => router.push('/app-info')} />
+        </Card>
+        <Pressable
           onPress={() => {
             void clearSession().then(() => router.replace('/login'));
           }}
-        />
-        <Pressable onPress={() => router.push('/page/privacy' as never)}>
-          <Text style={styles.privacy}>Privacy policy</Text>
+        >
+          <Text style={styles.logout}>Log out</Text>
         </Pressable>
-      </Feed>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  link: { fontWeight: '700', color: colors.navy },
-  privacy: { textAlign: 'center', color: colors.muted, marginTop: 8 },
+  logout: { textAlign: 'center', color: colors.danger, fontWeight: '800', padding: 12 },
 });

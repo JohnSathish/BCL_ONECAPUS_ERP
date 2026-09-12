@@ -16,9 +16,11 @@ export type SchoolSisNavPersona =
 const PERSONA_MODULES: Record<Exclude<SchoolSisNavPersona, 'full'>, Set<string>> = {
   teacher: new Set([
     'dashboard',
+    'academic-config',
     'application',
     'students',
     'classes-sections',
+    'subjects-curriculum',
     'timetable',
     'learning',
     'examination',
@@ -61,6 +63,7 @@ const PERSONA_MODULES: Record<Exclude<SchoolSisNavPersona, 'full'>, Set<string>>
     'dashboard',
     'students',
     'classes-sections',
+    'academic-config',
     'application',
     'documentation',
     'support',

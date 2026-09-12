@@ -39,7 +39,7 @@ export default function InboxScreen() {
   }, []);
 
   return (
-    <Screen title={`Notifications${unread ? ` · ${unread} unread` : ''}`}>
+    <Screen title={`Notifications${unread ? ` · ${unread} unread` : ''}`} onBack>
       {error ? <EmptyState title="Notifications unavailable" body={error} /> : null}
       {!error && !items.length ? (
         <EmptyState title="You're all caught up" body="School alerts will appear here." />

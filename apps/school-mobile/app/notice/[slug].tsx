@@ -17,14 +17,14 @@ export default function NoticeDetail() {
 
   if (!row && !error) {
     return (
-      <Screen title="Notice">
+      <Screen title="Notice" onBack>
         <Loader />
       </Screen>
     );
   }
   if (error || !row) {
     return (
-      <Screen title="Notice">
+      <Screen title="Notice" onBack>
         <EmptyState title="Notice unavailable" body={error ?? ''} />
       </Screen>
     );
@@ -32,6 +32,7 @@ export default function NoticeDetail() {
   return (
     <Screen
       title="Notice"
+      onBack
       action={
         <Text
           onPress={() => void Share.share({ message: `${row.title}\n\n${row.body}` })}

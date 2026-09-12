@@ -6,6 +6,7 @@ export const colors = {
   goldSoft: '#ffe14a',
   green: '#6aa84f',
   cream: '#fffdf8',
+  page: '#f4f6fb',
   paper: '#ffffff',
   ink: '#1c2430',
   muted: '#5b6573',

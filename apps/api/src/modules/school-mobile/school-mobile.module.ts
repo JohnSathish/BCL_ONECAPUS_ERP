@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { CommunicationModule } from '../communication/communication.module';
+import { AuthModule } from '../auth/auth.module';
 import { SchoolSisModule } from '../school-sis/school-sis.module';
 import { SchoolWebModule } from '../school-web/school-web.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
+import { SchoolMobileAuthService } from './school-mobile-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
@@ -14,6 +16,7 @@ import { SchoolMobileController } from './school-mobile.controller';
 @Module({
   imports: [
     TenantsModule,
+    AuthModule,
     SchoolSisModule,
     SchoolWebModule,
     CommunicationModule,
@@ -22,6 +25,7 @@ import { SchoolMobileController } from './school-mobile.controller';
   providers: [
     SchoolMobileSettingsService,
     SchoolMobileAccessService,
+    SchoolMobileAuthService,
     SchoolMobileDeviceService,
     SchoolMobileInboxService,
     SchoolMobilePrayerService,

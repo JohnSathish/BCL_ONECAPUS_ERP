@@ -7,6 +7,7 @@ import {
   SCHOOL_SIS_PRODUCT,
 } from '../../src/modules/school-sis/school-sis.constants';
 import {
+  SCHOOL_MOBILE_DEFAULT_PASSWORD,
   SCHOOL_MOBILE_PERMISSION_MANAGE,
   SCHOOL_MOBILE_PERMISSION_PARENT,
   SCHOOL_MOBILE_PERMISSION_STAFF,
@@ -55,18 +56,19 @@ const ADMIN_PERMISSIONS = [
 
 const GRADES: { code: string; name: string; sortOrder: number }[] = [
   { code: 'NURSERY', name: 'Nursery', sortOrder: 0 },
-  { code: 'UKG', name: 'UKG', sortOrder: 1 },
-  { code: 'I', name: 'Class I', sortOrder: 2 },
-  { code: 'II', name: 'Class II', sortOrder: 3 },
-  { code: 'III', name: 'Class III', sortOrder: 4 },
-  { code: 'IV', name: 'Class IV', sortOrder: 5 },
-  { code: 'V', name: 'Class V', sortOrder: 6 },
-  { code: 'VI', name: 'Class VI', sortOrder: 7 },
-  { code: 'VII', name: 'Class VII', sortOrder: 8 },
-  { code: 'VIII', name: 'Class VIII', sortOrder: 9 },
-  { code: 'IX', name: 'Class IX', sortOrder: 10 },
-  { code: 'X', name: 'Class X', sortOrder: 11 },
-  { code: 'XI', name: 'Class XI', sortOrder: 12 },
+  { code: 'LKG', name: 'LKG', sortOrder: 1 },
+  { code: 'UKG', name: 'UKG', sortOrder: 2 },
+  { code: 'I', name: 'Class I', sortOrder: 3 },
+  { code: 'II', name: 'Class II', sortOrder: 4 },
+  { code: 'III', name: 'Class III', sortOrder: 5 },
+  { code: 'IV', name: 'Class IV', sortOrder: 6 },
+  { code: 'V', name: 'Class V', sortOrder: 7 },
+  { code: 'VI', name: 'Class VI', sortOrder: 8 },
+  { code: 'VII', name: 'Class VII', sortOrder: 9 },
+  { code: 'VIII', name: 'Class VIII', sortOrder: 10 },
+  { code: 'IX', name: 'Class IX', sortOrder: 11 },
+  { code: 'X', name: 'Class X', sortOrder: 12 },
+  { code: 'XI', name: 'Class XI', sortOrder: 13 },
 ];
 
 const SUBJECTS: { code: string; name: string; sortOrder: number }[] = [
@@ -392,6 +394,36 @@ export async function seedStLukesSecondarySchool(
   }
 
   const subjectIds: Record<string, string> = {};
+  const mainType = await prisma.schoolSubjectType.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'MAIN' } },
+    update: {
+      name: 'Main Subject',
+      sortOrder: 1,
+      active: true,
+      deletedAt: null,
+    },
+    create: {
+      tenantId: tenant.id,
+      code: 'MAIN',
+      name: 'Main Subject',
+      sortOrder: 1,
+    },
+  });
+  await prisma.schoolSubjectType.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'OPTIONAL' } },
+    update: {
+      name: 'Optional Subject',
+      sortOrder: 2,
+      active: true,
+      deletedAt: null,
+    },
+    create: {
+      tenantId: tenant.id,
+      code: 'OPTIONAL',
+      name: 'Optional Subject',
+      sortOrder: 2,
+    },
+  });
   for (const subject of SUBJECTS) {
     const row = await prisma.schoolSubject.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code: subject.code } },
@@ -400,12 +432,14 @@ export async function seedStLukesSecondarySchool(
         sortOrder: subject.sortOrder,
         active: true,
         deletedAt: null,
+        subjectTypeId: mainType.id,
       },
       create: {
         tenantId: tenant.id,
         code: subject.code,
         name: subject.name,
         sortOrder: subject.sortOrder,
+        subjectTypeId: mainType.id,
       },
     });
     subjectIds[subject.code] = row.id;
@@ -498,13 +532,18 @@ export async function seedStLukesSecondarySchool(
           academicYearId: academicYear.id,
         },
       },
-      update: { sectionId: sectionA.id, status: 'ACTIVE', deletedAt: null },
+      update: {
+        sectionId: sectionA.id,
+        status: 'ACTIVE',
+        deletedAt: null,
+        rollNumber: 'SLS26-0001',
+      },
       create: {
         tenantId: tenant.id,
         studentId: student.id,
         academicYearId: academicYear.id,
         sectionId: sectionA.id,
-        rollNumber: '1',
+        rollNumber: 'SLS26-0001',
         status: 'ACTIVE',
       },
     });
@@ -562,11 +601,25 @@ export async function seedStLukesSecondarySchool(
     return user;
   };
 
+  const studentDefaultHash = await bcrypt.hash(
+    SCHOOL_MOBILE_DEFAULT_PASSWORD,
+    12,
+  );
   const studentUser = await ensureUser(
     'student@stlukestura.in',
     'John Marak',
     studentAppRole.id,
   );
+  await prisma.user.update({
+    where: { id: studentUser.id },
+    data: {
+      username: 'SLS26-0001',
+      passwordHash: studentDefaultHash,
+      mustResetPassword: true,
+      isActive: true,
+      displayName: 'John Marak',
+    },
+  });
   const parentUser = await ensureUser(
     'parent@stlukestura.in',
     'Mary Marak',

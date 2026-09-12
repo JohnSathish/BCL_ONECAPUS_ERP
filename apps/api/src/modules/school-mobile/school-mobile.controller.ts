@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ClsService } from 'nestjs-cls';
 import { CLS_TENANT_ID } from '../../common/cls/cls.constants';
@@ -34,9 +36,13 @@ import {
   PatchSchoolMobileSettingsDto,
   RegisterSchoolMobileDeviceDto,
   SchoolMobileBroadcastDto,
+  SchoolMobileChangePasswordDto,
+  SchoolMobileFeedbackDto,
+  SchoolMobileLoginDto,
   UpsertSchoolMobilePrayerDto,
 } from './dto/school-mobile.dto';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
+import { SchoolMobileAuthService } from './school-mobile-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
@@ -57,6 +63,7 @@ export class SchoolMobileController {
     private readonly inbox: SchoolMobileInboxService,
     private readonly prayer: SchoolMobilePrayerService,
     private readonly access: SchoolMobileAccessService,
+    private readonly auth: SchoolMobileAuthService,
     private readonly web: SchoolWebService,
     private readonly gallery: SchoolWebGalleryService,
     private readonly timetable: SchoolSisTimetableService,
@@ -94,6 +101,79 @@ export class SchoolMobileController {
     return this.settings.bootstrap(tenantId, {
       platform: platformQuery || platform,
       appVersion: versionQuery || appVersion,
+    });
+  }
+
+  @Public()
+  @Post('login')
+  async login(
+    @Req() req: Request,
+    @Body() dto: SchoolMobileLoginDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+    @Headers('x-device-id') deviceHeader?: string,
+    @Headers('x-app-version') appVersion?: string,
+    @Headers('x-app-platform') platform?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.auth.login(tenantId, dto.identifier, dto.password, {
+      deviceId: dto.deviceId || deviceHeader,
+      clientType: 'mobile',
+      appVersion,
+      platform,
+      userAgent: req.headers['user-agent'],
+      ipAddress:
+        (req.headers['x-forwarded-for'] as string | undefined)
+          ?.split(',')[0]
+          ?.trim() || req.ip,
+    });
+  }
+
+  @Post('change-password')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  changePassword(
+    @Req() req: Request,
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SchoolMobileChangePasswordDto,
+    @Headers('x-device-id') deviceHeader?: string,
+    @Headers('x-app-version') appVersion?: string,
+    @Headers('x-app-platform') platform?: string,
+  ) {
+    return this.auth.changePassword(
+      user.tid,
+      user.sub,
+      dto.currentPassword,
+      dto.newPassword,
+      {
+        deviceId: deviceHeader,
+        clientType: 'mobile',
+        appVersion,
+        platform,
+        userAgent: req.headers['user-agent'],
+        ipAddress:
+          (req.headers['x-forwarded-for'] as string | undefined)
+            ?.split(',')[0]
+            ?.trim() || req.ip,
+      },
+    );
+  }
+
+  @Post('feedback')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async feedback(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SchoolMobileFeedbackDto,
+  ) {
+    const me = await this.home.me(user);
+    return this.web.submitEnquiry(user.tid, {
+      name: me.displayName,
+      email: me.email,
+      phone: dto.phone,
+      subject: dto.subject || 'App feedback',
+      message: dto.message,
     });
   }
 

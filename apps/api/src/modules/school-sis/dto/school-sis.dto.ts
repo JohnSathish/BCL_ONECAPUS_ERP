@@ -197,6 +197,13 @@ export class SaveSchoolStaffDto {
   extrasJson?: Record<string, unknown>;
 }
 
+export class AssignSchoolRollNumbersDto {
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+}
+
 export class EnrollStudentDto {
   @IsString()
   studentId!: string;
@@ -903,4 +910,418 @@ export class CreateSchoolRoomDto {
   @IsString()
   @MaxLength(40)
   name!: string;
+}
+
+export class SaveSchoolSubjectTypeDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  code?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class SaveSchoolSubjectDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  code?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subjectTypeId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isOptional?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxMarks?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  passMarks?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  hasTheory?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasPractical?: boolean;
+}
+
+export class SaveSchoolClassSubjectsDto {
+  @IsUUID()
+  gradeId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  subjectIds!: string[];
+}
+
+export class BulkSchoolClassSubjectsDto {
+  @IsArray()
+  @IsUUID('4', { each: true })
+  gradeIds!: string[];
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  subjectIds!: string[];
+}
+
+export class SaveSchoolAcademicYearDto {
+  @IsString()
+  @MinLength(4)
+  @MaxLength(40)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  code?: string;
+
+  @IsDateString()
+  startDate!: string;
+
+  @IsDateString()
+  endDate!: string;
+
+  @IsOptional()
+  @IsIn(['CURRENT', 'UPCOMING', 'ARCHIVED'])
+  status?: string;
+}
+
+export class SaveSchoolGradeDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  code?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  capacity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class PatchSchoolSectionDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(12)
+  name?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  capacity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  roomLabel?: string;
+}
+
+export class SaveSchoolHouseDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  captainName?: string;
+
+  @IsOptional()
+  @IsUUID()
+  teacherStaffId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class AssignSchoolHouseMembersDto {
+  @IsUUID()
+  houseId!: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds!: string[];
+}
+
+export class SaveSchoolClubDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  description?: string;
+
+  @IsOptional()
+  @IsUUID()
+  coordinatorStaffId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class AssignSchoolClubMembersDto {
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds!: string[];
+}
+
+export class SaveSchoolClubActivityDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  title!: string;
+
+  @IsOptional()
+  @IsDateString()
+  activityDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+}
+
+export class SaveSchoolOptionalMappingDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  subjectIds!: string[];
+}
+
+export class BulkSchoolPromotionDto {
+  @IsArray()
+  @IsUUID('4', { each: true })
+  studentIds!: string[];
+
+  @IsIn(['PROMOTE', 'HOLD', 'WITHDRAW'])
+  action!: 'PROMOTE' | 'HOLD' | 'WITHDRAW';
+
+  @IsOptional()
+  @IsUUID()
+  toSectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  note?: string;
+}
+
+export class SaveSchoolIdCardTemplateDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsIn(['DRAFT', 'ACTIVE'])
+  status?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  layoutJson?: Record<string, unknown>;
+}
+
+export class SaveSchoolFeeSettingsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  dueDay?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  lateFeeAmount?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  lateFeeEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  paymentMethods?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(12)
+  receiptPrefix?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  signatoryName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  schoolName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  schoolAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  instructions?: string[];
+}
+
+export class SaveSchoolMonthlyFeePlanDto {
+  @IsUUID()
+  gradeId!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  tuitionAmount!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  lateFeeAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  otherAmount?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class CollectSchoolFeeDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsString()
+  @MinLength(7)
+  @MaxLength(7)
+  feeMonth!: string;
+
+  @IsString()
+  @IsIn(['CASH', 'UPI', 'BANK', 'CHEQUE', 'OTHER'])
+  paymentMode!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  reference?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  otherAmount?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  waiveLateFee?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  notes?: string;
+}
+
+export class VoidSchoolFeeDto {
+  @IsString()
+  @MinLength(4)
+  @MaxLength(240)
+  reason!: string;
 }

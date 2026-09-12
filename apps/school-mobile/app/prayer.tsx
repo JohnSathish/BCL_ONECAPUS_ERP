@@ -18,7 +18,7 @@ export default function PrayerScreen() {
   }, []);
 
   return (
-    <Screen title="Morning prayer">
+    <Screen title="Morning prayer" onBack>
       {!row && !error ? <Loader /> : null}
       {error ? <EmptyState title="Prayer unavailable" body={error} /> : null}
       {row ? (

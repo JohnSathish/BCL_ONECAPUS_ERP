@@ -31,7 +31,9 @@ export function mediaUrl(
   return `${origin}${rel.startsWith('/') ? rel : `/${rel}`}`;
 }
 
-export async function schoolHeaders(extra?: Record<string, string>) {
+export async function schoolHeaders(
+  extra?: Record<string, string>,
+): Promise<Record<string, string>> {
   const [deviceId, childId] = await Promise.all([getDeviceId(), getActiveChild()]);
   return {
     'Content-Type': 'application/json',

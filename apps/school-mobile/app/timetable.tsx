@@ -26,7 +26,7 @@ export default function TimetableScreen() {
   }, []);
 
   return (
-    <Screen title="Timetable">
+    <Screen title="Timetable" onBack>
       {loading ? <Loader /> : null}
       {error ? <EmptyState title="Timetable unavailable" body={error} /> : null}
       {!loading && !error && !slots.length ? (

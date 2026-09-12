@@ -28,21 +28,21 @@ export default function GalleryAlbum() {
 
   if (!album && !error) {
     return (
-      <Screen title="Album">
+      <Screen title="Album" onBack>
         <Loader />
       </Screen>
     );
   }
   if (error || !album) {
     return (
-      <Screen title="Album">
+      <Screen title="Album" onBack>
         <EmptyState title="Album unavailable" body={error ?? ''} />
       </Screen>
     );
   }
   const items = album.items ?? [];
   return (
-    <Screen title={album.title}>
+    <Screen title={album.title} onBack>
       <ScrollView contentContainerStyle={{ padding: space.md, gap: 10 }}>
         {items.map((item, index) => (
           <Pressable key={item.id} onPress={() => setActive(index)}>
