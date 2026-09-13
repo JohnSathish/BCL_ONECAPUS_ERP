@@ -38,7 +38,7 @@ const DEFAULT_INSTRUCTIONS = [
   'Fees once paid are not refundable.',
 ];
 
-const DEFAULT_METHODS = ['CASH', 'UPI', 'BANK', 'CHEQUE', 'OTHER'];
+const DEFAULT_METHODS = ['CASH', 'UPI', 'BANK', 'CHEQUE', 'ONLINE', 'OTHER'];
 
 function isMonth(value: string) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -92,8 +92,11 @@ export class SchoolSisMonthlyFeesService {
       data: {
         tenantId,
         academicYearId,
-        schoolName: branding?.displayName || "St. Luke's Secondary School",
-        schoolAddress: branding?.address || 'Walbakgre, New Tura',
+        schoolName:
+          branding?.displayName || "St. Luke's Secondary School, Tura",
+        schoolAddress:
+          branding?.address ||
+          'Walbakgre, Tura - 794101, West Garo Hills, Meghalaya',
         logoUrl: branding?.logoUrl ?? null,
         instructionsJson: DEFAULT_INSTRUCTIONS,
         paymentMethods: DEFAULT_METHODS,
@@ -398,29 +401,196 @@ export class SchoolSisMonthlyFeesService {
     return enrollment;
   }
 
+  async ledger(tenantId: string, studentId: string) {
+    const { year, settings, plans } = await this.ensureSetup(tenantId);
+    const enrollment = await this.loadJuniorEnrollment(
+      tenantId,
+      year.id,
+      studentId,
+    );
+    const plan = plans.find((p) => p.gradeId === enrollment.section.gradeId);
+    const tuition = plan?.tuitionAmount ?? 600;
+    const other = plan?.otherAmount ?? 0;
+    const lateRule = plan?.lateFeeAmount ?? settings.lateFeeAmount;
+    const today = startOfDay(new Date());
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const horizon = today < year.endDate ? today : year.endDate;
+    const months = this.monthsBetween(year.startDate, horizon);
+    const accounts = await this.prisma.schoolFeeMonthAccount.findMany({
+      where: { tenantId, academicYearId: year.id, studentId },
+    });
+    const accountMap = new Map(accounts.map((a) => [a.feeMonth, a]));
+    const history = await this.prisma.schoolFeePayment.findMany({
+      where: { tenantId, academicYearId: year.id, studentId },
+      include: { lines: { orderBy: { feeMonth: 'asc' } } },
+      orderBy: { paidAt: 'desc' },
+      take: 40,
+    });
+    const lastPaid = history.find((p) => p.status === 'PAID');
+    const rows = months.map((feeMonth) => {
+      const account = accountMap.get(feeMonth);
+      const paidAmount = account?.paidAmount ?? 0;
+      const lateApplies =
+        Boolean(settings.lateFeeEnabled) &&
+        today > dueDate(feeMonth, settings.dueDay);
+      const lateFeeAmount = lateApplies ? lateRule : 0;
+      const dueAmount = tuition + other + lateFeeAmount;
+      const remaining = Math.max(0, dueAmount - paidAmount);
+      let status: 'PAID' | 'PARTIAL' | 'DUE' | 'OVERDUE' = 'DUE';
+      if (paidAmount >= dueAmount && dueAmount > 0) status = 'PAID';
+      else if (account?.status === 'PAID') status = 'PAID';
+      else if (paidAmount > 0) status = 'PARTIAL';
+      else if (lateApplies) status = 'OVERDUE';
+      return {
+        feeMonth,
+        monthLabel: monthLabel(feeMonth),
+        tuitionAmount: tuition,
+        otherAmount: other,
+        lateFeeAmount,
+        lateApplies,
+        lateReason: lateApplies
+          ? `${monthLabel(feeMonth)} — Late Fee ₹${lateRule} (due by the ${settings.dueDay}th)`
+          : null,
+        previousDue: 0,
+        paidAmount,
+        totalDue: remaining,
+        grossDue: dueAmount,
+        status,
+        selectable: status !== 'PAID',
+      };
+    });
+    const unpaid = rows.filter((r) => r.status !== 'PAID');
+    const current = rows.find((r) => r.feeMonth === currentMonth);
+    return {
+      academicYear: year,
+      settings: this.publicSettings(settings),
+      student: {
+        id: enrollment.student.id,
+        fullName: enrollment.student.fullName,
+        admissionNumber: enrollment.student.admissionNumber,
+        phone: enrollment.student.phone,
+      },
+      className: enrollment.section.grade.name,
+      sectionName: enrollment.section.name,
+      gradeId: enrollment.section.gradeId,
+      sectionId: enrollment.section.id,
+      enrollmentId: enrollment.id,
+      currentMonth,
+      currentMonthStatus: current?.status ?? 'DUE',
+      unpaidMonths: unpaid.length,
+      totalOutstanding: unpaid.reduce((sum, r) => sum + r.totalDue, 0),
+      lastPaymentDate: lastPaid?.paidAt ?? null,
+      lastReceiptNumber: lastPaid?.receiptNumber ?? null,
+      rows,
+      history: history.map((p) => ({
+        id: p.id,
+        paidAt: p.paidAt,
+        receiptNumber: p.receiptNumber,
+        months:
+          p.lines.length > 0 ? p.lines.map((l) => l.feeMonth) : [p.feeMonth],
+        amount: p.totalAmount,
+        paymentMode: p.paymentMode,
+        collectedById: p.collectedById,
+        status: p.status,
+      })),
+      channelReady: ['OFFICE', 'PARENT', 'GATEWAY'],
+    };
+  }
+
   async collect(
     tenantId: string,
     dto: CollectSchoolFeeDto,
     actorUserId?: string,
   ) {
-    const quote = await this.quote(tenantId, dto.studentId, dto.feeMonth);
-    if (quote.paid) {
-      throw new ConflictException('This month is already paid for the student');
+    const months = [
+      ...new Set(
+        (dto.months?.length
+          ? dto.months
+          : dto.feeMonth
+            ? [dto.feeMonth]
+            : []
+        ).filter(isMonth),
+      ),
+    ].sort();
+    if (!months.length) {
+      throw new BadRequestException('Select at least one fee month');
     }
-    const methods = Array.isArray(quote.settings.paymentMethods)
-      ? (quote.settings.paymentMethods as string[])
-      : DEFAULT_METHODS;
-    if (!methods.includes(dto.paymentMode)) {
+    const book = await this.ledger(tenantId, dto.studentId);
+    const selected = months.map((m) => {
+      const row = book.rows.find((r) => r.feeMonth === m);
+      if (!row)
+        throw new BadRequestException(`Month ${m} is not on this ledger`);
+      if (row.status === 'PAID') {
+        throw new ConflictException(`${row.monthLabel} is already paid`);
+      }
+      return row;
+    });
+    const allowed = new Set([
+      ...(book.settings.paymentMethods ?? []),
+      ...DEFAULT_METHODS,
+    ]);
+    if (!allowed.has(dto.paymentMode)) {
       throw new BadRequestException('That payment mode is not enabled');
     }
-    const discount = dto.discountAmount ?? 0;
-    const other = dto.otherAmount ?? quote.otherAmount;
-    const late = dto.waiveLateFee ? 0 : quote.lateFeeAmount;
-    const total = Math.max(
-      0,
-      quote.tuitionAmount + other + late + quote.previousBalance - discount,
+    if (dto.paymentMode === 'CHEQUE' && !dto.chequeNumber?.trim()) {
+      throw new BadRequestException('Cheque number is required');
+    }
+    if (
+      ['UPI', 'BANK', 'ONLINE'].includes(dto.paymentMode) &&
+      !dto.reference?.trim()
+    ) {
+      throw new BadRequestException(
+        'Transaction / reference number is required',
+      );
+    }
+    const waiverMap = new Map(
+      (dto.lateWaivers ?? []).map((w) => [w.month, w.reason.trim()]),
     );
-    const year = quote.academicYear;
+    const lines = selected.map((row) => {
+      const reason = waiverMap.get(row.feeMonth);
+      const waive =
+        Boolean(reason) || Boolean(dto.waiveLateFee && row.lateFeeAmount);
+      if (waive && !(reason || dto.notes?.trim())) {
+        throw new BadRequestException(
+          `Late-fee waiver reason is required for ${row.monthLabel}`,
+        );
+      }
+      const late = waive ? 0 : row.lateFeeAmount;
+      return {
+        ...row,
+        lateFeeAmount: late,
+        lateWaived: waive,
+        lateWaiveReason: reason || (waive ? dto.notes?.trim() || null : null),
+        dueAmount: Math.max(
+          0,
+          row.tuitionAmount + row.otherAmount + late - row.paidAmount,
+        ),
+      };
+    });
+    const gross = lines.reduce((sum, l) => sum + l.dueAmount, 0);
+    let discount = dto.discountAmount ?? 0;
+    if (dto.discountType === 'PERCENT') {
+      discount = Math.round((gross * (dto.discountValue ?? 0)) / 100);
+    } else if (dto.discountValue != null && dto.discountAmount == null) {
+      discount = Math.round(dto.discountValue);
+    }
+    if (discount > 0 && !dto.discountReason?.trim()) {
+      throw new BadRequestException('Concession reason is required');
+    }
+    const net = Math.max(0, gross - discount);
+    const amountPaying = dto.amountPaying ?? net;
+    if (amountPaying <= 0) {
+      throw new BadRequestException('Amount paying must be greater than zero');
+    }
+    if (amountPaying > net) {
+      throw new BadRequestException('Amount paying cannot exceed net payable');
+    }
+    if (months.length > 1 && amountPaying !== net) {
+      throw new BadRequestException(
+        'Partial payment is only allowed for a single month',
+      );
+    }
+    const year = book.academicYear;
     try {
       return await this.prisma.$transaction(async (tx) => {
         const seq = await tx.schoolIdSequence.upsert({
@@ -439,54 +609,167 @@ export class SchoolSisMonthlyFeesService {
             lastValue: 1,
           },
         });
-        const receiptNumber = `${quote.settings.receiptPrefix || 'FB'}/${year.code}/${String(seq.lastValue).padStart(4, '0')}`;
+        const receiptNumber = `${book.settings.receiptPrefix || 'FB'}/${year.code}/${String(seq.lastValue).padStart(4, '0')}`;
+        let leftover = amountPaying;
+        const allocated = lines
+          .map((line) => {
+            const paid = Math.min(line.dueAmount, leftover);
+            leftover -= paid;
+            return {
+              ...line,
+              paidAmountThis: paid,
+              lineStatus:
+                paid >= line.dueAmount && line.dueAmount > 0
+                  ? 'PAID'
+                  : paid > 0
+                    ? 'PARTIAL'
+                    : 'DUE',
+            };
+          })
+          .filter((l) => l.paidAmountThis > 0);
         const payment = await tx.schoolFeePayment.create({
           data: {
             tenantId,
             academicYearId: year.id,
             studentId: dto.studentId,
-            enrollmentId: quote.enrollmentId,
-            gradeId: quote.gradeId,
-            sectionId: quote.sectionId,
-            feeMonth: dto.feeMonth,
+            enrollmentId: book.enrollmentId,
+            gradeId: book.gradeId,
+            sectionId: book.sectionId,
+            feeMonth: allocated[0].feeMonth,
             receiptNumber,
-            tuitionAmount: quote.tuitionAmount,
-            lateFeeAmount: late,
-            otherAmount: other,
+            tuitionAmount: allocated.reduce((s, l) => s + l.tuitionAmount, 0),
+            lateFeeAmount: allocated.reduce((s, l) => s + l.lateFeeAmount, 0),
+            otherAmount: allocated.reduce((s, l) => s + l.otherAmount, 0),
             discountAmount: discount,
-            previousBalance: quote.previousBalance,
-            totalAmount: total,
+            previousBalance: 0,
+            totalAmount: amountPaying,
             paymentMode: dto.paymentMode,
-            reference: dto.reference?.trim() || null,
+            reference:
+              dto.reference?.trim() || dto.chequeNumber?.trim() || null,
             notes: dto.notes?.trim() || null,
             collectedById: actorUserId ?? null,
+            channel: dto.channel || 'OFFICE',
+            grossAmount: gross,
+            remainingAmount: net - amountPaying,
+            discountType: dto.discountType ?? (discount ? 'AMOUNT' : null),
+            discountReason: dto.discountReason?.trim() || null,
+            discountApprovedBy: dto.discountApprovedBy?.trim() || null,
+            chequeNumber: dto.chequeNumber?.trim() || null,
+            bankName: dto.bankName?.trim() || null,
+            monthsJson: allocated.map((l) => l.feeMonth),
             snapshotJson: {
               feeKind: 'MONTHLY_TUITION',
-              studentName: quote.student.fullName,
-              admissionNumber: quote.student.admissionNumber,
-              className: quote.className,
-              sectionName: quote.sectionName,
+              studentName: book.student.fullName,
+              admissionNumber: book.student.admissionNumber,
+              className: book.className,
+              sectionName: book.sectionName,
               academicYear: year.name,
+              months: allocated.map((l) => ({
+                feeMonth: l.feeMonth,
+                monthLabel: l.monthLabel,
+                tuitionAmount: l.tuitionAmount,
+                otherAmount: l.otherAmount,
+                lateFeeAmount: l.lateFeeAmount,
+                paidAmount: l.paidAmountThis,
+                status: l.lineStatus,
+              })),
               settings: {
-                schoolName: quote.settings.schoolName,
-                schoolAddress: quote.settings.schoolAddress,
-                logoUrl: quote.settings.logoUrl,
-                signatoryName: quote.settings.signatoryName,
-                instructions: quote.settings.instructionsJson,
+                schoolName: book.settings.schoolName,
+                schoolAddress: book.settings.schoolAddress,
+                logoUrl: book.settings.logoUrl,
+                signatoryName: book.settings.signatoryName,
+                motto: 'Knowledge · Service · Light',
+                instructions: book.settings.instructionsJson,
               },
             } as Prisma.InputJsonValue,
+            lines: {
+              create: allocated.map((l) => ({
+                tenantId,
+                feeMonth: l.feeMonth,
+                tuitionAmount: l.tuitionAmount,
+                otherAmount: l.otherAmount,
+                lateFeeAmount: l.lateFeeAmount,
+                lateWaived: l.lateWaived,
+                lateWaiveReason: l.lateWaiveReason,
+                dueAmount: l.dueAmount,
+                paidAmount: l.paidAmountThis,
+                status: l.lineStatus,
+              })),
+            },
           },
         });
+        for (const line of allocated) {
+          const prev = await tx.schoolFeeMonthAccount.findUnique({
+            where: {
+              tenantId_academicYearId_studentId_feeMonth: {
+                tenantId,
+                academicYearId: year.id,
+                studentId: dto.studentId,
+                feeMonth: line.feeMonth,
+              },
+            },
+          });
+          const nextPaid = (prev?.paidAmount ?? 0) + line.paidAmountThis;
+          const due = prev?.dueAmount ?? line.grossDue;
+          const nextStatus =
+            nextPaid >= due ? 'PAID' : nextPaid > 0 ? 'PARTIAL' : 'DUE';
+          await tx.schoolFeeMonthAccount.upsert({
+            where: {
+              tenantId_academicYearId_studentId_feeMonth: {
+                tenantId,
+                academicYearId: year.id,
+                studentId: dto.studentId,
+                feeMonth: line.feeMonth,
+              },
+            },
+            create: {
+              tenantId,
+              academicYearId: year.id,
+              studentId: dto.studentId,
+              feeMonth: line.feeMonth,
+              dueAmount: line.grossDue,
+              paidAmount: nextPaid,
+              status: nextStatus,
+            },
+            update: { paidAmount: nextPaid, status: nextStatus },
+          });
+        }
         await tx.schoolFeePaymentEvent.create({
           data: {
             tenantId,
             paymentId: payment.id,
             type: 'CREATED',
             actorUserId: actorUserId ?? null,
-            afterJson: { receiptNumber, totalAmount: total },
+            afterJson: {
+              receiptNumber,
+              totalAmount: amountPaying,
+              months: allocated.map((l) => l.feeMonth),
+              channel: dto.channel || 'OFFICE',
+            },
           },
         });
-        return this.toReceiptPayload(payment, quote);
+        if (discount > 0) {
+          await tx.schoolFeePaymentEvent.create({
+            data: {
+              tenantId,
+              paymentId: payment.id,
+              type: 'CONCESSION',
+              actorUserId: actorUserId ?? null,
+              note: dto.discountReason?.trim(),
+              afterJson: { discount, approvedBy: dto.discountApprovedBy },
+            },
+          });
+        }
+        return {
+          payment: {
+            id: payment.id,
+            receiptNumber,
+            totalAmount: amountPaying,
+            status: 'PAID',
+          },
+          receiptNumber,
+          months: allocated.map((l) => l.monthLabel),
+        };
       });
     } catch (err) {
       if (
@@ -510,30 +793,63 @@ export class SchoolSisMonthlyFeesService {
     await this.sis.assertSecondarySisTenant(tenantId);
     const payment = await this.prisma.schoolFeePayment.findFirst({
       where: { id, tenantId },
+      include: { lines: true },
     });
     if (!payment) throw new NotFoundException('Receipt not found');
     if (payment.status !== 'PAID') {
       throw new BadRequestException('Only a paid receipt can be voided');
     }
-    const updated = await this.prisma.schoolFeePayment.update({
-      where: { id },
-      data: {
-        status: 'VOIDED',
-        voidedAt: new Date(),
-        voidedById: actorUserId ?? null,
-        voidReason: dto.reason.trim(),
-      },
-    });
-    await this.prisma.schoolFeePaymentEvent.create({
-      data: {
-        tenantId,
-        paymentId: id,
-        type: 'VOIDED',
-        actorUserId: actorUserId ?? null,
-        note: dto.reason.trim(),
-        beforeJson: { status: 'PAID' },
-        afterJson: { status: 'VOIDED' },
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.schoolFeePayment.update({
+        where: { id },
+        data: {
+          status: 'VOIDED',
+          voidedAt: new Date(),
+          voidedById: actorUserId ?? null,
+          voidReason: dto.reason.trim(),
+        },
+      });
+      const lines = payment.lines.length
+        ? payment.lines
+        : [{ feeMonth: payment.feeMonth, paidAmount: payment.totalAmount }];
+      for (const line of lines) {
+        const account = await tx.schoolFeeMonthAccount.findUnique({
+          where: {
+            tenantId_academicYearId_studentId_feeMonth: {
+              tenantId,
+              academicYearId: payment.academicYearId,
+              studentId: payment.studentId,
+              feeMonth: line.feeMonth,
+            },
+          },
+        });
+        if (!account) continue;
+        const paidAmount = Math.max(0, account.paidAmount - line.paidAmount);
+        await tx.schoolFeeMonthAccount.update({
+          where: { id: account.id },
+          data: {
+            paidAmount,
+            status:
+              paidAmount <= 0
+                ? 'DUE'
+                : paidAmount >= account.dueAmount
+                  ? 'PAID'
+                  : 'PARTIAL',
+          },
+        });
+      }
+      await tx.schoolFeePaymentEvent.create({
+        data: {
+          tenantId,
+          paymentId: id,
+          type: 'VOIDED',
+          actorUserId: actorUserId ?? null,
+          note: dto.reason.trim(),
+          beforeJson: { status: 'PAID' },
+          afterJson: { status: 'VOIDED' },
+        },
+      });
+      return next;
     });
     return updated;
   }
@@ -744,7 +1060,19 @@ export class SchoolSisMonthlyFeesService {
       },
       select: { studentId: true },
     });
-    const paidSet = new Set(paid.map((p) => p.studentId));
+    const accountsPaid = await this.prisma.schoolFeeMonthAccount.findMany({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        feeMonth: month,
+        status: 'PAID',
+      },
+      select: { studentId: true },
+    });
+    const paidSet = new Set([
+      ...paid.map((p) => p.studentId),
+      ...accountsPaid.map((p) => p.studentId),
+    ]);
     const settings = (await this.ensureSetup(tenantId)).settings;
     const lateApplies =
       Boolean(settings.lateFeeEnabled) &&
@@ -802,11 +1130,33 @@ export class SchoolSisMonthlyFeesService {
     };
   }
 
+  async sendToParent(tenantId: string, id: string, actorUserId?: string) {
+    const payment = await this.getPayment(tenantId, id);
+    await this.prisma.schoolFeePaymentEvent.create({
+      data: {
+        tenantId,
+        paymentId: id,
+        type: 'SENT_TO_PARENT',
+        actorUserId: actorUserId ?? null,
+        afterJson: { receiptNumber: payment.receiptNumber, channel: 'PARENT' },
+      },
+    });
+    return {
+      ok: true,
+      receiptNumber: payment.receiptNumber,
+      studentPhone: payment.student.phone,
+    };
+  }
+
   async getPayment(tenantId: string, id: string) {
     await this.sis.assertSecondarySisTenant(tenantId);
     const payment = await this.prisma.schoolFeePayment.findFirst({
       where: { id, tenantId },
-      include: { student: true, events: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        student: true,
+        events: { orderBy: { createdAt: 'asc' } },
+        lines: { orderBy: { feeMonth: 'asc' } },
+      },
     });
     if (!payment) throw new NotFoundException('Receipt not found');
     return payment;
@@ -825,14 +1175,25 @@ export class SchoolSisMonthlyFeesService {
     paymentMode: string;
     reference: string | null;
     snapshotJson: Prisma.JsonValue;
+    monthsJson?: Prisma.JsonValue;
+    lines?: Array<{
+      feeMonth: string;
+      tuitionAmount: number;
+      lateFeeAmount: number;
+      otherAmount: number;
+      paidAmount: number;
+    }>;
   }): MonthlyFeeReceiptView {
     const snap = (payment.snapshotJson ?? {}) as Record<string, any>;
     const settings = (snap.settings ?? {}) as Record<string, any>;
     return {
-      schoolName: settings.schoolName || "St. Luke's Secondary School",
-      schoolAddress: settings.schoolAddress || 'Walbakgre, New Tura',
-      logoUrl: settings.logoUrl,
+      schoolName: settings.schoolName || "St. Luke's Secondary School, Tura",
+      schoolAddress:
+        settings.schoolAddress ||
+        'Walbakgre, Tura - 794101, West Garo Hills, Meghalaya',
+      logoUrl: settings.logoUrl || '/school-sis/st-lukes-logo.png',
       signatoryName: settings.signatoryName,
+      motto: settings.motto || 'Knowledge · Service · Light',
       instructions: Array.isArray(settings.instructions)
         ? settings.instructions
         : DEFAULT_INSTRUCTIONS,
@@ -852,6 +1213,20 @@ export class SchoolSisMonthlyFeesService {
       totalAmount: payment.totalAmount,
       paymentMode: payment.paymentMode,
       reference: payment.reference,
+      monthsCovered: (Array.isArray(snap.months)
+        ? snap.months.map(
+            (m: { monthLabel?: string; feeMonth?: string }) =>
+              m.monthLabel || monthLabel(String(m.feeMonth)),
+          )
+        : payment.lines?.map((l) => monthLabel(l.feeMonth))
+      )?.length
+        ? Array.isArray(snap.months)
+          ? snap.months.map(
+              (m: { monthLabel?: string; feeMonth?: string }) =>
+                m.monthLabel || monthLabel(String(m.feeMonth)),
+            )
+          : payment.lines!.map((l) => monthLabel(l.feeMonth))
+        : [monthLabel(payment.feeMonth)],
     };
   }
 

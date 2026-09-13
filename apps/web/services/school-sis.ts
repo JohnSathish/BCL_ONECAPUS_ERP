@@ -1248,18 +1248,92 @@ export async function quoteMonthlyFee(studentId: string, month: string) {
   };
 }
 
+export async function fetchMonthlyFeeLedger(studentId: string) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/ledger', {
+    params: { studentId },
+  });
+  return data as MonthlyFeeLedger;
+}
+
+export type MonthlyFeeLedgerRow = {
+  feeMonth: string;
+  monthLabel: string;
+  tuitionAmount: number;
+  otherAmount: number;
+  lateFeeAmount: number;
+  lateApplies: boolean;
+  lateReason: string | null;
+  previousDue: number;
+  paidAmount: number;
+  totalDue: number;
+  grossDue: number;
+  status: 'PAID' | 'PARTIAL' | 'DUE' | 'OVERDUE';
+  selectable: boolean;
+};
+
+export type MonthlyFeeLedger = {
+  academicYear: { name: string; code: string };
+  settings: {
+    paymentMethods: string[];
+    dueDay: number;
+    schoolName: string;
+    schoolAddress: string;
+    signatoryName: string | null;
+    instructionsJson: string[];
+    receiptPrefix: string;
+  };
+  student: { id: string; fullName: string; admissionNumber: string; phone: string | null };
+  className: string;
+  sectionName: string;
+  currentMonth: string;
+  currentMonthStatus: string;
+  unpaidMonths: number;
+  totalOutstanding: number;
+  lastPaymentDate: string | null;
+  lastReceiptNumber: string | null;
+  rows: MonthlyFeeLedgerRow[];
+  history: Array<{
+    id: string;
+    paidAt: string;
+    receiptNumber: string;
+    months: string[];
+    amount: number;
+    paymentMode: string;
+    status: string;
+  }>;
+};
+
 export async function collectMonthlyFee(payload: {
   studentId: string;
-  feeMonth: string;
+  feeMonth?: string;
+  months?: string[];
   paymentMode: string;
   reference?: string;
+  chequeNumber?: string;
+  bankName?: string;
   discountAmount?: number;
+  discountType?: 'AMOUNT' | 'PERCENT';
+  discountValue?: number;
+  discountReason?: string;
+  discountApprovedBy?: string;
+  amountPaying?: number;
   otherAmount?: number;
   waiveLateFee?: boolean;
+  lateWaivers?: Array<{ month: string; reason: string }>;
   notes?: string;
+  channel?: 'OFFICE' | 'PARENT' | 'GATEWAY';
 }) {
   const { data } = await api.post('/v1/school-sis/fees/monthly/collect', payload);
-  return data as { receiptNumber: string; payment: { id: string } };
+  return data as {
+    receiptNumber: string;
+    payment: { id: string };
+    months?: string[];
+  };
+}
+
+export async function sendMonthlyFeeReceipt(id: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/monthly/payments/${id}/send`);
+  return data as { ok: boolean; receiptNumber: string; studentPhone: string | null };
 }
 
 export async function fetchMonthlyFeeDashboard() {

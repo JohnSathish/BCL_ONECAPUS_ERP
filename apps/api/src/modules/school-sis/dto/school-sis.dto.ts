@@ -1279,17 +1279,35 @@ export class SaveSchoolMonthlyFeePlanDto {
   active?: boolean;
 }
 
+export class SchoolFeeLateWaiverDto {
+  @IsString()
+  @MinLength(7)
+  @MaxLength(7)
+  month!: string;
+
+  @IsString()
+  @MinLength(4)
+  @MaxLength(240)
+  reason!: string;
+}
+
 export class CollectSchoolFeeDto {
   @IsUUID()
   studentId!: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(7)
   @MaxLength(7)
-  feeMonth!: string;
+  feeMonth?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  months?: string[];
 
   @IsString()
-  @IsIn(['CASH', 'UPI', 'BANK', 'CHEQUE', 'OTHER'])
+  @IsIn(['CASH', 'UPI', 'BANK', 'CHEQUE', 'OTHER', 'ONLINE'])
   paymentMode!: string;
 
   @IsOptional()
@@ -1298,10 +1316,45 @@ export class CollectSchoolFeeDto {
   reference?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  chequeNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  bankName?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   discountAmount?: number;
+
+  @IsOptional()
+  @IsIn(['AMOUNT', 'PERCENT'])
+  discountType?: 'AMOUNT' | 'PERCENT';
+
+  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
+  discountValue?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  discountReason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  discountApprovedBy?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  amountPaying?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -1312,6 +1365,16 @@ export class CollectSchoolFeeDto {
   @IsOptional()
   @IsBoolean()
   waiveLateFee?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SchoolFeeLateWaiverDto)
+  lateWaivers?: SchoolFeeLateWaiverDto[];
+
+  @IsOptional()
+  @IsIn(['OFFICE', 'PARENT', 'GATEWAY'])
+  channel?: 'OFFICE' | 'PARENT' | 'GATEWAY';
 
   @IsOptional()
   @IsString()

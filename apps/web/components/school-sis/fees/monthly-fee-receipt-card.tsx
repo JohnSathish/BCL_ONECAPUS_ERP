@@ -1,5 +1,7 @@
 'use client';
 
+const DEFAULT_LOGO = '/school-sis/st-lukes-logo.png';
+
 export function MonthlyFeeReceiptCard({
   copy,
   schoolName,
@@ -20,6 +22,9 @@ export function MonthlyFeeReceiptCard({
   total,
   signatory,
   instructions,
+  monthsCovered,
+  logoUrl,
+  motto,
 }: {
   copy: string;
   schoolName: string;
@@ -40,82 +45,109 @@ export function MonthlyFeeReceiptCard({
   total: number;
   signatory?: string | null;
   instructions: string[];
+  monthsCovered?: string[];
+  logoUrl?: string | null;
+  motto?: string | null;
 }) {
-  const money = (n: number) =>
-    `Rs. ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const amt = (n: number) =>
+    Number(n || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  const months = monthsCovered?.length ? monthsCovered.join(', ') : monthLabel;
+  const copyLabel = copy.toLowerCase().includes('school') ? 'School Copy' : "Parent's Copy";
+  const rows = [
+    { label: 'Tuition Fee', value: amt(tuition) },
+    { label: 'Late Fee', value: amt(late) },
+    ...(other ? [{ label: 'Other Fee', value: amt(other) }] : []),
+    ...(discount ? [{ label: 'Concession', value: `− ${amt(discount)}` }] : []),
+    ...(previous ? [{ label: 'Previous Balance', value: amt(previous) }] : []),
+  ];
   return (
-    <article className="border border-slate-900 bg-white p-4 text-[13px] text-slate-900">
-      <header className="mb-2 text-center">
-        <p className="font-semibold">{monthLabel}</p>
-        <h2 className="text-lg font-bold leading-tight">{schoolName}</h2>
-        <p>{schoolAddress}</p>
+    <article className="flex min-h-[32rem] flex-col rounded-xl border-[1.5px] border-[#1a365d] bg-white p-4 text-[#1a365d] shadow-sm print:shadow-none">
+      <header className="mb-3 flex items-center gap-3">
+        <img src={logoUrl || DEFAULT_LOGO} alt="" className="h-14 w-14 object-contain" />
+        <div>
+          <h2 className="text-[17px] font-bold leading-tight">{schoolName}</h2>
+          <p className="text-[11px] text-slate-600">{schoolAddress}</p>
+          <p className="text-[11px] italic">{motto || 'Knowledge · Service · Light'}</p>
+        </div>
       </header>
-      <p className="flex justify-between border-b border-dotted border-slate-500 py-1">
-        <span>Pupil's Name</span>
-        <strong>{studentName}</strong>
-      </p>
-      <p className="flex justify-between border-b border-dotted border-slate-500 py-1">
-        <span>Admission No.</span>
-        <strong>{admissionNumber}</strong>
-      </p>
-      <p className="flex justify-between border-b border-dotted border-slate-500 py-1">
-        <span>Class</span>
-        <strong>{className}</strong>
-      </p>
-      <table className="mt-2 w-full border-collapse">
+      <div className="mb-3 flex items-center justify-between rounded-md bg-[#1a365d] px-3 py-2 text-white">
+        <span className="text-sm font-extrabold tracking-wide">FEE RECEIPT</span>
+        <span className="text-right leading-tight">
+          <b className="block text-[13px]">{months}</b>
+          <span className="text-[10px] text-white/90">Academic Year: {academicYear}</span>
+        </span>
+      </div>
+      <section className="mb-3 space-y-1 rounded-md bg-[#e8eef6] px-3 py-2 text-[13px]">
+        <p className="flex justify-between gap-2">
+          <span className="text-slate-600">Pupil's Name</span>
+          <b>{studentName}</b>
+        </p>
+        <p className="flex justify-between gap-2">
+          <span className="text-slate-600">Admission No.</span>
+          <b>{admissionNumber}</b>
+        </p>
+        <p className="flex justify-between gap-2">
+          <span className="text-slate-600">Class & Section</span>
+          <b>{className}</b>
+        </p>
+      </section>
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-[#1a365d] text-white">
+            <th className="px-2 py-1.5 text-left font-semibold">Particulars</th>
+            <th className="px-2 py-1.5 text-right font-semibold">Amount (Rs.)</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr>
-            <td className="border border-slate-900 px-2 py-1">Tuition Fee</td>
-            <td className="border border-slate-900 px-2 py-1 text-right">{money(tuition)}</td>
-          </tr>
-          <tr>
-            <td className="border border-slate-900 px-2 py-1">Late Fee</td>
-            <td className="border border-slate-900 px-2 py-1 text-right">{money(late)}</td>
-          </tr>
-          {other ? (
-            <tr>
-              <td className="border border-slate-900 px-2 py-1">Other Fee</td>
-              <td className="border border-slate-900 px-2 py-1 text-right">{money(other)}</td>
+          {rows.map((row) => (
+            <tr key={row.label} className="border-b border-slate-200">
+              <td className="px-2 py-1.5">{row.label}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.value}</td>
             </tr>
-          ) : null}
-          {discount ? (
-            <tr>
-              <td className="border border-slate-900 px-2 py-1">Concession</td>
-              <td className="border border-slate-900 px-2 py-1 text-right">− {money(discount)}</td>
-            </tr>
-          ) : null}
-          {previous ? (
-            <tr>
-              <td className="border border-slate-900 px-2 py-1">Previous Balance</td>
-              <td className="border border-slate-900 px-2 py-1 text-right">{money(previous)}</td>
-            </tr>
-          ) : null}
-          <tr className="font-bold">
-            <td className="border border-slate-900 px-2 py-1">Total Rs.</td>
-            <td className="border border-slate-900 px-2 py-1 text-right">{money(total)}</td>
+          ))}
+          <tr className="bg-[#1a365d] font-bold text-white">
+            <td className="px-2 py-1.5">Total Amount</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{amt(total)}</td>
           </tr>
         </tbody>
       </table>
-      <p className="mt-2 text-xs">
-        Fee Book {receiptNumber} · {academicYear} · {paymentMode}
-      </p>
-      <p className="text-xs">Date {paidAt}</p>
-      <div className="mt-6 flex justify-between text-sm">
-        <span>{copy}</span>
-        <span className="text-right">
-          Signature
-          <br />
-          <span className="text-xs text-slate-500">{signatory || 'Authorized signatory'}</span>
-        </span>
-      </div>
-      <div className="mt-3 rounded-xl border border-slate-900 p-2 text-[11px]">
-        <p className="font-semibold">General instructions</p>
-        <ol className="ml-4 list-decimal">
-          {instructions.map((item) => (
-            <li key={item}>{item}</li>
+      <section className="mt-3 space-y-1 text-[13px]">
+        <p className="flex justify-between">
+          <span>Receipt No.</span>
+          <b>{receiptNumber}</b>
+        </p>
+        <p className="flex justify-between">
+          <span>Payment Mode</span>
+          <b>{paymentMode}</b>
+        </p>
+        <p className="flex justify-between">
+          <span>Date & Time</span>
+          <b>{paidAt}</b>
+        </p>
+      </section>
+      <div className="mt-3 rounded-lg border border-[#1a365d] p-2 text-[11px] text-slate-700">
+        <p className="font-semibold text-[#1a365d]">General Instructions</p>
+        <ol className="mt-1 space-y-0.5">
+          {instructions.map((item, i) => (
+            <li key={item}>
+              <b>{i + 1}.</b> {item}
+            </li>
           ))}
         </ol>
       </div>
+      <footer className="mt-auto flex items-end justify-between pt-4">
+        <span className="rounded-full bg-[#1a365d] px-3 py-1 text-[11px] font-bold text-white">
+          {copyLabel}
+        </span>
+        <span className="text-right text-[11px]">
+          Signature
+          <span className="block text-slate-500">{signatory || 'Authorized Signatory'}</span>
+        </span>
+      </footer>
+      <p className="mt-2 text-[10px] italic text-slate-500">Thank you for your support</p>
     </article>
   );
 }

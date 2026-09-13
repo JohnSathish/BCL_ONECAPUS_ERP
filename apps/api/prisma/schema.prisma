@@ -16597,8 +16597,9 @@ model SchoolAcademicYear {
   clubs             SchoolClub[]
   optionalSubjects  SchoolStudentOptionalSubject[]
   feeSettings       SchoolFeeSettings[]
-  monthlyFeePlans   SchoolMonthlyFeePlan[]
-  feePayments       SchoolFeePayment[]
+  monthlyFeePlans    SchoolMonthlyFeePlan[]
+  feePayments        SchoolFeePayment[]
+  feeMonthAccounts   SchoolFeeMonthAccount[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16918,6 +16919,7 @@ model SchoolStudent {
   clubMemberships  SchoolClubMembership[]
   optionalSubjects SchoolStudentOptionalSubject[]
   feePayments      SchoolFeePayment[]
+  feeMonthAccounts SchoolFeeMonthAccount[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -17456,23 +17458,76 @@ model SchoolFeePayment {
   notes            String?
   status           String    @default("PAID")
   paidAt           DateTime  @default(now()) @map("paid_at")
-  collectedById    String?   @map("collected_by_id") @db.Uuid
-  snapshotJson     Json      @default("{}") @map("snapshot_json")
-  voidedAt         DateTime? @map("voided_at")
-  voidedById       String?   @map("voided_by_id") @db.Uuid
-  voidReason       String?   @map("void_reason")
+  collectedById        String?   @map("collected_by_id") @db.Uuid
+  snapshotJson         Json      @default("{}") @map("snapshot_json")
+  channel              String    @default("OFFICE")
+  grossAmount          Int?      @map("gross_amount")
+  remainingAmount      Int       @default(0) @map("remaining_amount")
+  discountType         String?   @map("discount_type")
+  discountReason       String?   @map("discount_reason")
+  discountApprovedBy   String?   @map("discount_approved_by")
+  chequeNumber         String?   @map("cheque_number")
+  bankName             String?   @map("bank_name")
+  monthsJson           Json      @default("[]") @map("months_json")
+  voidedAt             DateTime? @map("voided_at")
+  voidedById           String?   @map("voided_by_id") @db.Uuid
+  voidReason           String?   @map("void_reason")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
   student      SchoolStudent      @relation(fields: [studentId], references: [id], onDelete: Restrict)
   events       SchoolFeePaymentEvent[]
+  lines        SchoolFeePaymentLine[]
 
   @@unique([tenantId, receiptNumber])
   @@index([tenantId, academicYearId, feeMonth, status])
   @@index([tenantId, studentId, feeMonth])
   @@index([tenantId, paidAt])
   @@map("school_fee_payments")
+  @@schema("school")
+}
+
+model SchoolFeePaymentLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  paymentId       String   @map("payment_id") @db.Uuid
+  feeMonth        String   @map("fee_month")
+  tuitionAmount   Int      @map("tuition_amount")
+  otherAmount     Int      @default(0) @map("other_amount")
+  lateFeeAmount   Int      @default(0) @map("late_fee_amount")
+  lateWaived      Boolean  @default(false) @map("late_waived")
+  lateWaiveReason String?  @map("late_waive_reason")
+  dueAmount       Int      @map("due_amount")
+  paidAmount      Int      @map("paid_amount")
+  status          String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment SchoolFeePayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, feeMonth])
+  @@index([tenantId, feeMonth, status])
+  @@map("school_fee_payment_lines")
+  @@schema("school")
+}
+
+model SchoolFeeMonthAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  feeMonth       String   @map("fee_month")
+  dueAmount      Int      @map("due_amount")
+  paidAmount     Int      @default(0) @map("paid_amount")
+  status         String   @default("DUE")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      SchoolStudent      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, studentId, feeMonth])
+  @@index([tenantId, academicYearId, status])
+  @@map("school_fee_month_accounts")
   @@schema("school")
 }
 

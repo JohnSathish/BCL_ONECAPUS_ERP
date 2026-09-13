@@ -31,10 +31,17 @@ export function MonthlyFeeReceiptPage() {
         'Pupils with dues may be barred from sitting for the Examinations.',
         'Fees once paid are not refundable.',
       ];
+  const monthsCovered = Array.isArray(snap.months)
+    ? snap.months.map((m: { monthLabel?: string }) => String(m.monthLabel || ''))
+    : [monthLabel];
   const props = {
-    schoolName: String(settings.schoolName || "St. Luke's Secondary School"),
-    schoolAddress: String(settings.schoolAddress || 'Walbakgre, New Tura'),
-    monthLabel,
+    schoolName: String(settings.schoolName || "St. Luke's Secondary School, Tura"),
+    schoolAddress: String(
+      settings.schoolAddress || 'Walbakgre, Tura - 794101, West Garo Hills, Meghalaya',
+    ),
+    logoUrl: (settings.logoUrl as string | null) || '/school-sis/st-lukes-logo.png',
+    motto: (settings.motto as string | null) || 'Knowledge · Service · Light',
+    monthLabel: monthsCovered.filter(Boolean).join(', ') || monthLabel,
     studentName: String(snap.studentName || p.student.fullName),
     admissionNumber: String(snap.admissionNumber || p.student.admissionNumber),
     className: `${snap.className ?? ''} ${snap.sectionName ?? ''}`.trim(),
@@ -50,6 +57,7 @@ export function MonthlyFeeReceiptPage() {
     total: p.totalAmount,
     signatory: settings.signatoryName as string | null,
     instructions,
+    monthsCovered: monthsCovered.filter(Boolean),
   };
   return (
     <div className="space-y-4">
@@ -72,9 +80,9 @@ export function MonthlyFeeReceiptPage() {
           {p.status === 'VOIDED' ? 'VOIDED — kept for audit' : p.receiptNumber}
         </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <MonthlyFeeReceiptCard copy="Parent's copy" {...props} />
-        <MonthlyFeeReceiptCard copy="School copy" {...props} />
+      <div className="grid gap-4 bg-[#eef2f7] p-2 print:bg-white lg:grid-cols-2">
+        <MonthlyFeeReceiptCard copy="Parent's Copy" {...props} />
+        <MonthlyFeeReceiptCard copy="School Copy" {...props} />
       </div>
     </div>
   );

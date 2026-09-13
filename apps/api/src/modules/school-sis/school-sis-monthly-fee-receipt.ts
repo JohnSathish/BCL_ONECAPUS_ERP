@@ -1,8 +1,11 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 export function money(n: number) {
-  return `Rs. ${Number(n || 0).toLocaleString('en-IN', {
+  return Number(n || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  });
 }
 
 export function monthLabel(feeMonth: string) {
@@ -21,10 +24,25 @@ function esc(value: string | null | undefined) {
     .replace(/>/g, '&gt;');
 }
 
+function schoolLogoDataUri() {
+  const candidates = [
+    join(process.cwd(), 'apps/web/public/school-sis/st-lukes-logo.png'),
+    join(process.cwd(), '../web/public/school-sis/st-lukes-logo.png'),
+    join(process.cwd(), '../../apps/web/public/school-sis/st-lukes-logo.png'),
+  ];
+  for (const file of candidates) {
+    if (!existsSync(file)) continue;
+    const buf = readFileSync(file);
+    return `data:image/png;base64,${buf.toString('base64')}`;
+  }
+  return null;
+}
+
 export type MonthlyFeeReceiptView = {
   schoolName: string;
   schoolAddress: string;
   logoUrl?: string | null;
+  motto?: string | null;
   signatoryName?: string | null;
   instructions: string[];
   receiptNumber: string;
@@ -43,85 +61,146 @@ export type MonthlyFeeReceiptView = {
   totalAmount: number;
   paymentMode: string;
   reference?: string | null;
+  monthsCovered?: string[];
 };
+
+const DEFAULT_INSTRUCTIONS = [
+  'Fees are to be paid before the 15th of every month.',
+  'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
+  'Pupils with dues may be barred from sitting for the Examinations.',
+  'Fees once paid are not refundable.',
+];
 
 function slip(
   view: MonthlyFeeReceiptView,
-  copy: "Parent's copy" | 'School copy',
+  copy: "Parent's Copy" | 'School Copy',
+  logoSrc: string | null,
 ) {
   const instructions = view.instructions.length
     ? view.instructions
-    : [
-        'Fees are to be paid before the 15th of every month.',
-        'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
-        'Pupils with dues may be barred from sitting for the Examinations.',
-        'Fees once paid are not refundable.',
-      ];
+    : DEFAULT_INSTRUCTIONS;
+  const months = view.monthsCovered?.length
+    ? view.monthsCovered.join(', ')
+    : monthLabel(view.feeMonth);
+  const classLabel = `${view.className} ${view.sectionName}`.trim();
+  const motto = view.motto || 'Knowledge · Service · Light';
+  const rows = [
+    ['Tuition Fee', money(view.tuitionAmount)],
+    ['Late Fee', money(view.lateFeeAmount)],
+    ...(view.otherAmount ? [['Other Fee', money(view.otherAmount)]] : []),
+    ...(view.discountAmount
+      ? [['Concession', `− ${money(view.discountAmount)}`]]
+      : []),
+    ...(view.previousBalance
+      ? [['Previous Balance', money(view.previousBalance)]]
+      : []),
+  ];
   return `
   <article class="slip">
     <header>
-      ${view.logoUrl ? `<img class="logo" src="${esc(view.logoUrl)}" alt="" />` : ''}
-      <p class="month">${esc(monthLabel(view.feeMonth))}</p>
-      <h1>${esc(view.schoolName)}</h1>
-      <p class="addr">${esc(view.schoolAddress)}</p>
+      <div class="brand">
+        ${logoSrc ? `<img class="crest" src="${esc(logoSrc)}" alt="" />` : '<div class="crest-fallback">SLS</div>'}
+        <div>
+          <h1>${esc(view.schoolName)}</h1>
+          <p class="addr">${esc(view.schoolAddress)}</p>
+          <p class="motto">${esc(motto)}</p>
+        </div>
+      </div>
+      <div class="banner">
+        <span>FEE RECEIPT</span>
+        <span class="banner-right">
+          <b>${esc(months)}</b>
+          <small>Academic Year: ${esc(view.academicYear)}</small>
+        </span>
+      </div>
     </header>
-    <p class="line"><span>Pupil's Name</span><b>${esc(view.studentName)}</b></p>
-    <p class="line"><span>Admission No.</span><b>${esc(view.admissionNumber)}</b></p>
-    <p class="line"><span>Class</span><b>${esc(view.className)} ${esc(view.sectionName)}</b></p>
+    <section class="pupil">
+      <p><span>Pupil's Name</span><b>${esc(view.studentName)}</b></p>
+      <p><span>Admission No.</span><b>${esc(view.admissionNumber)}</b></p>
+      <p><span>Class &amp; Section</span><b>${esc(classLabel)}</b></p>
+    </section>
     <table>
-      <tr><td>Tuition Fee</td><td>${money(view.tuitionAmount)}</td></tr>
-      <tr><td>Late Fee</td><td>${money(view.lateFeeAmount)}</td></tr>
-      ${view.otherAmount ? `<tr><td>Other Fee</td><td>${money(view.otherAmount)}</td></tr>` : ''}
-      ${view.discountAmount ? `<tr><td>Concession</td><td>− ${money(view.discountAmount)}</td></tr>` : ''}
-      ${view.previousBalance ? `<tr><td>Previous Balance</td><td>${money(view.previousBalance)}</td></tr>` : ''}
-      <tr class="total"><td>Total Rs.</td><td>${money(view.totalAmount)}</td></tr>
+      <thead>
+        <tr><th>Particulars</th><th>Amount (Rs.)</th></tr>
+      </thead>
+      <tbody>
+        ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
+        <tr class="total"><td>Total Amount</td><td>${money(view.totalAmount)}</td></tr>
+      </tbody>
     </table>
-    <p class="meta">Fee Book ${esc(view.receiptNumber)} · ${esc(view.academicYear)} · ${esc(view.paymentMode)}${view.reference ? ` · ${esc(view.reference)}` : ''}</p>
-    <p class="meta">Date ${esc(view.paidAt)}</p>
-    <div class="foot">
-      <span>${copy}</span>
-      <span>Signature<br/><small>${esc(view.signatoryName || 'Authorized signatory')}</small></span>
-    </div>
+    <section class="meta">
+      <p><span>Receipt No.</span><b>${esc(view.receiptNumber)}</b></p>
+      <p><span>Payment Mode</span><b>${esc(view.paymentMode)}${view.reference ? ` · ${esc(view.reference)}` : ''}</b></p>
+      <p><span>Date &amp; Time</span><b>${esc(view.paidAt)}</b></p>
+    </section>
     <aside class="notes">
-      <strong>General instructions</strong>
-      <ol>${instructions.map((item) => `<li>${esc(item)}</li>`).join('')}</ol>
+      <strong>General Instructions</strong>
+      <ol>${instructions.map((item, i) => `<li><b>${i + 1}.</b> ${esc(item)}</li>`).join('')}</ol>
     </aside>
+    <footer>
+      <span class="pill">${copy}</span>
+      <span class="sign">
+        Signature
+        <small>${esc(view.signatoryName || 'Authorized Signatory')}</small>
+      </span>
+    </footer>
+    <p class="thanks">Thank you for your support</p>
   </article>`;
 }
 
 export function monthlyFeeReceiptHtml(view: MonthlyFeeReceiptView) {
+  const logoSrc = view.logoUrl?.startsWith('data:')
+    ? view.logoUrl
+    : view.logoUrl && view.logoUrl.startsWith('http')
+      ? view.logoUrl
+      : schoolLogoDataUri() || view.logoUrl || null;
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Fee receipt ${esc(view.receiptNumber)}</title>
   <style>
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 8mm; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Times New Roman", Georgia, serif; color: #111; background: #fff; }
-    .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 180mm; }
-    .slip { border: 1px solid #111; padding: 14px 16px 12px; position: relative; }
-    header { text-align: center; margin-bottom: 8px; }
-    .logo { height: 42px; margin-bottom: 4px; }
-    h1 { font-size: 18px; margin: 0; }
-    .addr, .month { margin: 0; font-size: 13px; }
-    .month { font-weight: 700; margin-bottom: 2px; }
-    .line { display: flex; justify-content: space-between; border-bottom: 1px dotted #333; margin: 6px 0; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-    td { border: 1px solid #111; padding: 6px 8px; }
-    td:last-child { text-align: right; width: 38%; }
-    tr.total td { font-weight: 700; }
-    .meta { font-size: 12px; margin: 8px 0 0; }
-    .foot { display: flex; justify-content: space-between; margin-top: 18px; font-size: 13px; }
-    .notes { margin-top: 10px; border: 1px solid #111; border-radius: 10px; padding: 6px 10px; font-size: 11px; }
-    .notes ol { margin: 4px 0 0; padding-left: 18px; }
-    @media print { body { -webkit-print-color-adjust: exact; } }
+    body { margin: 0; font-family: "Segoe UI", Calibri, Arial, sans-serif; color: #1a365d; background: #eef2f7; }
+    .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .slip { background: #fff; border: 1.5px solid #1a365d; border-radius: 10px; padding: 14px 16px 10px; min-height: 178mm; display: flex; flex-direction: column; }
+    .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .crest { width: 52px; height: 52px; object-fit: contain; }
+    .crest-fallback { width: 52px; height: 52px; border-radius: 50%; background: #1a365d; color: #c5a572; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    h1 { margin: 0; font-size: 16px; color: #1a365d; }
+    .addr { margin: 2px 0 0; font-size: 11px; color: #334155; }
+    .motto { margin: 2px 0 0; font-size: 10px; font-style: italic; color: #1a365d; }
+    .banner { display: flex; justify-content: space-between; align-items: center; background: #1a365d; color: #fff; border-radius: 6px; padding: 8px 12px; }
+    .banner > span:first-child { font-size: 15px; font-weight: 800; letter-spacing: 0.06em; }
+    .banner-right { text-align: right; line-height: 1.2; }
+    .banner-right b { display: block; font-size: 13px; }
+    .banner-right small { font-size: 10px; opacity: 0.9; }
+    .pupil { background: #e8eef6; border-radius: 6px; padding: 8px 10px; margin: 10px 0; font-size: 12px; }
+    .pupil p { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
+    .pupil span { color: #475569; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; background: #1a365d; color: #fff; padding: 6px 8px; }
+    th:last-child, td:last-child { text-align: right; }
+    td { padding: 6px 8px; border-bottom: 1px solid #dbe4f0; }
+    tr.total td { background: #1a365d; color: #fff; font-weight: 700; border: 0; }
+    .meta { margin: 10px 0 8px; font-size: 12px; }
+    .meta p { display: flex; justify-content: space-between; margin: 3px 0; }
+    .notes { border: 1px solid #1a365d; border-radius: 8px; padding: 8px 10px; font-size: 10.5px; color: #1e293b; }
+    .notes ol { margin: 4px 0 0; padding-left: 0; list-style: none; }
+    .notes li { margin: 2px 0; }
+    footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 14px; }
+    .pill { background: #1a365d; color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 11px; font-weight: 700; }
+    .sign { text-align: right; font-size: 11px; color: #1a365d; }
+    .sign small { display: block; color: #64748b; }
+    .thanks { margin: 8px 0 0; font-size: 10px; color: #64748b; font-style: italic; }
+    @media print { body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style>
 </head>
 <body>
   <div class="sheet">
-    ${slip(view, "Parent's copy")}
-    ${slip(view, 'School copy')}
+    ${slip(view, "Parent's Copy", logoSrc)}
+    ${slip(view, 'School Copy', logoSrc)}
   </div>
 </body>
 </html>`;

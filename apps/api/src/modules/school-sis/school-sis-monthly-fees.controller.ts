@@ -154,6 +154,21 @@ export class SchoolSisMonthlyFeesController {
     return this.fees.pending(user.tid, month);
   }
 
+  @Get('ledger')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  ledger(@CurrentUser() user: JwtUser, @Query('studentId') studentId: string) {
+    return this.fees.ledger(user.tid, studentId);
+  }
+
+  @Post('payments/:id/send')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  async sendReceipt(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.fees.sendToParent(user.tid, id, user.sub);
+  }
+
   @Get('payments/:id')
   @RequireAnyPermission(
     SCHOOL_SIS_PERMISSION_READ,

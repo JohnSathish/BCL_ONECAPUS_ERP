@@ -414,6 +414,35 @@ export class SchoolSisService {
                     },
                   },
                 },
+                {
+                  enrollments: {
+                    some: {
+                      academicYearId: year.id,
+                      deletedAt: null,
+                      OR: [
+                        {
+                          section: {
+                            name: { contains: query, mode: 'insensitive' },
+                          },
+                        },
+                        {
+                          section: {
+                            grade: {
+                              name: { contains: query, mode: 'insensitive' },
+                            },
+                          },
+                        },
+                        {
+                          section: {
+                            grade: {
+                              code: { contains: query, mode: 'insensitive' },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
               ],
             }
           : {}),
