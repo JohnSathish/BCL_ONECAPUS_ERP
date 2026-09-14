@@ -39,16 +39,79 @@ body#opac-main #moresearches,
 /* —— Utility bar (Koha header-region) —— */
 #header-region {
   background: var(--dbc-navy) !important;
-  color: #d7e4f2 !important;
-  min-height: 38px;
-  padding: 0 18px !important;
+  color: #e8eef6 !important;
+  min-height: 44px;
+  padding: 0 22px !important;
   border: 0 !important;
+  box-shadow: 0 2px 10px rgba(8, 22, 40, 0.25);
 }
 #header-region a,
 #header-region .nav-link,
-#header-region .navbar-nav {
-  color: #d7e4f2 !important;
-  font-size: 13px;
+#header-region .navbar-nav,
+#header-region .cartlabel,
+#header-region #listsmenu,
+#header-region .userlabel {
+  color: #e8eef6 !important;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+#header-region .nav-link:hover,
+#header-region a.nav-link:hover,
+#header-region .nav-link:focus,
+#header-region .dropdown-toggle:hover {
+  color: var(--dbc-gold-2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px;
+}
+#header-region .nav-link.show,
+#header-region .dropdown-toggle[aria-expanded="true"] {
+  color: var(--dbc-gold-2) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px;
+}
+#header-region .dropdown-menu {
+  background: #fff !important;
+  border: 1px solid var(--dbc-line) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 36px rgba(11, 35, 64, 0.18) !important;
+  padding: 8px !important;
+  margin-top: 8px !important;
+  min-width: 240px;
+}
+#header-region .dropdown-menu a,
+#header-region .dropdown-menu .dropdown-item,
+#header-region .dropdown-menu .dropdown-header,
+#header-region .dropdown-menu p,
+#header-region .dropdown-menu span,
+#header-region .dropdown-menu li,
+#header-region .dropdown-menu .nav-link {
+  color: var(--dbc-ink) !important;
+  font-weight: 600;
+  font-size: 0.9rem !important;
+  background: transparent !important;
+}
+#header-region .dropdown-menu .dropdown-header,
+#header-region .dropdown-menu .dropdown-item-text {
+  color: var(--dbc-muted) !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700 !important;
+}
+#header-region .dropdown-menu a:hover,
+#header-region .dropdown-menu .dropdown-item:hover,
+#header-region .dropdown-menu a:focus,
+#header-region .dropdown-menu .dropdown-item:focus {
+  background: #eef6f5 !important;
+  color: var(--dbc-teal-dark) !important;
+  border-radius: 8px;
+}
+#header-region .dropdown-divider {
+  border-color: var(--dbc-line) !important;
+}
+#cart-list-nav .cartlabel,
+#listsmenu {
+  font-size: 13.5px;
 }
 #logo {
   display: flex !important;

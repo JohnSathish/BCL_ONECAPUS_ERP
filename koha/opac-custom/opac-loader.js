@@ -3,7 +3,7 @@
   var css = document.createElement('link');
   css.id = 'dbc-opac-css';
   css.rel = 'stylesheet';
-  css.href = '/opac-custom/opac-dbc.css?v=6';
+  css.href = '/opac-custom/opac-dbc.css?v=7';
   document.head.appendChild(css);
   var s = document.createElement('script');
   s.id = 'dbc-opac-js';
