@@ -1,0 +1,86 @@
+# Standalone Koha ILS for Don Bosco College Tura.
+# Own compose project, own MySQL, own network. No ERP services, env, or docker network.
+# OPAC 8080 / staff 8081 published only on loopback.
+
+name: dbc-koha
+
+services:
+  db:
+    image: docker.io/mysql:8.0
+    container_name: koha-db
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${KOHA_DB_ROOT_PASSWORD:?set KOHA_DB_ROOT_PASSWORD in koha/.env}
+      MYSQL_DATABASE: ${KOHA_DB_NAME:-koha_library}
+      MYSQL_USER: ${KOHA_DB_USER:-koha_library}
+      MYSQL_PASSWORD: ${KOHA_DB_PASSWORD:?set KOHA_DB_PASSWORD in koha/.env}
+    volumes:
+      - koha-mysql:/var/lib/mysql
+      - ./backups:/backups:ro
+    networks:
+      - koha
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  memcached:
+    image: docker.io/memcached:1.6-alpine
+    container_name: koha-memcached
+    restart: unless-stopped
+    command: memcached -m 64m
+    networks:
+      - koha
+
+  rabbitmq:
+    image: docker.io/rabbitmq:3
+    container_name: koha-rabbitmq
+    restart: unless-stopped
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    networks:
+      - koha
+
+  koha:
+    # Hub publishes 24.11 / latest, not 23.11. Restore the 23.11 dump; Koha upgrades the schema.
+    image: docker.io/teogramm/koha:${KOHA_IMAGE_TAG:-24.11}
+    container_name: koha-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      MYSQL_SERVER: db
+      DB_NAME: ${KOHA_DB_NAME:-koha_library}
+      MYSQL_USER: ${KOHA_DB_USER:-koha_library}
+      MYSQL_PASSWORD: ${KOHA_DB_PASSWORD:?set KOHA_DB_PASSWORD in koha/.env}
+      MEMCACHED_SERVERS: memcached:11211
+      MB_HOST: rabbitmq
+      ZEBRA_MARC_FORMAT: marc21
+      KOHA_LANGS: ${KOHA_LANGS:-}
+    cap_add:
+      - DAC_READ_SEARCH
+      - SYS_NICE
+    # Bound on the host so ERP nginx can proxy via host.docker.internal.
+    # Do not open 16080/16081 on the VPS firewall (only 80/443/22).
+    ports:
+      - '16080:8080'
+      - '16081:8081'
+    volumes:
+      - koha-logs:/var/log/koha
+    networks:
+      - koha
+
+networks:
+  koha:
+    name: koha_internal
+
+volumes:
+  koha-mysql:
+  koha-logs:

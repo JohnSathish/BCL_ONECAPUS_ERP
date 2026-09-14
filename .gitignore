@@ -76,3 +76,12 @@ apps/api/scripts/data/**
 !apps/api/scripts/data/news-export-demo.json
 !apps/api/scripts/data/staff_export_teaching.csv
 !apps/api/scripts/data/infrastructure-rooms.xlsx
+
+# Koha DB dumps (never commit — 300MB+ live data)
+koha/.env
+koha/*.sql
+koha/*.sql.gz
+koha/backups/*.sql
+koha/backups/*.sql.gz
+koha/backups/*.sql.xz
+koha/library-*.sql
