@@ -102,10 +102,15 @@ services:
       - '127.0.0.1:16082:80'
     volumes:
       - ./inout/overlay/dash.php:/var/www/html/dash.php:ro
+      - ./inout/overlay/login.php:/var/www/html/login.php:ro
       - ./inout/overlay/main.php:/var/www/html/process/operations/main.php:ro
       - ./inout/overlay/stats.php:/var/www/html/process/operations/stats.php:ro
       - ./inout/overlay/dbc-inout.css:/var/www/html/assets/css/dbc-inout.css:ro
+      - ./inout/overlay/dbc-login.css:/var/www/html/assets/css/dbc-login.css:ro
       - ./inout/overlay/dbc-logo.png:/var/www/html/assets/img/dbc-logo.png:ro
+      - ./inout/overlay/dbc-crest.png:/var/www/html/assets/img/dbc-crest.png:ro
+      - ./inout/overlay/campus.jpg:/var/www/html/assets/img/campus.jpg:ro
+      - ./inout/overlay/don-bosco.png:/var/www/html/assets/img/don-bosco.png:ro
     networks:
       - koha
 
