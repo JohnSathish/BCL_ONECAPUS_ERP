@@ -6,16 +6,35 @@ import pathlib
 import subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent
+ENV_FILE = ROOT.parent / ".env"
+
+
+def load_koha_env() -> None:
+    if not ENV_FILE.is_file():
+        return
+    for raw in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_koha_env()
 DB_NAME = os.environ.get("KOHA_DB_NAME", "koha_library")
 DB_ROOT = os.environ.get("KOHA_DB_ROOT_PASSWORD", "koha_local_root")
 MYSQL = [
     "docker",
     "exec",
     "-i",
+    "-e",
+    f"MYSQL_PWD={DB_ROOT}",
     "koha-db",
     "mysql",
     "-uroot",
-    f"-p{DB_ROOT}",
     DB_NAME,
 ]
 
