@@ -94,6 +94,8 @@ def main() -> None:
     loader = extra_css + "\n/* theme files: /opac-custom/opac-dbc.css */\n"
     sql = f"""
 UPDATE systempreferences SET value='Don Bosco College Library' WHERE variable='LibraryName';
+UPDATE systempreferences SET value='https://koha.donboscocollege.ac.in' WHERE variable='OPACBaseURL';
+UPDATE systempreferences SET value='https://staff.koha.donboscocollege.ac.in' WHERE variable='staffClientBaseURL';
 UPDATE systempreferences SET value='{sql_str(loader)}' WHERE variable='OPACUserCSS';
 UPDATE systempreferences SET value='{sql_str(js)}' WHERE variable='OPACUserJS';
 UPDATE additional_contents_localizations SET content='' WHERE additional_content_id=4;
