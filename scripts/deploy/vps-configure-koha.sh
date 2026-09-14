@@ -83,10 +83,14 @@ if [[ -n "${DUMP}" && -f "$DUMP" ]]; then
   set +a
   DB_NAME="${KOHA_DB_NAME:-koha_library}"
   docker exec koha-db mysql -uroot -p"${KOHA_DB_ROOT_PASSWORD}" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL ON \`${DB_NAME}\`.* TO '${KOHA_DB_USER:-koha_library}'@'%'; FLUSH PRIVILEGES;"
-  if [[ "$DUMP" == *.gz ]]; then
-    gzip -dc "$DUMP" | docker exec -i koha-db mysql -uroot -p"${KOHA_DB_ROOT_PASSWORD}"
+  # Windows tar -czf produces a tar (after gunzip), not plain SQL.
+  if tar -tf "$DUMP" >/dev/null 2>&1; then
+    echo "Dump is a tar archive; streaming the SQL member into MySQL…"
+    tar -xOf "$DUMP" | docker exec -i koha-db mysql --binary-mode -uroot -p"${KOHA_DB_ROOT_PASSWORD}" "$DB_NAME"
+  elif gzip -t "$DUMP" >/dev/null 2>&1; then
+    gzip -dc "$DUMP" | docker exec -i koha-db mysql --binary-mode -uroot -p"${KOHA_DB_ROOT_PASSWORD}" "$DB_NAME"
   else
-    docker exec -i koha-db mysql -uroot -p"${KOHA_DB_ROOT_PASSWORD}" < "$DUMP"
+    docker exec -i koha-db mysql --binary-mode -uroot -p"${KOHA_DB_ROOT_PASSWORD}" "$DB_NAME" < "$DUMP"
   fi
   docker exec koha-db mysql -uroot -p"${KOHA_DB_ROOT_PASSWORD}" "$DB_NAME" -e \
     "UPDATE systempreferences SET value='https://${OPAC_HOST}' WHERE variable='OPACBaseURL';
