@@ -6,6 +6,7 @@
 #   1. DNS A records (same VPS IP):
 #        koha.donboscocollege.ac.in
 #        staff.koha.donboscocollege.ac.in
+#        inout.donboscocollege.ac.in   (gate register; add when ready)
 #   2. Dump on the VPS, e.g. /opt/nep-erp/koha/library-2026-09-14.sql
 #   3. koha/.env from koha/env.example (strong passwords)
 #
@@ -19,6 +20,7 @@ KOHA_DIR="${APP_DIR}/koha"
 EMAIL="${SSL_EMAIL:-admin@donboscocollege.ac.in}"
 OPAC_HOST="koha.donboscocollege.ac.in"
 STAFF_HOST="staff.koha.donboscocollege.ac.in"
+INOUT_HOST="inout.donboscocollege.ac.in"
 # Nginx on this VPS owns :80/:443. Reload only — do not recreate ERP api/web.
 NGINX_COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
 COMPOSE_KOHA=(docker compose --project-name dbc-koha --env-file "${KOHA_DIR}/.env" -f "${KOHA_DIR}/docker-compose.yml")
@@ -43,6 +45,8 @@ mkdir -p "${KOHA_DIR}/backups" certbot/www/.well-known/acme-challenge nginx/extr
 
 echo "Pulling Koha from Docker Hub (no zip upload)…"
 "${COMPOSE_KOHA[@]}" pull
+echo "Building In/Out gate image…"
+"${COMPOSE_KOHA[@]}" build inout || true
 
 echo "Starting dedicated Koha stack (dbc-koha)…"
 "${COMPOSE_KOHA[@]}" up -d
@@ -87,10 +91,21 @@ if [[ -n "${DUMP}" && -f "$DUMP" ]]; then
   docker exec koha-db mysql -uroot -p"${KOHA_DB_ROOT_PASSWORD}" "$DB_NAME" -e \
     "UPDATE systempreferences SET value='https://${OPAC_HOST}' WHERE variable='OPACBaseURL';
      UPDATE systempreferences SET value='https://${STAFF_HOST}' WHERE variable='staffClientBaseURL';"
-  echo "Dump restored. Restarting Koha…"
+  echo "Dump restored. Upgrading Koha schema and applying Don Bosco theme…"
+  docker exec koha-web bash -lc 'koha-upgrade-schema default' || true
   "${COMPOSE_KOHA[@]}" restart koha
-  sleep 8
-  docker exec koha-web bash -lc 'koha-rebuild-zebra -f -v $(ls /etc/koha/sites 2>/dev/null | head -1) || true' || true
+  sleep 12
+  docker exec koha-web bash -lc 'koha-rebuild-zebra -f -v default || true' || true
+  if command -v python3 >/dev/null 2>&1; then
+    (
+      set -a
+      # shellcheck disable=SC1090
+      source "${KOHA_DIR}/.env"
+      set +a
+      python3 "${KOHA_DIR}/opac-custom/apply_opac_theme.py" || true
+    )
+  fi
+  echo flush_all | docker exec -i koha-memcached nc 127.0.0.1 11211 || true
 else
   echo "No Koha SQL dump found."
   echo "Upload library-2026-09-14.sql then re-run with KOHA_SQL_DUMP=..."
@@ -108,6 +123,12 @@ if getent hosts "${STAFF_HOST}" >/dev/null 2>&1; then
 else
   echo "No DNS yet for ${STAFF_HOST} — certificate for OPAC only."
   echo "Add an A record ${STAFF_HOST} → this VPS, then re-run this script."
+fi
+if getent hosts "${INOUT_HOST}" >/dev/null 2>&1; then
+  CERT_DOMAINS+=(-d "${INOUT_HOST}")
+  echo "Including ${INOUT_HOST} on the certificate."
+else
+  echo "No DNS yet for ${INOUT_HOST} — add A record later, then re-run this script."
 fi
 certbot certonly \
   --webroot -w "${APP_DIR}/certbot/www" \
@@ -143,4 +164,5 @@ done
 echo
 echo "Koha OPAC:  https://${OPAC_HOST}/"
 echo "Koha staff: https://${STAFF_HOST}/"
+echo "Koha In/Out: https://${INOUT_HOST}/login.php  (after DNS)"
 echo "This ILS does not use Bosco Connect login, students, or Library I/O."

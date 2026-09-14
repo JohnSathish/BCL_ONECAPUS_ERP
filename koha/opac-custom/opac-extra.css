@@ -1,0 +1,6 @@
+# Hide leftover Koha chrome on the OPAC home page
+body#opac-main #navigation,
+body#opac-main #OpacNavRight,
+body#opac-main #login {
+  display: none !important;
+}

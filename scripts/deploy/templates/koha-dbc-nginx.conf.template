@@ -5,7 +5,7 @@
 # ── HTTP: ACME + redirect ──
 server {
   listen 80;
-  server_name koha.donboscocollege.ac.in staff.koha.donboscocollege.ac.in;
+  server_name koha.donboscocollege.ac.in staff.koha.donboscocollege.ac.in inout.donboscocollege.ac.in;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
@@ -72,5 +72,36 @@ server {
     proxy_set_header   X-Forwarded-Proto $scheme;
     proxy_set_header   X-Forwarded-Host $host;
     proxy_read_timeout 180s;
+  }
+}
+
+# ── HTTPS: Koha In/Out gate register (enable after DNS + certbot -d) ──
+# Copied by vps-configure-koha.sh when the certificate includes this name.
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name inout.donboscocollege.ac.in;
+
+  ssl_certificate     /etc/letsencrypt/live/koha.donboscocollege.ac.in/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/koha.donboscocollege.ac.in/privkey.pem;
+  ssl_session_cache   shared:SSL:10m;
+  ssl_session_timeout 1d;
+  ssl_protocols       TLSv1.2 TLSv1.3;
+
+  client_max_body_size 32m;
+
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Frame-Options "SAMEORIGIN" always;
+
+  location / {
+    proxy_pass         http://host.docker.internal:16082;
+    proxy_http_version 1.1;
+    proxy_set_header   Host $host;
+    proxy_set_header   X-Real-IP $remote_addr;
+    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_set_header   X-Forwarded-Host $host;
+    proxy_read_timeout 120s;
   }
 }

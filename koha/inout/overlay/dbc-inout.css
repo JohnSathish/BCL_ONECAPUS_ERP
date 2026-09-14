@@ -1,0 +1,192 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;1,500&display=swap");
+:root {
+  --navy: #123056;
+  --ink: #1d2a3a;
+  --muted: #5c6d80;
+  --line: #e3ebf3;
+  --paper: #f3f7fb;
+  --teal: #1c6b63;
+}
+* { box-sizing: border-box; }
+body.dbc-io {
+  margin: 0;
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.io-side {
+  background: #0e2744;
+  color: #d7e4f2;
+  padding: 18px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.io-brand { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.io-brand img { height: 44px; width: 44px; background: #fff; border-radius: 50%; object-fit: contain; }
+.io-brand strong { display: block; color: #fff; }
+.io-brand span { font-size: 0.78rem; color: #9db4cc; }
+.io-find input, .io-scan input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.io-side nav a {
+  display: block;
+  color: #cfe0f2;
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.io-side nav a.is-on, .io-side nav a:hover { background: #1c6b63; color: #fff; }
+.io-ql { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8aa0b8; margin: 12px 0 4px; }
+.io-side blockquote {
+  margin-top: auto;
+  font-family: "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: #c5d6e8;
+  border: 0;
+  padding: 0;
+}
+.io-side small { display: block; margin-top: 6px; font-style: normal; opacity: 0.8; }
+.io-main { padding: 18px 22px 12px; min-width: 0; }
+.io-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.io-top h1 { margin: 0; font-size: 1.45rem; color: var(--navy); }
+.io-top p { margin: 2px 0 0; color: var(--muted); }
+.io-meta { display: flex; gap: 12px; align-items: center; font-size: 0.85rem; color: var(--muted); }
+.io-meta b { display: block; color: var(--navy); }
+.online { color: #1c8a4c; font-weight: 700; }
+.who small { display: block; color: var(--muted); }
+.io-meta .out { color: #c43d4e; text-decoration: none; font-weight: 600; }
+.io-script {
+  text-align: right;
+  font-family: "Playfair Display", Georgia, serif;
+  font-style: italic;
+  color: #7a8ba0;
+  margin: 0 0 12px;
+}
+.io-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.io-stats article {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+}
+.io-stats em { display: block; font-style: normal; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.io-stats b { font-size: 1.45rem; }
+.s1 { background: #eaf3ff; color: #1d6fd8; }
+.s2 { background: #fde8ea; color: #c43d4e; }
+.s3 { background: #e7f8ee; color: #1c8a4c; }
+.s4 { background: #ece7ff; color: #5b43d6; }
+.s5 { background: #fff4e0; color: #c47a12; }
+.s6 { background: #e8f4ff; color: #1565c0; }
+.io-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; }
+.io-scan, .panel, .io-chart {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+.io-scan h2 { margin: 0 0 4px; }
+.io-scan form { display: flex; gap: 8px; margin: 12px 0; }
+.io-scan button {
+  background: var(--teal);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tip { font-size: 0.82rem; color: #1d6fd8; }
+.patron {
+  margin-top: 14px;
+  background: #0b1c33;
+  color: #e8eef6;
+  border-radius: 16px;
+  padding: 16px;
+}
+.patron-top { display: flex; gap: 14px; align-items: center; }
+.patron-top img, .ph {
+  width: 86px;
+  height: 86px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #1c3354;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+}
+.badge {
+  display: inline-block;
+  background: #1c8a4c;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.patron.out .badge { background: #c47a12; }
+.patron.bad .badge { background: #c43d4e; }
+.patron.wait .badge { background: #5b43d6; }
+.patron h3 { margin: 6px 0 0; font-size: 1.35rem; }
+.usn { margin: 2px 0 0; color: #9db4cc; }
+.patron-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+  font-size: 0.88rem;
+}
+.patron-grid label, .chips label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8aa0b8;
+}
+.chips {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.chips div {
+  border: 1px solid #2a4568;
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+}
+.chips .warn { border-color: #e0b125; color: #f5d56a; }
+.note { margin: 10px 0 0; color: #b7c9dc; }
+.note.bad { color: #ffb4bc; }
+.act { list-style: none; padding: 0; margin: 0; }
+.act li { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 0.84rem; }
+.act .in { color: #1c8a4c; font-style: normal; font-weight: 700; }
+.act .out { color: #c43d4e; font-style: normal; font-weight: 700; }
+.io-chart { margin-top: 14px; }
+.bars { display: flex; gap: 10px; align-items: flex-end; height: 160px; }
+.col { flex: 1; text-align: center; font-size: 0.7rem; color: var(--muted); }
+.stack { height: 130px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.stack i { display: block; width: 10px; border-radius: 6px 6px 0 0; }
+.stack .in { background: #1d6fd8; }
+.stack .out { background: #1c8a4c; }
+.io-foot { margin-top: 16px; font-size: 0.78rem; color: var(--muted); text-align: center; }
+.io-foot a { color: var(--teal); }
+@media (max-width: 1100px) {
+  body.dbc-io, .io-grid, .io-stats, .chips, .patron-grid { grid-template-columns: 1fr; }
+  .io-side { display: none; }
+}

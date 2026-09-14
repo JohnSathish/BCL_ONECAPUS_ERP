@@ -68,14 +68,69 @@ services:
       - DAC_READ_SEARCH
       - SYS_NICE
     # Bound on the host so ERP nginx can proxy via host.docker.internal.
-    # Do not open 16080/16081 on the VPS firewall (only 80/443/22).
+    # Do not open 16080/16081/16082 on the VPS firewall (only 80/443/22).
     ports:
-      - '16080:8080'
-      - '16081:8081'
+      - '127.0.0.1:16080:8080'
+      - '127.0.0.1:16081:8081'
     volumes:
-      - koha-logs:/var/log/koha
+      - ./opac-custom:/usr/share/koha/opac/htdocs/opac-custom:ro
+      - ./opac-custom:/usr/share/koha/intranet/htdocs/staff-custom:ro
     networks:
       - koha
+
+  # Omkar In/Out gate register — reads Koha patrons, own visit tables. Not ERP Library I/O.
+  inout:
+    build:
+      context: ./inout
+    image: dbc-koha-inout:v6
+    container_name: koha-inout
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      inout-db-init:
+        condition: service_completed_successfully
+    environment:
+      INOUT_DB_HOST: db
+      INOUT_DB_NAME: ${INOUT_DB_NAME:-koha_inout}
+      KOHA_DB_NAME: ${KOHA_DB_NAME:-koha_library}
+      KOHA_DB_USER: ${KOHA_DB_USER:-koha_library}
+      KOHA_DB_PASSWORD: ${KOHA_DB_PASSWORD:?set KOHA_DB_PASSWORD in koha/.env}
+    ports:
+      - '127.0.0.1:16082:80'
+    volumes:
+      - ./inout/overlay/dash.php:/var/www/html/dash.php:ro
+      - ./inout/overlay/main.php:/var/www/html/process/operations/main.php:ro
+      - ./inout/overlay/stats.php:/var/www/html/process/operations/stats.php:ro
+      - ./inout/overlay/dbc-inout.css:/var/www/html/assets/css/dbc-inout.css:ro
+      - ./inout/overlay/dbc-logo.png:/var/www/html/assets/img/dbc-logo.png:ro
+    networks:
+      - koha
+
+  inout-db-init:
+    image: docker.io/mysql:8.0
+    container_name: koha-inout-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      INOUT_DB_HOST: db
+      INOUT_DB_NAME: ${INOUT_DB_NAME:-koha_inout}
+      KOHA_DB_NAME: ${KOHA_DB_NAME:-koha_library}
+      KOHA_DB_USER: ${KOHA_DB_USER:-koha_library}
+      KOHA_DB_ROOT_PASSWORD: ${KOHA_DB_ROOT_PASSWORD:?set KOHA_DB_ROOT_PASSWORD in koha/.env}
+    volumes:
+      - ./inout/schema.sql:/schema.sql:ro
+      - ./inout/init-db.sh:/init-db.sh:ro
+    entrypoint:
+      [
+        'bash',
+        '-c',
+        'cp /init-db.sh /tmp/init-db.sh && sed -i "s/\\r$//" /tmp/init-db.sh && bash /tmp/init-db.sh',
+      ]
+    networks:
+      - koha
+    restart: 'no'
 
 networks:
   koha:
@@ -83,4 +138,3 @@ networks:
 
 volumes:
   koha-mysql:
-  koha-logs:
