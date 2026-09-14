@@ -310,7 +310,7 @@ export class LibraryEntryExitReportsService {
       incompleteExits: rows
         .filter((r) => r.status === 'INCOMPLETE')
         .map((r) => this.toJson(r)),
-      multipleVisitsSameDay: [...byDayMember.entries].filter(
+      multipleVisitsSameDay: [...byDayMember.entries()].filter(
         ([, count]) => count > 1,
       ).length,
       firstEntry: rows.length
