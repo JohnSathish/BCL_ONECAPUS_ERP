@@ -38,6 +38,7 @@ export function StudentNameFormatProvider({ children }: { children: React.ReactN
     enabled:
       isReady &&
       Boolean(session?.accessToken) &&
+      !pathname?.startsWith('/library-desk') &&
       !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });

@@ -248,6 +248,18 @@ function handleAdmissionsHost(request: NextRequest) {
   ]);
 }
 
+function libraryHostToErpUrl(request: NextRequest, pathname: string) {
+  const url = request.nextUrl.clone();
+  const host = hostname(request.headers.get('host') ?? '');
+  if (host.startsWith('library.')) {
+    url.hostname = `erp.${host.slice('library.'.length)}`;
+    url.pathname = pathname;
+    return url;
+  }
+  url.pathname = '/library-desk/login';
+  return url;
+}
+
 function handleLibraryHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginPath = '/library-desk/login';
@@ -262,27 +274,16 @@ function handleLibraryHost(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const refreshCookie = request.cookies.get('nep_refresh')?.value;
-  const hasRefreshCookie = Boolean(refreshCookie && refreshCookie.length >= 10);
-  const isLogin =
-    pathname === '/login' || pathname === loginPath || pathname.startsWith(`${loginPath}/`);
+  // Refresh cookie is path-scoped to /api/v1/auth, so it is never sent on
+  // /library-desk HTML. Do not gate the kiosk on that cookie.
 
-  if (!hasRefreshCookie && !isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = loginPath;
-    return NextResponse.redirect(url);
-  }
-
-  // Do not bounce login → desk from the cookie alone. A student/staff ERP
-  // session on this host cannot be distinguished here and caused a redirect loop.
-
-  return handleSubdomainRewrite(request, deskPath, loginPath, [
-    '/admin',
-    '/student',
-    '/staff',
-    '/shift',
-    '/journals-portal',
-  ]);
+  return handleSubdomainRewrite(
+    request,
+    deskPath,
+    loginPath,
+    ['/admin', '/student', '/staff', '/shift', '/journals-portal'],
+    { blockedRedirect: 'erp' },
+  );
 }
 
 function handlePayHost(request: NextRequest) {
@@ -371,6 +372,7 @@ function handleSubdomainRewrite(
   basePath: string,
   loginPath: string,
   blockedPrefixes: string[],
+  options?: { blockedRedirect?: 'base' | 'erp' },
 ) {
   const { pathname } = request.nextUrl;
 
@@ -395,6 +397,9 @@ function handleSubdomainRewrite(
 
   for (const prefix of blockedPrefixes) {
     if (pathname.startsWith(prefix)) {
+      if (options?.blockedRedirect === 'erp') {
+        return NextResponse.redirect(libraryHostToErpUrl(request, pathname));
+      }
       const url = request.nextUrl.clone();
       url.pathname = basePath;
       return NextResponse.redirect(url);

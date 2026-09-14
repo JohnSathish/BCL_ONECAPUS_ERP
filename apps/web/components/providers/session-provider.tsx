@@ -169,12 +169,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    if (isAuthColdPath(pathname)) {
+      tokenRefreshManager.clearSchedule();
+      return;
+    }
     if (session) {
       tokenRefreshManager.scheduleProactiveRefresh(session);
     } else {
       tokenRefreshManager.clearSchedule();
     }
-  }, [session]);
+  }, [pathname, session]);
 
   useEffect(() => {
     return subscribeSessionBroadcast((message) => {

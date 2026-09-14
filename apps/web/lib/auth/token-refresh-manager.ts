@@ -1,6 +1,6 @@
 'use client';
 
-import { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { createHttpClient } from '@/lib/http/create-client';
 import { withApiStartupRetry, isApiStartupError } from '@/lib/http/wait-for-api';
 import { useAuthStore } from '@/store/auth-store';
@@ -10,6 +10,30 @@ import { broadcastSessionMessage } from './session-broadcast';
 import { processRefreshQueue, type RefreshQueueEntry } from './refresh-request-queue';
 
 const refreshClient = createHttpClient({ attachAuth: false });
+
+function isBrowserAuthColdPath() {
+  if (typeof window === 'undefined') return false;
+  const pathname = window.location.pathname;
+  return (
+    pathname === '/login' ||
+    pathname === '/forgot-password' ||
+    pathname.endsWith('/login') ||
+    pathname.endsWith('/register')
+  );
+}
+
+function httpStatus(error: unknown): number | undefined {
+  if (axios.isAxiosError(error)) return error.response?.status;
+  return undefined;
+}
+
+function accessTokenStillValid(): boolean {
+  const session = useAuthStore.getState().session;
+  if (!session?.accessToken || !session.expiresAt) return false;
+  const expiresAtMs = new Date(session.expiresAt).getTime();
+  return Number.isFinite(expiresAtMs) && expiresAtMs > Date.now() + 5_000;
+}
+
 class TokenRefreshManager {
   private refreshPromise: Promise<AuthSession> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -22,21 +46,22 @@ class TokenRefreshManager {
       this.refreshTimer = null;
     }
 
+    if (isBrowserAuthColdPath()) return;
+
     const expiresAtMs = new Date(session.expiresAt).getTime();
+    if (!Number.isFinite(expiresAtMs)) return;
+
     const refreshAt = expiresAtMs - 2 * 60 * 1000;
-    const delay = Math.max(refreshAt - Date.now(), 5_000);
+    const delay = expiresAtMs <= Date.now() ? 30_000 : Math.max(refreshAt - Date.now(), 60_000);
 
     this.refreshTimer = setTimeout(() => {
-      void this.refreshSession().catch(() => {
-        useAuthStore.getState().clear();
-        broadcastSessionMessage({ type: 'LOGOUT' });
-      });
+      void this.refreshSession().catch(() => undefined);
     }, delay);
   }
 
   async refreshSession(options?: { maxWaitMs?: number }): Promise<AuthSession> {
     if (this.refreshPromise) return this.refreshPromise;
-    if (Date.now() - this.lastRefreshFailureAt < 10_000) {
+    if (this.lastRefreshFailureAt > 0 && Date.now() - this.lastRefreshFailureAt < 30_000) {
       throw new Error('Refresh temporarily paused after a recent failure.');
     }
 
@@ -64,6 +89,15 @@ class TokenRefreshManager {
           throw error;
         }
         this.lastRefreshFailureAt = Date.now();
+        const status = httpStatus(error);
+        if (status === 429) {
+          this.processQueue(error, null);
+          const session = useAuthStore.getState().session;
+          if (session && accessTokenStillValid()) {
+            this.scheduleProactiveRefresh(session);
+          }
+          throw error;
+        }
         useAuthStore.getState().clear();
         this.clearSchedule();
         broadcastSessionMessage({ type: 'LOGOUT' });
@@ -85,6 +119,10 @@ class TokenRefreshManager {
     error: AxiosError,
     retry: (config: InternalAxiosRequestConfig) => Promise<unknown>,
   ): Promise<unknown> {
+    if (isBrowserAuthColdPath()) {
+      return Promise.reject(error);
+    }
+
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     if (!original || original._retry) {
       return Promise.reject(error);

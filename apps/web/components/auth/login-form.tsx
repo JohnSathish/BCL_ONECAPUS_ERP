@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import {
   canAccessAdminPortal,
   canAccessApplicantPortal,
+  canAccessPath,
   resolveHomePath,
 } from '@/lib/permissions/portal-access';
 import { getWebDeviceFingerprint } from '@/lib/device-fingerprint';
@@ -211,8 +212,13 @@ export function LoginForm({
                 ? '/school-admissions-portal/dashboard'
                 : null
             : null;
+        const requestedPath = postLoginPath ?? queryNextPath;
         const destination =
-          postLoginPath ?? queryNextPath ?? schoolHome ?? resolveHomePath(roles, permissions);
+          (requestedPath && canAccessPath(roles, requestedPath, permissions)
+            ? requestedPath
+            : null) ??
+          schoolHome ??
+          resolveHomePath(roles, permissions);
         // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
         window.location.assign(destination);
       } catch (err) {
