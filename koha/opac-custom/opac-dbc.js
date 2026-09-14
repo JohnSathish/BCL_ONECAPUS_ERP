@@ -46,9 +46,9 @@
         '<nav class="dbc-navpills" aria-label="Library">' +
         navHtml +
         '</nav>' +
-        '<p class="lead">Welcome to</p>' +
+        '<p class="kicker">Welcome to</p>' +
         '<h2>Don Bosco College <span>Library</span></h2>' +
-        '<p class="lead">Discover. Learn. Grow.</p>' +
+        '<p class="values">Read | Learn | Discover | Belong</p>' +
         '<blockquote>&ldquo;A good library will never be too neat, or too dusty, because somebody will always be in it, taking books off the shelves and staying up late reading them.&rdquo; &mdash; Lemony Snicket</blockquote>' +
         '</div>';
       brand.insertAdjacentElement('afterend', hero);
@@ -59,7 +59,40 @@
         wrap.className = 'dbc-searchwrap';
         search.parentNode.insertBefore(wrap, search);
         wrap.appendChild(search);
+        var q = document.getElementById('translControl1');
+        if (q)
+          q.setAttribute(
+            'placeholder',
+            'Search the catalog by keyword, title, author, subject, ISBN…',
+          );
+        var btn = document.getElementById('searchsubmit');
+        if (btn) {
+          btn.value = 'Search';
+          btn.innerHTML = 'Search';
+          btn.setAttribute('title', 'Search');
+          btn.classList.add('dbc-search-btn');
+        }
       }
+
+      function placeHome(html) {
+        var existing = document.querySelector('.dbc-home');
+        if (existing) {
+          existing.outerHTML = html;
+          return;
+        }
+        var host =
+          document.getElementById('opacmainuserblock') ||
+          document.querySelector('#main .main') ||
+          document.querySelector('main .main') ||
+          document.getElementById('main');
+        if (host) host.insertAdjacentHTML('afterbegin', html);
+      }
+      fetch('/opac-custom/blocks/main.html?v=9')
+        .then(function (r) {
+          return r.ok ? r.text() : Promise.reject();
+        })
+        .then(placeHome)
+        .catch(function () {});
     } else {
       var inner = document.createElement('div');
       inner.className = 'dbc-inner-navwrap';

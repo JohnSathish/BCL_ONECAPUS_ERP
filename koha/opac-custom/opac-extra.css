@@ -1,6 +1,20 @@
-# Hide leftover Koha chrome on the OPAC home page
+/* Hide leftover Koha chrome on the OPAC home page */
 body#opac-main #navigation,
 body#opac-main #OpacNavRight,
 body#opac-main #login {
   display: none !important;
+}
+
+/* Full-width home: Bootstrap containers otherwise cap at ~1140px */
+body#opac-main .container,
+body#opac-main .container-sm,
+body#opac-main .container-md,
+body#opac-main .container-lg,
+body#opac-main .container-xl,
+body#opac-main .container-xxl,
+body#opac-main .container-fluid {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
