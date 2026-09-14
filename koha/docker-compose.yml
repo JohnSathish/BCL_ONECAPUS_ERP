@@ -83,6 +83,7 @@ services:
     build:
       context: ./inout
     image: dbc-koha-inout:v6
+    pull_policy: never
     container_name: koha-inout
     restart: unless-stopped
     depends_on:

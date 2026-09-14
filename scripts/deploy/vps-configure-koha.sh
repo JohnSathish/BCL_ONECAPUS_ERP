@@ -43,10 +43,10 @@ fi
 
 mkdir -p "${KOHA_DIR}/backups" certbot/www/.well-known/acme-challenge nginx/extra-sites.d
 
-echo "Pulling Koha from Docker Hub (no zip upload)…"
-"${COMPOSE_KOHA[@]}" pull
-echo "Building In/Out gate image…"
-"${COMPOSE_KOHA[@]}" build inout || true
+echo "Pulling Koha images from Docker Hub…"
+"${COMPOSE_KOHA[@]}" pull db memcached rabbitmq koha
+echo "Building In/Out gate image locally (not on Docker Hub)…"
+"${COMPOSE_KOHA[@]}" build inout
 
 echo "Starting dedicated Koha stack (dbc-koha)…"
 "${COMPOSE_KOHA[@]}" up -d
