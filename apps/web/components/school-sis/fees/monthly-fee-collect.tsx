@@ -11,6 +11,7 @@ import {
   downloadMonthlyFeeReceiptPdf,
   fetchMonthlyFeeLedger,
   fetchSchoolSisStudents,
+  printMonthlyFeeReceipt,
   sendMonthlyFeeReceipt,
   type MonthlyFeeLedgerRow,
 } from '@/services/school-sis';
@@ -52,6 +53,12 @@ export function MonthlyFeeCollect() {
     id: string;
     receiptNumber: string;
     months: string[];
+    tuition: number;
+    late: number;
+    other: number;
+    discount: number;
+    total: number;
+    paidAt: string;
   } | null>(null);
 
   useEffect(() => {
@@ -82,12 +89,32 @@ export function MonthlyFeeCollect() {
   const other = selectedRows.reduce((s, r) => s + r.otherAmount, 0);
   const late = selectedRows.reduce((s, r) => s + r.lateFeeAmount, 0);
   const discRaw = Number(discountValue || 0);
-  const discount =
-    discountType === 'PERCENT' ? Math.round((gross * discRaw) / 100) : Math.round(discRaw);
+  const discount = Math.min(
+    gross,
+    discountType === 'PERCENT' ? Math.round((gross * discRaw) / 100) : Math.round(discRaw) || 0,
+  );
   const net = Math.max(0, gross - discount);
-  const paying = amountPaying === '' ? net : Math.round(Number(amountPaying) || 0);
+  const typedPaying = amountPaying === '' ? net : Math.round(Number(amountPaying) || 0);
+  const paying = Math.min(net, typedPaying);
   const remaining = Math.max(0, net - paying);
   const current = currentFeeMonth();
+  const concessionReady =
+    discount <= 0 || (Boolean(discountReason.trim()) && Boolean(approvedBy.trim()));
+  const canCollect =
+    canManage &&
+    selected.length > 0 &&
+    paying > 0 &&
+    concessionReady &&
+    (selected.length === 1 || paying === net);
+
+  useEffect(() => {
+    setAmountPaying((prev) => {
+      if (prev === '') return prev;
+      const n = Math.round(Number(prev) || 0);
+      if (n > net) return net ? String(net) : '';
+      return prev;
+    });
+  }, [net]);
 
   function toggle(month: string) {
     setSelected((cur) =>
@@ -267,7 +294,7 @@ export function MonthlyFeeCollect() {
                 <Line label="Tuition fees" value={rs(tuition)} />
                 <Line label="Other fees" value={rs(other)} />
                 <Line label="Late fees" value={rs(late)} />
-                <Line label="Discount" value={`− ${rs(discount)}`} />
+                <Line label="Concession" value={`− ${rs(discount)}`} />
               </dl>
               <p className="mt-3 text-3xl font-semibold tabular-nums text-[var(--school-erp-primary)]">
                 {rs(net)}
@@ -372,6 +399,16 @@ export function MonthlyFeeCollect() {
                       value={approvedBy}
                       onChange={(e) => setApprovedBy(e.target.value)}
                     />
+                    {!concessionReady ? (
+                      <p className="mt-2 text-xs text-rose-700">
+                        Reason and approver are required for a concession.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">
+                        {rs(discount)} will reduce the billed months; cash collected stays{' '}
+                        {rs(paying)}.
+                      </p>
+                    )}
                   </>
                 ) : null}
               </div>
@@ -418,7 +455,7 @@ export function MonthlyFeeCollect() {
               {canManage ? (
                 <button
                   type="button"
-                  disabled={!selected.length}
+                  disabled={!canCollect}
                   className="h-11 w-full rounded-xl bg-[var(--school-erp-primary)] text-sm font-medium text-white disabled:opacity-40"
                   onClick={() => setConfirmOpen(true)}
                 >
@@ -487,7 +524,11 @@ export function MonthlyFeeCollect() {
             <button
               type="button"
               className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-              onClick={() => window.print()}
+              onClick={() =>
+                void printMonthlyFeeReceipt(success.id).catch((err) =>
+                  setError(apiErrorMessage(err)),
+                )
+              }
             >
               Print
             </button>
@@ -536,14 +577,14 @@ export function MonthlyFeeCollect() {
                 className={`${book.className} ${book.sectionName}`}
                 receiptNumber={success.receiptNumber}
                 academicYear={book.academicYear.name}
-                paidAt={new Date().toLocaleString('en-IN')}
+                paidAt={success.paidAt}
                 paymentMode={mode}
-                tuition={tuition}
-                late={late}
-                other={other}
-                discount={discount}
+                tuition={success.tuition}
+                late={success.late}
+                other={success.other}
+                discount={success.discount}
                 previous={0}
-                total={paying}
+                total={success.total}
                 signatory={book.settings.signatoryName}
                 monthsCovered={success.months}
                 instructions={
@@ -573,7 +614,15 @@ export function MonthlyFeeCollect() {
             <p className="mt-3 text-sm">
               <b>Months:</b> {selectedRows.map((r) => r.monthLabel).join(', ')}
             </p>
+            {discount > 0 ? (
+              <p className="mt-2 text-sm text-slate-600">
+                Concession {rs(discount)}
+                {discountReason.trim() ? ` · ${discountReason.trim()}` : ''}
+                {approvedBy.trim() ? ` · Approved by ${approvedBy.trim()}` : ''}
+              </p>
+            ) : null}
             <p className="mt-1 text-2xl font-semibold tabular-nums">{rs(paying)}</p>
+            <p className="text-xs text-slate-500">Cash collected · Net payable {rs(net)}</p>
             <p className="text-sm text-slate-500">Payment mode: {METHOD_LABEL[mode] ?? mode}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -585,7 +634,8 @@ export function MonthlyFeeCollect() {
               </button>
               <button
                 type="button"
-                className="rounded-xl bg-[var(--school-erp-primary)] px-4 py-2 text-sm text-white"
+                disabled={!canCollect}
+                className="rounded-xl bg-[var(--school-erp-primary)] px-4 py-2 text-sm text-white disabled:opacity-40"
                 onClick={() => {
                   void collectMonthlyFee({
                     studentId,
@@ -613,6 +663,12 @@ export function MonthlyFeeCollect() {
                         id: res.payment.id,
                         receiptNumber: res.receiptNumber,
                         months: res.months ?? selectedRows.map((r) => r.monthLabel),
+                        tuition: res.payment.tuitionAmount ?? tuition,
+                        late: res.payment.lateFeeAmount ?? late,
+                        other: res.payment.otherAmount ?? other,
+                        discount: res.payment.discountAmount ?? discount,
+                        total: res.payment.totalAmount ?? paying,
+                        paidAt: new Date().toLocaleString('en-IN'),
                       });
                       setSelected([]);
                       void ledger.refetch();

@@ -3,7 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
-import { fetchMonthlyFeePayment, downloadMonthlyFeeReceiptPdf } from '@/services/school-sis';
+import {
+  fetchMonthlyFeePayment,
+  downloadMonthlyFeeReceiptPdf,
+  printMonthlyFeeReceipt,
+} from '@/services/school-sis';
 import { MonthlyFeeReceiptCard } from './monthly-fee-receipt-card';
 
 export function MonthlyFeeReceiptPage() {
@@ -34,6 +38,12 @@ export function MonthlyFeeReceiptPage() {
   const monthsCovered = Array.isArray(snap.months)
     ? snap.months.map((m: { monthLabel?: string }) => String(m.monthLabel || ''))
     : [monthLabel];
+  const amounts = (snap.amounts ?? {}) as Record<string, number>;
+  const lineSum = (key: 'tuitionAmount' | 'lateFeeAmount' | 'otherAmount') =>
+    (p.lines ?? []).reduce((sum, line) => sum + Number(line[key] || 0), 0);
+  const snapMonths = Array.isArray(snap.months) ? snap.months : [];
+  const snapSum = (key: string) =>
+    snapMonths.reduce((sum: number, m: Record<string, number>) => sum + Number(m[key] || 0), 0);
   const props = {
     schoolName: String(settings.schoolName || "St. Luke's Secondary School, Tura"),
     schoolAddress: String(
@@ -49,12 +59,31 @@ export function MonthlyFeeReceiptPage() {
     academicYear: String(snap.academicYear ?? ''),
     paidAt: new Date(p.paidAt).toLocaleString('en-IN'),
     paymentMode: p.paymentMode,
-    tuition: p.tuitionAmount,
-    late: p.lateFeeAmount,
-    other: p.otherAmount,
-    discount: p.discountAmount,
+    tuition:
+      p.tuitionAmount ||
+      Number(amounts.tuition || 0) ||
+      snapSum('tuitionAmount') ||
+      lineSum('tuitionAmount') ||
+      Math.max(
+        0,
+        Number(p.grossAmount || amounts.gross || 0) - (p.lateFeeAmount || 0) - (p.otherAmount || 0),
+      ),
+    late:
+      p.lateFeeAmount ||
+      Number(amounts.late || 0) ||
+      snapSum('lateFeeAmount') ||
+      lineSum('lateFeeAmount'),
+    other:
+      p.otherAmount ||
+      Number(amounts.other || 0) ||
+      snapSum('otherAmount') ||
+      lineSum('otherAmount'),
+    discount:
+      p.discountAmount ||
+      Number(amounts.concession || 0) ||
+      Number((snap.concession as { amount?: number } | undefined)?.amount || 0),
     previous: p.previousBalance,
-    total: p.totalAmount,
+    total: p.totalAmount || Number(amounts.cash || snap.cashCollected || 0),
     signatory: settings.signatoryName as string | null,
     instructions,
     monthsCovered: monthsCovered.filter(Boolean),
@@ -65,7 +94,7 @@ export function MonthlyFeeReceiptPage() {
         <button
           type="button"
           className="rounded-xl bg-[var(--school-erp-primary)] px-4 py-2 text-sm text-white"
-          onClick={() => window.print()}
+          onClick={() => void printMonthlyFeeReceipt(p.id)}
         >
           Print parent & school copies
         </button>

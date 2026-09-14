@@ -1377,7 +1377,14 @@ export async function collectMonthlyFee(payload: {
   const { data } = await api.post('/v1/school-sis/fees/monthly/collect', payload);
   return data as {
     receiptNumber: string;
-    payment: { id: string };
+    payment: {
+      id: string;
+      tuitionAmount?: number;
+      lateFeeAmount?: number;
+      otherAmount?: number;
+      discountAmount?: number;
+      totalAmount?: number;
+    };
     months?: string[];
   };
 }
@@ -1464,11 +1471,17 @@ export async function fetchMonthlyFeePayment(id: string) {
     discountAmount: number;
     previousBalance: number;
     totalAmount: number;
+    grossAmount?: number | null;
     paymentMode: string;
     reference: string | null;
     status: string;
     paidAt: string;
     snapshotJson: Record<string, unknown>;
+    lines?: Array<{
+      tuitionAmount: number;
+      lateFeeAmount: number;
+      otherAmount: number;
+    }>;
     student: { fullName: string; admissionNumber: string };
     events: Array<{ type: string; createdAt: string; note: string | null }>;
   };
@@ -1496,4 +1509,17 @@ export async function downloadMonthlyFeeReceiptPdf(id: string, receiptNumber: st
     responseType: 'blob',
   });
   triggerBlobDownload(data as Blob, `${receiptNumber.replaceAll('/', '-')}.pdf`);
+}
+
+export async function printMonthlyFeeReceipt(id: string) {
+  const { printHtmlDocument } = await import('@/lib/print-html-document');
+  const { data } = await api.get(`/v1/school-sis/fees/monthly/payments/${id}/receipt`, {
+    responseType: 'text',
+    headers: { Accept: 'text/html' },
+  });
+  await printHtmlDocument(String(data), {
+    title: 'Fee receipt',
+    width: '297mm',
+    height: '210mm',
+  });
 }

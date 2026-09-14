@@ -574,8 +574,14 @@ export class SchoolSisMonthlyFeesService {
     } else if (dto.discountValue != null && dto.discountAmount == null) {
       discount = Math.round(dto.discountValue);
     }
+    discount = Math.min(Math.max(0, discount), gross);
     if (discount > 0 && !dto.discountReason?.trim()) {
       throw new BadRequestException('Concession reason is required');
+    }
+    if (discount > 0 && !dto.discountApprovedBy?.trim()) {
+      throw new BadRequestException(
+        'Concession must be approved by a named authority',
+      );
     }
     const net = Math.max(0, gross - discount);
     const amountPaying = dto.amountPaying ?? net;
@@ -610,7 +616,8 @@ export class SchoolSisMonthlyFeesService {
           },
         });
         const receiptNumber = `${book.settings.receiptPrefix || 'FB'}/${year.code}/${String(seq.lastValue).padStart(4, '0')}`;
-        let leftover = amountPaying;
+        // Cash plus concession must cover billed dues; receipt cash stays amountPaying.
+        let leftover = amountPaying + discount;
         const allocated = lines
           .map((line) => {
             const paid = Math.min(line.dueAmount, leftover);
@@ -627,6 +634,15 @@ export class SchoolSisMonthlyFeesService {
             };
           })
           .filter((l) => l.paidAmountThis > 0);
+        const tuitionAmount = allocated.reduce(
+          (s, l) => s + l.tuitionAmount,
+          0,
+        );
+        const lateFeeAmount = allocated.reduce(
+          (s, l) => s + l.lateFeeAmount,
+          0,
+        );
+        const otherAmount = allocated.reduce((s, l) => s + l.otherAmount, 0);
         const payment = await tx.schoolFeePayment.create({
           data: {
             tenantId,
@@ -637,9 +653,9 @@ export class SchoolSisMonthlyFeesService {
             sectionId: book.sectionId,
             feeMonth: allocated[0].feeMonth,
             receiptNumber,
-            tuitionAmount: allocated.reduce((s, l) => s + l.tuitionAmount, 0),
-            lateFeeAmount: allocated.reduce((s, l) => s + l.lateFeeAmount, 0),
-            otherAmount: allocated.reduce((s, l) => s + l.otherAmount, 0),
+            tuitionAmount,
+            lateFeeAmount,
+            otherAmount,
             discountAmount: discount,
             previousBalance: 0,
             totalAmount: amountPaying,
@@ -664,6 +680,23 @@ export class SchoolSisMonthlyFeesService {
               className: book.className,
               sectionName: book.sectionName,
               academicYear: year.name,
+              concession: discount
+                ? {
+                    amount: discount,
+                    type: dto.discountType ?? 'AMOUNT',
+                    reason: dto.discountReason?.trim() || null,
+                    approvedBy: dto.discountApprovedBy?.trim() || null,
+                  }
+                : null,
+              cashCollected: amountPaying,
+              amounts: {
+                tuition: tuitionAmount,
+                late: lateFeeAmount,
+                other: otherAmount,
+                concession: discount,
+                gross,
+                cash: amountPaying,
+              },
               months: allocated.map((l) => ({
                 feeMonth: l.feeMonth,
                 monthLabel: l.monthLabel,
@@ -756,7 +789,11 @@ export class SchoolSisMonthlyFeesService {
               type: 'CONCESSION',
               actorUserId: actorUserId ?? null,
               note: dto.discountReason?.trim(),
-              afterJson: { discount, approvedBy: dto.discountApprovedBy },
+              afterJson: {
+                discount,
+                reason: dto.discountReason?.trim(),
+                approvedBy: dto.discountApprovedBy?.trim(),
+              },
             },
           });
         }
@@ -764,6 +801,10 @@ export class SchoolSisMonthlyFeesService {
           payment: {
             id: payment.id,
             receiptNumber,
+            tuitionAmount,
+            lateFeeAmount,
+            otherAmount,
+            discountAmount: discount,
             totalAmount: amountPaying,
             status: 'PAID',
           },
@@ -1176,6 +1217,7 @@ export class SchoolSisMonthlyFeesService {
     reference: string | null;
     snapshotJson: Prisma.JsonValue;
     monthsJson?: Prisma.JsonValue;
+    grossAmount?: number | null;
     lines?: Array<{
       feeMonth: string;
       tuitionAmount: number;
@@ -1186,6 +1228,32 @@ export class SchoolSisMonthlyFeesService {
   }): MonthlyFeeReceiptView {
     const snap = (payment.snapshotJson ?? {}) as Record<string, any>;
     const settings = (snap.settings ?? {}) as Record<string, any>;
+    const amounts = (snap.amounts ?? {}) as Record<string, number>;
+    const lineTuition =
+      payment.lines?.reduce((sum, line) => sum + line.tuitionAmount, 0) ?? 0;
+    const lineLate =
+      payment.lines?.reduce((sum, line) => sum + line.lateFeeAmount, 0) ?? 0;
+    const lineOther =
+      payment.lines?.reduce((sum, line) => sum + line.otherAmount, 0) ?? 0;
+    const lateFeeAmount =
+      payment.lateFeeAmount || Number(amounts.late || 0) || lineLate;
+    const otherAmount =
+      payment.otherAmount || Number(amounts.other || 0) || lineOther;
+    const tuitionAmount =
+      payment.tuitionAmount ||
+      Number(amounts.tuition || 0) ||
+      lineTuition ||
+      Math.max(
+        0,
+        Number(payment.grossAmount || amounts.gross || 0) -
+          lateFeeAmount -
+          otherAmount,
+      );
+    const totalAmount =
+      payment.totalAmount || Number(amounts.cash || snap.cashCollected || 0);
+    const discountAmount =
+      payment.discountAmount ||
+      Number(amounts.concession || snap.concession?.amount || 0);
     return {
       schoolName: settings.schoolName || "St. Luke's Secondary School, Tura",
       schoolAddress:
@@ -1205,12 +1273,12 @@ export class SchoolSisMonthlyFeesService {
       className: String(snap.className ?? ''),
       sectionName: String(snap.sectionName ?? ''),
       feeMonth: payment.feeMonth,
-      tuitionAmount: payment.tuitionAmount,
-      lateFeeAmount: payment.lateFeeAmount,
-      otherAmount: payment.otherAmount,
-      discountAmount: payment.discountAmount,
+      tuitionAmount,
+      lateFeeAmount,
+      otherAmount,
+      discountAmount,
       previousBalance: payment.previousBalance,
-      totalAmount: payment.totalAmount,
+      totalAmount,
       paymentMode: payment.paymentMode,
       reference: payment.reference,
       monthsCovered: (Array.isArray(snap.months)

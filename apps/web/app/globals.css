@@ -1388,9 +1388,13 @@ html.institution-branded .erp-theme-sidebar {
 }
 
 /* ── CR80 ID card print fallback (primary path uses isolated iframe) ── */
+/* Do not set a global @page size — that shrinks fee receipts and other prints to a card. */
 
 @media print {
-  @page {
+  .sls-id-card {
+    page: cr80;
+  }
+  @page cr80 {
     size: 53.98mm 85.6mm;
     margin: 0;
   }

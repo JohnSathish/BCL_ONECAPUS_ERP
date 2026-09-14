@@ -17,18 +17,21 @@ function waitForImages(doc: Document) {
 }
 
 /** Print a standalone HTML document in an isolated iframe (avoids admin shell / modal clipping). */
-export function printHtmlDocument(html: string): Promise<void> {
+export function printHtmlDocument(
+  html: string,
+  options?: { title?: string; width?: string; height?: string },
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const iframe = document.createElement('iframe');
-    iframe.setAttribute('title', 'IA Admit Card Print');
+    iframe.setAttribute('title', options?.title || 'Print');
     iframe.setAttribute(
       'style',
       [
         'position:fixed',
         'left:-10000px',
         'top:0',
-        'width:210mm',
-        'height:297mm',
+        `width:${options?.width || '210mm'}`,
+        `height:${options?.height || '297mm'}`,
         'border:0',
         'opacity:0',
         'pointer-events:none',
