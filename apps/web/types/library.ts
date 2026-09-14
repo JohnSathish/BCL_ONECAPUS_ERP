@@ -752,3 +752,70 @@ export type LibraryNextAccession = {
   prefix: string;
   nextSeq: number;
 };
+
+export type EntryExitPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom';
+
+export type EntryExitReportParams = {
+  from?: string;
+  to?: string;
+  period?: EntryExitPeriod;
+  departmentId?: string;
+  programId?: string;
+  semester?: number | string;
+  gender?: string;
+  memberType?: string;
+  visitStatus?: string;
+  timeRange?: string;
+  search?: string;
+  studentId?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDir?: string;
+  longStayMinutes?: number;
+};
+
+export type EntryExitVisitRow = {
+  id: string;
+  slNo?: number;
+  memberType: string;
+  studentId?: string | null;
+  memberCode: string | null;
+  memberName: string;
+  departmentId: string | null;
+  department: string | null;
+  programme: string | null;
+  semester: number | null;
+  gender: string | null;
+  date: string;
+  entryAt: string;
+  exitAt: string | null;
+  inTime: string;
+  outTime: string;
+  durationMinutes: number;
+  stayLabel: string;
+  status: 'INSIDE' | 'EXITED' | 'INCOMPLETE';
+  statusLabel: string;
+  zoneName: string | null;
+  seatLabel: string | null;
+};
+
+export type EntryExitKpi = { value: number; deltaPct: number | null };
+
+export type EntryExitSummary = {
+  header: { collegeName: string; libraryName: string };
+  range: { from: string; to: string };
+  kpis: {
+    totalVisits: EntryExitKpi;
+    totalEntries: EntryExitKpi;
+    totalExits: EntryExitKpi;
+    currentlyInside: EntryExitKpi;
+    averageStayMinutes: EntryExitKpi;
+    longestStayMinutes: EntryExitKpi;
+    maleVisitors: EntryExitKpi;
+    femaleVisitors: EntryExitKpi;
+  };
+  peakHour: { label: string; entries: number };
+  mostVisitedDepartment: { name: string; visits: number } | null;
+  mostFrequentStudent: { code: string; name: string; visits: number } | null;
+};

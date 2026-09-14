@@ -274,6 +274,11 @@ function handleLibraryHost(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // First-login reset lives at /change-password, not under /library-desk.
+  if (pathname === '/change-password' || pathname === '/forgot-password') {
+    return NextResponse.next();
+  }
+
   // Refresh cookie is path-scoped to /api/v1/auth, so it is never sent on
   // /library-desk HTML. Do not gate the kiosk on that cookie.
 

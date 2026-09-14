@@ -39,6 +39,7 @@ export function StudentNameFormatProvider({ children }: { children: React.ReactN
       isReady &&
       Boolean(session?.accessToken) &&
       !pathname?.startsWith('/library-desk') &&
+      pathname !== '/change-password' &&
       !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });

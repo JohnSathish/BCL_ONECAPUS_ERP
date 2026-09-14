@@ -411,3 +411,98 @@ export const searchLibrarySuggestions = (q: string) =>
       { label: string; type: string; id: string; meta: string }[]
     >(`${base}/search/suggestions`, { params: { q, limit: 8 } })
     .then((r) => r.data);
+
+function compactParams(params?: Record<string, string | number | undefined>) {
+  const next: Record<string, string | number> = {};
+  if (!params) return next;
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '' || value === 'ALL') continue;
+    next[key] = value;
+  }
+  return next;
+}
+
+export const fetchEntryExitFilters = () =>
+  api
+    .get<{
+      departments: { id: string; name: string }[];
+      programs: { id: string; name: string }[];
+    }>(`${base}/reports/entry-exit/filters`)
+    .then((r) => r.data);
+
+export const fetchEntryExitSummary = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<import('@/types/library').EntryExitSummary>(`${base}/reports/entry-exit/summary`, {
+      params: compactParams(params),
+    })
+    .then((r) => r.data);
+
+export const fetchEntryExitVisits = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      items: import('@/types/library').EntryExitVisitRow[];
+      total: number;
+      page: number;
+      limit: number;
+    }>(`${base}/reports/entry-exit/visits`, { params: compactParams(params) })
+    .then((r) => r.data);
+
+export const fetchEntryExitInside = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      items: import('@/types/library').EntryExitVisitRow[];
+      total: number;
+    }>(`${base}/reports/entry-exit/currently-inside`, { params: compactParams(params) })
+    .then((r) => r.data);
+
+export const fetchEntryExitDepartments = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      rows: {
+        departmentId: string | null;
+        department: string;
+        visits: number;
+        entries: number;
+        exits: number;
+        currentlyInside: number;
+        averageStayMinutes: number;
+        maximumStayMinutes: number;
+      }[];
+    }>(`${base}/reports/entry-exit/departments`, { params: compactParams(params) })
+    .then((r) => r.data);
+
+export const fetchEntryExitHourly = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      buckets: { hour: number; label: string; entries: number; exits: number; footfall: number }[];
+      peakHour: { label: string; entries: number };
+    }>(`${base}/reports/entry-exit/hourly`, { params: compactParams(params) })
+    .then((r) => r.data);
+
+export const fetchEntryExitInsights = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<Record<string, unknown>>(`${base}/reports/entry-exit/insights`, {
+      params: compactParams(params),
+    })
+    .then((r) => r.data);
+
+export const fetchEntryExitStudentHistory = (
+  studentId: string,
+  params?: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${base}/reports/entry-exit/students/${studentId}/history`, {
+      params: compactParams(params),
+    })
+    .then((r) => r.data);
+
+export const downloadEntryExitExport = (
+  format: 'xlsx' | 'csv' | 'pdf',
+  params?: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${base}/reports/entry-exit/export/${format}`, {
+      params: compactParams(params),
+      responseType: 'blob',
+    })
+    .then((r) => r.data as Blob);

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Circle, Eye, EyeOff, KeyRound, Loader2, Lock, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,16 @@ import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { evaluatePasswordPolicy } from '@/utils/password-policy';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+
+function isLibraryKioskHost() {
+  return (
+    typeof window !== 'undefined' && window.location.hostname.toLowerCase().startsWith('library.')
+  );
+}
+
+function loginPathAfterReset() {
+  return isLibraryKioskHost() ? '/library-desk/login?reset=1' : '/login?reset=1';
+}
 
 const STRENGTH_META = {
   weak: { bar: 'bg-red-500', label: 'text-red-600', width: '25%' },
@@ -97,6 +107,8 @@ export default function ForceChangePasswordPage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
 
+  const [kioskHost, setKioskHost] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -104,6 +116,20 @@ export default function ForceChangePasswordPage() {
   const [busy, setBusy] = useState(false);
 
   const policy = useMemo(() => evaluatePasswordPolicy(newPassword), [newPassword]);
+  const loginHref = kioskHost ? '/library-desk/login' : '/login';
+
+  useEffect(() => {
+    setKioskHost(isLibraryKioskHost());
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated || isBootstrapping) return;
+    if (!session?.accessToken || session.user.mustResetPassword) return;
+    if (isLibraryKioskHost()) {
+      window.location.replace('/library-desk');
+    }
+  }, [hasHydrated, isBootstrapping, session?.accessToken, session?.user.mustResetPassword]);
+
   const match =
     confirmPassword.length > 0 && newPassword.length > 0 && newPassword === confirmPassword;
   const canSubmit =
@@ -134,7 +160,7 @@ export default function ForceChangePasswordPage() {
       tokenRefreshManager.clearSchedule();
       clear();
       void logout().catch(() => undefined);
-      router.replace('/login?reset=1');
+      router.replace(loginPathAfterReset());
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not update password. Try again.'));
     } finally {
@@ -162,7 +188,7 @@ export default function ForceChangePasswordPage() {
           </div>
           <p className="text-sm text-slate-600">Sign in first to change your password.</p>
           <Button asChild className="mt-5 h-11 w-full bg-[#1e3a8a] hover:bg-[#1e40af]">
-            <Link href="/login">Go to login</Link>
+            <Link href={loginHref}>Go to login</Link>
           </Button>
         </div>
       </PageShell>

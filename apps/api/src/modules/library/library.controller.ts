@@ -70,6 +70,7 @@ import {
   UpdateResearchItemDto,
   VisitQueryDto,
   WaiveFineDto,
+  EntryExitReportQueryDto,
 } from './dto/library.dto';
 import { LibraryAccessService } from './services/library-access.service';
 import { LibraryAnalyticsService } from './services/library-analytics.service';
@@ -88,6 +89,7 @@ import { LibraryQuestionBankBridgeService } from './services/library-question-ba
 import { LibraryQrService } from './services/library-qr.service';
 import { LibraryRecommendationService } from './services/library-recommendation.service';
 import { LibraryReportsService } from './services/library-reports.service';
+import { LibraryEntryExitReportsService } from './services/library-entry-exit-reports.service';
 import { LibraryReservationService } from './services/library-reservation.service';
 import { LibrarySearchService } from './services/library-search.service';
 import { LibrarySettingsService } from './services/library-settings.service';
@@ -110,6 +112,7 @@ const LIB_READ = [
 const LIB_MANAGE = ['library:manage'] as const;
 const LIB_CIRCULATE = ['library:circulate', 'library:manage'] as const;
 const LIB_REPORTS = ['library:reports', 'library:manage'] as const;
+const LIB_IO_REPORTS = [...LIB_REPORTS, ...LIB_DESK] as const;
 const LIB_SETTINGS = ['library:settings', 'library:manage'] as const;
 const LIB_DIGITAL_READ = [
   'library:digital:read',
@@ -151,6 +154,7 @@ export class LibraryController {
     private readonly lookup: LibraryMemberLookupService,
     private readonly members: LibraryMembersService,
     private readonly reports: LibraryReportsService,
+    private readonly entryExitReports: LibraryEntryExitReportsService,
     private readonly naacReports: LibraryNaacReportsService,
     private readonly recommendations: LibraryRecommendationService,
     private readonly assistant: LibraryKnowledgeAssistantService,
@@ -697,6 +701,126 @@ export class LibraryController {
     @Query() query: ReportQueryDto,
   ) {
     return this.reports.peakHours(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/filters')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitFilters(@CurrentUser() user: JwtUser) {
+    return this.entryExitReports.filterOptions(user.tid);
+  }
+
+  @Get('reports/entry-exit/summary')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitSummary(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.summary(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/visits')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitVisits(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.visits(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/currently-inside')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitInside(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.currentlyInside(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/departments')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitDepartments(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.departments(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/hourly')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitHourly(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.hourly(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/insights')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitInsights(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    return this.entryExitReports.insights(user.tid, query);
+  }
+
+  @Get('reports/entry-exit/students/:studentId/history')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  entryExitStudentHistory(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    const includeContact =
+      user.permissions?.includes('library:manage') ||
+      user.permissions?.includes('library:reports') ||
+      user.roles?.includes('librarian') ||
+      user.roles?.includes('college-admin') ||
+      user.roles?.includes('principal');
+    return this.entryExitReports.studentHistory(
+      user.tid,
+      studentId,
+      query,
+      Boolean(includeContact),
+    );
+  }
+
+  @Get('reports/entry-exit/export/xlsx')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  async entryExitExcel(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    const result = await this.entryExitReports.exportExcel(user.tid, query);
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename="${result.filename}"`,
+    });
+  }
+
+  @Get('reports/entry-exit/export/csv')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  async entryExitCsv(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    const result = await this.entryExitReports.exportCsv(user.tid, query);
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename="${result.filename}"`,
+    });
+  }
+
+  @Get('reports/entry-exit/export/pdf')
+  @RequireAnyPermission(...LIB_IO_REPORTS)
+  async entryExitPdf(
+    @CurrentUser() user: JwtUser,
+    @Query() query: EntryExitReportQueryDto,
+  ) {
+    const result = await this.entryExitReports.exportPdf(user.tid, query);
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename="${result.filename}"`,
+    });
   }
 
   @Get('reports/books/accession')

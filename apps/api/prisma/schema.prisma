@@ -9772,6 +9772,7 @@ model LibraryVisit {
   @@index([tenantId, memberType, visitorId, exitAt])
   @@index([tenantId, entryAt])
   @@index([tenantId, exitAt])
+  @@index([tenantId, studentId, entryAt])
   @@map("library_visits")
   @@schema("library")
 }

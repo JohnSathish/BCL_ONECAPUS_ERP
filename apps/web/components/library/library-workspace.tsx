@@ -387,6 +387,16 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
     return (
       <div className="space-y-6">
         <h1 className="text-lg font-semibold">Reports</h1>
+        <div className="rounded-lg border border-cyan-500/20 bg-cyan-50/50 p-4 dark:bg-cyan-950/20">
+          <p className="text-sm font-medium">Library Entry / Exit reports</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Footfall, currently inside, department usage, and styled Excel/PDF exports live on the
+            Library I/O reports desk.
+          </p>
+          <Button asChild size="sm" className="mt-3">
+            <a href="/library-desk/reports">Open entry/exit reports</a>
+          </Button>
+        </div>
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
         {overdue.isError ||
         deptReport.isError ||

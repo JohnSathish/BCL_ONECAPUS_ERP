@@ -105,6 +105,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       pathname === '/change-password' ||
       pathname === '/login' ||
       pathname === '/forgot-password' ||
+      pathname === '/library-desk/login' ||
       pathname.startsWith('/admissions-portal') ||
       pathname.startsWith('/school-admissions-portal')
     ) {

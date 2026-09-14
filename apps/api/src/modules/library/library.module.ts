@@ -45,6 +45,7 @@ import { LibraryHardwareIntegrationService } from './services/library-hardware-i
 import { LibraryRecommendationService } from './services/library-recommendation.service';
 
 import { LibraryReportsService } from './services/library-reports.service';
+import { LibraryEntryExitReportsService } from './services/library-entry-exit-reports.service';
 
 import { LibraryReservationService } from './services/library-reservation.service';
 
@@ -96,6 +97,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryReservationService,
 
     LibraryReportsService,
+    LibraryEntryExitReportsService,
 
     LibraryNaacReportsService,
 

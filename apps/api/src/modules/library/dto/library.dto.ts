@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { OmitType } from '@nestjs/mapped-types';
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -501,6 +502,85 @@ export class ReportQueryDto {
   @IsOptional()
   @IsUUID()
   departmentId?: string;
+}
+
+export class EntryExitReportQueryDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsIn(['today', 'yesterday', 'week', 'month', 'year', 'custom'])
+  period?: 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom';
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  programId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  semester?: number;
+
+  @IsOptional()
+  @IsIn(['ALL', 'MALE', 'FEMALE', 'OTHER'])
+  gender?: 'ALL' | 'MALE' | 'FEMALE' | 'OTHER';
+
+  @IsOptional()
+  @IsIn(['ALL', 'STUDENT', 'STAFF', 'VISITOR'])
+  memberType?: 'ALL' | 'STUDENT' | 'STAFF' | 'VISITOR';
+
+  @IsOptional()
+  @IsIn(['ALL', 'INSIDE', 'EXITED', 'INCOMPLETE'])
+  visitStatus?: 'ALL' | 'INSIDE' | 'EXITED' | 'INCOMPLETE';
+
+  @IsOptional()
+  @IsIn(['ALL', 'MORNING', 'AFTERNOON', 'EVENING'])
+  timeRange?: 'ALL' | 'MORNING' | 'AFTERNOON' | 'EVENING';
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  studentId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 25;
+
+  @IsOptional()
+  @IsIn(['entryAt', 'exitAt', 'duration', 'department', 'name'])
+  sortBy?: 'entryAt' | 'exitAt' | 'duration' | 'department' | 'name';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortDir?: 'asc' | 'desc';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(30)
+  @Max(1440)
+  longStayMinutes?: number;
 }
 
 export class DigitalAssetQueryDto {

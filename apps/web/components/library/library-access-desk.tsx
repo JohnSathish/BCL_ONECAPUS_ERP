@@ -176,8 +176,8 @@ const SIDEBAR = [
   { icon: LayoutDashboard, label: 'Dashboard', active: true },
   { icon: ScanLine, label: 'Live Entry/Exit' },
   { icon: Users, label: 'Visitors Log', href: '/admin/library/visits' },
-  { icon: User, label: 'Students Inside' },
-  { icon: BookOpen, label: 'Reports', href: '/admin/library/analytics' },
+  { icon: User, label: 'Students Inside', href: '/library-desk/reports?view=inside' },
+  { icon: BookOpen, label: 'Reports', href: '/library-desk/reports' },
   { icon: Bell, label: 'Alerts' },
   { icon: Settings, label: 'Settings', href: '/admin/library/settings' },
 ];
@@ -471,7 +471,7 @@ export function LibraryAccessDesk() {
               <Link
                 key={label}
                 href={href}
-                target="_blank"
+                target={href.startsWith('/admin') ? '_blank' : undefined}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
               >
                 <Icon className="h-4 w-4" />
