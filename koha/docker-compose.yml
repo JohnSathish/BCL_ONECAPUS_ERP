@@ -67,8 +67,9 @@ services:
     cap_add:
       - DAC_READ_SEARCH
       - SYS_NICE
-    # Bound on the host so ERP nginx can proxy via host.docker.internal.
-    # Do not open 16080/16081/16082 on the VPS firewall (only 80/443/22).
+    # Loopback only for host-side curl/debug. Public HTTPS goes ERP nginx →
+    # koha_nginx_edge → koha-web:8080 (see vps-attach-koha-nginx.sh).
+    # Do not recreate this container with --force-recreate (wipes /etc/koha/sites).
     ports:
       - '127.0.0.1:16080:8080'
       - '127.0.0.1:16081:8081'

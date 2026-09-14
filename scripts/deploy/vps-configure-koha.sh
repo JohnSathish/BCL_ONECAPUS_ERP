@@ -155,8 +155,7 @@ fi
 cp "$TEMPLATE" "$TARGET"
 echo "Wrote ${TARGET}"
 
-"${NGINX_COMPOSE[@]}" exec -T nginx nginx -t
-"${NGINX_COMPOSE[@]}" exec -T nginx nginx -s reload || true
+bash "${APP_DIR}/scripts/deploy/vps-attach-koha-nginx.sh"
 
 echo
 echo "--- Checks ---"

@@ -1,6 +1,6 @@
 # Standalone Koha ILS — Don Bosco College Tura
 # Hosts: koha.donboscocollege.ac.in (OPAC), staff.koha.donboscocollege.ac.in (staff)
-# Proxies to Koha's own loopback ports. Do not add these names to ERP server_name lists.
+# Proxies to koha-web / koha-inout on koha_nginx_edge (not ERP app network).
 
 # ── HTTP: ACME + redirect ──
 server {
@@ -34,8 +34,9 @@ server {
   add_header X-Content-Type-Options "nosniff" always;
 
   location / {
-    proxy_pass         http://host.docker.internal:16080;
+    proxy_pass         http://koha-web:8080;
     proxy_http_version 1.1;
+    proxy_connect_timeout 15s;
     proxy_set_header   Host $host;
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -64,8 +65,9 @@ server {
   add_header X-Frame-Options "SAMEORIGIN" always;
 
   location / {
-    proxy_pass         http://host.docker.internal:16081;
+    proxy_pass         http://koha-web:8081;
     proxy_http_version 1.1;
+    proxy_connect_timeout 15s;
     proxy_set_header   Host $host;
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -95,8 +97,9 @@ server {
   add_header X-Frame-Options "SAMEORIGIN" always;
 
   location / {
-    proxy_pass         http://host.docker.internal:16082;
+    proxy_pass         http://koha-inout:80;
     proxy_http_version 1.1;
+    proxy_connect_timeout 15s;
     proxy_set_header   Host $host;
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
