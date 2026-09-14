@@ -273,11 +273,8 @@ function handleLibraryHost(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasRefreshCookie && isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = deskPath;
-    return NextResponse.redirect(url);
-  }
+  // Do not bounce login → desk from the cookie alone. A student/staff ERP
+  // session on this host cannot be distinguished here and caused a redirect loop.
 
   return handleSubdomainRewrite(request, deskPath, loginPath, [
     '/admin',

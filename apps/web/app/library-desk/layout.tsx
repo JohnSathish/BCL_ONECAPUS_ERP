@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { canAccessLibraryDesk, canAccessAdminPortal } from '@/lib/permissions/portal-access';
 import { useAuth } from '@/hooks/use-auth';
+import { logoutClientSide } from '@/lib/auth/client-logout';
 
 function LibraryDeskLoading({ message }: { message: string }) {
   return (
@@ -28,7 +29,7 @@ export default function LibraryDeskLayout({ children }: { children: React.ReactN
     const roles = session.user?.roles ?? [];
     const perms = session.user?.permissions ?? [];
     if (!canAccessLibraryDesk(roles, perms) && !canAccessAdminPortal(roles, perms)) {
-      router.replace('/login');
+      logoutClientSide(router, { redirectTo: '/library-desk/login' });
     }
   }, [isReady, session, router, isLogin]);
 
@@ -50,7 +51,9 @@ export default function LibraryDeskLayout({ children }: { children: React.ReactN
   const roles = session.user?.roles ?? [];
   const perms = session.user?.permissions ?? [];
   if (!canAccessLibraryDesk(roles, perms) && !canAccessAdminPortal(roles, perms)) {
-    return <LibraryDeskLoading message="Redirecting…" />;
+    return (
+      <LibraryDeskLoading message="This account cannot open the kiosk. Returning to sign in…" />
+    );
   }
 
   return <div className="min-h-screen">{children}</div>;
