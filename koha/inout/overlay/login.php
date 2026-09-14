@@ -11,6 +11,8 @@ if ($msg === '1') {
   $alert = 'This user is deactivated. Contact the library desk.';
 }
 $h = static fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -18,7 +20,7 @@ $h = static fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8')
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>In-Out Management · Don Bosco College Tura</title>
-  <link rel="stylesheet" href="assets/css/dbc-login.css">
+  <link rel="stylesheet" href="assets/css/dbc-login.css?v=plain2">
 </head>
 <body class="dbc-login">
   <header class="login-top">
