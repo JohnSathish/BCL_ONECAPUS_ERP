@@ -20,59 +20,85 @@ header('Pragma: no-cache');
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>In-Out Management · Don Bosco College Tura</title>
-  <link rel="stylesheet" href="assets/css/dbc-login.css?v=plain2">
+  <link rel="stylesheet" href="assets/css/dbc-login.css?v=wave3">
 </head>
 <body class="dbc-login">
-  <header class="login-top">
-    <img src="assets/img/dbc-crest.png" alt="Don Bosco College Tura">
-    <div>
-      <strong>Don Bosco College</strong>
-      <span>Tura, Meghalaya · Library In-Out</span>
-    </div>
-  </header>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-top">
+        <img src="assets/img/dbc-crest.png" alt="Don Bosco College Tura">
+        <div>
+          <strong>Don Bosco College</strong>
+          <span>Tura, Meghalaya</span>
+          <em>Learn · Serve · Lead</em>
+        </div>
+      </div>
+      <p class="kicker">Welcome to</p>
+      <h1>In-Out Management<br><b>System</b></h1>
+      <p class="lead">A safer campus. A smarter tomorrow.</p>
+      <div class="feats">
+        <div><strong>Secure Access</strong><small>Controlled and reliable</small></div>
+        <div><strong>Real-time Tracking</strong><small>Stay informed always</small></div>
+        <div><strong>Visitor Management</strong><small>Safe and organised</small></div>
+        <div><strong>Accurate Logs</strong><small>Data you can trust</small></div>
+      </div>
+      <blockquote>“Education is a matter of the heart.”<small>— Don Bosco</small></blockquote>
+      <ul class="values">
+        <li>Discipline today</li>
+        <li>Community always</li>
+        <li>Brighter tomorrow</li>
+      </ul>
+    </section>
 
-  <main class="login-wrap">
-    <div class="login-card">
-      <h1>Sign in</h1>
-      <p class="sub">In-Out Management System</p>
-      <?php if ($alert !== '') { ?>
-        <p class="banner"><?php echo $h($alert); ?></p>
-      <?php } ?>
-      <form method="post" action="login_verify.php">
-        <label>
-          <span>Username</span>
-          <input type="text" name="name" autocomplete="username" autofocus required>
-        </label>
-        <label>
-          <span>Password</span>
-          <input type="password" name="pass" autocomplete="current-password" required>
-        </label>
-        <label>
-          <span>Location</span>
-          <select name="loc" required>
-            <option value="" disabled selected>Select location</option>
-            <?php
-            if ($conn) {
-              $res = mysqli_query($conn, 'SELECT * FROM loc');
-              if ($res) {
-                while ($row = mysqli_fetch_array($res)) {
-                  echo '<option>' . $h($row[1]) . '</option>';
+    <section class="panel">
+      <p class="script">Good People<br>Build Better Tomorrows</p>
+      <img class="mark" src="assets/img/don-bosco.png" alt="">
+      <div class="card">
+        <div class="avatar" aria-hidden="true"></div>
+        <h2>Welcome Back</h2>
+        <p class="sub">Sign in to access the In-Out Management System</p>
+        <?php if ($alert !== '') { ?>
+          <p class="banner"><?php echo $h($alert); ?></p>
+        <?php } ?>
+        <form method="post" action="login_verify.php">
+          <label>
+            <span>Username</span>
+            <input type="text" name="name" autocomplete="username" autofocus required placeholder="Enter your username">
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="pass" autocomplete="current-password" required placeholder="Enter your password">
+          </label>
+          <label>
+            <span>Select Location</span>
+            <select name="loc" required>
+              <option value="" disabled selected>Select Location</option>
+              <?php
+              if ($conn) {
+                $res = mysqli_query($conn, 'SELECT * FROM loc');
+                if ($res) {
+                  while ($row = mysqli_fetch_array($res)) {
+                    echo '<option>' . $h($row[1]) . '</option>';
+                  }
                 }
               }
-            }
-            ?>
-            <option value="Master">Master</option>
-          </select>
-        </label>
-        <button type="submit" name="submit" value="Login">Login</button>
-      </form>
-      <p class="help">Need help? <a href="mailto:library@donboscocollege.ac.in">library@donboscocollege.ac.in</a></p>
-    </div>
-  </main>
-
+              ?>
+              <option value="Master">Master</option>
+            </select>
+          </label>
+          <div class="meta">
+            <label class="chk"><input type="checkbox" name="remember"> Remember me</label>
+            <a href="mailto:library@donboscocollege.ac.in">Forgot password?</a>
+          </div>
+          <button type="submit" name="submit" value="Login">Login →</button>
+        </form>
+        <p class="foot">Secure · Reliable · For a Better Campus</p>
+      </div>
+    </section>
+  </div>
   <footer>
-    © <?php echo date('Y'); ?> Don Bosco College, Tura
-    · <a href="https://koha.donboscocollege.ac.in/">Library catalogue</a>
+    © <?php echo date('Y'); ?> Don Bosco College, Tura | In-Out Management System
+    <a href="https://koha.donboscocollege.ac.in/">Library catalogue</a>
   </footer>
 </body>
 </html>
