@@ -113,6 +113,7 @@ services:
       - ./inout/overlay/don-bosco.png:/var/www/html/assets/img/don-bosco.png:ro
     networks:
       - koha
+      - edge
 
   inout-db-init:
     image: docker.io/mysql:8.0
@@ -142,6 +143,8 @@ services:
 networks:
   koha:
     name: koha_internal
+  edge:
+    name: koha_nginx_edge
 
 volumes:
   koha-mysql:
