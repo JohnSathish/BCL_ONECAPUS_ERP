@@ -34,9 +34,6 @@ export default function LibraryDeskLayout({ children }: { children: React.ReactN
   }, [isReady, session, router, isLogin]);
 
   if (isLogin) {
-    if (!isReady) {
-      return <LibraryDeskLoading message="Loading…" />;
-    }
     return <div className="min-h-screen">{children}</div>;
   }
 

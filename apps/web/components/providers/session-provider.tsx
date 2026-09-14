@@ -23,6 +23,20 @@ const TICK_MS = 15_000;
 /** Continue Session should fail fast — do not wait for API cold-start. */
 const CONTINUE_REFRESH_MAX_WAIT_MS = 8_000;
 
+function isAuthColdPath(pathname: string) {
+  return (
+    pathname === '/login' ||
+    pathname === '/forgot-password' ||
+    pathname === '/library-desk/login' ||
+    pathname === '/fee-collection-portal/login' ||
+    pathname === '/fee-collection-portal/register' ||
+    pathname === '/admissions-portal/login' ||
+    pathname === '/admissions-portal/register' ||
+    pathname === '/school-admissions-portal/login' ||
+    pathname === '/school-admissions-portal/register'
+  );
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -58,21 +72,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       if (broadcast) broadcastSessionMessage({ type: 'LOGOUT' });
       const schoolPortal = pathname.startsWith('/school-admissions-portal');
-      router.replace(schoolPortal ? '/school-admissions-portal/login' : '/login');
+      const libraryDesk = pathname.startsWith('/library-desk');
+      router.replace(
+        schoolPortal
+          ? '/school-admissions-portal/login'
+          : libraryDesk
+            ? '/library-desk/login'
+            : '/login',
+      );
       void logoutApi().catch(() => undefined);
     },
     [clear, pathname, router, setBootstrapping],
   );
 
   useEffect(() => {
-    if (pathname === '/login' || pathname === '/forgot-password') {
-      forcedLogoutRef.current = false;
-      initialBootstrapDoneRef.current = false;
-    }
-    if (
-      pathname === '/school-admissions-portal/login' ||
-      pathname === '/school-admissions-portal/register'
-    ) {
+    if (isAuthColdPath(pathname)) {
       forcedLogoutRef.current = false;
       initialBootstrapDoneRef.current = false;
     }
@@ -105,12 +119,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Login/forgot stay cold — no session restore.
     // /change-password MUST bootstrap so forced-reset after login (full page
     // navigation) and refresh still recover the httpOnly refresh cookie.
-    if (
-      pathname === '/login' ||
-      pathname === '/forgot-password' ||
-      pathname === '/school-admissions-portal/login' ||
-      pathname === '/school-admissions-portal/register'
-    ) {
+    if (isAuthColdPath(pathname)) {
       setBootstrapping(false);
       return;
     }
@@ -176,10 +185,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setBootstrapping(false);
         tokenRefreshManager.clearSchedule();
         setWarningOpen(false);
-        const schoolPortal =
-          typeof window !== 'undefined' &&
-          window.location.pathname.startsWith('/school-admissions-portal');
-        router.replace(schoolPortal ? '/school-admissions-portal/login' : '/login');
+        const path = typeof window !== 'undefined' ? window.location.pathname : pathname;
+        const schoolPortal = path.startsWith('/school-admissions-portal');
+        const libraryDesk = path.startsWith('/library-desk');
+        router.replace(
+          schoolPortal
+            ? '/school-admissions-portal/login'
+            : libraryDesk
+              ? '/library-desk/login'
+              : '/login',
+        );
       } else if (message.type === 'SESSION_UPDATED') {
         setSession(message.session);
         tokenRefreshManager.scheduleProactiveRefresh(message.session);
@@ -191,7 +206,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         pingActivity();
       }
     });
-  }, [clear, router, setBootstrapping, setSession]);
+  }, [clear, pathname, router, setBootstrapping, setSession]);
 
   useEffect(() => {
     if (!session) {

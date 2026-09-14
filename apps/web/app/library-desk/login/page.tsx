@@ -26,15 +26,11 @@ export default function LibraryDeskLoginPage() {
     logoutClientSide(router, { redirectTo: '/library-desk/login' });
   }, [isReady, session, router]);
 
-  if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
-        Loading…
-      </div>
-    );
-  }
-
-  if (session && canOpenLibraryDesk(session.user.roles ?? [], session.user.permissions ?? [])) {
+  if (
+    isReady &&
+    session &&
+    canOpenLibraryDesk(session.user.roles ?? [], session.user.permissions ?? [])
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
         Opening library desk…
