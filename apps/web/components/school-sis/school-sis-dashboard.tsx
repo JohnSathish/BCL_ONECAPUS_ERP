@@ -82,6 +82,11 @@ export function SchoolSisDashboard() {
   const welcomeName = user?.displayName?.trim() || user?.email?.split('@')[0] || 'there';
   const schoolName = branding?.displayName || displayName || "St. Luke's Secondary School";
   const canManage = canManageSchoolSis(user?.permissions);
+  const overview = useQuery({
+    queryKey: ['school-sis-overview'],
+    queryFn: fetchSchoolSisOverview,
+    enabled,
+  });
   const todayTt = useQuery({
     queryKey: ['school-sis-timetable-today'],
     queryFn: fetchSchoolSisTimetableToday,
