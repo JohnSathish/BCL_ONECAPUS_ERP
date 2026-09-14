@@ -21,15 +21,13 @@ export const TIMETABLE_DAYS: Array<{ id: number; short: string; full: string }> 
 ];
 
 export function formatBellClock(start: string, end: string) {
-  return `${toDisplayTime(start)} – ${toDisplayTime(end)}`;
-}
-
-function toDisplayTime(hhmm: string) {
-  const [h, m] = hhmm.split(':').map(Number);
-  if (Number.isNaN(h)) return hhmm;
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const hr = ((h + 11) % 12) + 1;
-  return `${hr}:${String(m ?? 0).padStart(2, '0')} ${suffix}`;
+  const clock = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    if (Number.isNaN(h)) return hhmm;
+    const hr = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${String(hr).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+  };
+  return `${clock(start)}–${clock(end)}`;
 }
 
 type Props = {
@@ -124,13 +122,17 @@ export function SchoolSisTimetableGrid({
     <div className="sls-tt">
       <div className="sls-tt-print-header hidden">
         <p className="text-sm font-bold uppercase tracking-wide text-[#1a365d]">
-          St. Luke&apos;s Hr. Secondary School
+          St. Luke&apos;s Higher Secondary School
         </p>
         <p className="text-xs text-slate-500">Walbakgre, Tura · West Garo Hills, Meghalaya</p>
         {printTitle ? <p className="mt-2 text-sm font-semibold">{printTitle}</p> : null}
         {printSub ? <p className="text-xs text-slate-500">{printSub}</p> : null}
       </div>
-      {error ? <p className="mb-3 text-sm text-red-600 sls-profile-print-hide">{error}</p> : null}
+      {error ? (
+        <p className="mb-3 text-sm text-rose-700 sls-profile-print-hide">
+          ⚠️ Timetable Conflict — {error}
+        </p>
+      ) : null}
       <div className="sls-profile-print-hide mb-3 flex flex-wrap gap-2">
         {days.map((day) => (
           <button
@@ -204,10 +206,17 @@ export function SchoolSisTimetableGrid({
                       }}
                       onClick={() => openCell(day.id, bell.id, slot)}
                     >
-                      {slot?.subject ? (
+                      {slot?.subject || slot?.printedSubject ? (
                         <div>
-                          <p className="font-semibold text-[#1a365d]">{slot.subject.name}</p>
-                          <p className="text-slate-500">{slot.staff?.fullName ?? 'No teacher'}</p>
+                          <p className="font-semibold uppercase text-[#1a365d]">
+                            {slot.subject?.name || slot.printedSubject}
+                          </p>
+                          <p className="text-slate-500">
+                            {slot.staff?.fullName ?? slot.printedTeacher ?? 'No teacher'}
+                          </p>
+                          {slot.needsConfirmation ? (
+                            <p className="text-[10px] font-semibold text-amber-700">Confirm</p>
+                          ) : null}
                           {slot.roomLabel ? (
                             <p className="text-slate-400">{slot.roomLabel}</p>
                           ) : null}
@@ -218,7 +227,7 @@ export function SchoolSisTimetableGrid({
                           ) : null}
                         </div>
                       ) : (
-                        <span className="text-slate-400">Free Period</span>
+                        <span className="text-amber-700/80">Empty</span>
                       )}
                     </td>
                   );

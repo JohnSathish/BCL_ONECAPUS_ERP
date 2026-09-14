@@ -8,12 +8,14 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
@@ -46,6 +48,7 @@ import {
   SaveSchoolTimetableSlotDto,
   MoveSchoolTimetableSlotDto,
   CopySchoolTimetableDto,
+  BulkSchoolTimetableSlotsDto,
   CreateSchoolRoomDto,
 } from './dto/school-sis.dto';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
@@ -640,7 +643,119 @@ export class SchoolSisController {
     @CurrentUser() user: JwtUser,
     @Body() dto: CopySchoolTimetableDto,
   ) {
-    return this.timetable.copySection(user.tid, dto);
+    return this.timetable.copy(user.tid, dto);
+  }
+
+  @Post('timetable/slots/bulk')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  bulkSlots(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: BulkSchoolTimetableSlotsDto,
+  ) {
+    return this.timetable.bulkUpsert(user.tid, dto);
+  }
+
+  @Get('timetable/dashboard')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  timetableDashboard(@CurrentUser() user: JwtUser) {
+    return this.timetable.dashboard(user.tid);
+  }
+
+  @Get('timetable/today')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  timetableToday(
+    @CurrentUser() user: JwtUser,
+    @Query('sectionId') sectionId?: string,
+    @Query('staffId') staffId?: string,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.timetable.todayBoard(user.tid, {
+      sectionId,
+      staffId,
+      studentId,
+    });
+  }
+
+  @Get('timetable/mine')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  myTimetable(@CurrentUser() user: JwtUser) {
+    return this.timetable.myTimetable(user.tid, user.email);
+  }
+
+  @Get('timetable/print')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  async timetablePrint(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+    @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    const html = await this.timetable.printHtml(user.tid, {
+      dayOfWeek: dayOfWeek ? Number(dayOfWeek) : undefined,
+      sectionId,
+    });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
+  @Get('timetable/pdf')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  async timetablePdf(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+    @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    const buf = await this.timetable.printPdf(user.tid, {
+      dayOfWeek: dayOfWeek ? Number(dayOfWeek) : undefined,
+      sectionId,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'inline; filename="st-lukes-timetable.pdf"',
+    );
+    res.send(buf);
+  }
+
+  @Get('timetable/excel')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  async timetableExcel(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+    @Query('dayOfWeek') dayOfWeek?: string,
+  ) {
+    const buf = await this.timetable.exportExcel(
+      user.tid,
+      dayOfWeek ? Number(dayOfWeek) : undefined,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="st-lukes-timetable.xlsx"',
+    );
+    res.send(buf);
   }
 
   @Get('fees/structures')

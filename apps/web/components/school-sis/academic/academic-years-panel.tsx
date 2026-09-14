@@ -45,14 +45,29 @@ export function AcademicYearsPanel() {
     startDate: '',
     endDate: '',
     status: 'UPCOMING',
+    copyTimetableFromYearId: '',
   });
   const rows = useMemo(() => query.data ?? [], [query.data]);
   const save = useMutation({
-    mutationFn: () => saveSchoolAcademicYear(form, editing ?? undefined),
+    mutationFn: () =>
+      saveSchoolAcademicYear(
+        {
+          ...form,
+          copyTimetableFromYearId: editing ? undefined : form.copyTimetableFromYearId || undefined,
+        },
+        editing ?? undefined,
+      ),
     onSuccess: () => {
       setError(null);
       setEditing(null);
-      setForm({ name: '', code: '', startDate: '', endDate: '', status: 'UPCOMING' });
+      setForm({
+        name: '',
+        code: '',
+        startDate: '',
+        endDate: '',
+        status: 'UPCOMING',
+        copyTimetableFromYearId: '',
+      });
       void qc.invalidateQueries({ queryKey: ['school-academic-years'] });
       void qc.invalidateQueries({ queryKey: ['school-sis-overview'] });
     },
@@ -110,6 +125,22 @@ export function AcademicYearsPanel() {
                 required
               />
             </Field>
+            {!editing ? (
+              <Field label="Copy timetable from">
+                <select
+                  className={fieldClass}
+                  value={form.copyTimetableFromYearId}
+                  onChange={(e) => setForm({ ...form, copyTimetableFromYearId: e.target.value })}
+                >
+                  <option value="">Start empty</option>
+                  {rows.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
             <div className="flex items-end gap-2">
               <PrimaryButton type="submit" disabled={save.isPending}>
                 {editing ? 'Save year' : 'Add year'}
@@ -167,6 +198,7 @@ export function AcademicYearsPanel() {
                             startDate: row.startDate.slice(0, 10),
                             endDate: row.endDate.slice(0, 10),
                             status: row.status,
+                            copyTimetableFromYearId: '',
                           });
                         }}
                       >

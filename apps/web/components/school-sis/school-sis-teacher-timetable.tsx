@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SchoolSisTimetableGrid } from '@/components/school-sis/school-sis-timetable-grid';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { TimetableChrome } from '@/components/school-sis/timetable/tt-chrome';
 import { fetchSchoolSisStaff, fetchSchoolSisTeacherTimetable } from '@/services/school-sis';
 
 export function SchoolSisTeacherTimetable() {
@@ -21,13 +22,10 @@ export function SchoolSisTeacherTimetable() {
     grid.data?.staff?.fullName ?? teachers.find((t) => t.id === active)?.fullName ?? 'Teacher';
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-[#1a365d]">Teacher timetable</h1>
-        <p className="text-sm text-slate-500">
-          Generated from class timetable assignments. Teachers are not typed in by name.
-        </p>
-      </div>
+    <TimetableChrome
+      title="Teacher-wise timetable"
+      hint="Every class this teacher is assigned to, Monday to Friday."
+    >
       <label className="block text-xs font-semibold text-slate-500">
         Teacher
         <select
@@ -58,6 +56,6 @@ export function SchoolSisTeacherTimetable() {
       ) : (
         <p className="text-sm text-slate-500">Loading…</p>
       )}
-    </div>
+    </TimetableChrome>
   );
 }

@@ -655,6 +655,10 @@ export type SchoolSisTimetableSlot = {
   staffId: string | null;
   roomLabel: string | null;
   notes: string | null;
+  printedSubject?: string | null;
+  printedTeacher?: string | null;
+  needsConfirmation?: boolean;
+  sectionId?: string;
   subject: { id: string; name: string; code: string } | null;
   staff: { id: string; fullName: string; employeeCode: string; designation: string | null } | null;
   section?: { id: string; name: string; grade: { name: string; code: string } };
@@ -760,8 +764,14 @@ export async function moveSchoolSisTimetableSlot(payload: {
 }
 
 export async function copySchoolSisTimetable(payload: {
-  fromSectionId: string;
-  toSectionId: string;
+  mode?: 'SECTION' | 'DAY' | 'WEEK' | 'YEAR';
+  fromSectionId?: string;
+  toSectionId?: string;
+  fromDay?: number;
+  toDay?: number;
+  fromYearId?: string;
+  toYearId?: string;
+  replaceDest?: boolean;
 }) {
   const { data } = await api.post('/v1/school-sis/timetable/copy', payload);
   return data;
@@ -775,12 +785,52 @@ export async function validateSchoolSisTimetable() {
     roomConflicts: string[];
     missingTeachers: string[];
     missingSubjects: string[];
+    emptyPeriods: string[];
+    needsConfirmation: string[];
   };
 }
 
 export async function publishSchoolSisTimetable() {
   const { data } = await api.post('/v1/school-sis/timetable/publish');
   return data;
+}
+
+export async function fetchSchoolSisTimetableDashboard() {
+  const { data } = await api.get('/v1/school-sis/timetable/dashboard');
+  return data;
+}
+
+export async function fetchSchoolSisTimetableToday(params?: {
+  sectionId?: string;
+  staffId?: string;
+  studentId?: string;
+}) {
+  const { data } = await api.get('/v1/school-sis/timetable/today', { params });
+  return data;
+}
+
+export async function fetchMySchoolSisTimetable() {
+  const { data } = await api.get('/v1/school-sis/timetable/mine');
+  return data;
+}
+
+export async function downloadSchoolSisTimetablePdf(params?: {
+  dayOfWeek?: number;
+  sectionId?: string;
+}) {
+  const { data } = await api.get('/v1/school-sis/timetable/pdf', {
+    params,
+    responseType: 'blob',
+  });
+  triggerBlobDownload(data as Blob, 'st-lukes-timetable.pdf');
+}
+
+export async function downloadSchoolSisTimetableExcel(dayOfWeek?: number) {
+  const { data } = await api.get('/v1/school-sis/timetable/excel', {
+    params: dayOfWeek ? { dayOfWeek } : undefined,
+    responseType: 'blob',
+  });
+  triggerBlobDownload(data as Blob, 'st-lukes-timetable.xlsx');
 }
 
 export type SchoolSisFeeLine = {
@@ -857,6 +907,7 @@ export async function saveSchoolAcademicYear(
     startDate: string;
     endDate: string;
     status?: string;
+    copyTimetableFromYearId?: string;
   },
   id?: string,
 ) {

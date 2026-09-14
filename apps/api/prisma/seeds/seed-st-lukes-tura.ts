@@ -74,11 +74,15 @@ const GRADES: { code: string; name: string; sortOrder: number }[] = [
 const SUBJECTS: { code: string; name: string; sortOrder: number }[] = [
   { code: 'ENG', name: 'English', sortOrder: 1 },
   { code: 'MAT', name: 'Mathematics', sortOrder: 2 },
-  { code: 'SCI', name: 'Science', sortOrder: 3 },
-  { code: 'SST', name: 'Social Studies', sortOrder: 4 },
-  { code: 'SL', name: 'Second Language', sortOrder: 5 },
-  { code: 'CSC', name: 'Computer', sortOrder: 6 },
-  { code: 'PE', name: 'Physical Education', sortOrder: 7 },
+  { code: 'MATHS', name: 'MATHS', sortOrder: 3 },
+  { code: 'SCI', name: 'Science', sortOrder: 4 },
+  { code: 'SST', name: 'Social Studies', sortOrder: 5 },
+  { code: 'SS', name: 'S.S.', sortOrder: 6 },
+  { code: 'EVS', name: 'EVS', sortOrder: 7 },
+  { code: 'HEDU', name: 'H.Edu', sortOrder: 8 },
+  { code: 'CSC', name: 'Computer', sortOrder: 9 },
+  { code: 'SL', name: 'Second Language', sortOrder: 10 },
+  { code: 'PE', name: 'Physical Education', sortOrder: 11 },
 ];
 
 export async function seedStLukesSecondarySchool(

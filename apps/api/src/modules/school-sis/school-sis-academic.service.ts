@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisTimetableService } from './school-sis-timetable.service';
 import type {
   AssignSchoolClubMembersDto,
   AssignSchoolHouseMembersDto,
@@ -56,6 +57,7 @@ export class SchoolSisAcademicService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly timetable: SchoolSisTimetableService,
   ) {}
 
   async listYears(tenantId: string) {
@@ -108,6 +110,13 @@ export class SchoolSisAcademicService {
       }
       return tx.schoolAcademicYear.create({ data: { tenantId, ...data } });
     });
+    if (!id && dto.copyTimetableFromYearId) {
+      await this.timetable.copyYear(tenantId, {
+        mode: 'YEAR',
+        fromYearId: dto.copyTimetableFromYearId,
+        toYearId: row.id,
+      });
+    }
     return row;
   }
 

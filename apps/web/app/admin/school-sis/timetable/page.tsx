@@ -1,7 +1,7 @@
 'use client';
 
-import { SchoolSisClassTimetable } from '@/components/school-sis/school-sis-class-timetable';
+import { SchoolSisTimetableDashboard } from '@/components/school-sis/timetable/tt-dashboard';
 
 export default function SchoolSisTimetablePage() {
-  return <SchoolSisClassTimetable />;
+  return <SchoolSisTimetableDashboard />;
 }

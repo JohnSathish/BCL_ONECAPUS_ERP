@@ -29,7 +29,7 @@ import {
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useBranding } from '@/hooks/use-branding';
 import { useAuthStore } from '@/store/auth-store';
-import { fetchSchoolSisOverview } from '@/services/school-sis';
+import { fetchSchoolSisOverview, fetchSchoolSisTimetableToday } from '@/services/school-sis';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -82,9 +82,9 @@ export function SchoolSisDashboard() {
   const welcomeName = user?.displayName?.trim() || user?.email?.split('@')[0] || 'there';
   const schoolName = branding?.displayName || displayName || "St. Luke's Secondary School";
   const canManage = canManageSchoolSis(user?.permissions);
-  const overview = useQuery({
-    queryKey: ['school-sis-overview'],
-    queryFn: fetchSchoolSisOverview,
+  const todayTt = useQuery({
+    queryKey: ['school-sis-timetable-today'],
+    queryFn: fetchSchoolSisTimetableToday,
     enabled,
   });
   const [now, setNow] = useState(() => new Date());
@@ -272,6 +272,41 @@ export function SchoolSisDashboard() {
           );
         })}
       </div>
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[#1a365d]">Today's Timetable</h2>
+          <Link href="/admin/school-sis/timetable" className="text-xs font-semibold text-sky-700">
+            Open module
+          </Link>
+        </div>
+        {todayTt.data?.weekend ? (
+          <p className="text-sm text-slate-500">Weekend — no teaching periods.</p>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(todayTt.data?.bells ?? []).map((row: any) => (
+              <div
+                key={row.bell.id}
+                className={cn(
+                  'min-w-[140px] rounded-xl border px-3 py-2 text-xs',
+                  row.bell.kind === 'BREAK' && 'border-sky-200 bg-sky-50',
+                  row.state === 'current' && 'border-[#1a365d] bg-[#1a365d] text-white',
+                  row.state === 'completed' && 'opacity-50',
+                )}
+              >
+                <p className="font-semibold uppercase tracking-wide">{row.bell.label}</p>
+                <p>
+                  {row.bell.startTime}–{row.bell.endTime}
+                </p>
+                {row.state === 'current' ? <p>Now</p> : null}
+                {row.state === 'upcoming' && todayTt.data?.next?.bell?.id === row.bell.id ? (
+                  <p>Next</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] xl:col-span-2">

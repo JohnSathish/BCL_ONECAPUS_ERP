@@ -875,6 +875,27 @@ export class SaveSchoolTimetableSlotDto {
   @IsOptional()
   @IsBoolean()
   allowOverride?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  printedSubject?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  printedTeacher?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  needsConfirmation?: boolean;
+}
+
+export class BulkSchoolTimetableSlotsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SaveSchoolTimetableSlotDto)
+  slots!: SaveSchoolTimetableSlotDto[];
 }
 
 export class MoveSchoolTimetableSlotDto {
@@ -895,15 +916,43 @@ export class MoveSchoolTimetableSlotDto {
 }
 
 export class CopySchoolTimetableDto {
-  @IsUUID()
-  fromSectionId!: string;
+  @IsOptional()
+  @IsIn(['SECTION', 'DAY', 'WEEK', 'YEAR'])
+  mode?: 'SECTION' | 'DAY' | 'WEEK' | 'YEAR';
 
+  @IsOptional()
   @IsUUID()
-  toSectionId!: string;
+  fromSectionId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  toSectionId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  fromDay?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  toDay?: number;
+
+  @IsOptional()
+  @IsUUID()
+  fromYearId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  toYearId?: string;
 
   @IsOptional()
   @IsUUID()
   planId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  replaceDest?: boolean;
 }
 
 export class CreateSchoolRoomDto {
@@ -1027,6 +1076,10 @@ export class SaveSchoolAcademicYearDto {
   @IsOptional()
   @IsIn(['CURRENT', 'UPCOMING', 'ARCHIVED'])
   status?: string;
+
+  @IsOptional()
+  @IsUUID()
+  copyTimetableFromYearId?: string;
 }
 
 export class SaveSchoolGradeDto {

@@ -13,7 +13,7 @@ import {
   saveSchoolSisTimetableBells,
   type SchoolSisTimetableBell,
 } from '@/services/school-sis';
-import { apiErrorMessage } from '@/utils/api-error';
+import { TimetableChrome } from '@/components/school-sis/timetable/tt-chrome';
 
 export function SchoolSisTimetableSettings() {
   const enabled = useAuthQueryEnabled();
@@ -21,7 +21,7 @@ export function SchoolSisTimetableSettings() {
   const canEdit = canManageSchoolSis(useAuthStore((s) => s.session?.user)?.permissions);
   const [error, setError] = useState<string | null>(null);
   const [bells, setBells] = useState<SchoolSisTimetableBell[]>([]);
-  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [roomName, setRoomName] = useState('');
 
   const setup = useQuery({
@@ -71,14 +71,10 @@ export function SchoolSisTimetableSettings() {
   };
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-[#1a365d]">Timetable settings</h1>
-        <p className="text-sm text-slate-500">
-          Default bells match the school printed timetable (7 periods, 15-minute recess, 30-minute
-          recess). Times can be changed here without rewriting class entries.
-        </p>
-      </div>
+    <TimetableChrome
+      title="Period configuration"
+      hint="1st–7th periods plus Short Break and Lunch/Break. Changing times here does not delete class entries."
+    >
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <section className="rounded-2xl border bg-white p-4">
@@ -223,6 +219,6 @@ export function SchoolSisTimetableSettings() {
           </form>
         ) : null}
       </section>
-    </div>
+    </TimetableChrome>
   );
 }

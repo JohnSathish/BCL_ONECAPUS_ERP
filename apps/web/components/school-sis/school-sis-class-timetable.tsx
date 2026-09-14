@@ -15,6 +15,7 @@ import {
   validateSchoolSisTimetable,
 } from '@/services/school-sis';
 import { apiErrorMessage } from '@/utils/api-error';
+import { TimetableChrome } from '@/components/school-sis/timetable/tt-chrome';
 
 export function SchoolSisClassTimetable() {
   const enabled = useAuthQueryEnabled();
@@ -22,6 +23,8 @@ export function SchoolSisClassTimetable() {
   const canEdit = canManageSchoolSis(user?.permissions);
   const [sectionId, setSectionId] = useState('');
   const [copyTo, setCopyTo] = useState('');
+  const [copyDayFrom, setCopyDayFrom] = useState(1);
+  const [copyDayTo, setCopyDayTo] = useState(2);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
 
@@ -41,7 +44,12 @@ export function SchoolSisClassTimetable() {
   });
 
   const copy = useMutation({
-    mutationFn: () => copySchoolSisTimetable({ fromSectionId: activeSection, toSectionId: copyTo }),
+    mutationFn: () =>
+      copySchoolSisTimetable({
+        mode: 'WEEK',
+        fromSectionId: activeSection,
+        toSectionId: copyTo,
+      }),
     onSuccess: () => {
       setError(null);
       setSummary('Timetable copied. Review the destination section before publishing.');
@@ -77,15 +85,21 @@ export function SchoolSisClassTimetable() {
   const printSub = `Academic Year: ${grid.data?.academicYear.name ?? masters.data?.academicYear.name ?? ''} · Status: ${grid.data?.plan?.status ?? 'DRAFT'}`;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-[#1a365d]">Class timetable</h1>
-        <p className="text-sm text-slate-500">
-          Monday–Saturday bell schedule for the selected class and section. Empty cells are free
-          periods.
-        </p>
-      </div>
-
+    <TimetableChrome
+      title="Class-wise timetable"
+      hint="Select a class, then a period cell. Subject and teacher come from dropdowns. Drag a lesson to another period. Conflicts are not saved."
+      actions={
+        canEdit ? (
+          <button
+            type="button"
+            className="rounded-xl bg-[#1a365d] px-4 py-2 text-sm text-white"
+            onClick={() => publish.mutate()}
+          >
+            Publish week
+          </button>
+        ) : null
+      }
+    >
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="text-xs font-semibold text-slate-500">
           Class & section
@@ -125,11 +139,57 @@ export function SchoolSisClassTimetable() {
               className="h-10 rounded-xl border px-3 text-sm"
               disabled={!copyTo || copy.isPending}
               onClick={() => {
-                if (window.confirm('Replace the destination section timetable with this copy?'))
+                if (window.confirm('Replace the destination class timetable with this week?'))
                   copy.mutate();
               }}
             >
-              Copy timetable
+              Copy week to class
+            </button>
+            <label className="text-xs font-semibold text-slate-500">
+              Copy day
+              <span className="mt-1 flex gap-2">
+                <select
+                  className="h-10 rounded-lg border px-2 text-sm"
+                  value={copyDayFrom}
+                  onChange={(e) => setCopyDayFrom(Number(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5].map((d) => (
+                    <option key={d} value={d}>
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][d - 1]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-10 rounded-lg border px-2 text-sm"
+                  value={copyDayTo}
+                  onChange={(e) => setCopyDayTo(Number(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5].map((d) => (
+                    <option key={d} value={d}>
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][d - 1]}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </label>
+            <button
+              type="button"
+              className="h-10 rounded-xl border px-3 text-sm"
+              onClick={() => {
+                void copySchoolSisTimetable({
+                  mode: 'DAY',
+                  fromSectionId: activeSection,
+                  fromDay: copyDayFrom,
+                  toDay: copyDayTo,
+                })
+                  .then(() => {
+                    setSummary('Day copied. Review before publishing.');
+                    void grid.refetch();
+                  })
+                  .catch((err) => setError(apiErrorMessage(err)));
+              }}
+            >
+              Copy day
             </button>
             <button
               type="button"
@@ -170,6 +230,6 @@ export function SchoolSisClassTimetable() {
           />
         </div>
       ) : null}
-    </div>
+    </TimetableChrome>
   );
 }

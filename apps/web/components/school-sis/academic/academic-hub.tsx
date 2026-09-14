@@ -46,8 +46,8 @@ const MODULES = [
   },
   {
     href: '/admin/school-sis/timetable',
-    title: 'Staff Timetable',
-    hint: 'Periods, rooms, conflict checks',
+    title: 'Weekly Timetable',
+    hint: 'Periods, class/teacher views, conflicts, print',
     icon: CalendarDays,
   },
   {

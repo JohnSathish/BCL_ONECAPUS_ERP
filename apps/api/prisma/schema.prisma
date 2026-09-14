@@ -17291,7 +17291,7 @@ model SchoolTimetablePlan {
   academicYearId String    @map("academic_year_id") @db.Uuid
   name           String
   status         String    @default("DRAFT")
-  daysJson       Json      @default("[1,2,3,4,5,6]") @map("days_json")
+  daysJson       Json      @default("[1,2,3,4,5]") @map("days_json")
   effectiveFrom  DateTime? @map("effective_from") @db.Date
   effectiveUntil DateTime? @map("effective_until") @db.Date
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -17316,6 +17316,9 @@ model SchoolTimetableSlot {
   staffId   String?   @map("staff_id") @db.Uuid
   roomLabel String?   @map("room_label")
   notes     String?
+  printedSubject String? @map("printed_subject")
+  printedTeacher String? @map("printed_teacher")
+  needsConfirmation Boolean @default(false) @map("needs_confirmation")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
