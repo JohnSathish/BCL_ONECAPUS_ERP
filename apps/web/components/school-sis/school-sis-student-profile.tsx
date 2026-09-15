@@ -55,6 +55,7 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { SchoolSisFeeStructureCard } from '@/components/school-sis/school-sis-fee-structure-card';
 import { SchoolSisTimetableGrid } from '@/components/school-sis/school-sis-timetable-grid';
+import { StationeryStudentPurchases } from '@/components/school-sis/stationery/stationery-admin';
 
 type TabId =
   | 'overview'
@@ -62,6 +63,7 @@ type TabId =
   | 'academics'
   | 'exams'
   | 'fees'
+  | 'stationery'
   | 'timetable'
   | 'health'
   | 'library'
@@ -79,6 +81,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'academics', label: 'Academics' },
   { id: 'exams', label: 'Exams & Results' },
   { id: 'fees', label: 'Fees' },
+  { id: 'stationery', label: 'Stationery' },
   { id: 'timetable', label: 'Timetable' },
   { id: 'health', label: 'Health' },
   { id: 'library', label: 'Library' },
@@ -1020,6 +1023,7 @@ export function SchoolSisStudentProfile({ studentId }: { studentId: string }) {
           </div>
         )
       ) : null}
+      {tab === 'stationery' ? <StationeryStudentPurchases studentId={studentId} /> : null}
       {tab === 'timetable' ? (
         timetable.isLoading ? (
           <p className="text-sm text-slate-500">Loading class timetable…</p>

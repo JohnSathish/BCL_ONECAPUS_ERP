@@ -1838,3 +1838,142 @@ export async function reopenSchoolFeeCashCounter(userId: string, date: string) {
   });
   return data;
 }
+
+export async function fetchStationerySettings() {
+  const { data } = await api.get('/v1/school-sis/stationery/settings');
+  return data;
+}
+
+export async function saveStationerySettings(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/school-sis/stationery/settings', payload);
+  return data;
+}
+
+export async function fetchStationeryDashboard() {
+  const { data } = await api.get('/v1/school-sis/stationery/dashboard');
+  return data;
+}
+
+export async function fetchStationeryCategories() {
+  const { data } = await api.get('/v1/school-sis/stationery/categories');
+  return data as Array<{
+    id: string;
+    name: string;
+    code: string;
+    children: Array<{ id: string; name: string; code: string }>;
+  }>;
+}
+
+export async function createStationeryCategory(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/stationery/categories', payload);
+  return data;
+}
+
+export async function fetchStationeryProducts(params?: {
+  q?: string;
+  categoryId?: string;
+  stock?: string;
+}) {
+  const { data } = await api.get('/v1/school-sis/stationery/products', { params });
+  return data as any[];
+}
+
+export async function saveStationeryProduct(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/stationery/products/${id}`, payload)
+    : await api.post('/v1/school-sis/stationery/products', payload);
+  return data;
+}
+
+export async function importStationeryProducts(rows: unknown[]) {
+  const { data } = await api.post('/v1/school-sis/stationery/products/import', { rows });
+  return data as {
+    total: number;
+    success: number;
+    failed: number;
+    duplicate: number;
+    invalid: number;
+    errors: Array<{ row: number; sku: string; error: string }>;
+  };
+}
+
+export async function downloadStationeryProductTemplate() {
+  const { data } = await api.get('/v1/school-sis/stationery/products/import-template', {
+    responseType: 'blob',
+  });
+  triggerBlobDownload(data as Blob, 'stationery-products.xlsx');
+}
+
+export async function searchStationeryStudents(q: string) {
+  const { data } = await api.get('/v1/school-sis/stationery/students', { params: { q } });
+  return data as any[];
+}
+
+export async function fetchStationerySuggested(studentId: string) {
+  const { data } = await api.get(`/v1/school-sis/stationery/students/${studentId}/suggested`);
+  return data as any[];
+}
+
+export async function completeStationerySale(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/stationery/sales', payload);
+  return data;
+}
+
+export async function fetchStationerySales(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/stationery/sales', { params });
+  return data as any[];
+}
+
+export async function fetchStationerySale(id: string) {
+  const { data } = await api.get(`/v1/school-sis/stationery/sales/${id}`);
+  return data;
+}
+
+export async function cancelStationerySale(id: string, reason?: string) {
+  const { data } = await api.post(`/v1/school-sis/stationery/sales/${id}/cancel`, { reason });
+  return data;
+}
+
+export async function fetchStationerySuppliers() {
+  const { data } = await api.get('/v1/school-sis/stationery/suppliers');
+  return data as any[];
+}
+
+export async function saveStationerySupplier(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/stationery/suppliers/${id}`, payload)
+    : await api.post('/v1/school-sis/stationery/suppliers', payload);
+  return data;
+}
+
+export async function fetchStationeryPurchases() {
+  const { data } = await api.get('/v1/school-sis/stationery/purchases');
+  return data as any[];
+}
+
+export async function createStationeryPurchase(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/stationery/purchases', payload);
+  return data;
+}
+
+export async function adjustStationeryStock(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/stationery/stock/adjust', payload);
+  return data;
+}
+
+export async function fetchStationeryMovements(productId?: string) {
+  const { data } = await api.get('/v1/school-sis/stationery/stock/movements', {
+    params: { productId },
+  });
+  return data as any[];
+}
+
+export async function createStationeryReturn(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/stationery/returns', payload);
+  return data;
+}
+
+export async function fetchStationeryReports(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/stationery/reports', { params });
+  return data;
+}

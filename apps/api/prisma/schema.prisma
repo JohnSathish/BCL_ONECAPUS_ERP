@@ -16602,6 +16602,9 @@ model SchoolAcademicYear {
   feePayments        SchoolFeePayment[]
   feeMonthAccounts   SchoolFeeMonthAccount[]
   feeCashCloses      SchoolFeeCashClose[]
+  stationerySales     SchoolStationerySale[]
+  stationeryPurchases SchoolStationeryPurchase[]
+  stationeryProducts  SchoolStationeryProduct[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16639,6 +16642,8 @@ model SchoolGrade {
   gradeSubjects  SchoolGradeSubject[]
   feeStructures  SchoolFeeStructure[]
   monthlyFeePlans SchoolMonthlyFeePlan[]
+  stationeryProducts SchoolStationeryProduct[]
+  stationeryClassMaps SchoolStationeryProductClassMapping[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16923,6 +16928,7 @@ model SchoolStudent {
   feePayments      SchoolFeePayment[]
   feeMonthAccounts SchoolFeeMonthAccount[]
   feeGatewayTransactions SchoolPaymentGatewayTransaction[]
+  stationerySales  SchoolStationerySale[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -18210,3 +18216,403 @@ model SchoolPortalPresence {
   @@map("school_portal_presence")
   @@schema("platform")
 }
+
+/// Campus store / stationery (St. Luke’s SIS). Isolated from college inventory.
+model SchoolStationeryCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  parentId  String?   @map("parent_id") @db.Uuid
+  code      String
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  parent       SchoolStationeryCategory?  @relation("StationeryCategoryTree", fields: [parentId], references: [id])
+  children     SchoolStationeryCategory[] @relation("StationeryCategoryTree")
+  products     SchoolStationeryProduct[]  @relation("ProductCategory")
+  subProducts  SchoolStationeryProduct[]  @relation("ProductSubcategory")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, parentId])
+  @@map("school_stationery_categories")
+  @@schema("school")
+}
+
+model SchoolStationerySupplier {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  contactPerson   String?   @map("contact_person")
+  mobile          String?
+  email           String?
+  address         String?   @db.Text
+  gstin           String?
+  pan             String?
+  paymentTerms    String?   @map("payment_terms")
+  openingBalance  Int       @default(0) @map("opening_balance")
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  products   SchoolStationeryProduct[]
+  purchases  SchoolStationeryPurchase[]
+
+  @@index([tenantId, name])
+  @@map("school_stationery_suppliers")
+  @@schema("school")
+}
+
+model SchoolStationeryProduct {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  name               String
+  sku                String
+  barcode            String?
+  categoryId         String    @map("category_id") @db.Uuid
+  subcategoryId      String?   @map("subcategory_id") @db.Uuid
+  brand              String?
+  description        String?   @db.Text
+  unit               String    @default("PIECE")
+  purchasePrice      Int       @default(0) @map("purchase_price")
+  sellingPrice       Int       @default(0) @map("selling_price")
+  taxApplicable      Boolean   @default(false) @map("tax_applicable")
+  taxPercent         Decimal   @default(0) @map("tax_percent") @db.Decimal(6, 2)
+  discountAllowed    Boolean   @default(true) @map("discount_allowed")
+  minStock           Decimal   @default(0) @map("min_stock") @db.Decimal(14, 3)
+  qtyOnHand          Decimal   @default(0) @map("qty_on_hand") @db.Decimal(14, 3)
+  openingStock       Decimal   @default(0) @map("opening_stock") @db.Decimal(14, 3)
+  supplierId         String?   @map("supplier_id") @db.Uuid
+  active             Boolean   @default(true)
+  imageUrl           String?   @map("image_url")
+  remarks            String?   @db.Text
+  gradeId            String?   @map("grade_id") @db.Uuid
+  academicYearId     String?   @map("academic_year_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  category     SchoolStationeryCategory  @relation("ProductCategory", fields: [categoryId], references: [id])
+  subcategory  SchoolStationeryCategory? @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
+  supplier     SchoolStationerySupplier? @relation(fields: [supplierId], references: [id])
+  grade        SchoolGrade?              @relation(fields: [gradeId], references: [id])
+  academicYear SchoolAcademicYear?       @relation(fields: [academicYearId], references: [id])
+  variants     SchoolStationeryProductVariant[]
+  classMaps    SchoolStationeryProductClassMapping[]
+  saleItems    SchoolStationerySaleItem[]
+  purchaseItems SchoolStationeryPurchaseItem[]
+  returnItems  SchoolStationeryReturnItem[]
+  movements    SchoolStationeryStockMovement[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, barcode])
+  @@index([tenantId, name])
+  @@index([tenantId, categoryId, active])
+  @@map("school_stationery_products")
+  @@schema("school")
+}
+
+model SchoolStationeryProductVariant {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  productId     String    @map("product_id") @db.Uuid
+  sku           String
+  barcode       String?
+  label         String
+  size          String?
+  gender        String?
+  colour        String?
+  house         String?
+  academicYear  String?   @map("academic_year")
+  purchasePrice Int?
+  sellingPrice  Int?
+  qtyOnHand     Decimal   @default(0) @map("qty_on_hand") @db.Decimal(14, 3)
+  minStock      Decimal   @default(0) @map("min_stock") @db.Decimal(14, 3)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  product       SchoolStationeryProduct          @relation(fields: [productId], references: [id])
+  saleItems     SchoolStationerySaleItem[]
+  purchaseItems SchoolStationeryPurchaseItem[]
+  returnItems   SchoolStationeryReturnItem[]
+  movements     SchoolStationeryStockMovement[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, productId])
+  @@map("school_stationery_product_variants")
+  @@schema("school")
+}
+
+model SchoolStationeryProductClassMapping {
+  id              String  @id @default(uuid()) @db.Uuid
+  tenantId        String  @map("tenant_id") @db.Uuid
+  productId       String  @map("product_id") @db.Uuid
+  gradeId         String  @map("grade_id") @db.Uuid
+  sectionId       String? @map("section_id") @db.Uuid
+  gender          String?
+  academicYearId  String? @map("academic_year_id") @db.Uuid
+  studentCategory String? @map("student_category")
+
+  product SchoolStationeryProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  grade   SchoolGrade             @relation(fields: [gradeId], references: [id])
+
+  @@index([tenantId, gradeId])
+  @@index([productId])
+  @@map("school_stationery_product_class_maps")
+  @@schema("school")
+}
+
+model SchoolStationerySettings {
+  id                         String   @id @default(uuid()) @db.Uuid
+  tenantId                   String   @unique @map("tenant_id") @db.Uuid
+  enabled                    Boolean  @default(true)
+  invoicePrefix              String   @default("STN") @map("invoice_prefix")
+  startingNumber             Int      @default(1) @map("starting_number")
+  defaultPaymentMethod       String   @default("CASH") @map("default_payment_method")
+  allowWalkInSales           Boolean  @default(true) @map("allow_walk_in_sales")
+  allowCreditSales           Boolean  @default(false) @map("allow_credit_sales")
+  allowNegativeStock         Boolean  @default(false) @map("allow_negative_stock")
+  defaultTaxPercent          Decimal  @default(0) @map("default_tax_percent") @db.Decimal(6, 2)
+  defaultDiscountPercent     Decimal  @default(0) @map("default_discount_percent") @db.Decimal(6, 2)
+  cashierMaxDiscountPercent  Decimal  @default(5) @map("cashier_max_discount_percent") @db.Decimal(6, 2)
+  managerMaxDiscountPercent  Decimal  @default(15) @map("manager_max_discount_percent") @db.Decimal(6, 2)
+  lowStockAlert              Boolean  @default(true) @map("low_stock_alert")
+  receiptFormat              String   @default("A5") @map("receipt_format")
+  requireStudentSelection    Boolean  @default(false) @map("require_student_selection")
+  enableBarcode              Boolean  @default(true) @map("enable_barcode")
+  enableProductImages        Boolean  @default(false) @map("enable_product_images")
+  enableStockTracking        Boolean  @default(true) @map("enable_stock_tracking")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  @@map("school_stationery_settings")
+  @@schema("school")
+}
+
+model SchoolStationerySale {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  academicYearId   String    @map("academic_year_id") @db.Uuid
+  invoiceNo        String    @map("invoice_no")
+  status           String    @default("DRAFT")
+  customerType     String    @map("customer_type")
+  studentId        String?   @map("student_id") @db.Uuid
+  walkInName       String?   @map("walk_in_name")
+  walkInMobile     String?   @map("walk_in_mobile")
+  walkInAddress    String?   @map("walk_in_address") @db.Text
+  subtotal         Int       @default(0)
+  itemDiscount     Int       @default(0) @map("item_discount")
+  billDiscount     Int       @default(0) @map("bill_discount")
+  billDiscountPct  Decimal   @default(0) @map("bill_discount_pct") @db.Decimal(6, 2)
+  taxAmount        Int       @default(0) @map("tax_amount")
+  grandTotal       Int       @default(0) @map("grand_total")
+  amountPaid       Int       @default(0) @map("amount_paid")
+  balanceDue       Int       @default(0) @map("balance_due")
+  notes            String?   @db.Text
+  cashierUserId    String    @map("cashier_user_id") @db.Uuid
+  cashierName      String    @map("cashier_name")
+  completedAt      DateTime? @map("completed_at")
+  cancelledAt      DateTime? @map("cancelled_at")
+  cancelReason     String?   @map("cancel_reason")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear         @relation(fields: [academicYearId], references: [id])
+  student      SchoolStudent?             @relation(fields: [studentId], references: [id])
+  items        SchoolStationerySaleItem[]
+  payments     SchoolStationerySalePayment[]
+  returns      SchoolStationeryReturn[]
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
+  @@map("school_stationery_sales")
+  @@schema("school")
+}
+
+model SchoolStationerySaleItem {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  saleId        String  @map("sale_id") @db.Uuid
+  productId     String  @map("product_id") @db.Uuid
+  variantId     String? @map("variant_id") @db.Uuid
+  productName   String  @map("product_name")
+  variantLabel  String? @map("variant_label")
+  sku           String
+  unit          String
+  qty           Decimal @db.Decimal(14, 3)
+  rate          Int
+  discountAmt   Int     @default(0) @map("discount_amt")
+  discountPct   Decimal @default(0) @map("discount_pct") @db.Decimal(6, 2)
+  taxPercent    Decimal @default(0) @map("tax_percent") @db.Decimal(6, 2)
+  taxAmount     Int     @default(0) @map("tax_amount")
+  lineTotal     Int     @map("line_total")
+  returnedQty   Decimal @default(0) @map("returned_qty") @db.Decimal(14, 3)
+
+  sale    SchoolStationerySale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product SchoolStationeryProduct          @relation(fields: [productId], references: [id])
+  variant SchoolStationeryProductVariant?  @relation(fields: [variantId], references: [id])
+
+  @@index([saleId])
+  @@map("school_stationery_sale_items")
+  @@schema("school")
+}
+
+model SchoolStationerySalePayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  saleId    String   @map("sale_id") @db.Uuid
+  method    String
+  amount    Int
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sale SchoolStationerySale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@map("school_stationery_sale_payments")
+  @@schema("school")
+}
+
+model SchoolStationeryStockMovement {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  variantId      String?  @map("variant_id") @db.Uuid
+  type           String
+  qty            Decimal  @db.Decimal(14, 3)
+  qtyBefore      Decimal  @map("qty_before") @db.Decimal(14, 3)
+  qtyAfter       Decimal  @map("qty_after") @db.Decimal(14, 3)
+  refType        String?  @map("ref_type")
+  refId          String?  @map("ref_id") @db.Uuid
+  reason         String?
+  remarks        String?  @db.Text
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  product SchoolStationeryProduct         @relation(fields: [productId], references: [id])
+  variant SchoolStationeryProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([tenantId, productId, createdAt])
+  @@index([tenantId, type, createdAt])
+  @@map("school_stationery_stock_movements")
+  @@schema("school")
+}
+
+model SchoolStationeryPurchase {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  supplierId     String    @map("supplier_id") @db.Uuid
+  invoiceNo      String    @map("invoice_no")
+  purchaseDate   DateTime  @map("purchase_date") @db.Date
+  subtotal       Int       @default(0)
+  discount       Int       @default(0)
+  taxAmount      Int       @default(0) @map("tax_amount")
+  grandTotal     Int       @default(0) @map("grand_total")
+  paymentStatus  String    @default("UNPAID") @map("payment_status")
+  amountPaid     Int       @default(0) @map("amount_paid")
+  remarks        String?   @db.Text
+  status         String    @default("COMPLETED")
+  userId         String    @map("user_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear              @relation(fields: [academicYearId], references: [id])
+  supplier     SchoolStationerySupplier        @relation(fields: [supplierId], references: [id])
+  items        SchoolStationeryPurchaseItem[]
+
+  @@index([tenantId, purchaseDate])
+  @@index([tenantId, supplierId])
+  @@map("school_stationery_purchases")
+  @@schema("school")
+}
+
+model SchoolStationeryPurchaseItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  purchaseId  String  @map("purchase_id") @db.Uuid
+  productId   String  @map("product_id") @db.Uuid
+  variantId   String? @map("variant_id") @db.Uuid
+  qty         Decimal @db.Decimal(14, 3)
+  rate        Int
+  discountAmt Int     @default(0) @map("discount_amt")
+  taxPercent  Decimal @default(0) @map("tax_percent") @db.Decimal(6, 2)
+  taxAmount   Int     @default(0) @map("tax_amount")
+  lineTotal   Int     @map("line_total")
+
+  purchase SchoolStationeryPurchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  SchoolStationeryProduct        @relation(fields: [productId], references: [id])
+  variant  SchoolStationeryProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([purchaseId])
+  @@map("school_stationery_purchase_items")
+  @@schema("school")
+}
+
+model SchoolStationeryReturn {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  saleId      String   @map("sale_id") @db.Uuid
+  returnNo    String   @map("return_no")
+  reason      String?
+  refundTotal Int      @default(0) @map("refund_total")
+  userId      String   @map("user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sale  SchoolStationerySale         @relation(fields: [saleId], references: [id])
+  items SchoolStationeryReturnItem[]
+
+  @@unique([tenantId, returnNo])
+  @@index([saleId])
+  @@map("school_stationery_returns")
+  @@schema("school")
+}
+
+model SchoolStationeryReturnItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  returnId    String  @map("return_id") @db.Uuid
+  saleItemId  String  @map("sale_item_id") @db.Uuid
+  productId   String  @map("product_id") @db.Uuid
+  variantId   String? @map("variant_id") @db.Uuid
+  qty         Decimal @db.Decimal(14, 3)
+  condition   String
+  refundAmt   Int     @map("refund_amt")
+
+  return  SchoolStationeryReturn         @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product SchoolStationeryProduct        @relation(fields: [productId], references: [id])
+  variant SchoolStationeryProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([returnId])
+  @@map("school_stationery_return_items")
+  @@schema("school")
+}
+
+model SchoolStationeryAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String
+  module    String   @default("STATIONERY")
+  recordId  String?  @map("record_id")
+  oldValue  Json?
+  newValue  Json?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, recordId])
+  @@map("school_stationery_audit_logs")
+  @@schema("school")
+}
+

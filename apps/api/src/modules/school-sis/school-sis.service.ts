@@ -307,7 +307,7 @@ export class SchoolSisService {
         fees: true,
         exams: false,
         library: false,
-        stationery: false,
+        stationery: true,
         transport: false,
         website: true,
         academicConfig: true,
