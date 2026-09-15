@@ -648,28 +648,41 @@ export class SchoolSisMonthlyFeesService {
       if (!row)
         throw new BadRequestException(`Month ${m} is not on this ledger`);
       if (row.status === 'PAID') {
-        throw new ConflictException(`${row.monthLabel} is already paid`);
+        throw new ConflictException('Payment already recorded.');
       }
       return row;
     });
-    const allowed = new Set([
-      ...(book.settings.paymentMethods ?? []),
-      ...DEFAULT_METHODS,
-    ]);
+    const configured = Array.isArray(book.settings.paymentMethods)
+      ? book.settings.paymentMethods
+      : DEFAULT_METHODS;
+    const allowed = new Set(configured.length ? configured : DEFAULT_METHODS);
     if (!allowed.has(dto.paymentMode)) {
       throw new BadRequestException('That payment mode is not enabled');
     }
     if (dto.paymentMode === 'CHEQUE' && !dto.chequeNumber?.trim()) {
       throw new BadRequestException('Cheque number is required');
     }
+    if (dto.paymentMode === 'BANK' && !dto.reference?.trim()) {
+      throw new BadRequestException('Bank transaction reference is required');
+    }
     if (
-      ['UPI', 'BANK', 'ONLINE'].includes(dto.paymentMode) &&
+      dto.paymentMode === 'UPI' &&
+      !dto.reference?.trim() &&
+      !opts?.skipReference
+    ) {
+      throw new BadRequestException('UPI reference number is required');
+    }
+    if (
+      dto.paymentMode === 'ONLINE' &&
       !dto.reference?.trim() &&
       !opts?.skipReference
     ) {
       throw new BadRequestException(
-        'Transaction / reference number is required',
+        'Complete the online payment through the gateway, or enter a confirmed transaction reference.',
       );
+    }
+    if (dto.paymentMode === 'OTHER' && !dto.reference?.trim()) {
+      throw new BadRequestException('Payment reference is required');
     }
     const waiverMap = new Map(
       (dto.lateWaivers ?? []).map((w) => [w.month, w.reason.trim()]),
@@ -724,6 +737,13 @@ export class SchoolSisMonthlyFeesService {
         'Partial payment is only allowed for a single month',
       );
     }
+    if (
+      dto.paymentMode === 'CASH' &&
+      dto.cashReceived != null &&
+      dto.cashReceived < amountPaying
+    ) {
+      throw new BadRequestException('Insufficient cash received.');
+    }
     return { months, book, lines, gross, discount, net, amountPaying };
   }
 
@@ -753,6 +773,18 @@ export class SchoolSisMonthlyFeesService {
     const year = book.academicYear;
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const already = await tx.schoolFeeMonthAccount.findFirst({
+          where: {
+            tenantId,
+            academicYearId: year.id,
+            studentId: dto.studentId,
+            feeMonth: { in: months },
+            status: 'PAID',
+          },
+        });
+        if (already) {
+          throw new ConflictException('Payment already recorded.');
+        }
         const seq = await tx.schoolIdSequence.upsert({
           where: {
             tenantId_academicYearId_kind: {
@@ -843,6 +875,21 @@ export class SchoolSisMonthlyFeesService {
                   }
                 : null,
               cashCollected: amountPaying,
+              tender:
+                dto.paymentMode === 'CASH'
+                  ? {
+                      cashReceived: dto.cashReceived ?? amountPaying,
+                      changeReturned: Math.max(
+                        0,
+                        (dto.cashReceived ?? amountPaying) - amountPaying,
+                      ),
+                    }
+                  : null,
+              payer: {
+                name: dto.payerName?.trim() || null,
+                mobile: dto.payerMobile?.trim() || null,
+                instrumentDate: dto.instrumentDate?.trim() || null,
+              },
               amounts: {
                 tuition: tuitionAmount,
                 late: lateFeeAmount,
@@ -973,9 +1020,7 @@ export class SchoolSisMonthlyFeesService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
-        throw new ConflictException(
-          'This month is already paid for the student',
-        );
+        throw new ConflictException('Payment already recorded.');
       }
       throw err;
     }
@@ -1266,7 +1311,26 @@ export class SchoolSisMonthlyFeesService {
       },
       orderBy: { student: { fullName: 'asc' } },
     });
-    const paid = await this.prisma.schoolFeePayment.findMany({
+    const monthAccounts = await this.prisma.schoolFeeMonthAccount.findMany({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        feeMonth: month,
+      },
+      select: {
+        studentId: true,
+        paidAmount: true,
+        dueAmount: true,
+        status: true,
+      },
+    });
+    const paidThisMonth = new Map(
+      monthAccounts.map((a) => [a.studentId, a.paidAmount] as const),
+    );
+    const paidSet = new Set(
+      monthAccounts.filter((a) => a.status === 'PAID').map((a) => a.studentId),
+    );
+    const paidReceipts = await this.prisma.schoolFeePayment.findMany({
       where: {
         tenantId,
         academicYearId: year.id,
@@ -1275,19 +1339,7 @@ export class SchoolSisMonthlyFeesService {
       },
       select: { studentId: true },
     });
-    const accountsPaid = await this.prisma.schoolFeeMonthAccount.findMany({
-      where: {
-        tenantId,
-        academicYearId: year.id,
-        feeMonth: month,
-        status: 'PAID',
-      },
-      select: { studentId: true },
-    });
-    const paidSet = new Set([
-      ...paid.map((p) => p.studentId),
-      ...accountsPaid.map((p) => p.studentId),
-    ]);
+    for (const p of paidReceipts) paidSet.add(p.studentId);
     const settings = (await this.ensureSetup(tenantId)).settings;
     const today = startOfDay(new Date());
     const priorMonths = this.monthsBetween(year.startDate, year.endDate).filter(
@@ -1325,6 +1377,11 @@ export class SchoolSisMonthlyFeesService {
           priorMonths.filter((m) => !priorPaidSet.has(`${e.studentId}:${m}`))
             .length *
           (tuition + other);
+        const monthGross = tuition + other + late;
+        const paidThis = paidThisMonth.get(e.student.id) ?? 0;
+        const monthRemaining = Math.max(0, monthGross - paidThis);
+        const totalDue = monthRemaining + previousBalance;
+        if (totalDue <= 0) return null;
         return {
           studentId: e.student.id,
           fullName: e.student.fullName,
@@ -1338,15 +1395,21 @@ export class SchoolSisMonthlyFeesService {
           sectionName: e.section.name,
           feeMonth: month,
           monthLabel: monthLabel(month),
-          tuitionAmount: tuition,
+          tuitionAmount: Math.max(0, tuition - Math.min(paidThis, tuition)),
           lateFeeAmount: late,
           otherAmount: other,
           previousBalance,
-          totalDue: tuition + other + late + previousBalance,
-          overdue: late > 0,
-          status: late > 0 ? 'OVERDUE' : 'PENDING',
+          totalDue,
+          overdue: late > 0 && paidThis === 0,
+          status:
+            paidThis > 0 && monthRemaining > 0
+              ? 'PARTIAL'
+              : late > 0
+                ? 'OVERDUE'
+                : 'PENDING',
         };
-      });
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
     const pendingIds = new Set(rows.map((r) => r.studentId));
     const amountByGrade = new Map<string, number>();
     for (const row of rows) {

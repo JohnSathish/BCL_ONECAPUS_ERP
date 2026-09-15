@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   CalendarDays,
@@ -24,8 +24,8 @@ import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { studentInitials } from '@/lib/school-sis/student-profile';
 import { cn } from '@/utils/cn';
-import { apiErrorMessage } from '@/utils/api-error';
-import { collectMonthlyFee, fetchMonthlyFeePending } from '@/services/school-sis';
+import { fetchMonthlyFeePending } from '@/services/school-sis';
+import { CollectFeeDialog, type CollectFeeStudent } from './collect-fee-dialog';
 import { MonthlyFeeSubnav, currentFeeMonth, rs } from './monthly-fee-ui';
 
 const AVATAR = [
@@ -66,9 +66,8 @@ export function MonthlyFeePending() {
   const [pageSize, setPageSize] = useState(15);
   const [selected, setSelected] = useState<string[]>([]);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [collecting, setCollecting] = useState<CollectFeeStudent | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const qc = useQueryClient();
   const query = useQuery({
     queryKey: ['monthly-fee-pending', month],
     queryFn: () => fetchMonthlyFeePending(month),
@@ -156,32 +155,17 @@ export function MonthlyFeePending() {
     setSelected([]);
   }
 
-  async function collectRows(
-    rows: Array<{ studentId: string; fullName: string; totalDue: number }>,
-  ) {
-    if (!rows.length) return;
-    const label =
-      rows.length === 1
-        ? `Collect ${rs(rows[0].totalDue)} in cash for ${rows[0].fullName}?`
-        : `Collect cash for ${rows.length} selected students (${rs(rows.reduce((s, r) => s + r.totalDue, 0))})?`;
-    if (!window.confirm(label)) return;
-    setBusy(true);
-    try {
-      for (const row of rows) {
-        await collectMonthlyFee({
-          studentId: row.studentId,
-          feeMonth: month,
-          paymentMode: 'CASH',
-        });
-      }
-      setError(null);
-      setSelected([]);
-      await qc.invalidateQueries({ queryKey: ['monthly-fee-pending'] });
-    } catch (err) {
-      setError(apiErrorMessage(err));
-    } finally {
-      setBusy(false);
+  function openCollect(row: CollectFeeStudent) {
+    setError(null);
+    setCollecting(row);
+  }
+
+  function collectSelected() {
+    if (selectedRows.length === 1) {
+      openCollect(selectedRows[0]);
+      return;
     }
+    setError('Collect each student individually so the payment method can be recorded.');
   }
 
   function sendReminders() {
@@ -478,9 +462,9 @@ export function MonthlyFeePending() {
             {canManage ? (
               <button
                 type="button"
-                disabled={busy || !selectedRows.length}
+                disabled={!selectedRows.length}
                 className="inline-flex h-10 items-center gap-2 rounded-full bg-[#e11d48] px-4 text-sm font-semibold text-white disabled:opacity-40"
-                onClick={() => void collectRows(selectedRows)}
+                onClick={collectSelected}
               >
                 <Wallet className="h-4 w-4" />
                 Collect Selected
@@ -615,7 +599,11 @@ export function MonthlyFeePending() {
                             : 'bg-rose-50 text-rose-600 ring-1 ring-rose-100',
                         )}
                       >
-                        {row.overdue ? 'Overdue' : 'Pending'}
+                        {row.status === 'PARTIAL'
+                          ? 'Partially paid'
+                          : row.overdue
+                            ? 'Overdue'
+                            : 'Pending'}
                       </span>
                     </td>
                     <td className="relative px-2 py-3">
@@ -623,9 +611,8 @@ export function MonthlyFeePending() {
                         {canManage ? (
                           <button
                             type="button"
-                            disabled={busy}
-                            className="inline-flex items-center gap-1 rounded-lg bg-[#1e3a8a] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
-                            onClick={() => void collectRows([row])}
+                            className="inline-flex items-center gap-1 rounded-lg bg-[#1e3a8a] px-3 py-1.5 text-xs font-semibold text-white"
+                            onClick={() => openCollect(row)}
                           >
                             <Wallet className="h-3.5 w-3.5" />
                             Collect
@@ -720,6 +707,16 @@ export function MonthlyFeePending() {
           </div>
         </div>
       </section>
+      <CollectFeeDialog
+        open={Boolean(collecting)}
+        onOpenChange={(next) => {
+          if (!next) setCollecting(null);
+        }}
+        student={collecting}
+        feeMonth={month}
+        monthLabel={data?.monthLabel ?? month}
+        academicYear={data?.academicYear?.name}
+      />
     </div>
   );
 }

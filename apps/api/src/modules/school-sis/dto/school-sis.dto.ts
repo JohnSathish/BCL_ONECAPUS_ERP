@@ -1448,6 +1448,27 @@ export class CollectSchoolFeeDto {
   @IsString()
   @MaxLength(240)
   notes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  cashReceived?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  payerName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  payerMobile?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  instrumentDate?: string;
 }
 
 export class VoidSchoolFeeDto {

@@ -1549,6 +1549,10 @@ export async function collectMonthlyFee(payload: {
   otherAmount?: number;
   waiveLateFee?: boolean;
   lateWaivers?: Array<{ month: string; reason: string }>;
+  cashReceived?: number;
+  payerName?: string;
+  payerMobile?: string;
+  instrumentDate?: string;
   notes?: string;
   channel?: 'OFFICE' | 'PARENT' | 'GATEWAY';
 }) {
@@ -1616,6 +1620,7 @@ export async function fetchMonthlyFeePending(month?: string) {
     params: month ? { month } : undefined,
   });
   return data as {
+    academicYear?: { id: string; name: string; code: string };
     feeMonth: string;
     monthLabel: string;
     summary: {
