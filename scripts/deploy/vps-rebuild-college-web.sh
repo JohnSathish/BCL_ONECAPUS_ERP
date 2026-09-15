@@ -8,6 +8,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-erp-net.sh"
 cd "$APP_DIR"
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
@@ -26,8 +29,7 @@ if [[ -f nginx/nginx.combined-dbc.ssl.conf ]]; then
 fi
 
 # Ensure college container is on the ERP network
-ERP_NET=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | xargs -r docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1 || true)
-ERP_NET="${ERP_NET:-$(basename "$APP_DIR")_default}"
+ERP_NET="$(pick_erp_docker_net "$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | head -1 || true)" "$(basename "$APP_DIR")_default")"
 docker network connect "$ERP_NET" donboscocollege-web 2>/dev/null || true
 
 sleep 3

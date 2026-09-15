@@ -5,6 +5,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-erp-net.sh"
 cd "$APP_DIR"
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
@@ -36,12 +39,9 @@ PY
 set +a
 
 resolve_erp_net() {
-  local net
-  net=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | xargs -r docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1 || true)
-  if [[ -z "${net}" ]]; then
-    net="$(basename "$APP_DIR")_default"
-  fi
-  echo "${net}"
+  local cid
+  cid=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | head -1 || true)
+  pick_erp_docker_net "${cid}" "$(basename "$APP_DIR")_default"
 }
 
 attach_college() {

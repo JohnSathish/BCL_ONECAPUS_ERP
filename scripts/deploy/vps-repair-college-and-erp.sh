@@ -4,6 +4,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-erp-net.sh"
 cd "$APP_DIR"
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db)
@@ -44,10 +47,7 @@ fi
 echo
 
 echo "--- Attach college web to ERP docker network ---"
-ERP_NET=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | xargs -r docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1 || true)
-if [[ -z "${ERP_NET}" ]]; then
-  ERP_NET="$(basename "$APP_DIR")_default"
-fi
+ERP_NET="$(pick_erp_docker_net "$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | head -1 || true)" "$(basename "$APP_DIR")_default")"
 if docker ps --format '{{.Names}}' | grep -qx 'donboscocollege-web'; then
   if docker network inspect "${ERP_NET}" >/dev/null 2>&1; then
     docker network connect "${ERP_NET}" donboscocollege-web 2>/dev/null || true

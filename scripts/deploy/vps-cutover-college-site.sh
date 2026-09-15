@@ -16,6 +16,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-erp-net.sh"
 OLD_APP_DIR="${OLD_APP_DIR:-/opt/donboscocollege}"
 LEGACY_NAME="donboscocollege-web-legacy"
 DELETE_OLD=0
@@ -119,8 +122,7 @@ echo "--- Step 2: build + start OneCampus college-web ---"
 "${COMPOSE[@]}" build college-web
 "${COMPOSE[@]}" up -d api college-web nginx
 
-ERP_NET="$("${COMPOSE[@]}" ps -q nginx | xargs -r docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' | head -1 || true)"
-ERP_NET="${ERP_NET:-nep-erp_default}"
+ERP_NET="$(pick_erp_docker_net "$("${COMPOSE[@]}" ps -q nginx | head -1 || true)" "nep-erp_default")"
 docker network connect "$ERP_NET" donboscocollege-web 2>/dev/null || true
 echo "Attached donboscocollege-web to ${ERP_NET}"
 

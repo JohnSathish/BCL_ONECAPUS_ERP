@@ -4,6 +4,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/nep-erp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-erp-net.sh"
 cd "$APP_DIR"
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile local-db --profile moodle)
@@ -33,7 +36,7 @@ echo "Starting moodle-db + moodle containers…"
 
 echo "Waiting for Moodle HTTP (up to 5 min)…"
 for i in $(seq 1 60); do
-  if docker run --rm --network "$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$("${COMPOSE[@]}" ps -q moodle-db 2>/dev/null | head -1)" 2>/dev/null || echo nep-erp_default)" \
+  if docker run --rm --network "$(pick_erp_docker_net "$("${COMPOSE[@]}" ps -q moodle-db 2>/dev/null | head -1 || true)" "nep-erp_default")" \
     curlimages/curl:8.5.0 -sf -m 5 "http://moodle:8080/" -o /dev/null 2>/dev/null; then
     echo "Moodle is responding."
     break
