@@ -62,6 +62,7 @@ export type MonthlyFeeReceiptView = {
   paymentMode: string;
   reference?: string | null;
   monthsCovered?: string[];
+  otherLabel?: string;
 };
 
 const DEFAULT_INSTRUCTIONS = [
@@ -86,8 +87,10 @@ function slip(
   const motto = view.motto || 'Knowledge · Service · Light';
   const rows = [
     ['Tuition Fee', money(view.tuitionAmount)],
+    ...(view.otherAmount || view.otherLabel === 'Computer Fee'
+      ? [[view.otherLabel || 'Computer Fee', money(view.otherAmount)]]
+      : []),
     ['Late Fee', money(view.lateFeeAmount)],
-    ...(view.otherAmount ? [['Other Fee', money(view.otherAmount)]] : []),
     ...(view.discountAmount
       ? [['Concession', `− ${money(view.discountAmount)}`]]
       : []),

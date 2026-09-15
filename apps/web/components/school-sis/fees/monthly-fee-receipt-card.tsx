@@ -25,6 +25,7 @@ export function MonthlyFeeReceiptCard({
   monthsCovered,
   logoUrl,
   motto,
+  otherLabel,
 }: {
   copy: string;
   schoolName: string;
@@ -48,6 +49,7 @@ export function MonthlyFeeReceiptCard({
   monthsCovered?: string[];
   logoUrl?: string | null;
   motto?: string | null;
+  otherLabel?: string;
 }) {
   const amt = (n: number) =>
     Number(n || 0).toLocaleString('en-IN', {
@@ -58,8 +60,10 @@ export function MonthlyFeeReceiptCard({
   const copyLabel = copy.toLowerCase().includes('school') ? 'School Copy' : "Parent's Copy";
   const rows = [
     { label: 'Tuition Fee', value: amt(tuition) },
+    ...(other || otherLabel === 'Computer Fee'
+      ? [{ label: otherLabel || 'Computer Fee', value: amt(other) }]
+      : []),
     { label: 'Late Fee', value: amt(late) },
-    ...(other ? [{ label: 'Other Fee', value: amt(other) }] : []),
     ...(discount ? [{ label: 'Concession', value: `− ${amt(discount)}` }] : []),
     ...(previous ? [{ label: 'Previous Balance', value: amt(previous) }] : []),
   ];

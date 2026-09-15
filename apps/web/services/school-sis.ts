@@ -1336,6 +1336,8 @@ export type MonthlyFeeLedger = {
   student: { id: string; fullName: string; admissionNumber: string; phone: string | null };
   className: string;
   sectionName: string;
+  gradeCode?: string;
+  otherLabel?: string;
   currentMonth: string;
   currentMonthStatus: string;
   unpaidMonths: number;
@@ -1440,16 +1442,39 @@ export async function fetchMonthlyFeePending(month?: string) {
   return data as {
     feeMonth: string;
     monthLabel: string;
+    summary: {
+      enrolled: number;
+      pending: number;
+      paid: number;
+      pendingAmount: number;
+    };
+    grades: Array<{
+      gradeId: string;
+      name: string;
+      enrolled: number;
+      paid: number;
+      pending: number;
+      pendingAmount: number;
+    }>;
+    sections: Array<{ id: string; gradeId: string; name: string; className: string }>;
     rows: Array<{
       studentId: string;
       fullName: string;
       admissionNumber: string;
+      phone?: string | null;
+      rollNumber?: string | null;
+      gradeId: string;
+      gradeCode?: string;
+      sectionId: string;
       className: string;
       sectionName: string;
       tuitionAmount: number;
       lateFeeAmount: number;
+      otherAmount?: number;
       previousBalance?: number;
       totalDue: number;
+      overdue?: boolean;
+      status?: string;
     }>;
   };
 }

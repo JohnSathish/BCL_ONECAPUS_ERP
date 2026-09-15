@@ -56,8 +56,9 @@ export function MonthlyFeeSettings() {
       <MonthlyFeeSubnav />
       <h1 className="text-2xl font-semibold">Fee configuration</h1>
       <p className="text-sm text-slate-500">
-        Academic year {query.data?.academicYear.name}. Changing these amounts does not alter
-        receipts already issued.
+        Academic year {query.data?.academicYear.name}. Nursery–IV uses the junior fee book (tuition
+        only, due by the 15th). Classes V–X use the printed monthly book: tuition ₹600, computer
+        ₹100, late ₹20, due by the 10th. Changing amounts does not alter receipts already issued.
       </p>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {query.isLoading ? <p className="text-sm text-slate-500">Loading configuration…</p> : null}
@@ -89,13 +90,16 @@ export function MonthlyFeeSettings() {
           }}
         >
           <label className="text-sm">
-            Due day of month
+            Due day of month (Nursery–IV)
             <input
               className="mt-1 h-10 w-full rounded-xl border px-3"
               value={dueDay}
               onChange={(e) => setDueDay(e.target.value)}
               disabled={!canManage}
             />
+            <span className="mt-1 block text-xs text-slate-500">
+              Junior fee book: 15th. Classes V–X always use the 10th from the Class V–X fee book.
+            </span>
           </label>
           <label className="text-sm">
             Late fee (₹)
@@ -205,7 +209,7 @@ export function MonthlyFeeSettings() {
             <tr className="text-left text-xs uppercase text-slate-500">
               <th className="px-3 py-2">Class</th>
               <th className="px-3 py-2">Monthly tuition</th>
-              <th className="px-3 py-2">Other</th>
+              <th className="px-3 py-2">Computer / other</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -223,7 +227,7 @@ export function MonthlyFeeSettings() {
         </table>
         {query.data && !query.data.plans.length ? (
           <p className="p-6 text-center text-sm text-slate-500">
-            No Nursery–IV classes found for this academic year.
+            No Nursery–X classes found for this academic year.
           </p>
         ) : null}
       </div>

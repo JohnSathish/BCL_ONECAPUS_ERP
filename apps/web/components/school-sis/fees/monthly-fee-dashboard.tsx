@@ -34,7 +34,7 @@ export function MonthlyFeeDashboard() {
     {
       label: 'Late payments',
       value: String(d?.latePayments ?? 0),
-      hint: `${d?.enrolled ?? 0} enrolled Nursery–IV`,
+      hint: `${d?.enrolled ?? 0} enrolled Nursery–X`,
     },
   ];
   return (
@@ -42,7 +42,7 @@ export function MonthlyFeeDashboard() {
       <MonthlyFeeSubnav />
       <div>
         <h1 className="text-2xl font-semibold text-[var(--school-erp-text)]">
-          Monthly fees · Nursery–IV
+          Monthly fees · Nursery–X
         </h1>
         <p className="text-sm text-slate-500">
           Session {d?.academicYear.name ?? '—'}. Collection uses the same students, classes and

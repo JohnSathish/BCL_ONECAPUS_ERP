@@ -31,12 +31,50 @@ export const JUNIOR_FEE_CODES = [
   'IV',
 ] as const;
 
+/** Printed Class V–X monthly fee book (pink cover, March–December slips). */
+export const MIDDLE_FEE_CODES = ['V', 'VI', 'VII', 'VIII', 'IX', 'X'] as const;
+
+export const MONTHLY_FEE_CODES = [
+  ...JUNIOR_FEE_CODES,
+  ...MIDDLE_FEE_CODES,
+] as const;
+
 const DEFAULT_INSTRUCTIONS = [
   'Fees are to be paid before the 15th of every month.',
   'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
   'Pupils with dues may be barred from sitting for the Examinations.',
   'Fees once paid are not refundable.',
 ];
+
+const MIDDLE_INSTRUCTIONS = [
+  'Fees are to be paid before the 10th of every month.',
+  'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
+  'Pupils with dues may be barred from sitting for the Examinations.',
+  'Fees once paid are not refundable.',
+];
+
+function isMonthlyFeeGrade(
+  code: string,
+): code is (typeof MONTHLY_FEE_CODES)[number] {
+  return (MONTHLY_FEE_CODES as readonly string[]).includes(code);
+}
+
+function isMiddleFeeGrade(code: string) {
+  return (MIDDLE_FEE_CODES as readonly string[]).includes(code);
+}
+
+function dueDayForGrade(code: string, settingsDueDay: number) {
+  return isMiddleFeeGrade(code) ? 10 : settingsDueDay;
+}
+
+function instructionsForGrade(code: string, stored: string[]) {
+  if (isMiddleFeeGrade(code)) return MIDDLE_INSTRUCTIONS;
+  return stored.length ? stored : DEFAULT_INSTRUCTIONS;
+}
+
+function otherLabelForGrade(code: string) {
+  return isMiddleFeeGrade(code) ? 'Computer Fee' : 'Other Fee';
+}
 
 const DEFAULT_METHODS = ['CASH', 'UPI', 'BANK', 'CHEQUE', 'ONLINE', 'OTHER'];
 
@@ -106,7 +144,11 @@ export class SchoolSisMonthlyFeesService {
 
   private async ensurePlans(tenantId: string, academicYearId: string) {
     const grades = await this.prisma.schoolGrade.findMany({
-      where: { tenantId, deletedAt: null, code: { in: [...JUNIOR_FEE_CODES] } },
+      where: {
+        tenantId,
+        deletedAt: null,
+        code: { in: [...MONTHLY_FEE_CODES] },
+      },
       orderBy: { sortOrder: 'asc' },
     });
     const existing = await this.prisma.schoolMonthlyFeePlan.findMany({
@@ -115,18 +157,17 @@ export class SchoolSisMonthlyFeesService {
     const byGrade = new Map(existing.map((row) => [row.gradeId, row]));
     for (const grade of grades) {
       if (byGrade.has(grade.id)) continue;
-      const tuition = await this.defaultTuition(
-        tenantId,
-        academicYearId,
-        grade.id,
-      );
+      const middle = isMiddleFeeGrade(grade.code);
+      const tuition = middle
+        ? 600
+        : await this.defaultTuition(tenantId, academicYearId, grade.id);
       const created = await this.prisma.schoolMonthlyFeePlan.create({
         data: {
           tenantId,
           academicYearId,
           gradeId: grade.id,
           tuitionAmount: tuition,
-          otherAmount: 0,
+          otherAmount: middle ? 100 : 0,
         },
       });
       byGrade.set(grade.id, created);
@@ -260,7 +301,7 @@ export class SchoolSisMonthlyFeesService {
     if (!isMonth(feeMonth))
       throw new BadRequestException('Use fee month YYYY-MM');
     const { year, settings, plans } = await this.ensureSetup(tenantId);
-    const enrollment = await this.loadJuniorEnrollment(
+    const enrollment = await this.loadMonthlyEnrollment(
       tenantId,
       year.id,
       studentId,
@@ -275,12 +316,14 @@ export class SchoolSisMonthlyFeesService {
       },
     });
     const plan = plans.find((p) => p.gradeId === enrollment.section.gradeId);
+    const gradeCode = enrollment.section.grade.code;
     const tuition = plan?.tuitionAmount ?? 600;
-    const other = plan?.otherAmount ?? 0;
+    const other = plan?.otherAmount ?? (isMiddleFeeGrade(gradeCode) ? 100 : 0);
     const lateRule = plan?.lateFeeAmount ?? settings.lateFeeAmount;
     const lateApplies =
       Boolean(settings.lateFeeEnabled) &&
-      startOfDay(new Date()) > dueDate(feeMonth, settings.dueDay);
+      startOfDay(new Date()) >
+        dueDate(feeMonth, dueDayForGrade(gradeCode, settings.dueDay));
     const previousBalance = await this.arrears(
       tenantId,
       year.id,
@@ -369,7 +412,7 @@ export class SchoolSisMonthlyFeesService {
     return out;
   }
 
-  private async loadJuniorEnrollment(
+  private async loadMonthlyEnrollment(
     tenantId: string,
     yearId: string,
     studentId: string,
@@ -389,13 +432,9 @@ export class SchoolSisMonthlyFeesService {
     });
     if (!enrollment)
       throw new NotFoundException('Student is not enrolled this year');
-    if (
-      !JUNIOR_FEE_CODES.includes(
-        enrollment.section.grade.code as (typeof JUNIOR_FEE_CODES)[number],
-      )
-    ) {
+    if (!isMonthlyFeeGrade(enrollment.section.grade.code)) {
       throw new BadRequestException(
-        'This monthly fee book is for Nursery–Class IV. Other classes will use the same engine later.',
+        'This monthly fee book is for Nursery–Class X. Class XI uses the annual structure.',
       );
     }
     return enrollment;
@@ -403,15 +442,17 @@ export class SchoolSisMonthlyFeesService {
 
   async ledger(tenantId: string, studentId: string) {
     const { year, settings, plans } = await this.ensureSetup(tenantId);
-    const enrollment = await this.loadJuniorEnrollment(
+    const enrollment = await this.loadMonthlyEnrollment(
       tenantId,
       year.id,
       studentId,
     );
     const plan = plans.find((p) => p.gradeId === enrollment.section.gradeId);
+    const gradeCode = enrollment.section.grade.code;
     const tuition = plan?.tuitionAmount ?? 600;
-    const other = plan?.otherAmount ?? 0;
+    const other = plan?.otherAmount ?? (isMiddleFeeGrade(gradeCode) ? 100 : 0);
     const lateRule = plan?.lateFeeAmount ?? settings.lateFeeAmount;
+    const dueDay = dueDayForGrade(gradeCode, settings.dueDay);
     const today = startOfDay(new Date());
     const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const horizon = today < year.endDate ? today : year.endDate;
@@ -431,8 +472,7 @@ export class SchoolSisMonthlyFeesService {
       const account = accountMap.get(feeMonth);
       const paidAmount = account?.paidAmount ?? 0;
       const lateApplies =
-        Boolean(settings.lateFeeEnabled) &&
-        today > dueDate(feeMonth, settings.dueDay);
+        Boolean(settings.lateFeeEnabled) && today > dueDate(feeMonth, dueDay);
       const lateFeeAmount = lateApplies ? lateRule : 0;
       const dueAmount = tuition + other + lateFeeAmount;
       const remaining = Math.max(0, dueAmount - paidAmount);
@@ -449,7 +489,7 @@ export class SchoolSisMonthlyFeesService {
         lateFeeAmount,
         lateApplies,
         lateReason: lateApplies
-          ? `${monthLabel(feeMonth)} — Late Fee ₹${lateRule} (due by the ${settings.dueDay}th)`
+          ? `${monthLabel(feeMonth)} — Late Fee ₹${lateRule} (due by the ${dueDay}th)`
           : null,
         previousDue: 0,
         paidAmount,
@@ -463,7 +503,14 @@ export class SchoolSisMonthlyFeesService {
     const current = rows.find((r) => r.feeMonth === currentMonth);
     return {
       academicYear: year,
-      settings: this.publicSettings(settings),
+      settings: {
+        ...this.publicSettings(settings),
+        dueDay,
+        instructionsJson: instructionsForGrade(
+          gradeCode,
+          this.publicSettings(settings).instructionsJson,
+        ),
+      },
       student: {
         id: enrollment.student.id,
         fullName: enrollment.student.fullName,
@@ -472,6 +519,8 @@ export class SchoolSisMonthlyFeesService {
       },
       className: enrollment.section.grade.name,
       sectionName: enrollment.section.name,
+      gradeCode,
+      otherLabel: otherLabelForGrade(gradeCode),
       gradeId: enrollment.section.gradeId,
       sectionId: enrollment.section.id,
       enrollmentId: enrollment.id,
@@ -697,6 +746,7 @@ export class SchoolSisMonthlyFeesService {
                 gross,
                 cash: amountPaying,
               },
+              otherLabel: otherLabelForGrade(book.gradeCode ?? ''),
               months: allocated.map((l) => ({
                 feeMonth: l.feeMonth,
                 monthLabel: l.monthLabel,
@@ -932,7 +982,7 @@ export class SchoolSisMonthlyFeesService {
           academicYearId: year.id,
           deletedAt: null,
           status: 'ACTIVE',
-          section: { grade: { code: { in: [...JUNIOR_FEE_CODES] } } },
+          section: { grade: { code: { in: [...MONTHLY_FEE_CODES] } } },
         },
         select: {
           studentId: true,
@@ -1082,11 +1132,16 @@ export class SchoolSisMonthlyFeesService {
         academicYearId: year.id,
         deletedAt: null,
         status: 'ACTIVE',
-        section: { grade: { code: { in: [...JUNIOR_FEE_CODES] } } },
+        section: { grade: { code: { in: [...MONTHLY_FEE_CODES] } } },
       },
       include: {
         student: {
-          select: { id: true, fullName: true, admissionNumber: true },
+          select: {
+            id: true,
+            fullName: true,
+            admissionNumber: true,
+            phone: true,
+          },
         },
         section: { include: { grade: true } },
       },
@@ -1115,9 +1170,7 @@ export class SchoolSisMonthlyFeesService {
       ...accountsPaid.map((p) => p.studentId),
     ]);
     const settings = (await this.ensureSetup(tenantId)).settings;
-    const lateApplies =
-      Boolean(settings.lateFeeEnabled) &&
-      startOfDay(new Date()) > dueDate(month, settings.dueDay);
+    const today = startOfDay(new Date());
     const priorMonths = this.monthsBetween(year.startDate, year.endDate).filter(
       (m) => m < month,
     );
@@ -1139,8 +1192,13 @@ export class SchoolSisMonthlyFeesService {
       .filter((e) => !paidSet.has(e.studentId))
       .map((e) => {
         const plan = plans.find((p) => p.gradeId === e.section.gradeId);
+        const gradeCode = e.section.grade.code;
         const tuition = plan?.tuitionAmount ?? 600;
-        const other = plan?.otherAmount ?? 0;
+        const other =
+          plan?.otherAmount ?? (isMiddleFeeGrade(gradeCode) ? 100 : 0);
+        const lateApplies =
+          Boolean(settings.lateFeeEnabled) &&
+          today > dueDate(month, dueDayForGrade(gradeCode, settings.dueDay));
         const late = lateApplies
           ? (plan?.lateFeeAmount ?? settings.lateFeeAmount)
           : 0;
@@ -1152,6 +1210,11 @@ export class SchoolSisMonthlyFeesService {
           studentId: e.student.id,
           fullName: e.student.fullName,
           admissionNumber: e.student.admissionNumber,
+          phone: e.student.phone,
+          rollNumber: e.rollNumber,
+          gradeId: e.section.gradeId,
+          gradeCode: gradeCode,
+          sectionId: e.section.id,
           className: e.section.grade.name,
           sectionName: e.section.name,
           feeMonth: month,
@@ -1161,12 +1224,71 @@ export class SchoolSisMonthlyFeesService {
           otherAmount: other,
           previousBalance,
           totalDue: tuition + other + late + previousBalance,
+          overdue: late > 0,
+          status: late > 0 ? 'OVERDUE' : 'PENDING',
         };
       });
+    const pendingIds = new Set(rows.map((r) => r.studentId));
+    const amountByGrade = new Map<string, number>();
+    for (const row of rows) {
+      amountByGrade.set(
+        row.gradeId,
+        (amountByGrade.get(row.gradeId) ?? 0) + row.totalDue,
+      );
+    }
+    const byGradeMap = new Map<
+      string,
+      {
+        gradeId: string;
+        name: string;
+        enrolled: number;
+        paid: number;
+        pending: number;
+        pendingAmount: number;
+      }
+    >();
+    const sectionMap = new Map<
+      string,
+      { id: string; gradeId: string; name: string; className: string }
+    >();
+    for (const e of enrollments) {
+      const g = byGradeMap.get(e.section.gradeId) ?? {
+        gradeId: e.section.gradeId,
+        name: e.section.grade.name,
+        enrolled: 0,
+        paid: 0,
+        pending: 0,
+        pendingAmount: 0,
+      };
+      g.enrolled += 1;
+      if (pendingIds.has(e.studentId)) g.pending += 1;
+      else g.paid += 1;
+      g.pendingAmount = amountByGrade.get(e.section.gradeId) ?? 0;
+      byGradeMap.set(e.section.gradeId, g);
+      sectionMap.set(e.section.id, {
+        id: e.section.id,
+        gradeId: e.section.gradeId,
+        name: e.section.name,
+        className: e.section.grade.name,
+      });
+    }
+    const grades = [...byGradeMap.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     return {
       academicYear: year,
       feeMonth: month,
       monthLabel: monthLabel(month),
+      summary: {
+        enrolled: enrollments.length,
+        pending: rows.length,
+        paid: Math.max(0, enrollments.length - rows.length),
+        pendingAmount: rows.reduce((sum, row) => sum + row.totalDue, 0),
+      },
+      grades,
+      sections: [...sectionMap.values()].sort((a, b) =>
+        `${a.className} ${a.name}`.localeCompare(`${b.className} ${b.name}`),
+      ),
       rows,
     };
   }
@@ -1276,6 +1398,12 @@ export class SchoolSisMonthlyFeesService {
       tuitionAmount,
       lateFeeAmount,
       otherAmount,
+      otherLabel:
+        typeof snap.otherLabel === 'string'
+          ? snap.otherLabel
+          : otherLabelForGrade(
+              String(snap.className ?? '').replace(/^Class\s+/i, ''),
+            ),
       discountAmount,
       previousBalance: payment.previousBalance,
       totalAmount,

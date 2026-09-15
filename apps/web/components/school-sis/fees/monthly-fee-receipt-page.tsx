@@ -78,6 +78,7 @@ export function MonthlyFeeReceiptPage() {
       Number(amounts.other || 0) ||
       snapSum('otherAmount') ||
       lineSum('otherAmount'),
+    otherLabel: String(snap.otherLabel || 'Other Fee'),
     discount:
       p.discountAmount ||
       Number(amounts.concession || 0) ||

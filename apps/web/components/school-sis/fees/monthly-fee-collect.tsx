@@ -1,25 +1,49 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Filter,
+  Home,
+  Info,
+  Mail,
+  Phone,
+  Printer,
+  Receipt,
+  Search,
+  UserRound,
+  Wallet,
+} from 'lucide-react';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import {
+  isMonthlyFeeGrade,
+  monthlyOtherLabel,
+  MONTHLY_FEE_CODES,
+} from '@/lib/school-sis/monthly-fee-bands';
+import { formatSchoolAddress, studentInitials } from '@/lib/school-sis/student-profile';
+import { cn } from '@/utils/cn';
+import { apiErrorMessage } from '@/utils/api-error';
+import {
   collectMonthlyFee,
   downloadMonthlyFeeReceiptPdf,
+  fetchMonthlyFeeConfig,
   fetchMonthlyFeeLedger,
   fetchSchoolSisStudents,
   printMonthlyFeeReceipt,
   sendMonthlyFeeReceipt,
   type MonthlyFeeLedgerRow,
+  type SchoolSisStudent,
 } from '@/services/school-sis';
-import { apiErrorMessage } from '@/utils/api-error';
 import { MonthlyFeeReceiptCard } from './monthly-fee-receipt-card';
-import { FeeStatusBadge, MonthlyFeeSubnav, currentFeeMonth, rs } from './monthly-fee-ui';
+import { MonthlyFeeSubnav, currentFeeMonth, rs, rupeesInWords, shortMonth } from './monthly-fee-ui';
 
-const JUNIOR = new Set(['NURSERY', 'LKG', 'UKG', 'I', 'II', 'III', 'IV']);
 const METHOD_LABEL: Record<string, string> = {
   CASH: 'Cash',
   UPI: 'UPI',
@@ -29,11 +53,40 @@ const METHOD_LABEL: Record<string, string> = {
   OTHER: 'Other',
 };
 
+const AVATAR = [
+  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-sky-100 text-sky-700',
+  'bg-amber-100 text-amber-800',
+  'bg-emerald-100 text-emerald-800',
+  'bg-violet-100 text-violet-700',
+  'bg-rose-100 text-rose-700',
+  'bg-cyan-100 text-cyan-800',
+  'bg-orange-100 text-orange-800',
+];
+
+function avatarTone(name: string) {
+  let n = 0;
+  for (const ch of name) n += ch.charCodeAt(0);
+  return AVATAR[n % AVATAR.length];
+}
+
+function classLabel(student: SchoolSisStudent) {
+  const enr = student.enrollments[0];
+  if (!enr) return '—';
+  return `${enr.section.grade.name} ${enr.section.name}`.trim();
+}
+
+function sectionKey(student: SchoolSisStudent) {
+  return student.enrollments[0]?.section.id ?? '';
+}
+
 export function MonthlyFeeCollect() {
   const enabled = useAuthQueryEnabled();
   const canManage = canManageSchoolSis(useAuthStore((s) => s.session?.user)?.permissions);
   const [q, setQ] = useState('');
-  const [debounced, setDebounced] = useState('');
+  const [sectionId, setSectionId] = useState('all');
+  const [sortBy, setSortBy] = useState<'name' | 'admission'>('name');
+  const [showMoreClasses, setShowMoreClasses] = useState(false);
   const [studentId, setStudentId] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState('CASH');
@@ -47,6 +100,7 @@ export function MonthlyFeeCollect() {
   const [waiveLate, setWaiveLate] = useState(false);
   const [lateReason, setLateReason] = useState('');
   const [amountPaying, setAmountPaying] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
@@ -61,29 +115,85 @@ export function MonthlyFeeCollect() {
     paidAt: string;
   } | null>(null);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(q.trim()), 250);
-    return () => window.clearTimeout(t);
-  }, [q]);
-
-  const students = useQuery({
-    queryKey: ['school-sis-students', debounced],
-    queryFn: () => fetchSchoolSisStudents({ q: debounced || undefined, status: 'ACTIVE' }),
+  const config = useQuery({
+    queryKey: ['monthly-fee-config'],
+    queryFn: fetchMonthlyFeeConfig,
     enabled,
   });
-  const junior = useMemo(
-    () =>
-      (students.data ?? []).filter((s) => JUNIOR.has(s.enrollments[0]?.section.grade.code ?? '')),
-    [students.data],
-  );
+  const students = useQuery({
+    queryKey: ['school-sis-students', 'monthly-collect'],
+    queryFn: () => fetchSchoolSisStudents({ status: 'ACTIVE' }),
+    enabled,
+  });
   const ledger = useQuery({
     queryKey: ['monthly-fee-ledger', studentId],
     queryFn: () => fetchMonthlyFeeLedger(studentId),
     enabled: Boolean(studentId),
   });
 
-  const dueRows = ledger.data?.rows.filter((r) => r.selectable) ?? [];
-  const selectedRows = (ledger.data?.rows ?? []).filter((r) => selected.includes(r.feeMonth));
+  const eligible = useMemo(
+    () =>
+      (students.data ?? []).filter((s) =>
+        isMonthlyFeeGrade(s.enrollments[0]?.section.grade.code ?? ''),
+      ),
+    [students.data],
+  );
+
+  const classChips = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; count: number; sort: number }>();
+    for (const s of eligible) {
+      const enr = s.enrollments[0];
+      if (!enr) continue;
+      const id = enr.section.id;
+      const cur = map.get(id);
+      if (cur) cur.count += 1;
+      else {
+        map.set(id, {
+          id,
+          label: `${enr.section.grade.name} ${enr.section.name}`.trim(),
+          count: 1,
+          sort: (MONTHLY_FEE_CODES as readonly string[]).indexOf(enr.section.grade.code),
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label));
+  }, [eligible]);
+
+  const pinnedChips = classChips.slice(0, 4);
+  const extraChips = classChips.slice(4);
+
+  const listed = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const rows = eligible.filter((s) => {
+      if (sectionId !== 'all' && sectionKey(s) !== sectionId) return false;
+      if (!needle) return true;
+      const hay = [
+        s.fullName,
+        s.admissionNumber,
+        s.phone,
+        s.email,
+        classLabel(s),
+        s.guardians[0]?.guardian.fullName,
+        s.guardians[0]?.guardian.phone,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(needle);
+    });
+    rows.sort((a, b) =>
+      sortBy === 'admission'
+        ? a.admissionNumber.localeCompare(b.admissionNumber, 'en')
+        : a.fullName.localeCompare(b.fullName, 'en', { sensitivity: 'base' }),
+    );
+    return rows;
+  }, [eligible, q, sectionId, sortBy]);
+
+  const selectedStudent = eligible.find((s) => s.id === studentId) ?? null;
+  const book = ledger.data;
+  const dueRows = book?.rows.filter((r) => r.selectable) ?? [];
+  const selectedRows = (book?.rows ?? []).filter((r) => selected.includes(r.feeMonth));
+  const paidMonths = book?.rows.filter((r) => r.status === 'PAID').length ?? 0;
   const gross = selectedRows.reduce((s, r) => s + r.totalDue, 0);
   const tuition = selectedRows.reduce((s, r) => s + r.tuitionAmount, 0);
   const other = selectedRows.reduce((s, r) => s + r.otherAmount, 0);
@@ -106,6 +216,15 @@ export function MonthlyFeeCollect() {
     paying > 0 &&
     concessionReady &&
     (selected.length === 1 || paying === net);
+  const otherLabel = book?.otherLabel || monthlyOtherLabel(book?.gradeCode ?? '');
+  const planTuition = book?.rows[0]?.tuitionAmount ?? 0;
+  const planOther = book?.rows[0]?.otherAmount ?? 0;
+  const planLate =
+    book?.rows.find((r) => r.lateFeeAmount)?.lateFeeAmount ??
+    config.data?.settings.lateFeeAmount ??
+    20;
+  const receiptId = success?.id || book?.history.find((h) => h.status === 'PAID')?.id;
+  const yearName = book?.academicYear.name || config.data?.academicYear.name || '—';
 
   useEffect(() => {
     setAmountPaying((prev) => {
@@ -116,6 +235,16 @@ export function MonthlyFeeCollect() {
     });
   }, [net]);
 
+  function pickStudent(id: string) {
+    setStudentId(id);
+    setSelected([]);
+    setSuccess(null);
+    setAmountPaying('');
+    setError(null);
+    setWaiveLate(false);
+    setDiscountValue('0');
+  }
+
   function toggle(month: string) {
     setSelected((cur) =>
       cur.includes(month) ? cur.filter((m) => m !== month) : [...cur, month].sort(),
@@ -123,493 +252,677 @@ export function MonthlyFeeCollect() {
     setSuccess(null);
   }
 
-  const book = ledger.data;
-
   return (
-    <div className="space-y-5">
+    <div className="-mx-1 space-y-4 rounded-[28px] bg-[#f4f7fb] p-3 sm:p-4">
       <MonthlyFeeSubnav />
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Monthly fee collection</h1>
-        <p className="text-sm text-slate-500">
-          Select a student, tick the months they owe, then collect one receipt.
-        </p>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2563eb] text-white shadow-sm">
+            <Wallet className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Monthly Fee Collection
+            </h1>
+            <p className="text-sm text-slate-500">
+              Select a student, choose the months, and collect the payment.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 ring-1 ring-slate-200">
+            <CalendarDays className="h-4 w-4 text-[#2563eb]" />
+            Academic Year
+            <b className="font-semibold text-slate-800">{yearName}</b>
+          </span>
+          {book ? (
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-100">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              {book.className} {book.sectionName}
+              <span className="text-xs font-normal text-emerald-700">Current Class</span>
+            </span>
+          ) : null}
+        </div>
       </div>
+
       {error ? (
-        <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+        <p className="rounded-2xl bg-rose-50 px-4 py-2 text-sm text-rose-700 ring-1 ring-rose-100">
+          {error}
+        </p>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block text-sm font-medium text-slate-700">
-          Search student
-          <input
-            className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Name, admission no., class, section or parent mobile"
-          />
-        </label>
-        <div className="mt-3 max-h-52 overflow-auto rounded-xl border border-slate-100">
-          {students.isLoading ? <p className="p-3 text-sm text-slate-500">Searching…</p> : null}
-          {!students.isLoading && !junior.length ? (
-            <p className="p-3 text-sm text-slate-500">No Nursery–IV students match that search.</p>
-          ) : null}
-          {junior.slice(0, 30).map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => {
-                setStudentId(s.id);
-                setSelected([]);
-                setSuccess(null);
-                setAmountPaying('');
-                setError(null);
-              }}
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 ${studentId === s.id ? 'bg-sky-50' : ''}`}
-            >
-              <span>
-                <span className="font-medium">{s.fullName}</span>
-                <span className="ml-2 text-xs text-slate-400">
-                  {s.guardians[0]?.guardian.phone || s.phone || ''}
-                </span>
-              </span>
-              <span className="text-xs text-slate-500">
-                {s.admissionNumber} · {s.enrollments[0]?.section.grade.name}{' '}
-                {s.enrollments[0]?.section.name}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {book ? (
-        <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-5">
-          <div className="xl:col-span-2">
-            <p className="text-lg font-semibold text-[#1a365d]">{book.student.fullName}</p>
-            <p className="text-sm text-slate-500">
-              {book.student.admissionNumber} · {book.className} {book.sectionName} ·{' '}
-              {book.academicYear.name}
+      <div className="grid gap-4 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+        <aside className="flex min-h-[36rem] flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">
+          <div className="border-b border-slate-100 p-4">
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <Search className="h-4 w-4 text-slate-400" />
+              Search Student
             </p>
-          </div>
-          <Stat label="Total outstanding" value={rs(book.totalOutstanding)} />
-          <Stat label="Unpaid months" value={String(book.unpaidMonths)} />
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">Current month</p>
-            <FeeStatusBadge status={book.currentMonthStatus} />
-            <p className="mt-1 text-xs text-slate-500">
-              Last receipt {book.lastReceiptNumber ?? '—'}
-              {book.lastPaymentDate
-                ? ` · ${new Date(book.lastPaymentDate).toLocaleDateString('en-IN')}`
-                : ''}
-            </p>
-          </div>
-        </section>
-      ) : (
-        <p className="rounded-2xl border border-dashed bg-white p-8 text-center text-sm text-slate-500">
-          Select a Nursery–IV student to open the month-wise ledger.
-        </p>
-      )}
-
-      {ledger.isLoading ? <p className="text-sm text-slate-500">Loading fee ledger…</p> : null}
-
-      {book ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.85fr)]">
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-              <h2 className="text-sm font-semibold">Fee due summary</h2>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <button
-                  type="button"
-                  className="rounded-lg border px-2 py-1"
-                  onClick={() => setSelected(dueRows.map((r) => r.feeMonth))}
-                >
-                  Pay all due
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border px-2 py-1"
-                  onClick={() => {
-                    const row = book.rows.find((r) => r.feeMonth === current && r.selectable);
-                    setSelected(row ? [row.feeMonth] : []);
-                  }}
-                >
-                  Pay current month
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border px-2 py-1"
-                  onClick={() =>
-                    setSelected(dueRows.filter((r) => r.feeMonth <= current).map((r) => r.feeMonth))
-                  }
-                >
-                  Select up to current
-                </button>
-              </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none ring-[#2563eb] placeholder:text-slate-400 focus:bg-white focus:ring-2"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Name, admission no., class or mobile..."
+              />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[46rem] text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
-                    <th className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={
-                          dueRows.length > 0 && dueRows.every((r) => selected.includes(r.feeMonth))
-                        }
-                        onChange={(e) =>
-                          setSelected(e.target.checked ? dueRows.map((r) => r.feeMonth) : [])
-                        }
-                      />
-                    </th>
-                    <th className="px-3 py-2">Month</th>
-                    <th className="px-3 py-2">Tuition</th>
-                    <th className="px-3 py-2">Other</th>
-                    <th className="px-3 py-2">Late fee</th>
-                    <th className="px-3 py-2">Total due</th>
-                    <th className="px-3 py-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {book.rows.map((row) => (
-                    <MonthRow
-                      key={row.feeMonth}
-                      row={row}
-                      checked={selected.includes(row.feeMonth)}
-                      onToggle={() => toggle(row.feeMonth)}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Chip active={sectionId === 'all'} onClick={() => setSectionId('all')}>
+                All
+              </Chip>
+              {pinnedChips.map((chip) => (
+                <Chip
+                  key={chip.id}
+                  active={sectionId === chip.id}
+                  onClick={() => setSectionId(chip.id)}
+                >
+                  {chip.label}
+                </Chip>
+              ))}
+              {extraChips.length ? (
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center rounded-full bg-slate-50 px-2.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"
+                  onClick={() => setShowMoreClasses((v) => !v)}
+                >
+                  <Filter className="mr-1 h-3.5 w-3.5" />
+                  {showMoreClasses ? 'Less' : 'More'}
+                </button>
+              ) : null}
             </div>
-          </section>
-
-          <aside className="space-y-4 xl:sticky xl:top-20 h-fit">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold">Payment summary</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                {selectedRows.length
-                  ? selectedRows.map((r) => r.monthLabel).join(' + ')
-                  : 'No months selected'}
-              </p>
-              <dl className="mt-3 space-y-1 text-sm">
-                <Line label="Tuition fees" value={rs(tuition)} />
-                <Line label="Other fees" value={rs(other)} />
-                <Line label="Late fees" value={rs(late)} />
-                <Line label="Concession" value={`− ${rs(discount)}`} />
-              </dl>
-              <p className="mt-3 text-3xl font-semibold tabular-nums text-[var(--school-erp-primary)]">
-                {rs(net)}
-              </p>
-              <p className="text-xs text-slate-400">Gross {rs(gross)} → Net payable</p>
-              {selectedRows
-                .filter((r) => r.lateApplies)
-                .map((r) => (
-                  <p key={r.feeMonth} className="mt-2 text-xs text-rose-700">
-                    {r.lateReason}
-                  </p>
+            {showMoreClasses && extraChips.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {extraChips.map((chip) => (
+                  <Chip
+                    key={chip.id}
+                    active={sectionId === chip.id}
+                    onClick={() => setSectionId(chip.id)}
+                  >
+                    {chip.label}
+                  </Chip>
                 ))}
-            </section>
-
-            <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <label className="block text-sm">
-                Payment method
+              </div>
+            ) : null}
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+              <span>
+                <b className="font-semibold text-slate-700">{listed.length}</b> Students
+              </span>
+              <label className="inline-flex items-center gap-1">
+                Sort:
                 <select
-                  className="mt-1 h-11 w-full rounded-xl border px-3"
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-1.5 py-0.5 text-xs"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'admission')}
                 >
-                  {(book.settings.paymentMethods?.length
-                    ? book.settings.paymentMethods
-                    : Object.keys(METHOD_LABEL)
-                  ).map((m) => (
-                    <option key={m} value={m}>
-                      {METHOD_LABEL[m] ?? m}
-                    </option>
-                  ))}
+                  <option value="name">Name</option>
+                  <option value="admission">Admission no.</option>
                 </select>
               </label>
-              {mode === 'UPI' || mode === 'ONLINE' ? (
-                <input
-                  className="h-11 w-full rounded-xl border px-3 text-sm"
-                  placeholder="Transaction ID"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                />
-              ) : null}
-              {mode === 'BANK' ? (
-                <input
-                  className="h-11 w-full rounded-xl border px-3 text-sm"
-                  placeholder="Bank reference number"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                />
-              ) : null}
-              {mode === 'CHEQUE' ? (
-                <>
-                  <input
-                    className="h-11 w-full rounded-xl border px-3 text-sm"
-                    placeholder="Cheque number"
-                    value={chequeNumber}
-                    onChange={(e) => setChequeNumber(e.target.value)}
-                  />
-                  <input
-                    className="h-11 w-full rounded-xl border px-3 text-sm"
-                    placeholder="Bank"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                  />
-                </>
-              ) : null}
-              {mode === 'OTHER' ? (
-                <input
-                  className="h-11 w-full rounded-xl border px-3 text-sm"
-                  placeholder="Reference"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                />
-              ) : null}
-
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-500">Concession</p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <select
-                    className="h-10 rounded-lg border px-2 text-sm"
-                    value={discountType}
-                    onChange={(e) => setDiscountType(e.target.value as 'AMOUNT' | 'PERCENT')}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            {students.isLoading ? (
+              <p className="p-4 text-sm text-slate-500">Loading students…</p>
+            ) : null}
+            {!students.isLoading && !listed.length ? (
+              <p className="p-4 text-sm text-slate-500">No Nursery–X students match that search.</p>
+            ) : null}
+            {listed.map((s) => {
+              const active = s.id === studentId;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => pickStudent(s.id)}
+                  className={cn(
+                    'flex w-full items-center gap-3 border-b border-slate-50 px-4 py-3 text-left transition',
+                    active ? 'bg-[#eef4ff]' : 'hover:bg-slate-50',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                      avatarTone(s.fullName),
+                    )}
                   >
-                    <option value="AMOUNT">Fixed ₹</option>
-                    <option value="PERCENT">Percent %</option>
-                  </select>
-                  <input
-                    className="h-10 rounded-lg border px-2 text-sm"
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
+                    {studentInitials(s.fullName)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-800">
+                      {s.fullName}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {s.admissionNumber} · {classLabel(s)}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    className={cn('h-4 w-4', active ? 'text-[#2563eb]' : 'text-slate-300')}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <div className="space-y-4">
+          {!studentId ? (
+            <div className="flex min-h-[28rem] flex-col items-center justify-center rounded-3xl bg-white p-10 text-center shadow-sm ring-1 ring-slate-100">
+              <span className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef4ff] text-[#2563eb]">
+                <UserRound className="h-7 w-7" />
+              </span>
+              <p className="text-lg font-semibold text-slate-800">Select a student</p>
+              <p className="mt-1 max-w-sm text-sm text-slate-500">
+                Choose a Nursery–X student from the list to open the month-wise fee book.
+              </p>
+            </div>
+          ) : null}
+
+          {ledger.isLoading ? (
+            <p className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">
+              Loading fee ledger…
+            </p>
+          ) : null}
+
+          {book && selectedStudent ? (
+            <>
+              <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-fuchsia-100 text-lg font-bold text-fuchsia-700">
+                      {studentInitials(book.student.fullName)}
+                    </span>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">{book.student.fullName}</h2>
+                      <p className="text-sm text-slate-500">
+                        {book.student.admissionNumber} · {book.className} {book.sectionName} ·{' '}
+                        {yearName}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Active Student
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <Meta
+                    icon={UserRound}
+                    label="Parent"
+                    value={selectedStudent.guardians[0]?.guardian.fullName || '—'}
+                  />
+                  <Meta
+                    icon={Phone}
+                    label="Mobile"
+                    value={
+                      selectedStudent.guardians[0]?.guardian.phone ||
+                      selectedStudent.phone ||
+                      book.student.phone ||
+                      '—'
+                    }
+                  />
+                  <Meta icon={Mail} label="Email" value={selectedStudent.email || '—'} />
+                  <Meta
+                    icon={Home}
+                    label="Address"
+                    value={
+                      formatSchoolAddress(
+                        selectedStudent.currentAddress,
+                        selectedStudent.address,
+                      ) || '—'
+                    }
                   />
                 </div>
-                {discount > 0 ? (
-                  <>
-                    <input
-                      className="mt-2 h-10 w-full rounded-lg border px-2 text-sm"
-                      placeholder="Concession reason"
-                      value={discountReason}
-                      onChange={(e) => setDiscountReason(e.target.value)}
-                    />
-                    <input
-                      className="mt-2 h-10 w-full rounded-lg border px-2 text-sm"
-                      placeholder="Approved by"
-                      value={approvedBy}
-                      onChange={(e) => setApprovedBy(e.target.value)}
-                    />
-                    {!concessionReady ? (
-                      <p className="mt-2 text-xs text-rose-700">
-                        Reason and approver are required for a concession.
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-xs text-slate-500">
-                        {rs(discount)} will reduce the billed months; cash collected stays{' '}
-                        {rs(paying)}.
-                      </p>
-                    )}
-                  </>
-                ) : null}
+              </section>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  icon={Wallet}
+                  label="Total Outstanding"
+                  value={rs(book.totalOutstanding)}
+                  tone="blue"
+                />
+                <StatCard
+                  icon={Clock3}
+                  label="Unpaid Months"
+                  value={String(book.unpaidMonths)}
+                  tone="rose"
+                />
+                <StatCard
+                  icon={CheckCircle2}
+                  label="Paid Months"
+                  value={String(paidMonths)}
+                  tone="green"
+                />
+                <StatCard
+                  icon={CalendarDays}
+                  label="Current Month"
+                  value={shortMonth(book.currentMonth)}
+                  tone="violet"
+                />
               </div>
 
-              {selectedRows.some((r) => r.lateFeeAmount > 0) ? (
-                <label className="block text-sm">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={waiveLate}
-                    onChange={(e) => setWaiveLate(e.target.checked)}
-                  />
-                  Override late fee
-                  {waiveLate ? (
-                    <input
-                      className="mt-2 h-10 w-full rounded-lg border px-2"
-                      placeholder="Mandatory reason"
-                      value={lateReason}
-                      onChange={(e) => setLateReason(e.target.value)}
-                    />
-                  ) : null}
-                </label>
-              ) : null}
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <CalendarDays className="h-4 w-4 text-[#2563eb]" />
+                      Select Months to Collect
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      <GhostBtn onClick={() => setSelected(dueRows.map((r) => r.feeMonth))}>
+                        Select All Due
+                      </GhostBtn>
+                      <GhostBtn
+                        onClick={() => {
+                          const row = book.rows.find((r) => r.feeMonth === current && r.selectable);
+                          setSelected(row ? [row.feeMonth] : []);
+                        }}
+                      >
+                        Pay Current Month
+                      </GhostBtn>
+                      <GhostBtn onClick={() => setSelected([])}>Clear Selection</GhostBtn>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {book.rows.map((row) => (
+                      <MonthCard
+                        key={row.feeMonth}
+                        row={row}
+                        checked={selected.includes(row.feeMonth)}
+                        onToggle={() => row.selectable && toggle(row.feeMonth)}
+                      />
+                    ))}
+                  </div>
+                </section>
 
-              <label className="block text-sm">
-                Amount paying
-                <input
-                  className="mt-1 h-11 w-full rounded-xl border px-3 text-lg font-semibold tabular-nums"
-                  value={amountPaying}
-                  placeholder={String(net)}
-                  onChange={(e) => setAmountPaying(e.target.value)}
-                />
-              </label>
-              {selected.length === 1 && paying < net ? (
-                <p className="text-xs text-amber-700">
-                  Partial payment. Remaining on {selectedRows[0]?.monthLabel}: {rs(remaining)}
-                </p>
-              ) : selected.length > 1 && paying !== net ? (
-                <p className="text-xs text-rose-700">
-                  Multi-month receipts must be paid in full so each month stays unambiguous.
-                </p>
-              ) : null}
+                <aside className="space-y-4">
+                  <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                    <h3 className="text-sm font-semibold text-slate-800">Payment Summary</h3>
+                    <dl className="mt-3 space-y-2 text-sm">
+                      <Line
+                        label="Selected Months"
+                        value={selectedRows.length ? String(selectedRows.length) : '0'}
+                      />
+                      <Line label="Tuition Fees" value={rs(tuition)} />
+                      <Line label={otherLabel} value={rs(other)} />
+                      <Line label="Late Fees" value={rs(late)} />
+                      <Line label="Concession" value={`− ${rs(discount)}`} />
+                    </dl>
+                    <div className="mt-4 rounded-2xl bg-[#2563eb] px-4 py-3 text-white">
+                      <p className="text-xs font-medium text-blue-100">Total Amount</p>
+                      <p className="text-3xl font-bold tabular-nums">{rs(net)}</p>
+                      <p className="mt-1 text-[11px] text-blue-100">{rupeesInWords(net)}</p>
+                    </div>
+                    {selectedRows
+                      .filter((r) => r.lateApplies)
+                      .map((r) => (
+                        <p key={r.feeMonth} className="mt-2 text-xs text-rose-700">
+                          {r.lateReason}
+                        </p>
+                      ))}
+                    <button
+                      type="button"
+                      className="mt-3 text-xs font-medium text-[#2563eb]"
+                      onClick={() => setDetailsOpen((v) => !v)}
+                    >
+                      {detailsOpen
+                        ? 'Hide payment details'
+                        : 'Payment method, concession & late override'}
+                    </button>
+                    {detailsOpen ? (
+                      <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                        <select
+                          className="h-10 w-full rounded-xl border px-3 text-sm"
+                          value={mode}
+                          onChange={(e) => setMode(e.target.value)}
+                        >
+                          {(book.settings.paymentMethods?.length
+                            ? book.settings.paymentMethods
+                            : Object.keys(METHOD_LABEL)
+                          ).map((m) => (
+                            <option key={m} value={m}>
+                              {METHOD_LABEL[m] ?? m}
+                            </option>
+                          ))}
+                        </select>
+                        {mode === 'UPI' ||
+                        mode === 'ONLINE' ||
+                        mode === 'BANK' ||
+                        mode === 'OTHER' ? (
+                          <input
+                            className="h-10 w-full rounded-xl border px-3 text-sm"
+                            placeholder={
+                              mode === 'BANK' ? 'Bank reference' : 'Transaction / reference'
+                            }
+                            value={reference}
+                            onChange={(e) => setReference(e.target.value)}
+                          />
+                        ) : null}
+                        {mode === 'CHEQUE' ? (
+                          <>
+                            <input
+                              className="h-10 w-full rounded-xl border px-3 text-sm"
+                              placeholder="Cheque number"
+                              value={chequeNumber}
+                              onChange={(e) => setChequeNumber(e.target.value)}
+                            />
+                            <input
+                              className="h-10 w-full rounded-xl border px-3 text-sm"
+                              placeholder="Bank"
+                              value={bankName}
+                              onChange={(e) => setBankName(e.target.value)}
+                            />
+                          </>
+                        ) : null}
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            className="h-10 rounded-xl border px-2 text-sm"
+                            value={discountType}
+                            onChange={(e) =>
+                              setDiscountType(e.target.value as 'AMOUNT' | 'PERCENT')
+                            }
+                          >
+                            <option value="AMOUNT">Concession ₹</option>
+                            <option value="PERCENT">Concession %</option>
+                          </select>
+                          <input
+                            className="h-10 rounded-xl border px-2 text-sm"
+                            value={discountValue}
+                            onChange={(e) => setDiscountValue(e.target.value)}
+                          />
+                        </div>
+                        {discount > 0 ? (
+                          <>
+                            <input
+                              className="h-10 w-full rounded-xl border px-3 text-sm"
+                              placeholder="Concession reason"
+                              value={discountReason}
+                              onChange={(e) => setDiscountReason(e.target.value)}
+                            />
+                            <input
+                              className="h-10 w-full rounded-xl border px-3 text-sm"
+                              placeholder="Approved by"
+                              value={approvedBy}
+                              onChange={(e) => setApprovedBy(e.target.value)}
+                            />
+                          </>
+                        ) : null}
+                        {selectedRows.some((r) => r.lateFeeAmount > 0) ? (
+                          <label className="block text-xs text-slate-600">
+                            <input
+                              type="checkbox"
+                              className="mr-2"
+                              checked={waiveLate}
+                              onChange={(e) => setWaiveLate(e.target.checked)}
+                            />
+                            Override late fee
+                            {waiveLate ? (
+                              <input
+                                className="mt-2 h-10 w-full rounded-xl border px-3 text-sm"
+                                placeholder="Mandatory reason"
+                                value={lateReason}
+                                onChange={(e) => setLateReason(e.target.value)}
+                              />
+                            ) : null}
+                          </label>
+                        ) : null}
+                        <label className="block text-xs text-slate-500">
+                          Amount paying
+                          <input
+                            className="mt-1 h-10 w-full rounded-xl border px-3 text-sm font-semibold tabular-nums"
+                            value={amountPaying}
+                            placeholder={String(net)}
+                            onChange={(e) => setAmountPaying(e.target.value)}
+                          />
+                        </label>
+                        {selected.length === 1 && paying < net ? (
+                          <p className="text-xs text-amber-700">
+                            Partial payment. Remaining on {selectedRows[0]?.monthLabel}:{' '}
+                            {rs(remaining)}
+                          </p>
+                        ) : selected.length > 1 && paying !== net ? (
+                          <p className="text-xs text-rose-700">
+                            Multi-month receipts must be paid in full.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {canManage ? (
+                      <button
+                        type="button"
+                        disabled={!canCollect}
+                        className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#2563eb] text-sm font-semibold text-white shadow-sm disabled:opacity-40"
+                        onClick={() => setConfirmOpen(true)}
+                      >
+                        <Wallet className="h-4 w-4" />
+                        Collect Payment
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={!receiptId}
+                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 disabled:opacity-40"
+                      onClick={() => {
+                        if (!receiptId) return;
+                        void printMonthlyFeeReceipt(receiptId).catch((err) =>
+                          setError(apiErrorMessage(err)),
+                        );
+                      }}
+                    >
+                      <Printer className="h-4 w-4" />
+                      Generate Receipt
+                    </button>
+                  </section>
+                </aside>
+              </div>
 
-              {canManage ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                    Fee Structure ({book.className} {book.sectionName})
+                  </h3>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                        <th className="pb-2">Fee head</th>
+                        <th className="pb-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-slate-100">
+                        <td className="py-2">Tuition Fee</td>
+                        <td className="py-2 text-right tabular-nums">{rs(planTuition)}</td>
+                      </tr>
+                      <tr className="border-t border-slate-100">
+                        <td className="py-2">{otherLabel}</td>
+                        <td className="py-2 text-right tabular-nums">{rs(planOther)}</td>
+                      </tr>
+                      <tr className="border-t border-slate-100">
+                        <td className="py-2">Late Fee (per month)</td>
+                        <td className="py-2 text-right tabular-nums">{rs(planLate)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </section>
+                <section className="rounded-3xl bg-[#eef6ff] p-5 ring-1 ring-sky-100">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <Info className="h-4 w-4 text-[#2563eb]" />
+                    Important Information
+                  </h3>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li>
+                      Late fee is added after the {book.settings.dueDay}
+                      {book.settings.dueDay === 1
+                        ? 'st'
+                        : book.settings.dueDay === 2
+                          ? 'nd'
+                          : book.settings.dueDay === 3
+                            ? 'rd'
+                            : 'th'}{' '}
+                      of each month.
+                    </li>
+                    <li>You can select multiple months to pay at once.</li>
+                    <li>A receipt will be generated after successful payment.</li>
+                    <li>Please verify the details before collecting the payment.</li>
+                  </ul>
+                </section>
+              </div>
+            </>
+          ) : null}
+
+          {book?.history.length ? (
+            <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Receipt className="h-4 w-4 text-[#2563eb]" />
+                Payment history
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                      <th className="px-2 py-1">Date</th>
+                      <th className="px-2 py-1">Receipt</th>
+                      <th className="px-2 py-1">Months</th>
+                      <th className="px-2 py-1">Amount</th>
+                      <th className="px-2 py-1">Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {book.history.map((row) => (
+                      <tr key={row.id} className="border-t border-slate-100">
+                        <td className="px-2 py-2">
+                          {new Date(row.paidAt).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-2 py-2">
+                          <Link
+                            className="font-medium text-[#2563eb]"
+                            href={`/admin/school-sis/fees/receipts/${row.id}`}
+                          >
+                            {row.receiptNumber}
+                          </Link>
+                        </td>
+                        <td className="px-2 py-2">{row.months.join(', ')}</td>
+                        <td className="px-2 py-2 tabular-nums">{rs(row.amount)}</td>
+                        <td className="px-2 py-2">{row.paymentMode}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {success && book ? (
+            <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+              <p className="font-semibold text-emerald-800">
+                Payment successful · Receipt {success.receiptNumber}
+              </p>
+              <p className="text-sm text-emerald-700">
+                Fee months paid: {success.months.join(', ')}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
+                  href={`/admin/school-sis/fees/receipts/${success.id}`}
+                >
+                  View receipt
+                </Link>
                 <button
                   type="button"
-                  disabled={!canCollect}
-                  className="h-11 w-full rounded-xl bg-[var(--school-erp-primary)] text-sm font-medium text-white disabled:opacity-40"
-                  onClick={() => setConfirmOpen(true)}
+                  className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
+                  onClick={() =>
+                    void printMonthlyFeeReceipt(success.id).catch((err) =>
+                      setError(apiErrorMessage(err)),
+                    )
+                  }
                 >
-                  Review & collect {rs(paying)}
+                  Print
                 </button>
-              ) : null}
-            </section>
-          </aside>
-        </div>
-      ) : null}
-
-      {book?.history.length ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold">Payment history</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[48rem] text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase text-slate-400">
-                  <th className="px-2 py-1">Date</th>
-                  <th className="px-2 py-1">Receipt</th>
-                  <th className="px-2 py-1">Months</th>
-                  <th className="px-2 py-1">Amount</th>
-                  <th className="px-2 py-1">Mode</th>
-                  <th className="px-2 py-1">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {book.history.map((row) => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-2 py-2">{new Date(row.paidAt).toLocaleString('en-IN')}</td>
-                    <td className="px-2 py-2">
-                      <Link
-                        className="text-[var(--school-erp-primary)]"
-                        href={`/admin/school-sis/fees/receipts/${row.id}`}
-                      >
-                        {row.receiptNumber}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-2">{row.months.join(', ')}</td>
-                    <td className="px-2 py-2 tabular-nums">{rs(row.amount)}</td>
-                    <td className="px-2 py-2">{row.paymentMode}</td>
-                    <td className="px-2 py-2">
-                      <FeeStatusBadge status={row.status} />
-                    </td>
-                  </tr>
+                <button
+                  type="button"
+                  className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
+                  onClick={() =>
+                    void downloadMonthlyFeeReceiptPdf(success.id, success.receiptNumber)
+                  }
+                >
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
+                  onClick={() => {
+                    void sendMonthlyFeeReceipt(success.id)
+                      .then((res) => {
+                        const phone = (res.studentPhone || '').replace(/\D/g, '');
+                        const text = encodeURIComponent(
+                          `Fee receipt ${res.receiptNumber} for ${book.student.fullName}`,
+                        );
+                        if (phone)
+                          window.open(`https://wa.me/91${phone.slice(-10)}?text=${text}`, '_blank');
+                        else window.alert('Receipt marked as sent. No parent mobile is on file.');
+                      })
+                      .catch((err) => setError(apiErrorMessage(err)));
+                  }}
+                >
+                  Send to parent
+                </button>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2 print:grid-cols-2">
+                {(["Parent's copy", 'School copy'] as const).map((copy) => (
+                  <MonthlyFeeReceiptCard
+                    key={copy}
+                    copy={copy}
+                    schoolName={book.settings.schoolName || "St. Luke's Secondary School, Tura"}
+                    schoolAddress={
+                      book.settings.schoolAddress ||
+                      'Walbakgre, Tura - 794101, West Garo Hills, Meghalaya'
+                    }
+                    logoUrl="/school-sis/st-lukes-logo.png"
+                    motto="Knowledge · Service · Light"
+                    monthLabel={success.months.join(', ')}
+                    studentName={book.student.fullName}
+                    admissionNumber={book.student.admissionNumber}
+                    className={`${book.className} ${book.sectionName}`}
+                    receiptNumber={success.receiptNumber}
+                    academicYear={book.academicYear.name}
+                    paidAt={success.paidAt}
+                    paymentMode={mode}
+                    tuition={success.tuition}
+                    late={success.late}
+                    other={success.other}
+                    otherLabel={otherLabel}
+                    discount={success.discount}
+                    previous={0}
+                    total={success.total}
+                    signatory={book.settings.signatoryName}
+                    monthsCovered={success.months}
+                    instructions={
+                      book.settings.instructionsJson?.length
+                        ? book.settings.instructionsJson
+                        : [
+                            'Fees are to be paid before the 15th of every month.',
+                            'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
+                            'Pupils with dues may be barred from sitting for the Examinations.',
+                            'Fees once paid are not refundable.',
+                          ]
+                    }
+                  />
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {success && book ? (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="font-semibold text-emerald-800">
-            Payment successful · Receipt {success.receiptNumber}
-          </p>
-          <p className="text-sm text-emerald-700">Fee months paid: {success.months.join(', ')}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-              href={`/admin/school-sis/fees/receipts/${success.id}`}
-            >
-              View receipt
-            </Link>
-            <button
-              type="button"
-              className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-              onClick={() =>
-                void printMonthlyFeeReceipt(success.id).catch((err) =>
-                  setError(apiErrorMessage(err)),
-                )
-              }
-            >
-              Print
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-              onClick={() => void downloadMonthlyFeeReceiptPdf(success.id, success.receiptNumber)}
-            >
-              Download PDF
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-              onClick={() => {
-                void sendMonthlyFeeReceipt(success.id)
-                  .then((res) => {
-                    const phone = (res.studentPhone || '').replace(/\D/g, '');
-                    const text = encodeURIComponent(
-                      `Fee receipt ${res.receiptNumber} for ${book.student.fullName}`,
-                    );
-                    if (phone)
-                      window.open(`https://wa.me/91${phone.slice(-10)}?text=${text}`, '_blank');
-                    else window.alert('Receipt marked as sent. No parent mobile is on file.');
-                  })
-                  .catch((err) => setError(apiErrorMessage(err)));
-              }}
-            >
-              Send to parent
-            </button>
-          </div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2 print:grid-cols-2">
-            {(["Parent's copy", 'School copy'] as const).map((copy) => (
-              <MonthlyFeeReceiptCard
-                key={copy}
-                copy={copy}
-                schoolName={book.settings.schoolName || "St. Luke's Secondary School, Tura"}
-                schoolAddress={
-                  book.settings.schoolAddress ||
-                  'Walbakgre, Tura - 794101, West Garo Hills, Meghalaya'
-                }
-                logoUrl="/school-sis/st-lukes-logo.png"
-                motto="Knowledge · Service · Light"
-                monthLabel={success.months.join(', ')}
-                studentName={book.student.fullName}
-                admissionNumber={book.student.admissionNumber}
-                className={`${book.className} ${book.sectionName}`}
-                receiptNumber={success.receiptNumber}
-                academicYear={book.academicYear.name}
-                paidAt={success.paidAt}
-                paymentMode={mode}
-                tuition={success.tuition}
-                late={success.late}
-                other={success.other}
-                discount={success.discount}
-                previous={0}
-                total={success.total}
-                signatory={book.settings.signatoryName}
-                monthsCovered={success.months}
-                instructions={
-                  book.settings.instructionsJson?.length
-                    ? book.settings.instructionsJson
-                    : [
-                        'Fees are to be paid before the 15th of every month.',
-                        'Annual Fees and Jan. & Feb. Tuition Fees to be paid at the time of Admission.',
-                        'Pupils with dues may be barred from sitting for the Examinations.',
-                        'Fees once paid are not refundable.',
-                      ]
-                }
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
 
       {confirmOpen && book ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold">Confirm fee payment</h3>
-            <p className="mt-2 text-sm">{book.student.fullName}</p>
+            <p className="mt-2 text-sm font-medium">{book.student.fullName}</p>
             <p className="text-sm text-slate-500">
-              {book.className} {book.sectionName} · {book.academicYear.name}
+              {book.className} {book.sectionName} · {yearName}
             </p>
             <p className="mt-3 text-sm">
               <b>Months:</b> {selectedRows.map((r) => r.monthLabel).join(', ')}
@@ -621,10 +934,12 @@ export function MonthlyFeeCollect() {
                 {approvedBy.trim() ? ` · Approved by ${approvedBy.trim()}` : ''}
               </p>
             ) : null}
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{rs(paying)}</p>
-            <p className="text-xs text-slate-500">Cash collected · Net payable {rs(net)}</p>
-            <p className="text-sm text-slate-500">Payment mode: {METHOD_LABEL[mode] ?? mode}</p>
-            <div className="mt-4 flex justify-end gap-2">
+            <p className="mt-2 text-3xl font-bold tabular-nums text-[#2563eb]">{rs(paying)}</p>
+            <p className="text-xs text-slate-500">{rupeesInWords(paying)}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Payment mode: {METHOD_LABEL[mode] ?? mode}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 className="rounded-xl border px-4 py-2 text-sm"
@@ -635,7 +950,7 @@ export function MonthlyFeeCollect() {
               <button
                 type="button"
                 disabled={!canCollect}
-                className="rounded-xl bg-[var(--school-erp-primary)] px-4 py-2 text-sm text-white disabled:opacity-40"
+                className="rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 onClick={() => {
                   void collectMonthlyFee({
                     studentId,
@@ -689,25 +1004,97 @@ export function MonthlyFeeCollect() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-[#1a365d]">{value}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'h-8 rounded-full px-3 text-xs font-semibold ring-1',
+        active
+          ? 'bg-[#2563eb] text-white ring-[#2563eb]'
+          : 'bg-slate-50 text-slate-600 ring-slate-200 hover:bg-white',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostBtn({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-white"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Meta({ icon: Icon, label, value }: { icon: typeof Phone; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <Icon className="mt-0.5 h-4 w-4 text-slate-400" />
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="truncate font-medium text-slate-700">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof Wallet;
+  label: string;
+  value: string;
+  tone: 'blue' | 'rose' | 'green' | 'violet';
+}) {
+  const tones = {
+    blue: 'bg-[#eef4ff] text-[#2563eb]',
+    rose: 'bg-rose-50 text-rose-600',
+    green: 'bg-emerald-50 text-emerald-600',
+    violet: 'bg-violet-50 text-violet-600',
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+      <span
+        className={cn('inline-flex h-11 w-11 items-center justify-center rounded-2xl', tones[tone])}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-lg font-bold tabular-nums text-slate-900">{value}</p>
+      </div>
     </div>
   );
 }
 
 function Line({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <dt>{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
+    <div className="flex justify-between gap-3">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="font-medium tabular-nums text-slate-800">{value}</dd>
     </div>
   );
 }
 
-function MonthRow({
+function MonthCard({
   row,
   checked,
   onToggle,
@@ -716,19 +1103,50 @@ function MonthRow({
   checked: boolean;
   onToggle: () => void;
 }) {
+  const paid = row.status === 'PAID';
+  const overdue = row.status === 'OVERDUE' || (row.lateApplies && row.selectable);
+  const upcoming = row.selectable && !overdue && row.status === 'DUE';
   return (
-    <tr className="border-t border-slate-100">
-      <td className="px-3 py-2">
-        <input type="checkbox" disabled={!row.selectable} checked={checked} onChange={onToggle} />
-      </td>
-      <td className="px-3 py-2 font-medium">{row.monthLabel}</td>
-      <td className="px-3 py-2 tabular-nums">{rs(row.tuitionAmount)}</td>
-      <td className="px-3 py-2 tabular-nums">{rs(row.otherAmount)}</td>
-      <td className="px-3 py-2 tabular-nums">{rs(row.lateFeeAmount)}</td>
-      <td className="px-3 py-2 font-semibold tabular-nums">{rs(row.totalDue)}</td>
-      <td className="px-3 py-2">
-        <FeeStatusBadge status={row.status} />
-      </td>
-    </tr>
+    <button
+      type="button"
+      disabled={!row.selectable}
+      onClick={onToggle}
+      className={cn(
+        'rounded-2xl border p-3 text-left transition',
+        paid && 'border-emerald-100 bg-emerald-50/70 opacity-80',
+        overdue && !checked && 'border-rose-100 bg-rose-50',
+        overdue && checked && 'border-rose-300 bg-rose-50 ring-2 ring-rose-200',
+        upcoming && !checked && 'border-slate-200 bg-white',
+        upcoming && checked && 'border-[#2563eb] bg-[#eef4ff] ring-2 ring-[#bfdbfe]',
+        row.status === 'PARTIAL' && 'border-amber-200 bg-amber-50',
+        !row.selectable && paid ? '' : !row.selectable ? 'cursor-not-allowed' : '',
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className={cn(
+            'mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded border',
+            checked ? 'border-[#2563eb] bg-[#2563eb] text-white' : 'border-slate-300 bg-white',
+          )}
+        >
+          {checked ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+        </span>
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+            paid && 'bg-emerald-100 text-emerald-800',
+            overdue && 'bg-rose-100 text-rose-700',
+            upcoming && 'bg-slate-100 text-slate-500',
+            row.status === 'PARTIAL' && 'bg-amber-100 text-amber-800',
+          )}
+        >
+          {paid ? 'Paid' : overdue ? 'Overdue' : row.status === 'PARTIAL' ? 'Partial' : 'Upcoming'}
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-slate-800">{row.monthLabel}</p>
+      <p className="text-lg font-bold tabular-nums text-slate-900">
+        {rs(paid ? row.paidAmount || row.grossDue : row.totalDue)}
+      </p>
+    </button>
   );
 }
