@@ -853,6 +853,7 @@ export type SchoolSisFeeStructure = {
   notesJson: string[] | unknown;
   grade: { id: string; code: string; name: string };
   academicYear: { id: string; name: string; code: string };
+  updatedAt?: string;
   lines: SchoolSisFeeLine[];
   installments: Array<{ id: string; sequence: number; label: string; amount: number }>;
   totals: {
