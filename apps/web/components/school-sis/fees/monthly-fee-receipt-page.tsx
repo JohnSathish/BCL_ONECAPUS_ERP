@@ -59,6 +59,9 @@ export function MonthlyFeeReceiptPage() {
     academicYear: String(snap.academicYear ?? ''),
     paidAt: new Date(p.paidAt).toLocaleString('en-IN'),
     paymentMode: p.paymentMode,
+    gatewayName: (snap.gateway as { gatewayName?: string } | undefined)?.gatewayName ?? null,
+    gatewayPaymentId:
+      (snap.gateway as { paymentId?: string } | undefined)?.paymentId ?? p.reference,
     tuition:
       p.tuitionAmount ||
       Number(amounts.tuition || 0) ||

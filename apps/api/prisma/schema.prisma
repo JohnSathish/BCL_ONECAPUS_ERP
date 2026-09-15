@@ -16922,6 +16922,7 @@ model SchoolStudent {
   optionalSubjects SchoolStudentOptionalSubject[]
   feePayments      SchoolFeePayment[]
   feeMonthAccounts SchoolFeeMonthAccount[]
+  feeGatewayTransactions SchoolPaymentGatewayTransaction[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -17411,6 +17412,10 @@ model SchoolFeeSettings {
   schoolAddress    String    @default("Walbakgre, New Tura") @map("school_address")
   logoUrl          String?   @map("logo_url")
   instructionsJson Json      @default("[]") @map("instructions_json")
+  refundPolicy     String?   @map("refund_policy") @db.Text
+  examInstructions String?   @map("exam_instructions") @db.Text
+  otherNotes       String?   @map("other_notes") @db.Text
+  updatedById      String?   @map("updated_by_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -17418,6 +17423,87 @@ model SchoolFeeSettings {
 
   @@unique([tenantId, academicYearId])
   @@map("school_fee_settings")
+  @@schema("school")
+}
+
+model SchoolPaymentGateway {
+  id                       String    @id @default(uuid()) @db.Uuid
+  tenantId                 String    @map("tenant_id") @db.Uuid
+  provider                 String
+  name                     String
+  environment              String    @default("TEST")
+  isActive                 Boolean   @default(false) @map("is_active")
+  isDefault                Boolean   @default(false) @map("is_default")
+  credentialsEncrypted     String    @map("credentials_encrypted") @db.Text
+  webhookSecretEncrypted   String?   @map("webhook_secret_encrypted") @db.Text
+  configuration            Json      @default("{}")
+  lastConnectionTest       DateTime? @map("last_connection_test")
+  connectionStatus         String    @default("UNKNOWN") @map("connection_status")
+  lastConnectionError      String?   @map("last_connection_error") @db.Text
+  createdById              String?   @map("created_by_id") @db.Uuid
+  updatedById              String?   @map("updated_by_id") @db.Uuid
+  deletedAt                DateTime? @map("deleted_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  transactions SchoolPaymentGatewayTransaction[]
+  audits       SchoolPaymentGatewayAudit[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive, isDefault])
+  @@map("school_payment_gateways")
+  @@schema("school")
+}
+
+model SchoolPaymentGatewayTransaction {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  gatewayId      String    @map("gateway_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  feePaymentId   String?   @map("fee_payment_id") @db.Uuid
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  amount         Int
+  currency       String    @default("INR")
+  status         String    @default("CREATED")
+  orderId        String    @map("order_id")
+  paymentId      String?   @map("payment_id")
+  feeReference   String?   @map("fee_reference")
+  monthsJson     Json      @default("[]") @map("months_json")
+  collectJson    Json      @default("{}") @map("collect_json")
+  rawReference   String?   @map("raw_reference")
+  verifiedAt     DateTime? @map("verified_at")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  gateway SchoolPaymentGateway @relation(fields: [gatewayId], references: [id], onDelete: Restrict)
+  student SchoolStudent        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, orderId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, gatewayId, createdAt])
+  @@map("school_payment_gateway_transactions")
+  @@schema("school")
+}
+
+model SchoolPaymentGatewayAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  gatewayId   String?  @map("gateway_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ip          String?
+  userAgent   String?  @map("user_agent") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  gateway SchoolPaymentGateway? @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, gatewayId, createdAt])
+  @@map("school_payment_gateway_audits")
   @@schema("school")
 }
 

@@ -10,6 +10,7 @@ import {
   Settings2,
   Wallet,
   ClipboardList,
+  CreditCard,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -25,6 +26,7 @@ const LINKS = [
   { href: '/admin/school-sis/fees/register', label: 'Register', icon: ClipboardList },
   { href: '/admin/school-sis/fees/reports', label: 'Reports', icon: FileBarChart2 },
   { href: '/admin/school-sis/fees/settings', label: 'Configuration', icon: Settings2 },
+  { href: '/admin/school-sis/fees/gateways', label: 'Gateways', icon: CreditCard },
   { href: '/admin/school-sis/fees', label: 'Annual structure', icon: BookOpen },
 ];
 
@@ -33,7 +35,9 @@ export function MonthlyFeeSubnav() {
   return (
     <nav className="flex flex-wrap gap-2">
       {LINKS.map((item) => {
-        const active = item.exact ? pathname === item.href : pathname === item.href;
+        const active = item.exact
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
         return (
           <Link
@@ -92,7 +96,7 @@ const ONES = [
 ];
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
-function chunkToWords(n: number) {
+function chunkToWords(n: number): string {
   if (n < 20) return ONES[n];
   if (n < 100) return `${TENS[Math.floor(n / 10)]}${n % 10 ? ` ${ONES[n % 10]}` : ''}`;
   const rest = n % 100;

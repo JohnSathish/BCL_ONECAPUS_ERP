@@ -61,6 +61,8 @@ export type MonthlyFeeReceiptView = {
   totalAmount: number;
   paymentMode: string;
   reference?: string | null;
+  gatewayName?: string | null;
+  gatewayPaymentId?: string | null;
   monthsCovered?: string[];
   otherLabel?: string;
 };
@@ -134,6 +136,8 @@ function slip(
     <section class="meta">
       <p><span>Receipt No.</span><b>${esc(view.receiptNumber)}</b></p>
       <p><span>Payment Mode</span><b>${esc(view.paymentMode)}${view.reference ? ` · ${esc(view.reference)}` : ''}</b></p>
+      ${view.gatewayName ? `<p><span>Gateway</span><b>${esc(view.gatewayName)}</b></p>` : ''}
+      ${view.gatewayPaymentId ? `<p><span>Gateway Txn</span><b>${esc(view.gatewayPaymentId)}</b></p>` : ''}
       <p><span>Date &amp; Time</span><b>${esc(view.paidAt)}</b></p>
     </section>
     <aside class="notes">

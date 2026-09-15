@@ -301,6 +301,12 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('fee-receipts', 'Collection register', '/admin/school-sis/fees/register'),
           live('fee-user-wise', 'User wise collection', '/admin/school-sis/fees/reports'),
           live('fee-settings', 'Fee configuration', '/admin/school-sis/fees/settings'),
+          live('fee-gateways', 'Payment gateway integration', '/admin/school-sis/fees/gateways'),
+          live(
+            'fee-gateway-txns',
+            'Gateway transactions',
+            '/admin/school-sis/fees/gateways/transactions',
+          ),
         ],
       },
       {

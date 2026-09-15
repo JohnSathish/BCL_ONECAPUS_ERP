@@ -14,6 +14,8 @@ export function MonthlyFeeReceiptCard({
   academicYear,
   paidAt,
   paymentMode,
+  gatewayName,
+  gatewayPaymentId,
   tuition,
   late,
   other,
@@ -38,6 +40,8 @@ export function MonthlyFeeReceiptCard({
   academicYear: string;
   paidAt: string;
   paymentMode: string;
+  gatewayName?: string | null;
+  gatewayPaymentId?: string | null;
   tuition: number;
   late: number;
   other: number;
@@ -127,6 +131,18 @@ export function MonthlyFeeReceiptCard({
           <span>Payment Mode</span>
           <b>{paymentMode}</b>
         </p>
+        {gatewayName ? (
+          <p className="flex justify-between">
+            <span>Gateway</span>
+            <b>{gatewayName}</b>
+          </p>
+        ) : null}
+        {gatewayPaymentId ? (
+          <p className="flex justify-between">
+            <span>Gateway Txn</span>
+            <b>{gatewayPaymentId}</b>
+          </p>
+        ) : null}
         <p className="flex justify-between">
           <span>Date & Time</span>
           <b>{paidAt}</b>

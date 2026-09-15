@@ -201,10 +201,49 @@ export class SchoolSisMonthlyFeesService {
 
   async getConfig(tenantId: string) {
     const { year, settings, plans } = await this.ensureSetup(tenantId);
+    const updater = settings.updatedById
+      ? await this.prisma.user.findFirst({
+          where: { id: settings.updatedById, tenantId },
+          select: { displayName: true, username: true, email: true },
+        })
+      : null;
+    const defaultGw = await this.prisma.schoolPaymentGateway.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        isDefault: true,
+        isActive: true,
+        connectionStatus: 'OK',
+      },
+      select: { name: true, provider: true, environment: true },
+    });
+    const grades = await this.prisma.schoolGrade.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        code: { in: [...MONTHLY_FEE_CODES] },
+      },
+      select: { name: true, code: true },
+      orderBy: { sortOrder: 'asc' },
+    });
     return {
       academicYear: year,
       settings: this.publicSettings(settings),
       plans,
+      applicableClasses: grades,
+      updatedAt: settings.updatedAt,
+      updatedBy: updater
+        ? updater.displayName || updater.username || updater.email
+        : null,
+      onlinePayments: {
+        available: Boolean(defaultGw),
+        gatewayName: defaultGw?.name ?? null,
+        provider: defaultGw?.provider ?? null,
+        environment: defaultGw?.environment ?? null,
+        warning: defaultGw
+          ? null
+          : 'Online payments are currently unavailable. No active default payment gateway has been configured.',
+      },
     };
   }
 
@@ -219,6 +258,9 @@ export class SchoolSisMonthlyFeesService {
     schoolAddress: string;
     logoUrl: string | null;
     instructionsJson: Prisma.JsonValue;
+    refundPolicy?: string | null;
+    examInstructions?: string | null;
+    otherNotes?: string | null;
   }) {
     return {
       ...settings,
@@ -231,7 +273,11 @@ export class SchoolSisMonthlyFeesService {
     };
   }
 
-  async saveSettings(tenantId: string, dto: SaveSchoolFeeSettingsDto) {
+  async saveSettings(
+    tenantId: string,
+    dto: SaveSchoolFeeSettingsDto,
+    actorUserId?: string,
+  ) {
     const { year } = await this.ensureSetup(tenantId);
     return this.prisma.schoolFeeSettings.update({
       where: {
@@ -260,6 +306,38 @@ export class SchoolSisMonthlyFeesService {
           : {}),
         ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl || null } : {}),
         ...(dto.instructions ? { instructionsJson: dto.instructions } : {}),
+        ...(dto.refundPolicy !== undefined
+          ? { refundPolicy: dto.refundPolicy.trim() || null }
+          : {}),
+        ...(dto.examInstructions !== undefined
+          ? { examInstructions: dto.examInstructions.trim() || null }
+          : {}),
+        ...(dto.otherNotes !== undefined
+          ? { otherNotes: dto.otherNotes.trim() || null }
+          : {}),
+        ...(actorUserId ? { updatedById: actorUserId } : {}),
+      },
+    });
+  }
+
+  async resetSettings(tenantId: string, actorUserId?: string) {
+    const { year } = await this.ensureSetup(tenantId);
+    return this.prisma.schoolFeeSettings.update({
+      where: {
+        tenantId_academicYearId: { tenantId, academicYearId: year.id },
+      },
+      data: {
+        dueDay: 15,
+        lateFeeAmount: 20,
+        lateFeeEnabled: true,
+        paymentMethods: DEFAULT_METHODS,
+        receiptPrefix: 'FB',
+        instructionsJson: DEFAULT_INSTRUCTIONS,
+        refundPolicy: 'Fees once paid are not refundable.',
+        examInstructions:
+          'Pupils with dues may be barred from sitting for the Examinations.',
+        otherNotes: null,
+        updatedById: actorUserId ?? null,
       },
     });
   }
@@ -546,10 +624,10 @@ export class SchoolSisMonthlyFeesService {
     };
   }
 
-  async collect(
+  private async buildCollectPlan(
     tenantId: string,
     dto: CollectSchoolFeeDto,
-    actorUserId?: string,
+    opts?: { skipReference?: boolean },
   ) {
     const months = [
       ...new Set(
@@ -586,7 +664,8 @@ export class SchoolSisMonthlyFeesService {
     }
     if (
       ['UPI', 'BANK', 'ONLINE'].includes(dto.paymentMode) &&
-      !dto.reference?.trim()
+      !dto.reference?.trim() &&
+      !opts?.skipReference
     ) {
       throw new BadRequestException(
         'Transaction / reference number is required',
@@ -645,6 +724,32 @@ export class SchoolSisMonthlyFeesService {
         'Partial payment is only allowed for a single month',
       );
     }
+    return { months, book, lines, gross, discount, net, amountPaying };
+  }
+
+  async previewCollect(tenantId: string, dto: CollectSchoolFeeDto) {
+    const plan = await this.buildCollectPlan(tenantId, dto, {
+      skipReference: true,
+    });
+    return {
+      academicYearId: plan.book.academicYear.id,
+      months: plan.months,
+      amountPaying: plan.amountPaying,
+      net: plan.net,
+    };
+  }
+
+  async collect(
+    tenantId: string,
+    dto: CollectSchoolFeeDto,
+    actorUserId?: string,
+    opts?: {
+      skipReference?: boolean;
+      gatewaySnapshot?: Record<string, unknown>;
+    },
+  ) {
+    const { months, book, lines, gross, discount, net, amountPaying } =
+      await this.buildCollectPlan(tenantId, dto, opts);
     const year = book.academicYear;
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -764,6 +869,7 @@ export class SchoolSisMonthlyFeesService {
                 motto: 'Knowledge · Service · Light',
                 instructions: book.settings.instructionsJson,
               },
+              gateway: opts?.gatewaySnapshot ?? null,
             } as Prisma.InputJsonValue,
             lines: {
               create: allocated.map((l) => ({
@@ -1420,8 +1526,12 @@ export class SchoolSisMonthlyFeesService {
       discountAmount,
       previousBalance: payment.previousBalance,
       totalAmount,
-      paymentMode: payment.paymentMode,
+      paymentMode: snap.gateway?.provider
+        ? `ONLINE · ${snap.gateway.gatewayName || snap.gateway.provider}`
+        : payment.paymentMode,
       reference: payment.reference,
+      gatewayName: snap.gateway?.gatewayName ?? null,
+      gatewayPaymentId: snap.gateway?.paymentId ?? payment.reference,
       monthsCovered: (Array.isArray(snap.months)
         ? snap.months.map(
             (m: { monthLabel?: string; feeMonth?: string }) =>

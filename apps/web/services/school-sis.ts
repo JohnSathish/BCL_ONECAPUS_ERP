@@ -1273,6 +1273,9 @@ export async function fetchMonthlyFeeConfig() {
       schoolAddress: string;
       logoUrl: string | null;
       instructionsJson: string[];
+      refundPolicy: string | null;
+      examInstructions: string | null;
+      otherNotes: string | null;
     };
     plans: Array<{
       id: string;
@@ -1282,11 +1285,152 @@ export async function fetchMonthlyFeeConfig() {
       otherAmount: number;
       grade: { id: string; name: string; code: string };
     }>;
+    applicableClasses?: Array<{ name: string; code: string }>;
+    updatedAt?: string;
+    updatedBy?: string | null;
+    onlinePayments?: {
+      available: boolean;
+      gatewayName: string | null;
+      provider: string | null;
+      environment: string | null;
+      warning: string | null;
+    };
   };
 }
 
 export async function saveMonthlyFeeSettings(payload: Record<string, unknown>) {
   const { data } = await api.patch('/v1/school-sis/fees/monthly/config', payload);
+  return data;
+}
+
+export async function resetMonthlyFeeSettings() {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/config/reset');
+  return data;
+}
+
+export type SchoolPaymentGateway = {
+  id: string;
+  provider: string;
+  name: string;
+  environment: 'TEST' | 'LIVE';
+  isActive: boolean;
+  isDefault: boolean;
+  connectionStatus: string;
+  lastConnectionTest: string | null;
+  lastConnectionError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  credentials: Record<string, string | boolean>;
+  configuration: {
+    webhookUrl: string;
+    callbackUrl: string;
+    successUrl: string;
+    failureUrl: string;
+    currency?: string;
+  };
+};
+
+export async function fetchSchoolPaymentGateways() {
+  const { data } = await api.get('/v1/school-sis/fees/payment-gateways');
+  return data as {
+    configured: number;
+    activeGateway: string | null;
+    defaultGateway: string | null;
+    gatewayStatus: string;
+    onlinePaymentsAvailable: boolean;
+    warning: string | null;
+    gateways: SchoolPaymentGateway[];
+  };
+}
+
+export async function fetchSchoolPaymentGateway(id: string, reveal = false) {
+  const { data } = await api.get(`/v1/school-sis/fees/payment-gateways/${id}`, {
+    params: reveal ? { reveal: '1' } : undefined,
+  });
+  return data as SchoolPaymentGateway;
+}
+
+export async function createSchoolPaymentGateway(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/fees/payment-gateways', payload);
+  return data as SchoolPaymentGateway;
+}
+
+export async function updateSchoolPaymentGateway(id: string, payload: Record<string, unknown>) {
+  const { data } = await api.patch(`/v1/school-sis/fees/payment-gateways/${id}`, payload);
+  return data as SchoolPaymentGateway;
+}
+
+export async function deleteSchoolPaymentGateway(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/fees/payment-gateways/${id}`);
+  return data as { ok: boolean };
+}
+
+export async function testSchoolPaymentGateway(id: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/payment-gateways/${id}/test-connection`);
+  return data as { ok: boolean; message: string; reason: string | null };
+}
+
+export async function setDefaultSchoolPaymentGateway(id: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/payment-gateways/${id}/set-default`);
+  return data as { ok: boolean; message: string };
+}
+
+export async function activateSchoolPaymentGateway(id: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/payment-gateways/${id}/activate`);
+  return data;
+}
+
+export async function deactivateSchoolPaymentGateway(id: string) {
+  const { data } = await api.post(`/v1/school-sis/fees/payment-gateways/${id}/deactivate`);
+  return data;
+}
+
+export async function fetchSchoolGatewayTransactions(params: Record<string, string>) {
+  const { data } = await api.get('/v1/school-sis/fees/payment-gateways/transactions', { params });
+  return data as {
+    items: Array<{
+      id: string;
+      gateway: string;
+      provider: string;
+      student: string;
+      admissionNumber: string;
+      amount: number;
+      feeReference: string | null;
+      orderId: string;
+      paymentId: string | null;
+      status: string;
+      createdAt: string;
+      completedAt: string | null;
+      feePaymentId: string | null;
+    }>;
+  };
+}
+
+export async function startSchoolOnlineCheckout(payload: {
+  studentId: string;
+  months: string[];
+  amountPaying?: number;
+  waiveLateFee?: boolean;
+  notes?: string;
+}) {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/online/checkout', payload);
+  return data as {
+    transactionId: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+    gatewayName: string;
+    checkout: Record<string, unknown>;
+  };
+}
+
+export async function verifySchoolOnlinePayment(payload: {
+  orderId: string;
+  paymentId?: string;
+  signature?: string;
+}) {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/online/verify', payload);
   return data;
 }
 
@@ -1358,6 +1502,7 @@ export type MonthlyFeeLedger = {
   settings: {
     paymentMethods: string[];
     dueDay: number;
+    lateFeeEnabled?: boolean;
     schoolName: string;
     schoolAddress: string;
     signatoryName: string | null;

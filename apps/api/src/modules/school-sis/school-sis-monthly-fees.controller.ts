@@ -25,9 +25,12 @@ import {
   CloseSchoolFeeCashDto,
   SaveSchoolFeeSettingsDto,
   SaveSchoolMonthlyFeePlanDto,
+  SchoolOnlineCheckoutDto,
+  SchoolOnlineVerifyDto,
   VoidSchoolFeeDto,
 } from './dto/school-sis.dto';
 import { SchoolSisMonthlyFeesService } from './school-sis-monthly-fees.service';
+import { SchoolSisPaymentGatewaysService } from './school-sis-payment-gateways.service';
 import {
   SchoolSisFeeReportsService,
   type UserWiseSort,
@@ -49,6 +52,7 @@ export class SchoolSisMonthlyFeesController {
   constructor(
     private readonly fees: SchoolSisMonthlyFeesService,
     private readonly reports: SchoolSisFeeReportsService,
+    private readonly gateways: SchoolSisPaymentGatewaysService,
   ) {}
 
   @Get('config')
@@ -66,7 +70,13 @@ export class SchoolSisMonthlyFeesController {
     @CurrentUser() user: JwtUser,
     @Body() dto: SaveSchoolFeeSettingsDto,
   ) {
-    return this.fees.saveSettings(user.tid, dto);
+    return this.fees.saveSettings(user.tid, dto, user.sub);
+  }
+
+  @Post('config/reset')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  resetConfig(@CurrentUser() user: JwtUser) {
+    return this.fees.resetSettings(user.tid, user.sub);
   }
 
   @Put('plans')
@@ -104,6 +114,24 @@ export class SchoolSisMonthlyFeesController {
       actor.canClose,
     );
     return this.fees.collect(user.tid, dto, user.sub);
+  }
+
+  @Post('online/checkout')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  onlineCheckout(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SchoolOnlineCheckoutDto,
+  ) {
+    return this.gateways.checkout(user.tid, dto, user.sub);
+  }
+
+  @Post('online/verify')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  onlineVerify(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SchoolOnlineVerifyDto,
+  ) {
+    return this.gateways.verifyCheckout(user.tid, dto, user.sub);
   }
 
   @Get('dashboard')

@@ -38,6 +38,8 @@ import {
   fetchSchoolSisStudents,
   printMonthlyFeeReceipt,
   sendMonthlyFeeReceipt,
+  startSchoolOnlineCheckout,
+  verifySchoolOnlinePayment,
   type MonthlyFeeLedgerRow,
   type SchoolSisStudent,
 } from '@/services/school-sis';
@@ -686,6 +688,132 @@ export function MonthlyFeeCollect() {
                             </option>
                           ))}
                         </select>
+                        {mode === 'ONLINE' ? (
+                          <div className="rounded-xl bg-[#eff6ff] p-3 text-xs text-slate-600">
+                            {config.data?.onlinePayments?.available ? (
+                              <>
+                                <p>
+                                  Pay Online uses <b>{config.data.onlinePayments.gatewayName}</b>.
+                                  The cashier cannot choose a different gateway.
+                                </p>
+                                <button
+                                  type="button"
+                                  className="mt-2 h-9 rounded-lg bg-[#2563eb] px-3 font-semibold text-white"
+                                  onClick={() => {
+                                    void startSchoolOnlineCheckout({
+                                      studentId,
+                                      months: selected,
+                                      amountPaying: paying,
+                                      waiveLateFee: waiveLate,
+                                      notes: lateReason || undefined,
+                                    })
+                                      .then(async (session) => {
+                                        setError(null);
+                                        const checkout = session.checkout as {
+                                          mode?: string;
+                                          keyId?: string;
+                                          amount?: number;
+                                        };
+                                        if (checkout.mode === 'RAZORPAY') {
+                                          await new Promise<void>((resolve, reject) => {
+                                            const go = () => {
+                                              const Razorpay = (
+                                                window as unknown as {
+                                                  Razorpay: new (opts: object) => {
+                                                    open: () => void;
+                                                  };
+                                                }
+                                              ).Razorpay;
+                                              const rzp = new Razorpay({
+                                                key: checkout.keyId,
+                                                amount: checkout.amount,
+                                                currency: session.currency,
+                                                order_id: session.orderId,
+                                                name: session.gatewayName,
+                                                handler: (resp: {
+                                                  razorpay_order_id: string;
+                                                  razorpay_payment_id: string;
+                                                  razorpay_signature: string;
+                                                }) => {
+                                                  void verifySchoolOnlinePayment({
+                                                    orderId: resp.razorpay_order_id,
+                                                    paymentId: resp.razorpay_payment_id,
+                                                    signature: resp.razorpay_signature,
+                                                  })
+                                                    .then(
+                                                      (res: {
+                                                        payment?: {
+                                                          id: string;
+                                                          receiptNumber?: string;
+                                                        };
+                                                        receiptNumber?: string;
+                                                      }) => {
+                                                        setSuccess({
+                                                          id: String(
+                                                            res.payment?.id ??
+                                                              res.receiptNumber ??
+                                                              '',
+                                                          ),
+                                                          receiptNumber: String(
+                                                            res.receiptNumber ??
+                                                              res.payment?.receiptNumber ??
+                                                              '',
+                                                          ),
+                                                          months: selectedRows.map(
+                                                            (r) => r.monthLabel,
+                                                          ),
+                                                          tuition,
+                                                          late: 0,
+                                                          other: 0,
+                                                          discount,
+                                                          total: paying,
+                                                          paidAt: new Date().toISOString(),
+                                                        });
+                                                        resolve();
+                                                      },
+                                                    )
+                                                    .catch((err) => reject(err));
+                                                },
+                                              });
+                                              rzp.open();
+                                            };
+                                            if (
+                                              (window as unknown as { Razorpay?: unknown }).Razorpay
+                                            ) {
+                                              go();
+                                              return;
+                                            }
+                                            const script = document.createElement('script');
+                                            script.src =
+                                              'https://checkout.razorpay.com/v1/checkout.js';
+                                            script.onload = () => go();
+                                            script.onerror = () =>
+                                              reject(new Error('Could not load Razorpay'));
+                                            document.body.appendChild(script);
+                                          });
+                                          return;
+                                        }
+                                        setError(
+                                          `Checkout started on ${session.gatewayName}. Complete payment using the gateway, then verify from Gateway transactions if needed.`,
+                                        );
+                                      })
+                                      .catch((err) => setError(apiErrorMessage(err)));
+                                  }}
+                                >
+                                  Pay via {config.data.onlinePayments.gatewayName}
+                                </button>
+                                <p className="mt-2">
+                                  Or record an already-received UPI/online transfer below.
+                                </p>
+                              </>
+                            ) : (
+                              <p>
+                                Online payments are currently unavailable. Collect cash, cheque,
+                                bank or UPI with a reference instead.
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
                         {mode === 'UPI' ||
                         mode === 'ONLINE' ||
                         mode === 'BANK' ||

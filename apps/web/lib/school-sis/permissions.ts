@@ -93,6 +93,15 @@ export function canManageSchoolSis(permissions?: string[]) {
   return has(permissions, MANAGE);
 }
 
+export function canConfigureSchoolPaymentGateways(permissions?: string[], roles?: string[]) {
+  if (!canManageSchoolSis(permissions)) return false;
+  const roleBlob = (roles ?? []).join(' ').toLowerCase();
+  if (/cashier/.test(roleBlob) && !/admin|principal|super/.test(roleBlob)) {
+    return false;
+  }
+  return true;
+}
+
 function applyFeatureFlags(
   item: SchoolErpNavModule,
   modules?: Record<string, boolean>,
@@ -120,10 +129,16 @@ function applyFeatureFlags(
 function filterChildren(
   children: SchoolErpNavLink[] | undefined,
   canManage: boolean,
+  roles?: string[],
 ): SchoolErpNavLink[] | undefined {
   if (!children) return children;
-  if (canManage) return children;
-  return children.filter((c) => c.id !== 'student-add');
+  const roleBlob = (roles ?? []).join(' ').toLowerCase();
+  const cashierOnly = /cashier/.test(roleBlob) && !/admin|principal|super/.test(roleBlob);
+  let next = canManage ? children : children.filter((c) => c.id !== 'student-add');
+  if (cashierOnly) {
+    next = next.filter((c) => c.id !== 'fee-gateways' && c.id !== 'fee-gateway-txns');
+  }
+  return next;
 }
 
 export function filterSchoolSisNavGroups(
@@ -141,7 +156,7 @@ export function filterSchoolSisNavGroups(
         .filter((item) => !allowed || allowed.has(item.id))
         .map((item) => {
           const flagged = applyFeatureFlags(item, input.modules);
-          return { ...flagged, children: filterChildren(flagged.children, canManage) };
+          return { ...flagged, children: filterChildren(flagged.children, canManage, input.roles) };
         }),
     }))
     .filter((group) => group.items.length > 0);

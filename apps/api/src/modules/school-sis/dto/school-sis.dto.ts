@@ -1304,6 +1304,21 @@ export class SaveSchoolFeeSettingsDto {
   @IsArray()
   @IsString({ each: true })
   instructions?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  refundPolicy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  examInstructions?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  otherNotes?: string;
 }
 
 export class SaveSchoolMonthlyFeePlanDto {
@@ -1497,4 +1512,87 @@ export class UpdateSchoolFeeInstallmentDto {
   @IsInt()
   @Min(0)
   amount!: number;
+}
+
+export class SaveSchoolPaymentGatewayDto {
+  @IsIn(['RAZORPAY', 'PAYU', 'CASHFREE', 'PHONEPE', 'STRIPE', 'OTHER'])
+  provider!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsIn(['TEST', 'LIVE'])
+  environment!: string;
+
+  @IsOptional()
+  @IsObject()
+  credentials?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  configuration?: Record<string, unknown>;
+}
+
+export class PatchSchoolPaymentGatewayDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @IsIn(['TEST', 'LIVE'])
+  environment?: string;
+
+  @IsOptional()
+  @IsObject()
+  credentials?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  configuration?: Record<string, unknown>;
+}
+
+export class SchoolOnlineCheckoutDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  months?: string[];
+
+  @IsOptional()
+  @IsString()
+  feeMonth?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  amountPaying?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  waiveLateFee?: boolean;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class SchoolOnlineVerifyDto {
+  @IsString()
+  @MinLength(4)
+  orderId!: string;
+
+  @IsOptional()
+  @IsString()
+  paymentId?: string;
+
+  @IsOptional()
+  @IsString()
+  signature?: string;
 }
