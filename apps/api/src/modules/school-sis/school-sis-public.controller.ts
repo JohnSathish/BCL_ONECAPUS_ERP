@@ -18,6 +18,8 @@ import { SchoolSisAdmissionService } from './school-sis-admission.service';
 import { SchoolSisPaymentGatewaysService } from './school-sis-payment-gateways.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.service';
+import { SchoolSisAutomationService } from './school-sis-automation.service';
+import { IncomingAutomationEventDto } from './dto/school-automation.dto';
 
 @ApiTags('school-sis-public')
 @Controller({ path: 'school-sis/public', version: '1' })
@@ -28,6 +30,7 @@ export class SchoolSisPublicController {
     private readonly admission: SchoolSisAdmissionService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
     private readonly whatsappWebhooks: SchoolSisWhatsappWebhookService,
+    private readonly automation: SchoolSisAutomationService,
   ) {}
 
   private async tenantId(host?: string) {
@@ -94,5 +97,25 @@ export class SchoolSisPublicController {
   ) {
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {});
     return this.whatsappWebhooks.handle(raw, signature);
+  }
+
+  @Public()
+  @Post('automation/hooks/:token')
+  incomingAutomation(
+    @Param('token') token: string,
+    @Body() dto: IncomingAutomationEventDto,
+    @Req() req: Request,
+  ) {
+    const ip = req.ip;
+    return this.automation.receiveIncoming(
+      token,
+      {
+        event: dto.event,
+        studentId: dto.studentId,
+        entityId: dto.entityId,
+        data: dto.data,
+      },
+      ip,
+    );
   }
 }

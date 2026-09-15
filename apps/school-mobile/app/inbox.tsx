@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiFetch } from '@/api/client';
-import { notificationPath } from '@/services/push';
+import { markNotificationOpened, notificationPath } from '@/services/push';
 import { Card, EmptyState, Feed, GoldButton, Screen } from '@/ui/kit';
 
 type Item = {
@@ -13,6 +13,7 @@ type Item = {
   deepLink?: string | null;
   relatedId?: string | null;
   readAt?: string | null;
+  createdAt?: string;
 };
 
 export default function InboxScreen() {
@@ -20,6 +21,7 @@ export default function InboxScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'all' | 'unread'>('all');
 
   const load = async () => {
     try {
@@ -38,10 +40,30 @@ export default function InboxScreen() {
     void load();
   }, []);
 
+  const visible = tab === 'unread' ? items.filter((i) => !i.readAt) : items;
+
   return (
     <Screen title={`Notifications${unread ? ` · ${unread} unread` : ''}`} onBack>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        {(['all', 'unread'] as const).map((t) => (
+          <Pressable
+            key={t}
+            onPress={() => setTab(t)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: tab === t ? '#1e3a8a' : '#e8eef7',
+            }}
+          >
+            <Text style={{ color: tab === t ? '#fff' : '#334155', fontWeight: '700' }}>
+              {t === 'all' ? 'All' : 'Unread'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       {error ? <EmptyState title="Notifications unavailable" body={error} /> : null}
-      {!error && !items.length ? (
+      {!error && !visible.length ? (
         <EmptyState title="You're all caught up" body="School alerts will appear here." />
       ) : null}
       <Feed>
@@ -53,7 +75,7 @@ export default function InboxScreen() {
             }}
           />
         ) : null}
-        {items.map((item) => (
+        {visible.map((item) => (
           <Card
             key={item.id}
             onPress={() => {
@@ -61,6 +83,7 @@ export default function InboxScreen() {
                 method: 'PATCH',
                 body: JSON.stringify({ read: true }),
               });
+              void markNotificationOpened(item.relatedId);
               router.push(
                 notificationPath({
                   deepLink: item.deepLink,
@@ -70,7 +93,10 @@ export default function InboxScreen() {
               );
             }}
           >
-            <Text style={{ fontWeight: item.readAt ? '600' : '800' }}>{item.title}</Text>
+            <Text style={{ fontWeight: item.readAt ? '600' : '800' }}>
+              {item.readAt ? '○ ' : '● '}
+              {item.title}
+            </Text>
             <Text style={{ color: '#5b6573' }}>{item.body}</Text>
           </Card>
         ))}

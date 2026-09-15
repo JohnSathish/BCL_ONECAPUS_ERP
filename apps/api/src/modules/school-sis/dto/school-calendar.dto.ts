@@ -52,6 +52,7 @@ export class SaveHolidayDto {
   @IsOptional() @IsString() recurringRule?: string;
   @IsOptional() @IsBoolean() overrideConflict?: boolean;
   @IsOptional() @IsUUID() academicYearId?: string;
+  @IsOptional() @IsBoolean() sendPush?: boolean;
 }
 
 export class ImportHolidayRowDto {

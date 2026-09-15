@@ -8,6 +8,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisCalendarService } from './school-sis-calendar.service';
+import { SchoolSisPushService } from './school-sis-push.service';
+import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import {
   DEFAULT_EXAM_TYPES,
   DEFAULT_GRADE_BANDS,
@@ -52,6 +54,8 @@ export class SchoolSisExamsService {
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
     private readonly calendar: SchoolSisCalendarService,
+    private readonly push: SchoolSisPushService,
+    private readonly events: SchoolSisEventBus,
   ) {}
 
   private async year(tenantId: string) {
@@ -1269,6 +1273,25 @@ export class SchoolSisExamsService {
       null,
       dto.reason,
     );
+    if (publish) {
+      const parentIds = await this.prisma.schoolPersonAccount.findMany({
+        where: { tenantId, personType: 'GUARDIAN' },
+        select: { userId: true },
+        take: 4000,
+      });
+      await this.push.onErpEvent(tenantId, 'RESULT_PUBLISHED', {
+        userIds: [...new Set(parentIds.map((p) => p.userId))],
+        title: 'Examination result',
+        body: 'Your child’s examination result is now available. Tap to view.',
+      });
+      await this.events.publish({
+        event: 'exam.result.published',
+        tenantId,
+        entityType: 'exam',
+        entityId: exam.id,
+        data: { exam_name: exam.name },
+      });
+    }
     return { ok: true };
   }
 

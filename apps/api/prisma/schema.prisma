@@ -18162,6 +18162,9 @@ model SchoolMobileDevice {
   appVersion  String?   @map("app_version")
   pushToken   String?   @map("push_token")
   deviceLabel String?   @map("device_label")
+  deviceModel String?   @map("device_model")
+  osVersion   String?   @map("os_version")
+  lastTokenRefreshAt DateTime? @map("last_token_refresh_at")
   lastActiveAt DateTime @default(now()) @map("last_active_at")
   revokedAt   DateTime? @map("revoked_at")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -20429,6 +20432,417 @@ model SchoolWhatsappAuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, userId, createdAt])
   @@map("school_whatsapp_audit_logs")
+  @@schema("school")
+}
+
+model SchoolPushSettings {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @unique @map("tenant_id") @db.Uuid
+  defaultPriority     String   @default("NORMAL") @map("default_priority")
+  defaultIconUrl      String?  @map("default_icon_url")
+  defaultTtlSeconds   Int      @default(86400) @map("default_ttl_seconds")
+  queueEnabled        Boolean  @default(true) @map("queue_enabled")
+  retryAttempts       Int      @default(3) @map("retry_attempts")
+  batchSize           Int      @default(80) @map("batch_size")
+  timezone            String   @default("Asia/Kolkata")
+  quietHoursEnabled   Boolean  @default(false) @map("quiet_hours_enabled")
+  quietFrom           String   @default("21:00") @map("quiet_from")
+  quietTo             String   @default("06:00") @map("quiet_to")
+  digestEnabled       Boolean  @default(false) @map("digest_enabled")
+  digestHour          String   @default("18:00") @map("digest_hour")
+  emergencyBypassQuiet Boolean @default(true) @map("emergency_bypass_quiet")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("school_push_settings")
+  @@schema("school")
+}
+
+model SchoolPushTemplate {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  category  String    @default("GENERAL")
+  title     String
+  body      String    @db.Text
+  deepLinkType String? @map("deep_link_type")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([tenantId, category, active])
+  @@map("school_push_templates")
+  @@schema("school")
+}
+
+model SchoolPushCampaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  title          String
+  body           String    @db.Text
+  category       String    @default("GENERAL")
+  priority       String    @default("NORMAL")
+  imageUrl       String?   @map("image_url")
+  iconUrl        String?   @map("icon_url")
+  deepLinkType   String?   @map("deep_link_type")
+  deepLinkValue  String?   @map("deep_link_value")
+  audienceType   String    @map("audience_type")
+  audienceJson   Json      @default("{}") @map("audience_json")
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime? @map("scheduled_at")
+  sentAt         DateTime? @map("sent_at")
+  recipientCount Int       @default(0) @map("recipient_count")
+  deviceCount    Int       @default(0) @map("device_count")
+  sentCount      Int       @default(0) @map("sent_count")
+  deliveredCount Int       @default(0) @map("delivered_count")
+  openedCount    Int       @default(0) @map("opened_count")
+  failedCount    Int       @default(0) @map("failed_count")
+  createdBy      String?   @map("created_by") @db.Uuid
+  archivedAt     DateTime? @map("archived_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  recipients SchoolPushRecipient[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, scheduledAt])
+  @@map("school_push_campaigns")
+  @@schema("school")
+}
+
+model SchoolPushRecipient {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  campaignId     String    @map("campaign_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  studentId      String?   @map("student_id") @db.Uuid
+  deviceId       String?   @map("device_id") @db.Uuid
+  platform       String?
+  status         String    @default("QUEUED")
+  failureCode    String?   @map("failure_code")
+  failureReason  String?   @map("failure_reason")
+  providerRef    String?   @map("provider_ref")
+  sentAt         DateTime? @map("sent_at")
+  deliveredAt    DateTime? @map("delivered_at")
+  openedAt       DateTime? @map("opened_at")
+  failedAt       DateTime? @map("failed_at")
+  idempotencyKey String    @unique @map("idempotency_key")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  campaign SchoolPushCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, campaignId, status])
+  @@index([tenantId, userId, createdAt])
+  @@map("school_push_recipients")
+  @@schema("school")
+}
+
+model SchoolPushPreference {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  category   String
+  enabled    Boolean  @default(true)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, userId, category])
+  @@map("school_push_preferences")
+  @@schema("school")
+}
+
+model SchoolPushRule {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  eventType   String   @map("event_type")
+  name        String
+  pushEnabled Boolean  @default(true) @map("push_enabled")
+  smsEnabled  Boolean  @default(false) @map("sms_enabled")
+  waEnabled   Boolean  @default(false) @map("wa_enabled")
+  emailEnabled Boolean @default(false) @map("email_enabled")
+  digestOnly  Boolean  @default(false) @map("digest_only")
+  templateId  String?  @map("template_id") @db.Uuid
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, eventType])
+  @@map("school_push_rules")
+  @@schema("school")
+}
+
+model SchoolPushAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  campaignId String?  @map("campaign_id") @db.Uuid
+  detailJson Json     @default("{}") @map("detail_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_push_audit_logs")
+  @@schema("school")
+}
+
+model SchoolAutomationSettings {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  timezone             String   @default("Asia/Kolkata")
+  quietHoursEnabled    Boolean  @default(true) @map("quiet_hours_enabled")
+  quietFrom            String   @default("22:00") @map("quiet_from")
+  quietTo              String   @default("07:00") @map("quiet_to")
+  holidayPolicy        String   @default("PREVIOUS_WORKING_DAY") @map("holiday_policy")
+  maxSmsPerMinute      Int      @default(40) @map("max_sms_per_minute")
+  maxWaPerMinute       Int      @default(80) @map("max_wa_per_minute")
+  maxEmailPerMinute    Int      @default(60) @map("max_email_per_minute")
+  maxPushPerMinute     Int      @default(120) @map("max_push_per_minute")
+  maxPerExecution      Int      @default(2000) @map("max_per_execution")
+  maxPerRecipientDay   Int      @default(12) @map("max_per_recipient_day")
+  retryAttempts        Int      @default(5) @map("retry_attempts")
+  emergencyBypassQuiet Boolean  @default(true) @map("emergency_bypass_quiet")
+  defaultChannelsJson  Json     @default("[\"PUSH\",\"WHATSAPP\"]") @map("default_channels_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("school_automation_settings")
+  @@schema("school")
+}
+
+model SchoolAutomationWorkflow {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  description   String?   @db.Text
+  module        String    @default("GENERAL")
+  status        String    @default("DRAFT")
+  triggerType   String    @map("trigger_type")
+  triggerEvent  String    @map("trigger_event")
+  version       Int       @default(1)
+  parentId      String?   @map("parent_id") @db.Uuid
+  graphJson     Json      @default("{}") @map("graph_json")
+  scheduleJson  Json      @default("{}") @map("schedule_json")
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedBy     String?   @map("updated_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  archivedAt    DateTime? @map("archived_at")
+
+  executions SchoolAutomationExecution[]
+
+  @@index([tenantId, status, triggerEvent])
+  @@index([tenantId, triggerType])
+  @@map("school_automation_workflows")
+  @@schema("school")
+}
+
+model SchoolAutomationTemplate {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  category    String    @default("GENERAL")
+  channel     String    @default("WHATSAPP")
+  subject     String?
+  body        String    @db.Text
+  language    String    @default("en")
+  variablesJson Json    @default("[]") @map("variables_json")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([tenantId, category, channel])
+  @@map("school_automation_templates")
+  @@schema("school")
+}
+
+model SchoolAutomationExecution {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  workflowId      String    @map("workflow_id") @db.Uuid
+  workflowVersion Int       @default(1) @map("workflow_version")
+  code            String
+  triggerEvent    String    @map("trigger_event")
+  entityType      String?   @map("entity_type")
+  entityId        String?   @map("entity_id")
+  studentId       String?   @map("student_id") @db.Uuid
+  recipientLabel  String?   @map("recipient_label")
+  channel         String?
+  status          String    @default("QUEUED")
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  error           String?   @db.Text
+  idempotencyKey  String    @map("idempotency_key")
+  testMode        Boolean   @default(false) @map("test_mode")
+  payloadJson     Json      @default("{}") @map("payload_json")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  workflow SchoolAutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps    SchoolAutomationExecutionStep[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, code])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, workflowId, createdAt])
+  @@map("school_automation_executions")
+  @@schema("school")
+}
+
+model SchoolAutomationExecutionStep {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  executionId       String    @map("execution_id") @db.Uuid
+  nodeId            String    @map("node_id")
+  actionType        String    @map("action_type")
+  channel           String?
+  status            String    @default("QUEUED")
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  provider          String?
+  providerMessageId String?   @map("provider_message_id")
+  error             String?   @db.Text
+  retryCount        Int       @default(0) @map("retry_count")
+  nextRetryAt       DateTime? @map("next_retry_at")
+  preview           String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  execution SchoolAutomationExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, executionId, status])
+  @@index([tenantId, status, nextRetryAt])
+  @@map("school_automation_execution_steps")
+  @@schema("school")
+}
+
+model SchoolAutomationAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  workflowId String?  @map("workflow_id") @db.Uuid
+  ip         String?
+  oldJson    Json     @default("{}") @map("old_json")
+  newJson    Json     @default("{}") @map("new_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_automation_audit_logs")
+  @@schema("school")
+}
+
+model SchoolAutomationWebhook {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  tokenHash     String    @unique @map("token_hash")
+  secretEnc     String?   @map("secret_enc") @db.Text
+  workflowId    String?   @map("workflow_id") @db.Uuid
+  allowedIps    String?   @map("allowed_ips")
+  active        Boolean   @default(true)
+  lastUsedAt    DateTime? @map("last_used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, active])
+  @@map("school_automation_webhooks")
+  @@schema("school")
+}
+
+model SchoolMisSettings {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  attendanceMinPercent  Int      @default(75) @map("attendance_min_percent")
+  passPercent           Int      @default(33) @map("pass_percent")
+  currency              String   @default("INR")
+  dateFormat            String   @default("DD/MM/YYYY") @map("date_format")
+  footerText            String?  @map("footer_text")
+  signatoryName         String?  @map("signatory_name")
+  pageFormat            String   @default("A4") @map("page_format")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("school_mis_settings")
+  @@schema("school")
+}
+
+model SchoolMisSavedReport {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  category    String
+  reportKey   String    @map("report_key")
+  filtersJson Json      @default("{}") @map("filters_json")
+  columnsJson Json      @default("[]") @map("columns_json")
+  visibility  String    @default("PRIVATE")
+  favorite    Boolean   @default(false)
+  version     Int       @default(1)
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([tenantId, category, createdBy])
+  @@map("school_mis_saved_reports")
+  @@schema("school")
+}
+
+model SchoolMisSchedule {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  savedReportId String?   @map("saved_report_id") @db.Uuid
+  reportKey     String    @map("report_key")
+  name          String
+  frequency     String
+  timeOfDay     String    @default("08:00") @map("time_of_day")
+  channel       String    @default("IN_APP")
+  filtersJson   Json      @default("{}") @map("filters_json")
+  active        Boolean   @default(true)
+  lastRunAt     DateTime? @map("last_run_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, active, frequency])
+  @@map("school_mis_schedules")
+  @@schema("school")
+}
+
+model SchoolMisExport {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  reportKey   String    @map("report_key")
+  format      String
+  status      String    @default("GENERATING")
+  fileKey     String?   @map("file_key")
+  error       String?
+  filtersJson Json      @default("{}") @map("filters_json")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([tenantId, createdBy, createdAt])
+  @@map("school_mis_exports")
+  @@schema("school")
+}
+
+model SchoolMisAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  action      String
+  reportKey   String?  @map("report_key")
+  filtersJson Json     @default("{}") @map("filters_json")
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_mis_audit")
   @@schema("school")
 }
 

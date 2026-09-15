@@ -79,9 +79,11 @@ apps/api/scripts/data/**
 
 # Koha DB dumps (never commit — 300MB+ live data)
 koha/.env
+koha/docker-compose.override.yml
 koha/*.sql
 koha/*.sql.gz
 koha/backups/*.sql
 koha/backups/*.sql.gz
 koha/backups/*.sql.xz
 koha/library-*.sql
+koha/inout-src/

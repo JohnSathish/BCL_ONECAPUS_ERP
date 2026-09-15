@@ -9,6 +9,7 @@ import puppeteer from 'puppeteer';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import type {
   CollectSchoolFeeDto,
   SaveSchoolFeeSettingsDto,
@@ -97,6 +98,7 @@ export class SchoolSisMonthlyFeesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly events: SchoolSisEventBus,
   ) {}
 
   async ensureSetup(tenantId: string) {
@@ -772,7 +774,7 @@ export class SchoolSisMonthlyFeesService {
       await this.buildCollectPlan(tenantId, dto, opts);
     const year = book.academicYear;
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const already = await tx.schoolFeeMonthAccount.findFirst({
           where: {
             tenantId,
@@ -1015,6 +1017,19 @@ export class SchoolSisMonthlyFeesService {
           months: allocated.map((l) => l.monthLabel),
         };
       });
+      await this.events.publish({
+        event: 'fee.paid',
+        tenantId,
+        studentId: dto.studentId,
+        entityType: 'fee_payment',
+        entityId: result.payment.id,
+        data: {
+          receipt_number: result.receiptNumber,
+          paid_amount: result.payment.totalAmount,
+          fee_status: 'PAID',
+        },
+      });
+      return result;
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&

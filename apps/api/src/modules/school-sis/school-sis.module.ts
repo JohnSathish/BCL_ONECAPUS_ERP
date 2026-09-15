@@ -27,12 +27,22 @@ import { SchoolSisWhatsappService } from './school-sis-whatsapp.service';
 import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.service';
 import { SchoolSisWhatsappController } from './school-sis-whatsapp.controller';
 import { SchoolSisWhatsappProcessor } from './school-sis-whatsapp.processor';
+import { SchoolSisFcmProvider } from './school-sis-push.provider';
+import { SchoolSisPushService } from './school-sis-push.service';
+import { SchoolSisPushController } from './school-sis-push.controller';
+import { SchoolSisPushProcessor } from './school-sis-push.processor';
+import { SchoolSisEventBus } from './school-sis-event-bus.service';
+import { SchoolSisAutomationService } from './school-sis-automation.service';
+import { SchoolSisAutomationController } from './school-sis-automation.controller';
+import { SchoolSisAutomationProcessor } from './school-sis-automation.processor';
 
 @Module({
   imports: [
     AuthModule,
     TenantsModule,
     BullModule.registerQueue({ name: 'school-whatsapp' }),
+    BullModule.registerQueue({ name: 'school-push' }),
+    BullModule.registerQueue({ name: 'school-automation' }),
   ],
   controllers: [
     SchoolSisController,
@@ -44,6 +54,8 @@ import { SchoolSisWhatsappProcessor } from './school-sis-whatsapp.processor';
     SchoolSisExamsController,
     SchoolSisCalendarController,
     SchoolSisWhatsappController,
+    SchoolSisPushController,
+    SchoolSisAutomationController,
   ],
   providers: [
     SchoolSisService,
@@ -62,6 +74,12 @@ import { SchoolSisWhatsappProcessor } from './school-sis-whatsapp.processor';
     SchoolSisWhatsappService,
     SchoolSisWhatsappWebhookService,
     SchoolSisWhatsappProcessor,
+    SchoolSisFcmProvider,
+    SchoolSisPushService,
+    SchoolSisPushProcessor,
+    SchoolSisEventBus,
+    SchoolSisAutomationService,
+    SchoolSisAutomationProcessor,
   ],
   exports: [
     SchoolSisService,
@@ -78,6 +96,9 @@ import { SchoolSisWhatsappProcessor } from './school-sis-whatsapp.processor';
     SchoolSisExamsService,
     SchoolSisCalendarService,
     SchoolSisWhatsappService,
+    SchoolSisPushService,
+    SchoolSisEventBus,
+    SchoolSisAutomationService,
   ],
 })
 export class SchoolSisModule {}

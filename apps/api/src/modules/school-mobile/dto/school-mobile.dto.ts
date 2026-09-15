@@ -80,6 +80,16 @@ export class RegisterSchoolMobileDeviceDto {
   @IsString()
   @MaxLength(120)
   deviceLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  deviceModel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  osVersion?: string;
 }
 
 export class PatchSchoolMobileDeviceDto {

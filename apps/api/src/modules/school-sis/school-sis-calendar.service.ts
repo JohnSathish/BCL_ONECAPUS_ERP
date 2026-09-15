@@ -7,6 +7,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisPushService } from './school-sis-push.service';
+import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import {
   DEFAULT_EVENT_CATEGORIES,
   DEFAULT_HOLIDAY_TYPES,
@@ -69,6 +71,8 @@ export class SchoolSisCalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly push: SchoolSisPushService,
+    private readonly events: SchoolSisEventBus,
   ) {}
 
   private async year(tenantId: string, academicYearId?: string) {
@@ -660,6 +664,15 @@ export class SchoolSisCalendarService {
           include: { type: true },
         });
     await this.syncHolidayEvent(tenantId, row.id, actor);
+    if (!id) {
+      await this.events.publish({
+        event: 'calendar.holiday.published',
+        tenantId,
+        entityType: 'holiday',
+        entityId: row.id,
+        data: { holiday_name: row.name },
+      });
+    }
     await this.audit(
       tenantId,
       actor,
@@ -668,6 +681,23 @@ export class SchoolSisCalendarService {
       null,
       row,
     );
+    if (dto.sendPush && !id) {
+      const parents = await this.prisma.schoolMobileDevice.findMany({
+        where: {
+          tenantId,
+          persona: 'parent',
+          revokedAt: null,
+          pushToken: { not: null },
+        },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      await this.push.onErpEvent(tenantId, 'HOLIDAY_PUBLISHED', {
+        userIds: parents.map((p) => p.userId),
+        title: 'Holiday announcement',
+        body: `${row.name} — school will remain closed. Open the app for the holiday calendar.`,
+      });
+    }
     return row;
   }
 

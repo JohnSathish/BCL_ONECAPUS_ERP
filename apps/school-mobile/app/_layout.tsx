@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setAuthFailureHandler } from '@/api/client';
 import { clearSession } from '@/auth/session';
-import { notificationPath } from '@/services/push';
+import { markNotificationOpened, notificationPath } from '@/services/push';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -19,6 +19,7 @@ export default function RootLayout() {
     });
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
+      void markNotificationOpened(String(data?.notificationId || ''));
       router.push(notificationPath(data) as never);
     });
     const failsafe = setTimeout(() => {
