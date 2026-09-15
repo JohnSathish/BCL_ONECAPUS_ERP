@@ -58,12 +58,28 @@ export function StationerySubnav() {
   );
 }
 
-export function StationeryShell({ title, children }: { title: string; children: React.ReactNode }) {
+export function StationeryShell({
+  title,
+  subtitle,
+  extra,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="space-y-5 bg-[#f4f7fb] p-4 sm:p-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billing</p>
-        <h1 className="text-xl font-semibold text-[#1e3a8a]">{title}</h1>
+    <div className="space-y-4 bg-[#f4f7fb] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Billing
+          </p>
+          <h1 className="text-xl font-semibold text-[#1e3a8a]">{title}</h1>
+          {subtitle ? <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p> : null}
+        </div>
+        {extra}
       </div>
       <StationerySubnav />
       {children}
@@ -128,6 +144,7 @@ export function printStationeryReceipt(sale: any, schoolName = "St. Luke's Secon
       <p>Tax ${rs(sale.taxAmount)}</p>
       <p><strong>Grand Total ${rs(sale.grandTotal)}</strong></p>
       <p>Paid ${rs(sale.amountPaid)} · Balance ${rs(sale.balanceDue)}</p>
+      ${sale.cashReceived != null ? `<p>Cash received ${rs(sale.cashReceived)} · Change ${rs(sale.changeReturned || 0)}</p>` : ''}
       <p>Payment: ${(sale.payments || []).map((p: any) => `${p.method} ${rs(p.amount)}`).join(', ') || '—'}</p>
       <p>Cashier: ${sale.cashierName || ''}</p>
     </div>

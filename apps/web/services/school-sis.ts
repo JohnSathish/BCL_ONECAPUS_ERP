@@ -1977,3 +1977,146 @@ export async function fetchStationeryReports(params?: Record<string, string | un
   const { data } = await api.get('/v1/school-sis/stationery/reports', { params });
   return data;
 }
+
+export async function fetchSchoolExamDashboard() {
+  const { data } = await api.get('/v1/school-sis/exams/dashboard');
+  return data;
+}
+
+export async function fetchSchoolExamSettings() {
+  const { data } = await api.get('/v1/school-sis/exams/settings');
+  return data;
+}
+
+export async function saveSchoolExamSettings(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/school-sis/exams/settings', payload);
+  return data;
+}
+
+export async function fetchSchoolExamTypes() {
+  const { data } = await api.get('/v1/school-sis/exams/types');
+  return data;
+}
+
+export async function saveSchoolExamType(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/exams/types/${id}`, payload)
+    : await api.post('/v1/school-sis/exams/types', payload);
+  return data;
+}
+
+export async function fetchSchoolGradeSystems() {
+  const { data } = await api.get('/v1/school-sis/exams/grade-systems');
+  return data;
+}
+
+export async function saveSchoolGradeSystem(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/exams/grade-systems/${id}`, payload)
+    : await api.post('/v1/school-sis/exams/grade-systems', payload);
+  return data;
+}
+
+export async function fetchSchoolExams() {
+  const { data } = await api.get('/v1/school-sis/exams');
+  return data;
+}
+
+export async function fetchSchoolExam(id: string) {
+  const { data } = await api.get(`/v1/school-sis/exams/${id}`);
+  return data;
+}
+
+export async function saveSchoolExam(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/exams/${id}`, payload)
+    : await api.post('/v1/school-sis/exams', payload);
+  return data;
+}
+
+export async function archiveSchoolExam(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/exams/${id}`);
+  return data;
+}
+
+export async function saveSchoolExamSubject(examId: string, payload: Record<string, unknown>) {
+  const { data } = await api.post(`/v1/school-sis/exams/${examId}/subjects`, payload);
+  return data;
+}
+
+export async function saveSchoolExamComponent(
+  examSubjectId: string,
+  payload: Record<string, unknown>,
+) {
+  const { data } = await api.post(
+    `/v1/school-sis/exams/subjects/${examSubjectId}/components`,
+    payload,
+  );
+  return data;
+}
+
+export async function fetchSchoolExamSchedules(examId?: string) {
+  const { data } = await api.get('/v1/school-sis/exams/schedules', { params: { examId } });
+  return data;
+}
+
+export async function saveSchoolExamSchedule(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/exams/schedules', payload);
+  return data;
+}
+
+export async function fetchSchoolExamMarksRoster(params: {
+  examId: string;
+  sectionId: string;
+  componentId: string;
+}) {
+  const { data } = await api.get('/v1/school-sis/exams/marks/roster', { params });
+  return data;
+}
+
+export async function saveSchoolExamMarks(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/exams/marks', payload);
+  return data;
+}
+
+export async function reopenSchoolExamMarks(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/exams/marks/reopen', payload);
+  return data;
+}
+
+export async function generateSchoolExamResults(payload: { examId: string; sectionId?: string }) {
+  const { data } = await api.post('/v1/school-sis/exams/results/generate', payload);
+  return data;
+}
+
+export async function publishSchoolExamResults(examId: string, reason?: string) {
+  const { data } = await api.post('/v1/school-sis/exams/results/publish', { examId, reason });
+  return data;
+}
+
+export async function unpublishSchoolExamResults(examId: string, reason?: string) {
+  const { data } = await api.post('/v1/school-sis/exams/results/unpublish', { examId, reason });
+  return data;
+}
+
+export async function fetchSchoolExamResults(examId: string, sectionId?: string) {
+  const { data } = await api.get('/v1/school-sis/exams/results', { params: { examId, sectionId } });
+  return data;
+}
+
+export async function fetchSchoolExamReportCard(examId: string, studentId: string) {
+  const { data } = await api.get('/v1/school-sis/exams/report-card', {
+    params: { examId, studentId },
+  });
+  return data;
+}
+
+export async function fetchSchoolExamReports(examId: string) {
+  const { data } = await api.get('/v1/school-sis/exams/reports', { params: { examId } });
+  return data;
+}
+
+export async function fetchStudentPublishedExamResults(studentId: string) {
+  const { data } = await api.get(`/v1/school-sis/exams/students/${studentId}/published`);
+  return data;
+}

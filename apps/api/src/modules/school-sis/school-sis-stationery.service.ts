@@ -8,7 +8,10 @@ import ExcelJS from 'exceljs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
-import { STATIONERY_CATEGORY_SEED } from './school-sis-stationery.catalog';
+import {
+  STATIONERY_CATEGORY_SEED,
+  STATIONERY_STARTER_PRICES,
+} from './school-sis-stationery.catalog';
 import type {
   AdjustStationeryStockDto,
   CompleteStationerySaleDto,
@@ -134,6 +137,55 @@ export class SchoolSisStationeryService {
       update: {},
       create: { tenantId },
     });
+    await this.ensureStarterProducts(tenantId);
+  }
+
+  private async ensureStarterProducts(tenantId: string) {
+    const productCount = await this.prisma.schoolStationeryProduct.count({
+      where: { tenantId, deletedAt: null },
+    });
+    if (productCount > 0) return;
+    const categories = await this.prisma.schoolStationeryCategory.findMany({
+      where: { tenantId, deletedAt: null },
+    });
+    const parents = categories.filter((c) => !c.parentId);
+    for (const parent of parents) {
+      const prices = STATIONERY_STARTER_PRICES[parent.code] ?? {
+        purchase: 20,
+        sell: 30,
+      };
+      const children = categories.filter((c) => c.parentId === parent.id);
+      for (const child of children) {
+        const created = await this.prisma.schoolStationeryProduct.create({
+          data: {
+            tenantId,
+            name: child.name,
+            sku: child.code.slice(0, 40),
+            categoryId: parent.id,
+            subcategoryId: child.id,
+            unit: 'PIECE',
+            purchasePrice: prices.purchase,
+            sellingPrice: prices.sell,
+            minStock: 10,
+            openingStock: 50,
+            qtyOnHand: 50,
+            remarks: 'Starter catalog item — update price and stock as needed.',
+          },
+        });
+        await this.prisma.schoolStationeryStockMovement.create({
+          data: {
+            tenantId,
+            productId: created.id,
+            type: 'OPENING',
+            qty: 50,
+            qtyBefore: 0,
+            qtyAfter: 50,
+            reason: 'Starter catalog',
+            userId: tenantId,
+          },
+        });
+      }
+    }
   }
 
   async getSettings(tenantId: string) {
@@ -299,18 +351,30 @@ export class SchoolSisStationeryService {
       where: {
         tenantId,
         deletedAt: null,
-        ...(categoryId
-          ? { OR: [{ categoryId }, { subcategoryId: categoryId }] }
-          : {}),
-        ...(term
-          ? {
-              OR: [
-                { name: { contains: term, mode: 'insensitive' } },
-                { sku: { contains: term, mode: 'insensitive' } },
-                { barcode: { equals: term } },
-              ],
-            }
-          : {}),
+        AND: [
+          categoryId
+            ? { OR: [{ categoryId }, { subcategoryId: categoryId }] }
+            : {},
+          term
+            ? {
+                OR: [
+                  { name: { contains: term, mode: 'insensitive' } },
+                  { sku: { contains: term, mode: 'insensitive' } },
+                  { barcode: { contains: term, mode: 'insensitive' } },
+                  {
+                    category: {
+                      name: { contains: term, mode: 'insensitive' },
+                    },
+                  },
+                  {
+                    subcategory: {
+                      name: { contains: term, mode: 'insensitive' },
+                    },
+                  },
+                ],
+              }
+            : {},
+        ],
       },
       include: {
         category: true,
@@ -732,8 +796,13 @@ export class SchoolSisStationeryService {
       if (settings.requireStudentSelection) {
         throw new BadRequestException('Student selection is required');
       }
-      if (!dto.walkInName?.trim())
-        throw new BadRequestException('Customer name is required');
+      if (!dto.walkInName?.trim()) dto.walkInName = 'Walk-in Customer';
+    }
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.schoolStationerySale.findFirst({
+        where: { tenantId, idempotencyKey: dto.idempotencyKey },
+      });
+      if (existing) return this.getSale(tenantId, existing.id);
     }
     const year = await this.year(tenantId);
     const cap = this.maxDiscountPct(settings, actor);
@@ -761,10 +830,21 @@ export class SchoolSisStationeryService {
           `Select a size/variant for ${product.name}`,
         );
       }
-      const rate = line.rate ?? variant?.sellingPrice ?? product.sellingPrice;
+      const rate = variant?.sellingPrice ?? product.sellingPrice;
       const qty = line.qty;
+      const onHand = n(variant?.qtyOnHand ?? product.qtyOnHand);
+      if (
+        !dto.draft &&
+        settings.enableStockTracking &&
+        !settings.allowNegativeStock &&
+        qty > onHand + 0.0001
+      ) {
+        throw new BadRequestException(
+          `Stock has changed. Please review the cart. Only ${onHand} units of ${product.name} are currently available.`,
+        );
+      }
       const gross = rate * qty;
-      let discountAmt = line.discountAmt ?? 0;
+      let discountAmt = 0;
       if (line.discountPct)
         discountAmt = money((gross * line.discountPct) / 100);
       if (discountAmt && !product.discountAllowed) {
@@ -816,10 +896,24 @@ export class SchoolSisStationeryService {
       subtotal - itemDiscount - billDiscount + taxAmount,
     );
     const payments = dto.draft ? [] : (dto.payments ?? []);
+    for (const p of payments) {
+      if (p.method === 'CHEQUE' && !p.chequeNumber && !p.reference) {
+        throw new BadRequestException('Cheque number is required');
+      }
+    }
     const amountPaid = payments.reduce((s, p) => s + p.amount, 0);
     if (amountPaid > grandTotal) {
       throw new BadRequestException('Paid amount cannot exceed grand total');
     }
+    const cashPaid = payments
+      .filter((p) => p.method === 'CASH')
+      .reduce((s, p) => s + p.amount, 0);
+    const cashReceived = dto.cashReceived ?? cashPaid;
+    if (!dto.draft && cashPaid > 0 && cashReceived < cashPaid) {
+      throw new BadRequestException('Insufficient cash received');
+    }
+    const changeReturned =
+      cashReceived > cashPaid ? cashReceived - cashPaid : 0;
     const balanceDue = grandTotal - amountPaid;
     if (!dto.draft && balanceDue > 0 && !settings.allowCreditSales) {
       throw new BadRequestException(
@@ -867,6 +961,9 @@ export class SchoolSisStationeryService {
           grandTotal,
           amountPaid,
           balanceDue,
+          cashReceived: dto.draft ? null : cashReceived,
+          changeReturned: dto.draft ? null : changeReturned,
+          idempotencyKey: dto.idempotencyKey || null,
           notes: dto.notes?.trim() || null,
           cashierUserId: actor.userId,
           cashierName: actor.name,
@@ -894,8 +991,11 @@ export class SchoolSisStationeryService {
               tenantId,
               method: p.method,
               amount: p.amount,
-              reference: p.reference || null,
-              notes: p.notes || null,
+              reference: p.reference || p.chequeNumber || null,
+              notes:
+                [p.bankName, p.instrumentDate, p.notes]
+                  .filter(Boolean)
+                  .join(' | ') || null,
             })),
           },
         },

@@ -16605,6 +16605,7 @@ model SchoolAcademicYear {
   stationerySales     SchoolStationerySale[]
   stationeryPurchases SchoolStationeryPurchase[]
   stationeryProducts  SchoolStationeryProduct[]
+  exams               SchoolExam[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16644,6 +16645,7 @@ model SchoolGrade {
   monthlyFeePlans SchoolMonthlyFeePlan[]
   stationeryProducts SchoolStationeryProduct[]
   stationeryClassMaps SchoolStationeryProductClassMapping[]
+  examSubjects        SchoolExamSubject[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16670,6 +16672,7 @@ model SchoolSection {
   classTeachers      SchoolClassTeacherAssignment[]
   subjectTeachers    SchoolSubjectTeacherAssignment[]
   timetableSlots     SchoolTimetableSlot[]
+  examSchedules      SchoolExamSchedule[]
 
   @@unique([tenantId, academicYearId, gradeId, name])
   @@index([tenantId, academicYearId])
@@ -16718,6 +16721,9 @@ model SchoolSubject {
   subjectTeachers   SchoolSubjectTeacherAssignment[]
   timetableSlots    SchoolTimetableSlot[]
   optionalEnrolments SchoolStudentOptionalSubject[]
+  examSubjects       SchoolExamSubject[]
+  examSchedules      SchoolExamSchedule[]
+  examResultSubjects SchoolExamResultSubject[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16929,6 +16935,8 @@ model SchoolStudent {
   feeMonthAccounts SchoolFeeMonthAccount[]
   feeGatewayTransactions SchoolPaymentGatewayTransaction[]
   stationerySales  SchoolStationerySale[]
+  examMarks        SchoolExamMark[]
+  examResults      SchoolExamResult[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -17208,6 +17216,7 @@ model SchoolStaff {
   webProfiles               SchoolWebStaffProfile[]
   housesLed                 SchoolHouse[]
   clubsCoordinated          SchoolClub[]
+  examInvigilators          SchoolExamInvigilator[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -18413,6 +18422,9 @@ model SchoolStationerySale {
   grandTotal       Int       @default(0) @map("grand_total")
   amountPaid       Int       @default(0) @map("amount_paid")
   balanceDue       Int       @default(0) @map("balance_due")
+  cashReceived     Int?      @map("cash_received")
+  changeReturned   Int?      @map("change_returned")
+  idempotencyKey   String?   @map("idempotency_key")
   notes            String?   @db.Text
   cashierUserId    String    @map("cashier_user_id") @db.Uuid
   cashierName      String    @map("cashier_name")
@@ -18430,6 +18442,7 @@ model SchoolStationerySale {
   returns      SchoolStationeryReturn[]
 
   @@unique([tenantId, invoiceNo])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, createdAt])
   @@index([tenantId, studentId])
   @@index([tenantId, status])
@@ -18615,4 +18628,298 @@ model SchoolStationeryAuditLog {
   @@map("school_stationery_audit_logs")
   @@schema("school")
 }
+
+/// Configurable school examinations (not college FYUP).
+model SchoolExamSettings {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @unique @map("tenant_id") @db.Uuid
+  passPercent            Decimal  @default(35) @map("pass_percent") @db.Decimal(6, 2)
+  rankingEnabled         Boolean  @default(true) @map("ranking_enabled")
+  rankingMethod          String   @default("SECTION") @map("ranking_method")
+  rankingTie             String   @default("COMPETITION") @map("ranking_tie")
+  graceEnabled           Boolean  @default(false) @map("grace_enabled")
+  graceMax               Int      @default(5) @map("grace_max")
+  decimalPlaces          Int      @default(2) @map("decimal_places")
+  rounding               String   @default("MATH")
+  absentCode             String   @default("AB") @map("absent_code")
+  medicalCode            String   @default("ML") @map("medical_code")
+  notAppearedCode        String   @default("NA") @map("not_appeared_code")
+  attendanceMinPercent   Decimal  @default(75) @map("attendance_min_percent") @db.Decimal(6, 2)
+  attendanceAffectsResult Boolean @default(false) @map("attendance_affects_result")
+  requirePassEverySubject Boolean @default(false) @map("require_pass_every_subject")
+  maxFailedSubjects      Int      @default(99) @map("max_failed_subjects")
+  requireTheoryPass      Boolean  @default(false) @map("require_theory_pass")
+  approvalWorkflow       Boolean  @default(false) @map("approval_workflow")
+  allowNegativeMarks     Boolean  @default(false) @map("allow_negative_marks")
+  defaultGradeSystemId   String?  @map("default_grade_system_id") @db.Uuid
+  reportTemplate         String   @default("STANDARD") @map("report_template")
+  showRankOnCard         Boolean  @default(true) @map("show_rank_on_card")
+  showPhotoOnCard        Boolean  @default(true) @map("show_photo_on_card")
+  remarkBands            Json     @default("[]") @map("remark_bands")
+  configJson             Json     @default("{}") @map("config_json")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  @@map("school_exam_settings")
+  @@schema("school")
+}
+
+model SchoolExamType {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String
+  code           String
+  description    String?
+  defaultWeight  Decimal   @default(100) @map("default_weight") @db.Decimal(6, 2)
+  gradeIds       Json      @default("[]") @map("grade_ids")
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  exams SchoolExam[]
+
+  @@unique([tenantId, code])
+  @@map("school_exam_types")
+  @@schema("school")
+}
+
+model SchoolExam {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  academicYearId   String    @map("academic_year_id") @db.Uuid
+  typeId           String    @map("type_id") @db.Uuid
+  name             String
+  startDate        DateTime? @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  description      String?   @db.Text
+  status           String    @default("DRAFT")
+  gradeIds         Json      @default("[]") @map("grade_ids")
+  settingsOverride Json      @default("{}") @map("settings_override")
+  marksDeadline    DateTime? @map("marks_deadline")
+  publishedAt      DateTime? @map("published_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear      @relation(fields: [academicYearId], references: [id])
+  type         SchoolExamType          @relation(fields: [typeId], references: [id])
+  subjects     SchoolExamSubject[]
+  schedules    SchoolExamSchedule[]
+  marks        SchoolExamMark[]
+  results      SchoolExamResult[]
+
+  @@index([tenantId, academicYearId, status])
+  @@map("school_exams")
+  @@schema("school")
+}
+
+model SchoolExamSubject {
+  id                 String  @id @default(uuid()) @db.Uuid
+  tenantId           String  @map("tenant_id") @db.Uuid
+  examId             String  @map("exam_id") @db.Uuid
+  gradeId            String  @map("grade_id") @db.Uuid
+  subjectId          String  @map("subject_id") @db.Uuid
+  maxTotal           Decimal @default(100) @map("max_total") @db.Decimal(8, 2)
+  passTotal          Decimal @default(35) @map("pass_total") @db.Decimal(8, 2)
+  weightage          Decimal @default(100) @db.Decimal(6, 2)
+  requireTheoryPass  Boolean @default(false) @map("require_theory_pass")
+  theoryMax          Decimal @default(0) @map("theory_max") @db.Decimal(8, 2)
+  theoryPass         Decimal @default(0) @map("theory_pass") @db.Decimal(8, 2)
+
+  exam       SchoolExam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  grade      SchoolGrade            @relation(fields: [gradeId], references: [id])
+  subject    SchoolSubject          @relation(fields: [subjectId], references: [id])
+  components SchoolExamComponent[]
+
+  @@unique([examId, gradeId, subjectId])
+  @@map("school_exam_subjects")
+  @@schema("school")
+}
+
+model SchoolExamComponent {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  examSubjectId String @map("exam_subject_id") @db.Uuid
+  name         String
+  code         String
+  maxMarks     Decimal @map("max_marks") @db.Decimal(8, 2)
+  passMarks    Decimal @default(0) @map("pass_marks") @db.Decimal(8, 2)
+  weightage    Decimal @default(100) @db.Decimal(6, 2)
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  examSubject SchoolExamSubject @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
+  marks       SchoolExamMark[]
+
+  @@unique([examSubjectId, code])
+  @@map("school_exam_components")
+  @@schema("school")
+}
+
+model SchoolExamSchedule {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  examId       String   @map("exam_id") @db.Uuid
+  sectionId    String   @map("section_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.Uuid
+  examDate     DateTime @map("exam_date") @db.Date
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  durationMin  Int      @default(0) @map("duration_min")
+  room         String?
+  maxMarks     Decimal? @map("max_marks") @db.Decimal(8, 2)
+  instructions String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  exam         SchoolExam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  section      SchoolSection           @relation(fields: [sectionId], references: [id])
+  subject      SchoolSubject           @relation(fields: [subjectId], references: [id])
+  invigilators SchoolExamInvigilator[]
+
+  @@index([tenantId, examId, examDate])
+  @@map("school_exam_schedules")
+  @@schema("school")
+}
+
+model SchoolExamInvigilator {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  scheduleId String @map("schedule_id") @db.Uuid
+  staffId    String @map("staff_id") @db.Uuid
+  override   Boolean @default(false)
+
+  schedule SchoolExamSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  staff    SchoolStaff        @relation(fields: [staffId], references: [id])
+
+  @@unique([scheduleId, staffId])
+  @@map("school_exam_invigilators")
+  @@schema("school")
+}
+
+model SchoolExamMark {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  examId         String    @map("exam_id") @db.Uuid
+  componentId    String    @map("component_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  marks          Decimal?  @db.Decimal(8, 2)
+  status         String    @default("PRESENT")
+  remarks        String?
+  entryStatus    String    @default("DRAFT") @map("entry_status")
+  submittedAt    DateTime? @map("submitted_at")
+  submittedBy    String?   @map("submitted_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  exam      SchoolExam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  component SchoolExamComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  student   SchoolStudent       @relation(fields: [studentId], references: [id])
+
+  @@unique([examId, componentId, studentId])
+  @@index([tenantId, examId, studentId])
+  @@map("school_exam_marks")
+  @@schema("school")
+}
+
+model SchoolGradeSystem {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  kind      String    @default("PERCENTAGE")
+  isDefault Boolean   @default(false) @map("is_default")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  bands SchoolGradeBand[]
+
+  @@unique([tenantId, name])
+  @@map("school_grade_systems")
+  @@schema("school")
+}
+
+model SchoolGradeBand {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  systemId    String  @map("system_id") @db.Uuid
+  code        String
+  label       String
+  minPercent  Decimal @map("min_percent") @db.Decimal(6, 2)
+  maxPercent  Decimal @map("max_percent") @db.Decimal(6, 2)
+  gradePoint  Decimal @default(0) @map("grade_point") @db.Decimal(4, 2)
+  description String?
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  system SchoolGradeSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+  @@map("school_grade_bands")
+  @@schema("school")
+}
+
+model SchoolExamResult {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  examId          String   @map("exam_id") @db.Uuid
+  studentId       String   @map("student_id") @db.Uuid
+  totalObtained   Decimal  @map("total_obtained") @db.Decimal(10, 2)
+  totalMax        Decimal  @map("total_max") @db.Decimal(10, 2)
+  percent         Decimal  @db.Decimal(8, 2)
+  grade           String?
+  gradePoint      Decimal? @map("grade_point") @db.Decimal(4, 2)
+  status          String
+  rankSection     Int?     @map("rank_section")
+  rankClass       Int?     @map("rank_class")
+  graceApplied    Decimal  @default(0) @map("grace_applied") @db.Decimal(6, 2)
+  remarks         String?
+  snapshot        Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  exam     SchoolExam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student  SchoolStudent            @relation(fields: [studentId], references: [id])
+  subjects SchoolExamResultSubject[]
+
+  @@unique([examId, studentId])
+  @@index([tenantId, examId, status])
+  @@map("school_exam_results")
+  @@schema("school")
+}
+
+model SchoolExamResultSubject {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  resultId      String  @map("result_id") @db.Uuid
+  subjectId     String  @map("subject_id") @db.Uuid
+  obtained      Decimal @db.Decimal(8, 2)
+  max           Decimal @db.Decimal(8, 2)
+  percent       Decimal @db.Decimal(8, 2)
+  grade         String?
+  status        String
+  graceApplied  Decimal @default(0) @map("grace_applied") @db.Decimal(6, 2)
+
+  result  SchoolExamResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  subject SchoolSubject    @relation(fields: [subjectId], references: [id])
+
+  @@index([resultId])
+  @@map("school_exam_result_subjects")
+  @@schema("school")
+}
+
+model SchoolExamAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String
+  recordId  String?  @map("record_id")
+  oldValue  Json?
+  newValue  Json?
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_exam_audit_logs")
+  @@schema("school")
+}
+
 

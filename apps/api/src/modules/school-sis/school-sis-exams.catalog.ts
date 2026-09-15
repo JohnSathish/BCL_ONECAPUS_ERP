@@ -1,0 +1,70 @@
+export const DEFAULT_EXAM_TYPES = [
+  { code: 'UNIT', name: 'Unit Test', defaultWeight: 10 },
+  { code: 'CLASS', name: 'Class Test', defaultWeight: 10 },
+  { code: 'PERIODIC', name: 'Periodic Test', defaultWeight: 10 },
+  { code: 'MONTHLY', name: 'Monthly Test', defaultWeight: 10 },
+  { code: 'MID', name: 'Mid Term', defaultWeight: 30 },
+  { code: 'HALF', name: 'Half Yearly', defaultWeight: 40 },
+  { code: 'PREFINAL', name: 'Pre-Final', defaultWeight: 20 },
+  { code: 'ANNUAL', name: 'Annual Examination', defaultWeight: 50 },
+  { code: 'FINAL', name: 'Final Examination', defaultWeight: 50 },
+  { code: 'PRACTICAL', name: 'Practical Examination', defaultWeight: 20 },
+  { code: 'ORAL', name: 'Oral Examination', defaultWeight: 10 },
+  { code: 'ASSIGN', name: 'Assignment', defaultWeight: 10 },
+  { code: 'PROJECT', name: 'Project', defaultWeight: 10 },
+  { code: 'IA', name: 'Internal Assessment', defaultWeight: 20 },
+] as const;
+
+export const DEFAULT_GRADE_BANDS = [
+  {
+    code: 'A+',
+    label: 'A+',
+    min: 90,
+    max: 100,
+    point: 10,
+    description: 'Outstanding',
+  },
+  {
+    code: 'A',
+    label: 'A',
+    min: 80,
+    max: 89.99,
+    point: 9,
+    description: 'Excellent',
+  },
+  {
+    code: 'B+',
+    label: 'B+',
+    min: 70,
+    max: 79.99,
+    point: 8,
+    description: 'Very Good',
+  },
+  { code: 'B', label: 'B', min: 60, max: 69.99, point: 7, description: 'Good' },
+  {
+    code: 'C',
+    label: 'C',
+    min: 50,
+    max: 59.99,
+    point: 6,
+    description: 'Satisfactory',
+  },
+  {
+    code: 'D',
+    label: 'D',
+    min: 35,
+    max: 49.99,
+    point: 5,
+    description: 'Needs Improvement',
+  },
+  { code: 'F', label: 'F', min: 0, max: 34.99, point: 0, description: 'Fail' },
+] as const;
+
+export const DEFAULT_REMARK_BANDS = [
+  { min: 90, max: 100, text: 'Outstanding performance.' },
+  { min: 80, max: 89.99, text: 'Excellent performance.' },
+  { min: 70, max: 79.99, text: 'Very good performance.' },
+  { min: 60, max: 69.99, text: 'Good performance.' },
+  { min: 50, max: 59.99, text: 'Satisfactory performance.' },
+  { min: 0, max: 49.99, text: 'Needs improvement.' },
+];

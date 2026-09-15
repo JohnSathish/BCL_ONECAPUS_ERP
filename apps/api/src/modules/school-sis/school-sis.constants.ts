@@ -21,6 +21,7 @@ export const SCHOOL_SIS_STATIONERY_PAY_METHODS = [
   'BANK_TRANSFER',
   'ONLINE',
   'CREDIT',
+  'CHEQUE',
   'OTHER',
 ] as const;
 export const SCHOOL_ADMISSION_NUMBER_PREFIX = 'SLS';

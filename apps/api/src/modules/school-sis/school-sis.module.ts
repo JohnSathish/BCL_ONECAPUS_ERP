@@ -17,6 +17,8 @@ import { SchoolSisPaymentGatewaysService } from './school-sis-payment-gateways.s
 import { SchoolSisPaymentGatewaysController } from './school-sis-payment-gateways.controller';
 import { SchoolSisStationeryService } from './school-sis-stationery.service';
 import { SchoolSisStationeryController } from './school-sis-stationery.controller';
+import { SchoolSisExamsService } from './school-sis-exams.service';
+import { SchoolSisExamsController } from './school-sis-exams.controller';
 import { SchoolSisTimetableService } from './school-sis-timetable.service';
 
 @Module({
@@ -28,6 +30,7 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisMonthlyFeesController,
     SchoolSisPaymentGatewaysController,
     SchoolSisStationeryController,
+    SchoolSisExamsController,
   ],
   providers: [
     SchoolSisService,
@@ -41,6 +44,7 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisFeeReportsService,
     SchoolSisPaymentGatewaysService,
     SchoolSisStationeryService,
+    SchoolSisExamsService,
   ],
   exports: [
     SchoolSisService,
@@ -54,6 +58,7 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisFeeReportsService,
     SchoolSisPaymentGatewaysService,
     SchoolSisStationeryService,
+    SchoolSisExamsService,
   ],
 })
 export class SchoolSisModule {}

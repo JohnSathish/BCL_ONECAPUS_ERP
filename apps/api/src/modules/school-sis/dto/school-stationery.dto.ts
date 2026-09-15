@@ -372,6 +372,18 @@ export class StationeryPaymentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  chequeNumber?: string;
+
+  @IsOptional()
+  @IsDateString()
+  instrumentDate?: string;
 }
 
 export class CompleteStationerySaleDto {
@@ -410,6 +422,16 @@ export class CompleteStationerySaleDto {
   @IsOptional()
   @IsBoolean()
   draft?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  cashReceived?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  idempotencyKey?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

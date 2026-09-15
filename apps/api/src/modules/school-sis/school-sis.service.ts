@@ -305,7 +305,7 @@ export class SchoolSisService {
         timetable: true,
         attendance: false,
         fees: true,
-        exams: false,
+        exams: true,
         library: false,
         stationery: true,
         transport: false,

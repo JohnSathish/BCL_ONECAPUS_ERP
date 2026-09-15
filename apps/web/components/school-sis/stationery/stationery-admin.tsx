@@ -172,6 +172,10 @@ export function StationeryProductsDesk() {
           }}
         >
           <p className="font-semibold text-[#1e3a8a]">New product</p>
+          <p className="text-xs text-slate-500">
+            This is the store catalog. POS search looks up products saved here (name, SKU or
+            barcode), not category titles. Use the form below or import the Excel template.
+          </p>
           <input
             className={inputClass}
             placeholder="Product name"

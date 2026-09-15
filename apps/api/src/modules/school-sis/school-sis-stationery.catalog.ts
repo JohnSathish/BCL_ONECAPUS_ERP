@@ -4,6 +4,24 @@ export type StationeryCategorySeed = {
   children: Array<{ code: string; name: string }>;
 };
 
+/** Default purchase/selling rupees used when seeding one product per subcategory. */
+export const STATIONERY_STARTER_PRICES: Record<
+  string,
+  { purchase: number; sell: number }
+> = {
+  BOOKS: { purchase: 150, sell: 200 },
+  NOTEBOOKS: { purchase: 30, sell: 40 },
+  WRITING: { purchase: 8, sell: 10 },
+  PAPER_FILES: { purchase: 20, sell: 30 },
+  GEOMETRY: { purchase: 12, sell: 20 },
+  ART_CRAFT: { purchase: 25, sell: 35 },
+  UNIFORM: { purchase: 250, sell: 300 },
+  FOOTWEAR: { purchase: 400, sell: 480 },
+  ACCESSORIES: { purchase: 50, sell: 80 },
+  OFFICE: { purchase: 20, sell: 30 },
+  EXAM: { purchase: 8, sell: 15 },
+};
+
 export const STATIONERY_CATEGORY_SEED: StationeryCategorySeed[] = [
   {
     code: 'BOOKS',

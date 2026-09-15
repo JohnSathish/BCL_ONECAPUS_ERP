@@ -47,6 +47,7 @@ import {
   fetchSchoolSisStudentDocumentFile,
   fetchSchoolSisStudentFees,
   fetchSchoolSisStudentTimetable,
+  fetchStudentPublishedExamResults,
   uploadSchoolSisStudentPhoto,
   type SchoolSisFeeStructure,
   type SchoolSisStudentMaster,
@@ -173,6 +174,11 @@ export function SchoolSisStudentProfile({ studentId }: { studentId: string }) {
     queryKey: ['school-sis-fees-student', studentId],
     queryFn: () => fetchSchoolSisStudentFees(studentId),
     enabled: enabled && Boolean(studentId) && tab === 'fees',
+  });
+  const publishedExams = useQuery({
+    queryKey: ['school-sis-student-exams', studentId],
+    queryFn: () => fetchStudentPublishedExamResults(studentId),
+    enabled: enabled && Boolean(studentId) && tab === 'exams',
   });
 
   const photoMut = useMutation({
@@ -998,10 +1004,35 @@ export function SchoolSisStudentProfile({ studentId }: { studentId: string }) {
         />
       ) : null}
       {tab === 'exams' ? (
-        <ComingSoon
-          title="Exams & results"
-          hint="Marks, grades and report cards will load from the examinations module."
-        />
+        publishedExams.isLoading ? (
+          <p className="text-sm text-slate-500">Loading published results…</p>
+        ) : (publishedExams.data ?? []).length ? (
+          <div className="space-y-3">
+            {(publishedExams.data as any[]).map((r) => (
+              <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="font-semibold text-[#1a365d]">{r.exam?.name}</p>
+                <p className="text-xs text-slate-500">
+                  {r.exam?.academicYear?.name} · {r.status} · {Number(r.percent)}%
+                </p>
+                <ul className="mt-2 text-sm text-slate-700">
+                  {(r.subjects ?? []).map((s: any) => (
+                    <li key={s.id}>
+                      {s.subject?.name}: {Number(s.obtained)}/{Number(s.max)} {s.grade ?? ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="text-xs text-slate-400">Only published results are shown.</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
+            <p className="text-sm font-semibold text-[#1a365d]">No published results</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Results appear here after the school publishes an examination.
+            </p>
+          </div>
+        )
       ) : null}
       {tab === 'fees' ? (
         fees.isLoading ? (
