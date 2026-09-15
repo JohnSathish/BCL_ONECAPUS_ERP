@@ -1082,14 +1082,27 @@ export class SchoolSisMonthlyFeesService {
           : {}),
         ...(query.q
           ? {
-              student: {
-                OR: [
-                  { fullName: { contains: query.q, mode: 'insensitive' } },
-                  {
-                    admissionNumber: { contains: query.q, mode: 'insensitive' },
+              OR: [
+                {
+                  receiptNumber: {
+                    contains: query.q,
+                    mode: 'insensitive',
                   },
-                ],
-              },
+                },
+                {
+                  student: {
+                    OR: [
+                      { fullName: { contains: query.q, mode: 'insensitive' } },
+                      {
+                        admissionNumber: {
+                          contains: query.q,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
             }
           : {}),
       },

@@ -1441,3 +1441,26 @@ export class VoidSchoolFeeDto {
   @MaxLength(240)
   reason!: string;
 }
+
+export class CloseSchoolFeeCashDto {
+  @IsUUID()
+  userId!: string;
+
+  @IsString()
+  date!: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+
+  @Type(() => Number)
+  openingCash!: number;
+
+  @Type(() => Number)
+  actualCashCount!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  notes?: string;
+}

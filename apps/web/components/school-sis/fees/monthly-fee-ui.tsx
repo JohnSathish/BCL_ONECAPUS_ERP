@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Clock3, LayoutDashboard, Settings2, Wallet, ClipboardList } from 'lucide-react';
+import {
+  BookOpen,
+  Clock3,
+  FileBarChart2,
+  LayoutDashboard,
+  Settings2,
+  Wallet,
+  ClipboardList,
+} from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 const LINKS = [
@@ -15,6 +23,7 @@ const LINKS = [
   { href: '/admin/school-sis/fees/collect', label: 'Collect', icon: Wallet },
   { href: '/admin/school-sis/fees/pending', label: 'Pending', icon: Clock3 },
   { href: '/admin/school-sis/fees/register', label: 'Register', icon: ClipboardList },
+  { href: '/admin/school-sis/fees/reports', label: 'Reports', icon: FileBarChart2 },
   { href: '/admin/school-sis/fees/settings', label: 'Configuration', icon: Settings2 },
   { href: '/admin/school-sis/fees', label: 'Annual structure', icon: BookOpen },
 ];

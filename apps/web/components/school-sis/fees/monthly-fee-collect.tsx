@@ -82,7 +82,8 @@ function sectionKey(student: SchoolSisStudent) {
 
 export function MonthlyFeeCollect() {
   const enabled = useAuthQueryEnabled();
-  const canManage = canManageSchoolSis(useAuthStore((s) => s.session?.user)?.permissions);
+  const sessionUser = useAuthStore((s) => s.session?.user);
+  const canManage = canManageSchoolSis(sessionUser?.permissions);
   const [q, setQ] = useState('');
   const [sectionId, setSectionId] = useState('all');
   const [sortBy, setSortBy] = useState<'name' | 'admission'>('name');
@@ -100,7 +101,7 @@ export function MonthlyFeeCollect() {
   const [waiveLate, setWaiveLate] = useState(false);
   const [lateReason, setLateReason] = useState('');
   const [amountPaying, setAmountPaying] = useState('');
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
@@ -194,10 +195,12 @@ export function MonthlyFeeCollect() {
   const dueRows = book?.rows.filter((r) => r.selectable) ?? [];
   const selectedRows = (book?.rows ?? []).filter((r) => selected.includes(r.feeMonth));
   const paidMonths = book?.rows.filter((r) => r.status === 'PAID').length ?? 0;
-  const gross = selectedRows.reduce((s, r) => s + r.totalDue, 0);
+  const billedGross = selectedRows.reduce((s, r) => s + r.totalDue, 0);
   const tuition = selectedRows.reduce((s, r) => s + r.tuitionAmount, 0);
   const other = selectedRows.reduce((s, r) => s + r.otherAmount, 0);
   const late = selectedRows.reduce((s, r) => s + r.lateFeeAmount, 0);
+  const lateCharged = waiveLate ? 0 : late;
+  const gross = Math.max(0, billedGross - (waiveLate ? late : 0));
   const discRaw = Number(discountValue || 0);
   const discount = Math.min(
     gross,
@@ -210,12 +213,15 @@ export function MonthlyFeeCollect() {
   const current = currentFeeMonth();
   const concessionReady =
     discount <= 0 || (Boolean(discountReason.trim()) && Boolean(approvedBy.trim()));
+  const lateWaiverReady = !waiveLate || Boolean(lateReason.trim());
   const canCollect =
     canManage &&
     selected.length > 0 &&
     paying > 0 &&
     concessionReady &&
+    lateWaiverReady &&
     (selected.length === 1 || paying === net);
+  const lateFeesOn = book?.settings.lateFeeEnabled ?? config.data?.settings.lateFeeEnabled ?? true;
   const otherLabel = book?.otherLabel || monthlyOtherLabel(book?.gradeCode ?? '');
   const planTuition = book?.rows[0]?.tuitionAmount ?? 0;
   const planOther = book?.rows[0]?.otherAmount ?? 0;
@@ -234,6 +240,11 @@ export function MonthlyFeeCollect() {
       return prev;
     });
   }, [net]);
+
+  useEffect(() => {
+    const name = sessionUser?.displayName?.trim();
+    if (name && !approvedBy) setApprovedBy(name);
+  }, [sessionUser?.displayName, approvedBy]);
 
   function pickStudent(id: string) {
     setStudentId(id);
@@ -547,16 +558,106 @@ export function MonthlyFeeCollect() {
                       />
                       <Line label="Tuition Fees" value={rs(tuition)} />
                       <Line label={otherLabel} value={rs(other)} />
-                      <Line label="Late Fees" value={rs(late)} />
-                      <Line label="Concession" value={`− ${rs(discount)}`} />
+                      <Line
+                        label="Late Fees"
+                        value={waiveLate && late ? `${rs(0)} (waived)` : rs(lateCharged)}
+                      />
                     </dl>
+
+                    <div className="mt-4 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Concession
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <select
+                          className="h-10 rounded-xl border border-slate-200 bg-white px-2 text-sm"
+                          value={discountType}
+                          onChange={(e) => setDiscountType(e.target.value as 'AMOUNT' | 'PERCENT')}
+                        >
+                          <option value="AMOUNT">Amount (₹)</option>
+                          <option value="PERCENT">Percent (%)</option>
+                        </select>
+                        <input
+                          className="h-10 rounded-xl border border-slate-200 bg-white px-2 text-sm tabular-nums"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                        />
+                      </div>
+                      <div className="mt-2 flex justify-between text-sm">
+                        <span className="text-slate-500">Concession applied</span>
+                        <span className="font-semibold tabular-nums text-rose-600">
+                          − {rs(discount)}
+                        </span>
+                      </div>
+                      {discount > 0 ? (
+                        <div className="mt-2 space-y-2">
+                          <input
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            placeholder="Reason (required)"
+                            value={discountReason}
+                            onChange={(e) => setDiscountReason(e.target.value)}
+                          />
+                          <input
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            placeholder="Approved by (required)"
+                            value={approvedBy}
+                            onChange={(e) => setApprovedBy(e.target.value)}
+                          />
+                          {!concessionReady ? (
+                            <p className="text-xs text-amber-700">
+                              Enter a reason and who approved the concession before collecting.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-slate-400">
+                          Enter an amount or percent to reduce this receipt. Reason and approver are
+                          required when a concession is given.
+                        </p>
+                      )}
+                    </div>
+
+                    {late > 0 && lateFeesOn ? (
+                      <div className="mt-3 rounded-2xl bg-rose-50 p-3 ring-1 ring-rose-100">
+                        <label className="flex items-start gap-2 text-sm text-rose-900">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={waiveLate}
+                            onChange={(e) => setWaiveLate(e.target.checked)}
+                          />
+                          <span>
+                            Do not collect late fee on this receipt
+                            <span className="block text-xs font-normal text-rose-700">
+                              Removes {rs(late)} from the total for the selected overdue months.
+                            </span>
+                          </span>
+                        </label>
+                        {waiveLate ? (
+                          <input
+                            className="mt-2 h-10 w-full rounded-xl border border-rose-200 bg-white px-3 text-sm"
+                            placeholder="Waiver reason (required)"
+                            value={lateReason}
+                            onChange={(e) => setLateReason(e.target.value)}
+                          />
+                        ) : null}
+                      </div>
+                    ) : !lateFeesOn ? (
+                      <p className="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                        School-wide late fees are switched off in Configuration. Overdue months will
+                        not add a late charge.
+                      </p>
+                    ) : null}
+
                     <div className="mt-4 rounded-2xl bg-[#2563eb] px-4 py-3 text-white">
                       <p className="text-xs font-medium text-blue-100">Total Amount</p>
                       <p className="text-3xl font-bold tabular-nums">{rs(net)}</p>
                       <p className="mt-1 text-[11px] text-blue-100">{rupeesInWords(net)}</p>
                     </div>
                     {selectedRows
-                      .filter((r) => r.lateApplies)
+                      .filter((r) => r.lateApplies && !waiveLate)
                       .map((r) => (
                         <p key={r.feeMonth} className="mt-2 text-xs text-rose-700">
                           {r.lateReason}
@@ -567,9 +668,7 @@ export function MonthlyFeeCollect() {
                       className="mt-3 text-xs font-medium text-[#2563eb]"
                       onClick={() => setDetailsOpen((v) => !v)}
                     >
-                      {detailsOpen
-                        ? 'Hide payment details'
-                        : 'Payment method, concession & late override'}
+                      {detailsOpen ? 'Hide payment method' : 'Payment method & amount paying'}
                     </button>
                     {detailsOpen ? (
                       <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
@@ -615,58 +714,6 @@ export function MonthlyFeeCollect() {
                               onChange={(e) => setBankName(e.target.value)}
                             />
                           </>
-                        ) : null}
-                        <div className="grid grid-cols-2 gap-2">
-                          <select
-                            className="h-10 rounded-xl border px-2 text-sm"
-                            value={discountType}
-                            onChange={(e) =>
-                              setDiscountType(e.target.value as 'AMOUNT' | 'PERCENT')
-                            }
-                          >
-                            <option value="AMOUNT">Concession ₹</option>
-                            <option value="PERCENT">Concession %</option>
-                          </select>
-                          <input
-                            className="h-10 rounded-xl border px-2 text-sm"
-                            value={discountValue}
-                            onChange={(e) => setDiscountValue(e.target.value)}
-                          />
-                        </div>
-                        {discount > 0 ? (
-                          <>
-                            <input
-                              className="h-10 w-full rounded-xl border px-3 text-sm"
-                              placeholder="Concession reason"
-                              value={discountReason}
-                              onChange={(e) => setDiscountReason(e.target.value)}
-                            />
-                            <input
-                              className="h-10 w-full rounded-xl border px-3 text-sm"
-                              placeholder="Approved by"
-                              value={approvedBy}
-                              onChange={(e) => setApprovedBy(e.target.value)}
-                            />
-                          </>
-                        ) : null}
-                        {selectedRows.some((r) => r.lateFeeAmount > 0) ? (
-                          <label className="block text-xs text-slate-600">
-                            <input
-                              type="checkbox"
-                              className="mr-2"
-                              checked={waiveLate}
-                              onChange={(e) => setWaiveLate(e.target.checked)}
-                            />
-                            Override late fee
-                            {waiveLate ? (
-                              <input
-                                className="mt-2 h-10 w-full rounded-xl border px-3 text-sm"
-                                placeholder="Mandatory reason"
-                                value={lateReason}
-                                onChange={(e) => setLateReason(e.target.value)}
-                              />
-                            ) : null}
-                          </label>
                         ) : null}
                         <label className="block text-xs text-slate-500">
                           Amount paying
@@ -969,6 +1016,7 @@ export function MonthlyFeeCollect() {
                           .filter((r) => r.lateFeeAmount)
                           .map((r) => ({ month: r.feeMonth, reason: lateReason }))
                       : undefined,
+                    waiveLateFee: waiveLate,
                     channel: 'OFFICE',
                   })
                     .then((res) => {

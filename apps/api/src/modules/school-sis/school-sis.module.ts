@@ -11,6 +11,7 @@ import { SchoolSisAcademicService } from './school-sis-academic.service';
 import { SchoolSisAcademicController } from './school-sis-academic.controller';
 import { SchoolSisFeesService } from './school-sis-fees.service';
 import { SchoolSisMonthlyFeesService } from './school-sis-monthly-fees.service';
+import { SchoolSisFeeReportsService } from './school-sis-fee-reports.service';
 import { SchoolSisMonthlyFeesController } from './school-sis-monthly-fees.controller';
 import { SchoolSisTimetableService } from './school-sis-timetable.service';
 
@@ -31,6 +32,7 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisTimetableService,
     SchoolSisFeesService,
     SchoolSisMonthlyFeesService,
+    SchoolSisFeeReportsService,
   ],
   exports: [
     SchoolSisService,
@@ -41,6 +43,7 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisTimetableService,
     SchoolSisFeesService,
     SchoolSisMonthlyFeesService,
+    SchoolSisFeeReportsService,
   ],
 })
 export class SchoolSisModule {}

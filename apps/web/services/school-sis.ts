@@ -1548,3 +1548,112 @@ export async function printMonthlyFeeReceipt(id: string) {
     height: '210mm',
   });
 }
+
+export type UserWiseCollectionReport = {
+  date: string;
+  summary: {
+    totalCollection: number;
+    totalCash: number;
+    totalOnline: number;
+    cashPercent: number;
+    onlinePercent: number;
+    totalTransactions: number;
+    userCount: number;
+  };
+  users: Array<{
+    userId: string | null;
+    userName: string;
+    role: string;
+    cashCollection: number;
+    onlineCollection: number;
+    totalCollection: number;
+    receiptCount: number;
+    firstCollectionTime: string | null;
+    lastCollectionTime: string | null;
+    cashClose: { status: string; difference: number; actualCashCount: number } | null;
+  }>;
+  pagination: { page: number; limit: number; total: number };
+  canViewAll: boolean;
+  canClose: boolean;
+  filters: {
+    academicYear: { id: string; name: string };
+    years: Array<{ id: string; name: string; status: string }>;
+    grades: Array<{ id: string; name: string }>;
+    sections: Array<{ id: string; gradeId: string; name: string }>;
+    paymentModes: string[];
+    collectors: Array<{ userId: string; userName: string }>;
+    schoolName: string | null;
+    logoUrl: string | null;
+  };
+};
+
+export async function fetchUserWiseCollection(params: Record<string, string | number | undefined>) {
+  const { data } = await api.get('/v1/school-sis/fees/monthly/reports/user-wise-collection', {
+    params,
+  });
+  return data as UserWiseCollectionReport;
+}
+
+export async function fetchUserWiseReceipts(
+  userId: string,
+  params: Record<string, string | number | undefined>,
+) {
+  const { data } = await api.get(
+    `/v1/school-sis/fees/monthly/reports/user-wise-collection/users/${userId}`,
+    { params },
+  );
+  return data as {
+    date: string;
+    user: { userId: string | null; userName: string; role: string };
+    summary: {
+      cashCollected: number;
+      onlineCollected: number;
+      total: number;
+      receipts: number;
+    };
+    receipts: Array<{
+      id: string;
+      receiptNumber: string;
+      studentName: string;
+      admissionNo: string;
+      className: string;
+      feeMonth: string;
+      amount: number;
+      paymentMode: string;
+      collectionTime: string | null;
+      status: string;
+    }>;
+    pagination: { page: number; limit: number; total: number };
+  };
+}
+
+export async function downloadUserWiseCollectionXlsx(params: Record<string, string | undefined>) {
+  const { data } = await api.get(
+    '/v1/school-sis/fees/monthly/reports/user-wise-collection/export',
+    {
+      params,
+      responseType: 'blob',
+    },
+  );
+  triggerBlobDownload(data as Blob, `user-wise-collection-${params.date || 'today'}.xlsx`);
+}
+
+export async function closeSchoolFeeCashCounter(payload: {
+  userId: string;
+  date: string;
+  academicYearId?: string;
+  openingCash: number;
+  actualCashCount: number;
+  notes?: string;
+}) {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/reports/cash-close', payload);
+  return data;
+}
+
+export async function reopenSchoolFeeCashCounter(userId: string, date: string) {
+  const { data } = await api.post('/v1/school-sis/fees/monthly/reports/cash-close/reopen', {
+    userId,
+    date,
+  });
+  return data;
+}

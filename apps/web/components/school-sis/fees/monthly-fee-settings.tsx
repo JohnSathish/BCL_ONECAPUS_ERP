@@ -64,7 +64,7 @@ export function MonthlyFeeSettings() {
       {query.isLoading ? <p className="text-sm text-slate-500">Loading configuration…</p> : null}
       {query.data?.settings ? (
         <form
-          className="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2"
+          className="grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             void saveMonthlyFeeSettings({
@@ -89,118 +89,142 @@ export function MonthlyFeeSettings() {
               .catch((err) => setError(apiErrorMessage(err)));
           }}
         >
-          <label className="text-sm">
-            Due day of month (Nursery–IV)
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={dueDay}
-              onChange={(e) => setDueDay(e.target.value)}
-              disabled={!canManage}
-            />
-            <span className="mt-1 block text-xs text-slate-500">
-              Junior fee book: 15th. Classes V–X always use the 10th from the Class V–X fee book.
-            </span>
-          </label>
-          <label className="text-sm">
-            Late fee (₹)
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={late}
-              onChange={(e) => setLate(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={lateEnabled}
-              onChange={(e) => setLateEnabled(e.target.checked)}
-              disabled={!canManage}
-            />
-            Apply late fee after due date
-          </label>
-          <label className="text-sm">
-            Receipt prefix
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={prefix}
-              onChange={(e) => setPrefix(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <label className="text-sm">
-            Authorized signatory
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={signatory}
-              onChange={(e) => setSignatory(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <label className="text-sm sm:col-span-2">
-            School name on receipt
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <label className="text-sm sm:col-span-2">
-            Address
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={schoolAddress}
-              onChange={(e) => setSchoolAddress(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <label className="text-sm sm:col-span-2">
-            Logo URL
-            <input
-              className="mt-1 h-10 w-full rounded-xl border px-3"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          <fieldset className="sm:col-span-2">
-            <legend className="text-sm">Payment methods</legend>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {METHODS.map((m) => (
-                <label key={m} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={methods.includes(m)}
-                    disabled={!canManage}
-                    onChange={(e) => {
-                      setMethods((cur) =>
-                        e.target.checked ? [...cur, m] : cur.filter((x) => x !== m),
-                      );
-                    }}
-                  />
-                  {m}
-                </label>
-              ))}
+          <section
+            className={`rounded-3xl p-5 ring-1 ${
+              lateEnabled ? 'bg-white ring-slate-100' : 'bg-amber-50 ring-amber-100'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Late fee collection</h2>
+                <p className="mt-1 max-w-xl text-sm text-slate-500">
+                  Turn this off if management decides not to collect late fees. Overdue months will
+                  then show only tuition (and computer fee for V–X). Receipts already issued are not
+                  changed.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={lateEnabled}
+                  onChange={(e) => setLateEnabled(e.target.checked)}
+                  disabled={!canManage}
+                />
+                {lateEnabled ? 'Collect late fees' : 'Late fees off'}
+              </label>
             </div>
-          </fieldset>
-          <label className="text-sm sm:col-span-2">
-            General instructions (one per line)
-            <textarea
-              className="mt-1 min-h-28 w-full rounded-xl border px-3 py-2"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              disabled={!canManage}
-            />
-          </label>
-          {canManage ? (
-            <button
-              type="submit"
-              className="h-10 rounded-xl bg-[var(--school-erp-primary)] text-white sm:col-span-2"
-            >
-              Save rules
-            </button>
-          ) : null}
+            <label className="mt-4 block max-w-xs text-sm">
+              Late fee amount (₹)
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3 disabled:bg-slate-50"
+                value={late}
+                onChange={(e) => setLate(e.target.value)}
+                disabled={!canManage || !lateEnabled}
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Charged after the due date (15th for Nursery–IV, 10th for Classes V–X) when late
+                fees are on.
+              </span>
+            </label>
+          </section>
+
+          <div className="grid gap-3 rounded-3xl bg-white p-5 ring-1 ring-slate-100 sm:grid-cols-2">
+            <label className="text-sm">
+              Due day of month (Nursery–IV)
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={dueDay}
+                onChange={(e) => setDueDay(e.target.value)}
+                disabled={!canManage}
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Junior fee book: 15th. Classes V–X always use the 10th from the Class V–X fee book.
+              </span>
+            </label>
+            <label className="text-sm">
+              Receipt prefix
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={prefix}
+                onChange={(e) => setPrefix(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            <label className="text-sm">
+              Authorized signatory
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={signatory}
+                onChange={(e) => setSignatory(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              School name on receipt
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={schoolName}
+                onChange={(e) => setSchoolName(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              Address
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={schoolAddress}
+                onChange={(e) => setSchoolAddress(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              Logo URL
+              <input
+                className="mt-1 h-10 w-full rounded-xl border px-3"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="text-sm">Payment methods</legend>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {METHODS.map((m) => (
+                  <label key={m} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={methods.includes(m)}
+                      disabled={!canManage}
+                      onChange={(e) => {
+                        setMethods((cur) =>
+                          e.target.checked ? [...cur, m] : cur.filter((x) => x !== m),
+                        );
+                      }}
+                    />
+                    {m}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="text-sm sm:col-span-2">
+              General instructions (one per line)
+              <textarea
+                className="mt-1 min-h-28 w-full rounded-xl border px-3 py-2"
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                disabled={!canManage}
+              />
+            </label>
+            {canManage ? (
+              <button
+                type="submit"
+                className="h-10 rounded-xl bg-[var(--school-erp-primary)] text-white sm:col-span-2"
+              >
+                Save rules
+              </button>
+            ) : null}
+          </div>
         </form>
       ) : null}
       <div className="overflow-x-auto rounded-2xl border bg-white">

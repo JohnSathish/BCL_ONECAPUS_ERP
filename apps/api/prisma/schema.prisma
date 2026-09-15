@@ -16601,6 +16601,7 @@ model SchoolAcademicYear {
   monthlyFeePlans    SchoolMonthlyFeePlan[]
   feePayments        SchoolFeePayment[]
   feeMonthAccounts   SchoolFeeMonthAccount[]
+  feeCashCloses      SchoolFeeCashClose[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -17488,6 +17489,9 @@ model SchoolFeePayment {
   @@index([tenantId, academicYearId, feeMonth, status])
   @@index([tenantId, studentId, feeMonth])
   @@index([tenantId, paidAt])
+  @@index([tenantId, collectedById, paidAt, status])
+  @@index([tenantId, paymentMode, status, paidAt])
+  @@index([tenantId, gradeId, sectionId, status])
   @@map("school_fee_payments")
   @@schema("school")
 }
@@ -17550,6 +17554,36 @@ model SchoolFeePaymentEvent {
 
   @@index([tenantId, paymentId, createdAt])
   @@map("school_fee_payment_events")
+  @@schema("school")
+}
+
+/// Daily cash-counter close for St. Luke's monthly fees. Not college finance.
+model SchoolFeeCashClose {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  academicYearId   String    @map("academic_year_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  businessDate     DateTime  @map("business_date") @db.Date
+  openingCash      Int       @map("opening_cash")
+  cashCollected    Int       @map("cash_collected")
+  cashRefunds      Int       @default(0) @map("cash_refunds")
+  expectedClosing  Int       @map("expected_closing")
+  actualCashCount  Int       @map("actual_cash_count")
+  difference       Int
+  status           String
+  notes            String?
+  closedAt         DateTime  @default(now()) @map("closed_at")
+  closedById       String    @map("closed_by_id") @db.Uuid
+  reopenedAt       DateTime? @map("reopened_at")
+  reopenedById     String?   @map("reopened_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, userId, businessDate])
+  @@index([tenantId, businessDate, status])
+  @@map("school_fee_cash_closes")
   @@schema("school")
 }
 

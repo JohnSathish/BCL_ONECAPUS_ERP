@@ -22,17 +22,34 @@ import {
 } from './school-sis.constants';
 import {
   CollectSchoolFeeDto,
+  CloseSchoolFeeCashDto,
   SaveSchoolFeeSettingsDto,
   SaveSchoolMonthlyFeePlanDto,
   VoidSchoolFeeDto,
 } from './dto/school-sis.dto';
 import { SchoolSisMonthlyFeesService } from './school-sis-monthly-fees.service';
+import {
+  SchoolSisFeeReportsService,
+  type UserWiseSort,
+} from './school-sis-fee-reports.service';
+
+function reportActor(user: JwtUser) {
+  const perms = user.permissions ?? [];
+  const canClose =
+    perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) || perms.includes('*');
+  const roleBlob = (user.roles ?? []).join(' ').toLowerCase();
+  const canViewAll = canClose || /accountant|admin|principal/.test(roleBlob);
+  return { userId: user.sub, canViewAll, canClose };
+}
 
 @ApiBearerAuth()
 @ApiTags('school-sis-monthly-fees')
 @Controller({ path: 'school-sis/fees/monthly', version: '1' })
 export class SchoolSisMonthlyFeesController {
-  constructor(private readonly fees: SchoolSisMonthlyFeesService) {}
+  constructor(
+    private readonly fees: SchoolSisMonthlyFeesService,
+    private readonly reports: SchoolSisFeeReportsService,
+  ) {}
 
   @Get('config')
   @RequireAnyPermission(
@@ -76,7 +93,16 @@ export class SchoolSisMonthlyFeesController {
 
   @Post('collect')
   @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
-  collect(@CurrentUser() user: JwtUser, @Body() dto: CollectSchoolFeeDto) {
+  async collect(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CollectSchoolFeeDto,
+  ) {
+    const actor = reportActor(user);
+    await this.reports.assertCounterOpenForCollect(
+      user.tid,
+      user.sub,
+      actor.canClose,
+    );
     return this.fees.collect(user.tid, dto, user.sub);
   }
 
@@ -145,6 +171,153 @@ export class SchoolSisMonthlyFeesController {
     res.send(file.buffer);
   }
 
+  @Get('reports/user-wise-collection')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  userWiseCollection(
+    @CurrentUser() user: JwtUser,
+    @Query('date') date?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('paymentMode') paymentMode?: string,
+    @Query('userId') userId?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: UserWiseSort,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reports.userWiseCollection(
+      user.tid,
+      {
+        date,
+        academicYearId,
+        classId,
+        sectionId,
+        paymentMode,
+        userId,
+        search,
+        sortBy,
+        sortOrder,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      },
+      reportActor(user),
+    );
+  }
+
+  @Get('reports/user-wise-collection/export')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  async userWiseExport(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+    @Query('date') date?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('paymentMode') paymentMode?: string,
+    @Query('userId') userId?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: UserWiseSort,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    const buffer = await this.reports.userWiseExcel(
+      user.tid,
+      {
+        date,
+        academicYearId,
+        classId,
+        sectionId,
+        paymentMode,
+        userId,
+        search,
+        sortBy,
+        sortOrder,
+      },
+      reportActor(user),
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="user-wise-collection-${date || 'today'}.xlsx"`,
+    );
+    res.send(buffer);
+  }
+
+  @Get('reports/user-wise-collection/users/:userId')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  userWiseReceipts(
+    @CurrentUser() user: JwtUser,
+    @Param('userId') collectorUserId: string,
+    @Query('date') date?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('paymentMode') paymentMode?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reports.userReceipts(
+      user.tid,
+      collectorUserId,
+      {
+        date,
+        academicYearId,
+        classId,
+        sectionId,
+        paymentMode,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      },
+      reportActor(user),
+    );
+  }
+
+  @Get('reports/cash-close')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  cashClose(
+    @CurrentUser() user: JwtUser,
+    @Query('userId') userId: string,
+    @Query('date') date: string,
+  ) {
+    return this.reports.getCashClose(user.tid, userId, date);
+  }
+
+  @Post('reports/cash-close')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  closeCash(@CurrentUser() user: JwtUser, @Body() dto: CloseSchoolFeeCashDto) {
+    return this.reports.closeCashCounter(user.tid, dto, reportActor(user));
+  }
+
+  @Post('reports/cash-close/reopen')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  reopenCash(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: { userId: string; date: string },
+  ) {
+    return this.reports.reopenCashCounter(
+      user.tid,
+      dto.userId,
+      dto.date,
+      reportActor(user),
+    );
+  }
+
   @Get('pending')
   @RequireAnyPermission(
     SCHOOL_SIS_PERMISSION_READ,
@@ -180,11 +353,18 @@ export class SchoolSisMonthlyFeesController {
 
   @Post('payments/:id/void')
   @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
-  voidPayment(
+  async voidPayment(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
     @Body() dto: VoidSchoolFeeDto,
   ) {
+    const payment = await this.fees.getPayment(user.tid, id);
+    await this.reports.assertCounterOpenForVoid(
+      user.tid,
+      payment.paidAt,
+      payment.collectedById,
+      reportActor(user).canClose,
+    );
     return this.fees.voidPayment(user.tid, id, dto, user.sub);
   }
 
