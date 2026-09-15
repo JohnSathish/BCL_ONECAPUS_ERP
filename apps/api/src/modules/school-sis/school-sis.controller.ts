@@ -50,6 +50,8 @@ import {
   CopySchoolTimetableDto,
   BulkSchoolTimetableSlotsDto,
   CreateSchoolRoomDto,
+  UpdateSchoolFeeLineDto,
+  UpdateSchoolFeeInstallmentDto,
 } from './dto/school-sis.dto';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
 import { SchoolSisCurriculumService } from './school-sis-curriculum.service';
@@ -774,6 +776,28 @@ export class SchoolSisController {
   )
   feeStructureOne(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.fees.one(user.tid, id);
+  }
+
+  @Patch('fees/structures/:id/lines/:lineId')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  updateFeeLine(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+    @Body() dto: UpdateSchoolFeeLineDto,
+  ) {
+    return this.fees.updateLine(user.tid, id, lineId, dto);
+  }
+
+  @Patch('fees/structures/:id/installments/:installmentId')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  updateFeeInstallment(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('installmentId') installmentId: string,
+    @Body() dto: UpdateSchoolFeeInstallmentDto,
+  ) {
+    return this.fees.updateInstallment(user.tid, id, installmentId, dto.amount);
   }
 
   @Get('fees/student/:studentId')

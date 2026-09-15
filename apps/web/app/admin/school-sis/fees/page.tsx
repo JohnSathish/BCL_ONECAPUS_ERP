@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { MonthlyFeeSubnav } from '@/components/school-sis/fees/monthly-fee-ui';
 import {
   SchoolSisFeeStructureCard,
   formatInr,
@@ -25,6 +26,7 @@ export default function SchoolSisFeesPage() {
 
   return (
     <div className="space-y-4">
+      <MonthlyFeeSubnav />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[#1a365d]">Fee structure</h1>

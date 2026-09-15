@@ -320,6 +320,89 @@ export class SchoolSisFeesService {
       }
     }
   }
+
+  async updateLine(
+    tenantId: string,
+    structureId: string,
+    lineId: string,
+    dto: {
+      amount?: number | null;
+      unspecified?: boolean;
+      label?: string;
+      remarks?: string | null;
+      applyToSameSchedule?: boolean;
+    },
+  ) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const line = await this.prisma.schoolFeeLine.findFirst({
+      where: { id: lineId, tenantId, structureId },
+      include: { structure: true },
+    });
+    if (!line) throw new NotFoundException('Fee head not found');
+
+    const unspecified =
+      dto.unspecified ??
+      (dto.amount === null
+        ? true
+        : dto.amount !== undefined
+          ? false
+          : line.unspecified);
+    const amount = unspecified
+      ? null
+      : dto.amount !== undefined
+        ? dto.amount
+        : line.amount;
+
+    const data = {
+      amount,
+      unspecified,
+      ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+      ...(dto.remarks !== undefined
+        ? { remarks: dto.remarks?.trim() || null }
+        : {}),
+    };
+
+    if (dto.applyToSameSchedule) {
+      await this.prisma.schoolFeeLine.updateMany({
+        where: {
+          tenantId,
+          code: line.code,
+          kind: line.kind,
+          structure: {
+            tenantId,
+            academicYearId: line.structure.academicYearId,
+            code: line.structure.code,
+          },
+        },
+        data,
+      });
+    } else {
+      await this.prisma.schoolFeeLine.update({
+        where: { id: line.id },
+        data,
+      });
+    }
+
+    return this.one(tenantId, structureId);
+  }
+
+  async updateInstallment(
+    tenantId: string,
+    structureId: string,
+    installmentId: string,
+    amount: number,
+  ) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const row = await this.prisma.schoolFeeInstallment.findFirst({
+      where: { id: installmentId, tenantId, structureId },
+    });
+    if (!row) throw new NotFoundException('Installment not found');
+    await this.prisma.schoolFeeInstallment.update({
+      where: { id: row.id },
+      data: { amount },
+    });
+    return this.one(tenantId, structureId);
+  }
 }
 
 function withTotals<

@@ -872,6 +872,36 @@ export async function fetchSchoolSisFeeStructures() {
   return data;
 }
 
+export async function updateSchoolSisFeeLine(
+  structureId: string,
+  lineId: string,
+  payload: {
+    amount?: number | null;
+    unspecified?: boolean;
+    label?: string;
+    remarks?: string | null;
+    applyToSameSchedule?: boolean;
+  },
+) {
+  const { data } = await api.patch(
+    `/v1/school-sis/fees/structures/${structureId}/lines/${lineId}`,
+    payload,
+  );
+  return data as SchoolSisFeeStructure;
+}
+
+export async function updateSchoolSisFeeInstallment(
+  structureId: string,
+  installmentId: string,
+  amount: number,
+) {
+  const { data } = await api.patch(
+    `/v1/school-sis/fees/structures/${structureId}/installments/${installmentId}`,
+    { amount },
+  );
+  return data as SchoolSisFeeStructure;
+}
+
 export async function fetchSchoolSisStudentFees(studentId: string) {
   const { data } = await api.get<{
     student: { id: string; fullName: string };

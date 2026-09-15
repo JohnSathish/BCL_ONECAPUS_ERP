@@ -1464,3 +1464,37 @@ export class CloseSchoolFeeCashDto {
   @MaxLength(240)
   notes?: string;
 }
+
+export class UpdateSchoolFeeLineDto {
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  amount?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  unspecified?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  label?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  remarks?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  applyToSameSchedule?: boolean;
+}
+
+export class UpdateSchoolFeeInstallmentDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  amount!: number;
+}
