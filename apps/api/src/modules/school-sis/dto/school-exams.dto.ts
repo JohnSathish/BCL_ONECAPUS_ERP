@@ -57,6 +57,7 @@ export class SaveSchoolExamDto {
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) gradeIds?: string[];
   @IsOptional() settingsOverride?: Record<string, unknown>;
   @IsOptional() @IsDateString() marksDeadline?: string;
+  @IsOptional() @IsBoolean() addToCalendar?: boolean;
 }
 
 export class SaveExamSubjectDto {

@@ -6,6 +6,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import { SubmitSchoolApplicationDto } from './dto/school-sis.dto';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
 import { SchoolSisPaymentGatewaysService } from './school-sis-payment-gateways.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.service';
 
 @ApiTags('school-sis-public')
 @Controller({ path: 'school-sis/public', version: '1' })
@@ -25,6 +27,7 @@ export class SchoolSisPublicController {
     private readonly sis: SchoolSisService,
     private readonly admission: SchoolSisAdmissionService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
+    private readonly whatsappWebhooks: SchoolSisWhatsappWebhookService,
   ) {}
 
   private async tenantId(host?: string) {
@@ -71,5 +74,25 @@ export class SchoolSisPublicController {
       'x-cashfree-signature': headers['x-cashfree-signature'],
       'x-webhook-timestamp': headers['x-webhook-timestamp'],
     });
+  }
+
+  @Public()
+  @Get('whatsapp/webhooks/meta')
+  verifyWhatsapp(
+    @Query('hub.mode') mode: string,
+    @Query('hub.verify_token') token: string,
+    @Query('hub.challenge') challenge: string,
+  ) {
+    return this.whatsappWebhooks.verifyChallenge(mode, token, challenge);
+  }
+
+  @Public()
+  @Post('whatsapp/webhooks/meta')
+  async whatsappWebhook(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers('x-hub-signature-256') signature?: string,
+  ) {
+    const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {});
+    return this.whatsappWebhooks.handle(raw, signature);
   }
 }

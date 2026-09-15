@@ -59,6 +59,7 @@ export function ExaminationDesk() {
     status: 'DRAFT',
     gradeIds: [] as string[],
     marksDeadline: '',
+    addToCalendar: true,
   });
 
   const cards = useMemo(
@@ -84,6 +85,7 @@ export function ExaminationDesk() {
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
         marksDeadline: form.marksDeadline || undefined,
+        addToCalendar: form.addToCalendar,
       }),
     onSuccess: () => {
       setOpen(false);
@@ -97,6 +99,7 @@ export function ExaminationDesk() {
         status: 'DRAFT',
         gradeIds: [],
         marksDeadline: '',
+        addToCalendar: true,
       });
       void qc.invalidateQueries({ queryKey: ['school-exams-dash'] });
     },
@@ -223,6 +226,14 @@ export function ExaminationDesk() {
                 value={form.marksDeadline}
                 onChange={(e) => setForm({ ...form, marksDeadline: e.target.value })}
               />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={form.addToCalendar}
+                onChange={(e) => setForm({ ...form, addToCalendar: e.target.checked })}
+              />
+              Add this examination to Academic Calendar
             </label>
             <label className="md:col-span-2 text-xs font-medium text-slate-600">
               Applicable classes

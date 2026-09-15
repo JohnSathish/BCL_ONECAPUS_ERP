@@ -22,7 +22,11 @@ export function prismaSchemaDriftMessage(error: unknown): string | null {
   }
 
   if (error.code === 'P2022') {
-    return 'Database schema is outdated (missing column). Run migrations and rebuild the API.';
+    const column = String(
+      (error.meta as { column?: string } | undefined)?.column ??
+        'unknown column',
+    );
+    return `Database schema is outdated (missing ${column}). On the VPS run: bash scripts/deploy/vps-migrate.sh then recreate the API container.`;
   }
 
   if (error.code === 'P2002') {

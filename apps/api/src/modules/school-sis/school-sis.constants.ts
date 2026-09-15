@@ -1,6 +1,11 @@
 export const SCHOOL_SIS_PRODUCT = 'SECONDARY_SIS';
 export const SCHOOL_SIS_PERMISSION_READ = 'school-sis:read';
 export const SCHOOL_SIS_PERMISSION_MANAGE = 'school-sis:manage';
+export const SCHOOL_WHATSAPP_PERMISSION_VIEW = 'whatsapp.view';
+export const SCHOOL_WHATSAPP_PERMISSION_SEND = 'whatsapp.send';
+export const SCHOOL_WHATSAPP_PERMISSION_MANAGE = 'whatsapp.manage';
+export const SCHOOL_WHATSAPP_PERMISSION_CAMPAIGNS = 'whatsapp.campaigns';
+export const SCHOOL_WHATSAPP_PERMISSION_SETTINGS = 'whatsapp.settings';
 export const SCHOOL_SIS_STATIONERY_UNITS = [
   'PIECE',
   'BOX',

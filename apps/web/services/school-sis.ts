@@ -2120,3 +2120,109 @@ export async function fetchStudentPublishedExamResults(studentId: string) {
   const { data } = await api.get(`/v1/school-sis/exams/students/${studentId}/published`);
   return data;
 }
+
+export async function fetchSchoolCalendarSetup(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/setup', { params: { academicYearId } });
+  return data;
+}
+
+export async function fetchSchoolCalendarDashboard(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/dashboard', {
+    params: { academicYearId },
+  });
+  return data;
+}
+
+export async function fetchSchoolCalendarMonth(params: {
+  year: number;
+  month: number;
+  academicYearId?: string;
+}) {
+  const { data } = await api.get('/v1/school-sis/calendar/month', { params });
+  return data;
+}
+
+export async function fetchSchoolCalendarYear(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/year', { params: { academicYearId } });
+  return data;
+}
+
+export async function fetchSchoolHolidays(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/holidays', {
+    params: { academicYearId },
+  });
+  return data;
+}
+
+export async function saveSchoolHoliday(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/calendar/holidays/${id}`, payload)
+    : await api.post('/v1/school-sis/calendar/holidays', payload);
+  return data;
+}
+
+export async function deleteSchoolHoliday(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/calendar/holidays/${id}`);
+  return data;
+}
+
+export async function duplicateSchoolHoliday(id: string) {
+  const { data } = await api.post(`/v1/school-sis/calendar/holidays/${id}/duplicate`);
+  return data;
+}
+
+export async function importSchoolHolidays(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/calendar/holidays/import', payload);
+  return data;
+}
+
+export async function saveSchoolWeeklyOff(payload: Record<string, unknown>) {
+  const { data } = await api.patch('/v1/school-sis/calendar/weekly-off', payload);
+  return data;
+}
+
+export async function saveSchoolAcademicTerms(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/calendar/terms', payload);
+  return data;
+}
+
+export async function fetchSchoolCalendarOverrides(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/overrides', {
+    params: { academicYearId },
+  });
+  return data;
+}
+
+export async function saveSchoolCalendarOverride(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/calendar/overrides', payload);
+  return data;
+}
+
+export async function deleteSchoolCalendarOverride(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/calendar/overrides/${id}`);
+  return data;
+}
+
+export async function fetchSchoolCalendarEvents(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/calendar/events', { params });
+  return data;
+}
+
+export async function saveSchoolCalendarEvent(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/calendar/events/${id}`, payload)
+    : await api.post('/v1/school-sis/calendar/events', payload);
+  return data;
+}
+
+export async function deleteSchoolCalendarEvent(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/calendar/events/${id}`);
+  return data;
+}
+
+export async function fetchSchoolCalendarReports(kind?: string, academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/calendar/reports', {
+    params: { kind, academicYearId },
+  });
+  return data;
+}

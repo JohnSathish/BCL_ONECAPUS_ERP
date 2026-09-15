@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
@@ -19,10 +20,20 @@ import { SchoolSisStationeryService } from './school-sis-stationery.service';
 import { SchoolSisStationeryController } from './school-sis-stationery.controller';
 import { SchoolSisExamsService } from './school-sis-exams.service';
 import { SchoolSisExamsController } from './school-sis-exams.controller';
+import { SchoolSisCalendarService } from './school-sis-calendar.service';
+import { SchoolSisCalendarController } from './school-sis-calendar.controller';
 import { SchoolSisTimetableService } from './school-sis-timetable.service';
+import { SchoolSisWhatsappService } from './school-sis-whatsapp.service';
+import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.service';
+import { SchoolSisWhatsappController } from './school-sis-whatsapp.controller';
+import { SchoolSisWhatsappProcessor } from './school-sis-whatsapp.processor';
 
 @Module({
-  imports: [AuthModule, TenantsModule],
+  imports: [
+    AuthModule,
+    TenantsModule,
+    BullModule.registerQueue({ name: 'school-whatsapp' }),
+  ],
   controllers: [
     SchoolSisController,
     SchoolSisPublicController,
@@ -31,6 +42,8 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisPaymentGatewaysController,
     SchoolSisStationeryController,
     SchoolSisExamsController,
+    SchoolSisCalendarController,
+    SchoolSisWhatsappController,
   ],
   providers: [
     SchoolSisService,
@@ -44,7 +57,11 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisFeeReportsService,
     SchoolSisPaymentGatewaysService,
     SchoolSisStationeryService,
+    SchoolSisCalendarService,
     SchoolSisExamsService,
+    SchoolSisWhatsappService,
+    SchoolSisWhatsappWebhookService,
+    SchoolSisWhatsappProcessor,
   ],
   exports: [
     SchoolSisService,
@@ -59,6 +76,8 @@ import { SchoolSisTimetableService } from './school-sis-timetable.service';
     SchoolSisPaymentGatewaysService,
     SchoolSisStationeryService,
     SchoolSisExamsService,
+    SchoolSisCalendarService,
+    SchoolSisWhatsappService,
   ],
 })
 export class SchoolSisModule {}

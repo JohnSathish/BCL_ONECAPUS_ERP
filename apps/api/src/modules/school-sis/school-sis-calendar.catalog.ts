@@ -1,0 +1,71 @@
+export const DEFAULT_HOLIDAY_TYPES = [
+  { code: 'GOVERNMENT', name: 'Government Holiday', kind: 'GOVERNMENT' },
+  { code: 'SCHOOL', name: 'School Holiday', kind: 'SCHOOL' },
+  { code: 'RELIGIOUS', name: 'Religious Holiday', kind: 'RELIGIOUS' },
+  { code: 'LOCAL', name: 'Local Holiday', kind: 'LOCAL' },
+  { code: 'VACATION', name: 'Vacation', kind: 'VACATION' },
+  { code: 'SPECIAL', name: 'Special Holiday', kind: 'SPECIAL' },
+  { code: 'EMERGENCY', name: 'Emergency Holiday', kind: 'EMERGENCY' },
+  { code: 'OTHER', name: 'Other', kind: 'OTHER' },
+] as const;
+
+export const DEFAULT_EVENT_CATEGORIES = [
+  { code: 'ACADEMIC', name: 'Academic', color: '#1e3a8a', icon: 'BookOpen' },
+  {
+    code: 'EXAMINATION',
+    name: 'Examination',
+    color: '#7c3aed',
+    icon: 'ClipboardList',
+  },
+  { code: 'HOLIDAY', name: 'Holiday', color: '#dc2626', icon: 'Palmtree' },
+  { code: 'VACATION', name: 'Vacation', color: '#ea580c', icon: 'Sun' },
+  { code: 'ADMISSION', name: 'Admission', color: '#0284c7', icon: 'UserPlus' },
+  { code: 'PTM', name: 'PTM', color: '#0f766e', icon: 'Users' },
+  {
+    code: 'MEETING',
+    name: 'Meeting',
+    color: '#4338ca',
+    icon: 'MessagesSquare',
+  },
+  {
+    code: 'SCHOOL_EVENT',
+    name: 'School Event',
+    color: '#2563eb',
+    icon: 'CalendarDays',
+  },
+  { code: 'SPORTS', name: 'Sports', color: '#16a34a', icon: 'Trophy' },
+  { code: 'CULTURAL', name: 'Cultural', color: '#db2777', icon: 'Music' },
+  { code: 'COMPETITION', name: 'Competition', color: '#ca8a04', icon: 'Medal' },
+  {
+    code: 'TRAINING',
+    name: 'Training',
+    color: '#475569',
+    icon: 'GraduationCap',
+  },
+  {
+    code: 'STAFF',
+    name: 'Staff Activity',
+    color: '#334155',
+    icon: 'Briefcase',
+  },
+  {
+    code: 'STUDENT',
+    name: 'Student Activity',
+    color: '#0891b2',
+    icon: 'Smile',
+  },
+  {
+    code: 'CO_CURRICULAR',
+    name: 'Co-Curricular',
+    color: '#4f46e5',
+    icon: 'Sparkles',
+  },
+  { code: 'EXTRA', name: 'Extra-Curricular', color: '#9333ea', icon: 'Star' },
+  {
+    code: 'ADMIN',
+    name: 'Administrative',
+    color: '#64748b',
+    icon: 'Building2',
+  },
+  { code: 'OTHER', name: 'Other', color: '#94a3b8', icon: 'Circle' },
+] as const;

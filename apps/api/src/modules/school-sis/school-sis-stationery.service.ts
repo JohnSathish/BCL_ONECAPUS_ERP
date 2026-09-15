@@ -100,8 +100,37 @@ export class SchoolSisStationeryService {
     });
   }
 
+  private schemaPatched = false;
+
+  /** Idempotent catch-up when the API image is ahead of `prisma migrate deploy`. */
+  private async patchMissingColumns() {
+    if (this.schemaPatched) return;
+    const statements = [
+      `ALTER TABLE "school"."school_stationery_sales" ADD COLUMN IF NOT EXISTS "cash_received" INTEGER`,
+      `ALTER TABLE "school"."school_stationery_sales" ADD COLUMN IF NOT EXISTS "change_returned" INTEGER`,
+      `ALTER TABLE "school"."school_stationery_sales" ADD COLUMN IF NOT EXISTS "idempotency_key" TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "school_stationery_sales_tenant_id_idempotency_key_key" ON "school"."school_stationery_sales"("tenant_id", "idempotency_key")`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "subcategory_id" UUID`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "grade_id" UUID`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "academic_year_id" UUID`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "opening_stock" DECIMAL(14,3) NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "min_stock" DECIMAL(14,3) NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "qty_on_hand" DECIMAL(14,3) NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_product_variants" ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3)`,
+    ];
+    for (const sql of statements) {
+      try {
+        await this.prisma.$executeRawUnsafe(sql);
+      } catch {
+        /* Table may not exist until the full stationery migration has run. */
+      }
+    }
+    this.schemaPatched = true;
+  }
+
   async ensureSetup(tenantId: string) {
     await this.sis.assertSecondarySisTenant(tenantId);
+    await this.patchMissingColumns();
     const existing = await this.prisma.schoolStationeryCategory.count({
       where: { tenantId, deletedAt: null },
     });
@@ -347,44 +376,80 @@ export class SchoolSisStationeryService {
   ) {
     await this.ensureSetup(tenantId);
     const term = q?.trim();
-    const rows = await this.prisma.schoolStationeryProduct.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        AND: [
-          categoryId
-            ? { OR: [{ categoryId }, { subcategoryId: categoryId }] }
-            : {},
-          term
-            ? {
-                OR: [
-                  { name: { contains: term, mode: 'insensitive' } },
-                  { sku: { contains: term, mode: 'insensitive' } },
-                  { barcode: { contains: term, mode: 'insensitive' } },
-                  {
-                    category: {
-                      name: { contains: term, mode: 'insensitive' },
-                    },
-                  },
-                  {
-                    subcategory: {
-                      name: { contains: term, mode: 'insensitive' },
-                    },
-                  },
-                ],
-              }
-            : {},
-        ],
-      },
-      include: {
-        category: true,
-        subcategory: true,
-        variants: { where: { deletedAt: null }, orderBy: { label: 'asc' } },
-        grade: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: { name: 'asc' },
-      take: Math.min(100, Math.max(1, take)),
-    });
+    const query = (lite: boolean) =>
+      this.prisma.schoolStationeryProduct.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          AND: [
+            categoryId
+              ? lite
+                ? { categoryId }
+                : { OR: [{ categoryId }, { subcategoryId: categoryId }] }
+              : {},
+            term
+              ? {
+                  OR: [
+                    { name: { contains: term, mode: 'insensitive' } },
+                    { sku: { contains: term, mode: 'insensitive' } },
+                    { barcode: { contains: term, mode: 'insensitive' } },
+                    ...(lite
+                      ? []
+                      : [
+                          {
+                            category: {
+                              name: {
+                                contains: term,
+                                mode: 'insensitive' as const,
+                              },
+                            },
+                          },
+                          {
+                            subcategory: {
+                              name: {
+                                contains: term,
+                                mode: 'insensitive' as const,
+                              },
+                            },
+                          },
+                        ]),
+                  ],
+                }
+              : {},
+          ],
+        },
+        include: lite
+          ? { category: true }
+          : {
+              category: true,
+              subcategory: true,
+              variants: {
+                where: { deletedAt: null },
+                orderBy: { label: 'asc' },
+              },
+              grade: { select: { id: true, name: true, code: true } },
+            },
+        orderBy: { name: 'asc' },
+        take: Math.min(100, Math.max(1, take)),
+      });
+    let rows;
+    try {
+      rows = await query(false);
+    } catch (err) {
+      if (
+        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+        (err.code !== 'P2022' && err.code !== 'P2021')
+      ) {
+        throw err;
+      }
+      this.schemaPatched = false;
+      await this.patchMissingColumns();
+      try {
+        rows = await query(false);
+      } catch {
+        rows = await query(true);
+      }
+    }
     const mapped = rows.map((p) => {
       const qty = n(p.qtyOnHand);
       const min = n(p.minStock);

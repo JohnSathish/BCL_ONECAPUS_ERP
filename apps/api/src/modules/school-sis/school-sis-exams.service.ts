@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisCalendarService } from './school-sis-calendar.service';
 import {
   DEFAULT_EXAM_TYPES,
   DEFAULT_GRADE_BANDS,
@@ -50,6 +51,7 @@ export class SchoolSisExamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly calendar: SchoolSisCalendarService,
   ) {}
 
   private async year(tenantId: string) {
@@ -285,12 +287,33 @@ export class SchoolSisExamsService {
           'Unpublish the result before changing a published examination',
         );
       }
-      return this.prisma.schoolExam.update({ where: { id }, data });
+      const updated = await this.prisma.schoolExam.update({
+        where: { id },
+        data,
+      });
+      if (dto.addToCalendar !== undefined) {
+        await this.calendar.upsertExamEvent(
+          tenantId,
+          updated,
+          !!dto.addToCalendar,
+          {
+            userId: actor.userId,
+            manage: actor.manage,
+          },
+        );
+      }
+      return updated;
     }
     const exam = await this.prisma.schoolExam.create({
       data: { tenantId, academicYearId: year.id, ...data },
     });
     await this.seedStructure(tenantId, exam.id, dto.gradeIds ?? []);
+    if (dto.addToCalendar) {
+      await this.calendar.upsertExamEvent(tenantId, exam, true, {
+        userId: actor.userId,
+        manage: actor.manage,
+      });
+    }
     return exam;
   }
 

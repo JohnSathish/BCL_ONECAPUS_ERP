@@ -16606,6 +16606,16 @@ model SchoolAcademicYear {
   stationeryPurchases SchoolStationeryPurchase[]
   stationeryProducts  SchoolStationeryProduct[]
   exams               SchoolExam[]
+  terms               SchoolAcademicTerm[]
+  holidays            SchoolHoliday[]
+  weeklyOffs          SchoolWeeklyOffSetting[]
+  calendarOverrides   SchoolCalendarOverride[]
+  calendarEvents      SchoolCalendarEvent[]
+  transportAllocations SchoolTransportStudentAllocation[]
+  transportTrips       SchoolTransportTrip[]
+  transportFeePlans    SchoolTransportFeePlan[]
+  transportDuties      SchoolTransportDutyAssignment[]
+  transportCalendar    SchoolTransportCalendarEvent[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16937,6 +16947,10 @@ model SchoolStudent {
   stationerySales  SchoolStationerySale[]
   examMarks        SchoolExamMark[]
   examResults      SchoolExamResult[]
+  transportAllocations   SchoolTransportStudentAllocation[]
+  transportBoarding      SchoolTransportBoardingEvent[]
+  transportFeeAssignments SchoolTransportFeeAssignment[]
+  whatsappContacts       SchoolWhatsappContact[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -16962,6 +16976,7 @@ model SchoolGuardian {
 
   students       SchoolStudentGuardian[]
   personAccounts SchoolPersonAccount[]
+  whatsappContacts SchoolWhatsappContact[]
 
   @@index([tenantId])
   @@map("school_guardians")
@@ -17217,6 +17232,9 @@ model SchoolStaff {
   housesLed                 SchoolHouse[]
   clubsCoordinated          SchoolClub[]
   examInvigilators          SchoolExamInvigilator[]
+  calendarEvents            SchoolCalendarEvent[]
+  transportPersonnel        SchoolTransportPersonnel[]
+  whatsappContacts          SchoolWhatsappContact[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -18707,7 +18725,8 @@ model SchoolExam {
   subjects     SchoolExamSubject[]
   schedules    SchoolExamSchedule[]
   marks        SchoolExamMark[]
-  results      SchoolExamResult[]
+  results         SchoolExamResult[]
+  calendarEvents  SchoolCalendarEvent[]
 
   @@index([tenantId, academicYearId, status])
   @@map("school_exams")
@@ -18921,5 +18940,1499 @@ model SchoolExamAuditLog {
   @@map("school_exam_audit_logs")
   @@schema("school")
 }
+
+model SchoolAcademicTerm {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  name           String
+  sortOrder      Int       @default(0) @map("sort_order")
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([academicYearId, name])
+  @@index([tenantId, academicYearId])
+  @@map("school_academic_terms")
+  @@schema("school")
+}
+
+model SchoolHolidayType {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  kind      String    @default("OTHER")
+  sortOrder Int       @default(0) @map("sort_order")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  holidays SchoolHoliday[]
+
+  @@unique([tenantId, code])
+  @@map("school_holiday_types")
+  @@schema("school")
+}
+
+model SchoolHoliday {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  typeId         String    @map("type_id") @db.Uuid
+  name           String
+  startDate      DateTime  @map("start_date") @db.Date
+  endDate        DateTime  @map("end_date") @db.Date
+  appliesTo      String    @default("ALL") @map("applies_to")
+  gradeIds       Json      @default("[]") @map("grade_ids")
+  sectionIds     Json      @default("[]") @map("section_ids")
+  description    String?   @db.Text
+  recurring      Boolean   @default(false)
+  recurringRule  String?   @map("recurring_rule")
+  status         String    @default("ACTIVE")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  type         SchoolHolidayType      @relation(fields: [typeId], references: [id])
+  events       SchoolCalendarEvent[]
+
+  @@unique([tenantId, academicYearId, name, startDate])
+  @@index([tenantId, academicYearId, startDate, endDate])
+  @@map("school_holidays")
+  @@schema("school")
+}
+
+model SchoolWeeklyOffSetting {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  weekdays       Json     @default("[]")
+  saturdayRule   String   @default("NONE") @map("saturday_rule")
+  customWeeks    Json     @default("[]") @map("custom_weeks")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId])
+  @@map("school_weekly_off_settings")
+  @@schema("school")
+}
+
+model SchoolCalendarOverride {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  date           DateTime  @db.Date
+  kind           String    @default("SPECIAL_WORKING_DAY")
+  reason         String?
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId, date, kind])
+  @@index([tenantId, academicYearId, date])
+  @@map("school_calendar_overrides")
+  @@schema("school")
+}
+
+model SchoolCalendarEventCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  color     String    @default("#2563eb")
+  icon      String?
+  sortOrder Int       @default(0) @map("sort_order")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  events SchoolCalendarEvent[]
+
+  @@unique([tenantId, code])
+  @@map("school_calendar_event_categories")
+  @@schema("school")
+}
+
+model SchoolCalendarEvent {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  academicYearId       String    @map("academic_year_id") @db.Uuid
+  categoryId           String    @map("category_id") @db.Uuid
+  title                String
+  startDate            DateTime  @map("start_date") @db.Date
+  endDate              DateTime  @map("end_date") @db.Date
+  startTime            String?   @map("start_time")
+  endTime              String?   @map("end_time")
+  allDay               Boolean   @default(true) @map("all_day")
+  description          String?   @db.Text
+  audience             Json      @default("[]")
+  gradeIds             Json      @default("[]") @map("grade_ids")
+  sectionIds           Json      @default("[]") @map("section_ids")
+  location             String?
+  organizerType        String?   @map("organizer_type")
+  organizerStaffId     String?   @map("organizer_staff_id") @db.Uuid
+  status               String    @default("SCHEDULED")
+  importantParents     Boolean   @default(false) @map("important_parents")
+  importantStudents    Boolean   @default(false) @map("important_students")
+  importantTeachers    Boolean   @default(false) @map("important_teachers")
+  notifyParents        Boolean   @default(false) @map("notify_parents")
+  notifyStudents       Boolean   @default(false) @map("notify_students")
+  notifyTeachers       Boolean   @default(false) @map("notify_teachers")
+  ptm                  Json?
+  source               String    @default("MANUAL")
+  holidayId            String?   @unique @map("holiday_id") @db.Uuid
+  examId               String?   @unique @map("exam_id") @db.Uuid
+  createdBy            String?   @map("created_by") @db.Uuid
+  updatedBy            String?   @map("updated_by") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear            @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  category     SchoolCalendarEventCategory   @relation(fields: [categoryId], references: [id])
+  holiday      SchoolHoliday?                @relation(fields: [holidayId], references: [id], onDelete: Cascade)
+  exam         SchoolExam?                   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  organizer    SchoolStaff?                  @relation(fields: [organizerStaffId], references: [id])
+  transportCal SchoolTransportCalendarEvent?
+
+  @@index([tenantId, academicYearId, startDate, endDate])
+  @@index([tenantId, categoryId])
+  @@map("school_calendar_events")
+  @@schema("school")
+}
+
+model SchoolCalendarAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String
+  recordId  String?  @map("record_id")
+  oldValue  Json?
+  newValue  Json?
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_calendar_audit_logs")
+  @@schema("school")
+}
+
+model SchoolTransportSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @unique @map("tenant_id") @db.Uuid
+  transportName            String   @default("School Transport") @map("transport_name")
+  managerName              String?  @map("manager_name")
+  emergencyContact         String?  @map("emergency_contact")
+  emergencyContactsJson    Json     @default("[]") @map("emergency_contacts_json")
+  tripStartBufferMinutes   Int      @default(10) @map("trip_start_buffer_minutes")
+  gpsEnabled               Boolean  @default(false) @map("gps_enabled")
+  gpsProvider              String   @default("NONE") @map("gps_provider")
+  mapProvider              String   @default("OSM") @map("map_provider")
+  mapApiKey                String?  @map("map_api_key")
+  gpsOfflineMinutes        Int      @default(5) @map("gps_offline_minutes")
+  overspeedKmh             Int      @default(40) @map("overspeed_kmh")
+  longStopMinutes          Int      @default(10) @map("long_stop_minutes")
+  geofenceDefaultMeters    Int      @default(80) @map("geofence_default_meters")
+  documentRemindDays       Json     @default("[7, 15, 30]") @map("document_remind_days")
+  allowCapacityOverride    Boolean  @default(false) @map("allow_capacity_override")
+  requireCapacityApproval  Boolean  @default(true) @map("require_capacity_approval")
+  requireValidDocuments    Boolean  @default(true) @map("require_valid_documents")
+  blockExpiredDriver       Boolean  @default(true) @map("block_expired_driver")
+  allowDriverOverride      Boolean  @default(false) @map("allow_driver_override")
+  attendanceProvider       String   @default("MANUAL") @map("attendance_provider")
+  notifyParents            Boolean  @default(true) @map("notify_parents")
+  notifySms                Boolean  @default(false) @map("notify_sms")
+  notifyWhatsapp           Boolean  @default(false) @map("notify_whatsapp")
+  notifyEmail              Boolean  @default(false) @map("notify_email")
+  notifyPush               Boolean  @default(true) @map("notify_push")
+  preTripChecklistRequired Boolean  @default(true) @map("pre_trip_checklist_required")
+  postTripChecklistRequired Boolean @default(false) @map("post_trip_checklist_required")
+  mandatoryAckMissing      Boolean  @default(true) @map("mandatory_ack_missing")
+  blockDispatchOnFail      Boolean  @default(true) @map("block_dispatch_on_fail")
+  allowSafetyOverride      Boolean  @default(true) @map("allow_safety_override")
+  approachingStopMeters    Int      @default(250) @map("approaching_stop_meters")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("school_transport_settings")
+  @@schema("school")
+}
+
+model SchoolTransportVehicle {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  code               String
+  registrationNumber String    @map("registration_number")
+  vehicleType        String    @default("SCHOOL_BUS") @map("vehicle_type")
+  make               String?
+  model              String?
+  year               Int?
+  colour             String?
+  seatingCapacity    Int       @default(0) @map("seating_capacity")
+  standingCapacity   Int       @default(0) @map("standing_capacity")
+  totalCapacity      Int       @default(0) @map("total_capacity")
+  ownership          String    @default("SCHOOL_OWNED")
+  operator           String?
+  fuelType           String?   @map("fuel_type")
+  odometer           Int       @default(0)
+  gpsDeviceId        String?   @map("gps_device_id")
+  insuranceNumber    String?   @map("insurance_number")
+  status             String    @default("ACTIVE")
+  photoUrl           String?   @map("photo_url")
+  remarks            String?   @db.Text
+  createdBy          String?   @map("created_by") @db.Uuid
+  updatedBy          String?   @map("updated_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  documents     SchoolTransportVehicleDocument[]
+  safetyItems   SchoolTransportVehicleSafetyItem[]
+  routes        SchoolTransportRoute[]
+  trips         SchoolTransportTrip[]
+  duties        SchoolTransportDutyAssignment[]
+  gpsDevice     SchoolTransportGpsDevice?
+  gpsLocations  SchoolTransportGpsLocation[]
+  gpsAlerts     SchoolTransportGpsAlert[]
+  maintenance   SchoolTransportMaintenance[]
+  fuelLogs      SchoolTransportFuelLog[]
+  expenses      SchoolTransportExpense[]
+  incidents     SchoolTransportIncident[]
+  inspections   SchoolTransportSafetyInspection[]
+  allocations   SchoolTransportStudentAllocation[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, registrationNumber])
+  @@index([tenantId, status])
+  @@map("school_transport_vehicles")
+  @@schema("school")
+}
+
+model SchoolTransportVehicleDocument {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  vehicleId      String    @map("vehicle_id") @db.Uuid
+  kind           String
+  documentNumber String?   @map("document_number")
+  issueDate      DateTime? @map("issue_date") @db.Date
+  expiryDate     DateTime? @map("expiry_date") @db.Date
+  attachmentUrl  String?   @map("attachment_url")
+  remarks        String?
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vehicleId, kind])
+  @@index([tenantId, expiryDate])
+  @@map("school_transport_vehicle_documents")
+  @@schema("school")
+}
+
+model SchoolTransportVehicleSafetyItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  vehicleId       String    @map("vehicle_id") @db.Uuid
+  code            String
+  name            String
+  status          String    @default("AVAILABLE")
+  lastInspection  DateTime? @map("last_inspection") @db.Date
+  nextInspection  DateTime? @map("next_inspection") @db.Date
+  inspectedBy     String?   @map("inspected_by")
+  remarks         String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, code])
+  @@map("school_transport_vehicle_safety_items")
+  @@schema("school")
+}
+
+model SchoolTransportStop {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  area             String?
+  landmark         String?
+  latitude         Decimal?  @db.Decimal(10, 7)
+  longitude        Decimal?  @db.Decimal(10, 7)
+  geofenceMeters   Int?      @map("geofence_meters")
+  morningPickup    String?   @map("morning_pickup")
+  afternoonDrop    String?   @map("afternoon_drop")
+  maxStudents      Int       @default(0) @map("max_students")
+  status           String    @default("ACTIVE")
+  createdBy        String?   @map("created_by") @db.Uuid
+  updatedBy        String?   @map("updated_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  routeStops          SchoolTransportRouteStop[]
+  pickupAllocations   SchoolTransportStudentAllocation[] @relation("PickupStop")
+  dropAllocations     SchoolTransportStudentAllocation[] @relation("DropStop")
+  tripStops           SchoolTransportTripStop[]
+  boardingEvents      SchoolTransportBoardingEvent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status, area])
+  @@map("school_transport_stops")
+  @@schema("school")
+}
+
+model SchoolTransportRoute {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @map("tenant_id") @db.Uuid
+  code                    String
+  name                    String
+  direction               String    @default("BOTH")
+  morningStartTime        String?   @map("morning_start_time")
+  schoolArrivalTime       String?   @map("school_arrival_time")
+  afternoonDepartureTime  String?   @map("afternoon_departure_time")
+  expectedCompletionTime  String?   @map("expected_completion_time")
+  distanceKm              Decimal?  @map("distance_km") @db.Decimal(8, 2)
+  estimatedMinutes        Int?      @map("estimated_minutes")
+  vehicleId               String?   @map("vehicle_id") @db.Uuid
+  driverId                String?   @map("driver_id") @db.Uuid
+  attendantId             String?   @map("attendant_id") @db.Uuid
+  status                  String    @default("ACTIVE")
+  polylineJson            Json?
+  createdBy               String?   @map("created_by") @db.Uuid
+  updatedBy               String?   @map("updated_by") @db.Uuid
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  deletedAt               DateTime? @map("deleted_at")
+
+  vehicle     SchoolTransportVehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver      SchoolTransportPersonnel?  @relation("RouteDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  attendant   SchoolTransportPersonnel?  @relation("RouteAttendant", fields: [attendantId], references: [id], onDelete: SetNull)
+  stops       SchoolTransportRouteStop[]
+  allocations SchoolTransportStudentAllocation[]
+  trips       SchoolTransportTrip[]
+  duties      SchoolTransportDutyAssignment[]
+  incidents   SchoolTransportIncident[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("school_transport_routes")
+  @@schema("school")
+}
+
+model SchoolTransportRouteStop {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  routeId              String   @map("route_id") @db.Uuid
+  stopId               String   @map("stop_id") @db.Uuid
+  stopNumber           Int      @map("stop_number")
+  pickupTime           String?  @map("pickup_time")
+  dropTime             String?  @map("drop_time")
+  distanceFromPrevKm   Decimal? @map("distance_from_prev_km") @db.Decimal(8, 2)
+  expectedStudents     Int      @default(0) @map("expected_students")
+
+  route SchoolTransportRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop  SchoolTransportStop  @relation(fields: [stopId], references: [id], onDelete: Restrict)
+
+  @@unique([routeId, stopId])
+  @@unique([routeId, stopNumber])
+  @@index([tenantId, routeId])
+  @@map("school_transport_route_stops")
+  @@schema("school")
+}
+
+model SchoolTransportPersonnel {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  kind              String
+  employment        String    @default("SCHOOL_STAFF")
+  staffId           String?   @map("staff_id") @db.Uuid
+  code              String
+  fullName          String    @map("full_name")
+  photoUrl          String?   @map("photo_url")
+  mobile            String?
+  alternateMobile   String?   @map("alternate_mobile")
+  address           String?
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  emergencyContact  String?   @map("emergency_contact")
+  bloodGroup        String?   @map("blood_group")
+  licenseNumber     String?   @map("license_number")
+  licenseType       String?   @map("license_type")
+  licenseIssueDate  DateTime? @map("license_issue_date") @db.Date
+  licenseExpiry     DateTime? @map("license_expiry") @db.Date
+  experienceYears   Int?      @map("experience_years")
+  status            String    @default("ACTIVE")
+  blocked           Boolean   @default(false)
+  createdBy         String?   @map("created_by") @db.Uuid
+  updatedBy         String?   @map("updated_by") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  staff       SchoolStaff? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  documents   SchoolTransportPersonnelDocument[]
+  routesDriven    SchoolTransportRoute[] @relation("RouteDriver")
+  routesAttended  SchoolTransportRoute[] @relation("RouteAttendant")
+  dutiesAsDriver     SchoolTransportDutyAssignment[] @relation("DutyDriver")
+  dutiesAsAttendant  SchoolTransportDutyAssignment[] @relation("DutyAttendant")
+  dutiesAsSubstitute SchoolTransportDutyAssignment[] @relation("DutySubstitute")
+  tripsDriven     SchoolTransportTrip[] @relation("TripDriver")
+  tripsAttended   SchoolTransportTrip[] @relation("TripAttendant")
+  incidents       SchoolTransportIncident[]
+  fuelLogs        SchoolTransportFuelLog[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, kind, status])
+  @@map("school_transport_personnel")
+  @@schema("school")
+}
+
+model SchoolTransportPersonnelDocument {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  personnelId    String    @map("personnel_id") @db.Uuid
+  kind           String
+  documentNumber String?   @map("document_number")
+  issueDate      DateTime? @map("issue_date") @db.Date
+  expiryDate     DateTime? @map("expiry_date") @db.Date
+  attachmentUrl  String?   @map("attachment_url")
+  remarks        String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  personnel SchoolTransportPersonnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, personnelId, kind])
+  @@index([tenantId, expiryDate])
+  @@map("school_transport_personnel_documents")
+  @@schema("school")
+}
+
+model SchoolTransportDutyAssignment {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  academicYearId    String    @map("academic_year_id") @db.Uuid
+  date              DateTime  @db.Date
+  session           String    @default("MORNING")
+  routeId           String    @map("route_id") @db.Uuid
+  vehicleId         String    @map("vehicle_id") @db.Uuid
+  driverId          String    @map("driver_id") @db.Uuid
+  attendantId       String?   @map("attendant_id") @db.Uuid
+  substituteDriverId String?  @map("substitute_driver_id") @db.Uuid
+  substituteReason  String?   @map("substitute_reason")
+  status            String    @default("SCHEDULED")
+  createdBy         String?   @map("created_by") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear         @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  route        SchoolTransportRoute       @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  vehicle      SchoolTransportVehicle     @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver       SchoolTransportPersonnel   @relation("DutyDriver", fields: [driverId], references: [id])
+  attendant    SchoolTransportPersonnel?  @relation("DutyAttendant", fields: [attendantId], references: [id])
+  substitute   SchoolTransportPersonnel?  @relation("DutySubstitute", fields: [substituteDriverId], references: [id])
+
+  @@index([tenantId, date, session])
+  @@index([tenantId, routeId, date])
+  @@map("school_transport_duty_assignments")
+  @@schema("school")
+}
+
+model SchoolTransportFeePlan {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  name           String
+  code           String
+  cadence        String    @default("MONTHLY")
+  pricingModel   String    @default("ROUTE") @map("pricing_model")
+  amount         Int       @default(0)
+  routeId        String?   @map("route_id") @db.Uuid
+  stopId         String?   @map("stop_id") @db.Uuid
+  minDistanceKm  Decimal?  @map("min_distance_km") @db.Decimal(8, 2)
+  maxDistanceKm  Decimal?  @map("max_distance_km") @db.Decimal(8, 2)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  allocations  SchoolTransportStudentAllocation[]
+  assignments  SchoolTransportFeeAssignment[]
+  concessions  SchoolTransportFeeConcession[]
+
+  @@unique([tenantId, academicYearId, code])
+  @@index([tenantId, academicYearId, active])
+  @@map("school_transport_fee_plans")
+  @@schema("school")
+}
+
+model SchoolTransportFeeConcession {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  planId    String?   @map("plan_id") @db.Uuid
+  kind      String
+  name      String
+  percent   Decimal?  @db.Decimal(6, 2)
+  amount    Int?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  plan SchoolTransportFeePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, kind])
+  @@map("school_transport_fee_concessions")
+  @@schema("school")
+}
+
+model SchoolTransportStudentAllocation {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  academicYearId  String    @map("academic_year_id") @db.Uuid
+  studentId       String    @map("student_id") @db.Uuid
+  status          String    @default("ACTIVE")
+  routeId         String    @map("route_id") @db.Uuid
+  vehicleId       String?   @map("vehicle_id") @db.Uuid
+  pickupStopId    String    @map("pickup_stop_id") @db.Uuid
+  dropStopId      String    @map("drop_stop_id") @db.Uuid
+  morningPickup   String?   @map("morning_pickup")
+  afternoonDrop   String?   @map("afternoon_drop")
+  validFrom       DateTime  @map("valid_from") @db.Date
+  validUntil      DateTime? @map("valid_until") @db.Date
+  feePlanId       String?   @map("fee_plan_id") @db.Uuid
+  concessionKind  String?   @map("concession_kind")
+  siblingSameRoute Boolean  @default(false) @map("sibling_same_route")
+  capacityOverride Boolean  @default(false) @map("capacity_override")
+  overrideReason  String?   @map("override_reason")
+  remarks         String?
+  qrToken         String?   @unique @map("qr_token")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedBy       String?   @map("updated_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      SchoolStudent             @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  route        SchoolTransportRoute      @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  vehicle      SchoolTransportVehicle?   @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  pickupStop   SchoolTransportStop       @relation("PickupStop", fields: [pickupStopId], references: [id])
+  dropStop     SchoolTransportStop       @relation("DropStop", fields: [dropStopId], references: [id])
+  feePlan      SchoolTransportFeePlan?   @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
+  history      SchoolTransportAllocationHistory[]
+  boarding     SchoolTransportBoardingEvent[]
+  feeAssignments SchoolTransportFeeAssignment[]
+
+  @@index([tenantId, academicYearId, status])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, routeId, status])
+  @@index([tenantId, pickupStopId])
+  @@map("school_transport_student_allocations")
+  @@schema("school")
+}
+
+model SchoolTransportAllocationHistory {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  allocationId  String    @map("allocation_id") @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  routeId       String?   @map("route_id") @db.Uuid
+  vehicleId     String?   @map("vehicle_id") @db.Uuid
+  pickupStopId  String?   @map("pickup_stop_id") @db.Uuid
+  dropStopId    String?   @map("drop_stop_id") @db.Uuid
+  status        String
+  validFrom     DateTime  @map("valid_from") @db.Date
+  validUntil    DateTime? @map("valid_until") @db.Date
+  reason        String?
+  actorUserId   String?   @map("actor_user_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  snapshotJson  Json      @default("{}") @map("snapshot_json")
+
+  allocation SchoolTransportStudentAllocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, createdAt])
+  @@map("school_transport_allocation_history")
+  @@schema("school")
+}
+
+model SchoolTransportFeeAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  allocationId   String    @map("allocation_id") @db.Uuid
+  planId         String    @map("plan_id") @db.Uuid
+  amount         Int
+  concessionAmt  Int       @default(0) @map("concession_amt")
+  netAmount      Int       @map("net_amount")
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validUntil     DateTime? @map("valid_until") @db.Date
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  student    SchoolStudent                    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  allocation SchoolTransportStudentAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  plan       SchoolTransportFeePlan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, studentId, status])
+  @@map("school_transport_fee_assignments")
+  @@schema("school")
+}
+
+model SchoolTransportTrip {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  academicYearId    String    @map("academic_year_id") @db.Uuid
+  date              DateTime  @db.Date
+  routeId           String    @map("route_id") @db.Uuid
+  vehicleId         String    @map("vehicle_id") @db.Uuid
+  driverId          String?   @map("driver_id") @db.Uuid
+  attendantId       String?   @map("attendant_id") @db.Uuid
+  tripType          String    @map("trip_type")
+  status            String    @default("SCHEDULED")
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  delayedReason     String?   @map("delayed_reason")
+  missingAck        Boolean   @default(false) @map("missing_ack")
+  missingAckBy      String?   @map("missing_ack_by") @db.Uuid
+  missingAckNote    String?   @map("missing_ack_note")
+  safetyOverride    Boolean   @default(false) @map("safety_override")
+  safetyOverrideBy  String?   @map("safety_override_by") @db.Uuid
+  safetyOverrideNote String?  @map("safety_override_note")
+  createdBy         String?   @map("created_by") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  cancelledAt       DateTime? @map("cancelled_at")
+  cancelReason      String?   @map("cancel_reason")
+
+  academicYear SchoolAcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  route        SchoolTransportRoute     @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  vehicle      SchoolTransportVehicle   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver       SchoolTransportPersonnel? @relation("TripDriver", fields: [driverId], references: [id])
+  attendant    SchoolTransportPersonnel? @relation("TripAttendant", fields: [attendantId], references: [id])
+  stops        SchoolTransportTripStop[]
+  boarding     SchoolTransportBoardingEvent[]
+  inspections  SchoolTransportSafetyInspection[]
+  gpsAlerts    SchoolTransportGpsAlert[]
+  incidents    SchoolTransportIncident[]
+  notifications SchoolTransportNotification[]
+
+  @@unique([tenantId, date, routeId, tripType])
+  @@index([tenantId, date, status])
+  @@index([tenantId, vehicleId, date])
+  @@map("school_transport_trips")
+  @@schema("school")
+}
+
+model SchoolTransportTripStop {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  tripId       String    @map("trip_id") @db.Uuid
+  stopId       String    @map("stop_id") @db.Uuid
+  stopNumber   Int       @map("stop_number")
+  status       String    @default("PENDING")
+  arrivedAt    DateTime? @map("arrived_at")
+  departedAt   DateTime? @map("departed_at")
+
+  trip SchoolTransportTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  stop SchoolTransportStop @relation(fields: [stopId], references: [id], onDelete: Restrict)
+
+  @@unique([tripId, stopId])
+  @@index([tenantId, tripId])
+  @@map("school_transport_trip_stops")
+  @@schema("school")
+}
+
+model SchoolTransportBoardingEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  tripId        String    @map("trip_id") @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  allocationId  String?   @map("allocation_id") @db.Uuid
+  vehicleId     String?   @map("vehicle_id") @db.Uuid
+  routeId       String?   @map("route_id") @db.Uuid
+  stopId        String?   @map("stop_id") @db.Uuid
+  eventType     String    @map("event_type")
+  method        String    @default("MANUAL")
+  recordedBy    String?   @map("recorded_by") @db.Uuid
+  latitude      Decimal?  @db.Decimal(10, 7)
+  longitude     Decimal?  @db.Decimal(10, 7)
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  trip       SchoolTransportTrip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  student    SchoolStudent                     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  allocation SchoolTransportStudentAllocation? @relation(fields: [allocationId], references: [id], onDelete: SetNull)
+  stop       SchoolTransportStop?              @relation(fields: [stopId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, tripId, studentId])
+  @@index([tenantId, studentId, occurredAt])
+  @@map("school_transport_boarding_events")
+  @@schema("school")
+}
+
+model SchoolTransportGpsDevice {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  vehicleId  String    @unique @map("vehicle_id") @db.Uuid
+  deviceId   String    @map("device_id")
+  provider   String    @default("DEVICE_API")
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, deviceId])
+  @@map("school_transport_gps_devices")
+  @@schema("school")
+}
+
+model SchoolTransportGpsLocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  vehicleId String   @map("vehicle_id") @db.Uuid
+  tripId    String?  @map("trip_id") @db.Uuid
+  latitude  Decimal  @db.Decimal(10, 7)
+  longitude Decimal  @db.Decimal(10, 7)
+  speedKmh  Decimal? @map("speed_kmh") @db.Decimal(6, 2)
+  heading   Decimal? @db.Decimal(6, 2)
+  accuracy  Decimal? @db.Decimal(8, 2)
+  ignition  Boolean?
+  source    String   @default("MANUAL")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vehicleId, recordedAt])
+  @@map("school_transport_gps_locations")
+  @@schema("school")
+}
+
+model SchoolTransportGpsAlert {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  vehicleId  String    @map("vehicle_id") @db.Uuid
+  tripId     String?   @map("trip_id") @db.Uuid
+  kind       String
+  message    String
+  latitude   Decimal?  @db.Decimal(10, 7)
+  longitude  Decimal?  @db.Decimal(10, 7)
+  acknowledged Boolean @default(false)
+  ackBy      String?   @map("ack_by") @db.Uuid
+  ackAt      DateTime? @map("ack_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  trip    SchoolTransportTrip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, kind, createdAt])
+  @@map("school_transport_gps_alerts")
+  @@schema("school")
+}
+
+model SchoolTransportMaintenance {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  vehicleId          String    @map("vehicle_id") @db.Uuid
+  serviceType        String    @map("service_type")
+  date               DateTime  @db.Date
+  odometer           Int?
+  vendor             String?
+  invoiceNumber      String?   @map("invoice_number")
+  cost               Int       @default(0)
+  nextServiceDate    DateTime? @map("next_service_date") @db.Date
+  nextServiceOdometer Int?     @map("next_service_odometer")
+  description        String?   @db.Text
+  attachmentUrl      String?   @map("attachment_url")
+  createdBy          String?   @map("created_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  vehicle SchoolTransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vehicleId, date])
+  @@index([tenantId, nextServiceDate])
+  @@map("school_transport_maintenance")
+  @@schema("school")
+}
+
+model SchoolTransportFuelLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  vehicleId   String    @map("vehicle_id") @db.Uuid
+  date        DateTime  @db.Date
+  odometer    Int
+  fuelType    String?   @map("fuel_type")
+  litres      Decimal   @db.Decimal(10, 2)
+  rate        Int       @default(0)
+  totalAmount Int       @map("total_amount")
+  station     String?
+  receiptNo   String?   @map("receipt_no")
+  receiptUrl  String?   @map("receipt_url")
+  driverId    String?   @map("driver_id") @db.Uuid
+  routeId     String?   @map("route_id") @db.Uuid
+  flagsJson   Json      @default("[]") @map("flags_json")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  vehicle SchoolTransportVehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver  SchoolTransportPersonnel? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, vehicleId, date])
+  @@index([tenantId, receiptNo])
+  @@map("school_transport_fuel_logs")
+  @@schema("school")
+}
+
+model SchoolTransportExpense {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  vehicleId   String?   @map("vehicle_id") @db.Uuid
+  routeId     String?   @map("route_id") @db.Uuid
+  date        DateTime  @db.Date
+  category    String
+  amount      Int
+  vendor      String?
+  notes       String?
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  vehicle SchoolTransportVehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, date, category])
+  @@map("school_transport_expenses")
+  @@schema("school")
+}
+
+model SchoolTransportIncident {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  incidentNo    String    @map("incident_no")
+  kind          String
+  severity      String    @default("MEDIUM")
+  status        String    @default("OPEN")
+  date          DateTime  @db.Date
+  time          String?
+  vehicleId     String?   @map("vehicle_id") @db.Uuid
+  routeId       String?   @map("route_id") @db.Uuid
+  driverId      String?   @map("driver_id") @db.Uuid
+  attendantId   String?   @map("attendant_id") @db.Uuid
+  tripId        String?   @map("trip_id") @db.Uuid
+  location      String?
+  latitude      Decimal?  @db.Decimal(10, 7)
+  longitude     Decimal?  @db.Decimal(10, 7)
+  description   String    @db.Text
+  actionTaken   String?   @map("action_taken") @db.Text
+  reportedBy    String?   @map("reported_by")
+  assignedTo    String?   @map("assigned_to")
+  sos           Boolean   @default(false)
+  studentsJson  Json      @default("[]") @map("students_json")
+  photosJson    Json      @default("[]") @map("photos_json")
+  ackAt         DateTime? @map("ack_at")
+  ackBy         String?   @map("ack_by") @db.Uuid
+  resolvedAt    DateTime? @map("resolved_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  vehicle   SchoolTransportVehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  route     SchoolTransportRoute?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  driver    SchoolTransportPersonnel?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  trip      SchoolTransportTrip?       @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, incidentNo])
+  @@index([tenantId, status, severity, date])
+  @@map("school_transport_incidents")
+  @@schema("school")
+}
+
+model SchoolTransportSafetyChecklist {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  phase     String   @default("PRE_TRIP")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items        SchoolTransportSafetyChecklistItem[]
+  inspections  SchoolTransportSafetyInspection[]
+
+  @@index([tenantId, phase, active])
+  @@map("school_transport_safety_checklists")
+  @@schema("school")
+}
+
+model SchoolTransportSafetyChecklistItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  checklistId String  @map("checklist_id") @db.Uuid
+  code        String
+  label       String
+  mandatory   Boolean @default(true)
+  requiresPhoto Boolean @default(false) @map("requires_photo")
+  requiresRemarks Boolean @default(false) @map("requires_remarks")
+  sortOrder   Int     @default(0) @map("sort_order")
+  active      Boolean @default(true)
+
+  checklist SchoolTransportSafetyChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  answers   SchoolTransportSafetyAnswer[]
+
+  @@unique([checklistId, code])
+  @@map("school_transport_safety_checklist_items")
+  @@schema("school")
+}
+
+model SchoolTransportSafetyInspection {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  checklistId  String    @map("checklist_id") @db.Uuid
+  tripId       String?   @map("trip_id") @db.Uuid
+  vehicleId    String    @map("vehicle_id") @db.Uuid
+  result       String    @default("PENDING")
+  inspectedBy  String?   @map("inspected_by")
+  override     Boolean   @default(false)
+  overrideNote String?   @map("override_note")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  checklist SchoolTransportSafetyChecklist @relation(fields: [checklistId], references: [id], onDelete: Restrict)
+  trip      SchoolTransportTrip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  vehicle   SchoolTransportVehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  answers   SchoolTransportSafetyAnswer[]
+
+  @@index([tenantId, tripId])
+  @@map("school_transport_safety_inspections")
+  @@schema("school")
+}
+
+model SchoolTransportSafetyAnswer {
+  id            String  @id @default(uuid()) @db.Uuid
+  inspectionId  String  @map("inspection_id") @db.Uuid
+  itemId        String  @map("item_id") @db.Uuid
+  passed        Boolean
+  remarks       String?
+  photoUrl      String? @map("photo_url")
+
+  inspection SchoolTransportSafetyInspection     @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  item       SchoolTransportSafetyChecklistItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([inspectionId, itemId])
+  @@map("school_transport_safety_answers")
+  @@schema("school")
+}
+
+model SchoolTransportCalendarEvent {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  academicYearId       String    @map("academic_year_id") @db.Uuid
+  kind                 String
+  title                String
+  startDate            DateTime  @map("start_date") @db.Date
+  endDate              DateTime  @map("end_date") @db.Date
+  routeId              String?   @map("route_id") @db.Uuid
+  academicEventId      String?   @unique @map("academic_event_id") @db.Uuid
+  notes                String?
+  createdBy            String?   @map("created_by") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  academicYear  SchoolAcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  academicEvent SchoolCalendarEvent?  @relation(fields: [academicEventId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId, startDate, endDate])
+  @@map("school_transport_calendar_events")
+  @@schema("school")
+}
+
+model SchoolTransportNotification {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  tripId      String?   @map("trip_id") @db.Uuid
+  studentId   String?   @map("student_id") @db.Uuid
+  eventType   String    @map("event_type")
+  channel     String    @default("IN_APP")
+  title       String
+  body        String    @db.Text
+  payloadJson Json      @default("{}") @map("payload_json")
+  status      String    @default("QUEUED")
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  trip SchoolTransportTrip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, eventType, createdAt])
+  @@map("school_transport_notifications")
+  @@schema("school")
+}
+
+model SchoolTransportAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String
+  recordId  String?  @map("record_id")
+  oldValue  Json?
+  newValue  Json?
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_transport_audit_logs")
+  @@schema("school")
+}
+
+model SchoolWhatsappSettings {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  defaultLanguage       String   @default("en") @map("default_language")
+  defaultPhoneNumberId  String?  @map("default_phone_number_id") @db.Uuid
+  retryAttempts         Int      @default(3) @map("retry_attempts")
+  rateLimitPerMinute    Int      @default(80) @map("rate_limit_per_minute")
+  requireCampaignConfirm Boolean @default(true) @map("require_campaign_confirm")
+  allowDuplicateSend    Boolean  @default(false) @map("allow_duplicate_send")
+  campaignApproval      Boolean  @default(false) @map("campaign_approval")
+  optInRequired         Boolean  @default(true) @map("opt_in_required")
+  essentialCategories   Json     @default("[\"ACADEMIC\",\"FEES\",\"ATTENDANCE\",\"TRANSPORT\",\"EMERGENCY\"]") @map("essential_categories")
+  graphApiVersion       String   @default("v22.0") @map("graph_api_version")
+  embeddedSignupVersion String   @default("v4") @map("embedded_signup_version")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("school_whatsapp_settings")
+  @@schema("school")
+}
+
+model SchoolWhatsappAccount {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  name                String
+  provider            String    @default("META")
+  wabaId              String?   @map("waba_id")
+  businessPortfolioId String?   @map("business_portfolio_id")
+  appId               String?   @map("app_id")
+  apiVersion          String    @default("v22.0") @map("api_version")
+  accessTokenEnc      String?   @map("access_token_enc") @db.Text
+  appSecretEnc        String?   @map("app_secret_enc") @db.Text
+  webhookVerifyEnc    String?   @map("webhook_verify_enc")
+  webhookVerifyHash   String?   @map("webhook_verify_hash")
+  status              String    @default("DISCONNECTED")
+  lastHealthAt        DateTime? @map("last_health_at")
+  lastWebhookAt       DateTime? @map("last_webhook_at")
+  lastError           String?   @map("last_error") @db.Text
+  createdBy           String?   @map("created_by") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  numbers SchoolWhatsappPhoneNumber[]
+
+  @@index([tenantId, status])
+  @@map("school_whatsapp_accounts")
+  @@schema("school")
+}
+
+model SchoolWhatsappPhoneNumber {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  accountId         String    @map("account_id") @db.Uuid
+  name              String
+  displayPhone      String    @map("display_phone")
+  phoneNumberId     String    @map("phone_number_id")
+  qualityRating     String?   @map("quality_rating")
+  purpose           String    @default("GENERAL")
+  isDefault         Boolean   @default(false) @map("is_default")
+  status            String    @default("ACTIVE")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  account       SchoolWhatsappAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages      SchoolWhatsappMessage[]
+  campaigns     SchoolWhatsappCampaign[]
+  conversations SchoolWhatsappConversation[]
+
+  @@unique([tenantId, phoneNumberId])
+  @@index([tenantId, isDefault, status])
+  @@map("school_whatsapp_phone_numbers")
+  @@schema("school")
+}
+
+model SchoolWhatsappContact {
+  id                         String    @id @default(uuid()) @db.Uuid
+  tenantId                   String    @map("tenant_id") @db.Uuid
+  phoneE164                  String    @map("phone_e164")
+  displayName                String    @map("display_name")
+  studentId                  String?   @map("student_id") @db.Uuid
+  guardianId                 String?   @map("guardian_id") @db.Uuid
+  staffId                    String?   @map("staff_id") @db.Uuid
+  relationship               String?
+  lastInboundAt              DateTime? @map("last_inbound_at")
+  lastOutboundAt             DateTime? @map("last_outbound_at")
+  windowExpiresAt            DateTime? @map("window_expires_at")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  student       SchoolStudent? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  guardian      SchoolGuardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  staff         SchoolStaff? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  conversations SchoolWhatsappConversation[]
+  messages      SchoolWhatsappMessage[]
+  optIns        SchoolWhatsappOptIn[]
+  campaignRecipients SchoolWhatsappCampaignRecipient[]
+
+  @@unique([tenantId, phoneE164])
+  @@index([tenantId, studentId])
+  @@index([tenantId, guardianId])
+  @@index([tenantId, staffId])
+  @@map("school_whatsapp_contacts")
+  @@schema("school")
+}
+
+model SchoolWhatsappOptIn {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  contactId    String    @map("contact_id") @db.Uuid
+  category     String
+  status       String    @default("UNKNOWN")
+  source       String    @default("OFFICE")
+  consentedAt  DateTime? @map("consented_at")
+  optedOutAt   DateTime? @map("opted_out_at")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  contact SchoolWhatsappContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, category])
+  @@index([tenantId, status, category])
+  @@map("school_whatsapp_opt_ins")
+  @@schema("school")
+}
+
+model SchoolWhatsappConversation {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  contactId    String    @map("contact_id") @db.Uuid
+  phoneNumberId String?  @map("phone_number_id") @db.Uuid
+  status       String    @default("OPEN")
+  assignedTo   String?   @map("assigned_to") @db.Uuid
+  unreadCount  Int       @default(0) @map("unread_count")
+  lastMessageAt DateTime? @map("last_message_at")
+  lastPreview  String?   @map("last_preview")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  contact     SchoolWhatsappContact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  phoneNumber SchoolWhatsappPhoneNumber? @relation(fields: [phoneNumberId], references: [id], onDelete: SetNull)
+  messages    SchoolWhatsappMessage[]
+  notes       SchoolWhatsappConversationNote[]
+
+  @@unique([tenantId, contactId, phoneNumberId])
+  @@index([tenantId, status, lastMessageAt])
+  @@index([tenantId, assignedTo])
+  @@map("school_whatsapp_conversations")
+  @@schema("school")
+}
+
+model SchoolWhatsappConversationNote {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  body           String   @db.Text
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation SchoolWhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, conversationId, createdAt])
+  @@map("school_whatsapp_conversation_notes")
+  @@schema("school")
+}
+
+model SchoolWhatsappTemplate {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  language        String    @default("en")
+  category        String    @default("UTILITY")
+  status          String    @default("DRAFT")
+  metaTemplateId  String?   @map("meta_template_id")
+  metaStatus      String?   @map("meta_status")
+  body            String    @db.Text
+  headerType      String?   @map("header_type")
+  headerText      String?   @map("header_text")
+  footerText      String?   @map("footer_text")
+  buttonsJson     Json      @default("[]") @map("buttons_json")
+  componentsJson  Json      @default("[]") @map("components_json")
+  libraryKey      String?   @map("library_key")
+  usedCount       Int       @default(0) @map("used_count")
+  lastUsedAt      DateTime? @map("last_used_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  variables SchoolWhatsappTemplateVariable[]
+  campaigns SchoolWhatsappCampaign[]
+  messages  SchoolWhatsappMessage[]
+
+  @@unique([tenantId, name, language])
+  @@index([tenantId, status, category])
+  @@map("school_whatsapp_templates")
+  @@schema("school")
+}
+
+model SchoolWhatsappTemplateVariable {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  templateId String @map("template_id") @db.Uuid
+  position   Int
+  token      String
+  erpField   String @map("erp_field")
+  sample     String?
+
+  template SchoolWhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, position])
+  @@map("school_whatsapp_template_variables")
+  @@schema("school")
+}
+
+model SchoolWhatsappCampaign {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  templateId      String?   @map("template_id") @db.Uuid
+  phoneNumberId   String?   @map("phone_number_id") @db.Uuid
+  audienceJson    Json      @default("{}") @map("audience_json")
+  language        String    @default("en")
+  status          String    @default("DRAFT")
+  scheduledAt     DateTime? @map("scheduled_at")
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  totalRecipients Int       @default(0) @map("total_recipients")
+  validCount      Int       @default(0) @map("valid_count")
+  invalidCount    Int       @default(0) @map("invalid_count")
+  duplicateCount  Int       @default(0) @map("duplicate_count")
+  sentCount       Int       @default(0) @map("sent_count")
+  deliveredCount  Int       @default(0) @map("delivered_count")
+  readCount       Int       @default(0) @map("read_count")
+  failedCount     Int       @default(0) @map("failed_count")
+  createdBy       String?   @map("created_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+
+  template    SchoolWhatsappTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  phoneNumber SchoolWhatsappPhoneNumber? @relation(fields: [phoneNumberId], references: [id], onDelete: SetNull)
+  recipients  SchoolWhatsappCampaignRecipient[]
+  messages    SchoolWhatsappMessage[]
+
+  @@index([tenantId, status, createdAt])
+  @@map("school_whatsapp_campaigns")
+  @@schema("school")
+}
+
+model SchoolWhatsappCampaignRecipient {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  campaignId    String    @map("campaign_id") @db.Uuid
+  contactId     String?   @map("contact_id") @db.Uuid
+  phoneE164     String    @map("phone_e164")
+  displayName   String    @map("display_name")
+  studentId     String?   @map("student_id") @db.Uuid
+  status        String    @default("QUEUED")
+  skipReason    String?   @map("skip_reason")
+  messageId     String?   @map("message_id") @db.Uuid
+  idempotencyKey String   @unique @map("idempotency_key")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  campaign SchoolWhatsappCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  SchoolWhatsappContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, phoneE164])
+  @@index([tenantId, campaignId, status])
+  @@map("school_whatsapp_campaign_recipients")
+  @@schema("school")
+}
+
+model SchoolWhatsappMessage {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  conversationId     String?   @map("conversation_id") @db.Uuid
+  contactId          String    @map("contact_id") @db.Uuid
+  phoneNumberId      String?   @map("phone_number_id") @db.Uuid
+  campaignId         String?   @map("campaign_id") @db.Uuid
+  templateId         String?   @map("template_id") @db.Uuid
+  direction          String
+  type               String    @default("TEXT")
+  body               String?   @db.Text
+  payloadJson        Json      @default("{}") @map("payload_json")
+  status             String    @default("QUEUED")
+  failureCode        String?   @map("failure_code")
+  failureReason      String?   @map("failure_reason") @db.Text
+  providerMessageId  String?   @map("provider_message_id")
+  idempotencyKey     String    @unique @map("idempotency_key")
+  sentBy             String?   @map("sent_by") @db.Uuid
+  sentAt             DateTime? @map("sent_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  readAt             DateTime? @map("read_at")
+  failedAt           DateTime? @map("failed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  conversation SchoolWhatsappConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  contact      SchoolWhatsappContact       @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  phoneNumber  SchoolWhatsappPhoneNumber?  @relation(fields: [phoneNumberId], references: [id], onDelete: SetNull)
+  campaign     SchoolWhatsappCampaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  template     SchoolWhatsappTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  statuses     SchoolWhatsappMessageStatus[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, contactId, createdAt])
+  @@index([tenantId, providerMessageId])
+  @@index([tenantId, sentBy, createdAt])
+  @@index([tenantId, campaignId])
+  @@map("school_whatsapp_messages")
+  @@schema("school")
+}
+
+model SchoolWhatsappMessageStatus {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  status    String
+  timestamp DateTime @default(now())
+  rawJson   Json     @default("{}") @map("raw_json")
+
+  message SchoolWhatsappMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, status])
+  @@index([tenantId, timestamp])
+  @@map("school_whatsapp_message_statuses")
+  @@schema("school")
+}
+
+model SchoolWhatsappMedia {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  filename        String
+  mimeType        String    @map("mime_type")
+  sizeBytes       Int       @map("size_bytes")
+  storageKey      String    @map("storage_key")
+  providerMediaId String?   @map("provider_media_id")
+  sha256          String?
+  uploadedBy      String?   @map("uploaded_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([tenantId, sha256])
+  @@map("school_whatsapp_media")
+  @@schema("school")
+}
+
+model SchoolWhatsappFlow {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  kind      String
+  status    String    @default("DRAFT")
+  metaFlowId String?  @map("meta_flow_id")
+  schemaJson Json     @default("{}") @map("schema_json")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([tenantId, kind, status])
+  @@map("school_whatsapp_flows")
+  @@schema("school")
+}
+
+model SchoolWhatsappAutomation {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  trigger     String
+  matchValue  String?   @map("match_value")
+  action      String
+  templateId  String?   @map("template_id") @db.Uuid
+  replyText   String?   @map("reply_text") @db.Text
+  escalateTo  String?   @map("escalate_to")
+  category    String    @default("GENERAL")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([tenantId, trigger, active])
+  @@map("school_whatsapp_automations")
+  @@schema("school")
+}
+
+model SchoolWhatsappWebhookEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String?   @map("tenant_id") @db.Uuid
+  eventId     String    @unique @map("event_id")
+  eventType   String    @map("event_type")
+  phoneNumberId String? @map("phone_number_id")
+  payloadJson Json      @default("{}") @map("payload_json")
+  processed   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("school_whatsapp_webhook_events")
+  @@schema("school")
+}
+
+model SchoolWhatsappAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  recipient String?
+  template  String?
+  messageId String?  @map("message_id")
+  ip        String?
+  status    String?
+  detailJson Json    @default("{}") @map("detail_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@map("school_whatsapp_audit_logs")
+  @@schema("school")
+}
+
+
+
 
 
