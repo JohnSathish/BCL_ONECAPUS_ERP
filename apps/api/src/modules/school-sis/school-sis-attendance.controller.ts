@@ -9,6 +9,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   CurrentUser,
   type JwtUser,
@@ -65,6 +66,7 @@ function actor(
 
 @ApiBearerAuth()
 @ApiTags('school-sis-attendance')
+@RequiresSchoolLicense('attendance')
 @Controller({ path: 'school-sis/attendance', version: '1' })
 export class SchoolSisAttendanceController {
   constructor(

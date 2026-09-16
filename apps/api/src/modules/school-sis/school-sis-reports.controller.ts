@@ -9,6 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import type { Request, Response } from 'express';
 import {
   CurrentUser,
@@ -32,6 +33,7 @@ const VIEW = [
 
 @ApiBearerAuth()
 @ApiTags('school-sis-reports')
+@RequiresSchoolLicense('reports')
 @Controller({ path: 'school-sis/reports', version: '1' })
 export class SchoolSisReportsController {
   constructor(private readonly reports: SchoolSisReportsService) {}

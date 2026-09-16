@@ -213,12 +213,18 @@ function filterChildren(
 
 export function filterSchoolSisNavGroups(
   groups: SchoolSisNavGroup[],
-  input: { permissions?: string[]; roles?: string[]; modules?: Record<string, boolean> },
+  input: {
+    permissions?: string[];
+    roles?: string[];
+    modules?: Record<string, boolean>;
+    licenseModules?: string[];
+  },
 ): SchoolSisNavGroup[] {
   const persona = resolveSchoolSisNavPersona(input.permissions, input.roles);
   const canManage = canManageSchoolSis(input.permissions);
   const allowed = persona === 'full' ? null : PERSONA_MODULES[persona];
   const usersOk = canViewSchoolUsers(input.permissions);
+  const lic = input.licenseModules;
 
   return groups
     .map((group) => ({
@@ -226,6 +232,7 @@ export function filterSchoolSisNavGroups(
       items: group.items
         .filter((item) => {
           if (item.id === 'users' || item.id === 'account-security') return usersOk;
+          if (item.id === 'system' && !canManage) return false;
           return !allowed || allowed.has(item.id);
         })
         .map((item) => {
@@ -240,7 +247,33 @@ export function filterSchoolSisNavGroups(
               input.permissions,
             ),
           };
+        })
+        .filter((item) => {
+          if (!lic?.length) return true;
+          const need = LICENSE_NAV[item.id];
+          return !need || lic.includes(need);
         }),
     }))
     .filter((group) => group.items.length > 0);
 }
+
+const LICENSE_NAV: Record<string, string> = {
+  'academic-config': 'academic',
+  students: 'students',
+  teachers: 'staff',
+  staff: 'staff',
+  attendance: 'attendance',
+  fees: 'fees',
+  accounts: 'accounts',
+  billing: 'fees',
+  examination: 'examination',
+  library: 'library',
+  transport: 'transport',
+  'hr-payroll': 'hr_payroll',
+  sms: 'sms',
+  whatsapp: 'whatsapp',
+  notifications: 'notifications',
+  automation: 'automation',
+  'reports-analytics': 'reports',
+  'mobile-app': 'mobile',
+};

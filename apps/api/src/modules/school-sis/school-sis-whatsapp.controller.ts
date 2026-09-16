@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   CurrentUser,
   type JwtUser,
@@ -77,6 +78,7 @@ const VIEW = [
 
 @ApiBearerAuth()
 @ApiTags('school-sis-whatsapp')
+@RequiresSchoolLicense('whatsapp')
 @Controller({ path: 'school-sis/whatsapp', version: '1' })
 export class SchoolSisWhatsappController {
   constructor(private readonly wa: SchoolSisWhatsappService) {}

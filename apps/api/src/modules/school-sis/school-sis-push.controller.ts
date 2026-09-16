@@ -14,6 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   CurrentUser,
   type JwtUser,
@@ -64,6 +65,7 @@ function actor(user: JwtUser): PushActor {
 
 @ApiBearerAuth()
 @ApiTags('school-sis-push')
+@RequiresSchoolLicense('notifications')
 @Controller({ path: 'school-sis/notifications', version: '1' })
 export class SchoolSisPushController {
   constructor(private readonly push: SchoolSisPushService) {}

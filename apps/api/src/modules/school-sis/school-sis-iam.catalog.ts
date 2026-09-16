@@ -257,6 +257,15 @@ export const SCHOOL_IAM_MODULES: IamModuleDef[] = [
       { action: 'manage', slug: 'users.impersonate', label: 'Impersonate' },
     ],
   },
+  {
+    id: 'license',
+    label: 'License',
+    actions: [
+      { action: 'view', slug: 'license:read', label: 'View' },
+      { action: 'manage', slug: 'license:activate', label: 'Activate / renew' },
+      { action: 'manage', slug: 'license.manage', label: 'Manage' },
+    ],
+  },
 ];
 
 export const SCHOOL_IAM_ALL_SLUGS = [
@@ -271,6 +280,9 @@ export const SCHOOL_IAM_ALL_SLUGS = [
   'school-mobile:student',
   'school-mobile:parent',
   'school-mobile:manage',
+  'license:read',
+  'license:activate',
+  'license.manage',
 ];
 
 const ALL_SCHOOL = SCHOOL_IAM_ALL_SLUGS;

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
@@ -46,6 +47,11 @@ import { SchoolSisHrController } from './school-sis-hr.controller';
 import { SchoolSisHrService } from './school-sis-hr.service';
 import { SchoolSisTransportController } from './school-sis-transport.controller';
 import { SchoolSisTransportService } from './school-sis-transport.service';
+import { SchoolSisLicenseService } from './school-sis-license.service';
+import { SchoolSaasLicenseIssuerService } from './school-saas-license-issuer.service';
+import { SchoolSisLicenseController } from './school-sis-license.controller';
+import { SchoolSaasLicenseIssuerController } from './school-saas-license-issuer.controller';
+import { SchoolLicenseGuard } from './school-sis-license.guard';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 import { SchoolSisReportsService } from './school-sis-reports.service';
 import { SchoolSisReportsQueryService } from './school-sis-reports-query.service';
@@ -81,6 +87,8 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAttendanceController,
     SchoolSisHrController,
     SchoolSisTransportController,
+    SchoolSisLicenseController,
+    SchoolSaasLicenseIssuerController,
   ],
   providers: [
     SchoolSisService,
@@ -109,6 +117,9 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAttendanceService,
     SchoolSisHrService,
     SchoolSisTransportService,
+    SchoolSisLicenseService,
+    SchoolSaasLicenseIssuerService,
+    { provide: APP_GUARD, useClass: SchoolLicenseGuard },
     SchoolSisIamService,
     SchoolSisReportsQueryService,
     SchoolSisReportsService,
@@ -139,6 +150,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAttendanceService,
     SchoolSisHrService,
     SchoolSisTransportService,
+    SchoolSisLicenseService,
     SchoolSisIamService,
     SchoolSisReportsService,
     SchoolReportEngineService,

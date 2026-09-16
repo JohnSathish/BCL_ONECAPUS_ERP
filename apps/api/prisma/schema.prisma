@@ -21930,6 +21930,158 @@ model SchoolIamAccessReview {
   @@schema("school")
 }
 
+/// BCL-issued school ERP license (private signing key is never stored here).
+model SchoolSaasLicense {
+  id                 String    @id @default(uuid()) @db.Uuid
+  licenseKey         String    @unique @map("license_key")
+  tenantId           String?   @map("tenant_id") @db.Uuid
+  institutionCode    String    @map("institution_code")
+  institutionName    String    @map("institution_name")
+  licenseType        String    @map("license_type")
+  status             String    @default("ISSUED")
+  issuedAt           DateTime  @map("issued_at")
+  validFrom          DateTime  @map("valid_from")
+  expiresAt          DateTime? @map("expires_at")
+  activatedAt        DateTime? @map("activated_at")
+  maxStudents        Int       @default(2000) @map("max_students")
+  maxStaff           Int       @default(250) @map("max_staff")
+  maxAdminUsers      Int       @default(50) @map("max_admin_users")
+  installationLimit  Int       @default(3) @map("installation_limit")
+  modulesJson        Json      @default("[]") @map("modules_json")
+  graceDays          Int       @default(15) @map("grace_days")
+  offlineGraceHours  Int       @default(72) @map("offline_grace_hours")
+  expiredPolicy      String    @default("read_only") @map("expired_policy")
+  licenseVersion     String    @default("1.0") @map("license_version")
+  tokenFingerprint   String    @map("token_fingerprint")
+  signedToken        String    @map("signed_token")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  installations SchoolSaasInstallation[]
+  events        SchoolSaasLicenseEvent[]
+  revocations   SchoolSaasRevocation[]
+
+  @@index([tenantId])
+  @@index([institutionCode])
+  @@index([status, expiresAt])
+  @@map("school_saas_licenses")
+  @@schema("platform")
+}
+
+model SchoolSaasInstallation {
+  id              String    @id @default(uuid()) @db.Uuid
+  licenseId       String    @map("license_id") @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  installationId  String    @map("installation_id")
+  hostname        String?
+  status          String    @default("ACTIVE")
+  activatedAt     DateTime  @default(now()) @map("activated_at")
+  deactivatedAt   DateTime? @map("deactivated_at")
+  lastSeenAt      DateTime? @map("last_seen_at")
+  adminEmail      String?   @map("admin_email")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  license SchoolSaasLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, installationId])
+  @@index([tenantId])
+  @@map("school_saas_installations")
+  @@schema("platform")
+}
+
+model SchoolSaasLicenseEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  licenseId  String   @map("license_id") @db.Uuid
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  event      String
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  metaJson   Json     @default("{}") @map("meta_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  license SchoolSaasLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("school_saas_license_events")
+  @@schema("platform")
+}
+
+model SchoolSaasRevocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  licenseId  String   @map("license_id") @db.Uuid
+  reason     String
+  revokedBy  String?  @map("revoked_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  license SchoolSaasLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@map("school_saas_revocations")
+  @@schema("platform")
+}
+
+/// Cached signed license for this school ERP installation (no private keys).
+model SchoolLicenseState {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @unique @map("tenant_id") @db.Uuid
+  licenseId          String?   @map("license_id") @db.Uuid
+  licenseKey         String?   @map("license_key")
+  installationId     String    @map("installation_id")
+  signedToken        String    @map("signed_token")
+  claimsJson         Json      @map("claims_json")
+  status             String    @default("ACTIVE")
+  lastValidatedAt    DateTime? @map("last_validated_at")
+  nextValidationAt   DateTime? @map("next_validation_at")
+  lastServerError    String?   @map("last_server_error")
+  activatedAt        DateTime? @map("activated_at")
+  activatedBy        String?   @map("activated_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  events       SchoolLicenseEvent[]
+  validations  SchoolLicenseValidation[]
+
+  @@map("school_license_state")
+  @@schema("school")
+}
+
+model SchoolLicenseEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  stateId    String   @map("state_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  event      String
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  metaJson   Json     @default("{}") @map("meta_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  state SchoolLicenseState @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("school_license_events")
+  @@schema("school")
+}
+
+model SchoolLicenseValidation {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  stateId      String   @map("state_id") @db.Uuid
+  ok           Boolean
+  source       String
+  message      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  state SchoolLicenseState @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("school_license_validations")
+  @@schema("school")
+}
+
 
 
 

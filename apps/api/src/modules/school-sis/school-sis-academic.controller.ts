@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   CurrentUser,
   type JwtUser,
@@ -39,6 +40,7 @@ import { SchoolSisService } from './school-sis.service';
 
 @ApiBearerAuth()
 @ApiTags('school-sis-academic')
+@RequiresSchoolLicense('academic')
 @Controller({ path: 'school-sis/academic', version: '1' })
 export class SchoolSisAcademicController {
   constructor(

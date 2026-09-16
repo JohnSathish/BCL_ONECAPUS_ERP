@@ -557,6 +557,7 @@ export const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { prefix: '/admin/administration', permissions: [...MODULE_PERMISSIONS.administration] },
   { prefix: '/platform/licenses', permissions: [...MODULE_PERMISSIONS.platform] },
   { prefix: '/platform/license-keys', permissions: [...MODULE_PERMISSIONS.platform] },
+  { prefix: '/platform/school-licenses', permissions: [...MODULE_PERMISSIONS.platform] },
   { prefix: '/platform', permissions: [...MODULE_PERMISSIONS.platform] },
   { prefix: '/admin/governance', permissions: [...MODULE_PERMISSIONS.governance] },
   { prefix: '/admin/naac', permissions: [...MODULE_PERMISSIONS.naacIqac] },

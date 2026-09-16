@@ -26,6 +26,7 @@ import { isSecondarySchoolSisSession, SCHOOL_SIS_LOGO_SRC } from '@/lib/school-e
 import { SCHOOL_ERP_SESSION_LABEL } from '@/lib/school-erp/nav';
 import { changePassword } from '@/services/student-portal';
 import { fetchSchoolSisMasters } from '@/services/school-sis';
+import { SchoolLicenseHeaderChip } from '@/components/school-sis/license/license-desk';
 import { useAuthStore } from '@/store/auth-store';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -336,6 +337,8 @@ export function SchoolErpTopbar({ onMenu }: { onMenu: () => void }) {
                 ) : null}
               </div>
             ) : null}
+
+            {sis ? <SchoolLicenseHeaderChip /> : null}
 
             <button
               type="button"

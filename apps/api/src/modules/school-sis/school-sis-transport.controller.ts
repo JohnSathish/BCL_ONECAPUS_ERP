@@ -15,6 +15,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
 import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   SIS_TRANSPORT_ATTENDANCE,
   SIS_TRANSPORT_FEE,
@@ -72,6 +73,7 @@ function actor(user: JwtUser, req?: { ip?: string }): TransportActor {
 
 @ApiBearerAuth()
 @ApiTags('school-sis-transport')
+@RequiresSchoolLicense('transport')
 @Controller({ path: 'school-sis/transport', version: '1' })
 export class SchoolSisTransportController {
   constructor(private readonly transport: SchoolSisTransportService) {}

@@ -11,6 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import type { Request, Response } from 'express';
 import {
   CurrentUser,
@@ -56,6 +57,7 @@ function actor(user: JwtUser, req: Request): StationeryActor {
 
 @ApiBearerAuth()
 @ApiTags('school-sis-stationery')
+@RequiresSchoolLicense('fees')
 @Controller({ path: 'school-sis/stationery', version: '1' })
 export class SchoolSisStationeryController {
   constructor(private readonly store: SchoolSisStationeryService) {}

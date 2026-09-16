@@ -11,10 +11,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
-import {
-  SCHOOL_ADMISSION_NUMBER_PREFIX,
-  SCHOOL_SIS_PRODUCT,
-} from './school-sis.constants';
+import { SchoolSisLicenseService } from './school-sis-license.service';
 import {
   isSchoolRollNumber,
   resolveSchoolEnrollmentRollNumber,
@@ -48,7 +45,10 @@ const STAFF_DOC_MIME = new Set([...STAFF_IMAGE_MIME, 'application/pdf']);
 
 @Injectable()
 export class SchoolSisService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly licenses: SchoolSisLicenseService,
+  ) {}
 
   async assertSecondarySisTenant(tenantId: string) {
     const branding = await this.prisma.tenantBranding.findUnique({
@@ -502,6 +502,7 @@ export class SchoolSisService {
     actorUserId?: string,
   ) {
     await this.assertSecondarySisTenant(tenantId);
+    await this.licenses.assertStudentCapacity(tenantId);
     const year = await this.currentYear(tenantId);
     const admissionNumber = dto.admissionNumber?.trim()
       ? dto.admissionNumber.trim().toUpperCase()
@@ -828,6 +829,7 @@ export class SchoolSisService {
 
   async createStaff(tenantId: string, dto: CreateSchoolStaffDto) {
     await this.assertSecondarySisTenant(tenantId);
+    await this.licenses.assertStaffCapacity(tenantId);
     try {
       return await this.prisma.schoolStaff.create({
         data: {

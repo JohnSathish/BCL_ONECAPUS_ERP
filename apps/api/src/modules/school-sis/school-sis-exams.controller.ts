@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   CurrentUser,
   type JwtUser,
@@ -59,6 +60,7 @@ function actor(user: JwtUser): ExamActor {
 
 @ApiBearerAuth()
 @ApiTags('school-sis-exams')
+@RequiresSchoolLicense('examination')
 @Controller({ path: 'school-sis/exams', version: '1' })
 export class SchoolSisExamsController {
   constructor(

@@ -21,6 +21,7 @@ import { useBranding } from '@/hooks/use-branding';
 import { logoutClientSide } from '@/lib/auth/client-logout';
 import { useRouter } from 'next/navigation';
 import { fetchSchoolSisOverview } from '@/services/school-sis';
+import { fetchSchoolLicenseStatus } from '@/services/school-license';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { SchoolErpComingSoonBadge } from './school-erp-ui';
@@ -253,11 +254,18 @@ export function SchoolErpSidebar({ open, onClose }: { open?: boolean; onClose?: 
     enabled: enabled && sis,
     staleTime: 60_000,
   });
+  const license = useQuery({
+    queryKey: ['school-license'],
+    queryFn: fetchSchoolLicenseStatus,
+    enabled: enabled && sis,
+    staleTime: 60_000,
+  });
   const groups = sis
     ? filterSchoolSisNavGroups(SCHOOL_SIS_NAV_GROUPS, {
         permissions: user?.permissions,
         roles: user?.roles,
         modules: overview.data?.modules,
+        licenseModules: license.data?.enabledModules,
       })
     : null;
   const nav = SCHOOL_ERP_NAV;

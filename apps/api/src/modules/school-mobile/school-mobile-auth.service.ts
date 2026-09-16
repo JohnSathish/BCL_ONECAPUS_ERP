@@ -9,6 +9,7 @@ import { AuthService } from '../auth/auth.service';
 import { LoginAttemptService } from '../auth/login-attempt.service';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from '../school-sis/school-sis.service';
+import { SchoolSisLicenseService } from '../school-sis/school-sis-license.service';
 import { SCHOOL_MOBILE_DEFAULT_PASSWORD } from './school-mobile.constants';
 
 function compactId(value: string) {
@@ -25,6 +26,7 @@ export class SchoolMobileAuthService {
     private readonly auth: AuthService,
     private readonly loginAttempts: LoginAttemptService,
     private readonly sis: SchoolSisService,
+    private readonly licenses: SchoolSisLicenseService,
   ) {}
 
   async login(
@@ -92,7 +94,10 @@ export class SchoolMobileAuthService {
       { ...meta, clientType: 'mobile' },
       { mustResetPassword },
     );
-    return this.auth.toPublicSession(session, { includeRefreshToken: true });
+    return {
+      ...this.auth.toPublicSession(session, { includeRefreshToken: true }),
+      license: await this.licenses.publicStatus(tenantId),
+    };
   }
 
   async changePassword(

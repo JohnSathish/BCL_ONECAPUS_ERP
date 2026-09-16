@@ -11,6 +11,7 @@ const NAV = [
   { href: '/platform', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/platform/licenses', label: 'Licenses', icon: Building2 },
   { href: '/platform/license-keys', label: 'Activation keys', icon: KeyRound },
+  { href: '/platform/school-licenses', label: 'School licenses', icon: Shield },
 ];
 
 export function PlatformShell({ children, title }: { children: React.ReactNode; title?: string }) {

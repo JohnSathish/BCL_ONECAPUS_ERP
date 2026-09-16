@@ -797,8 +797,9 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         id: 'system',
         label: 'System',
         icon: Settings as LucideIcon,
-        status: 'coming_soon',
+        status: 'active',
         children: [
+          live('license', 'License Management', '/admin/school-sis/system/license'),
           soon('system-status', 'System status'),
           soon('cache', 'Cache'),
           soon('backup', 'Backup'),

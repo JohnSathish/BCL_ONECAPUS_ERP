@@ -30,6 +30,7 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useBranding } from '@/hooks/use-branding';
 import { useAuthStore } from '@/store/auth-store';
 import { fetchSchoolSisOverview, fetchSchoolSisTimetableToday } from '@/services/school-sis';
+import { SchoolLicenseStatusCard } from '@/components/school-sis/license/license-desk';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -235,6 +236,8 @@ export function SchoolSisDashboard() {
       {overview.isError ? (
         <p className="text-sm text-red-600">{apiErrorMessage(overview.error)}</p>
       ) : null}
+
+      <SchoolLicenseStatusCard />
 
       <div className="sls-stat-grid">
         {stats.map((card) => {

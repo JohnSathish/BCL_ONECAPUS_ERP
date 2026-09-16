@@ -18,6 +18,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
 import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
+import { RequiresSchoolLicense } from './school-sis-license.decorators';
 import {
   SIS_HR_SELF,
   SIS_HR_VIEW,
@@ -78,6 +79,7 @@ function actor(user: JwtUser, req?: { ip?: string }): HrActor {
 
 @ApiBearerAuth()
 @ApiTags('school-sis-hr')
+@RequiresSchoolLicense('hr_payroll')
 @Controller({ path: 'school-sis/hr', version: '1' })
 export class SchoolSisHrController {
   constructor(private readonly hr: SchoolSisHrService) {}
